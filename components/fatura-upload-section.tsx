@@ -35,6 +35,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     const rez = rezervasyonlar[0];
     const toplamNet = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
     const toplamBrut = konteynerler.reduce((s, k) => s + ((k as any).brut_agirlik_kg || 0), 0);
+    const toplamKap = konteynerler.reduce((s, k) => s + ((k as any).pieces || 0), 0);
     return {
       satici_firma: dosya.satici_firma,
       alici_firma: dosya.alici_firma,
@@ -49,7 +50,13 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       diib_tarihi: dosya.diib_tarihi,
       toplam_net_kg: toplamNet > 0 ? toplamNet : null,
       toplam_brut_kg: toplamBrut > 0 ? toplamBrut : null,
-      konteynerler: konteynerler.map((k) => ({ konteyner_no: k.konteyner_no })),
+      toplam_kap_adeti: toplamKap > 0 ? toplamKap : null,
+      konteynerler: konteynerler.map((k) => ({ 
+        konteyner_no: k.konteyner_no,
+        net_agirlik_kg: k.net_agirlik_kg,
+        brut_agirlik_kg: (k as any).brut_agirlik_kg,
+        kap_adeti: (k as any).pieces
+      })),
     };
   };
 

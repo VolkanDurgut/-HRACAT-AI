@@ -19,16 +19,24 @@ function buildPrompt(sistemVerisi: Record<string, unknown>): string {
 SISTEMDEKI VERI:
 ${JSON.stringify(sistemVerisi, null, 2)}
 
-Karşılaştırmada şu noktalara dikkat et:
-- Alıcı firma, satıcı firma, ürün adı/tanımı, toplam tutar, para birimi gibi alanları kontrol et.
-- Küçük yazım farklarını (büyük/küçük harf, fazla boşluk, firma unvanındaki "LTD.STI." gibi kısaltma farkları) uyumsuzluk SAYMA.
-- Tutarlarda küçük yuvarlama farkları (1 USD altı) uyumsuzluk SAYMA.
-- Önemli bir tutar veya firma adı farkı varsa bunu mutlaka uyumsuzluk olarak bildir.
-- LİMAN VE GEMİ ADI KARŞILAŞTIRMASI (esnek olun): Liman isimleri ve gemi adlarında, bir değerin diğerini İÇERMESİ veya kısmen eşleşmesi durumunda bunu uyumsuzluk SAYMA. Örnek: "MARPORT" ile "MARPORT/AMBARLI/ISTANBUL/TURKIYE" aynı limandır, uyumsuzluk DEĞİLDİR. "POLAR ECUADOR" ile "POLAR ECUADOR / 627W" aynı gemidir, uyumsuzluk DEĞİLDİR. Sadece tamamen alakasız bir isim varsa gerçek uyumsuzluk say.
-- KONTEYNER KARŞILAŞTIRMASI (kritik): Faturada konteyner numaraları listelenmişse (genelde "KONTEYNER NO:" başlığı altında, tire veya virgülle ayrılmış), bunları sistemdeki "konteynerler" listesiyle TEK TEK eşleştirip karşılaştır. Konteyner numarasında tek bir karakter farkı bile varsa mutlaka uyumsuzluk olarak bildir.
-- AĞIRLIK KARŞILAŞTIRMASI: Faturada toplam Net KG ve Brüt KG yazıyorsa, sistemdeki konteynerlerin toplam net/brüt ağırlığıyla karşılaştır. Sistemde bu veriler henüz girilmemişse (boş/null), uyumsuzluk SAYMA.
-- DIIB KARŞILAŞTIRMASI: Faturada DIIB No/Tarihi yazıyorsa, sistemdeki "diib_no" ile karşılaştır. Sistemde boşsa uyumsuzluk SAYMA.
-- Faturadan ayrıca "fatura_no" (fatura numarası) ve "fatura_tarihi" (YYYY-MM-DD formatında) bilgilerini çıkar, bunlar sistemde olmasa bile mutlaka doldur. Fatura tarihinde saat bilgisi varsa (örn. "30-06-2026 11:53:59"), sadece tarih kısmını al, saati yok say.
+Karşılaştırmada ŞU KURALLARA KESİNLİKLE UY:
+
+1. YOK SAYILACAKLAR (BUNLARI KESİNLİKLE UYUMSUZLUK SAYMA):
+   - "alici_firma" (Alıcı Firma): Müşteri gizliliği veya yer darlığı için faturada kasıtlı olarak kısaltılmış olabilir (Örn: "COOL LINK & MARKETING" yerine "C.L.M.P.L" veya unvan eksikliği). Bunu uyumsuzluk SAYMA.
+   - "urun_tanimi" (Ürün Tanımı): Muhasebe/gümrük zorunluluğu nedeniyle faturada Türkçe çevirisi veya farklı bir gümrük ibaresi (örn: "BUĞDAY UNU 74 RANDIMAN") yer alabilir. Ürün tanımını uyumsuzluk SAYMA.
+   - "proforma_no" (Proforma No): Faturada yer almayabilir veya Booking/Sipariş numarası ile değiştirilmiş olabilir. Proforma numarasını KARŞILAŞTIRMA.
+   - Liman isimleri ve gemi adlarındaki kısmi eşleşmeleri (örn: "MARPORT" vs "ISTANBUL-MARPORT", "POLAR ECUADOR" vs "POLAR ECUADOR / 627W") uyumsuzluk SAYMA.
+
+2. ODAKLANILACAK ASIL KONTROLLER (BUNLARI KONTROL ET):
+   - KONTEYNER NUMARALARI: Faturada listelenen konteyner numaralarını sistemdeki "konteynerler" listesiyle tek tek eşleştir. Tek bir karakter farkı bile varsa bildir.
+   - AĞIRLIK VE KAP ADEDİ: Faturadaki toplam Net KG, Brüt KG ve Kap Adedi (Pieces) bilgilerini kontrol et. Eğer faturada konteyner bazlı ağırlık yazıyorsa sistemdeki verilerle eşleştirerek bak.
+   - TUTARLAR: Toplam tutarı ve para birimini kontrol et.
+
+3. KARŞILAŞTIRMA KATILIĞI (ESNEKLİK):
+   - Binlik/ondalık ayraç farklılıklarını (virgül vs nokta kullanımı) YOK SAY.
+   - Küçük yuvarlama veya kantar tartım farklarını YOK SAY (Örn: Net 25.000 ile 25.050 arasında ufak farklar normaldir, tutarlarda 1-2 USD/EUR altı farklar yuvarlamadan kaynaklanır, bunları uyumsuzluk sayma).
+
+- Faturadan ayrıca "fatura_no" (fatura numarası) ve "fatura_tarihi" (YYYY-MM-DD formatında, saat hariç) bilgilerini çıkar, bunlar sistemde olmasa bile mutlaka doldur.
 
 Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
 {
@@ -36,7 +44,7 @@ Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
   "uyusmazliklar": [
     { "alan": "alan adi", "sistemde": "sistemdeki deger", "dosyada": "faturadaki deger" }
   ],
-  "ozet": "Kisa, 1-2 cumlelik Turkce ozet. Eger uyumlu ise olumlu bir mesaj yaz.",
+  "ozet": "Kisa, 1-2 cumlelik Turkce ozet.",
   "fatura_no": "faturadaki fatura numarasi",
   "fatura_tarihi": "YYYY-MM-DD"
 }`;

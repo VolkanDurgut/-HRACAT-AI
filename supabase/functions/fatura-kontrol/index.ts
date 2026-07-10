@@ -7,6 +7,8 @@ type FaturaKontrolSonucu = {
   ozet: string;
   fatura_no: string;
   fatura_tarihi: string;
+  diib_no: string | null;
+  diib_tarihi: string | null;
 };
 
 function isFaturaKontrolSonucu(value: unknown): value is FaturaKontrolSonucu {
@@ -26,6 +28,7 @@ Karşılaştırmada ŞU KURALLARA KESİNLİKLE UY:
    - "urun_tanimi" (Ürün Tanımı): Muhasebe/gümrük zorunluluğu nedeniyle faturada Türkçe çevirisi veya farklı bir gümrük ibaresi (örn: "BUĞDAY UNU 74 RANDIMAN") yer alabilir. Ürün tanımını uyumsuzluk SAYMA.
    - "proforma_no" (Proforma No): Faturada yer almayabilir veya Booking/Sipariş numarası ile değiştirilmiş olabilir. Proforma numarasını KARŞILAŞTIRMA.
    - Liman isimleri ve gemi adlarındaki kısmi eşleşmeleri (örn: "MARPORT" vs "ISTANBUL-MARPORT", "POLAR ECUADOR" vs "POLAR ECUADOR / 627W") uyumsuzluk SAYMA.
+   - DİİB Numarası ve Tarihi: Faturada DİİB numarası var ancak sistemde yoksa bunu KESİNLİKLE "uyusmazliklar" listesine EKLEME.
 
 2. ODAKLANILACAK ASIL KONTROLLER (BUNLARI KONTROL ET):
    - KONTEYNER NUMARALARI: Faturada listelenen konteyner numaralarını sistemdeki "konteynerler" listesiyle tek tek eşleştir. Tek bir karakter farkı bile varsa bildir.
@@ -36,7 +39,7 @@ Karşılaştırmada ŞU KURALLARA KESİNLİKLE UY:
    - Binlik/ondalık ayraç farklılıklarını (virgül vs nokta kullanımı) YOK SAY.
    - Küçük yuvarlama veya kantar tartım farklarını YOK SAY (Örn: Net 25.000 ile 25.050 arasında ufak farklar normaldir, tutarlarda 1-2 USD/EUR altı farklar yuvarlamadan kaynaklanır, bunları uyumsuzluk sayma).
 
-- Faturadan ayrıca "fatura_no" (fatura numarası) ve "fatura_tarihi" (YYYY-MM-DD formatında, saat hariç) bilgilerini çıkar, bunlar sistemde olmasa bile mutlaka doldur.
+- Faturadan "fatura_no", "fatura_tarihi" (YYYY-MM-DD), "diib_no" ve "diib_tarihi" (YYYY-MM-DD) bilgilerini çıkar. Bu 4 bilgiyi "uyusmazliklar" dizisine KESİNLİKLE KOYMA, doğrudan JSON ana objesinde döndür. Bulamazsan null ver.
 
 Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
 {
@@ -46,7 +49,9 @@ Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
   ],
   "ozet": "Kisa, 1-2 cumlelik Turkce ozet.",
   "fatura_no": "faturadaki fatura numarasi",
-  "fatura_tarihi": "YYYY-MM-DD"
+  "fatura_tarihi": "YYYY-MM-DD",
+  "diib_no": "faturadaki diib numarasi veya null",
+  "diib_tarihi": "YYYY-MM-DD veya null"
 }`;
 }
 

@@ -12,6 +12,8 @@ type FaturaKontrolSonucu = {
   ozet: string;
   fatura_no: string;
   fatura_tarihi: string;
+  diib_no: string | null;
+  diib_tarihi: string | null;
 };
 
 type Props = {
@@ -94,6 +96,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         fatura_kontrol_sonucu: data,
         fatura_no: data.fatura_no || dosya.fatura_no,
         fatura_tarihi: data.fatura_tarihi || dosya.fatura_tarihi,
+        diib_no: data.diib_no || dosya.diib_no,
+        diib_tarihi: data.diib_tarihi || dosya.diib_tarihi,
       }).eq("id", dosya.id);
 
       onRefresh();
@@ -196,9 +200,12 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
                   <p className="text-sm font-semibold text-green-700">Fatura bilgileri sistemle uyumlu.</p>
                 </div>
                 {faturaKontrolSonucu.ozet && <p className="text-xs text-slate-500 mt-1 ml-6">{faturaKontrolSonucu.ozet}</p>}
-                <div className="mt-2 ml-6 flex gap-4 text-xs text-slate-500">
+                <div className="mt-2 ml-6 flex flex-wrap gap-4 text-xs text-slate-500">
                   <span>Fatura No: <strong className="text-slate-700">{faturaKontrolSonucu.fatura_no || dosya.fatura_no || "-"}</strong></span>
                   <span>Fatura Tarihi: <strong className="text-slate-700">{formatDateTR(faturaKontrolSonucu.fatura_tarihi || dosya.fatura_tarihi)}</strong></span>
+                  {(faturaKontrolSonucu.diib_no || dosya.diib_no) && (
+                    <span>DİİB No: <strong className="text-slate-700">{faturaKontrolSonucu.diib_no || dosya.diib_no}</strong></span>
+                  )}
                 </div>
               </div>
             ) : (

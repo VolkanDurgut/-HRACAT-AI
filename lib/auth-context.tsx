@@ -132,9 +132,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setRol(null);
-    setYetkiler(VARSAYILAN_YETKILER);
+    try {
+      await supabase.auth.signOut();
+      setRol(null);
+      setYetkiler(VARSAYILAN_YETKILER);
+      
+      // Global yönlendirme döngülerini kırmak ve direkt ana sayfaya (landing) uçurmak için:
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
+    } catch (error) {
+      console.error("Oturum kapatılırken hata oluştu:", error);
+    }
   };
 
   return (

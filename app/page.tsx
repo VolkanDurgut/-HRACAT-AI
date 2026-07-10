@@ -51,7 +51,8 @@ const AuthScreen = ({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    showToast("Kayıt ve 14 Günlük Deneme için Ödeme altyapısına yönlendiriliyorsunuz...", "info");
+    // Tip hatasını çözmek için "info" parametresi "success" olarak güncellendi.
+    showToast("Kayıt ve 14 Günlük Deneme için Ödeme altyapısına yönlendiriliyorsunuz...", "success");
   };
 
   const handleKurumsalRequest = async (e: React.FormEvent) => {
@@ -120,7 +121,7 @@ const AuthScreen = ({
               Bireysel
             </button>
             <button type="button" onClick={() => { setLoginMode("kurumsal"); setAuthError(null); }} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${loginMode === "kurumsal" ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700"}`}>
-              Kurumsal
+              Kurumsal (Lokal Kurulum)
             </button>
           </div>
         )}
@@ -286,7 +287,7 @@ export default function Home() {
         </p>
         <div className="flex items-center justify-center w-full">
           <button onClick={() => goToAuth("register")} className="w-full sm:w-auto bg-emerald-500 text-white px-8 py-3 rounded-md font-medium text-base hover:bg-emerald-600 transition-all shadow-sm">
-            14 Gün Ücretsiz Başlayın
+            Projenizi başlatın
           </button>
         </div>
       </section>
@@ -383,7 +384,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MÜŞTERI HİKAYELERİ */}
+      {/* MÜŞTERİ HİKAYELERİ */}
       <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-6">
           <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center tracking-tight">
@@ -410,7 +411,7 @@ export default function Home() {
       {/* ALT CTA BÖLÜMÜ */}
       <section className="py-24 bg-[#1C1C1C] text-center px-6">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">İlk günden itibaren endüstri standardı güvenlik.</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">İlk günden itibaren endüstri standardıDoc güvenlik.</h2>
           <p className="text-slate-400 text-lg mb-10">
             Kullanıcı verileriniz şifrelenmiş sunucularda barınır. Sadece yetkili personelleriniz verilere erişebilir. Daima kontroldesiniz.
           </p>

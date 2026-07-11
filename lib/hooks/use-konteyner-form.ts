@@ -17,7 +17,7 @@ const EMPTY_FORM: FormState = { konteyner_no: "", muhur_no: "", tip: "20DC", rez
  * (ekleme, silme, manuel alan kaydetme, kullanici haritasi) yoneten hook.
  * Bilesik component'i (konteyner-tab.tsx) sadece UI cizmekle sorumlu birakir.
  */
-export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
+export function useKonteynerForm(dosyaId: string, onRefresh: () => void, companyId: string) { // companyId eklendi
   const { showToast } = useToast();
 
   const [showForm, setShowForm] = useState(false);
@@ -28,7 +28,8 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
   const [kullaniciMap, setKullaniciMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    supabase.from("kullanici_listesi").select("id, email").then(({ data }) => {
+    if (!companyId) return;
+    supabase.from("kullanici_listesi").select("id, email").eq("company_id", companyId).then(({ data }) => { // Şirket filtresi eklendi
       const map: Record<string, string> = {};
       (data || []).forEach((u: any) => { map[u.id] = u.email; });
       setKullaniciMap(map);
@@ -55,6 +56,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
     setSaving(true);
     const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
     const { error } = await supabase.from("konteynerler").insert({
+      company_id: companyId, // Yeni konteyner şirkete zimmetlendi
       dosya_id: dosyaId,
       konteyner_no: cleaned,
       muhur_no: form.muhur_no || null,
@@ -74,7 +76,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await supabase.from("konteynerler").delete().eq("id", deleteTarget.id);
+    const { error } = await supabase.from("konteynerler").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket kilidi eklendi
     if (error) {
       showToast(`Konteyner silinemedi: ${error.message}`, "error");
       setDeleteTarget(null);
@@ -91,7 +93,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
       [alan]: deger,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
-    }).eq("id", konteynerId);
+    }).eq("id", konteynerId).eq("company_id", companyId); // Şirket kilidi eklendi
     if (error) {
       showToast(`Değer kaydedilemedi: ${error.message}`, "error");
       return;
@@ -115,6 +117,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
         continue;
       }
       basarililar.push({
+        company_id: companyId, // Toplu eklenen her satıra şirket mührü basıldı
         dosya_id: dosyaId,
         konteyner_no: konteynerNo,
         muhur_no: muhurNo,
@@ -151,7 +154,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void) {
       pieces: (kaynak as any).pieces ?? null,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
-    }).in("id", hedefIds);
+    }).in("id", hedefIds).eq("company_id", companyId); // Şirket kilidi eklendi
     if (error) {
       showToast(`Değerler uygulanamadı: ${error.message}`, "error");
       return false;

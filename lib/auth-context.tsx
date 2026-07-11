@@ -53,6 +53,7 @@ type AuthContextType = {
   session: Session | null;
   loading: boolean;
   rol: Rol;
+  companyId: string | null; // Şirket bazlı izolasyon için eklendi
   yetkiler: KullaniciYetkileri;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -63,6 +64,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   rol: null,
+  companyId: null, // Şirket bazlı izolasyon için eklendi
   yetkiler: VARSAYILAN_YETKILER,
   signIn: async () => ({ error: null }),
   signOut: async () => {},
@@ -73,14 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [rol, setRol] = useState<Rol>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null); // Şirket state'i eklendi
   const [yetkiler, setYetkiler] = useState<KullaniciYetkileri>(VARSAYILAN_YETKILER);
 
   const fetchRolVeYetkiler = async (userId: string) => {
     const [rolRes, yetkiRes] = await Promise.all([
-      supabase.from("kullanici_rolleri").select("rol").eq("user_id", userId).single(),
+      // Kritik Değişiklik: "rol" bilgisinin yanına veritabanına eklediğimiz "company_id" kolonunu da ekledik
+      supabase.from("kullanici_rolleri").select("rol, company_id").eq("user_id", userId).single(),
       supabase.from("kullanici_yetkileri").select("sayfa_yetkileri, sekme_yetkileri").eq("user_id", userId).single(),
     ]);
     setRol((rolRes.data?.rol as Rol) ?? null);
+    setCompanyId(rolRes.data?.company_id ?? null); // Şirket ID'si state'e yazıldı
     if (yetkiRes.data) {
       setYetkiler({
         sayfa_yetkileri: { ...VARSAYILAN_YETKILER.sayfa_yetkileri, ...yetkiRes.data.sayfa_yetkileri },
@@ -107,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           fetchRolVeYetkiler(session.user.id);
         } else {
           setRol(null);
+          setCompanyId(null); // Çıkış yapıldığında şirket bilgisi de sıfırlandı
           setYetkiler(VARSAYILAN_YETKILER);
         }
         setLoading(false);
@@ -147,7 +153,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, rol, yetkiler, signIn, signOut }}>
+    // State'e aldığımız companyId'yi buraya ekleyerek tüm alt bileşenlerin kullanımına açıyoruz
+    <AuthContext.Provider value={{ user, session, loading, rol, companyId, yetkiler, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

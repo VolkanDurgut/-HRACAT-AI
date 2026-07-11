@@ -54,7 +54,7 @@ function DosyaDetailContent() {
   const { id } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, yetkiler } = useAuth();
+  const { user, yetkiler, companyId } = useAuth(); // companyId global context'ten alındı
   const { showToast } = useToast();
   const [dosya, setDosya] = useState<Dosya | null>(null);
   const [rezervasyonlar, setRezervasyonlar] = useState<Rezervasyon[]>([]);
@@ -63,17 +63,17 @@ function DosyaDetailContent() {
   const [activeTab, setActiveTab] = useState<TabKey>((searchParams.get("tab") as TabKey) || "proforma");
 
   const fetchData = useCallback(async () => {
-    if (!id || !user) return;
+    if (!id || !user || !companyId) return; // companyId kontrolü eklendi
     const [dosyaRes, rezRes, kontRes] = await Promise.all([
-      supabase.from("ihracat_dosyalari").select("*").eq("id", id).single(),
-      supabase.from("rezervasyonlar").select("*").eq("dosya_id", id),
-      supabase.from("konteynerler").select("*").eq("dosya_id", id).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
+      supabase.from("ihracat_dosyalari").select("*").eq("id", id).eq("company_id", companyId).single(),
+      supabase.from("rezervasyonlar").select("*").eq("dosya_id", id).eq("company_id", companyId),
+      supabase.from("konteynerler").select("*").eq("dosya_id", id).eq("company_id", companyId).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
     ]);
     if (dosyaRes.data) setDosya(dosyaRes.data);
     setRezervasyonlar(rezRes.data || []);
     setKonteynerler(kontRes.data || []);
     setLoading(false);
-  }, [id, user]);
+  }, [id, user, companyId]); // Bağımlılık zincirine companyId eklendi
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -348,11 +348,25 @@ function DosyaDetailContent() {
       )}
 
       {activeTab === "rezervasyon" && (
-        <RezervasyonTab dosyaId={dosya.id} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} onNavigateTab={setActiveTab} />
+        <RezervasyonTab 
+          dosyaId={dosya.id} 
+          rezervasyonlar={rezervasyonlar} 
+          onRefresh={fetchData} 
+          onNavigateTab={setActiveTab}
+          companyId={companyId} // Şirket bazlı izolasyon alt sekmeye aktarıldı
+        />
       )}
 
       {activeTab === "konteynerler" && (
-        <KonteynerTab dosyaId={dosya.id} dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} onNavigateTab={setActiveTab} />
+        <KonteynerTab 
+          dosyaId={dosya.id} 
+          dosya={dosya} 
+          konteynerler={konteynerler} 
+          rezervasyonlar={rezervasyonlar} 
+          onRefresh={fetchData} 
+          onNavigateTab={setActiveTab}
+          companyId={companyId} // Şirket bazlı izolasyon alt sekmeye aktarıldı
+        />
       )}
       </div>
 

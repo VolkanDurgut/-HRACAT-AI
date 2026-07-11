@@ -45,7 +45,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 }
 
 export default function YetkilendirmePage() {
-  const { yetkiler, user } = useAuth();
+  const { yetkiler, user, companyId } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [kullanicilar, setKullanicilar] = useState<KullaniciYetki[]>([]);
@@ -57,12 +57,15 @@ export default function YetkilendirmePage() {
   }, [yetkiler, router]);
 
   const fetchKullanicilar = useCallback(async () => {
+    if (!user || !companyId) return; // Güvenlik duvarı kontrolü
+
     const { data } = await supabase
       .from("kullanici_yetkileri")
       .select("user_id, email, sayfa_yetkileri, sekme_yetkileri")
+      .eq("company_id", companyId) // Sadece bu şirketin çalışanlarının yetkileri listelenir
       .order("email");
 
-    if (!data) { setLoading(false); return; }
+    if (!data) { setKullanicilar([]); setLoading(false); return; }
 
     const sorted = [...data].sort((a, b) => {
       if (a.user_id === user?.id) return -1;
@@ -85,13 +88,15 @@ export default function YetkilendirmePage() {
   };
 
   const handleSave = async (userId: string) => {
+    if (!companyId) return;
     setSaving(userId);
     const k = kullanicilar.find(k => k.user_id === userId);
     if (!k) return;
     const { error } = await supabase
       .from("kullanici_yetkileri")
       .update({ sayfa_yetkileri: k.sayfa_yetkileri, sekme_yetkileri: k.sekme_yetkileri, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("company_id", companyId); // Güncelleme yetkisi şirket doğrulamasına kilitlendi
     if (error) showToast("Kayıt sırasında hata oluştu.", "error");
     else showToast("Yetkiler kaydedildi.", "success");
     setSaving(null);

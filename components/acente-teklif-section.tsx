@@ -31,9 +31,10 @@ type Props = {
   dosyaId: string;
   proformData: any;
   userId: string;
+  companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
-export default function AcenteTeklifSection({ dosyaId, proformData, userId }: Props) {
+export default function AcenteTeklifSection({ dosyaId, proformData, userId, companyId }: Props) {
   const [acenteler, setAcenteler] = useState<AcenteWithTeklif[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Acente | null>(null);
@@ -49,7 +50,13 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId }: Pr
   useEffect(() => { fetchAcenteler(); }, []);
 
   const fetchAcenteler = async () => {
-    const { data: acenteData } = await supabase.from("acenteler").select("*").order("isim");
+    // Acenteleri çekerken şirket bazlı filtreyi (company_id) kod seviyesinde de ekliyoruz:
+    const { data: acenteData } = await supabase
+      .from("acenteler")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("isim");
+      
     const { data: teklifData } = await supabase.from("acente_teklifleri").select("*").eq("dosya_id", dosyaId);
 
     const merged: AcenteWithTeklif[] = (acenteData || []).map((a: Acente) => ({
@@ -134,7 +141,12 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId }: Pr
     if (existing) {
       await supabase.from("acente_teklifleri").update(payload).eq("id", existing.id);
     } else {
-      await supabase.from("acente_teklifleri").insert({ dosya_id: dosyaId, acente_id: acenteId, ...payload });
+      await supabase.from("acente_teklifleri").insert({ 
+        dosya_id: dosyaId, 
+        acente_id: acenteId, 
+        company_id: companyId, // Şirket mührü eklendi
+        ...payload 
+      });
     }
   };
 
@@ -185,7 +197,13 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId }: Pr
       }).eq("id", editTarget.id);
     } else {
       await supabase.from("acenteler").insert({
-        isim: form.isim, email: form.email, telefon: form.telefon, cc_emails: form.cc_emails, notlar: form.notlar, created_by: userId,
+        isim: form.isim, 
+        email: form.email, 
+        telefon: form.telefon, 
+        cc_emails: form.cc_emails, 
+        notlar: form.notlar, 
+        created_by: userId,
+        company_id: companyId, // Şirket mührü eklendi
       });
     }
     setForm({ isim: "", email: "", telefon: "", cc_emails: "", notlar: "" });

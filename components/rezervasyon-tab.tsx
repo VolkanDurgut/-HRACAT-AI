@@ -14,6 +14,7 @@ type Props = {
   rezervasyonlar: Rezervasyon[];
   onRefresh: () => void;
   onNavigateTab: (tab: TabKey) => void;
+  companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
 const emptyForm = {
@@ -73,11 +74,13 @@ function buildPayload(form: typeof emptyForm) {
  * gonderilen MTS uzerinden dogru tutari gosterir.
  * ana_siparis_id olmayan (tek seferlik) dosyalara hic dokunulmaz.
  */
-async function syncDevamEdenDosyaTutari(dosyaId: string) {
+async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) { // companyId içeri alındı
+  if (!companyId) return;
   const { data: dosya } = await supabase
     .from("ihracat_dosyalari")
     .select("ana_siparis_id")
     .eq("id", dosyaId)
+    .eq("company_id", companyId) // Şirket filtresi enjekte edildi
     .maybeSingle();
   if (!dosya?.ana_siparis_id) return;
 
@@ -85,6 +88,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string) {
     .from("ana_siparisler")
     .select("toplam_mts, urun_detaylari_master")
     .eq("id", dosya.ana_siparis_id)
+    .eq("company_id", companyId) // Şirket filtresi enjekte edildi
     .maybeSingle();
   const masterUrunler = (anaSiparis?.urun_detaylari_master as any[]) || [];
   const toplamSiparisMts = anaSiparis?.toplam_mts || 0;
@@ -93,7 +97,8 @@ async function syncDevamEdenDosyaTutari(dosyaId: string) {
   const { data: tumRezervasyonlar } = await supabase
     .from("rezervasyonlar")
     .select("konteyner_adedi")
-    .eq("dosya_id", dosyaId);
+    .eq("dosya_id", dosyaId)
+    .eq("company_id", companyId); // Şirket filtresi enjekte edildi
   const toplamKonteynerAdedi = (tumRezervasyonlar || []).reduce((s, r: any) => s + (r.konteyner_adedi || 0), 0);
   if (toplamKonteynerAdedi <= 0) return;
 
@@ -121,7 +126,8 @@ async function syncDevamEdenDosyaTutari(dosyaId: string) {
   await supabase
     .from("ihracat_dosyalari")
     .update({ urun_detaylari: urunDetaylari, toplam_tutar: toplamTutar })
-    .eq("id", dosyaId);
+    .eq("id", dosyaId)
+    .eq("company_id", companyId); // Şirket kilidi enjekte edildi
 }
 
 function RezervasyonFormFields({ form, update, updateSaat, errors }: {
@@ -191,10 +197,11 @@ function RezervasyonFormFields({ form, update, updateSaat, errors }: {
   );
 }
 
-function RezervasyonCard({ rez, onRefresh, onDeleteRequest }: {
+function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // companyId eklendi
   rez: Rezervasyon;
   onRefresh: () => void;
   onDeleteRequest: (target: { id: string; bookingNo: string }) => void;
+  companyId: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -225,8 +232,8 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest }: {
     if (Object.keys(e).length > 0) return;
 
     setSaving(true);
-    await supabase.from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id);
-    await syncDevamEdenDosyaTutari(rez.dosya_id);
+    await supabase.from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id).eq("company_id", companyId); // Şirket kilidi eklendi
+    await syncDevamEdenDosyaTutari(rez.dosya_id, companyId); // Şirket kimliği paslandı
     showToast("Rezervasyon guncellendi.", "success");
     setSaving(false);
     setEditing(false);
@@ -328,7 +335,7 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest }: {
   );
 }
 
-export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh }: Props) {
+export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, companyId }: Props) { // companyId eklendi
   const [showNewForm, setShowNewForm] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
   const [newForm, setNewForm] = useState(emptyForm);
@@ -353,8 +360,8 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh }: P
     if (Object.keys(e).length > 0) return;
 
     setSavingNew(true);
-    await supabase.from("rezervasyonlar").insert({ dosya_id: dosyaId, ...buildPayload(newForm) });
-    await syncDevamEdenDosyaTutari(dosyaId);
+    await supabase.from("rezervasyonlar").insert({ company_id: companyId, dosya_id: dosyaId, ...buildPayload(newForm) }); // company_id mühürlendi
+    await syncDevamEdenDosyaTutari(dosyaId, companyId); // companyId paslandı
     showToast("Rezervasyon eklendi.", "success");
     setShowNewForm(false);
     setNewForm(emptyForm);
@@ -364,7 +371,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh }: P
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await supabase.from("rezervasyonlar").delete().eq("id", deleteTarget.id);
+    await supabase.from("rezervasyonlar").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket kilidi eklendi
     showToast(`${deleteTarget.bookingNo} silindi.`, "success");
     setDeleteTarget(null);
     onRefresh();
@@ -384,7 +391,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh }: P
       />
 
       {rezervasyonlar.map((rez) => (
-        <RezervasyonCard key={rez.id} rez={rez} onRefresh={onRefresh} onDeleteRequest={setDeleteTarget} />
+        <RezervasyonCard key={rez.id} rez={rez} onRefresh={onRefresh} onDeleteRequest={setDeleteTarget} companyId={companyId} /> // companyId eklendi
       ))}
 
       {!showNewForm ? (

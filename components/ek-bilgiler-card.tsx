@@ -11,9 +11,10 @@ type Props = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
   onRefresh: () => void;
+  companyId: string; // SaaS şirket bazlı izolasyon için eklendi
 };
 
-export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Props) {
+export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, companyId }: Props) { // companyId eklendi
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
@@ -103,9 +104,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Pro
         ...(dosya.ham_veri as any || {}),
         notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : []
       }
-      };
+    };
 
-    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id);
+    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId); // Şirket kilidi enjekte edildi
     showToast("Ek bilgiler guncellendi.", "success");
     setSaving(false);
     setEditing(false);

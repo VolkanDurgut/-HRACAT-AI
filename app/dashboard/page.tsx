@@ -70,24 +70,25 @@ function AkisConnector({ tamamlandi }: { tamamlandi: boolean }) {
 }
 
 export default function DashboardPage() {
-  const { user, yetkiler } = useAuth();
+  const { user, yetkiler, companyId } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const [durumlar, setDurumlar] = useState<DosyaDurum[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("*")
+      .eq("company_id", companyId) // Sadece bu şirketin dosyaları kontrol merkezine gelir
       .order("olusturma_tarihi", { ascending: false });
-    if (!dosyaData) { setLoading(false); return; }
+    if (!dosyaData) { setDurumlar([]); setLoading(false); return; } // Temiz sıfırlama
 
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
 
     const [{ data: rezData }, { data: kontData }] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds),
-      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds),
+      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
+      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
     ]);
 
     const combined: DosyaDurum[] = dosyaData.map((d: Dosya) => ({

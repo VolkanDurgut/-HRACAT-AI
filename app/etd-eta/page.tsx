@@ -34,7 +34,7 @@ function kalanGun(eta: string): number {
 }
 
 export default function EtdEtaPage() {
-  const { user } = useAuth();
+  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
   const { showToast } = useToast();
   const [satirlar, setSatirlar] = useState<SevkiyatSatir[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,19 +44,21 @@ export default function EtdEtaPage() {
   const [saving, setSaving] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: rezData } = await supabase
       .from("rezervasyonlar")
       .select("id, dosya_id, booking_no, gemi_adi, sefer_no, acente_ismi, yuklenme_limani, konteyner_adedi, gemi_kalkis_tarihi, eta, eta_guncelleme_tarihi")
+      .eq("company_id", companyId) // Sadece giriş yapan şirketin rezervasyonları çekilir
       .order("gemi_kalkis_tarihi", { ascending: false });
 
-    if (!rezData || rezData.length === 0) { setLoading(false); return; }
+    if (!rezData || rezData.length === 0) { setSatirlar([]); setLoading(false); return; } // Temiz sıfırlama eklendi
 
     const dosyaIds = Array.from(new Set(rezData.map((r: any) => r.dosya_id)));
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("id, dosya_no, alici_firma, varis_limani, bl_no")
-      .in("id", dosyaIds);
+      .in("id", dosyaIds)
+      .eq("company_id", companyId); // Sadece giriş yapan şirketin dosyalarıyla eşleştirilir
 
     const dosyaMap: Record<string, any> = {};
     (dosyaData || []).forEach((d: any) => { dosyaMap[d.id] = d; });
@@ -92,7 +94,8 @@ export default function EtdEtaPage() {
     const { error } = await supabase
       .from("rezervasyonlar")
       .update({ eta: etaValue || null, eta_guncelleme_tarihi: etaValue ? new Date().toISOString() : null })
-      .eq("id", rezervasyonId);
+      .eq("id", rezervasyonId)
+      .eq("company_id", companyId); // Güncelleme işlemi şirket doğrulamasına kilitlendi
 
     if (error) {
       showToast("ETA kaydedilemedi.", "error");

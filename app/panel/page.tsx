@@ -19,7 +19,7 @@ function StatusBadge({ label, color }: { label: string; color: string }) {
 }
 
 function PanelContent() {
-  const { user, yetkiler } = useAuth();
+  const { user, yetkiler, companyId } = useAuth(); // Global context'ten companyId alındı
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -30,10 +30,11 @@ function PanelContent() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
 
   const fetchDosyalar = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("*")
+      .eq("company_id", companyId) // Sadece giriş yapan şirketin dosyaları çekilir
       .or("durum.eq.Açık,durum.eq.Acik")
       .order("olusturma_tarihi", { ascending: false });
 
@@ -41,8 +42,8 @@ function PanelContent() {
 
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
     const [rezRes, kontRes] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds),
-      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds),
+      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
+      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
     ]);
 
     const rezMap: Record<string, Rezervasyon[]> = {};
@@ -68,15 +69,15 @@ function PanelContent() {
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !companyId) return;
     const { data: dosyaData } = await supabase
-      .from("ihracat_dosyalari").select("ana_siparis_id").eq("id", deleteTarget.id).maybeSingle();
+      .from("ihracat_dosyalari").select("ana_siparis_id").eq("id", deleteTarget.id).eq("company_id", companyId).maybeSingle(); // Şirket filtresi eklendi
     const anaSiparisId = dosyaData?.ana_siparis_id;
-    const { error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id);
+    const { error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket filtresi eklendi
     if (error) { showToast("Dosya silinirken hata olustu.", "error"); setDeleteTarget(null); return; }
     if (anaSiparisId) {
-      const { count } = await supabase.from("ihracat_dosyalari").select("id", { count: "exact", head: true }).eq("ana_siparis_id", anaSiparisId);
-      if (!count || count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId);
+      const { count } = await supabase.from("ihracat_dosyalari").select("id", { count: "exact", head: true }).eq("ana_siparis_id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
+      if (!count || count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
     }
     showToast(`${deleteTarget.dosyaNo} basariyla silindi.`, "success");
     fetchDosyalar();

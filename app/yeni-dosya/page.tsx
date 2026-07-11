@@ -13,7 +13,7 @@ import { Upload, FileText, Check, Loader2, Package, AlertCircle } from "lucide-r
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
 
 export default function YeniDosyaPage() {
-  const { user } = useAuth();
+  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>("upload");
@@ -90,12 +90,13 @@ export default function YeniDosyaPage() {
 
       setProformData(extracted);
 
-      // Ayni proforma_no'ya sahip bir ana siparis var mi kontrol et
+      // Ayni proforma_no'ya sahip ve AYNI ŞİRKETE ait bir ana siparis var mi kontrol et
       if (extracted.proforma_no) {
         const { data: existingAnaSiparis } = await supabase
           .from("ana_siparisler")
           .select("*")
           .eq("proforma_no", extracted.proforma_no)
+          .eq("company_id", companyId) // Şirket izolasyon filtresi eklendi
           .maybeSingle();
 
         if (existingAnaSiparis) {
@@ -161,6 +162,7 @@ export default function YeniDosyaPage() {
       const { data, error: dbError } = await supabase
         .from("ihracat_dosyalari")
         .insert({
+          company_id: companyId, // Yeni oluşturulan dosya şirkete zimmetlendi
           satici_firma: extracted.satici_firma,
           alici_firma: extracted.alici_firma,
           urun_tanimi: extracted.urun_detaylari?.map((u: any) => u.description || u.urun_adi).join(", ") || "-",
@@ -222,6 +224,7 @@ export default function YeniDosyaPage() {
       const { data: yeniAnaSiparis, error: anaSiparisError } = await supabase
         .from("ana_siparisler")
         .insert({
+          company_id: companyId, // Yeni ana sipariş şirkete zimmetlendi
           proforma_no: proformData.proforma_no,
           alici_firma: proformData.alici_firma,
           urun_tanimi: proformData.urun_detaylari?.map((u: any) => u.description || u.urun_adi).join(", ") || "-",
@@ -432,7 +435,7 @@ export default function YeniDosyaPage() {
               <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
                 <h3 className="font-semibold text-slate-800 mb-1">Acentelerden Teklif Al</h3>
                 <p className="text-sm text-slate-500 mb-4">Kayitli acentelerinize freight teklifi isteyin.</p>
-                <AcenteTeklifSection dosyaId={dosyaId!} proformData={proformData} userId={user!.id} />
+                <AcenteTeklifSection dosyaId={dosyaId!} proformData={proformData} userId={user!.id} companyId={companyId!} />
               </div>
             </div>
           </div>

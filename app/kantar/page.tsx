@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context"; // useAuth ithal edildi
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw } from "lucide-react";
 
@@ -24,6 +25,7 @@ type KonteynerRow = {
 };
 
 export default function KantarPage() {
+  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,17 +33,21 @@ export default function KantarPage() {
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
   const fetchKonteynerler = useCallback(async () => {
+    if (!user || !companyId) return; // Güvenlik kontrolü eklendi
+    
     const { data: kontData } = await supabase
       .from("konteynerler")
-      .select("id, konteyner_no, muhur_no, tip, dosya_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no");
+      .select("id, konteyner_no, muhur_no, tip, dosya_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no")
+      .eq("company_id", companyId); // Sadece bu şirketin konteynerleri çekilir
 
-    if (!kontData) return;
+    if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; } // Temiz sıfırlama eklendi
 
     const dosyaIds = Array.from(new Set(kontData.map((k) => k.dosya_id)));
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("id, dosya_no, durum")
       .in("id", dosyaIds)
+      .eq("company_id", companyId) // Sadece bu şirketin dosyalarıyla eşleştirilir
       .or("durum.eq.Açık,durum.eq.Acik");
 
     const dosyaMap: Record<string, string> = {};
@@ -55,9 +61,13 @@ export default function KantarPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchKonteynerler(); }, [fetchKonteynerler]);
+  useEffect(() => { 
+    if (user && companyId) fetchKonteynerler(); 
+  }, [fetchKonteynerler, user, companyId]); // Bağımlılık zinciri güncellendi
 
   useEffect(() => {
+    if (!user || !companyId) return; // Oturum yoksa dinleme başlatılmaz
+    
     const channel = supabase
       .channel("kantar-konteynerler")
       .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler" }, () => {
@@ -65,7 +75,7 @@ export default function KantarPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchKonteynerler]);
+  }, [fetchKonteynerler, user, companyId]); // Bağımlılık zinciri güncellendi
 
   const handleDbaYukle = async (konteyner: KonteynerRow, file: File) => {
     await yukleDba(konteyner, file);

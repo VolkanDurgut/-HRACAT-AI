@@ -27,7 +27,7 @@ function HBar({ value, max, color = NAVY }: { value: number; max: number; color?
 }
 
 export default function AnalizPage() {
-  const { user } = useAuth();
+  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
   const [dosyalar, setDosyalar] = useState<DosyaFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [yilFiltre, setYilFiltre] = useState("Tümü");
@@ -35,14 +35,18 @@ export default function AnalizPage() {
   const [gemiModal, setGemiModal] = useState<GemiModal | null>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
-      .from("ihracat_dosyalari").select("*").order("olusturma_tarihi", { ascending: true });
+      .from("ihracat_dosyalari")
+      .select("*")
+      .eq("company_id", companyId) // Sadece bu şirketin dosyaları analize dahil edilir
+      .order("olusturma_tarihi", { ascending: true });
+      
     if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setLoading(false); return; }
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
     const [{ data: rezData }, { data: kontData }] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds),
-      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds),
+      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket kilidi eklendi
+      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket kilidi eklendi
     ]);
     setDosyalar(dosyaData.map((d: Dosya) => ({
       ...d,

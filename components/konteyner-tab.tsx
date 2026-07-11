@@ -21,9 +21,10 @@ type Props = {
   rezervasyonlar: Rezervasyon[];
   onRefresh: () => void;
   onNavigateTab: (tab: TabKey) => void;
+  companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
-export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab }: Props) {
+export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId }: Props) {
   const {
     showForm, setShowForm,
     saving,

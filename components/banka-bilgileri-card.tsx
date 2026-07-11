@@ -8,13 +8,14 @@ import { Pencil, Check, X, Banknote } from "lucide-react";
 type Props = {
   dosya: Dosya;
   onRefresh: () => void;
+  companyId: string; // SaaS şirket bazlı izolasyon için eklendi
 };
 
 /**
  * Banka bilgilerini (Hesap Adi, Banka, SWIFT, IBAN, Hesap Numarasi) gosterir
  * ve kendi basina, Ek Bilgiler karti ile ilgisiz, bagimsiz duzenlenebilir kilar.
  */
-export default function BankaBilgileriCard({ dosya, onRefresh }: Props) {
+export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Props) { // companyId eklendi
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
@@ -46,7 +47,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh }: Props) {
       hesap_numarasi: form.hesap_numarasi || null,
       iban: form.iban || null,
     };
-    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id);
+    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId); // Şirket kilidi enjekte edildi
     showToast("Banka bilgileri guncellendi.", "success");
     setSaving(false);
     setEditing(false);

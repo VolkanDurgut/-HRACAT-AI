@@ -70,7 +70,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         .select("*")
         .eq("alici_firma", dosya.alici_firma)
         .eq("company_id", companyId) // SaaS: şirket bazlı izolasyon
-        .single();
+        .maybeSingle();
       if (data) setFumigationAyar(data);
     };
     fetchAyar();
@@ -123,7 +123,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           .eq("dosya_id", dosya.id)
           .eq("evrak_tipi", evrakTipi)
           .eq("company_id", companyId) // SaaS: şirket bazlı izolasyon
-          .single();
+          .maybeSingle();
 
         if (mevcutKayit) {
           await supabase.from("dosya_evraklari").update({

@@ -130,7 +130,7 @@ function DosyaDetailContent() {
 
   if (loading) return <AppShell><DetailSkeleton /></AppShell>;
 
-  if (!dosya) {
+  if (!dosya || !companyId) {
     return (
       <AppShell>
         <div className="text-center py-20">

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
+import { useAuth } from "@/lib/auth-context";
 import { FileText, Pencil } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
@@ -51,6 +52,7 @@ type Props = {
 
 export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerler, show = "both" }: Props) {
   const { showToast } = useToast();
+  const { companyId } = useAuth(); // SaaS: şirket bazlı izolasyon için company_id kaynağı
   const [fumigationAyar, setFumigationAyar] = useState<FumigationAyari | null>(null);
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
 
@@ -62,15 +64,17 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   useEffect(() => {
     if (!dosya.alici_firma) return;
     const fetchAyar = async () => {
+      if (!companyId) return; // Şirket bilinmeden fumigation ayarı çekme
       const { data } = await supabase
         .from("fumigation_ayarlari")
         .select("*")
         .eq("alici_firma", dosya.alici_firma)
+        .eq("company_id", companyId) // SaaS: şirket bazlı izolasyon
         .single();
       if (data) setFumigationAyar(data);
     };
     fetchAyar();
-  }, [dosya.alici_firma]);
+  }, [dosya.alici_firma, companyId]);
 
   const kaydetVeAc = async (html: string, evrakTipi: string, storageAdi: string, gosterilenAd: string) => {
     const temizIsim = gosterilenAd.replace(".html", "");
@@ -94,6 +98,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     // Arsivleme: evragi Supabase Storage'a kaydet + dosya_evraklari kaydini guncelle.
     // Bu adim basarisiz olsa bile (asagida) evrak yine de acilir.
     try {
+      if (!companyId) {
+        // Şirket bilgisi yoksa arşive yazma (NULL company_id kaydı oluşmasın); evrak yine de açılır.
+        console.warn("companyId yok, evrak arşive kaydedilmedi ama açılıyor.");
+        acBlobIle();
+        return;
+      }
       const blob = new Blob([guncelHtml], { type: "text/html; charset=utf-8" });
       const storagePath = `${dosya.id}/${storageAdi}`;
 
@@ -112,6 +122,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           .select("id")
           .eq("dosya_id", dosya.id)
           .eq("evrak_tipi", evrakTipi)
+          .eq("company_id", companyId) // SaaS: şirket bazlı izolasyon
           .single();
 
         if (mevcutKayit) {
@@ -119,7 +130,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             dosya_url: urlData.publicUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
-          }).eq("id", mevcutKayit.id);
+          }).eq("id", mevcutKayit.id).eq("company_id", companyId); // SaaS: update de şirkete kilitli
         } else {
           await supabase.from("dosya_evraklari").insert({
             dosya_id: dosya.id,
@@ -127,6 +138,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             dosya_url: urlData.publicUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
+            company_id: companyId, // SaaS: yeni kayda şirket mührü
           });
         }
       }

@@ -290,9 +290,9 @@ function DosyaDetailContent() {
                   <CopyableField label="Odeme Sekli" value={dosya.odeme_sekli} />
                 </div>
               </div>
-              <BankaBilgileriCard dosya={dosya} onRefresh={fetchData} />
+              <BankaBilgileriCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
             </div>
-          <EkBilgilerCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} />
+          <EkBilgilerCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
         </div>
       )}
 

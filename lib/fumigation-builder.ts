@@ -5,7 +5,7 @@
  *
  * Rapor No       = dosya.proforma_no
  * Consignee      = dosya.consignee
- * Notify         = dosya.alici_firma + ham_veri adresi/tel/email
+ * Notify         = ham_veri.notify dizisi (Yoksa: alici_firma + adresi/tel/email)
  * Net/Brut       = konteynerler tablosundan otomatik toplam
  * Fumigasyon detaylari = FumigationAyari parametresinden (musteri bazli kayitli ayarlar)
  * Sabit bilgiler = UNEX firma bilgileri
@@ -267,14 +267,20 @@ export function buildFumigationHtml(
     REPORT_NR:             safe(dosya.proforma_no),
     CONSIGNEE:             safe(dosya.consignee),
     NOTIFY:                escapeHtml(
-                             [
-                               dosya.alici_firma,
-                               (dosya.ham_veri as any)?.alici_adresi,
-                               (dosya.ham_veri as any)?.alici_tel ? `TEL: ${(dosya.ham_veri as any)?.alici_tel}` : null,
-                               (dosya.ham_veri as any)?.alici_email ? `E-mail: ${(dosya.ham_veri as any)?.alici_email}` : null,
-                             ]
-                               .filter(Boolean)
-                               .join("\n")
+                             (() => {
+                               const notifyArr = (dosya.ham_veri as any)?.notify;
+                               // Eğer yeni sistemden gelen veya manuel girilen bir Notify dizisi varsa onu kullan
+                               if (Array.isArray(notifyArr) && notifyArr.length > 0) {
+                                 return notifyArr.join("\n\n");
+                               }
+                               // Eğer Notify boşsa (eski dosyalar için), varsayılan olarak alıcı firma bilgilerini getir
+                               return [
+                                 dosya.alici_firma,
+                                 (dosya.ham_veri as any)?.alici_adresi,
+                                 (dosya.ham_veri as any)?.alici_tel ? `TEL: ${(dosya.ham_veri as any)?.alici_tel}` : null,
+                                 (dosya.ham_veri as any)?.alici_email ? `E-mail: ${(dosya.ham_veri as any)?.alici_email}` : null,
+                               ].filter(Boolean).join("\n");
+                             })()
                            ),
     KIND_OF_FUMIGATION:    buildKindOfFumigation(konteynerler),
     PLACE:                 escapeHtml(hamVeri["fumigation_yeri"] as string || FUMIGATION_PLACE),

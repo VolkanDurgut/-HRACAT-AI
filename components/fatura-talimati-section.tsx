@@ -13,6 +13,7 @@ type KontrolSonucu = {
   uyusmazliklar: { alan: string; sistemde: string; dosyada: string }[];
   ozet: string;
   consignee?: string;
+  notify?: string[];
 };
 
 type Props = {
@@ -216,10 +217,17 @@ export default function FaturaTalimatiSection({
           : data.ozet,
       };
 
+      // Mevcut ham_veri'yi koruyarak notify bilgisini ekliyoruz
+      const guncelHamVeri = {
+        ...(dosya.ham_veri || {}),
+        notify: data.notify || []
+      };
+
       const { error: updateError } = await supabase.from("ihracat_dosyalari").update({
         konsimento_dosya_url: urlData.publicUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
+        ham_veri: guncelHamVeri,
       }).eq("id", dosyaId);
       if (updateError) throw new Error(`Sonuc kaydedilemedi: ${updateError.message}`);
       onRefresh();

@@ -52,7 +52,12 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Pro
   const avansTutari = (dosya.ham_veri as any)?.avans_tutari;
   const odenecekTutar = dosya.toplam_tutar && avansTutari ? dosya.toplam_tutar - avansTutari : null;
 
+  // Veritabanındaki notify dizisini (array), ekranda rahat düzenlemek için çift satır boşlukla metne çeviriyoruz
+  const mevcutNotify = (dosya.ham_veri as any)?.notify || [];
+  const notifyText = Array.isArray(mevcutNotify) ? mevcutNotify.join("\n\n") : "";
+
   const buildEmptyForm = () => ({
+    notify: notifyText,
     lot_no: (dosya as any).lot_no || "",
     marka: (dosya as any).marka || "",
     navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
@@ -93,6 +98,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Pro
       diib_tarihi: form.diib_tarihi || null,
       uretim_tarihi: form.uretim_tarihi || null,
       son_kullanim_tarihi: form.son_kullanim_tarihi || null,
+      // Mevcut ham_veri objesini bozmadan, düzenlediğimiz yeni notify listesini ekliyoruz
+      ham_veri: {
+        ...(dosya.ham_veri as any || {}),
+        notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : []
+      }
       };
 
     await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id);
@@ -180,6 +190,15 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Pro
         </div>
 
         {renderUrunFiyatlari(false)}
+
+        {mevcutNotify.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Notify (BİLDİRİM YAPILACAK TARAF)</p>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 whitespace-pre-wrap text-sm text-slate-700 font-medium">
+              {notifyText}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <CopyableField label="Lot No" value={(dosya as any).lot_no} />
@@ -270,6 +289,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh }: Pro
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Son Kullanim Tarihi</label>
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        </div>
+        
+        <div className="col-span-2 md:col-span-3">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Notify (Birden fazla Notify varsa aralarında bir boş satır bırakarak yazın)</label>
+          <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="Firma Adı A.Ş.&#10;Adres satırı...&#10;&#10;İkinci Notify Firma...&#10;Adres..." />
         </div>
       </div>
 

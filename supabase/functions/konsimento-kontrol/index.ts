@@ -6,6 +6,7 @@ type KontrolSonucu = {
   uyusmazliklar: { alan: string; sistemde: string; dosyada: string }[];
   ozet: string;
   consignee: string;
+  notify: string[];
 };
 
 function isKontrolSonucu(value: unknown): value is KontrolSonucu {
@@ -32,6 +33,7 @@ Karşılaştırmada şu noktalara dikkat et:
 - Sistemde bir konteyner için Net/Brüt/Kap Adeti henüz hiç girilmemişse (boş/null ise), bunu uyumsuzluk SAYMA, çünkü bu bilgi henüz idari personel tarafından girilmemiş olabilir.
 - Sistemde olmayan ama dosyada olan bilgileri (örn. dosyada yazan ama bizim sistemde tutmadığımız alanlar) görmezden gel.
 - Ayrıca dosyadan "Consignee" (malı teslim alacak taraf, alıcıdan farklı olabilir) bilgisini çıkar ve mutlaka doldur. Consignee yoksa boş string döndür.
+- Dosyada bulunan TÜM "Notify" veya "Notify Party" (Bildirim Yapılacak Taraf) bilgilerini tespit et. Bazen birden fazla Notify (Notify 1, Also Notify vb.) olabilir. Bunları tam adres ve unvanlarıyla birlikte bir dizi (array) olarak çıkar. Eğer hiç Notify bilgisi yoksa boş bir dizi [] döndür.
 
 Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
 {
@@ -40,7 +42,8 @@ Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
     { "alan": "alan adi", "sistemde": "sistemdeki deger", "dosyada": "dosyadaki deger" }
   ],
   "ozet": "Kisa, 1-2 cumlelik Turkce ozet. Eger uyumlu ise olumlu bir mesaj yaz.",
-  "consignee": "Consignee firma adi ve adresi (varsa)"
+  "consignee": "Consignee firma adi ve adresi (varsa)",
+  "notify": ["Birinci notify unvan ve adresi", "Ikinci notify unvan ve adresi (varsa)"]
 }`;
 }
 

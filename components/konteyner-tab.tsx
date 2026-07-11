@@ -37,7 +37,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
     handleManuelAlanKaydet,
     handleTopluEkle,
     handleHepsineUygula,
-  } = useKonteynerForm(dosyaId, onRefresh);
+  } = useKonteynerForm(dosyaId, onRefresh, companyId);
 
   const [showTopluForm, setShowTopluForm] = React.useState(false);
   const [topluMetin, setTopluMetin] = React.useState("");

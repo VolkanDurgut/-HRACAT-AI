@@ -12,9 +12,10 @@ type Props = {
   rezervasyonlar: Rezervasyon[];
   dbaYuklenenSayisi: number;
   onRefresh: () => void;
+  companyId: string; // SaaS: şirket bazlı izolasyon
 };
 
-export default function VgmMailSection({ dosyaId, dosya, konteynerler, rezervasyonlar, dbaYuklenenSayisi, onRefresh }: Props) {
+export default function VgmMailSection({ dosyaId, dosya, konteynerler, rezervasyonlar, dbaYuklenenSayisi, onRefresh, companyId }: Props) {
   const { showToast } = useToast();
   const [showVgmMail, setShowVgmMail] = useState(false);
   const [vgmTo, setVgmTo] = useState("");
@@ -56,7 +57,7 @@ export default function VgmMailSection({ dosyaId, dosya, konteynerler, rezervasy
     const vgmKonu = `VGM Sonuclari - ${dosya.dosya_no}`;
     const ccPart = vgmCc ? `&cc=${encodeURIComponent(vgmCc)}` : "";
     window.open(`mailto:${vgmTo}?subject=${encodeURIComponent(vgmKonu)}${ccPart}&body=${encodeURIComponent(buildVgmMailMetni())}`);
-    const { error } = await supabase.from("ihracat_dosyalari").update({ vgm_gonderildi: true }).eq("id", dosyaId);
+    const { error } = await supabase.from("ihracat_dosyalari").update({ vgm_gonderildi: true }).eq("id", dosyaId).eq("company_id", companyId);
     if (error) {
       showToast(`VGM durumu kaydedilemedi: ${error.message}`, "error");
       return;

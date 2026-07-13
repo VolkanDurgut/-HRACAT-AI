@@ -57,7 +57,7 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
       .eq("company_id", companyId)
       .order("isim");
       
-    const { data: teklifData } = await supabase.from("acente_teklifleri").select("*").eq("dosya_id", dosyaId);
+    const { data: teklifData } = await supabase.from("acente_teklifleri").select("*").eq("dosya_id", dosyaId).eq("company_id", companyId);
 
     const merged: AcenteWithTeklif[] = (acenteData || []).map((a: Acente) => ({
       ...a,
@@ -139,7 +139,7 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("acente_teklifleri").update(payload).eq("id", existing.id);
+      await supabase.from("acente_teklifleri").update(payload).eq("id", existing.id).eq("company_id", companyId);
     } else {
       await supabase.from("acente_teklifleri").insert({ 
         dosya_id: dosyaId, 
@@ -194,7 +194,7 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
     if (editTarget) {
       await supabase.from("acenteler").update({
         isim: form.isim, email: form.email, telefon: form.telefon, cc_emails: form.cc_emails, notlar: form.notlar,
-      }).eq("id", editTarget.id);
+      }).eq("id", editTarget.id).eq("company_id", companyId);
     } else {
       await supabase.from("acenteler").insert({
         isim: form.isim, 
@@ -221,7 +221,7 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("acenteler").delete().eq("id", id);
+    await supabase.from("acenteler").delete().eq("id", id).eq("company_id", companyId);
     if (activePanel?.id === id) setActivePanel(null);
     fetchAcenteler();
   };

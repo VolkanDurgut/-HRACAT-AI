@@ -101,7 +101,7 @@ function DosyaDetailContent() {
     setDurumSaving(true);
     const isAcik = dosya.durum === "Açık" || dosya.durum === "Acik";
     const newDurum = isAcik ? "Kapalı" : "Açık";
-    await supabase.from("ihracat_dosyalari").update({ durum: newDurum }).eq("id", dosya.id);
+    await supabase.from("ihracat_dosyalari").update({ durum: newDurum }).eq("id", dosya.id).eq("company_id", companyId);
     showToast(newDurum === "Kapalı" ? "Dosya kapatıldı." : "Dosya yeniden açıldı.", "success");
     setDurumSaving(false);
     setShowDurumConfirm(false);
@@ -114,7 +114,7 @@ function DosyaDetailContent() {
 
   const updateToplamKonteyner = async (val: number) => {
     if (!dosya) return;
-    await supabase.from("ihracat_dosyalari").update({ toplam_konteyner: val }).eq("id", dosya.id);
+    await supabase.from("ihracat_dosyalari").update({ toplam_konteyner: val }).eq("id", dosya.id).eq("company_id", companyId);
     setDosya({ ...dosya, toplam_konteyner: val });
     showToast("Toplam konteyner guncellendi.", "success");
   };
@@ -298,7 +298,7 @@ function DosyaDetailContent() {
 
       {activeTab === "evraklar" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} />
+          <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
             <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: "#E2E8F0" }}>
               <Package size={16} style={{ color: "#1B2B4B" }} />

@@ -25,11 +25,12 @@ type Props = {
   eklenenKonteynerAdedi: number;
   rezervasyonKonteynerAdedi: number;
   onRefresh: () => void;
+  companyId: string; // SaaS: şirket bazlı izolasyon
 };
 
 export default function FaturaTalimatiSection({
   dosyaId, dosya, konteynerler, rezervasyonlar,
-  faturaTalimatiHazir, eklenenKonteynerAdedi, rezervasyonKonteynerAdedi, onRefresh,
+  faturaTalimatiHazir, eklenenKonteynerAdedi, rezervasyonKonteynerAdedi, onRefresh, companyId,
 }: Props) {
   const { showToast } = useToast();
 
@@ -141,7 +142,7 @@ export default function FaturaTalimatiSection({
     const { error } = await supabase.from("ihracat_dosyalari").update({
       fatura_talimati_gonderildi: true,
       fatura_talimati_metni: metin,
-    }).eq("id", dosyaId);
+    }).eq("id", dosyaId).eq("company_id", companyId);
     if (error) {
       showToast(`Fatura talimati durumu kaydedilemedi: ${error.message}`, "error");
       return;
@@ -228,7 +229,7 @@ export default function FaturaTalimatiSection({
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
         ham_veri: guncelHamVeri,
-      }).eq("id", dosyaId);
+      }).eq("id", dosyaId).eq("company_id", companyId);
       if (updateError) throw new Error(`Sonuc kaydedilemedi: ${updateError.message}`);
       onRefresh();
     } catch (err: any) {
@@ -241,7 +242,7 @@ export default function FaturaTalimatiSection({
     const { error } = await supabase.from("ihracat_dosyalari").update({
       konsimento_dosya_url: null, konsimento_dosya_adi: null,
       konsimento_yukleme_tarihi: null, konsimento_kontrol_sonucu: null,
-    }).eq("id", dosyaId);
+    }).eq("id", dosyaId).eq("company_id", companyId);
     if (error) {
       showToast(`Islem basarisiz: ${error.message}`, "error");
       return;

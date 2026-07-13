@@ -21,9 +21,10 @@ type Props = {
   konteynerler: Konteyner[];
   rezervasyonlar: Rezervasyon[];
   onRefresh: () => void;
+  companyId: string; // SaaS: şirket bazlı izolasyon
 };
 
-export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonlar, onRefresh }: Props) {
+export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonlar, onRefresh, companyId }: Props) {
   const [faturaYukleniyor, setFaturaYukleniyor] = useState(false);
   const [faturaHata, setFaturaHata] = useState<string | null>(null);
 
@@ -98,7 +99,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         fatura_tarihi: data.fatura_tarihi || dosya.fatura_tarihi,
         diib_no: data.diib_no || dosya.diib_no,
         diib_tarihi: data.diib_tarihi || dosya.diib_tarihi,
-      }).eq("id", dosya.id);
+      }).eq("id", dosya.id).eq("company_id", companyId);
 
       onRefresh();
     } catch (err: any) {
@@ -122,7 +123,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       fatura_dosya_adi: null,
       fatura_yukleme_tarihi: null,
       fatura_kontrol_sonucu: null,
-    }).eq("id", dosya.id);
+    }).eq("id", dosya.id).eq("company_id", companyId);
     onRefresh();
   };
 

@@ -416,6 +416,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
           rezervasyonlar={rezervasyonlar}
           dbaYuklenenSayisi={dbaYuklenenSayisi}
           onRefresh={onRefresh}
+          companyId={companyId}
         />
       </div>
 
@@ -429,6 +430,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
           eklenenKonteynerAdedi={eklenenKonteynerAdedi}
           rezervasyonKonteynerAdedi={rezervasyonKonteynerAdedi}
           onRefresh={onRefresh}
+          companyId={companyId}
         />
       </div>
     </div>

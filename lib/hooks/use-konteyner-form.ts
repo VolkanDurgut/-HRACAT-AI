@@ -29,12 +29,18 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
 
   useEffect(() => {
     if (!companyId) return;
-    supabase.from("kullanici_listesi").select("id, email").eq("company_id", companyId).then(({ data }) => { // Şirket filtresi eklendi
+    // "updated_by" (user_id) -> email haritası. Kaynak: kullanici_yetkileri
+    // (user_id + email + company_id kolonlarını birlikte içeren tek tablo).
+    supabase.from("kullanici_yetkileri").select("user_id, email").eq("company_id", companyId).then(({ data, error }) => {
+      if (error) {
+        console.error("Kullanıcı haritası yüklenemedi:", error.message);
+        return;
+      }
       const map: Record<string, string> = {};
-      (data || []).forEach((u: any) => { map[u.id] = u.email; });
+      (data || []).forEach((u: any) => { if (u.user_id) map[u.user_id] = u.email; });
       setKullaniciMap(map);
     });
-  }, []);
+  }, [companyId]);
 
   const update = (field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

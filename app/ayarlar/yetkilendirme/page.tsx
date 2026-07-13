@@ -75,7 +75,7 @@ export default function YetkilendirmePage() {
 
     setKullanicilar(sorted);
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchKullanicilar(); }, [fetchKullanicilar]);
 

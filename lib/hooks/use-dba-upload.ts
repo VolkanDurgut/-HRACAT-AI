@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
+import { useAuth } from '@/lib/auth-context';
 
 type DbaYukleResult = {
   success: boolean;
@@ -34,6 +35,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
   const [hatalar, setHatalar] = useState<Record<string, string>>({});
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { showToast } = useToast();
+  const { companyId } = useAuth(); // Şirket ID'si context'ten çekildi
 
   const yukleDba = useCallback(async (
     konteyner: { id: string; dosya_id: string; konteyner_no: string },
@@ -79,10 +81,11 @@ export function useDbaUpload(): UseDbaUploadReturn {
       if (!response.ok) throw new Error((dbaData as any).error || 'DBA okunamadı.');
 
       // 4. Ayni DBA belgesi daha once yuklendi mi kontrol et
-      if (dbaData.dba_belge_no) {
+      if (dbaData.dba_belge_no && companyId) {
         const { data: mevcutDba } = await supabase
           .from('konteynerler')
           .select('id, konteyner_no')
+          .eq('company_id', companyId)
           .eq('dba_belge_no', dbaData.dba_belge_no)
           .neq('id', konteyner.id)
           .maybeSingle();
@@ -117,6 +120,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
           dba_belge_no: dbaData.dba_belge_no || null,
           dba_kontrol_sonucu: { ...dbaData, uyusmazliklar: [] },
         })
+        .eq('company_id', companyId)
         .eq('id', konteyner.id);
       if (updateError) throw new Error(`DBA bilgileri kaydedilemedi: ${updateError.message}`);
 
@@ -128,9 +132,10 @@ export function useDbaUpload(): UseDbaUploadReturn {
     } finally {
       setYukleniyor((prev) => ({ ...prev, [konteyner.id]: false }));
     }
-  }, []);
+  }, [companyId]);
 
   const kaldirDba = useCallback(async (konteynerId: string) => {
+    if (!companyId) return;
     const { error } = await supabase
       .from('konteynerler')
       .update({
@@ -143,11 +148,12 @@ export function useDbaUpload(): UseDbaUploadReturn {
         dba_belge_no: null,
         dba_kontrol_sonucu: null,
       })
+      .eq('company_id', companyId)
       .eq('id', konteynerId);
     if (error) {
       showToast(`DBA kaldırılamadı: ${error.message}`, 'error');
     }
-  }, [showToast]);
+  }, [showToast, companyId]);
 
   return { yukleniyor, hatalar, yukleDba, kaldirDba, inputRefs };
 }

@@ -104,12 +104,14 @@ export default function YeniDosyaPage() {
           const { data: bagliDosyalar } = await supabase
             .from("ihracat_dosyalari")
             .select("id, urun_detaylari, durum")
+            .eq("company_id", companyId)
             .eq("ana_siparis_id", existingAnaSiparis.id);
 
           const dosyaIdListesi = (bagliDosyalar || []).map((d: any) => d.id);
           const { data: bagliKonteynerler } = await supabase
             .from("konteynerler")
             .select("dosya_id, dba_dosya_url")
+            .eq("company_id", companyId)
             .in("dosya_id", dosyaIdListesi);
 
           const toplamGonderilmis = (bagliDosyalar || []).reduce((s: number, d: any) => {

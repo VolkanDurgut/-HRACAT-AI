@@ -97,7 +97,7 @@ function DosyaDetailContent() {
   };
 
   const confirmToggleDurum = async () => {
-    if (!dosya) return;
+    if (!dosya || !companyId) return;
     setDurumSaving(true);
     const isAcik = dosya.durum === "Açık" || dosya.durum === "Acik";
     const newDurum = isAcik ? "Kapalı" : "Açık";
@@ -113,7 +113,7 @@ function DosyaDetailContent() {
   };
 
   const updateToplamKonteyner = async (val: number) => {
-    if (!dosya) return;
+    if (!dosya || !companyId) return;
     await supabase.from("ihracat_dosyalari").update({ toplam_konteyner: val }).eq("id", dosya.id).eq("company_id", companyId);
     setDosya({ ...dosya, toplam_konteyner: val });
     showToast("Toplam konteyner guncellendi.", "success");

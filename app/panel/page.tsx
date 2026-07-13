@@ -64,7 +64,7 @@ function PanelContent() {
     }));
     setDosyalar(enriched);
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
 

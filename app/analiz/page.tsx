@@ -54,7 +54,7 @@ export default function AnalizPage() {
       konteynerler: (kontData || []).filter((k: Konteyner) => k.dosya_id === d.id),
     })));
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 

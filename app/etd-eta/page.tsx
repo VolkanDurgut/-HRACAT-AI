@@ -85,7 +85,7 @@ export default function EtdEtaPage() {
 
     setSatirlar(rows);
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

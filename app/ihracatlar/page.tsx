@@ -17,7 +17,7 @@ type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler:
 type AnaSiparisWithProgress = AnaSiparis & { gonderilmisMts: number; dosyaSayisi: number };
 
 export default function IhracatlarPage() {
-  const { user, yetkiler } = useAuth();
+  const { user, yetkiler, companyId } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
@@ -30,19 +30,20 @@ export default function IhracatlarPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
 
   const fetchDosyalar = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return;
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("*")
+      .eq("company_id", companyId)
       .or("durum.eq.Kapalı,durum.eq.Kapali")
       .order("olusturma_tarihi", { ascending: false });
 
-    if (!dosyaData) { setDosyalar([]); setLoading(false); return; }
+    if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setLoading(false); return; }
 
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
     const [{ data: rezData }, { data: kontData }] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds),
-      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds),
+      supabase.from("rezervasyonlar").select("*").eq("company_id", companyId).in("dosya_id", dosyaIds),
+      supabase.from("konteynerler").select("*").eq("company_id", companyId).in("dosya_id", dosyaIds),
     ]);
 
     const enriched = dosyaData.map((d: Dosya) => ({
@@ -53,13 +54,14 @@ export default function IhracatlarPage() {
 
     setDosyalar(enriched);
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   const fetchAcikSiparisler = useCallback(async () => {
-    if (!user) return;
+    if (!user || !companyId) return;
     const { data: siparisler } = await supabase
       .from("ana_siparisler")
       .select("*")
+      .eq("company_id", companyId)
       .order("olusturma_tarihi", { ascending: false });
 
     if (!siparisler || siparisler.length === 0) { setAcikSiparisler([]); setSiparisLoading(false); return; }
@@ -68,12 +70,14 @@ export default function IhracatlarPage() {
     const { data: bagliDosyalar } = await supabase
       .from("ihracat_dosyalari")
       .select("id, ana_siparis_id, urun_detaylari, durum")
+      .eq("company_id", companyId)
       .in("ana_siparis_id", siparisIds);
 
     const dosyaIdListesi = (bagliDosyalar || []).map((d: any) => d.id);
     const { data: bagliKonteynerler } = await supabase
       .from("konteynerler")
       .select("dosya_id, dba_dosya_url")
+      .eq("company_id", companyId)
       .in("dosya_id", dosyaIdListesi);
 
     const withProgress: AnaSiparisWithProgress[] = siparisler.map((s: AnaSiparis) => {
@@ -102,18 +106,19 @@ export default function IhracatlarPage() {
     const acikOlanlar = withProgress.filter((s) => (s.toplam_mts || 0) - s.gonderilmisMts > 0.01);
     setAcikSiparisler(acikOlanlar);
     setSiparisLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchDosyalar(); fetchAcikSiparisler(); }, [fetchDosyalar, fetchAcikSiparisler]);
 
   const handleSipariseDevamEt = async (siparis: AnaSiparisWithProgress) => {
-    if (!user) return;
+    if (!user || !companyId) return;
     setDevamEdiyor(siparis.id);
     try {
       // Ayni ana siparise bagli ilk dosyanin tam proforma bilgilerini al (kopyalamak icin)
       const { data: ornekDosya } = await supabase
         .from("ihracat_dosyalari")
         .select("*")
+        .eq("company_id", companyId)
         .eq("ana_siparis_id", siparis.id)
         .order("olusturma_tarihi", { ascending: true })
         .limit(1)
@@ -149,6 +154,7 @@ export default function IhracatlarPage() {
           durum: "Açık",
           created_by: user.id,
           ana_siparis_id: siparis.id,
+          company_id: companyId,
         })
         .select("id")
         .single();
@@ -172,17 +178,18 @@ export default function IhracatlarPage() {
     );
   }, [dosyalar, search]);
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !companyId) return;
 
     // Silinecek dosyanin bagli oldugu ana siparisi onceden ogren
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("ana_siparis_id")
+      .eq("company_id", companyId)
       .eq("id", deleteTarget.id)
       .maybeSingle();
     const anaSiparisId = dosyaData?.ana_siparis_id;
 
-    const { error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id);
+    const { error } = await supabase.from("ihracat_dosyalari").delete().eq("company_id", companyId).eq("id", deleteTarget.id);
     if (error) {
       showToast("Dosya silinirken hata oluştu.", "error");
       setDeleteTarget(null);
@@ -194,9 +201,10 @@ export default function IhracatlarPage() {
       const { count } = await supabase
         .from("ihracat_dosyalari")
         .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
         .eq("ana_siparis_id", anaSiparisId);
       if (!count || count === 0) {
-        await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId);
+        await supabase.from("ana_siparisler").delete().eq("company_id", companyId).eq("id", anaSiparisId);
       }
     }
 

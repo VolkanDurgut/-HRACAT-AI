@@ -99,7 +99,7 @@ export default function DashboardPage() {
 
     setDurumlar(combined);
     setLoading(false);
-  }, [user]);
+  }, [user, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

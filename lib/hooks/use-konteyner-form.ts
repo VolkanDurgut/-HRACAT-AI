@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase, Konteyner } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 
@@ -42,12 +42,12 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     });
   }, [companyId]);
 
-  const update = (field: keyof FormState, value: string) => {
+  const update = useCallback((field: keyof FormState, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: "" }));
-  };
+  }, []);
 
-  const validate = () => {
+  const validate = useCallback(() => {
     const e: Record<string, string> = {};
     const pattern = /^[A-Z]{4}[0-9]{7}$/;
     const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
@@ -55,9 +55,9 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     else if (!pattern.test(cleaned)) e.konteyner_no = "Format: 4 harf + 7 rakam (orn: ABCU1234567)";
     setErrors(e);
     return Object.keys(e).length === 0;
-  };
+  }, [form.konteyner_no]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!validate()) return;
     setSaving(true);
     const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
@@ -78,9 +78,9 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     setForm(EMPTY_FORM);
     showToast("Konteyner eklendi.", "success");
     onRefresh();
-  };
+  }, [validate, form, companyId, dosyaId, showToast, onRefresh]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
     const { error } = await supabase.from("konteynerler").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket kilidi eklendi
     if (error) {
@@ -91,9 +91,9 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     showToast(`${deleteTarget.konteynerNo} silindi.`, "success");
     setDeleteTarget(null);
     onRefresh();
-  };
+  }, [deleteTarget, companyId, showToast, onRefresh]);
 
-  const handleManuelAlanKaydet = async (konteynerId: string, alan: "net_agirlik_kg" | "brut_agirlik_kg" | "pieces", deger: number | null) => {
+  const handleManuelAlanKaydet = useCallback(async (konteynerId: string, alan: "net_agirlik_kg" | "brut_agirlik_kg" | "pieces", deger: number | null) => {
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("konteynerler").update({
       [alan]: deger,
@@ -105,9 +105,9 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
       return;
     }
     onRefresh();
-  };
+  }, [companyId, showToast, onRefresh]);
 
-  const handleTopluEkle = async (metin: string, rezervasyonId: string): Promise<{ basarili: number; hatali: string[] }> => {
+  const handleTopluEkle = useCallback(async (metin: string, rezervasyonId: string): Promise<{ basarili: number; hatali: string[] }> => {
     const satirlar = metin.trim().split("\n").filter(s => s.trim());
     const basarililar: any[] = [];
     const hatalilar: string[] = [];
@@ -149,9 +149,9 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     }
 
     return { basarili: basarililar.length, hatali: hatalilar };
-  };
+  }, [companyId, dosyaId, onRefresh]);
 
-  const handleHepsineUygula = async (kaynak: Konteyner, hedefIds: string[]): Promise<boolean> => {
+  const handleHepsineUygula = useCallback(async (kaynak: Konteyner, hedefIds: string[]): Promise<boolean> => {
     if (hedefIds.length === 0) return false;
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("konteynerler").update({
@@ -168,7 +168,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     showToast(`${hedefIds.length} konteynere uygulandı.`, "success");
     onRefresh();
     return true;
-  };
+  }, [companyId, showToast, onRefresh]);
 
   return {
     showForm, setShowForm,

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { callGeminiWithPdf, corsHeaders, errorResponse, successResponse, pdfToBase64 } from "../_shared/gemini-helper.ts";
+import { kotaKontrolVeLogla } from "../_shared/kota-kontrol.ts";
 
 type DbaVerisi = {
   dba_belge_no: string;
@@ -54,6 +55,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // AI kota kontrolü — Gemini çağrılmadan önce (maliyet koruması)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return errorResponse("Yetkilendirme gerekli. Lütfen giriş yapın.", 401);
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const kota = await kotaKontrolVeLogla(token, "dba-oku");
+    if (!kota.izin) {
+      return errorResponse(kota.mesaj, 403);
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 

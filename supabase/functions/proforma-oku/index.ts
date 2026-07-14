@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { callGeminiWithPdf, corsHeaders, errorResponse, successResponse, pdfToBase64 } from "../_shared/gemini-helper.ts";
+import { callGeminiWithPdf, corsHeaders, pdfToBase64, errorResponse, successResponse, requireAuthToken } from "../_shared/gemini-helper.ts";
+import { kotaKontrolVeLogla } from "../_shared/kota-kontrol.ts";
 
 function isProformaVerisi(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && typeof (value as Record<string, unknown>).satici_firma === "string";
@@ -85,6 +86,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // AI kota kontrolü — Gemini çağrılmadan önce (maliyet koruması)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return errorResponse("Yetkilendirme gerekli. Lütfen giriş yapın.", 401);
+    }
+    const token = authHeader.replace("Bearer ", "");
+    const kota = await kotaKontrolVeLogla(token, "proforma-oku");
+    if (!kota.izin) {
+      return errorResponse(kota.mesaj, 403);
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 

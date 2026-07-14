@@ -282,7 +282,7 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => goToAuth("login")} className="text-sm font-medium bg-emerald-500 text-white px-4 py-1.5 rounded-md hover:bg-emerald-600 transition-colors shadow-sm">
-            Projenizi başlatın
+            Dashboard
           </button>
         </div>
       </nav>
@@ -298,7 +298,7 @@ export default function Home() {
         </p>
         <div className="flex items-center justify-center w-full">
           <button onClick={() => goToAuth("login")} className="w-full sm:w-auto bg-emerald-500 text-white px-8 py-3 rounded-md font-medium text-base hover:bg-emerald-600 transition-all shadow-sm">
-            Projenizi başlatın
+            İhracat Başlatın
           </button>
         </div>
       </section>
@@ -428,7 +428,7 @@ export default function Home() {
           </p>
           <div className="flex items-center justify-center">
             <button onClick={() => goToAuth("login")} className="bg-emerald-500 text-white px-8 py-3 rounded-md font-medium text-base hover:bg-emerald-600 transition-all shadow-sm">
-              Projenizi başlatın
+              İhracat Başlatın
             </button>
           </div>
         </div>

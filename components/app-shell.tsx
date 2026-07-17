@@ -25,10 +25,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login");
+      router.replace("/");
       return;
     }
-    if (!loading && user && pathname !== "/login") {
+    if (!loading && user && pathname !== "/") {
       const yetkiKey = Object.entries(SAYFA_YETKI_MAP).find(([path]) => pathname.startsWith(path))?.[1];
       if (yetkiKey && !yetkiler.sayfa_yetkileri[yetkiKey]) {
         const gidilecek = Object.entries(SAYFA_YETKI_MAP).find(

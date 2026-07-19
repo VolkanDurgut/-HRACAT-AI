@@ -4,7 +4,7 @@ import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
-import { FileText, Pencil } from "lucide-react";
+import { FileText, Pencil, Loader2 } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
@@ -55,6 +55,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const { companyId } = useAuth(); // SaaS: şirket bazlı izolasyon için company_id kaynağı
   const [fumigationAyar, setFumigationAyar] = useState<FumigationAyari | null>(null);
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
+  // Hangi evrak hazirlaniyor: "ci" | "pl" | "fc" | null (her buton kendi loading'ini gosterir)
+  const [yukleniyor, setYukleniyor] = useState<"ci" | "pl" | "fc" | null>(null);
 
   const ciHazirlik = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
   const plHazirlik = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
@@ -150,25 +152,52 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     acBlobIle();
   };
 
-  const handleCommercialInvoiceOlustur = () => {
-    const html = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
-    kaydetVeAc(html, "commercial_invoice",
-      storageDosyaAdi(1, "commercial_invoice", dosya, rezervasyonlar),
-      gosterilecekDosyaAdi(1, "COMMERCIAL INVOICE", dosya, rezervasyonlar));
+  const handleCommercialInvoiceOlustur = async () => {
+    if (yukleniyor) return; // Cift tiklama koruması
+    setYukleniyor("ci");
+    try {
+      const html = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
+      await kaydetVeAc(html, "commercial_invoice",
+        storageDosyaAdi(1, "commercial_invoice", dosya, rezervasyonlar),
+        gosterilecekDosyaAdi(1, "COMMERCIAL INVOICE", dosya, rezervasyonlar));
+    } catch (err) {
+      console.error("Commercial Invoice olusturma hatasi:", err);
+      showToast("Commercial Invoice oluşturulamadı.", "error");
+    } finally {
+      setYukleniyor(null);
+    }
   };
 
-  const handlePackingListOlustur = () => {
-    const html = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
-    kaydetVeAc(html, "packing_list",
-      storageDosyaAdi(2, "packing_list", dosya, rezervasyonlar),
-      gosterilecekDosyaAdi(2, "PACKING LIST", dosya, rezervasyonlar));
+  const handlePackingListOlustur = async () => {
+    if (yukleniyor) return; // Cift tiklama koruması
+    setYukleniyor("pl");
+    try {
+      const html = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
+      await kaydetVeAc(html, "packing_list",
+        storageDosyaAdi(2, "packing_list", dosya, rezervasyonlar),
+        gosterilecekDosyaAdi(2, "PACKING LIST", dosya, rezervasyonlar));
+    } catch (err) {
+      console.error("Packing List olusturma hatasi:", err);
+      showToast("Packing List oluşturulamadı.", "error");
+    } finally {
+      setYukleniyor(null);
+    }
   };
 
-  const handleFumigationOlustur = () => {
-    const html = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
-    kaydetVeAc(html, "fumigation",
-      storageDosyaAdi(8, "fumigation", dosya, rezervasyonlar),
-      gosterilecekDosyaAdi(8, "FUMIGATION", dosya, rezervasyonlar));
+  const handleFumigationOlustur = async () => {
+    if (yukleniyor) return; // Cift tiklama koruması
+    setYukleniyor("fc");
+    try {
+      const html = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
+      await kaydetVeAc(html, "fumigation",
+        storageDosyaAdi(8, "fumigation", dosya, rezervasyonlar),
+        gosterilecekDosyaAdi(8, "FUMIGATION", dosya, rezervasyonlar));
+    } catch (err) {
+      console.error("Fumigation olusturma hatasi:", err);
+      showToast("Fumigation Certificate oluşturulamadı.", "error");
+    } finally {
+      setYukleniyor(null);
+    }
   };
 
   const btnClass = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors";
@@ -179,8 +208,16 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       <div className="flex items-center gap-1">
         {(show === "ci" || show === "both") && (
           ciHazirlik.hazir ? (
-            <button onClick={handleCommercialInvoiceOlustur} className={btnClass}>
-              <FileText size={12} /> Commercial Invoice
+            <button
+              onClick={handleCommercialInvoiceOlustur}
+              disabled={yukleniyor !== null}
+              className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
+            >
+              {yukleniyor === "ci" ? (
+                <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
+              ) : (
+                <><FileText size={12} /> Commercial Invoice</>
+              )}
             </button>
           ) : (
             <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>
@@ -190,8 +227,16 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         )}
         {(show === "pl" || show === "both") && (
           plHazirlik.hazir ? (
-            <button onClick={handlePackingListOlustur} className={btnClass}>
-              <FileText size={12} /> Packing List
+            <button
+              onClick={handlePackingListOlustur}
+              disabled={yukleniyor !== null}
+              className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
+            >
+              {yukleniyor === "pl" ? (
+                <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
+              ) : (
+                <><FileText size={12} /> Packing List</>
+              )}
             </button>
           ) : (
             <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>
@@ -202,8 +247,16 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         {(show === "fc" || show === "both") && (
           <div className="flex items-center gap-1">
             {fcHazirlik.hazir ? (
-              <button onClick={handleFumigationOlustur} className={btnClass}>
-                <FileText size={12} /> Fumigation Cert.
+              <button
+                onClick={handleFumigationOlustur}
+                disabled={yukleniyor !== null}
+                className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
+              >
+                {yukleniyor === "fc" ? (
+                  <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
+                ) : (
+                  <><FileText size={12} /> Fumigation Cert.</>
+                )}
               </button>
             ) : (
               <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>

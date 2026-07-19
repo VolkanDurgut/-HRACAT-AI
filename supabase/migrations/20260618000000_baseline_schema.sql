@@ -18,11 +18,12 @@
 --     - DROP POLICY IF EXISTS + CREATE POLICY  (politikayi guvenle yeniden kurar)
 --     - CREATE INDEX IF NOT EXISTS
 --     - CREATE OR REPLACE FUNCTION
+--     - DROP TRIGGER IF EXISTS + CREATE TRIGGER
 --   Icinde DROP TABLE / TRUNCATE / DELETE gibi VERI SILEN hicbir komut YOKTUR.
 --   Dolayisiyla yanlislikla dolu bir DB'de calissa bile veri KAYBETTIRMEZ.
 -- * Bos bir ortamda (yeni kurulum) calistirilirsa: canlinin birebir kopyasini
---   kurar. TEK istisna: auth.users uzerindeki handle_new_user TRIGGER'i
---   (asagida ayrica aciklanmistir).
+--   kurar. auth.users uzerindeki on_auth_user_created TRIGGER'i de dahil
+--   (17 Tem 2026'da eklendi; oncesinde eksikti — detay asagida).
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -534,21 +535,28 @@ end;
 $function$;
 
 -- ----------------------------------------------------------------------------
--- !!! ELLE KURULMASI GEREKEN TRIGGER — auth.users uzerinde !!!
+-- TRIGGER: on_auth_user_created — auth.users uzerinde
 -- ----------------------------------------------------------------------------
 -- Yukaridaki handle_new_user() FONKSIYONU tek basina yeterli DEGILDIR; onu
--- auth.users tablosuna baglayan bir TRIGGER gerekir. Canlida bu trigger ZATEN
--- KURULU (yeni kullanici kaydolunca otomatik sirket aciliyor). Ancak trigger'in
--- adi/tanimi teshis dokumunde yer almadigi ve auth semasi Supabase korumasinda
--- oldugu icin bu dosyaya birebir yazilmadi. SIFIRDAN bir ortam kurulursa,
--- asagidakine benzer sekilde (ad canlidaki ile teyit edilerek) olusturulmalidir:
+-- auth.users tablosuna baglayan bu TRIGGER olmadan yeni kullaniciya sirket/rol/
+-- yetki ACILMAZ.
 --
---   CREATE TRIGGER on_auth_user_created
---     AFTER INSERT ON auth.users
---     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+-- TARIHCE (onemli): Bu trigger canlida uzun sure HIC YOKTU. Fonksiyon vardi ama
+-- tetikleyici olmadigi icin kaydolan kullanicilar company_id'siz kaliyor ve
+-- uygulamada sonsuz "Yukleniyor" ekraninda takiliyordu. 17 Tem 2026'da canliya
+-- kuruldu ve dogrulandi (tgenabled = 'O'). Bu satirlar o kurulumun birebir
+-- kaydidir; boylece sifirdan bir ortam kurulumunda ayni hata tekrarlanmaz.
 --
--- CANLIDA ZATEN VAR — burada CALISTIRMAYIN.
+-- Idempotent: drop-if-exists + create ile tekrar tekrar calistirilabilir.
+-- NOT: 'auth' semasi Supabase korumasi altindadir. Bazi ortamlarda bu iki satir
+-- yetki hatasi verebilir; o durumda Supabase Dashboard uzerinden ayni trigger
+-- elle olusturulmalidir.
 -- ----------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================================
 -- INDEKSLER  (hepsi idempotent)

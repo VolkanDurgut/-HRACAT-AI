@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
-  Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote
+  Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote, FileType2, ExternalLink
 } from "lucide-react";
 
 type FaturaKontrolSonucu = {
@@ -186,12 +186,13 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         {dosya.fatura_dosya_url && faturaKontrolSonucu && (
           <div className="mt-2 space-y-2">
             <div className="flex items-center gap-2 p-3 rounded-lg bg-white border" style={{ borderColor: "#E2E8F0" }}>
-              <FileText size={16} className="text-slate-500 shrink-0" />
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 shrink-0" title="PDF dosyası"><FileType2 size={16} /></span>
               <a href={dosya.fatura_dosya_url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 truncate flex-1 hover:underline">
                 {dosya.fatura_dosya_adi}
               </a>
               {dosya.fatura_yukleme_tarihi && <span className="text-xs text-slate-400 shrink-0">{formatDateTimeTR(dosya.fatura_yukleme_tarihi)}</span>}
-              <button onClick={handleFaturaYenidenYukle} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
+              <a href={dosya.fatura_dosya_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shrink-0" title="Faturayı yeni sekmede aç"><ExternalLink size={12} /> Görüntüle</a>
+              <button onClick={handleFaturaYenidenYukle} className="text-slate-400 hover:text-slate-600 shrink-0" title="Faturayı kaldır"><X size={16} /></button>
             </div>
 
             {faturaKontrolSonucu.uyumlu ? (

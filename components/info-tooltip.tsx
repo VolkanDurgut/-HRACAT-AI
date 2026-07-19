@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 
 type Variant = "warning" | "danger" | "info";
 type Position = "top" | "bottom";
+type Align = "center" | "left" | "right";
 
 type Props = {
   /** Tooltip icinde gosterilecek metin. Kalin baslik icin **metin** kullanabilirsiniz (basit markdown destegi yok, JSX verin). */
@@ -12,6 +13,8 @@ type Props = {
   variant?: Variant;
   /** Tooltip'in ikona gore konumu */
   position?: Position;
+  /** Tooltip'in yatay hizalamasi. right = tooltip sola dogru acilir (sag kenardaki ikonlar icin). */
+  align?: Align;
   /** Tooltip genisligi (Tailwind width sinifi) */
   width?: string;
   /** Ikon boyutu */
@@ -39,6 +42,7 @@ export default function InfoTooltip({
   children,
   variant = "warning",
   position = "top",
+  align = "center",
   width = "w-56",
   size = 13,
   badge,
@@ -49,6 +53,12 @@ export default function InfoTooltip({
   const positionClasses = position === "top"
     ? "bottom-full mb-1.5"
     : "top-full mt-1.5";
+
+  // Yatay hizalama: right => tooltip sola dogru acilir (ekran sagindan tasmayi onler)
+  const alignClasses =
+    align === "right" ? "right-0" :
+    align === "left"  ? "left-0"  :
+    "left-1/2 -translate-x-1/2";
 
   return (
     <div className="relative inline-flex items-center">
@@ -68,7 +78,7 @@ export default function InfoTooltip({
       </button>
       {open && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 ${positionClasses} ${width} p-2.5 rounded-lg shadow-lg border bg-white z-20 animate-fade-in`}
+          className={`absolute ${alignClasses} ${positionClasses} ${width} max-w-[calc(100vw-2rem)] p-2.5 rounded-lg shadow-lg border bg-white z-20 animate-fade-in`}
           style={{ borderColor: "#E2E8F0" }}
         >
           <p className="text-xs text-slate-700 leading-relaxed">{children}</p>

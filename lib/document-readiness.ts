@@ -21,7 +21,6 @@ export function checkCommercialInvoiceReadiness(
   if (!dosya.alici_firma) eksikler.push("Alıcı Firma");
   if (!dosya.alici_adresi) eksikler.push("Alıcı Adresi");
   if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
-  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
   if (!dosya.hesap_adi) eksikler.push("Hesap Adı");
   if (!dosya.banka) eksikler.push("Banka");
   if (!dosya.swift) eksikler.push("SWIFT Kodu");

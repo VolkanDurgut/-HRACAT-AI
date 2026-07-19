@@ -220,7 +220,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
               )}
             </button>
           ) : (
-            <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>
+            <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
               <span className="font-semibold text-amber-600">Commercial Invoice eksik bilgiler:</span> {ciHazirlik.eksikler.join(", ")}
             </InfoTooltip>
           )
@@ -239,7 +239,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
               )}
             </button>
           ) : (
-            <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>
+            <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
               <span className="font-semibold text-amber-600">Packing List eksik bilgiler:</span> {plHazirlik.eksikler.join(", ")}
             </InfoTooltip>
           )
@@ -259,7 +259,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
                 )}
               </button>
             ) : (
-              <InfoTooltip variant="warning" position="bottom" width="w-64" size={14}>
+              <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
                 <span className="font-semibold text-amber-600">Fumigation Certificate eksik bilgiler:</span> {fcHazirlik.eksikler.join(", ")}
               </InfoTooltip>
             )}

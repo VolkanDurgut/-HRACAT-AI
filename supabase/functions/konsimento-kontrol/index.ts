@@ -8,14 +8,18 @@ type KontrolSonucu = {
   ozet: string;
   consignee: string;
   notify: string[];
+  bl_no?: string;
 };
 
 function isKontrolSonucu(value: unknown): value is KontrolSonucu {
   return typeof value === "object" && value !== null && typeof (value as KontrolSonucu).uyumlu === "boolean";
 }
 
-function buildPrompt(sistemVerisi: Record<string, unknown>): string {
-  return `Ekte bir konşimento talimatı (Bill of Lading Instruction) dosyası bulunmaktadır. Bu dosyadaki bilgileri, aşağıda JSON olarak verilen bizim sistemimizdeki kayıtlı verilerle karşılaştır.
+function buildPrompt(sistemVerisi: Record<string, unknown>, belgeTipi: string): string {
+  const belgeAdi = belgeTipi === "draft_bl"
+    ? "taslak konşimento (Draft Bill of Lading)"
+    : "konşimento talimatı (Bill of Lading Instruction)";
+  return `Ekte bir ${belgeAdi} dosyası bulunmaktadır. Bu dosyadaki bilgileri, aşağıda JSON olarak verilen bizim sistemimizdeki kayıtlı verilerle karşılaştır.
 
 SISTEMDEKI VERI:
 ${JSON.stringify(sistemVerisi, null, 2)}
@@ -33,6 +37,9 @@ Karşılaştırmada şu noktalara dikkat et:
 - Net/Brüt ağırlık veya kap adedinde fark varsa (sistemde kayıtlı değerle dosyadaki değer farklıysa), bunu da uyumsuzluk olarak bildir; hangi konteynere ait olduğunu "alan" kısmında belirt (örnek: "MRKU7041920 - Net Ağırlık").
 - Sistemde bir konteyner için Net/Brüt/Kap Adeti henüz hiç girilmemişse (boş/null ise), bunu uyumsuzluk SAYMA, çünkü bu bilgi henüz idari personel tarafından girilmemiş olabilir.
 - Sistemde olmayan ama dosyada olan bilgileri (örn. dosyada yazan ama bizim sistemde tutmadığımız alanlar) görmezden gel.
+- CONSIGNEE ve ALICI FIRMA AYRIMI (çok önemli): Dosyadaki "Consignee" alanını SADECE sistemdeki "consignee" değeriyle karşılaştır. Consignee'yi ASLA "alici_firma" ile karşılaştırma; bunlar farklı alanlardır. Konşimentolarda Consignee sıklıkla "TO ORDER", "TO ORDER OF SHIPPER" veya bir banka adı olabilir; bu, alıcı firmadan farklı olduğu için uyumsuzluk DEĞİLDİR ve bunu asla "alici_firma" uyumsuzluğu olarak bildirme.
+- SISTEMDE BOŞ OLAN ALANLAR: Sistemdeki bir alan boş, null veya tanımsız ise (örneğin bl_no henüz girilmemişse), dosyada o bilgi bulunsa bile bunu uyumsuzluk SAYMA. Bu bilgi henüz sisteme girilmemiş demektir, hata değildir.
+- BL NUMARASI: Dosyada bir konşimento/BL numarası (Bill of Lading No, B/L No, Document No) varsa bunu tespit et ve "bl_no" alanına yaz. Yoksa boş string döndür.
 - Ayrıca dosyadan "Consignee" (malı teslim alacak taraf, alıcıdan farklı olabilir) bilgisini çıkar ve mutlaka doldur. Consignee yoksa boş string döndür.
 - Dosyada bulunan TÜM "Notify" veya "Notify Party" (Bildirim Yapılacak Taraf) bilgilerini tespit et. Bazen birden fazla Notify (Notify 1, Also Notify vb.) olabilir. Bunları tam adres ve unvanlarıyla birlikte bir dizi (array) olarak çıkar. Eğer hiç Notify bilgisi yoksa boş bir dizi [] döndür.
 
@@ -44,7 +51,8 @@ Yanıtını SADECE şu JSON formatında ver, başka hiçbir metin ekleme:
   ],
   "ozet": "Kisa, 1-2 cumlelik Turkce ozet. Eger uyumlu ise olumlu bir mesaj yaz.",
   "consignee": "Consignee firma adi ve adresi (varsa)",
-  "notify": ["Birinci notify unvan ve adresi", "Ikinci notify unvan ve adresi (varsa)"]
+  "notify": ["Birinci notify unvan ve adresi", "Ikinci notify unvan ve adresi (varsa)"],
+  "bl_no": "Dosyadaki konsimento/BL numarasi (varsa, yoksa bos string)"
 }`;
 }
 
@@ -82,10 +90,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const sistemVerisi = JSON.parse(sistemVerisiRaw);
+    // Belge tipi: "talimat" (varsayilan) veya "draft_bl"
+    const belgeTipi = (formData.get("belge_tipi") as string | null) || "talimat";
     const arrayBuffer = await file.arrayBuffer();
     const base64 = pdfToBase64(new Uint8Array(arrayBuffer));
 
-    const prompt = buildPrompt(sistemVerisi);
+    const prompt = buildPrompt(sistemVerisi, belgeTipi);
     const sonuc = await callGeminiWithPdf(base64, file.type || "application/pdf", prompt, isKontrolSonucu);
 
     return successResponse(sonuc);

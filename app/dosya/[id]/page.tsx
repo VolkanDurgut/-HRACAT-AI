@@ -20,6 +20,7 @@ import { Loader2, Package, FileCheck, Copy } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
+import DraftBlSection from "@/components/draft-bl-section";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -298,7 +299,10 @@ function DosyaDetailContent() {
 
       {activeTab === "evraklar" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+          <div className="space-y-4">
+            <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+            <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+          </div>
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
             <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: "#E2E8F0" }}>
               <Package size={16} style={{ color: "#1B2B4B" }} />

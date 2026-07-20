@@ -135,7 +135,7 @@ function DosyaDetailContent() {
       <AppShell>
         <div className="text-center py-20">
           <p className="text-slate-400">Dosya bulunamadi</p>
-          <button onClick={() => router.push("/panel")} className="text-amber-600 text-sm mt-2 hover:underline">
+          <button onClick={() => router.push("/panel")} className="text-emerald-600 text-sm mt-2 hover:underline">
             Ana Panele Don
           </button>
         </div>
@@ -189,7 +189,7 @@ function DosyaDetailContent() {
                 !canAccessTab(tab.key)
                   ? "border-transparent text-slate-300 cursor-not-allowed"
                   : activeTab === tab.key
-                  ? "border-amber-500 text-amber-600"
+                  ? "border-emerald-500 text-emerald-600"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -376,7 +376,7 @@ function DosyaDetailContent() {
 
 export default function DosyaDetailPage() {
   return (
-    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-amber-500" /></div></AppShell>}>
+    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-emerald-500" /> </div></AppShell>}>
       <DosyaDetailContent />
     </Suspense>
   );

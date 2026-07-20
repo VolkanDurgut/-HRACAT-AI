@@ -61,9 +61,14 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const consigneeText = (dosya as any).consignee || "";
   const consigneeKaynak = (dosya.ham_veri as any)?.consignee_kaynak || null;
 
+  // Cuval marka listesi: ham_veri icinde dizi olarak tutulur. Konteyner tablosundaki secim listesini besler.
+  const mevcutMarkaListesi = (dosya.ham_veri as any)?.marka_listesi || [];
+  const markaListesiText = Array.isArray(mevcutMarkaListesi) ? mevcutMarkaListesi.join("\n") : "";
+
   const buildEmptyForm = () => ({
     notify: notifyText,
     consignee: consigneeText,
+    marka_listesi: markaListesiText,
     lot_no: (dosya as any).lot_no || "",
     marka: (dosya as any).marka || "",
     navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
@@ -113,7 +118,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       ham_veri: {
         ...(dosya.ham_veri as any || {}),
         notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : [],
-        consignee_kaynak: form.consignee ? yeniKaynak : null
+        consignee_kaynak: form.consignee ? yeniKaynak : null,
+        marka_listesi: form.marka_listesi ? form.marka_listesi.split("\n").map(m => m.trim()).filter(Boolean) : []
       }
     };
 
@@ -229,6 +235,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         <div className="grid grid-cols-2 gap-3">
           <CopyableField label="Lot No" value={(dosya as any).lot_no} />
           <CopyableField label="Marka" value={(dosya as any).marka} />
+          {mevcutMarkaListesi.length > 1 && (
+            <CopyableField label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
+          )}
           <CopyableField label="Navlun (Konteyner Basi)" value={formatCurrency(navlunBirimFiyati, dosya.para_birimi)} />
           <CopyableField label="Lokal Masraf (Konteyner Basi)" value={formatCurrency(lokalMasrafBirimFiyati, dosya.para_birimi)} />
           <CopyableField label="Beyanname No" value={(dosya as any).beyanname_no} />
@@ -283,6 +292,10 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Marka</label>
           <input value={form.marka} onChange={(e) => update("marka", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        </div>
+        <div className="col-span-2 md:col-span-3">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Çuval Marka Listesi (her satıra bir marka yazın — konteyner tablosunda seçim listesi olarak çıkar)</label>
+          <textarea value={form.marka_listesi} onChange={(e) => update("marka_listesi", e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="DIVA BRAND&#10;MILA BRAND" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Beyanname No</label>

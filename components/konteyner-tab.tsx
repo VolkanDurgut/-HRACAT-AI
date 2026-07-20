@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI } from "@/lib/supabase";
+import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase } from "@/lib/supabase";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { useKonteynerForm } from "@/lib/hooks/use-konteyner-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -185,6 +185,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Konteyner No</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Muhur No</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Tip</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Çuval</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Plaka</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Dara</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Net</th>
@@ -197,6 +198,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
               </thead>
               <tbody>
                 {konteynerler.map((k, i) => {
+                  const markaListesi: string[] = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
                   const dbaVeri = k.dba_kontrol_sonucu as { uyusmazliklar?: string[] } | null;
                   const uyusmazlik = (dbaVeri?.uyusmazliklar?.length ?? 0) > 0;
                   return (
@@ -217,6 +219,9 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
                         ) : "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{k.tip}</td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        <MarkaHucresi konteynerId={k.id} deger={(k as any).marka} secenekler={markaListesi} companyId={companyId} onKaydedildi={onRefresh} />
+                      </td>
                       <td className="px-4 py-3 text-sm text-slate-600">{k.plaka || <span className="text-slate-300">-</span>}</td>
                       <td className="px-4 py-3 text-sm text-slate-600 text-right">{k.tare_kg ? `${k.tare_kg} KG` : <span className="text-slate-300">-</span>}</td>
                       <td className="px-4 py-3">
@@ -285,7 +290,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
               {konteynerler.length > 0 && (
                 <tfoot>
                   <tr className="border-t-2" style={{ borderColor: "#E2E8F0", backgroundColor: "#FAFBFC" }}>
-                    <td colSpan={6} className="px-4 py-3 text-xs font-bold text-slate-600 text-right">TOPLAM</td>
+                    <td colSpan={7} className="px-4 py-3 text-xs font-bold text-slate-600 text-right">TOPLAM</td>
                     <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
                       {toplamNet > 0 ? `${toplamNet.toLocaleString("tr-TR")} KG` : "-"}
                     </td>
@@ -434,5 +439,48 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
         />
       </div>
     </div>
+  );
+}
+// Konteyner bazinda cuval markasi hucresi.
+// Marka listesi doluysa acilir liste, bossa serbest metin olarak calisir.
+function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi }: {
+  konteynerId: string; deger: string | null; secenekler: string[]; companyId: string; onKaydedildi: () => void;
+}) {
+  const [duzenle, setDuzenle] = React.useState(false);
+  const [taslak, setTaslak] = React.useState(deger || "");
+  const [kaydediyor, setKaydediyor] = React.useState(false);
+
+  const kaydet = async (yeniDeger: string) => {
+    setKaydediyor(true);
+    try {
+      await supabase.from("konteynerler").update({ marka: yeniDeger || null }).eq("id", konteynerId).eq("company_id", companyId);
+      onKaydedildi();
+    } finally {
+      setKaydediyor(false);
+      setDuzenle(false);
+    }
+  };
+
+  if (kaydediyor) return <span className="text-xs text-slate-400">Kaydediliyor...</span>;
+
+  if (!duzenle) {
+    return (
+      <span className="cursor-pointer hover:text-emerald-600 text-sm" onClick={() => { setTaslak(deger || ""); setDuzenle(true); }} title="Düzenlemek için tıklayın">
+        {deger || <span className="text-slate-300">-</span>}
+      </span>
+    );
+  }
+
+  if (secenekler.length > 0) {
+    return (
+      <select autoFocus value={taslak} onChange={(e) => kaydet(e.target.value)} onBlur={() => setDuzenle(false)} className="text-sm border rounded px-2 py-1 w-full" style={{ borderColor: "#E2E8F0" }}>
+        <option value="">- Seçiniz -</option>
+        {secenekler.map((s) => (<option key={s} value={s}>{s}</option>))}
+      </select>
+    );
+  }
+
+  return (
+    <input autoFocus value={taslak} onChange={(e) => setTaslak(e.target.value)} onBlur={() => kaydet(taslak)} onKeyDown={(e) => { if (e.key === "Enter") kaydet(taslak); if (e.key === "Escape") setDuzenle(false); }} className="text-sm border rounded px-2 py-1 w-full" style={{ borderColor: "#E2E8F0" }} placeholder="Marka" />
   );
 }

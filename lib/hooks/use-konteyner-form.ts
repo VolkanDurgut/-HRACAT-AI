@@ -8,16 +8,17 @@ type FormState = {
   muhur_no: string;
   tip: string;
   rezervasyon_id: string;
+  marka: string;
 };
 
-const EMPTY_FORM: FormState = { konteyner_no: "", muhur_no: "", tip: "20DC", rezervasyon_id: "" };
+const EMPTY_FORM: FormState = { konteyner_no: "", muhur_no: "", tip: "20DC", rezervasyon_id: "", marka: "" };
 
 /**
  * Konteynerler sekmesindeki tum form state'ini ve veritabani islemlerini
  * (ekleme, silme, manuel alan kaydetme, kullanici haritasi) yoneten hook.
  * Bilesik component'i (konteyner-tab.tsx) sadece UI cizmekle sorumlu birakir.
  */
-export function useKonteynerForm(dosyaId: string, onRefresh: () => void, companyId: string) { // companyId eklendi
+export function useKonteynerForm(dosyaId: string, onRefresh: () => void, companyId: string, varsayilanMarka: string = "") {
   const { showToast } = useToast();
 
   const [showForm, setShowForm] = useState(false);
@@ -68,6 +69,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
       muhur_no: form.muhur_no || null,
       tip: form.tip,
       rezervasyon_id: form.rezervasyon_id || null,
+      marka: form.marka || varsayilanMarka || null,
     });
     setSaving(false);
     if (error) {
@@ -75,7 +77,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
       return;
     }
     setShowForm(false);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, marka: varsayilanMarka });
     showToast("Konteyner eklendi.", "success");
     onRefresh();
   }, [validate, form, companyId, dosyaId, showToast, onRefresh]);
@@ -129,6 +131,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
         muhur_no: muhurNo,
         tip: "20DC",
         rezervasyon_id: rezervasyonId || null,
+        marka: varsayilanMarka || null,
       });
     }
 
@@ -158,6 +161,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
       net_agirlik_kg: (kaynak as any).net_agirlik_kg ?? null,
       brut_agirlik_kg: (kaynak as any).brut_agirlik_kg ?? null,
       pieces: (kaynak as any).pieces ?? null,
+      marka: (kaynak as any).marka ?? null,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
     }).in("id", hedefIds).eq("company_id", companyId); // Şirket kilidi eklendi

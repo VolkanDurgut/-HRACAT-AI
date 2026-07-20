@@ -25,6 +25,9 @@ type Props = {
 };
 
 export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId }: Props) {
+  const markaListesi = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
+  const varsayilanMarka = markaListesi.length === 1 ? markaListesi[0] : "";
+
   const {
     showForm, setShowForm,
     saving,
@@ -37,7 +40,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
     handleManuelAlanKaydet,
     handleTopluEkle,
     handleHepsineUygula,
-  } = useKonteynerForm(dosyaId, onRefresh, companyId);
+  } = useKonteynerForm(dosyaId, onRefresh, companyId, varsayilanMarka);
 
   const [showTopluForm, setShowTopluForm] = React.useState(false);
   const [topluMetin, setTopluMetin] = React.useState("");
@@ -322,7 +325,7 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
         open={uygulaConfirm}
         onOpenChange={(open) => { if (!open) setUygulaConfirm(false); }}
         title="Değerler üzerine yazılsın mı?"
-        description="Diğer konteynerlerde girilmiş net / brüt / kap değerleri, ilk konteynerinkiyle değiştirilecek. Devam edilsin mi?"
+        description="Diğer konteynerlerde girilmiş çuval markası, net, brüt ve kap değerleri ilk konteynerinkiyle değiştirilecek. Devam edilsin mi?"
         confirmLabel="Evet, Uygula" cancelLabel="Vazgeç"
         onConfirm={uygulaOnayli}
       />

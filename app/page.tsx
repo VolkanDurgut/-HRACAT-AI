@@ -280,9 +280,15 @@ export default function Home() {
             <a href="#" className="hover:text-slate-900 transition-colors">Fiyatlandırma</a>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => goToAuth("login")} className="text-sm font-medium bg-emerald-500 text-white px-4 py-1.5 rounded-md hover:bg-emerald-600 transition-colors shadow-sm">
-            Dashboard
+        <div className="flex items-center gap-5">
+          {/* Supabase tarzı hayalet (ghost) Sign In butonu */}
+          <button onClick={() => goToAuth("login")} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
+            Sign in
+          </button>
+          
+          {/* Supabase tarzı ana (primary) Start your project butonu */}
+          <button onClick={() => goToAuth("register")} className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
+            Start your project
           </button>
         </div>
       </nav>
@@ -296,9 +302,15 @@ export default function Home() {
         <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
           İhracat operasyonlarınıza yapay zeka ile başlayın. AI destekli belge okuma, %100 uyumlu evrak üretimi, akıllı cut-off takibi ve navlun yönetimi ekleyin.
         </p>
-        <div className="flex items-center justify-center w-full">
-          <button onClick={() => goToAuth("login")} className="w-full sm:w-auto bg-emerald-500 text-white px-8 py-3 rounded-md font-medium text-base hover:bg-emerald-600 transition-all shadow-sm">
-            İhracat Başlatın
+        <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
+          {/* Supabase tarzı ana aksiyon butonu */}
+          <button onClick={() => goToAuth("login")} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
+            Start your project
+          </button>
+          
+          {/* Supabase tarzı ikincil aksiyon butonu */}
+          <button onClick={() => goToAuth("register")} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium transition-all bg-white border rounded-md shadow-sm text-slate-700 border-slate-300 hover:bg-slate-50">
+            Request a demo
           </button>
         </div>
       </section>
@@ -427,8 +439,8 @@ export default function Home() {
             Kullanıcı verileriniz şifrelenmiş sunucularda barınır. Sadece yetkili personelleriniz verilere erişebilir. Daima kontroldesiniz.
           </p>
           <div className="flex items-center justify-center">
-            <button onClick={() => goToAuth("login")} className="bg-emerald-500 text-white px-8 py-3 rounded-md font-medium text-base hover:bg-emerald-600 transition-all shadow-sm">
-              İhracat Başlatın
+            <button onClick={() => goToAuth("login")} className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
+              Start your project
             </button>
           </div>
         </div>

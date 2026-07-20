@@ -140,24 +140,24 @@ function RezervasyonFormFields({ form, update, updateSaat, errors }: {
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Booking No *</label>
-        <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} maxLength={50} />
+        <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} maxLength={50} />
         {errors.booking_no && <p className="text-xs text-red-500 mt-0.5">{errors.booking_no}</p>}
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Gemi Adi</label>
-        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: NAVIOS AZURE" />
+        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: NAVIOS AZURE" />
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Sefer No (Voyage No)</label>
-        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: 1BM21S1MA" />
+        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: 1BM21S1MA" />
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Acente Ismi</label>
-        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: MSC, CMA CGM" />
+        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: MSC, CMA CGM" />
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Yukleme Limani</label>
-        <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Konteyner Adedi</label>
@@ -191,7 +191,7 @@ function RezervasyonFormFields({ form, update, updateSaat, errors }: {
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">Ekipman Alim Yeri</label>
-        <input value={form.ekipman_alim_yeri} onChange={(e) => update("ekipman_alim_yeri", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <input value={form.ekipman_alim_yeri} onChange={(e) => update("ekipman_alim_yeri", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
       </div>
     </div>
   );

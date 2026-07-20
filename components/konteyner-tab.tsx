@@ -331,16 +331,28 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
       />
 
       {!showForm ? (
-        <div className="flex gap-2">
-        <button onClick={() => { setShowForm(true); setShowTopluForm(false); }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
-          <Plus size={16} /> Konteyner Ekle
-        </button>
-        <button onClick={() => { setShowTopluForm(true); setShowForm(false); }}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-          <ClipboardList size={16} /> Toplu Ekle
-        </button>
-      </div>
+        showTopluForm ? null : rezervasyonlar.length === 0 ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+            <div>
+              <h4 className="text-sm font-medium text-amber-800">Rezervasyon Gerekli</h4>
+              <p className="text-xs text-amber-700 mt-1">
+                Konteyner ekleyebilmek için öncelikle sisteme en az bir adet rezervasyon girmeniz gerekmektedir. Lütfen <strong className="font-semibold">Rezervasyon</strong> sekmesinden kayıt oluşturun.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={() => { setShowForm(true); setShowTopluForm(false); }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+              <Plus size={16} /> Konteyner Ekle
+            </button>
+            <button onClick={() => { setShowTopluForm(true); setShowForm(false); }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+              <ClipboardList size={16} /> Toplu Ekle
+            </button>
+          </div>
+        )
       ) : (
         <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

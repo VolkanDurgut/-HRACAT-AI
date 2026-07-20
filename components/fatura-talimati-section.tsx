@@ -51,6 +51,16 @@ export default function FaturaTalimatiSection({
   const konsimentoYuklemeTarihi = dosya.konsimento_yukleme_tarihi;
   const kontrolSonucu = dosya.konsimento_kontrol_sonucu as KontrolSonucu | null;
 
+  // Tüm konteynerlerin net, brüt ve kap adetlerinin dolu olup olmadığını kontrol ediyoruz
+  const tumKonteynerlerDolu = konteynerler.length > 0 && konteynerler.every(k => 
+    k.net_agirlik_kg != null && 
+    (k as any).brut_agirlik_kg != null && 
+    (k as any).pieces != null
+  );
+
+  // Konşimento butonunun aktif olması için hem sayının tutması hem de verilerin tam olması gerekiyor
+  const konsimentoHazir = faturaTalimatiHazir && tumKonteynerlerDolu;
+
   const buildKonu = () => [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani].filter(Boolean).join(" - ");
 
   const buildMetin = () => {
@@ -329,9 +339,18 @@ export default function FaturaTalimatiSection({
     <div className="pt-2 border-t space-y-4" style={{ borderColor: "#F1F5F9" }}>
       {!showKonsimento ? (
         <div className="space-y-3">
-          <button onClick={() => setShowKonsimento(true)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: "#1B2B4B" }}>
-            <FileText size={16} /> {konsimentoDosyaUrl ? "Konsimento Talimatini Goruntule" : "Konsimento Talimati Yukle"}
-          </button>
+          {!konsimentoHazir && !konsimentoDosyaUrl ? (
+            <div>
+              <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 bg-slate-100 cursor-not-allowed">
+                <FileText size={16} /> Konşimento Talimatı Yükle
+              </button>
+              <p className="text-xs text-slate-400 mt-1.5 text-center">Aktif olması için tüm konteynerlerin kap, net ve brüt bilgileri girilmelidir.</p>
+            </div>
+          ) : (
+            <button onClick={() => setShowKonsimento(true)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: "#1B2B4B" }}>
+              <FileText size={16} /> {konsimentoDosyaUrl ? "Konsimento Talimatini Goruntule" : "Konsimento Talimati Yukle"}
+            </button>
+          )}
         </div>
       ) : (
         <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-in" style={{ borderColor: "#E2E8F0" }}>

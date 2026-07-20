@@ -57,8 +57,13 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const mevcutNotify = (dosya.ham_veri as any)?.notify || [];
   const notifyText = Array.isArray(mevcutNotify) ? mevcutNotify.join("\n\n") : "";
 
+  // Consignee: DB'de text kolonu. Kaynak bilgisi ham_veri icinde metadata olarak tutulur.
+  const consigneeText = (dosya as any).consignee || "";
+  const consigneeKaynak = (dosya.ham_veri as any)?.consignee_kaynak || null;
+
   const buildEmptyForm = () => ({
     notify: notifyText,
+    consignee: consigneeText,
     lot_no: (dosya as any).lot_no || "",
     marka: (dosya as any).marka || "",
     navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
@@ -86,7 +91,12 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
   const handleSave = async () => {
     setSaving(true);
+    // Consignee elle degistirildiyse kaynagi "manuel" olarak isaretle
+    const consigneeDegisti = (form.consignee || "") !== (consigneeText || "");
+    const yeniKaynak = consigneeDegisti ? "manuel" : consigneeKaynak;
+
     const payload = {
+      consignee: form.consignee || null,
       lot_no: form.lot_no || null,
       marka: form.marka || null,
       navlun_tutari: form.navlun_tutari ? parseFloat(form.navlun_tutari) : null,
@@ -102,7 +112,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       // Mevcut ham_veri objesini bozmadan, düzenlediğimiz yeni notify listesini ekliyoruz
       ham_veri: {
         ...(dosya.ham_veri as any || {}),
-        notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : []
+        notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : [],
+        consignee_kaynak: form.consignee ? yeniKaynak : null
       }
     };
 
@@ -191,6 +202,20 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         </div>
 
         {renderUrunFiyatlari(false)}
+
+        {consigneeText && (
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consignee (ALICI)</p>
+              {consigneeKaynak === "manuel" && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">elle girildi</span>
+              )}
+            </div>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 whitespace-pre-wrap text-sm text-slate-700 font-medium">
+              {consigneeText}
+            </div>
+          </div>
+        )}
 
         {mevcutNotify.length > 0 && (
           <div className="mb-4">
@@ -292,6 +317,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
         </div>
         
+        <div className="col-span-2 md:col-span-3">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Consignee (Alıcı — firma adı ve adresi. Konşimento talimatı yüklenmediyse buradan elle girebilirsiniz.)</label>
+          <textarea value={form.consignee} onChange={(e) => update("consignee", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="ALICI FIRMA LTD.&#10;Adres satırı...&#10;Şehir, Ülke" />
+        </div>
+
         <div className="col-span-2 md:col-span-3">
           <label className="block text-xs font-medium text-slate-600 mb-1">Notify (Birden fazla Notify varsa aralarında bir boş satır bırakarak yazın)</label>
           <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="Firma Adı A.Ş.&#10;Adres satırı...&#10;&#10;İkinci Notify Firma...&#10;Adres..." />

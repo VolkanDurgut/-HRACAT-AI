@@ -367,20 +367,20 @@ export default function DashboardPage() {
       {kapalilar.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Package size={16} className="text-slate-400" />
-            <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Tamamlanan Dosyalar</h2>
+            <Package size={16} style={{ color: TEXT_MUTED }} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Tamamlanan Dosyalar</h2>
           </div>
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+          <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Dosya No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Alıcı</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-400">Konteyner</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Booking No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Gemi</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400">Kalkış</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-400"></th>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Dosya No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Alıcı</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Booking No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Gemi</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Kalkış</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -388,15 +388,15 @@ export default function DashboardPage() {
                   const rez = rezervasyonlar[0];
                   const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
                   return (
-                    <tr key={dosya.id} className={`border-b last:border-0 opacity-60 hover:opacity-100 transition-opacity animate-fade-up ${staggerClass}`} style={{ borderColor: "#F1F5F9" }}>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-600">{dosya.dosya_no}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[180px] truncate">{dosya.alici_firma || "-"}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500 text-right">{rez?.konteyner_adedi || "-"}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-slate-500">{rez?.booking_no || "-"}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{rez?.gemi_adi || "-"}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</td>
+                    <tr key={dosya.id} className={`border-b last:border-0 opacity-70 hover:opacity-100 transition-opacity animate-fade-up ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-4 py-3 text-sm font-medium text-white">{dosya.dosya_no}</td>
+                      <td className="px-4 py-3 text-xs max-w-[180px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</td>
+                      <td className="px-4 py-3 text-xs text-right" style={{ color: TEXT_MUTED }}>{rez?.konteyner_adedi || "-"}</td>
+                      <td className="px-4 py-3 text-xs font-mono" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "-"}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: TEXT_MUTED }}>{rez?.gemi_adi || "-"}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: TEXT_MUTED }}>{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</td>
                       <td className="px-4 py-3 text-right">
-                        <Link href={`/dosya/${dosya.id}`} className="text-xs text-slate-400 hover:text-amber-600">
+                        <Link href={`/dosya/${dosya.id}`} className="text-xs hover:text-amber-500" style={{ color: TEXT_MUTED }}>
                           <ChevronRight size={14} />
                         </Link>
                       </td>

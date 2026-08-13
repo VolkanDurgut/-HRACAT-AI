@@ -41,8 +41,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F8F9FA" }}>
-        <Loader2 size={32} className="animate-spin text-amber-500" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0B0F14" }}>
+        <Loader2 size={32} className="animate-spin text-emerald-500" />
       </div>
     );
   }
@@ -50,7 +50,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F8F9FA" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#0B0F14" }}>
       <Sidebar />
       <main className="md:ml-[240px] min-h-screen">
         <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>

@@ -12,6 +12,7 @@ import { CopyableField } from "@/components/copyable-field";
 import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 type AnaSiparisWithProgress = AnaSiparis & { gonderilmisMts: number; dosyaSayisi: number };
@@ -242,35 +243,35 @@ export default function IhracatlarPage() {
 
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <Archive size={22} style={{ color: "#1B2B4B" }} />
-          <h1 className="text-2xl font-bold" style={{ color: "#1B2B4B" }}>İhracatlar Arşivi</h1>
+          <Archive size={22} style={{ color: ACCENT }} />
+          <h1 className="text-2xl font-bold text-white">İhracatlar Arşivi</h1>
         </div>
-        <p className="text-slate-500 text-sm ml-7">Tamamlanmış dosyalar ve devam eden siparişleriniz</p>
+        <p className="text-sm ml-7" style={{ color: TEXT_MUTED }}>Tamamlanmış dosyalar ve devam eden siparişleriniz</p>
       </div>
 
       {!siparisLoading && acikSiparisler.length > 0 && (
         <div className="mb-8 space-y-3">
           <div className="flex items-center gap-2">
-            <Package size={16} style={{ color: "#1B2B4B" }} />
-            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Devam Eden Siparişler</h2>
+            <Package size={16} style={{ color: ACCENT }} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Devam Eden Siparişler</h2>
           </div>
           {acikSiparisler.map((s, idx) => {
             const kalan = Math.max(0, (s.toplam_mts || 0) - s.gonderilmisMts);
             const yuzde = s.toplam_mts ? Math.min(100, (s.gonderilmisMts / s.toplam_mts) * 100) : 0;
             const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
             return (
-              <div key={s.id} className={`bg-white rounded-xl border shadow-sm p-4 animate-fade-up ${staggerClass}`} style={{ borderColor: "#E2E8F0" }}>
+              <div key={s.id} className={`rounded-xl border shadow-sm p-4 animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
-                    <p className="text-sm font-bold" style={{ color: "#1B2B4B" }}>{s.proforma_no}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{s.alici_firma}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{s.urun_tanimi}</p>
+                    <p className="text-sm font-bold text-white">{s.proforma_no}</p>
+                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.alici_firma}</p>
+                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.urun_tanimi}</p>
                   </div>
                   <button
                     onClick={() => handleSipariseDevamEt(s)}
                     disabled={devamEdiyor === s.id}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap transition-all hover:opacity-90 disabled:opacity-50"
-                    style={{ backgroundColor: "#1B2B4B" }}
+                    style={{ backgroundColor: ACCENT }}
                   >
                     {devamEdiyor === s.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
                     Siparişe Devam Et
@@ -278,22 +279,22 @@ export default function IhracatlarPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-2">
                   <div>
-                    <p className="text-[11px] text-slate-400">Toplam Taahhüt</p>
-                    <p className="text-sm font-bold" style={{ color: "#1B2B4B" }}>{(s.toplam_mts || 0).toLocaleString("tr-TR")} MTS</p>
+                    <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Toplam Taahhüt</p>
+                    <p className="text-sm font-bold text-white">{(s.toplam_mts || 0).toLocaleString("tr-TR")} MTS</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-slate-400">Gönderilmiş</p>
-                    <p className="text-sm font-bold text-green-600">{s.gonderilmisMts.toLocaleString("tr-TR")} MTS</p>
+                    <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Gönderilmiş</p>
+                    <p className="text-sm font-bold text-green-400">{s.gonderilmisMts.toLocaleString("tr-TR")} MTS</p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-amber-600">Kalan</p>
-                    <p className="text-sm font-bold text-amber-700">{kalan.toLocaleString("tr-TR")} MTS</p>
+                    <p className="text-[11px] text-amber-500">Kalan</p>
+                    <p className="text-sm font-bold text-amber-400">{kalan.toLocaleString("tr-TR")} MTS</p>
                   </div>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-1.5">
+                <div className="w-full rounded-full h-1.5" style={{ backgroundColor: CARD_BORDER }}>
                   <div className="h-1.5 rounded-full bg-green-500 transition-all duration-500" style={{ width: `${yuzde}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5">{s.dosyaSayisi} sevkiyat dosyası oluşturuldu</p>
+                <p className="text-[11px] mt-1.5" style={{ color: TEXT_MUTED }}>{s.dosyaSayisi} sevkiyat dosyası oluşturuldu</p>
               </div>
             );
           })}
@@ -301,27 +302,27 @@ export default function IhracatlarPage() {
       )}
 
       <div className="flex items-center gap-2 mb-3">
-        <Archive size={16} className="text-slate-400" />
-        <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider">Kapatılmış Dosyalar</h2>
+        <Archive size={16} style={{ color: TEXT_MUTED }} />
+        <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Kapatılmış Dosyalar</h2>
       </div>
 
       <div className="relative mb-4">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Alıcı, satıcı, proforma, ürün, liman, BL no, marka ile ara..."
-          className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-          style={{ borderColor: "#E2E8F0" }}
+          className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-500"
+          style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
         />
       </div>
 
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-xl border p-4 animate-pulse" style={{ borderColor: "#E2E8F0" }}>
-              <div className="h-4 bg-slate-200 rounded w-full"></div>
+            <div key={i} className="rounded-xl border p-4 animate-pulse" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div className="h-4 rounded w-full" style={{ backgroundColor: CARD_BORDER }}></div>
             </div>
           ))}
         </div>
@@ -332,22 +333,22 @@ export default function IhracatlarPage() {
           description={search ? "Arama kriterlerinizi değiştirmeyi deneyin" : "Henüz kapatılmış bir ihracat dosyanız yok"}
         />
       ) : (
-        <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Proforma No</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Müşteri</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Varış Limanı</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Teslim</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Ürün</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Birim Fiyat</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">MTS</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Tutar</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Acente</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">BL No</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold text-slate-500 whitespace-nowrap">Marka</th>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Teslim</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ürün</th>
+                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>MTS</th>
+                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tutar</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>BL No</th>
+                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Marka</th>
                   <th className="w-16"></th>
                 </tr>
               </thead>
@@ -358,28 +359,28 @@ export default function IhracatlarPage() {
                   return (
                     <tr
                       key={d.id}
-                      className={`border-b last:border-0 hover:bg-slate-50 cursor-pointer transition-colors animate-fade-up ${staggerClass}`}
-                      style={{ borderColor: "#F1F5F9" }}
+                      className={`border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors animate-fade-up ${staggerClass}`}
+                      style={{ borderColor: CARD_BORDER }}
                       onClick={() => setSelectedDosya(d)}
                     >
-                      <td className="px-2.5 py-2.5 text-xs font-medium whitespace-nowrap" style={{ color: "#1B2B4B" }}>{d.proforma_no || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-700 max-w-[140px] truncate">{d.alici_firma || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 max-w-[140px] truncate">{d.varis_limani || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 whitespace-nowrap">{d.teslim_sekli || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 max-w-[150px] truncate">{urunOzet(d, "urun_adi")}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 text-right whitespace-nowrap">{urunOzet(d, "birim_fiyat_usd")}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 text-right whitespace-nowrap">{urunOzet(d, "miktar_mts")}</td>
-                      <td className="px-2.5 py-2.5 text-xs font-semibold text-right whitespace-nowrap" style={{ color: "#1B2B4B" }}>{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 max-w-[100px] truncate">{rez?.acente_ismi || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 font-mono whitespace-nowrap">{d.bl_no || "—"}</td>
-                      <td className="px-2.5 py-2.5 text-xs text-slate-600 max-w-[90px] truncate">{d.marka || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs font-medium whitespace-nowrap" style={{ color: ACCENT }}>{d.proforma_no || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs text-white max-w-[140px] truncate">{d.alici_firma || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{d.teslim_sekli || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs max-w-[150px] truncate" style={{ color: TEXT_MUTED }}>{urunOzet(d, "urun_adi")}</td>
+                      <td className="px-2.5 py-2.5 text-xs text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{urunOzet(d, "birim_fiyat_usd")}</td>
+                      <td className="px-2.5 py-2.5 text-xs text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{urunOzet(d, "miktar_mts")}</td>
+                      <td className="px-2.5 py-2.5 text-xs font-semibold text-right whitespace-nowrap" style={{ color: ACCENT }}>{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
+                      <td className="px-2.5 py-2.5 text-xs max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{rez?.acente_ismi || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{d.bl_no || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs max-w-[90px] truncate" style={{ color: TEXT_MUTED }}>{d.marka || "—"}</td>
                       <td className="px-2.5 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <ExternalLink size={12} className="text-slate-400" />
+                          <ExternalLink size={12} style={{ color: TEXT_MUTED }} />
                           {yetkiler.sayfa_yetkileri.yeni_dosya && (
                             <button
                               onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: d.id, dosyaNo: d.dosya_no }); }}
-                              className="text-red-300 hover:text-red-500 transition-colors"
+                              className="text-red-400 hover:text-red-300 transition-colors"
                             >
                               <Trash2 size={13} />
                             </button>

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type KonteynerRow = {
   id: string;
@@ -136,8 +137,8 @@ export default function KantarPage() {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-        <div className="flex items-center gap-3 text-slate-500">
+      <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
+        <div className="flex items-center gap-3" style={{ color: TEXT_MUTED }}>
           <Loader2 size={24} className="animate-spin" />
           <span>Yükleniyor...</span>
         </div>
@@ -146,36 +147,36 @@ export default function KantarPage() {
   }
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden bg-slate-50">
+    <div className="h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
       <div className="max-w-6xl mx-auto w-full flex flex-col h-full min-h-0 gap-5">
 
         {/* Üst Başlık Sabit */}
         <div className="shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-900 shadow-sm">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: ACCENT }}>
               <Weight size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900 leading-tight">Kantar Paneli</h1>
-              <p className="text-xs font-medium text-slate-500">DBA belgelerini yükleyin</p>
+              <h1 className="text-xl font-bold text-white leading-tight">Kantar Paneli</h1>
+              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>DBA belgelerini yükleyin</p>
             </div>
           </div>
           <button onClick={fetchKonteynerler}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-white border text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-            style={{ borderColor: "#E2E8F0" }}>
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
+            style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}>
             <RefreshCw size={14} /> Yenile
           </button>
         </div>
 
         {/* Özet Kartları Sabit */}
         <div className="shrink-0 grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border p-4 shadow-sm" style={{ borderColor: "#E2E8F0" }}>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">DBA Beklenen</p>
-            <p className="text-2xl font-bold text-amber-500">{bekleyenler.length}</p>
+          <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>DBA Beklenen</p>
+            <p className="text-2xl font-bold text-amber-400">{bekleyenler.length}</p>
           </div>
-          <div className="bg-white rounded-xl border p-4 shadow-sm" style={{ borderColor: "#E2E8F0" }}>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Tamamlanan</p>
-            <p className="text-2xl font-bold text-emerald-600">{tamamlananlar.length}</p>
+          <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Tamamlanan</p>
+            <p className="text-2xl font-bold text-emerald-400">{tamamlananlar.length}</p>
           </div>
         </div>
 
@@ -185,60 +186,60 @@ export default function KantarPage() {
           {/* Bekleyen DBA'lar */}
           {bekleyenGruplar.length > 0 && (
             <div className="space-y-3 mb-8">
-              <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <h2 className="text-sm font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span> DBA Bekleyen İhracatlar
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {bekleyenGruplar.map((grup) => {
                   const ilk = grup[0];
                   return (
-                    <div key={`bekleyen-${ilk.dosya_id}`} className="bg-white rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+                    <div key={`bekleyen-${ilk.dosya_id}`} className="rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                       {/* KART BAŞLIĞI */}
-                      <div className="bg-amber-50/30 border-b p-3" style={{ borderColor: "#E2E8F0" }}>
+                      <div className="border-b p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#241D0F" }}>
                         <div className="flex items-center justify-between mb-1.5 gap-2">
-                          <span className="font-bold text-slate-900 text-sm leading-tight truncate flex-1" title={ilk.maskeli_musteri}>{ilk.maskeli_musteri}</span>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-white text-slate-500 shrink-0">{ilk.dosya_no}</span>
+                          <span className="font-bold text-white text-sm leading-tight truncate flex-1" title={ilk.maskeli_musteri}>{ilk.maskeli_musteri}</span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>{ilk.dosya_no}</span>
                         </div>
-                        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-                          <span className="truncate"><strong className="text-slate-700">Rez No:</strong> {ilk.booking_no || "-"}</span>
-                          <span className="truncate"><strong className="text-slate-700">Marka:</strong> {ilk.marka || "-"}</span>
+                        <div className="flex flex-col gap-0.5 text-[11px]" style={{ color: TEXT_MUTED }}>
+                          <span className="truncate"><strong className="text-white">Rez No:</strong> {ilk.booking_no || "-"}</span>
+                          <span className="truncate"><strong className="text-white">Marka:</strong> {ilk.marka || "-"}</span>
                         </div>
                       </div>
                       
                       {/* KART İÇERİĞİ (MİNİ TABLO) */}
                       <div className="flex-1 overflow-y-auto max-h-[260px]" style={{ scrollbarWidth: "thin" }}>
                         <table className="w-full text-left border-collapse">
-                          <thead className="sticky top-0 bg-white/95 backdrop-blur border-b z-10" style={{ borderColor: "#E2E8F0" }}>
+                          <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                             <tr>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Konteyner</th>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Detay</th>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase text-center w-20">İşlem</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Detay</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase text-center w-20" style={{ color: TEXT_MUTED }}>İşlem</th>
                             </tr>
                           </thead>
                           <tbody>
                             {grup.map((k) => (
-                              <tr key={k.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors" style={{ borderColor: "#F1F5F9" }}>
+                              <tr key={k.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
                                 <td className="px-3 py-2">
-                                  <div className="text-xs font-bold font-mono text-slate-800">{k.konteyner_no}</div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5">{k.tip}</div>
+                                  <div className="text-xs font-bold font-mono text-white">{k.konteyner_no}</div>
+                                  <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.tip}</div>
                                 </td>
                                 <td className="px-3 py-2">
-                                  <div className="text-[10px] text-slate-600 font-mono truncate max-w-[80px]" title={k.muhur_no || "Mühür yok"}>{k.muhur_no || "-"}</div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[80px]" title={k.plaka || "Plaka yok"}>{k.plaka || "-"}</div>
+                                  <div className="text-[10px] font-mono truncate max-w-[80px]" style={{ color: TEXT_MUTED }} title={k.muhur_no || "Mühür yok"}>{k.muhur_no || "-"}</div>
+                                  <div className="text-[10px] mt-0.5 truncate max-w-[80px]" style={{ color: TEXT_MUTED }} title={k.plaka || "Plaka yok"}>{k.plaka || "-"}</div>
                                 </td>
                                 <td className="px-3 py-2 align-middle text-center">
                                   {yukleniyor[k.id] ? (
-                                    <Loader2 size={14} className="animate-spin text-slate-400 mx-auto" />
+                                    <Loader2 size={14} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
                                   ) : (
                                     <div className="flex flex-col items-center">
-                                      <label className="inline-flex items-center justify-center gap-1 w-full px-2 py-1 rounded border cursor-pointer text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors"
-                                        style={{ borderColor: "#fcd34d" }}>
-                                        <Upload size={10} className="text-amber-500" /> DBA
+                                      <label className="inline-flex items-center justify-center gap-1 w-full px-2 py-1 rounded border cursor-pointer text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                                        style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+                                        <Upload size={10} className="text-amber-400" /> DBA
                                         <input type="file" accept="application/pdf" className="hidden"
                                           ref={(el) => { inputRefs.current[k.id] = el; }}
                                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleDbaYukle(k, f); }} />
                                       </label>
-                                      {hatalar[k.id] && <p className="text-[9px] text-red-500 leading-tight mt-1 truncate max-w-[70px]" title={hatalar[k.id]}>{hatalar[k.id]}</p>}
+                                      {hatalar[k.id] && <p className="text-[9px] text-red-400 leading-tight mt-1 truncate max-w-[70px]" title={hatalar[k.id]}>{hatalar[k.id]}</p>}
                                     </div>
                                   )}
                                 </td>
@@ -257,56 +258,56 @@ export default function KantarPage() {
           {/* Tamamlanan DBA'lar */}
           {tamamlananGruplar.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <h2 className="text-sm font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> DBA Tamamlanan Dosyalar
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {tamamlananGruplar.map((grup) => {
                   const ilk = grup[0];
                   return (
-                    <div key={`tamamlanan-${ilk.dosya_id}`} className="bg-white rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+                    <div key={`tamamlanan-${ilk.dosya_id}`} className="rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                       {/* KART BAŞLIĞI */}
-                      <div className="bg-emerald-50/30 border-b p-3" style={{ borderColor: "#E2E8F0" }}>
+                      <div className="border-b p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F2A20" }}>
                         <div className="flex items-center justify-between mb-1.5 gap-2">
-                          <span className="font-bold text-slate-900 text-sm leading-tight truncate flex-1" title={ilk.maskeli_musteri}>{ilk.maskeli_musteri}</span>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded border bg-white text-slate-500 shrink-0">{ilk.dosya_no}</span>
+                          <span className="font-bold text-white text-sm leading-tight truncate flex-1" title={ilk.maskeli_musteri}>{ilk.maskeli_musteri}</span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded border shrink-0" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>{ilk.dosya_no}</span>
                         </div>
-                        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500">
-                          <span className="truncate"><strong className="text-slate-700">Rez No:</strong> {ilk.booking_no || "-"}</span>
-                          <span className="truncate"><strong className="text-slate-700">Marka:</strong> {ilk.marka || "-"}</span>
+                        <div className="flex flex-col gap-0.5 text-[11px]" style={{ color: TEXT_MUTED }}>
+                          <span className="truncate"><strong className="text-white">Rez No:</strong> {ilk.booking_no || "-"}</span>
+                          <span className="truncate"><strong className="text-white">Marka:</strong> {ilk.marka || "-"}</span>
                         </div>
                       </div>
                       
                       {/* KART İÇERİĞİ (MİNİ TABLO) */}
                       <div className="flex-1 overflow-y-auto max-h-[260px]" style={{ scrollbarWidth: "thin" }}>
                         <table className="w-full text-left border-collapse">
-                          <thead className="sticky top-0 bg-white/95 backdrop-blur border-b z-10" style={{ borderColor: "#E2E8F0" }}>
+                          <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                             <tr>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Konteyner</th>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase text-right">Ağırlıklar</th>
-                              <th className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase text-center w-12">Durum</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase text-right" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
+                              <th className="px-3 py-2 text-[10px] font-bold uppercase text-center w-12" style={{ color: TEXT_MUTED }}>Durum</th>
                             </tr>
                           </thead>
                           <tbody>
                             {grup.map((k) => {
                               const uyusmazlik = (k.dba_kontrol_sonucu?.uyusmazliklar?.length ?? 0) > 0;
                               return (
-                                <tr key={k.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors" style={{ borderColor: "#F1F5F9" }}>
+                                <tr key={k.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
                                   <td className="px-3 py-2">
-                                    <div className="text-xs font-bold font-mono text-slate-800">{k.konteyner_no}</div>
-                                    <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[80px]" title={k.plaka || "Plaka yok"}>{k.plaka || "-"}</div>
+                                    <div className="text-xs font-bold font-mono text-white">{k.konteyner_no}</div>
+                                    <div className="text-[10px] mt-0.5 truncate max-w-[80px]" style={{ color: TEXT_MUTED }} title={k.plaka || "Plaka yok"}>{k.plaka || "-"}</div>
                                   </td>
                                   <td className="px-3 py-2 text-right">
-                                    <div className="text-[10px] text-slate-500">Dara: {k.tare_kg ? `${k.tare_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
-                                    <div className="text-xs font-bold text-slate-800 mt-0.5">VGM: {k.vgm_kg ? `${k.vgm_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
+                                    <div className="text-[10px]" style={{ color: TEXT_MUTED }}>Dara: {k.tare_kg ? `${k.tare_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
+                                    <div className="text-xs font-bold text-white mt-0.5">VGM: {k.vgm_kg ? `${k.vgm_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
                                   </td>
                                   <td className="px-3 py-2 align-middle text-center">
                                     <div className="flex items-center justify-center gap-3">
                                       <span title={uyusmazlik ? "Uyuşmazlık var" : "Onaylı"}>
-                                        {uyusmazlik ? <AlertTriangle size={15} className="text-amber-500" /> : <CheckCircle2 size={15} className="text-emerald-500" />}
+                                        {uyusmazlik ? <AlertTriangle size={15} className="text-amber-400" /> : <CheckCircle2 size={15} className="text-emerald-400" />}
                                       </span>
                                       {k.dba_dosya_url && (
-                                        <a href={k.dba_dosya_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-7 h-7 rounded-md bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors shadow-sm" title="DBA Belgesini Gör">
+                                        <a href={k.dba_dosya_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} title="DBA Belgesini Gör">
                                           <FileText size={13} />
                                         </a>
                                       )}
@@ -326,9 +327,9 @@ export default function KantarPage() {
           )}
 
           {konteynerler.length === 0 && (
-            <div className="bg-white rounded-xl border shadow-sm p-12 text-center" style={{ borderColor: "#E2E8F0" }}>
-              <Weight size={40} className="text-slate-300 mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-500">Aktif dosyada konteyner bulunamadı.</p>
+            <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <Weight size={40} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
+              <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>Aktif dosyada konteyner bulunamadı.</p>
             </div>
           )}
           

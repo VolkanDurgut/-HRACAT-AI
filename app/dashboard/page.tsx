@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 
+const CARD_BG = "#12161F";
+const CARD_BORDER = "#1E2530";
+const TEXT_MUTED = "#8B95A5";
+const ACCENT = "#10B981";
+
 type DosyaDurum = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
@@ -132,25 +137,25 @@ export default function DashboardPage() {
       {/* Baslik */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
-          <Anchor size={24} style={{ color: "#1B2B4B" }} />
-          <h1 className="text-2xl font-bold" style={{ color: "#1B2B4B" }}>Kontrol Merkezi</h1>
+          <Anchor size={24} style={{ color: ACCENT }} />
+          <h1 className="text-2xl font-bold text-white">Kontrol Merkezi</h1>
         </div>
-        <p className="text-slate-500 text-sm ml-9">Tüm ihracat operasyonlarının anlık durumu</p>
+        <p className="text-sm ml-9" style={{ color: TEXT_MUTED }}>Tüm ihracat operasyonlarının anlık durumu</p>
       </div>
 
       {/* Ozet kartlar */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
         {[
-          { key: "aktif", label: "Aktif Dosya", value: aciklar.length, icon: <FileText size={18} />, color: "#1B2B4B", bg: "#EEF2F8", pulse: false },
-          { key: "rezervasyon", label: "Rezervasyon Bekleyen", value: bekleyenRez, icon: <Ship size={18} />, color: bekleyenRez > 0 ? "#DC2626" : "#16a34a", bg: bekleyenRez > 0 ? "#FEF2F2" : "#F0FDF4", pulse: bekleyenRez > 0 },
-          { key: "kapali", label: "Kapalı Dosya", value: kapalilar.length, icon: <CheckCircle2 size={18} />, color: "#64748B", bg: "#F8FAFC", pulse: false },
+          { key: "aktif", label: "Aktif Dosya", value: aciklar.length, icon: <FileText size={18} />, color: ACCENT, bg: "#0F2A20", pulse: false },
+          { key: "rezervasyon", label: "Rezervasyon Bekleyen", value: bekleyenRez, icon: <Ship size={18} />, color: bekleyenRez > 0 ? "#F87171" : "#34D399", bg: bekleyenRez > 0 ? "#2A1519" : "#0F2A20", pulse: bekleyenRez > 0 },
+          { key: "kapali", label: "Kapalı Dosya", value: kapalilar.length, icon: <CheckCircle2 size={18} />, color: TEXT_MUTED, bg: CARD_BG, pulse: false },
         ].map((m, idx) => (
-          <div key={m.label} className={`bg-white rounded-xl border shadow-sm p-4 animate-fade-up stagger-${idx + 1}`} style={{ borderColor: "#E2E8F0" }}>
+          <div key={m.label} className={`rounded-xl border shadow-sm p-4 animate-fade-up stagger-${idx + 1}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-2 mb-2">
               <div className={`p-1.5 rounded-lg ${m.pulse ? "animate-pulse" : ""}`} style={{ backgroundColor: m.bg, color: m.color }}>
                 {m.icon}
               </div>
-              <p className="text-xs font-medium text-slate-500">{m.label}</p>
+              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>{m.label}</p>
               {m.key === "rezervasyon" && bekleyenRez > 0 && (
                 <InfoTooltip variant="warning" position="bottom" width="w-72">
                   <span className="font-semibold text-amber-600">Rezervasyon bekleyen dosyalar:</span>

@@ -210,8 +210,8 @@ export default function DashboardPage() {
       {aciklar.length > 0 && (
         <div className="space-y-2 mb-6">
           <div className="flex items-center gap-2">
-            <TrendingUp size={16} style={{ color: "#1B2B4B" }} />
-            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Aktif Dosyalar — İş Akışı</h2>
+            <TrendingUp size={16} style={{ color: ACCENT }} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Aktif Dosyalar — İş Akışı</h2>
           </div>
 
           {aciklar.map(({ dosya, rezervasyonlar, konteynerler }, idx) => {
@@ -230,22 +230,22 @@ export default function DashboardPage() {
             const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
 
             return (
-              <div key={dosya.id} className={`bg-white rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ borderColor: "#E2E8F0" }}>
+              <div key={dosya.id} className={`rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 {/* Dosya baslik */}
-                <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "#F1F5F9", backgroundColor: "#FAFBFC" }}>
+                <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#22c55e" }} />
                     <div>
-                      <p className="text-sm font-bold" style={{ color: "#1B2B4B" }}>{dosya.dosya_no}</p>
-                      <p className="text-xs text-slate-400">{dosya.alici_firma || "-"}</p>
+                      <p className="text-sm font-bold text-white">{dosya.dosya_no}</p>
+                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</p>
                     </div>
                     {rez?.booking_no && (
-                      <span className="ml-2 text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                      <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
                         {rez.booking_no}
                       </span>
                     )}
                     {rez?.gemi_adi && (
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <span className="text-xs flex items-center gap-1" style={{ color: TEXT_MUTED }}>
                         <Ship size={11} /> {rez.gemi_adi}
                       </span>
                     )}
@@ -255,7 +255,7 @@ export default function DashboardPage() {
                     {beyannameCutoffGun !== null && <CutoffBadge days={beyannameCutoffGun} label="Beyanname" />}
                     <Link href={`/dosya/${dosya.id}`}
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
-                      style={{ backgroundColor: "#1B2B4B" }}>
+                      style={{ backgroundColor: ACCENT }}>
                       <ExternalLink size={12} /> Detay
                     </Link>
                   </div>

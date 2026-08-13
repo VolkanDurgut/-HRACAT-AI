@@ -7,6 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { Ship, Search, Loader2, AlertCircle, Bell } from "lucide-react";
 import { formatDateTR } from "@/lib/cutoff-utils";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type SevkiyatSatir = {
   rezervasyon_id: string;
@@ -138,10 +139,10 @@ export default function EtdEtaPage() {
     <AppShell>
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">
-          <Ship size={20} style={{ color: "#1B2B4B" }} />
-          <h1 className="text-xl font-bold" style={{ color: "#1B2B4B" }}>ETD / ETA</h1>
+          <Ship size={20} style={{ color: ACCENT }} />
+          <h1 className="text-xl font-bold text-white">ETD / ETA</h1>
         </div>
-        <p className="text-slate-500 text-sm ml-7">Sevkiyat kalkış ve varış tarihleri</p>
+        <p className="text-sm ml-7" style={{ color: TEXT_MUTED }}>Sevkiyat kalkış ve varış tarihleri</p>
       </div>
 
       {/* ETA'sı Yaklaşan Sevkiyatlar */}
@@ -149,35 +150,36 @@ export default function EtdEtaPage() {
         <div className="mb-5">
           <div className="flex items-center gap-2 mb-2">
             <Bell size={14} className="text-amber-500" />
-            <h2 className="text-sm font-semibold text-slate-700">ETA'sı Yaklaşan Sevkiyatlar</h2>
-            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">{yaklasanlar.length}</span>
+            <h2 className="text-sm font-semibold text-white">ETA'sı Yaklaşan Sevkiyatlar</h2>
+            <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-medium">{yaklasanlar.length}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {yaklasanlar.map(s => (
               <div
                 key={s.rezervasyon_id}
-                className={`bg-white rounded-xl border p-4 shadow-sm ${s.kalanGun === 0 ? "border-red-300 bg-red-50/30" : s.kalanGun <= 2 ? "border-orange-200" : "border-amber-100"}`}
+                className={`rounded-xl border p-4 shadow-sm ${s.kalanGun === 0 ? "border-red-500/40" : s.kalanGun <= 2 ? "border-orange-500/30" : "border-amber-500/25"}`}
+                style={{ backgroundColor: CARD_BG }}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800 truncate">{s.alici_firma || "—"}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{s.dosya_no}</p>
+                    <p className="text-xs font-semibold text-white truncate">{s.alici_firma || "—"}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.dosya_no}</p>
                   </div>
                   <span className={`shrink-0 ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                     s.kalanGun === 0
-                      ? "bg-red-100 text-red-600"
+                      ? "bg-red-500/15 text-red-400"
                       : s.kalanGun <= 2
-                      ? "bg-orange-100 text-orange-600"
-                      : "bg-amber-100 text-amber-700"
+                      ? "bg-orange-500/15 text-orange-400"
+                      : "bg-amber-500/15 text-amber-400"
                   }`}>
                     {s.kalanGun === 0 ? "Bugün" : `${s.kalanGun} gün`}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                  <div><span className="text-slate-400">Liman: </span><span className="text-slate-700">{s.varis_limani || "—"}</span></div>
-                  <div><span className="text-slate-400">Kont: </span><span className="text-slate-700 font-semibold">{s.konteyner_adedi}</span></div>
-                  <div><span className="text-slate-400">Gemi: </span><span className="text-slate-700 truncate">{s.gemi_adi || "—"}</span></div>
-                  <div><span className="text-slate-400">ETA: </span><span className="text-slate-700 font-semibold">{formatDateTR(s.eta!)}</span></div>
+                  <div><span style={{ color: TEXT_MUTED }}>Liman: </span><span className="text-white">{s.varis_limani || "—"}</span></div>
+                  <div><span style={{ color: TEXT_MUTED }}>Kont: </span><span className="text-white font-semibold">{s.konteyner_adedi}</span></div>
+                  <div><span style={{ color: TEXT_MUTED }}>Gemi: </span><span className="text-white truncate">{s.gemi_adi || "—"}</span></div>
+                  <div><span style={{ color: TEXT_MUTED }}>ETA: </span><span className="text-white font-semibold">{formatDateTR(s.eta!)}</span></div>
                 </div>
               </div>
             ))}
@@ -187,39 +189,40 @@ export default function EtdEtaPage() {
 
       {/* Özet Kartlar */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="bg-white rounded-xl border shadow-sm p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-xs text-slate-400 mb-1">Toplam Sevkiyat</p>
-          <p className="text-2xl font-bold" style={{ color: "#1B2B4B" }}>{satirlar.length}</p>
+        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Toplam Sevkiyat</p>
+          <p className="text-2xl font-bold text-white">{satirlar.length}</p>
         </div>
-        <div className="bg-white rounded-xl border shadow-sm p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-xs text-slate-400 mb-1">ETA Girilmiş</p>
-          <p className="text-2xl font-bold text-green-600">{satirlar.length - eksikEtaSayisi}</p>
+        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>ETA Girilmiş</p>
+          <p className="text-2xl font-bold text-green-400">{satirlar.length - eksikEtaSayisi}</p>
         </div>
-        <div className="bg-white rounded-xl border shadow-sm p-4" style={{ borderColor: eksikEtaSayisi > 0 ? "#FCA5A5" : "#E2E8F0" }}>
-          <p className="text-xs text-slate-400 mb-1">ETA Eksik</p>
-          <p className={`text-2xl font-bold ${eksikEtaSayisi > 0 ? "text-red-500" : "text-slate-300"}`}>{eksikEtaSayisi}</p>
+        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: eksikEtaSayisi > 0 ? "#F87171" : CARD_BORDER }}>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>ETA Eksik</p>
+          <p className={`text-2xl font-bold ${eksikEtaSayisi > 0 ? "text-red-400" : ""}`} style={eksikEtaSayisi === 0 ? { color: TEXT_MUTED } : undefined}>{eksikEtaSayisi}</p>
         </div>
       </div>
 
       {/* Filtreler */}
       <div className="flex gap-3 mb-4">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Firma, booking, BL, gemi, liman ile ara..."
-            className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            style={{ borderColor: "#E2E8F0" }}
+            className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-white placeholder:text-slate-500"
+            style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
           />
         </div>
-        <div className="flex rounded-lg border overflow-hidden text-xs font-medium" style={{ borderColor: "#E2E8F0" }}>
+        <div className="flex rounded-lg border overflow-hidden text-xs font-medium" style={{ borderColor: CARD_BORDER }}>
           {(["hepsi", "eksik", "tamam"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setEtaFilter(f)}
-              className={`px-3 py-2 transition-colors ${etaFilter === f ? "bg-amber-500 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+              className="px-3 py-2 transition-colors"
+              style={etaFilter === f ? { backgroundColor: ACCENT, color: "white" } : { backgroundColor: CARD_BG, color: TEXT_MUTED }}
             >
               {f === "hepsi" ? "Hepsi" : f === "eksik" ? "ETA Eksik" : "ETA Tamam"}
             </button>
@@ -233,26 +236,26 @@ export default function EtdEtaPage() {
           <Loader2 size={32} className="animate-spin text-amber-500" />
         </div>
       ) : (
-        <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Firma Adı</th>
-                  <th className="text-center px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Kont.</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Varış Limanı</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Acente</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Booking No</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">B/L No</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">ETD</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">ETA</th>
-                  <th className="text-left px-3 py-2.5 font-semibold text-slate-500 whitespace-nowrap">Gemi Adı</th>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Firma Adı</th>
+                  <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>B/L No</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
+                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-slate-400">Kayıt bulunamadı</td>
+                    <td colSpan={9} className="text-center py-10" style={{ color: TEXT_MUTED }}>Kayıt bulunamadı</td>
                   </tr>
                 ) : filtered.map((s) => {
                   const gun = s.eta ? kalanGun(s.eta) : null;
@@ -260,16 +263,16 @@ export default function EtdEtaPage() {
                   return (
                     <tr
                       key={s.rezervasyon_id}
-                      className={`border-b last:border-0 hover:bg-slate-50 transition-colors ${!s.eta ? "bg-red-50/30" : yaklasan ? "bg-amber-50/40" : ""}`}
-                      style={{ borderColor: "#F1F5F9" }}
+                      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${!s.eta ? "bg-red-500/[0.06]" : yaklasan ? "bg-amber-500/[0.06]" : ""}`}
+                      style={{ borderColor: CARD_BORDER }}
                     >
-                      <td className="px-3 py-2 font-medium text-slate-800 max-w-[150px] truncate">{s.alici_firma || "—"}</td>
-                      <td className="px-3 py-2 text-center font-semibold" style={{ color: "#1B2B4B" }}>{s.konteyner_adedi}</td>
-                      <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{s.varis_limani || "—"}</td>
-                      <td className="px-3 py-2 text-slate-600 max-w-[100px] truncate">{s.acente_ismi || "—"}</td>
-                      <td className="px-3 py-2 font-mono text-slate-600 whitespace-nowrap">{s.booking_no || "—"}</td>
-                      <td className="px-3 py-2 font-mono text-slate-600 whitespace-nowrap">{s.bl_no || "—"}</td>
-                      <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{s.etd ? formatDateTR(s.etd) : "—"}</td>
+                      <td className="px-3 py-2 font-medium text-white max-w-[150px] truncate">{s.alici_firma || "—"}</td>
+                      <td className="px-3 py-2 text-center font-semibold" style={{ color: ACCENT }}>{s.konteyner_adedi}</td>
+                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.varis_limani || "—"}</td>
+                      <td className="px-3 py-2 max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{s.acente_ismi || "—"}</td>
+                      <td className="px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.booking_no || "—"}</td>
+                      <td className="px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.bl_no || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.etd ? formatDateTR(s.etd) : "—"}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {editingEta?.id === s.rezervasyon_id ? (
                           <div className="flex items-center gap-1">
@@ -277,20 +280,22 @@ export default function EtdEtaPage() {
                               type="date"
                               value={editingEta.value}
                               onChange={(e) => setEditingEta({ id: s.rezervasyon_id, value: e.target.value })}
-                              className="border rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
-                              style={{ borderColor: "#E2E8F0" }}
+                              className="border rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-400 text-white"
+                              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }}
                               autoFocus
                             />
                             <button
                               onClick={() => handleEtaKaydet(s.rezervasyon_id, editingEta.value)}
                               disabled={saving === s.rezervasyon_id}
-                              className="px-2 py-0.5 rounded bg-amber-500 text-white text-[10px] font-medium"
+                              className="px-2 py-0.5 rounded text-white text-[10px] font-medium"
+                              style={{ backgroundColor: ACCENT }}
                             >
                               {saving === s.rezervasyon_id ? <Loader2 size={10} className="animate-spin" /> : "Kaydet"}
                             </button>
                             <button
                               onClick={() => setEditingEta(null)}
-                              className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px]"
+                              className="px-2 py-0.5 rounded text-[10px]"
+                              style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
                             >
                               İptal
                             </button>
@@ -316,12 +321,12 @@ export default function EtdEtaPage() {
                           </button>
                         )}
                         {s.eta_guncelleme_tarihi && (
-                          <p className="text-[9px] text-slate-400 mt-0.5">
+                          <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>
                             {new Date(s.eta_guncelleme_tarihi).toLocaleDateString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </p>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-slate-600 max-w-[160px] truncate">{s.gemi_adi || "—"}</td>
+                      <td className="px-3 py-2 max-w-[160px] truncate" style={{ color: TEXT_MUTED }}>{s.gemi_adi || "—"}</td>
                     </tr>
                   );
                 })}

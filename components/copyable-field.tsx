@@ -7,10 +7,12 @@ export function CopyableField({
   label,
   value,
   monospace = false,
+  dark = false,
 }: {
   label: string;
   value: string | null | undefined;
   monospace?: boolean;
+  dark?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -36,12 +38,12 @@ export function CopyableField({
 
   return (
     <div className="group relative">
-      {label && <p className="text-xs text-slate-400 mb-0.5">{label}</p>}
+      {label && <p className={`text-xs mb-0.5 ${dark ? "text-[#8B95A5]" : "text-slate-400"}`}>{label}</p>}
       <div
-        className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 rounded px-1 py-0.5 -mx-1 transition-colors"
+        className={`flex items-center gap-2 cursor-pointer rounded px-1 py-0.5 -mx-1 transition-colors ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"}`}
         onClick={handleCopy}
       >
-        <p className={`text-sm font-medium text-slate-700 break-all ${monospace ? "font-mono tracking-tight" : ""}`}>
+        <p className={`text-sm font-medium break-all ${monospace ? "font-mono tracking-tight" : ""} ${dark ? "text-white" : "text-slate-700"}`}>
           {value || "—"}
         </p>
         {value && (
@@ -49,7 +51,7 @@ export function CopyableField({
             {copied ? (
               <Check size={14} className="text-green-500" />
             ) : (
-              <Copy size={14} className="text-slate-400" />
+              <Copy size={14} className={dark ? "text-[#8B95A5]" : "text-slate-400"} />
             )}
           </span>
         )}

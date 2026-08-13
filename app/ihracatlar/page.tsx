@@ -398,22 +398,22 @@ export default function IhracatlarPage() {
 
       {selectedDosya && (
         <>
-          <div className="fixed inset-0 bg-black/30 z-40 animate-fade-in" onClick={() => setSelectedDosya(null)} />
-          <div className="fixed right-0 top-0 bottom-0 w-full max-w-xl bg-white shadow-2xl z-50 overflow-y-auto animate-fade-in">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10" style={{ borderColor: "#E2E8F0" }}>
+          <div className="fixed inset-0 bg-black/50 z-40 animate-fade-in" onClick={() => setSelectedDosya(null)} />
+          <div className="fixed right-0 top-0 bottom-0 w-full max-w-xl shadow-2xl z-50 overflow-y-auto animate-fade-in" style={{ backgroundColor: CARD_BG }}>
+            <div className="sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
               <div>
-                <p className="text-lg font-bold" style={{ color: "#1B2B4B" }}>{selectedDosya.dosya_no}</p>
-                <p className="text-xs text-slate-400">{formatDateTR(selectedDosya.olusturma_tarihi)}</p>
+                <p className="text-lg font-bold text-white">{selectedDosya.dosya_no}</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>{formatDateTR(selectedDosya.olusturma_tarihi)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => router.push(`/dosya/${selectedDosya.id}`)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
-                  style={{ backgroundColor: "#1B2B4B" }}
+                  style={{ backgroundColor: ACCENT }}
                 >
                   <ExternalLink size={12} /> Tam Dosyayı Aç
                 </button>
-                <button onClick={() => setSelectedDosya(null)} className="p-1.5 text-slate-400 hover:text-slate-600">
+                <button onClick={() => setSelectedDosya(null)} className="p-1.5 hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
                   <X size={18} />
                 </button>
               </div>
@@ -421,33 +421,33 @@ export default function IhracatlarPage() {
 
             <div className="p-6 space-y-5">
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Proforma Bilgileri</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Proforma Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField label="Proforma No" value={selectedDosya.proforma_no} />
-                  <CopyableField label="Proforma Tarihi" value={formatDateTR(selectedDosya.proforma_tarihi)} />
-                  <CopyableField label="Alıcı Firma" value={selectedDosya.alici_firma} />
-                  <CopyableField label="Satıcı Firma" value={selectedDosya.satici_firma} />
-                  <CopyableField label="Varış Limanı" value={selectedDosya.varis_limani} />
-                  <CopyableField label="Teslim Şekli" value={selectedDosya.teslim_sekli} />
-                  <CopyableField label="Toplam Tutar" value={formatCurrency(selectedDosya.toplam_tutar, selectedDosya.para_birimi)} />
-                  <CopyableField label="Marka" value={selectedDosya.marka} />
-                  <CopyableField label="BL No" value={selectedDosya.bl_no} />
-                  <CopyableField label="Beyanname No" value={selectedDosya.beyanname_no} />
+                  <CopyableField dark label="Proforma No" value={selectedDosya.proforma_no} />
+                  <CopyableField dark label="Proforma Tarihi" value={formatDateTR(selectedDosya.proforma_tarihi)} />
+                  <CopyableField dark label="Alıcı Firma" value={selectedDosya.alici_firma} />
+                  <CopyableField dark label="Satıcı Firma" value={selectedDosya.satici_firma} />
+                  <CopyableField dark label="Varış Limanı" value={selectedDosya.varis_limani} />
+                  <CopyableField dark label="Teslim Şekli" value={selectedDosya.teslim_sekli} />
+                  <CopyableField dark label="Toplam Tutar" value={formatCurrency(selectedDosya.toplam_tutar, selectedDosya.para_birimi)} />
+                  <CopyableField dark label="Marka" value={selectedDosya.marka} />
+                  <CopyableField dark label="BL No" value={selectedDosya.bl_no} />
+                  <CopyableField dark label="Beyanname No" value={selectedDosya.beyanname_no} />
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Evraklar</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Evraklar</h3>
                 <EvrakOlusturButtons dosya={selectedDosya} rezervasyonlar={selectedDosya.rezervasyonlar} konteynerler={selectedDosya.konteynerler} />
               </div>
 
               {selectedDosya.urun_detaylari && (selectedDosya.urun_detaylari as any[]).length > 0 && (
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Ürünler</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Ürünler</h3>
                   <div className="space-y-2">
                     {(selectedDosya.urun_detaylari as any[]).map((u: any, i: number) => (
-                      <div key={i} className="p-3 rounded-lg bg-slate-50 border" style={{ borderColor: "#E2E8F0" }}>
-                        <p className="text-sm font-medium text-slate-700">{u.urun_adi || u.description || "-"}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                      <div key={i} className="p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+                        <p className="text-sm font-medium text-white">{u.urun_adi || u.description || "-"}</p>
+                        <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
                           {u.miktar_mts || u.quantity || "-"} MTS × {formatCurrency(parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0)), selectedDosya.para_birimi)}
                           {" = "}
                           {formatCurrency(parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), selectedDosya.para_birimi)}
@@ -459,47 +459,47 @@ export default function IhracatlarPage() {
               )}
 
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Rezervasyon</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Rezervasyon</h3>
                 {selectedDosya.rezervasyonlar.length > 0 ? (
                   <div className="space-y-3">
                     {selectedDosya.rezervasyonlar.map((rez) => (
                       <div key={rez.id} className="grid grid-cols-2 gap-3">
-                        <CopyableField label="Booking No" value={rez.booking_no} />
-                        <CopyableField label="Gemi Adı" value={rez.gemi_adi} />
-                        <CopyableField label="Acente" value={rez.acente_ismi} />
-                        <CopyableField label="Gemi Kalkış" value={rez.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : null} />
-                        <CopyableField label="Konteyner Adedi" value={rez.konteyner_adedi?.toString()} />
-                        <CopyableField label="Yükleme Limanı" value={rez.yuklenme_limani} />
+                        <CopyableField dark label="Booking No" value={rez.booking_no} />
+                        <CopyableField dark label="Gemi Adı" value={rez.gemi_adi} />
+                        <CopyableField dark label="Acente" value={rez.acente_ismi} />
+                        <CopyableField dark label="Gemi Kalkış" value={rez.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : null} />
+                        <CopyableField dark label="Konteyner Adedi" value={rez.konteyner_adedi?.toString()} />
+                        <CopyableField dark label="Yükleme Limanı" value={rez.yuklenme_limani} />
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">Rezervasyon bilgisi bulunmuyor.</p>
+                  <p className="text-sm" style={{ color: TEXT_MUTED }}>Rezervasyon bilgisi bulunmuyor.</p>
                 )}
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>
                   Konteynerler ({selectedDosya.konteynerler.length} adet)
                 </h3>
                 {selectedDosya.konteynerler.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                          <th className="text-left px-2 py-2 text-xs font-semibold text-slate-500">Konteyner No</th>
-                          <th className="text-left px-2 py-2 text-xs font-semibold text-slate-500">Mühür</th>
-                          <th className="text-left px-2 py-2 text-xs font-semibold text-slate-500">Tip</th>
-                          <th className="text-right px-2 py-2 text-xs font-semibold text-slate-500">VGM</th>
+                        <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner No</th>
+                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Mühür</th>
+                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Tip</th>
+                          <th className="text-right px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>VGM</th>
                         </tr>
                       </thead>
                       <tbody>
                         {selectedDosya.konteynerler.map((k) => (
-                          <tr key={k.id} className="border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
-                            <td className="px-2 py-2 text-sm font-mono text-slate-700">{k.konteyner_no}</td>
-                            <td className="px-2 py-2 text-sm text-slate-600 font-mono">{k.muhur_no || "—"}</td>
-                            <td className="px-2 py-2 text-sm text-slate-600">{k.tip}</td>
-                            <td className="px-2 py-2 text-sm text-right font-medium" style={{ color: "#1B2B4B" }}>
+                          <tr key={k.id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                            <td className="px-2 py-2 text-sm font-mono text-white">{k.konteyner_no}</td>
+                            <td className="px-2 py-2 text-sm font-mono" style={{ color: TEXT_MUTED }}>{k.muhur_no || "—"}</td>
+                            <td className="px-2 py-2 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
+                            <td className="px-2 py-2 text-sm text-right font-medium" style={{ color: ACCENT }}>
                               {k.vgm_kg ? `${k.vgm_kg} KG` : "—"}
                             </td>
                           </tr>
@@ -508,7 +508,7 @@ export default function IhracatlarPage() {
                     </table>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400">Konteyner bilgisi bulunmuyor.</p>
+                  <p className="text-sm" style={{ color: TEXT_MUTED }}>Konteyner bilgisi bulunmuyor.</p>
                 )}
               </div>
             </div>

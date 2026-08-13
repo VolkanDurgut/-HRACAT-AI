@@ -6,6 +6,7 @@ import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import AppShell from "@/components/app-shell";
 import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type DosyaFull = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
@@ -15,12 +16,12 @@ type GemiModal = {
 };
 
 const YILLAR = ["Tümü", "2026"];
-const NAVY = "#14213D";
+const NAVY = ACCENT;
 
 function HBar({ value, max, color = NAVY }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.max((value / max) * 100, 1) : 0;
   return (
-    <div className="w-full bg-slate-100 rounded-full h-1" style={{ marginTop: 4 }}>
+    <div className="w-full rounded-full h-1" style={{ marginTop: 4, backgroundColor: CARD_BORDER }}>
       <div className="h-1 rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
     </div>
   );
@@ -215,7 +216,7 @@ export default function AnalizPage() {
   if (loading) return (
     <AppShell>
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={22} className="animate-spin text-slate-300" />
+        <Loader2 size={22} className="animate-spin" style={{ color: TEXT_MUTED }} />
       </div>
     </AppShell>
   );
@@ -225,41 +226,41 @@ export default function AnalizPage() {
       {/* Gemi Modal */}
       {gemiModal && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setGemiModal(null)} />
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setGemiModal(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#E2E8F0" }}>
+            <div className="rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" style={{ backgroundColor: CARD_BG }}>
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">{gemiModal.gemiAdi}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{gemiModal.dosyalar.length} sevkiyat · {gemiModal.dosyalar.reduce((s, d) => s + d.konteyner, 0)} konteyner</p>
+                  <p className="text-sm font-semibold text-white">{gemiModal.gemiAdi}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{gemiModal.dosyalar.length} sevkiyat · {gemiModal.dosyalar.reduce((s, d) => s + d.konteyner, 0)} konteyner</p>
                 </div>
-                <button onClick={() => setGemiModal(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <button onClick={() => setGemiModal(null)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
                   <X size={18} />
                 </button>
               </div>
               <div className="overflow-y-auto flex-1">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-slate-50 border-b" style={{ borderColor: "#E2E8F0" }}>
+                  <thead className="sticky top-0 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">Dosya</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">Müşteri</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">Liman</th>
-                      <th className="text-center px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">Kont.</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">ETD</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">ETA</th>
-                      <th className="text-right px-4 py-2.5 font-semibold text-slate-400 uppercase text-[10px]">Tutar</th>
+                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Dosya</th>
+                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Liman</th>
+                      <th className="text-center px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Kont.</th>
+                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>ETD</th>
+                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>ETA</th>
+                      <th className="text-right px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Tutar</th>
                     </tr>
                   </thead>
                   <tbody>
                     {gemiModal.dosyalar.map((d, i) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-slate-50" style={{ borderColor: "#F1F5F9" }}>
-                        <td className="px-4 py-2.5 font-medium text-slate-700">{d.dosyaNo}</td>
-                        <td className="px-4 py-2.5 text-slate-600 max-w-[120px] truncate">{d.aliciFirma}</td>
-                        <td className="px-4 py-2.5 text-slate-600">{d.varisLimani}</td>
-                        <td className="px-4 py-2.5 text-center font-medium text-slate-700">{d.konteyner}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{d.etd ? formatDateTR(d.etd) : "—"}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{d.eta ? formatDateTR(d.eta) : "—"}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-slate-800">{formatCurrency(d.tutar, d.paraBirimi)}</td>
+                      <tr key={i} className="border-b last:border-0 hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
+                        <td className="px-4 py-2.5 font-medium text-white">{d.dosyaNo}</td>
+                        <td className="px-4 py-2.5 max-w-[120px] truncate" style={{ color: TEXT_MUTED }}>{d.aliciFirma}</td>
+                        <td className="px-4 py-2.5" style={{ color: TEXT_MUTED }}>{d.varisLimani}</td>
+                        <td className="px-4 py-2.5 text-center font-medium text-white">{d.konteyner}</td>
+                        <td className="px-4 py-2.5" style={{ color: TEXT_MUTED }}>{d.etd ? formatDateTR(d.etd) : "—"}</td>
+                        <td className="px-4 py-2.5" style={{ color: TEXT_MUTED }}>{d.eta ? formatDateTR(d.eta) : "—"}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-white">{formatCurrency(d.tutar, d.paraBirimi)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -273,24 +274,24 @@ export default function AnalizPage() {
       {/* Başlık */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-semibold text-slate-800">Analiz</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtrelenmis.length} dosya üzerinden hesaplanıyor</p>
+          <h1 className="text-base font-semibold text-white">Analiz</h1>
+          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filtrelenmis.length} dosya üzerinden hesaplanıyor</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded border text-xs overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+          <div className="flex rounded border text-xs overflow-hidden" style={{ borderColor: CARD_BORDER }}>
             {(["tumu", "tamamlanan"] as const).map(f => (
               <button key={f} onClick={() => setDurumFiltre(f)}
-                className={`px-3 py-1.5 transition-colors ${durumFiltre === f ? "text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
-                style={durumFiltre === f ? { backgroundColor: NAVY } : {}}>
+                className="px-3 py-1.5 transition-colors"
+                style={durumFiltre === f ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: CARD_BG, color: TEXT_MUTED }}>
                 {f === "tumu" ? "Tümü" : "Tamamlananlar"}
               </button>
             ))}
           </div>
-          <div className="flex rounded border text-xs overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+          <div className="flex rounded border text-xs overflow-hidden" style={{ borderColor: CARD_BORDER }}>
             {YILLAR.map(y => (
               <button key={y} onClick={() => setYilFiltre(y)}
-                className={`px-3 py-1.5 transition-colors ${yilFiltre === y ? "text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
-                style={yilFiltre === y ? { backgroundColor: NAVY } : {}}>
+                className="px-3 py-1.5 transition-colors"
+                style={yilFiltre === y ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: CARD_BG, color: TEXT_MUTED }}>
                 {y}
               </button>
             ))}
@@ -300,37 +301,37 @@ export default function AnalizPage() {
 
       {/* KPI Kartlar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Toplam Hacim</p>
-          <p className="text-2xl font-bold text-slate-800">{formatCurrency(toplamHacim, paraBirimi)}</p>
+        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam Hacim</p>
+          <p className="text-2xl font-bold text-white">{formatCurrency(toplamHacim, paraBirimi)}</p>
         </div>
-        <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Toplam Konteyner</p>
-          <p className="text-2xl font-bold text-slate-800">{toplamKonteyner}</p>
+        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam Konteyner</p>
+          <p className="text-2xl font-bold text-white">{toplamKonteyner}</p>
         </div>
-        <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Toplam MTS</p>
-          <p className="text-2xl font-bold text-slate-800">{toplamMts.toLocaleString("tr-TR")}</p>
-          <p className="text-[10px] text-slate-400">metrik ton</p>
+        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam MTS</p>
+          <p className="text-2xl font-bold text-white">{toplamMts.toLocaleString("tr-TR")}</p>
+          <p className="text-[10px]" style={{ color: TEXT_MUTED }}>metrik ton</p>
         </div>
-        <div className="bg-white rounded-lg border p-4" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Dosya Durumu</p>
-          <p className="text-2xl font-bold text-slate-800">{kapaliSayisi} <span className="text-base font-normal text-slate-400">/ {filtrelenmis.length}</span></p>
-          <p className="text-[10px] text-slate-400">{acikSayisi} açık dosya</p>
+        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Dosya Durumu</p>
+          <p className="text-2xl font-bold text-white">{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></p>
+          <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{acikSayisi} açık dosya</p>
         </div>
       </div>
 
       {/* Aylık Trend */}
       {aylikTrend.length > 0 && (
-        <div className="bg-white rounded-lg border mb-4" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-lg border mb-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-2">
-              <BarChart2 size={13} className="text-slate-400" />
-              <span className="text-xs font-semibold text-slate-600">Aylık Trend</span>
+              <BarChart2 size={13} style={{ color: TEXT_MUTED }} />
+              <span className="text-xs font-semibold text-white">Aylık Trend</span>
             </div>
-            <div className="flex items-center gap-4 text-[10px] text-slate-400">
+            <div className="flex items-center gap-4 text-[10px]" style={{ color: TEXT_MUTED }}>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: NAVY }} /> Hacim</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block bg-slate-200" /> Konteyner</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: CARD_BORDER }} /> Konteyner</span>
             </div>
           </div>
           <div className="px-5 pt-4 pb-3">
@@ -342,9 +343,9 @@ export default function AnalizPage() {
                   </div>
                   <div className="w-full flex items-end gap-0.5" style={{ height: 96 }}>
                     <div className="flex-1 rounded-t-sm" style={{ height: `${Math.max((item.tutar / maxTutar) * 100, 3)}%`, backgroundColor: NAVY }} />
-                    <div className="flex-1 rounded-t-sm bg-slate-200" style={{ height: `${Math.max((item.konteyner / maxKont) * 100, 3)}%` }} />
+                    <div className="flex-1 rounded-t-sm" style={{ height: `${Math.max((item.konteyner / maxKont) * 100, 3)}%`, backgroundColor: CARD_BORDER }} />
                   </div>
-                  <p className="text-[9px] text-slate-400 text-center">{item.ay}</p>
+                  <p className="text-[9px] text-center" style={{ color: TEXT_MUTED }}>{item.ay}</p>
                 </div>
               ))}
             </div>

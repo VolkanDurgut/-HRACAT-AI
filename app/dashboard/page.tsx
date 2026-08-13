@@ -50,12 +50,13 @@ function AkisAdimi({ tamamlandi, bekliyor, label, sublabel, tooltip }: { tamamla
       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
         tamamlandi ? "bg-green-500 border-green-500 text-white" :
         bekliyor ? "bg-amber-400 border-amber-400 text-white animate-pulse" :
-        "bg-white border-slate-200 text-slate-300"
-      } ${tooltip ? "cursor-pointer" : ""}`}>
-        {tamamlandi ? <CheckCircle2 size={12} /> : bekliyor ? <Clock size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />}
+        "border-2"
+      } ${tooltip ? "cursor-pointer" : ""}`}
+      style={!tamamlandi && !bekliyor ? { backgroundColor: "#1A1F2B", borderColor: "#2A3141" } : undefined}>
+        {tamamlandi ? <CheckCircle2 size={12} /> : bekliyor ? <Clock size={12} /> : <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#3A4152" }} />}
       </div>
-      <p className={`text-[9px] font-medium text-center leading-tight ${tamamlandi ? "text-green-700" : bekliyor ? "text-amber-600" : "text-slate-400"}`}>{label}</p>
-      {sublabel && <p className="text-[8px] text-slate-400 text-center">{sublabel}</p>}
+      <p className={`text-[9px] font-medium text-center leading-tight ${tamamlandi ? "text-green-400" : bekliyor ? "text-amber-400" : ""}`} style={!tamamlandi && !bekliyor ? { color: "#5A6272" } : undefined}>{label}</p>
+      {sublabel && <p className="text-[8px] text-center" style={{ color: "#5A6272" }}>{sublabel}</p>}
       {tooltip && hover && (
         <div className="absolute top-full left-0 pt-1.5 z-30" style={{ width: "max-content", maxWidth: "320px" }}>
           <div className="p-3 rounded-lg shadow-lg border bg-white animate-fade-in overflow-y-auto"
@@ -70,7 +71,7 @@ function AkisAdimi({ tamamlandi, bekliyor, label, sublabel, tooltip }: { tamamla
 
 function AkisConnector({ tamamlandi }: { tamamlandi: boolean }) {
   return (
-    <div className={`flex-1 h-0.5 mt-3 rounded transition-all ${tamamlandi ? "bg-green-400" : "bg-slate-200"}`} />
+    <div className={`flex-1 h-0.5 mt-3 rounded transition-all ${tamamlandi ? "bg-green-400" : ""}`} style={!tamamlandi ? { backgroundColor: "#2A3141" } : undefined} />
   );
 }
 

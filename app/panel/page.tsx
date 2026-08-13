@@ -10,6 +10,7 @@ import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Trash2, ExternalLink, FolderX, Loader2 } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
@@ -104,18 +105,18 @@ function PanelContent() {
     <AppShell>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-base font-semibold text-slate-800">Ana Panel</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filteredDosyalar.length} açık dosya</p>
+          <h1 className="text-base font-semibold text-white">Ana Panel</h1>
+          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filteredDosyalar.length} açık dosya</p>
         </div>
         <div className="flex gap-1.5">
           {filters.map((f) => (
             <button
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeFilter === f.key ? "text-white" : "bg-white text-slate-500 border hover:border-slate-300"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                activeFilter === f.key ? "text-white" : "hover:border-slate-500"
               }`}
-              style={activeFilter === f.key ? { backgroundColor: "#1B2B4B" } : { borderColor: "#E2E8F0" }}
+              style={activeFilter === f.key ? { backgroundColor: ACCENT, borderColor: ACCENT } : { borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: CARD_BG }}
             >
               {f.label}
             </button>
@@ -141,9 +142,9 @@ function PanelContent() {
       ) : filteredDosyalar.length === 0 ? (
         <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
       ) : (
-        <div className="bg-white rounded-xl border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           {/* Tablo başlığı */}
-          <div className="grid text-[10px] font-semibold text-slate-400 uppercase tracking-wide px-4 py-2.5 border-b bg-slate-50" style={{ borderColor: "#E2E8F0", gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}>
+          <div className="grid text-[10px] font-semibold uppercase tracking-wide px-4 py-2.5 border-b" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}>
             <span>Proforma No</span>
             <span>Müşteri</span>
             <span>Booking No</span>
@@ -177,43 +178,43 @@ function PanelContent() {
               <React.Fragment key={dosya.id}>
                 {/* Ana satır */}
                 <div
-                  className="grid items-center px-4 py-3 border-b hover:bg-slate-50/60 transition-colors"
-                  style={{ borderColor: "#F1F5F9", gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}
+                  className="grid items-center px-4 py-3 border-b hover:bg-white/[0.03] transition-colors"
+                  style={{ borderColor: CARD_BORDER, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold" style={{ color: "#1B2B4B" }}>{dosya.proforma_no || dosya.dosya_no}</span>
+                    <span className="text-xs font-semibold" style={{ color: ACCENT }}>{dosya.proforma_no || dosya.dosya_no}</span>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-700 truncate">{dosya.alici_firma || "—"}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{dosya.varis_limani || ""}</p>
+                    <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>
+                    <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{dosya.varis_limani || ""}</p>
                   </div>
                   {!hasRez
                     ? <span className="text-xs font-medium text-amber-500 animate-pulse" style={{ gridColumn: "3 / span 5" }}>Henüz rezervasyon alınmadı</span>
-                    : <span className="text-xs text-slate-600 font-mono" style={{ gridColumn: 3 }}>{latestRez!.booking_no}</span>
+                    : <span className="text-xs font-mono" style={{ gridColumn: 3, color: TEXT_MUTED }}>{latestRez!.booking_no}</span>
                   }
-                  {hasRez && <span className="text-xs text-slate-600" style={{ gridColumn: 4 }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span>}
-                  {hasRez && <span className="text-xs text-slate-600" style={{ gridColumn: 5 }}>{konteynerAdedi > 0 ? `${eklenenKont}/${konteynerAdedi}` : "—"}</span>}
+                  {hasRez && <span className="text-xs" style={{ gridColumn: 4, color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span>}
+                  {hasRez && <span className="text-xs" style={{ gridColumn: 5, color: TEXT_MUTED }}>{konteynerAdedi > 0 ? `${eklenenKont}/${konteynerAdedi}` : "—"}</span>}
                   <div style={{ gridColumn: 6 }}>
                     {tCutoff ? (
                       <div>
-                        <p className="text-[10px] text-slate-600">{formatDateTimeTR(latestRez!.talimat_cutoff!)}</p>
+                        <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.talimat_cutoff!)}</p>
                         <StatusBadge label={tCutoff.text} color={tCutoff.color} />
                       </div>
-                    ) : <span className="text-xs text-slate-300">—</span>}
+                    ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                   </div>
                   <div style={{ gridColumn: 7 }}>
                     {bCutoff ? (
                       <div>
-                        <p className="text-[10px] text-slate-600">{formatDateTimeTR(latestRez!.beyanname_cutoff!)}</p>
+                        <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.beyanname_cutoff!)}</p>
                         <StatusBadge label={bCutoff.text} color={bCutoff.color} />
                       </div>
-                    ) : <span className="text-xs text-slate-300">—</span>}
+                    ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                   </div>
                   <div className="flex items-center justify-end gap-1.5" style={{ gridColumn: 8 }}>
                     <button
                       onClick={() => router.push(`/dosya/${dosya.id}`)}
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
-                      style={{ backgroundColor: "#1B2B4B" }}
+                      style={{ backgroundColor: ACCENT }}
                     >
                       <ExternalLink size={12} /> Detay
                     </button>
@@ -230,17 +231,18 @@ function PanelContent() {
                 </div>
 
                 {/* Durum adımları — kompakt tek satır */}
-                <div className="px-4 py-2 border-b bg-slate-50/40 flex items-center gap-1.5 flex-wrap" style={{ borderColor: "#F1F5F9" }}>
+                <div className="px-4 py-2 border-b flex items-center gap-1.5 flex-wrap" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   {akisAdimlari.map((adim) => (
                     <span
                       key={adim.label}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-400"}`}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-500/10 text-green-400" : ""}`}
+                      style={!adim.done ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : "bg-slate-300"}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : ""}`} style={!adim.done ? { backgroundColor: "#4A5262" } : undefined} />
                       {adim.label}
                     </span>
                   ))}
-                  <span className="ml-auto text-[10px] text-slate-400 truncate max-w-[35%]">
+                  <span className="ml-auto text-[10px] truncate max-w-[35%]" style={{ color: TEXT_MUTED }}>
                     {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}
                   </span>
                 </div>
@@ -255,7 +257,7 @@ function PanelContent() {
 
 export default function PanelPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#F8F9FA" }}><div className="animate-pulse text-slate-400">Yükleniyor...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}><div className="animate-pulse" style={{ color: TEXT_MUTED }}>Yükleniyor...</div></div>}>
       <PanelContent />
     </Suspense>
   );

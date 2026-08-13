@@ -30,7 +30,10 @@ const ayarlarAltMenu = [
   { label: "Yetkilendirme", href: "/ayarlar/yetkilendirme", icon: <ShieldCheck size={15} /> },
 ];
 
-const NAVY = "#14213D";
+const NAVY = "#10B981";
+const SIDEBAR_BG = "#0B0F14";
+const BORDER = "#1E2530";
+const TEXT_MUTED = "#8B95A5";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -56,9 +59,9 @@ export default function Sidebar() {
           href={item.href}
           onClick={closeMobile}
           className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 ${
-            active ? "font-medium text-white" : "text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-700"
+            active ? "font-medium text-white" : "font-medium hover:bg-white/5"
           }`}
-          style={active ? { backgroundColor: NAVY } : undefined}
+          style={active ? { backgroundColor: NAVY } : { color: TEXT_MUTED }}
         >
           <span className="shrink-0">{item.icon}</span>
           <span>{item.label}</span>
@@ -69,7 +72,8 @@ export default function Sidebar() {
     return (
       <div
         key={item.href}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 cursor-not-allowed select-none"
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed select-none opacity-40"
+        style={{ color: TEXT_MUTED }}
         title="Bu bölüme erişim yetkiniz yok"
       >
         <span className="shrink-0">{item.icon}</span>
@@ -80,13 +84,13 @@ export default function Sidebar() {
 
   const navContent = (
     <>
-      <div className="px-5 py-5 border-b border-slate-200 flex items-center gap-3">
+      <div className="px-5 py-5 border-b flex items-center gap-3" style={{ borderColor: BORDER }}>
         <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: NAVY }}>
           <Anchor size={17} className="text-white" />
         </div>
         <div>
-          <h1 className="font-semibold text-[15px] leading-tight" style={{ color: NAVY }}>İhracat AI</h1>
-          <p className="text-slate-400 text-[11px]">Export Management</p>
+          <h1 className="font-semibold text-[15px] leading-tight text-white">İhracat AI</h1>
+          <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Export Management</p>
         </div>
       </div>
 
@@ -94,7 +98,7 @@ export default function Sidebar() {
         {mainItems.map(renderItem)}
 
         <div className="pt-3 pb-2 px-3">
-          <div className="h-px bg-slate-200" />
+          <div className="h-px" style={{ backgroundColor: BORDER }} />
         </div>
 
         {opsItems.map(renderItem)}
@@ -104,11 +108,8 @@ export default function Sidebar() {
           <div>
             <button
               onClick={() => setAyarlarAcik(!ayarlarAcik)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 ${
-                pathname.startsWith("/ayarlar")
-                  ? "text-amber-600"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 hover:bg-white/5`}
+              style={{ color: pathname.startsWith("/ayarlar") ? "#FFFFFF" : TEXT_MUTED }}
             >
               <span className="shrink-0"><Settings size={18} /></span>
               <span className="flex-1 text-left">Ayarlar</span>
@@ -118,17 +119,16 @@ export default function Sidebar() {
               />
             </button>
             {ayarlarAcik && (
-              <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-100 pl-3">
+              <div className="ml-4 mt-1 space-y-0.5 border-l-2 pl-3" style={{ borderColor: BORDER }}>
                 {ayarlarAltMenu.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={closeMobile}
                     className={`flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-colors duration-150 ${
-                      isActive(item.href)
-                        ? "font-medium text-amber-600 bg-amber-50"
-                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                      isActive(item.href) ? "font-medium text-white" : "hover:bg-white/5"
                     }`}
+                    style={{ color: isActive(item.href) ? "#FFFFFF" : TEXT_MUTED, backgroundColor: isActive(item.href) ? NAVY : undefined }}
                   >
                     <span className="shrink-0">{item.icon}</span>
                     <span>{item.label}</span>
@@ -139,7 +139,8 @@ export default function Sidebar() {
           </div>
         ) : (
           <div
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 cursor-not-allowed select-none"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed select-none opacity-40"
+            style={{ color: TEXT_MUTED }}
             title="Bu bölüme erişim yetkiniz yok"
           >
             <span className="shrink-0"><Settings size={18} /></span>
@@ -148,18 +149,19 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="px-3 pb-3 pt-2 border-t border-slate-200 space-y-1">
+      <div className="px-3 pb-3 pt-2 border-t space-y-1" style={{ borderColor: BORDER }}>
         {user?.email && (
           <div className="flex items-center gap-2.5 px-3 py-2">
-            <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-              <User size={13} className="text-slate-400" />
+            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: BORDER }}>
+              <User size={13} style={{ color: TEXT_MUTED }} />
             </div>
-            <p className="text-xs text-slate-400 truncate">{user.email}</p>
+            <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>{user.email}</p>
           </div>
         )}
         <button
           onClick={() => { signOut(); closeMobile(); }}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"
+          style={{ color: TEXT_MUTED }}
         >
           <LogOut size={18} />
           Çıkış Yap
@@ -183,17 +185,18 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed left-0 top-0 bottom-0 w-[240px] flex flex-col z-[56] bg-white border-r-2 border-slate-200 transition-transform duration-300 ease-out md:hidden ${
+        className={`fixed left-0 top-0 bottom-0 w-[240px] flex flex-col z-[56] border-r transition-transform duration-300 ease-out md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ backgroundColor: SIDEBAR_BG, borderColor: BORDER }}
       >
-        <button onClick={closeMobile} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
+        <button onClick={closeMobile} className="absolute top-4 right-4 hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
           <X size={20} />
         </button>
         {navContent}
       </aside>
 
-      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] flex-col z-50 bg-white border-r-2 border-slate-200">
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] flex-col z-50 border-r" style={{ backgroundColor: SIDEBAR_BG, borderColor: BORDER }}>
         {navContent}
       </aside>
     </>

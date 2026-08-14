@@ -5,6 +5,7 @@ import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
 } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type DraftBlKontrolSonucu = {
   uyumlu: boolean;
@@ -161,21 +162,21 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
   };
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-      <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: "#E2E8F0" }}>
-        <Ship size={16} style={{ color: "#1B2B4B" }} />
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">İhracat Draft BL</h3>
+    <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
+        <Ship size={16} style={{ color: ACCENT }} />
+        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>İhracat Draft BL</h3>
       </div>
       <div className="p-4">
         <div className="flex items-center justify-between gap-4 mb-2">
-          <p className="text-sm font-medium text-slate-700">Draft Konşimento</p>
+          <p className="text-sm font-medium text-white">Draft Konşimento</p>
           {draftBlUrl && kontrolSonucu && (
             kontrolSonucu.uyumlu ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full">
                 <CheckCircle2 size={12} /> Yüklendi
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full">
                 <AlertTriangle size={12} /> Uyuşmazlık var
               </span>
             )
@@ -183,25 +184,25 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         </div>
 
         {!draftBlUrl && !yukleniyor && (
-          <label className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer hover:bg-slate-50 transition-colors" style={{ borderColor: "#CBD5E1" }}>
-            <Upload size={18} className="text-slate-400" />
-            <span className="text-sm text-slate-600">Draft BL PDF yükle</span>
+          <label className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
+            <Upload size={18} style={{ color: TEXT_MUTED }} />
+            <span className="text-sm" style={{ color: TEXT_MUTED }}>Draft BL PDF yükle</span>
             <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handleDosyaSec(e.target.files?.[0] || null)} />
           </label>
         )}
 
         {yukleniyor && (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-slate-50 border" style={{ borderColor: "#E2E8F0" }}>
-            <Loader2 size={18} className="text-slate-500 animate-spin" />
-            <span className="text-sm text-slate-600">Draft BL okunuyor ve kontrol ediliyor...</span>
+          <div className="flex items-center gap-2 px-3 py-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+            <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
+            <span className="text-sm" style={{ color: TEXT_MUTED }}>Draft BL okunuyor ve kontrol ediliyor...</span>
           </div>
         )}
 
         {hata && (
-          <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
-            <p className="text-sm font-medium text-amber-800">Kontrol yapılamadı</p>
-            <p className="text-xs text-amber-700">{hata}</p>
-            <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200">
+          <div className="mt-2 p-3 rounded-lg border bg-amber-500/10 space-y-2" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+            <p className="text-sm font-medium text-amber-400">Kontrol yapılamadı</p>
+            <p className="text-xs text-amber-300">{hata}</p>
+            <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20">
               <RotateCcw size={12} /> Tekrar Dene
             </button>
           </div>
@@ -209,49 +210,49 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
 
         {draftBlUrl && kontrolSonucu && (
           <div className="mt-2 space-y-2">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-white border" style={{ borderColor: "#E2E8F0" }}>
-              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-600 shrink-0" title="PDF dosyası"><FileType2 size={16} /></span>
-              <a href={draftBlUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 truncate flex-1 hover:underline">{draftBlAdi}</a>
-              {draftBlTarihi && <span className="text-xs text-slate-400 shrink-0 hidden sm:inline">{formatDateTimeTR(draftBlTarihi)}</span>}
-              <a href={draftBlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors shrink-0" title="Draft BL'yi yeni sekmede aç"><ExternalLink size={12} /> Görüntüle</a>
-              <button onClick={handleYenidenYukle} className="text-slate-400 hover:text-slate-600 shrink-0" title="Draft BL'yi kaldır"><X size={16} /></button>
+            <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-400 shrink-0" title="PDF dosyası"><FileType2 size={16} /></span>
+              <a href={draftBlUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-white truncate flex-1 hover:underline">{draftBlAdi}</a>
+              {draftBlTarihi && <span className="text-xs shrink-0 hidden sm:inline" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(draftBlTarihi)}</span>}
+              <a href={draftBlUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} title="Draft BL'yi yeni sekmede aç"><ExternalLink size={12} /> Görüntüle</a>
+              <button onClick={handleYenidenYukle} className="hover:text-white shrink-0" style={{ color: TEXT_MUTED }} title="Draft BL'yi kaldır"><X size={16} /></button>
             </div>
 
             {kontrolSonucu.uyumlu ? (
-              <div className="p-3 rounded-lg bg-white border-2 border-green-300">
+              <div className="p-3 rounded-lg border-2 border-green-500/40" style={{ backgroundColor: ROW_HEADER_BG }}>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-green-600" />
-                  <p className="text-sm font-semibold text-green-700">Draft BL sistemle uyumlu.</p>
+                  <CheckCircle2 size={16} className="text-green-400" />
+                  <p className="text-sm font-semibold text-green-400">Draft BL sistemle uyumlu.</p>
                 </div>
-                {kontrolSonucu.ozet && <p className="text-xs text-slate-500 mt-1 ml-6">{kontrolSonucu.ozet}</p>}
-                <div className="mt-2 ml-6 flex flex-wrap gap-4 text-xs text-slate-500">
+                {kontrolSonucu.ozet && <p className="text-xs mt-1 ml-6" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
+                <div className="mt-2 ml-6 flex flex-wrap gap-4 text-xs" style={{ color: TEXT_MUTED }}>
                   {(kontrolSonucu.bl_no || dosya.bl_no) && (
-                    <span>BL No: <strong className="text-slate-700">{kontrolSonucu.bl_no || dosya.bl_no}</strong></span>
+                    <span>BL No: <strong className="text-white">{kontrolSonucu.bl_no || dosya.bl_no}</strong></span>
                   )}
                   {kontrolSonucu.consignee && (
-                    <span>Consignee: <strong className="text-slate-700">{kontrolSonucu.consignee}</strong></span>
+                    <span>Consignee: <strong className="text-white">{kontrolSonucu.consignee}</strong></span>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="p-3 rounded-lg bg-white border-2 border-red-300 space-y-2">
+              <div className="p-3 rounded-lg border-2 border-red-500/40 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }}>
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-red-600" />
-                  <p className="text-sm font-semibold text-red-700">Draft BL'de uyuşmazlık tespit edildi</p>
+                  <AlertTriangle size={16} className="text-red-400" />
+                  <p className="text-sm font-semibold text-red-400">Draft BL'de uyuşmazlık tespit edildi</p>
                 </div>
-                {kontrolSonucu.ozet && <p className="text-xs text-slate-600">{kontrolSonucu.ozet}</p>}
+                {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
                 {kontrolSonucu.uyusmazliklar?.length > 0 && (
                   <div className="space-y-1.5">
                     {kontrolSonucu.uyusmazliklar.map((u, idx) => (
-                      <div key={idx} className="text-xs p-2 rounded bg-red-50 border border-red-100">
-                        <p className="font-medium text-red-700">{u.alan}</p>
-                        <p className="text-red-600">Sistemde: <span className="font-mono">{u.sistemde}</span></p>
-                        <p className="text-red-600">Draft BL'de: <span className="font-mono">{u.dosyada}</span></p>
+                      <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
+                        <p className="font-medium text-red-400">{u.alan}</p>
+                        <p className="text-red-300">Sistemde: <span className="font-mono">{u.sistemde}</span></p>
+                        <p className="text-red-300">Draft BL'de: <span className="font-mono">{u.dosyada}</span></p>
                       </div>
                     ))}
                   </div>
                 )}
-                <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100">
+                <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20">
                   <RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle
                 </button>
               </div>

@@ -7,6 +7,7 @@ import {
   FileText, Mail, X, Upload, CheckCircle2,
   AlertTriangle, Loader2, RotateCcw
 } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type KontrolSonucu = {
   uyumlu: boolean;
@@ -264,70 +265,70 @@ export default function FaturaTalimatiSection({
   const konsimentoIcerik = (
     <div className="space-y-3">
       {!konsimentoDosyaUrl && !kontrolEdiliyor ? (
-        <label className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-slate-50" style={{ borderColor: "#CBD5E1" }}>
-          <Upload size={28} className="text-slate-400" />
-          <span className="text-sm font-medium text-slate-700">Konsimento talimati PDF dosyasini secin</span>
-          <span className="text-xs text-slate-500">veya surukleyip birakin</span>
+        <label className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
+          <Upload size={28} style={{ color: TEXT_MUTED }} />
+          <span className="text-sm font-medium text-white">Konsimento talimati PDF dosyasini secin</span>
+          <span className="text-xs" style={{ color: TEXT_MUTED }}>veya surukleyip birakin</span>
           <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }} />
         </label>
       ) : (
         <div className="space-y-3">
           {konsimentoDosyaUrl && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-white border" style={{ borderColor: "#bbf7d0" }}>
-              <FileText size={16} className="text-slate-500 shrink-0" />
-              <a href={konsimentoDosyaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-700 truncate flex-1 hover:underline">{konsimentoDosyaAdi}</a>
-              {konsimentoYuklemeTarihi && <span className="text-xs text-slate-400 shrink-0">{formatDateTimeTR(konsimentoYuklemeTarihi)}</span>}
-              <button onClick={handleYenidenYukle} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
+            <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: "rgba(74,222,128,0.3)" }}>
+              <FileText size={16} className="shrink-0" style={{ color: TEXT_MUTED }} />
+              <a href={konsimentoDosyaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-white truncate flex-1 hover:underline">{konsimentoDosyaAdi}</a>
+              {konsimentoYuklemeTarihi && <span className="text-xs shrink-0" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(konsimentoYuklemeTarihi)}</span>}
+              <button onClick={handleYenidenYukle} className="hover:text-white shrink-0" style={{ color: TEXT_MUTED }}><X size={16} /></button>
             </div>
           )}
           {kontrolEdiliyor && (
-            <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-white border animate-fade-in" style={{ borderColor: "#E2E8F0" }}>
-              <Loader2 size={18} className="text-slate-500 animate-spin" />
-              <span className="text-sm text-slate-600">Belge kontrol ediliyor, bu işlem birkaç saniye sürebilir</span>
+            <div className="flex items-center gap-2 px-3 py-3 rounded-lg border animate-fade-in" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+              <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
+              <span className="text-sm" style={{ color: TEXT_MUTED }}>Belge kontrol ediliyor, bu işlem birkaç saniye sürebilir</span>
             </div>
           )}
           {kontrolHata && (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-2 animate-fade-in">
-              <p className="text-sm font-medium text-amber-800">Kontrol yapilamadi</p>
-              <p className="text-xs text-amber-700">{kontrolHata}</p>
-              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200"><RotateCcw size={12} /> Tekrar Dene</button>
+            <div className="p-3 rounded-lg border bg-amber-500/10 space-y-2 animate-fade-in" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+              <p className="text-sm font-medium text-amber-400">Kontrol yapilamadi</p>
+              <p className="text-xs text-amber-300">{kontrolHata}</p>
+              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"><RotateCcw size={12} /> Tekrar Dene</button>
             </div>
           )}
           {kontrolSonucu && kontrolSonucu.uyumlu && (
-            <div className="p-4 rounded-lg bg-white border-2 border-green-300 space-y-2 animate-fade-in">
+            <div className="p-4 rounded-lg border-2 border-green-500/40 space-y-2 animate-fade-in" style={{ backgroundColor: ROW_HEADER_BG }}>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={18} className="text-green-600" />
-                <p className="text-sm font-semibold text-green-700">Elinize saglik. Gonul rahatligiyla gonderebilirsiniz.</p>
+                <CheckCircle2 size={18} className="text-green-400" />
+                <p className="text-sm font-semibold text-green-400">Elinize saglik. Gonul rahatligiyla gonderebilirsiniz.</p>
               </div>
-              {kontrolSonucu.ozet && <p className="text-xs text-slate-500 ml-6">{kontrolSonucu.ozet}</p>}
+              {kontrolSonucu.ozet && <p className="text-xs ml-6" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
               {kontrolSonucu.consignee && (
-                <p className="text-xs text-slate-500 ml-6 mt-1">
-                  <span className="font-medium text-slate-600">Consignee:</span> {kontrolSonucu.consignee}
+                <p className="text-xs ml-6 mt-1" style={{ color: TEXT_MUTED }}>
+                  <span className="font-medium text-white">Consignee:</span> {kontrolSonucu.consignee}
                 </p>
               )}
-              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 ml-6"><RotateCcw size={12} /> Baska Dosya Yukle</button>
+              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ml-6 hover:bg-white/10" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}><RotateCcw size={12} /> Baska Dosya Yukle</button>
             </div>
           )}
           {kontrolSonucu && !kontrolSonucu.uyumlu && (
-            <div className="p-4 rounded-lg bg-white border-2 border-red-300 space-y-3 animate-fade-in">
+            <div className="p-4 rounded-lg border-2 border-red-500/40 space-y-3 animate-fade-in" style={{ backgroundColor: ROW_HEADER_BG }}>
               <div className="flex items-center gap-2">
-                <AlertTriangle size={18} className="text-red-600" />
-                <p className="text-sm font-semibold text-red-700">Dosyada uyusmazlik tespit edildi</p>
+                <AlertTriangle size={18} className="text-red-400" />
+                <p className="text-sm font-semibold text-red-400">Dosyada uyusmazlik tespit edildi</p>
               </div>
-              {kontrolSonucu.ozet && <p className="text-xs text-slate-600">{kontrolSonucu.ozet}</p>}
+              {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
               {kontrolSonucu.uyusmazliklar?.length > 0 && (
                 <div className="space-y-1.5">
                   {kontrolSonucu.uyusmazliklar.map((u, idx) => (
-                    <div key={idx} className="text-xs p-2 rounded bg-red-50 border border-red-100">
-                      <p className="font-medium text-red-700">{u.alan}</p>
-                      <p className="text-red-600">Sistemde: <span className="font-mono">{u.sistemde}</span></p>
-                      <p className="text-red-600">Dosyada: <span className="font-mono">{u.dosyada}</span></p>
+                    <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
+                      <p className="font-medium text-red-400">{u.alan}</p>
+                      <p className="text-red-300">Sistemde: <span className="font-mono">{u.sistemde}</span></p>
+                      <p className="text-red-300">Dosyada: <span className="font-mono">{u.dosyada}</span></p>
                     </div>
                   ))}
                 </div>
               )}
-              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100"><RotateCcw size={12} /> Dogru Dosyayi Yeniden Yukle</button>
+              <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20"><RotateCcw size={12} /> Dogru Dosyayi Yeniden Yukle</button>
             </div>
           )}
         </div>
@@ -336,27 +337,27 @@ export default function FaturaTalimatiSection({
   );
 
   return (
-    <div className="pt-2 border-t space-y-4" style={{ borderColor: "#F1F5F9" }}>
+    <div className="pt-2 border-t space-y-4" style={{ borderColor: CARD_BORDER }}>
       {!showKonsimento ? (
         <div className="space-y-3">
           {!konsimentoHazir && !konsimentoDosyaUrl ? (
             <div>
-              <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 bg-slate-100 cursor-not-allowed">
+              <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed" style={{ color: TEXT_MUTED, backgroundColor: CARD_BORDER }}>
                 <FileText size={16} /> Konşimento Talimatı Yükle
               </button>
-              <p className="text-xs text-slate-400 mt-1.5 text-center">Aktif olması için tüm konteynerlerin kap, net ve brüt bilgileri girilmelidir.</p>
+              <p className="text-xs mt-1.5 text-center" style={{ color: TEXT_MUTED }}>Aktif olması için tüm konteynerlerin kap, net ve brüt bilgileri girilmelidir.</p>
             </div>
           ) : (
-            <button onClick={() => setShowKonsimento(true)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: "#1B2B4B" }}>
+            <button onClick={() => setShowKonsimento(true)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: ACCENT }}>
               <FileText size={16} /> {konsimentoDosyaUrl ? "Konsimento Talimatini Goruntule" : "Konsimento Talimati Yukle"}
             </button>
           )}
         </div>
       ) : (
-        <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-in" style={{ borderColor: "#E2E8F0" }}>
+        <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-in" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">Konsimento Talimati</p>
-            <button onClick={() => setShowKonsimento(false)} className="p-1 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            <p className="text-sm font-bold text-white">Konsimento Talimati</p>
+            <button onClick={() => setShowKonsimento(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
           </div>
           {konsimentoIcerik}
         </div>
@@ -364,43 +365,43 @@ export default function FaturaTalimatiSection({
 
       {!faturaTalimatiHazir ? (
         <div className="mt-3">
-          <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 bg-slate-100 cursor-not-allowed">
+          <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed" style={{ color: TEXT_MUTED, backgroundColor: CARD_BORDER }}>
             <FileText size={16} /> Fatura Talimati Olustur
           </button>
-          <p className="text-xs text-slate-400 mt-1.5 text-center">{eklenenKonteynerAdedi} / {rezervasyonKonteynerAdedi || 0} konteyner eklendi</p>
+          <p className="text-xs mt-1.5 text-center" style={{ color: TEXT_MUTED }}>{eklenenKonteynerAdedi} / {rezervasyonKonteynerAdedi || 0} konteyner eklendi</p>
         </div>
       ) : showFaturaTalimati ? (
-        <div className="mt-3 p-4 rounded-xl border bg-white shadow-sm space-y-3 animate-fade-in" style={{ borderColor: "#E2E8F0" }}>
+        <div className="mt-3 p-4 rounded-xl border shadow-sm space-y-3 animate-fade-in" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">Fatura Talimati Maili</p>
-            <button onClick={() => setShowFaturaTalimati(false)} className="p-1 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
+            <button onClick={() => setShowFaturaTalimati(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">TO (Alici)</p>
-            <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
+            <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">CC</p>
-            <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
+            <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">Konu</p>
-            <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Konu</p>
+            <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">Metin</p>
-            <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Metin</p>
+            <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
           <div className="flex gap-2">
-            <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: "#1B2B4B" }}>
+            <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
               <Mail size={14} /> Mail Uygulamasini Ac
             </button>
-            <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50" style={{ borderColor: "#E2E8F0" }}>Iptal</button>
+            <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
           </div>
         </div>
       ) : (
         <div className="space-y-3">
-          <button onClick={handleFaturaTalimatiAc} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: "#1B2B4B" }}>
+          <button onClick={handleFaturaTalimatiAc} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: ACCENT }}>
             <FileText size={16} /> {talimatGonderildi ? "Fatura Talimatini Yeniden Gonder" : "Fatura Talimati Olustur"}
           </button>
           </div>

@@ -6,6 +6,7 @@ import { CopyableField } from "@/components/copyable-field";
 import { formatDateTR, formatCurrency } from "@/lib/cutoff-utils";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type Props = {
   dosya: Dosya;
@@ -133,8 +134,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const renderUrunFiyatlari = (forEdit: boolean) => {
     if (urunler.length === 0) return null;
     return (
-      <div className={forEdit ? "p-3 rounded-lg bg-slate-50 border" : ""} style={forEdit ? { borderColor: "#E2E8F0" } : undefined}>
-        {forEdit && <p className="text-xs text-slate-500 mb-2">Proformadan otomatik hesaplanir, buradan duzenlenemez</p>}
+      <div className={forEdit ? "p-3 rounded-lg border" : ""} style={forEdit ? { borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG } : undefined}>
+        {forEdit && <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>Proformadan otomatik hesaplanir, buradan duzenlenemez</p>}
         <div className="space-y-2">
           {urunler.map((u: any, i: number) => {
             const ad = u.urun_adi || u.description || "Urun";
@@ -142,8 +143,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
             const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
             return (
               <div key={i}>
-                <p className="text-sm font-medium text-slate-700">{ad}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-white">{ad}</p>
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>
                   CIF: {formatCurrency(cifBirim, dosya.para_birimi)}
                   {fobBirim !== null && ` — FOB: ${formatCurrency(fobBirim, dosya.para_birimi)}`}
                 </p>
@@ -151,25 +152,25 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
             );
           })}
         </div>
-        <div className="mt-3 pt-2 border-t grid grid-cols-2 gap-3" style={{ borderColor: "#E2E8F0" }}>
+        <div className="mt-3 pt-2 border-t grid grid-cols-2 gap-3" style={{ borderColor: CARD_BORDER }}>
           <div>
-            <p className="text-xs text-slate-400">Toplam CIF</p>
-            <p className="text-sm font-semibold text-slate-700">{formatCurrency(toplamCif, dosya.para_birimi)}</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam CIF</p>
+            <p className="text-sm font-semibold text-white">{formatCurrency(toplamCif, dosya.para_birimi)}</p>
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="text-xs text-slate-400">Toplam FOB</p>
+              <p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam FOB</p>
               {navlunBekleniyor && (
                 <InfoTooltip variant="warning">
                   <span className="font-semibold text-amber-600">Konteyner adedi gerekli.</span> Navlun tutarı kaydedildi, FOB hesaplanması için Rezervasyon sekmesinden konteyner adedini girin.
                 </InfoTooltip>
               )}
             </div>
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-white">
               {toplamFob !== null ? (
                 formatCurrency(toplamFob, dosya.para_birimi)
               ) : navlunBekleniyor ? (
-                <span className="text-amber-600">Bekliyor</span>
+                <span className="text-amber-400">Bekliyor</span>
               ) : (
                 "Navlun/Lokal Masraf girilmedi"
               )}
@@ -177,18 +178,18 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           </div>
         </div>
         {navlunToplam !== null && (
-          <p className="text-xs text-slate-400 mt-2">
+          <p className="text-xs mt-2" style={{ color: TEXT_MUTED }}>
             Navlun: {formatCurrency(navlunBirimFiyati, dosya.para_birimi)} x {konteynerAdedi} konteyner = {formatCurrency(navlunToplam, dosya.para_birimi)}
           </p>
         )}
         {lokalMasrafToplam !== null && (
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>
             Lokal Masraf: {formatCurrency(lokalMasrafBirimFiyati, dosya.para_birimi)} x {konteynerAdedi} konteyner = {formatCurrency(lokalMasrafToplam, dosya.para_birimi)}
           </p>
         )}
         {fobKusuratli && onerilenLokalMasrafBirim !== null && (
-          <div className="mt-2 p-2 rounded-lg bg-blue-50 border" style={{ borderColor: "#BFDBFE" }}>
-            <p className="text-xs text-blue-700">
+          <div className="mt-2 p-2 rounded-lg border bg-blue-500/10" style={{ borderColor: "rgba(96,165,250,0.35)" }}>
+            <p className="text-xs text-blue-300">
               FOB tutarı küsüratlı çıkıyor. Lokal masrafı <strong>{formatCurrency(onerilenLokalMasrafBirim, dosya.para_birimi)}</strong> (konteyner başı) olarak girerseniz FOB küsüratsız olur.
             </p>
           </div>
@@ -199,10 +200,10 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
   if (!editing) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-6 space-y-3" style={{ borderColor: "#E2E8F0" }}>
-        <div className="flex items-center justify-between border-b pb-2">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Ek Bilgiler</h3>
-          <button onClick={handleEditStart} className="text-amber-500 hover:text-amber-700 text-xs font-medium inline-flex items-center gap-1">
+      <div className="rounded-xl border shadow-sm p-6 space-y-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
+          <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ek Bilgiler</h3>
+          <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
             <Pencil size={12} /> Duzenle
           </button>
         </div>
@@ -212,12 +213,12 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         {consigneeText && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consignee (ALICI)</p>
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Consignee (ALICI)</p>
               {consigneeKaynak === "manuel" && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">elle girildi</span>
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>elle girildi</span>
               )}
             </div>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 whitespace-pre-wrap text-sm text-slate-700 font-medium">
+            <div className="p-3 rounded-lg border whitespace-pre-wrap text-sm font-medium text-white" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
               {consigneeText}
             </div>
           </div>
@@ -225,35 +226,35 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
         {mevcutNotify.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Notify (BİLDİRİM YAPILACAK TARAF)</p>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 whitespace-pre-wrap text-sm text-slate-700 font-medium">
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: TEXT_MUTED }}>Notify (BİLDİRİM YAPILACAK TARAF)</p>
+            <div className="p-3 rounded-lg border whitespace-pre-wrap text-sm font-medium text-white" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
               {notifyText}
             </div>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <CopyableField label="Lot No" value={(dosya as any).lot_no} />
-          <CopyableField label="Marka" value={(dosya as any).marka} />
+          <CopyableField dark label="Lot No" value={(dosya as any).lot_no} />
+          <CopyableField dark label="Marka" value={(dosya as any).marka} />
           {mevcutMarkaListesi.length > 1 && (
-            <CopyableField label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
+            <CopyableField dark label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
           )}
-          <CopyableField label="Navlun (Konteyner Basi)" value={formatCurrency(navlunBirimFiyati, dosya.para_birimi)} />
-          <CopyableField label="Lokal Masraf (Konteyner Basi)" value={formatCurrency(lokalMasrafBirimFiyati, dosya.para_birimi)} />
-          <CopyableField label="Beyanname No" value={(dosya as any).beyanname_no} />
-          <CopyableField label="Fatura No" value={(dosya as any).fatura_no} />
-          <CopyableField label="Fatura Tarihi" value={formatDateTR((dosya as any).fatura_tarihi)} />
-          <CopyableField label="BL No" value={(dosya as any).bl_no} />
-          <CopyableField label="DIIB No" value={(dosya as any).diib_no} />
-          <CopyableField label="DIIB Tarihi" value={formatDateTR((dosya as any).diib_tarihi)} />
-          <CopyableField label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
-          <CopyableField label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
+          <CopyableField dark label="Navlun (Konteyner Basi)" value={formatCurrency(navlunBirimFiyati, dosya.para_birimi)} />
+          <CopyableField dark label="Lokal Masraf (Konteyner Basi)" value={formatCurrency(lokalMasrafBirimFiyati, dosya.para_birimi)} />
+          <CopyableField dark label="Beyanname No" value={(dosya as any).beyanname_no} />
+          <CopyableField dark label="Fatura No" value={(dosya as any).fatura_no} />
+          <CopyableField dark label="Fatura Tarihi" value={formatDateTR((dosya as any).fatura_tarihi)} />
+          <CopyableField dark label="BL No" value={(dosya as any).bl_no} />
+          <CopyableField dark label="DIIB No" value={(dosya as any).diib_no} />
+          <CopyableField dark label="DIIB Tarihi" value={formatDateTR((dosya as any).diib_tarihi)} />
+          <CopyableField dark label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
+          <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
         </div>
 
         {odenecekTutar !== null && (
-          <div className="mt-3 p-3 rounded-lg bg-amber-50 border" style={{ borderColor: "#FDE68A" }}>
-            <p className="text-xs text-amber-700">Avans Düşülmüş Ödenecek Tutar</p>
-            <p className="text-sm font-bold text-amber-800">{formatCurrency(odenecekTutar, dosya.para_birimi)}</p>
+          <div className="mt-3 p-3 rounded-lg border bg-amber-500/10" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+            <p className="text-xs text-amber-400">Avans Düşülmüş Ödenecek Tutar</p>
+            <p className="text-sm font-bold text-amber-300">{formatCurrency(odenecekTutar, dosya.para_birimi)}</p>
           </div>
         )}
       </div>
@@ -261,22 +262,22 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   }
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-6 space-y-3" style={{ borderColor: "#E2E8F0" }}>
-      <div className="flex items-center justify-between border-b pb-2">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Ek Bilgiler</h3>
+    <div className="rounded-xl border shadow-sm p-6 space-y-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
+        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ek Bilgiler</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Navlun Tutari (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
-          <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="orn: 400" className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutari (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
+          <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="orn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Lokal Masraf (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
-          <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="orn: 150" className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
+          <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="orn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
       </div>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs" style={{ color: TEXT_MUTED }}>
         {konteynerAdedi > 0
           ? `Rezervasyonda ${konteynerAdedi} konteyner var. Girilen fiyatlar bu adetle carpilip CIF'ten dusulup FOB hesaplanir.`
           : "Rezervasyonda konteyner adedi tanimli degil, toplam tutarlar hesaplanamaz."}
@@ -286,66 +287,66 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Lot No</label>
-          <input value={form.lot_no} onChange={(e) => update("lot_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lot No</label>
+          <input value={form.lot_no} onChange={(e) => update("lot_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Marka</label>
-          <input value={form.marka} onChange={(e) => update("marka", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Marka</label>
+          <input value={form.marka} onChange={(e) => update("marka", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Çuval Marka Listesi (her satıra bir marka yazın — konteyner tablosunda seçim listesi olarak çıkar)</label>
-          <textarea value={form.marka_listesi} onChange={(e) => update("marka_listesi", e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="DIVA BRAND&#10;MILA BRAND" />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Çuval Marka Listesi (her satıra bir marka yazın — konteyner tablosunda seçim listesi olarak çıkar)</label>
+          <textarea value={form.marka_listesi} onChange={(e) => update("marka_listesi", e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="DIVA BRAND&#10;MILA BRAND" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Beyanname No</label>
-          <input value={form.beyanname_no} onChange={(e) => update("beyanname_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Beyanname No</label>
+          <input value={form.beyanname_no} onChange={(e) => update("beyanname_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Fatura No</label>
-          <input value={form.fatura_no} onChange={(e) => update("fatura_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fatura No</label>
+          <input value={form.fatura_no} onChange={(e) => update("fatura_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Fatura Tarihi</label>
-          <input type="date" value={form.fatura_tarihi} onChange={(e) => update("fatura_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fatura Tarihi</label>
+          <input type="date" value={form.fatura_tarihi} onChange={(e) => update("fatura_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">BL No</label>
-          <input value={form.bl_no} onChange={(e) => update("bl_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>BL No</label>
+          <input value={form.bl_no} onChange={(e) => update("bl_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">DIIB No</label>
-          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DIIB No</label>
+          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">DIIB Tarihi</label>
-          <input type="date" value={form.diib_tarihi} onChange={(e) => update("diib_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DIIB Tarihi</label>
+          <input type="date" value={form.diib_tarihi} onChange={(e) => update("diib_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Uretim Tarihi</label>
-          <input type="date" value={form.uretim_tarihi} onChange={(e) => update("uretim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Uretim Tarihi</label>
+          <input type="date" value={form.uretim_tarihi} onChange={(e) => update("uretim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Son Kullanim Tarihi</label>
-          <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanim Tarihi</label>
+          <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         
         <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Consignee (Alıcı — firma adı ve adresi. Konşimento talimatı yüklenmediyse buradan elle girebilirsiniz.)</label>
-          <textarea value={form.consignee} onChange={(e) => update("consignee", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="ALICI FIRMA LTD.&#10;Adres satırı...&#10;Şehir, Ülke" />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Consignee (Alıcı — firma adı ve adresi. Konşimento talimatı yüklenmediyse buradan elle girebilirsiniz.)</label>
+          <textarea value={form.consignee} onChange={(e) => update("consignee", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="ALICI FIRMA LTD.&#10;Adres satırı...&#10;Şehir, Ülke" />
         </div>
 
         <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium text-slate-600 mb-1">Notify (Birden fazla Notify varsa aralarında bir boş satır bırakarak yazın)</label>
-          <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y" style={{ borderColor: "#E2E8F0" }} placeholder="Firma Adı A.Ş.&#10;Adres satırı...&#10;&#10;İkinci Notify Firma...&#10;Adres..." />
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Notify (Birden fazla Notify varsa aralarında bir boş satır bırakarak yazın)</label>
+          <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="Firma Adı A.Ş.&#10;Adres satırı...&#10;&#10;İkinci Notify Firma...&#10;Adres..." />
         </div>
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60 inline-flex items-center gap-1" style={{ backgroundColor: "#1B2B4B" }}>
+        <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60 inline-flex items-center gap-1" style={{ backgroundColor: ACCENT }}>
           <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
         </button>
-        <button onClick={() => setEditing(false)} className="px-5 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50 transition-all inline-flex items-center gap-1" style={{ borderColor: "#E2E8F0" }}>
+        <button onClick={() => setEditing(false)} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all inline-flex items-center gap-1" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
           <X size={14} /> Iptal
         </button>
       </div>

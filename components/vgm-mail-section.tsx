@@ -4,6 +4,7 @@ import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Weight } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 type Props = {
   dosyaId: string;
@@ -68,41 +69,41 @@ export default function VgmMailSection({ dosyaId, dosya, konteynerler, rezervasy
   };
 
   return (
-    <div className="pt-2 border-t" style={{ borderColor: "#F1F5F9" }}>
+    <div className="pt-2 border-t" style={{ borderColor: CARD_BORDER }}>
       {!tumVgmHazir ? (
         <div className="mt-3">
-          <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 bg-slate-100 cursor-not-allowed">
+          <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed" style={{ color: TEXT_MUTED, backgroundColor: CARD_BORDER }}>
             <Weight size={16} /> VGM Gonder
           </button>
-          <p className="text-xs text-slate-400 mt-1.5 text-center">
+          <p className="text-xs mt-1.5 text-center" style={{ color: TEXT_MUTED }}>
             {dbaYuklenenSayisi}/{konteynerler.length} DBA yuklendi — tum konteynerler tamamlandiginda VGM gonderilebilir
           </p>
         </div>
       ) : !showVgmMail ? (
-        <button onClick={() => setShowVgmMail(true)} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: "#1B2B4B" }}>
+        <button onClick={() => setShowVgmMail(true)} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: ACCENT }}>
           <Weight size={16} /> VGM Gonder
         </button>
       ) : (
-        <div className="mt-3 p-4 rounded-xl border bg-white shadow-sm space-y-3 animate-fade-in" style={{ borderColor: "#E2E8F0" }}>
+        <div className="mt-3 p-4 rounded-xl border shadow-sm space-y-3 animate-fade-in" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-slate-800">VGM Maili</p>
-            <button onClick={() => setShowVgmMail(false)} className="p-1 text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            <p className="text-sm font-bold text-white">VGM Maili</p>
+            <button onClick={() => setShowVgmMail(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">TO (Acente / Armator)</p>
-            <input value={vgmTo} onChange={(e) => setVgmTo(e.target.value)} placeholder="acente@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Acente / Armator)</p>
+            <input value={vgmTo} onChange={(e) => setVgmTo(e.target.value)} placeholder="acente@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">CC</p>
-            <input value={vgmCc} onChange={(e) => setVgmCc(e.target.value)} placeholder="cc@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg" style={{ borderColor: "#E2E8F0" }} />
+            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
+            <input value={vgmCc} onChange={(e) => setVgmCc(e.target.value)} placeholder="cc@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           </div>
-          <p className="text-xs text-slate-400">Mail metninde konteynerlerin VGM sonuçları otomatik yer alır.</p>
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>Mail metninde konteynerlerin VGM sonuçları otomatik yer alır.</p>
           <div className="flex gap-2">
             <button onClick={handleVgmMailGonder} disabled={!vgmTo}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: "#1B2B4B" }}>
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
               <Mail size={14} /> Mail Uygulamasini Ac
             </button>
-            <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50" style={{ borderColor: "#E2E8F0" }}>Iptal</button>
+            <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
           </div>
         </div>
       )}

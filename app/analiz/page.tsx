@@ -355,70 +355,70 @@ export default function AnalizPage() {
 
       {/* Satır 1: Müşteriler + Limanlar + Acenteler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Users size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Müşteriler</span></div>
-            <span className="text-[10px] text-slate-400">Hacim</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Users size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Müşteriler</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Hacim</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
-            {enCokMusteriler.length === 0 ? <p className="px-4 py-6 text-xs text-slate-400 text-center">Veri yok</p> :
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+            {enCokMusteriler.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokMusteriler.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                      <span className="text-xs text-slate-700 truncate">{item.ad}</span>
+                      <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                      <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">{formatCurrency(item.tutar, paraBirimi)}</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{formatCurrency(item.tutar, paraBirimi)}</span>
                   </div>
                   <HBar value={item.tutar} max={enCokMusteriler[0]?.tutar || 1} color="#F59E0B" />
-                  <p className="text-[9px] text-slate-400 mt-0.5">{item.adet} dosya · {item.konteyner} konteyner</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} dosya · {item.konteyner} konteyner</p>
                 </div>
               ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Globe2 size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Varış Limanları</span></div>
-            <span className="text-[10px] text-slate-400">Konteyner</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Globe2 size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Varış Limanları</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Konteyner</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
-            {enCokLimanlar.length === 0 ? <p className="px-4 py-6 text-xs text-slate-400 text-center">Veri yok</p> :
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+            {enCokLimanlar.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokLimanlar.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                      <span className="text-xs text-slate-700 truncate">{item.ad}</span>
+                      <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                      <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">{item.konteyner} kont.</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner} kont.</span>
                   </div>
                   <HBar value={item.konteyner} max={enCokLimanlar[0]?.konteyner || 1} color={NAVY} />
-                  <p className="text-[9px] text-slate-400 mt-0.5">{item.adet} dosya · {formatCurrency(item.tutar, paraBirimi)}</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} dosya · {formatCurrency(item.tutar, paraBirimi)}</p>
                 </div>
               ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Ship size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Acenteler</span></div>
-            <span className="text-[10px] text-slate-400">Konteyner</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Ship size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Acenteler</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Konteyner</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
-            {enCokAcenteler.length === 0 ? <p className="px-4 py-6 text-xs text-slate-400 text-center">Veri yok</p> :
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+            {enCokAcenteler.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokAcenteler.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                      <span className="text-xs text-slate-700 truncate">{item.ad}</span>
+                      <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                      <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">{item.konteyner}</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner}</span>
                   </div>
                   <HBar value={item.konteyner} max={enCokAcenteler[0]?.konteyner || 1} color="#6366F1" />
-                  <p className="text-[9px] text-slate-400 mt-0.5">{item.adet} rezervasyon</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} rezervasyon</p>
                 </div>
               ))}
           </div>
@@ -428,73 +428,73 @@ export default function AnalizPage() {
       {/* Satır 2: Birim Fiyat + Teslim Şekli + Transit Süresi */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* Liman Bazlı Birim Fiyat */}
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Globe2 size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Birim Fiyat (Liman)</span></div>
-            <span className="text-[10px] text-slate-400">$/MTS</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Globe2 size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Birim Fiyat (Liman)</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>$/MTS</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
-            {ulkeFiyat.length === 0 ? <p className="px-4 py-6 text-xs text-slate-400 text-center">Veri yok</p> :
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+            {ulkeFiyat.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               ulkeFiyat.map((item, i) => (
-                <div key={item.liman} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <div key={item.liman} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                      <span className="text-xs text-slate-700 truncate">{item.liman}</span>
+                      <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                      <span className="text-xs text-white truncate">{item.liman}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">${item.birimFiyat.toFixed(0)}/MTS</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">${item.birimFiyat.toFixed(0)}/MTS</span>
                   </div>
                   <HBar value={item.birimFiyat} max={ulkeFiyat[0]?.birimFiyat || 1} color="#10B981" />
-                  <p className="text-[9px] text-slate-400 mt-0.5">{item.mts.toLocaleString("tr-TR")} MTS toplam</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.mts.toLocaleString("tr-TR")} MTS toplam</p>
                 </div>
               ))}
           </div>
         </div>
 
         {/* Teslim Şekli */}
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Truck size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Teslim Şekli</span></div>
-            <span className="text-[10px] text-slate-400">Dosya</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Truck size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Teslim Şekli</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Dosya</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
-            {teslimSekli.length === 0 ? <p className="px-4 py-6 text-xs text-slate-400 text-center">Veri yok</p> :
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+            {teslimSekli.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               teslimSekli.map((item, i) => (
-                <div key={item.tip} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+                <div key={item.tip} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                      <span className="text-xs font-semibold text-slate-700">{item.tip}</span>
+                      <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                      <span className="text-xs font-semibold text-white">{item.tip}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">{item.adet} dosya</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.adet} dosya</span>
                   </div>
                   <HBar value={item.adet} max={teslimSekli[0]?.adet || 1} color="#8B5CF6" />
-                  <p className="text-[9px] text-slate-400 mt-0.5">%{Math.round((item.adet / filtrelenmis.length) * 100)} oran</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>%{Math.round((item.adet / filtrelenmis.length) * 100)} oran</p>
                 </div>
               ))}
           </div>
         </div>
 
         {/* Transit Süresi */}
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "#E2E8F0" }}>
-            <div className="flex items-center gap-1.5"><Clock size={12} className="text-slate-400" /><span className="text-xs font-semibold text-slate-600">Ortalama Transit Süresi</span></div>
-            <span className="text-[10px] text-slate-400">Gün</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-1.5"><Clock size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Ortalama Transit Süresi</span></div>
+            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Gün</span>
           </div>
-          <div className="divide-y" style={{ borderColor: "#F8FAFC" }}>
+          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
             {transitSuresi.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-slate-400 text-center">ETA girilince hesaplanır</p>
+              <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>ETA girilince hesaplanır</p>
             ) : transitSuresi.map((item, i) => (
-              <div key={item.liman} className="px-4 py-2.5 hover:bg-slate-50 transition-colors">
+              <div key={item.liman} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[10px] text-slate-300 font-bold w-3 shrink-0">{i + 1}</span>
-                    <span className="text-xs text-slate-700 truncate">{item.liman}</span>
+                    <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                    <span className="text-xs text-white truncate">{item.liman}</span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-800 shrink-0 ml-2">{item.ortalama} gün</span>
+                  <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.ortalama} gün</span>
                 </div>
                 <HBar value={item.ortalama} max={Math.max(...transitSuresi.map(t => t.ortalama), 1)} color="#F59E0B" />
-                <p className="text-[9px] text-slate-400 mt-0.5">{item.adet} rezervasyon</p>
+                <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} rezervasyon</p>
               </div>
             ))}
           </div>
@@ -503,35 +503,35 @@ export default function AnalizPage() {
 
       {/* Gemiler */}
       {gemiler.length > 0 && (
-        <div className="bg-white rounded-lg border overflow-hidden mb-4" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-lg border overflow-hidden mb-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5">
-              <Ship size={12} className="text-slate-400" />
-              <span className="text-xs font-semibold text-slate-600">Gemi Başına Konteyner</span>
-              <span className="text-[10px] text-slate-400 ml-1">— detay için tıklayın</span>
+              <Ship size={12} style={{ color: TEXT_MUTED }} />
+              <span className="text-xs font-semibold text-white">Gemi Başına Konteyner</span>
+              <span className="text-[10px] ml-1" style={{ color: TEXT_MUTED }}>— detay için tıklayın</span>
             </div>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">#</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Gemi Adı</th>
-                <th className="text-center px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Dosya</th>
-                <th className="text-right px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Konteyner</th>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>#</th>
+                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
+                <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
+                <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
               </tr>
             </thead>
             <tbody>
               {gemiler.map((g, i) => (
                 <tr
                   key={g.ad}
-                  className="border-b last:border-0 hover:bg-slate-50 cursor-pointer transition-colors"
-                  style={{ borderColor: "#F1F5F9" }}
+                  className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors"
+                  style={{ borderColor: CARD_BORDER }}
                   onClick={() => handleGemiClick(g.ad)}
                 >
-                  <td className="px-4 py-2.5 text-[10px] text-slate-300 font-bold">{i + 1}</td>
-                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{g.ad}</td>
-                  <td className="px-4 py-2.5 text-xs text-center text-slate-500">{g.dosyaSayisi}</td>
-                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-slate-800">{g.konteyner}</td>
+                  <td className="px-4 py-2.5 text-[10px] font-bold" style={{ color: TEXT_MUTED }}>{i + 1}</td>
+                  <td className="px-4 py-2.5 text-xs font-medium text-white">{g.ad}</td>
+                  <td className="px-4 py-2.5 text-xs text-center" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
+                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{g.konteyner}</td>
                 </tr>
               ))}
             </tbody>
@@ -541,29 +541,29 @@ export default function AnalizPage() {
 
       {/* Son Sevkiyatlar */}
       {sonSevkiyatlar.length > 0 && (
-        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-          <div className="px-4 py-3 border-b flex items-center gap-1.5" style={{ borderColor: "#E2E8F0" }}>
-            <Package size={12} className="text-slate-400" />
-            <span className="text-xs font-semibold text-slate-600">Son Tamamlanan Sevkiyatlar</span>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="px-4 py-3 border-b flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
+            <Package size={12} style={{ color: TEXT_MUTED }} />
+            <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Dosya</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Müşteri</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Liman</th>
-                <th className="text-center px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Kont.</th>
-                <th className="text-right px-4 py-2 text-[10px] font-semibold text-slate-400 uppercase">Tutar</th>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
+                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Liman</th>
+                <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Kont.</th>
+                <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Tutar</th>
               </tr>
             </thead>
             <tbody>
               {sonSevkiyatlar.map(d => (
-                <tr key={d.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors" style={{ borderColor: "#F1F5F9" }}>
-                  <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{d.dosya_no}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-600 max-w-[140px] truncate">{d.alici_firma || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-600">{d.varis_limani || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-center font-medium text-slate-700">{d.konteynerler.length}</td>
-                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-slate-800">{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
+                <tr key={d.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
+                  <td className="px-4 py-2.5 text-xs font-medium text-white">{d.dosya_no}</td>
+                  <td className="px-4 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{d.alici_firma || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-center font-medium text-white">{d.konteynerler.length}</td>
+                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
                 </tr>
               ))}
             </tbody>

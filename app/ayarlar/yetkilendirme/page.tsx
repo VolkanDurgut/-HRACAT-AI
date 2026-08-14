@@ -7,6 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Loader2, Save } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type KullaniciYetki = {
   user_id: string;
@@ -37,7 +38,8 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${value ? "bg-amber-500" : "bg-slate-200"}`}
+      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+      style={{ backgroundColor: value ? ACCENT : CARD_BORDER }}
     >
       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-4" : "translate-x-1"}`} />
     </button>
@@ -113,50 +115,50 @@ export default function YetkilendirmePage() {
   return (
     <AppShell>
       <div className="mb-5 flex items-center gap-2">
-        <ShieldCheck size={20} style={{ color: "#1B2B4B" }} />
-        <h1 className="text-xl font-bold" style={{ color: "#1B2B4B" }}>Yetkilendirme</h1>
+        <ShieldCheck size={20} style={{ color: ACCENT }} />
+        <h1 className="text-xl font-bold text-white">Yetkilendirme</h1>
       </div>
 
-      <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+      <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 w-48">Kullanıcı</th>
-                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-500 border-l" style={{ borderColor: "#E2E8F0" }} colSpan={8}>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-4 py-3 text-xs font-semibold w-48" style={{ color: TEXT_MUTED }}>Kullanıcı</th>
+                <th className="px-2 py-3 text-center text-xs font-semibold border-l" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} colSpan={8}>
                   Sayfa Erişimi
                 </th>
-                <th className="px-2 py-3 text-center text-xs font-semibold text-slate-500 border-l" style={{ borderColor: "#E2E8F0" }} colSpan={4}>
+                <th className="px-2 py-3 text-center text-xs font-semibold border-l" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} colSpan={4}>
                   Sekme Erişimi
                 </th>
-                <th className="px-4 py-3 w-20 border-l" style={{ borderColor: "#E2E8F0" }}></th>
+                <th className="px-4 py-3 w-20 border-l" style={{ borderColor: CARD_BORDER }}></th>
               </tr>
-              <tr className="border-b" style={{ borderColor: "#E2E8F0" }}>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER }}>
                 <th></th>
                 {Object.values(SAYFA_ETIKETLER).map((label, i) => (
-                  <th key={i} className={`px-2 py-2 text-center text-[10px] text-slate-400 font-medium ${i === 0 ? "border-l" : ""}`} style={{ borderColor: "#E2E8F0" }}>
+                  <th key={i} className={`px-2 py-2 text-center text-[10px] font-medium ${i === 0 ? "border-l" : ""}`} style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
                     {label}
                   </th>
                 ))}
                 {Object.values(SEKME_ETIKETLER).map((label, i) => (
-                  <th key={i} className="px-2 py-2 text-center text-[10px] text-slate-400 font-medium border-l" style={{ borderColor: "#E2E8F0" }}>
+                  <th key={i} className="px-2 py-2 text-center text-[10px] font-medium border-l" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
                     {label}
                   </th>
                 ))}
-                <th className="border-l" style={{ borderColor: "#E2E8F0" }}></th>
+                <th className="border-l" style={{ borderColor: CARD_BORDER }}></th>
               </tr>
             </thead>
             <tbody>
               {kullanicilar.map((k) => (
-                <tr key={k.user_id} className="border-b last:border-0 hover:bg-slate-50" style={{ borderColor: "#F1F5F9" }}>
+                <tr key={k.user_id} className="border-b last:border-0 hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
                   <td className="px-4 py-3">
                     <div>
-                      <p className="text-xs font-medium text-slate-700 truncate max-w-[160px]">{k.email || k.user_id}</p>
-                      {k.user_id === user?.id && <p className="text-[10px] text-amber-600">Siz</p>}
+                      <p className="text-xs font-medium text-white truncate max-w-[160px]">{k.email || k.user_id}</p>
+                      {k.user_id === user?.id && <p className="text-[10px] text-amber-400">Siz</p>}
                     </div>
                   </td>
                   {Object.keys(SAYFA_ETIKETLER).map((key, i) => (
-                    <td key={key} className={`px-2 py-3 text-center ${i === 0 ? "border-l" : ""}`} style={{ borderColor: "#E2E8F0" }}>
+                    <td key={key} className={`px-2 py-3 text-center ${i === 0 ? "border-l" : ""}`} style={{ borderColor: CARD_BORDER }}>
                       <div className="flex justify-center">
                         <Toggle
                           value={!!k.sayfa_yetkileri[key]}
@@ -166,7 +168,7 @@ export default function YetkilendirmePage() {
                     </td>
                   ))}
                   {Object.keys(SEKME_ETIKETLER).map((key) => (
-                    <td key={key} className="px-2 py-3 text-center border-l" style={{ borderColor: "#E2E8F0" }}>
+                    <td key={key} className="px-2 py-3 text-center border-l" style={{ borderColor: CARD_BORDER }}>
                       <div className="flex justify-center">
                         <Toggle
                           value={!!k.sekme_yetkileri[key]}
@@ -175,11 +177,12 @@ export default function YetkilendirmePage() {
                       </div>
                     </td>
                   ))}
-                  <td className="px-4 py-3 border-l" style={{ borderColor: "#E2E8F0" }}>
+                  <td className="px-4 py-3 border-l" style={{ borderColor: CARD_BORDER }}>
                     <button
                       onClick={() => handleSave(k.user_id)}
                       disabled={saving === k.user_id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 hover:opacity-90"
+                      style={{ backgroundColor: ACCENT, color: "white" }}
                     >
                       {saving === k.user_id ? <Loader2 size={11} className="animate-spin" /> : <Save size={11} />}
                       Kaydet

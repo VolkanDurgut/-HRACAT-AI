@@ -21,6 +21,7 @@ import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import DraftBlSection from "@/components/draft-bl-section";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -164,14 +165,14 @@ function DosyaDetailContent() {
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "#1B2B4B" }}>📁 {dosya.dosya_no}</h1>
-            <p className="text-slate-500 text-sm mt-1">Olusturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
+            <h1 className="text-2xl font-bold text-white">📁 {dosya.dosya_no}</h1>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Olusturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
           </div>
           {yetkiler.sayfa_yetkileri.yeni_dosya && (
             <button
               onClick={handleDurumButtonClick}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                (dosya.durum === "Açık" || dosya.durum === "Acik") ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-green-50 text-green-600 hover:bg-green-100"
+                (dosya.durum === "Açık" || dosya.durum === "Acik") ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
               }`}
             >
               {(dosya.durum === "Açık" || dosya.durum === "Acik") ? "Dosyayı Kapat" : "Dosyayı Yeniden Aç"}
@@ -180,7 +181,7 @@ function DosyaDetailContent() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 mb-6 border-b" style={{ borderColor: "#E2E8F0" }}>
+      <div className="flex flex-wrap gap-1 mb-6 border-b" style={{ borderColor: CARD_BORDER }}>
         {tabs.map((tab) => (
           <div key={tab.key} className="relative flex items-center">
             <button
@@ -188,11 +189,12 @@ function DosyaDetailContent() {
               disabled={!canAccessTab(tab.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px inline-flex items-center gap-1.5 ${
                 !canAccessTab(tab.key)
-                  ? "border-transparent text-slate-300 cursor-not-allowed"
+                  ? "border-transparent cursor-not-allowed opacity-40"
                   : activeTab === tab.key
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
+                  ? "border-emerald-500 text-emerald-400"
+                  : "border-transparent hover:text-white"
               }`}
+              style={!canAccessTab(tab.key) || activeTab !== tab.key ? { color: TEXT_MUTED } : undefined}
             >
               {tab.label}
             </button>
@@ -211,57 +213,57 @@ function DosyaDetailContent() {
       {activeTab === "proforma" && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
             <div className="space-y-4">
-            <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5" style={{ borderColor: "#E2E8F0" }}>
+            <div className="rounded-xl border shadow-sm p-6 space-y-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Taraflar</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Taraflar</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField label="Satici Firma" value={dosya.satici_firma} />
-                  <CopyableField label="Alici Firma" value={dosya.alici_firma} />
-                  <CopyableField label="Alici Tel" value={(dosya.ham_veri as any)?.alici_tel} />
-                  <CopyableField label="Alici Email" value={(dosya.ham_veri as any)?.alici_email} />
+                  <CopyableField dark label="Satici Firma" value={dosya.satici_firma} />
+                  <CopyableField dark label="Alici Firma" value={dosya.alici_firma} />
+                  <CopyableField dark label="Alici Tel" value={(dosya.ham_veri as any)?.alici_tel} />
+                  <CopyableField dark label="Alici Email" value={(dosya.ham_veri as any)?.alici_email} />
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Proforma</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Proforma</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField label="Proforma No" value={dosya.proforma_no} />
-                  <CopyableField label="Proforma Tarihi" value={formatDateTR(dosya.proforma_tarihi)} />
-                  <CopyableField label="Gecerlilik Tarihi" value={formatDateTR(dosya.gecerlilik_tarihi)} />
-                  <CopyableField label="Lot No" value={dosya.lot_no} />
+                  <CopyableField dark label="Proforma No" value={dosya.proforma_no} />
+                  <CopyableField dark label="Proforma Tarihi" value={formatDateTR(dosya.proforma_tarihi)} />
+                  <CopyableField dark label="Gecerlilik Tarihi" value={formatDateTR(dosya.gecerlilik_tarihi)} />
+                  <CopyableField dark label="Lot No" value={dosya.lot_no} />
                 </div>
               </div>
             </div>
           {dosya.urun_detaylari && (dosya.urun_detaylari as any[]).length > 0 && (
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-              <div className="px-6 py-4 border-b" style={{ borderColor: "#E2E8F0" }}>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b pb-2">Urun Detaylari</h3>
+            <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div className="px-6 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
+                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Urun Detaylari</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-700">Urun Adi</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-700">Ambalaj</th>
-                      <th className="text-right px-4 py-3 text-xs font-bold text-slate-700">Miktar (MTS)</th>
-                      <th className="text-right px-4 py-3 text-xs font-bold text-slate-700">Birim Fiyat</th>
-                      <th className="text-right px-4 py-3 text-xs font-bold text-slate-700">Toplam</th>
+                    <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                      <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Urun Adi</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ambalaj</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                      <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Toplam</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(dosya.urun_detaylari as any[]).map((item: any, i: number) => (
-                      <tr key={i} className="border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
-                        <td className="px-4 py-3 text-sm text-slate-700">{item.urun_adi || item.description || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{item.ambalaj_boyutu || item.packaging_size || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 text-right">{item.miktar_mts || item.quantity || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 text-right">{formatCurrency(item.birim_fiyat_usd || item.unit_price, dosya.para_birimi)}</td>
-                        <td className="px-4 py-3 text-sm text-slate-700 text-right font-medium">{formatCurrency(item.toplam_tutar_usd || item.total_amount, dosya.para_birimi)}</td>
+                      <tr key={i} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                        <td className="px-4 py-3 text-sm text-white">{item.urun_adi || item.description || "-"}</td>
+                        <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{item.ambalaj_boyutu || item.packaging_size || "-"}</td>
+                        <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{item.miktar_mts || item.quantity || "-"}</td>
+                        <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{formatCurrency(item.birim_fiyat_usd || item.unit_price, dosya.para_birimi)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-white">{formatCurrency(item.toplam_tutar_usd || item.total_amount, dosya.para_birimi)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-50">
-                      <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "#1B2B4B" }}>TOPLAM</td>
-                      <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
+                    <tr style={{ backgroundColor: ROW_HEADER_BG }}>
+                      <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "white" }}>TOPLAM</td>
+                      <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: ACCENT }}>
                         {formatCurrency((dosya.urun_detaylari as any[]).reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0), dosya.para_birimi)}
                       </td>
                     </tr>
@@ -271,24 +273,24 @@ function DosyaDetailContent() {
             </div>
           )}
             </div>
-            <div className="bg-white rounded-xl border shadow-sm p-6 space-y-5" style={{ borderColor: "#E2E8F0" }}>
+            <div className="rounded-xl border shadow-sm p-6 space-y-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Lojistik</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Lojistik</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField label="Yukleme Limani" value={dosya.yuklenme_limani || rezervasyonlar[0]?.yuklenme_limani} />
-                  <CopyableField label="Varis Limani" value={dosya.varis_limani} />
-                  <CopyableField label="Teslim Sekli" value={dosya.teslim_sekli} />
-                  <CopyableField label="Sevkiyat Suresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />
-                  <CopyableField label="Toplam Miktar" value={dosya.miktar ? `${dosya.miktar} ${dosya.miktar_birimi || "MTS"}` : null} />
-                  <CopyableField label="Ambalaj" value={dosya.ambalaj} />
+                  <CopyableField dark label="Yukleme Limani" value={dosya.yuklenme_limani || rezervasyonlar[0]?.yuklenme_limani} />
+                  <CopyableField dark label="Varis Limani" value={dosya.varis_limani} />
+                  <CopyableField dark label="Teslim Sekli" value={dosya.teslim_sekli} />
+                  <CopyableField dark label="Sevkiyat Suresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />
+                  <CopyableField dark label="Toplam Miktar" value={dosya.miktar ? `${dosya.miktar} ${dosya.miktar_birimi || "MTS"}` : null} />
+                  <CopyableField dark label="Ambalaj" value={dosya.ambalaj} />
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 border-b pb-2">Odeme</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Odeme</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField label="Toplam Tutar" value={formatCurrency(dosya.toplam_tutar, dosya.para_birimi)} />
-                  <CopyableField label="Avans Tutari" value={formatCurrency((dosya.ham_veri as any)?.avans_tutari, dosya.para_birimi)} />
-                  <CopyableField label="Odeme Sekli" value={dosya.odeme_sekli} />
+                  <CopyableField dark label="Toplam Tutar" value={formatCurrency(dosya.toplam_tutar, dosya.para_birimi)} />
+                  <CopyableField dark label="Avans Tutari" value={formatCurrency((dosya.ham_veri as any)?.avans_tutari, dosya.para_birimi)} />
+                  <CopyableField dark label="Odeme Sekli" value={dosya.odeme_sekli} />
                 </div>
               </div>
               <BankaBilgileriCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
@@ -303,10 +305,10 @@ function DosyaDetailContent() {
             <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           </div>
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-            <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: "#E2E8F0" }}>
-              <Package size={16} style={{ color: "#1B2B4B" }} />
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">İhracat Evrakları</h3>
+          <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
+              <Package size={16} style={{ color: ACCENT }} />
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>İhracat Evrakları</h3>
             </div>
             <div className="p-4">
               {(dosya.sevkiyat_evraklari || []).length > 0 ? (
@@ -317,14 +319,14 @@ function DosyaDetailContent() {
                     return (
                       <div
                         key={tanim.anahtar}
-                        className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border hover:bg-slate-50 transition-colors"
-                        style={{ borderColor: "#E2E8F0" }}
+                        className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border hover:bg-white/[0.03] transition-colors"
+                        style={{ borderColor: CARD_BORDER }}
                         title={orijinalMetin}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-xs font-semibold text-slate-400 w-5 shrink-0">{i + 1}.</span>
-                          <FileCheck size={15} className="text-slate-400 shrink-0" />
-                          <span className="text-sm font-medium text-slate-700 truncate">{tanim.baslik}</span>
+                          <span className="text-xs font-semibold w-5 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}.</span>
+                          <FileCheck size={15} className="shrink-0" style={{ color: TEXT_MUTED }} />
+                          <span className="text-sm font-medium text-white truncate">{tanim.baslik}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {tanim.evrakTuru ? (
@@ -333,7 +335,8 @@ function DosyaDetailContent() {
                             <button
                               onClick={async () => { await navigator.clipboard.writeText(orijinalMetin); }}
                               title="Metni kopyala"
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/10 hover:text-white transition-colors"
+                              style={{ color: TEXT_MUTED }}
                             >
                               <Copy size={13} />
                             </button>

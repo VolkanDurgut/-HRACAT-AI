@@ -11,6 +11,7 @@ import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
 import VgmMailSection from "@/components/vgm-mail-section";
 import FaturaTalimatiSection from "@/components/fatura-talimati-section";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -140,40 +141,40 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
     <div className="space-y-4">
       {/* Konteyner tablosu */}
       {konteynerler.length > 0 && (
-        <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           {/* DBA ilerleme ozeti */}
           {konteynerler.length > 0 && (
-            <div className="px-4 py-3 border-b flex items-center justify-between bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
+            <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
               <div className="flex items-center gap-3">
-                <p className="text-xs font-medium text-slate-600">DBA Durumu</p>
-                <div className="w-32 bg-slate-200 rounded-full h-1.5">
+                <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>DBA Durumu</p>
+                <div className="w-32 rounded-full h-1.5" style={{ backgroundColor: CARD_BORDER }}>
                   <div className="h-1.5 rounded-full transition-all duration-500"
-                    style={{ backgroundColor: "#1B2B4B", width: konteynerler.length > 0 ? `${(dbaYuklenenSayisi / konteynerler.length) * 100}%` : "0%" }} />
+                    style={{ backgroundColor: ACCENT, width: konteynerler.length > 0 ? `${(dbaYuklenenSayisi / konteynerler.length) * 100}%` : "0%" }} />
                 </div>
-                <p className="text-xs font-semibold" style={{ color: "#1B2B4B" }}>{dbaYuklenenSayisi}/{konteynerler.length}</p>
+                <p className="text-xs font-semibold" style={{ color: ACCENT }}>{dbaYuklenenSayisi}/{konteynerler.length}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => scrollToBolum("vgm-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
                   VGM Gönder
                 </button>
                 <button onClick={() => scrollToBolum("fatura-talimati-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
                   Fatura Talimatı
                 </button>
                 <button onClick={() => scrollToBolum("fatura-talimati-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
                   Konşimento Talimatı
                 </button>
                 {konteynerler.length >= 2 && ilkKonteynerDolu && (
                   <button onClick={uygulaButonaTikla}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
                     <CopyPlus size={13} /> İlk Konteyneri Uygula
                   </button>
                 )}
                 <button onClick={handleTumunuKopyala}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border text-slate-600 hover:bg-slate-100 transition-colors"
-                  style={{ borderColor: "#E2E8F0" }}>
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-white/5"
+                  style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
                   <ClipboardList size={13} /> Tumunu Kopyala
                 </button>
               </div>
@@ -183,19 +184,19 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 w-8">No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Konteyner No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Muhur No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Tip</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Çuval</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">Plaka</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Dara</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Net</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Brüt</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">Kap Adeti</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">VGM</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500">DBA</th>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  <th className="text-left px-4 py-3 text-xs font-semibold w-8" style={{ color: TEXT_MUTED }}>No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Muhur No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Tip</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Çuval</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Plaka</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Dara</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Net</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Brüt</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Kap Adeti</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>VGM</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>DBA</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -205,28 +206,28 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
                   const dbaVeri = k.dba_kontrol_sonucu as { uyusmazliklar?: string[] } | null;
                   const uyusmazlik = (dbaVeri?.uyusmazliklar?.length ?? 0) > 0;
                   return (
-                    <tr key={k.id} className="border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
-                      <td className="px-4 py-3 text-sm text-slate-400">{i + 1}</td>
+                    <tr key={k.id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                       <td className="px-4 py-3">
-                        <span className="text-sm font-medium text-slate-700 font-mono cursor-pointer hover:text-amber-600"
+                        <span className="text-sm font-medium text-white font-mono cursor-pointer hover:text-amber-400"
                           onClick={() => handleKopyala(k.konteyner_no, "Konteyner no")}>
                           {k.konteyner_no}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-600 font-mono">
+                      <td className="px-4 py-3 text-sm font-mono" style={{ color: TEXT_MUTED }}>
                         {k.muhur_no ? (
-                          <span className="cursor-pointer hover:text-amber-600"
+                          <span className="cursor-pointer hover:text-amber-400"
                             onClick={() => handleKopyala(k.muhur_no!, "Muhur no")}>
                             {k.muhur_no}
                           </span>
                         ) : "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{k.tip}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
+                      <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
+                      <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>
                         <MarkaHucresi konteynerId={k.id} deger={(k as any).marka} secenekler={markaListesi} companyId={companyId} onKaydedildi={onRefresh} />
                       </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{k.plaka || <span className="text-slate-300">-</span>}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600 text-right">{k.tare_kg ? `${k.tare_kg} KG` : <span className="text-slate-300">-</span>}</td>
+                      <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.plaka || <span style={{ color: "#4A5262" }}>-</span>}</td>
+                      <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{k.tare_kg ? `${k.tare_kg} KG` : <span style={{ color: "#4A5262" }}>-</span>}</td>
                       <td className="px-4 py-3">
                         <EditableCell
                           value={k.net_agirlik_kg}
@@ -253,36 +254,36 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
                           updatedAt={(k as any).updated_at}
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-right" style={{ color: k.vgm_kg ? "#1B2B4B" : undefined }}>
-                        {k.vgm_kg ? `${k.vgm_kg} KG` : <span className="text-slate-300 font-normal">-</span>}
+                      <td className="px-4 py-3 text-sm font-semibold text-right" style={{ color: k.vgm_kg ? ACCENT : undefined }}>
+                        {k.vgm_kg ? `${k.vgm_kg} KG` : <span className="font-normal" style={{ color: "#4A5262" }}>-</span>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {dbaYukleniyor[k.id] ? (
-                          <Loader2 size={16} className="animate-spin text-slate-400 mx-auto" />
+                          <Loader2 size={16} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
                         ) : k.dba_dosya_url ? (
                           <div className="flex items-center justify-center gap-1.5">
                             {uyusmazlik ? (
-                              <AlertTriangle size={14} className="text-amber-500" aria-label="Uyusmazlik var" />
+                              <AlertTriangle size={14} className="text-amber-400" aria-label="Uyusmazlik var" />
                             ) : (
-                              <CheckCircle2 size={14} className="text-green-500" />
+                              <CheckCircle2 size={14} className="text-green-400" />
                             )}
                             <a href={k.dba_dosya_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-800">
+                              className="inline-flex items-center gap-1 text-xs font-medium hover:text-white" style={{ color: TEXT_MUTED }}>
                               <Download size={12} />
                             </a>
-                            <button onClick={() => handleDbaKaldir(k)} className="text-slate-300 hover:text-red-400">
+                            <button onClick={() => handleDbaKaldir(k)} className="hover:text-red-400" style={{ color: "#4A5262" }}>
                               <X size={12} />
                             </button>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
                             Bekleniyor
                           </span>
                         )}
-                        {dbaHata[k.id] && <p className="text-xs text-red-500 mt-0.5">{dbaHata[k.id]}</p>}
+                        {dbaHata[k.id] && <p className="text-xs text-red-400 mt-0.5">{dbaHata[k.id]}</p>}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => setDeleteTarget({ id: k.id, konteynerNo: k.konteyner_no })} className="text-red-300 hover:text-red-500">
+                        <button onClick={() => setDeleteTarget({ id: k.id, konteynerNo: k.konteyner_no })} className="hover:text-red-400" style={{ color: "#4A5262" }}>
                           <Trash2 size={15} />
                         </button>
                       </td>
@@ -292,15 +293,15 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
               </tbody>
               {konteynerler.length > 0 && (
                 <tfoot>
-                  <tr className="border-t-2" style={{ borderColor: "#E2E8F0", backgroundColor: "#FAFBFC" }}>
-                    <td colSpan={7} className="px-4 py-3 text-xs font-bold text-slate-600 text-right">TOPLAM</td>
-                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
+                  <tr className="border-t-2" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                    <td colSpan={7} className="px-4 py-3 text-xs font-bold text-right" style={{ color: TEXT_MUTED }}>TOPLAM</td>
+                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
                       {toplamNet > 0 ? `${toplamNet.toLocaleString("tr-TR")} KG` : "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
+                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
                       {toplamBrut > 0 ? `${toplamBrut.toLocaleString("tr-TR")} KG` : "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
+                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
                       {toplamKapAdeti > 0 ? toplamKapAdeti.toLocaleString("tr-TR") : "-"}
                     </td>
                     <td colSpan={3}></td>
@@ -332,11 +333,11 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
 
       {!showForm ? (
         showTopluForm ? null : rezervasyonlar.length === 0 ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={18} />
             <div>
-              <h4 className="text-sm font-medium text-amber-800">Rezervasyon Gerekli</h4>
-              <p className="text-xs text-amber-700 mt-1">
+              <h4 className="text-sm font-medium text-amber-300">Rezervasyon Gerekli</h4>
+              <p className="text-xs text-amber-400/90 mt-1">
                 Konteyner ekleyebilmek için öncelikle sisteme en az bir adet rezervasyon girmeniz gerekmektedir. Lütfen <strong className="font-semibold">Rezervasyon</strong> sekmesinden kayıt oluşturun.
               </p>
             </div>
@@ -344,71 +345,72 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
         ) : (
           <div className="flex gap-2">
             <button onClick={() => { setShowForm(true); setShowTopluForm(false); }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
               <Plus size={16} /> Konteyner Ekle
             </button>
             <button onClick={() => { setShowTopluForm(true); setShowForm(false); }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
+              style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
               <ClipboardList size={16} /> Toplu Ekle
             </button>
           </div>
         )
       ) : (
-        <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Konteyner No *</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Konteyner No *</label>
               <input value={form.konteyner_no} onChange={(e) => update("konteyner_no", e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 border rounded-lg text-sm uppercase" style={{ borderColor: "#E2E8F0" }} placeholder="ABCU1234567" />
-              {errors.konteyner_no && <p className="text-xs text-red-500 mt-0.5">{errors.konteyner_no}</p>}
+                className="w-full px-3 py-2 border rounded-lg text-sm uppercase text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="ABCU1234567" />
+              {errors.konteyner_no && <p className="text-xs text-red-400 mt-0.5">{errors.konteyner_no}</p>}
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Muhur No</label>
-              <input value={form.muhur_no} onChange={(e) => update("muhur_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm uppercase" style={{ borderColor: "#E2E8F0" }} />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Muhur No</label>
+              <input value={form.muhur_no} onChange={(e) => update("muhur_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm uppercase text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Tip</label>
-              <select value={form.tip} onChange={(e) => update("tip", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }}>
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Tip</label>
+              <select value={form.tip} onChange={(e) => update("tip", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
                 {KONTEYNER_TIPLERI.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Rezervasyon</label>
-              <select value={form.rezervasyon_id} onChange={(e) => update("rezervasyon_id", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }}>
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Rezervasyon</label>
+              <select value={form.rezervasyon_id} onChange={(e) => update("rezervasyon_id", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
                 <option value="">-</option>
                 {rezervasyonlar.map((r) => <option key={r.id} value={r.id}>{r.booking_no}</option>)}
               </select>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
-            <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "#1B2B4B" }}>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
               {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-5 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
+            <button onClick={() => setShowForm(false)} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               Iptal
             </button>
           </div>
         </div>
       )}
         {showTopluForm && (
-        <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-800">Toplu Konteyner Ekle</p>
-            <button onClick={() => setShowTopluForm(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            <p className="text-sm font-semibold text-white">Toplu Konteyner Ekle</p>
+            <button onClick={() => setShowTopluForm(false)} className="hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
           </div>
-          <p className="text-xs text-slate-500">Excel'den kopyaladığınız konteyner ve mühür numaralarını yapıştırın. Her satır bir konteyner, iki sütun arasında Tab olmalı.</p>
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>Excel'den kopyaladığınız konteyner ve mühür numaralarını yapıştırın. Her satır bir konteyner, iki sütun arasında Tab olmalı.</p>
           <textarea
             value={topluMetin}
             onChange={(e) => setTopluMetin(e.target.value)}
             placeholder={"CAAU2037116\tAKKON640418\nCAIU3509082\tAKKON640376"}
             rows={6}
-            className="w-full px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-            style={{ borderColor: "#E2E8F0" }}
+            className="w-full px-3 py-2 border rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
           />
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Rezervasyon</label>
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Rezervasyon</label>
             <select value={topluRezId} onChange={(e) => setTopluRezId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }}>
+              className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
               <option value="">-</option>
               {rezervasyonlar.map((r) => <option key={r.id} value={r.id}>{r.booking_no}</option>)}
             </select>
@@ -416,12 +418,12 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
           <div className="flex gap-2">
             <button onClick={handleTopluKaydet} disabled={topluSaving || !topluMetin.trim()}
               className="px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-60"
-              style={{ backgroundColor: "#1B2B4B" }}>
+              style={{ backgroundColor: ACCENT }}>
               {topluSaving ? "Ekleniyor..." : "Ekle"}
             </button>
             <button onClick={() => setShowTopluForm(false)}
-              className="px-5 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50"
-              style={{ borderColor: "#E2E8F0" }}>
+              className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5"
+              style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               İptal
             </button>
           </div>
@@ -476,19 +478,19 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
     }
   };
 
-  if (kaydediyor) return <span className="text-xs text-slate-400">Kaydediliyor...</span>;
+  if (kaydediyor) return <span className="text-xs" style={{ color: TEXT_MUTED }}>Kaydediliyor...</span>;
 
   if (!duzenle) {
     return (
-      <span className="cursor-pointer hover:text-emerald-600 text-sm" onClick={() => { setTaslak(deger || ""); setDuzenle(true); }} title="Düzenlemek için tıklayın">
-        {deger || <span className="text-slate-300">-</span>}
+      <span className="cursor-pointer hover:text-emerald-400 text-sm" onClick={() => { setTaslak(deger || ""); setDuzenle(true); }} title="Düzenlemek için tıklayın">
+        {deger || <span style={{ color: "#4A5262" }}>-</span>}
       </span>
     );
   }
 
   if (secenekler.length > 0) {
     return (
-      <select autoFocus value={taslak} onChange={(e) => kaydet(e.target.value)} onBlur={() => setDuzenle(false)} className="text-sm border rounded px-2 py-1 w-full" style={{ borderColor: "#E2E8F0" }}>
+      <select autoFocus value={taslak} onChange={(e) => kaydet(e.target.value)} onBlur={() => setDuzenle(false)} className="text-sm border rounded px-2 py-1 w-full text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
         <option value="">- Seçiniz -</option>
         {secenekler.map((s) => (<option key={s} value={s}>{s}</option>))}
       </select>
@@ -496,6 +498,6 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
   }
 
   return (
-    <input autoFocus value={taslak} onChange={(e) => setTaslak(e.target.value)} onBlur={() => kaydet(taslak)} onKeyDown={(e) => { if (e.key === "Enter") kaydet(taslak); if (e.key === "Escape") setDuzenle(false); }} className="text-sm border rounded px-2 py-1 w-full" style={{ borderColor: "#E2E8F0" }} placeholder="Marka" />
+    <input autoFocus value={taslak} onChange={(e) => setTaslak(e.target.value)} onBlur={() => kaydet(taslak)} onKeyDown={(e) => { if (e.key === "Enter") kaydet(taslak); if (e.key === "Escape") setDuzenle(false); }} className="text-sm border rounded px-2 py-1 w-full text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="Marka" />
   );
 }

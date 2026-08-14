@@ -51,8 +51,8 @@ export function EditableCell({
           if (e.key === "Enter") commit();
           if (e.key === "Escape") setEditing(false);
         }}
-        className="w-20 px-1.5 py-1 border rounded text-sm text-right"
-        style={{ borderColor: "#1B2B4B" }}
+        className="w-20 px-1.5 py-1 border rounded text-sm text-right text-white"
+        style={{ borderColor: "#10B981", backgroundColor: "#12161F" }}
       />
     );
   }
@@ -65,12 +65,12 @@ export function EditableCell({
     <button
       onClick={() => setEditing(true)}
       title={tooltipText}
-      className="text-sm text-right w-full hover:bg-amber-50 rounded px-1.5 py-1 transition-colors"
+      className="text-sm text-right w-full hover:bg-white/5 rounded px-1.5 py-1 transition-colors"
     >
       {value !== null && value !== undefined ? (
-        <span className="text-slate-700">{value.toLocaleString("tr-TR")}{suffix ? ` ${suffix}` : ""}</span>
+        <span className="text-white">{value.toLocaleString("tr-TR")}{suffix ? ` ${suffix}` : ""}</span>
       ) : (
-        <span className="text-amber-500 italic">Gir</span>
+        <span className="text-amber-400 italic">Gir</span>
       )}
     </button>
   );

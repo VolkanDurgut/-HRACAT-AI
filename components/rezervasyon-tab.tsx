@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Trash2, Plus, Package, Check, X } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -139,59 +140,59 @@ function RezervasyonFormFields({ form, update, updateSaat, errors }: {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Booking No *</label>
-        <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} maxLength={50} />
-        {errors.booking_no && <p className="text-xs text-red-500 mt-0.5">{errors.booking_no}</p>}
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Booking No *</label>
+        <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} maxLength={50} />
+        {errors.booking_no && <p className="text-xs text-red-400 mt-0.5">{errors.booking_no}</p>}
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Gemi Adi</label>
-        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: NAVIOS AZURE" />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Adi</label>
+        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: NAVIOS AZURE" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Sefer No (Voyage No)</label>
-        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: 1BM21S1MA" />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sefer No (Voyage No)</label>
+        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: 1BM21S1MA" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Acente Ismi</label>
-        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} placeholder="orn: MSC, CMA CGM" />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Acente Ismi</label>
+        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: MSC, CMA CGM" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Yukleme Limani</label>
-        <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yukleme Limani</label>
+        <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Konteyner Adedi</label>
-        <input type="number" min={0} value={form.konteyner_adedi} onChange={(e) => update("konteyner_adedi", parseInt(e.target.value) || 0)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Konteyner Adedi</label>
+        <input type="number" min={0} value={form.konteyner_adedi} onChange={(e) => update("konteyner_adedi", parseInt(e.target.value) || 0)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Gemi Kalkis Tarihi</label>
-        <input type="date" value={form.gemi_kalkis_tarihi} onChange={(e) => update("gemi_kalkis_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Kalkis Tarihi</label>
+        <input type="date" value={form.gemi_kalkis_tarihi} onChange={(e) => update("gemi_kalkis_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Talimat Cut-Off</label>
-        <input type="date" value={form.talimat_cutoff} onChange={(e) => update("talimat_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</label>
+        <input type="date" value={form.talimat_cutoff} onChange={(e) => update("talimat_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         {form.talimat_cutoff && (
-          <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5" style={{ borderColor: "#E2E8F0" }} />
+          <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         )}
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Beyanname Cut-Off</label>
-        <input type="date" value={form.beyanname_cutoff} onChange={(e) => update("beyanname_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</label>
+        <input type="date" value={form.beyanname_cutoff} onChange={(e) => update("beyanname_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         {form.beyanname_cutoff && (
-          <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5" style={{ borderColor: "#E2E8F0" }} />
+          <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         )}
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Ekipman Alim Tarihi</label>
-        <input type="date" value={form.ekipman_alim_tarihi} onChange={(e) => update("ekipman_alim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi</label>
+        <input type="date" value={form.ekipman_alim_tarihi} onChange={(e) => update("ekipman_alim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Ardiyesiz Giris Tarihi</label>
-        <input type="date" value={form.ardiyesiz_giris} onChange={(e) => update("ardiyesiz_giris", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi</label>
+        <input type="date" value={form.ardiyesiz_giris} onChange={(e) => update("ardiyesiz_giris", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Ekipman Alim Yeri</label>
-        <input value={form.ekipman_alim_yeri} onChange={(e) => update("ekipman_alim_yeri", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm" style={{ borderColor: "#E2E8F0" }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri</label>
+        <input value={form.ekipman_alim_yeri} onChange={(e) => update("ekipman_alim_yeri", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
       </div>
     </div>
   );
@@ -242,14 +243,14 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
 
   if (editing) {
     return (
-      <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
+      <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="font-semibold text-sm" style={{ color: "#1B2B4B" }}>Rezervasyonu Duzenle</h4>
+          <h4 className="font-semibold text-sm" style={{ color: "white" }}>Rezervasyonu Duzenle</h4>
           <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="text-green-600 hover:text-green-700 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50">
+            <button onClick={handleSave} disabled={saving} className="text-green-400 hover:text-green-300 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50">
               <Check size={12} /> {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
-            <button onClick={() => setEditing(false)} className="text-slate-400 hover:text-slate-600 text-xs font-medium inline-flex items-center gap-1">
+            <button onClick={() => setEditing(false)} className="hover:text-white text-xs font-medium inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
               <X size={12} /> Iptal
             </button>
           </div>
@@ -263,26 +264,26 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
   const beyanLabel = getCutOffLabel(rez.beyanname_cutoff);
 
   return (
-    <div className="bg-white rounded-xl border shadow-sm p-5" style={{ borderColor: "#E2E8F0" }}>
+    <div className="rounded-xl border shadow-sm p-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h4 className="font-semibold text-sm" style={{ color: "#1B2B4B" }}>
+          <h4 className="font-semibold text-sm" style={{ color: "white" }}>
             Booking: <span className="font-mono">{rez.booking_no}</span>
           </h4>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             {(rez as any).gemi_adi && (
-              <p className="text-xs text-slate-400 whitespace-nowrap">Gemi: <span className="font-medium text-slate-600">{(rez as any).gemi_adi}{(rez as any).sefer_no ? ` / ${(rez as any).sefer_no}` : ""}</span></p>
+              <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi: <span className="font-medium text-white">{(rez as any).gemi_adi}{(rez as any).sefer_no ? ` / ${(rez as any).sefer_no}` : ""}</span></p>
             )}
             {(rez as any).acente_ismi && (
-              <p className="text-xs text-slate-400 whitespace-nowrap">Acente: <span className="font-medium text-slate-600">{(rez as any).acente_ismi}</span></p>
+              <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente: <span className="font-medium text-white">{(rez as any).acente_ismi}</span></p>
             )}
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleEditStart} className="text-amber-500 hover:text-amber-700 text-xs font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100">
+          <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20">
             Duzenle
           </button>
-          <button onClick={() => onDeleteRequest({ id: rez.id, bookingNo: rez.booking_no })} className="text-red-400 hover:text-red-600">
+          <button onClick={() => onDeleteRequest({ id: rez.id, bookingNo: rez.booking_no })} className="text-red-400 hover:text-red-300">
             <Trash2 size={16} />
           </button>
         </div>
@@ -290,45 +291,45 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
 
       <div className="space-y-3">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div><p className="text-xs text-slate-400">Yukleme Limani</p><p className="font-medium text-slate-700">{rez.yuklenme_limani || "-"}</p></div>
-          <div><p className="text-xs text-slate-400">Konteyner Adedi</p><p className="font-medium text-slate-700">{rez.konteyner_adedi}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yukleme Limani</p><p className="font-medium text-white">{rez.yuklenme_limani || "-"}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Konteyner Adedi</p><p className="font-medium text-white">{rez.konteyner_adedi}</p></div>
         </div>
 
-        <div className="border-t" style={{ borderColor: "#F1F5F9" }} />
+        <div className="border-t" style={{ borderColor: CARD_BORDER }} />
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
           <div>
-            <p className="text-xs text-slate-400">Talimat Cut-Off</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</p>
             {rez.talimat_cutoff ? (
               <div>
-                <p className="font-medium text-slate-700">{formatDateTR(rez.talimat_cutoff)}</p>
-                <p className="text-slate-500">{new Date(rez.talimat_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="font-medium text-white">{formatDateTR(rez.talimat_cutoff)}</p>
+                <p style={{ color: TEXT_MUTED }}>{new Date(rez.talimat_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
               </div>
-            ) : <p className="font-medium text-slate-700">-</p>}
+            ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
-            <p className="text-xs text-slate-400">Beyanname Cut-Off</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</p>
             {rez.beyanname_cutoff ? (
               <div>
-                <p className="font-medium text-slate-700">{formatDateTR(rez.beyanname_cutoff)}</p>
-                <p className="text-slate-500">{new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="font-medium text-white">{formatDateTR(rez.beyanname_cutoff)}</p>
+                <p style={{ color: TEXT_MUTED }}>{new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
               </div>
-            ) : <p className="font-medium text-slate-700">-</p>}
+            ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
-            <p className="text-xs text-slate-400">Gemi Kalkis</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>Gemi Kalkis</p>
             <p className={`font-medium ${getCutOffLabel(rez.gemi_kalkis_tarihi).color}`}>
               {rez.gemi_kalkis_tarihi ? `${formatDateTR(rez.gemi_kalkis_tarihi)} ${getCutOffLabel(rez.gemi_kalkis_tarihi).text}` : "-"}
             </p>
           </div>
         </div>
 
-        <div className="border-t" style={{ borderColor: "#F1F5F9" }} />
+        <div className="border-t" style={{ borderColor: CARD_BORDER }} />
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div><p className="text-xs text-slate-400">Ekipman Alim Tarihi</p><p className="font-medium text-slate-700">{rez.ekipman_alim_tarihi ? formatDateTR(rez.ekipman_alim_tarihi) : "-"}</p></div>
-          <div><p className="text-xs text-slate-400">Ardiyesiz Giris Tarihi</p><p className="font-medium text-slate-700">{(rez as any).ardiyesiz_giris ? formatDateTR((rez as any).ardiyesiz_giris) : "-"}</p></div>
-          <div><p className="text-xs text-slate-400">Ekipman Alim Yeri</p><p className="font-medium text-slate-700">{rez.ekipman_alim_yeri || "-"}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi</p><p className="font-medium text-white">{rez.ekipman_alim_tarihi ? formatDateTR(rez.ekipman_alim_tarihi) : "-"}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi</p><p className="font-medium text-white">{(rez as any).ardiyesiz_giris ? formatDateTR((rez as any).ardiyesiz_giris) : "-"}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri</p><p className="font-medium text-white">{rez.ekipman_alim_yeri || "-"}</p></div>
         </div>
       </div>
     </div>
@@ -400,19 +401,19 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
             <EmptyState icon={<Package size={36} />} title="Henuz rezervasyon yok" description="Bu dosyaya bir rezervasyon ekleyin" />
           )}
           <button onClick={() => { setNewForm(emptyForm); setShowNewForm(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors mt-2">
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors mt-2">
             <Plus size={16} /> Yeni Rezervasyon Ekle
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
-          <h4 className="font-semibold text-sm mb-4" style={{ color: "#1B2B4B" }}>Yeni Rezervasyon</h4>
+        <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <h4 className="font-semibold text-sm mb-4" style={{ color: "white" }}>Yeni Rezervasyon</h4>
           <RezervasyonFormFields form={newForm} update={updateNew} updateSaat={updateNewSaat} errors={newErrors} />
           <div className="flex gap-3 mt-6">
-            <button onClick={handleSaveNew} disabled={savingNew} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "#1B2B4B" }}>
+            <button onClick={handleSaveNew} disabled={savingNew} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
               {savingNew ? "Kaydediliyor..." : "Kaydet"}
             </button>
-            <button onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }} className="px-5 py-2 rounded-lg text-slate-600 text-sm font-medium border hover:bg-slate-50 transition-all" style={{ borderColor: "#E2E8F0" }}>
+            <button onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               Iptal
             </button>
           </div>

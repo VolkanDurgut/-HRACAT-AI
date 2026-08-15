@@ -257,9 +257,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   }
 
   return (
-    <div className="rounded-xl border shadow-sm p-6 space-y-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
+    <div className="rounded-xl border shadow-sm p-6 space-y-3 w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ek Bilgiler</h3>
+        <button onClick={() => setEditing(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
       </div>
 
       {renderUrunFiyatlari(true)}
@@ -329,6 +331,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <X size={14} /> Iptal
         </button>
       </div>
+    </div>
     </div>
   );
 }

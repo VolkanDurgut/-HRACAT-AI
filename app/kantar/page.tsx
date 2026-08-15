@@ -170,11 +170,11 @@ export default function KantarPage() {
 
         {/* Özet Kartları Sabit */}
         <div className="shrink-0 grid grid-cols-2 gap-4">
-          <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border p-4 shadow-sm animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>DBA Beklenen</p>
             <p className="text-2xl font-bold text-amber-400">{bekleyenler.length}</p>
           </div>
-          <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border p-4 shadow-sm animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Tamamlanan</p>
             <p className="text-2xl font-bold text-emerald-400">{tamamlananlar.length}</p>
           </div>
@@ -190,10 +190,10 @@ export default function KantarPage() {
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span> DBA Bekleyen İhracatlar
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {bekleyenGruplar.map((grup) => {
+                {bekleyenGruplar.map((grup, idx) => {
                   const ilk = grup[0];
                   return (
-                    <div key={`bekleyen-${ilk.dosya_id}`} className="rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                    <div key={`bekleyen-${ilk.dosya_id}`} className={`rounded-xl border shadow-sm flex flex-col overflow-hidden animate-fade-up stagger-${Math.min(idx + 1, 8)}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                       {/* KART BAŞLIĞI */}
                       <div className="border-b p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#241D0F" }}>
                         <div className="flex items-center justify-between mb-1.5 gap-2">
@@ -262,10 +262,10 @@ export default function KantarPage() {
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> DBA Tamamlanan Dosyalar
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {tamamlananGruplar.map((grup) => {
+                {tamamlananGruplar.map((grup, idx) => {
                   const ilk = grup[0];
                   return (
-                    <div key={`tamamlanan-${ilk.dosya_id}`} className="rounded-xl border shadow-sm flex flex-col overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                    <div key={`tamamlanan-${ilk.dosya_id}`} className={`rounded-xl border shadow-sm flex flex-col overflow-hidden animate-fade-up stagger-${Math.min(idx + 1, 8)}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                       {/* KART BAŞLIĞI */}
                       <div className="border-b p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F2A20" }}>
                         <div className="flex items-center justify-between mb-1.5 gap-2">
@@ -327,7 +327,7 @@ export default function KantarPage() {
           )}
 
           {konteynerler.length === 0 && (
-            <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <Weight size={40} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
               <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>Aktif dosyada konteyner bulunamadı.</p>
             </div>

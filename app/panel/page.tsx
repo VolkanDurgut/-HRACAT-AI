@@ -142,7 +142,7 @@ function PanelContent() {
       ) : filteredDosyalar.length === 0 ? (
         <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
       ) : (
-        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           {/* Tablo başlığı */}
           <div className="grid text-[10px] font-semibold uppercase tracking-wide px-4 py-2.5 border-b" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}>
             <span>Proforma No</span>
@@ -156,7 +156,8 @@ function PanelContent() {
           </div>
 
           {/* Satırlar */}
-          {filteredDosyalar.map((dosya) => {
+          {filteredDosyalar.map((dosya, idx) => {
+            const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
             const latestRez = dosya.rezervasyonlar[0] || null;
             const hasRez = !!latestRez;
             const tCutoff = latestRez?.talimat_cutoff ? getCutOffLabel(latestRez.talimat_cutoff) : null;
@@ -178,7 +179,7 @@ function PanelContent() {
               <React.Fragment key={dosya.id}>
                 {/* Ana satır */}
                 <div
-                  className="grid items-center px-4 py-3 border-b hover:bg-white/[0.03] transition-colors"
+                  className={`grid items-center px-4 py-3 border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
                   style={{ borderColor: CARD_BORDER, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}
                 >
                   <div className="flex items-center gap-2">
@@ -222,7 +223,7 @@ function PanelContent() {
                       <button
                         onClick={() => setDeleteTarget({ id: dosya.id, dosyaNo: dosya.dosya_no })}
                         title="Sil"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -231,7 +232,7 @@ function PanelContent() {
                 </div>
 
                 {/* Durum adımları — kompakt tek satır */}
-                <div className="px-4 py-2 border-b flex items-center gap-1.5 flex-wrap" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <div className={`px-4 py-2 border-b flex items-center gap-1.5 flex-wrap ${staggerClass}`} style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   {akisAdimlari.map((adim) => (
                     <span
                       key={adim.label}

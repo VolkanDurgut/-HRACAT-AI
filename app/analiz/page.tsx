@@ -301,20 +301,20 @@ export default function AnalizPage() {
 
       {/* KPI Kartlar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border p-4 animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam Hacim</p>
           <p className="text-2xl font-bold text-white">{formatCurrency(toplamHacim, paraBirimi)}</p>
         </div>
-        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border p-4 animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam Konteyner</p>
           <p className="text-2xl font-bold text-white">{toplamKonteyner}</p>
         </div>
-        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border p-4 animate-fade-up stagger-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Toplam MTS</p>
           <p className="text-2xl font-bold text-white">{toplamMts.toLocaleString("tr-TR")}</p>
           <p className="text-[10px]" style={{ color: TEXT_MUTED }}>metrik ton</p>
         </div>
-        <div className="rounded-lg border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border p-4 animate-fade-up stagger-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Dosya Durumu</p>
           <p className="text-2xl font-bold text-white">{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></p>
           <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{acikSayisi} açık dosya</p>
@@ -323,7 +323,7 @@ export default function AnalizPage() {
 
       {/* Aylık Trend */}
       {aylikTrend.length > 0 && (
-        <div className="rounded-lg border mb-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border mb-4 animate-fade-up stagger-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-2">
               <BarChart2 size={13} style={{ color: TEXT_MUTED }} />
@@ -355,7 +355,7 @@ export default function AnalizPage() {
 
       {/* Satır 1: Müşteriler + Limanlar + Acenteler */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Users size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Müşteriler</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Hacim</span>
@@ -378,7 +378,7 @@ export default function AnalizPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Globe2 size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Varış Limanları</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Konteyner</span>
@@ -401,7 +401,7 @@ export default function AnalizPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Ship size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Acenteler</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Konteyner</span>
@@ -428,7 +428,7 @@ export default function AnalizPage() {
       {/* Satır 2: Birim Fiyat + Teslim Şekli + Transit Süresi */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
         {/* Liman Bazlı Birim Fiyat */}
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Globe2 size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Birim Fiyat (Liman)</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>$/MTS</span>
@@ -452,7 +452,7 @@ export default function AnalizPage() {
         </div>
 
         {/* Teslim Şekli */}
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Truck size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Teslim Şekli</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Dosya</span>
@@ -476,7 +476,7 @@ export default function AnalizPage() {
         </div>
 
         {/* Transit Süresi */}
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-lg border overflow-hidden animate-fade-up stagger-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Clock size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Ortalama Transit Süresi</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Gün</span>
@@ -504,7 +504,7 @@ export default function AnalizPage() {
       {/* Gemiler + Son Sevkiyatlar: yan yana */}
       <div className="space-y-4">
         {gemiler.length > 0 && (
-          <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-lg border overflow-hidden animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
               <div className="flex items-center gap-1.5">
                 <Ship size={12} style={{ color: TEXT_MUTED }} />
@@ -543,7 +543,7 @@ export default function AnalizPage() {
         )}
 
         {sonSevkiyatlar.length > 0 && (
-          <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-lg border overflow-hidden animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="px-4 py-3 border-b flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
               <Package size={12} style={{ color: TEXT_MUTED }} />
               <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>

@@ -360,7 +360,7 @@ export default function AnalizPage() {
             <div className="flex items-center gap-1.5"><Users size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Müşteriler</span></div>
             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Hacim</span>
           </div>
-          <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
+          <div>
             {enCokMusteriler.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokMusteriler.map((item, i) => (
                 <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
@@ -369,7 +369,7 @@ export default function AnalizPage() {
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
                       <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{formatCurrency(item.tutar, paraBirimi)}</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{formatCurrency(item.tutar, paraBirimi)} <span className="font-normal" style={{ color: TEXT_MUTED }}>· %{Math.round((item.tutar / (enCokMusteriler[0]?.tutar || 1)) * 100)}</span></span>
                   </div>
                   <HBar value={item.tutar} max={enCokMusteriler[0]?.tutar || 1} color="#F59E0B" />
                   <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} dosya · {item.konteyner} konteyner</p>
@@ -392,7 +392,7 @@ export default function AnalizPage() {
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
                       <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner} kont.</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner} kont. <span className="font-normal" style={{ color: TEXT_MUTED }}>· %{Math.round((item.konteyner / (enCokLimanlar[0]?.konteyner || 1)) * 100)}</span></span>
                   </div>
                   <HBar value={item.konteyner} max={enCokLimanlar[0]?.konteyner || 1} color={NAVY} />
                   <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} dosya · {formatCurrency(item.tutar, paraBirimi)}</p>
@@ -415,7 +415,7 @@ export default function AnalizPage() {
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
                       <span className="text-xs text-white truncate">{item.ad}</span>
                     </div>
-                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner}</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.konteyner} <span className="font-normal" style={{ color: TEXT_MUTED }}>· %{Math.round((item.konteyner / (enCokAcenteler[0]?.konteyner || 1)) * 100)}</span></span>
                   </div>
                   <HBar value={item.konteyner} max={enCokAcenteler[0]?.konteyner || 1} color="#6366F1" />
                   <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} rezervasyon</p>
@@ -442,7 +442,7 @@ export default function AnalizPage() {
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
                       <span className="text-xs text-white truncate">{item.liman}</span>
                     </div>
-                    <span className="text-xs font-semibold text-white shrink-0 ml-2">${item.birimFiyat.toFixed(0)}/MTS</span>
+                    <span className="text-xs font-semibold text-white shrink-0 ml-2">${item.birimFiyat.toFixed(0)}/MTS <span className="font-normal" style={{ color: TEXT_MUTED }}>· %{Math.round((item.birimFiyat / (ulkeFiyat[0]?.birimFiyat || 1)) * 100)}</span></span>
                   </div>
                   <HBar value={item.birimFiyat} max={ulkeFiyat[0]?.birimFiyat || 1} color="#10B981" />
                   <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.mts.toLocaleString("tr-TR")} MTS toplam</p>
@@ -491,7 +491,7 @@ export default function AnalizPage() {
                     <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
                     <span className="text-xs text-white truncate">{item.liman}</span>
                   </div>
-                  <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.ortalama} gün</span>
+                  <span className="text-xs font-semibold text-white shrink-0 ml-2">{item.ortalama} gün <span className="font-normal" style={{ color: TEXT_MUTED }}>· %{Math.round((item.ortalama / Math.max(...transitSuresi.map(t => t.ortalama), 1)) * 100)}</span></span>
                 </div>
                 <HBar value={item.ortalama} max={Math.max(...transitSuresi.map(t => t.ortalama), 1)} color="#F59E0B" />
                 <p className="text-[9px] mt-0.5" style={{ color: TEXT_MUTED }}>{item.adet} rezervasyon</p>
@@ -502,7 +502,7 @@ export default function AnalizPage() {
       </div>
 
       {/* Gemiler + Son Sevkiyatlar: yan yana */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+      <div className="space-y-4">
         {gemiler.length > 0 && (
           <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>

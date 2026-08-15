@@ -377,12 +377,12 @@ export default function YeniDosyaPage() {
 
                 <div className="mb-5">
                   <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Toplam Taahhüt Edilen Miktar (MTS)</label>
-                  <div className="relative">
+                  <div className="relative w-40">
                     <input
                       type="number"
                       value={yeniSiparisMts}
                       onChange={(e) => setYeniSiparisMts(e.target.value)}
-                      className="w-full px-3 py-2 pr-14 border rounded-lg text-sm text-white"
+                      className="w-full px-3 py-2 pr-12 border rounded-lg text-sm text-white"
                       style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium pointer-events-none" style={{ color: TEXT_MUTED }}>MTS</span>

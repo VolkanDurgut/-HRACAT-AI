@@ -334,14 +334,14 @@ export default function AnalizPage() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ backgroundColor: CARD_BORDER }} /> Konteyner</span>
             </div>
           </div>
-          <div className="px-5 pt-4 pb-3">
-            <div className="flex items-end gap-2" style={{ height: 120 }}>
+          <div className="px-5 pt-3 pb-3">
+            <div className="flex items-end gap-2" style={{ height: 60 }}>
               {aylikTrend.map((item, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                   <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
                     {item.ay}: {formatCurrency(item.tutar, paraBirimi)} / {item.konteyner} kont.
                   </div>
-                  <div className="w-full flex items-end gap-0.5" style={{ height: 96 }}>
+                  <div className="w-full flex items-end gap-0.5" style={{ height: 44 }}>
                     <div className="flex-1 rounded-t-sm" style={{ height: `${Math.max((item.tutar / maxTutar) * 100, 3)}%`, backgroundColor: NAVY }} />
                     <div className="flex-1 rounded-t-sm" style={{ height: `${Math.max((item.konteyner / maxKont) * 100, 3)}%`, backgroundColor: CARD_BORDER }} />
                   </div>
@@ -354,7 +354,7 @@ export default function AnalizPage() {
       )}
 
       {/* Satır 1: Müşteriler + Limanlar + Acenteler */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
         <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
             <div className="flex items-center gap-1.5"><Users size={12} style={{ color: TEXT_MUTED }} /><span className="text-xs font-semibold text-white">Müşteriler</span></div>
@@ -426,7 +426,7 @@ export default function AnalizPage() {
       </div>
 
       {/* Satır 2: Birim Fiyat + Teslim Şekli + Transit Süresi */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
         {/* Liman Bazlı Birim Fiyat */}
         <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
@@ -501,75 +501,80 @@ export default function AnalizPage() {
         </div>
       </div>
 
-      {/* Gemiler */}
-      {gemiler.length > 0 && (
-        <div className="rounded-lg border overflow-hidden mb-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
-            <div className="flex items-center gap-1.5">
-              <Ship size={12} style={{ color: TEXT_MUTED }} />
-              <span className="text-xs font-semibold text-white">Gemi Başına Konteyner</span>
-              <span className="text-[10px] ml-1" style={{ color: TEXT_MUTED }}>— detay için tıklayın</span>
+      {/* Gemiler + Son Sevkiyatlar: yan yana */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {gemiler.length > 0 && (
+          <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
+              <div className="flex items-center gap-1.5">
+                <Ship size={12} style={{ color: TEXT_MUTED }} />
+                <span className="text-xs font-semibold text-white">Gemi Başına Konteyner</span>
+                <span className="text-[10px] ml-1" style={{ color: TEXT_MUTED }}>— detay için tıklayın</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>#</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
+                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
+                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gemiler.map((g, i) => (
+                    <tr
+                      key={g.ad}
+                      className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors"
+                      style={{ borderColor: CARD_BORDER }}
+                      onClick={() => handleGemiClick(g.ad)}
+                    >
+                      <td className="px-4 py-2.5 text-[10px] font-bold" style={{ color: TEXT_MUTED }}>{i + 1}</td>
+                      <td className="px-4 py-2.5 text-xs font-medium text-white">{g.ad}</td>
+                      <td className="px-4 py-2.5 text-xs text-center" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
+                      <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{g.konteyner}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>#</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
-                <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
-                <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gemiler.map((g, i) => (
-                <tr
-                  key={g.ad}
-                  className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors"
-                  style={{ borderColor: CARD_BORDER }}
-                  onClick={() => handleGemiClick(g.ad)}
-                >
-                  <td className="px-4 py-2.5 text-[10px] font-bold" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                  <td className="px-4 py-2.5 text-xs font-medium text-white">{g.ad}</td>
-                  <td className="px-4 py-2.5 text-xs text-center" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
-                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{g.konteyner}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        )}
 
-      {/* Son Sevkiyatlar */}
-      {sonSevkiyatlar.length > 0 && (
-        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <div className="px-4 py-3 border-b flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
-            <Package size={12} style={{ color: TEXT_MUTED }} />
-            <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
+        {sonSevkiyatlar.length > 0 && (
+          <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="px-4 py-3 border-b flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
+              <Package size={12} style={{ color: TEXT_MUTED }} />
+              <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Liman</th>
+                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Kont.</th>
+                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Tutar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sonSevkiyatlar.map(d => (
+                    <tr key={d.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-4 py-2.5 text-xs font-medium text-white">{d.dosya_no}</td>
+                      <td className="px-4 py-2.5 text-xs max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{d.alici_firma || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs text-center font-medium text-white">{d.konteynerler.length}</td>
+                      <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Liman</th>
-                <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Kont.</th>
-                <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Tutar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sonSevkiyatlar.map(d => (
-                <tr key={d.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
-                  <td className="px-4 py-2.5 text-xs font-medium text-white">{d.dosya_no}</td>
-                  <td className="px-4 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{d.alici_firma || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-center font-medium text-white">{d.konteynerler.length}</td>
-                  <td className="px-4 py-2.5 text-xs text-right font-semibold text-white">{formatCurrency(d.toplam_tutar, d.para_birimi)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        )}
+      </div>
     </AppShell>
   );
 }

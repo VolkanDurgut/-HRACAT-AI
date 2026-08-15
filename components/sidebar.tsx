@@ -85,9 +85,7 @@ export default function Sidebar() {
   const navContent = (
     <>
       <div className="px-5 py-5 border-b flex items-center gap-3" style={{ borderColor: BORDER }}>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: NAVY }}>
-          <Anchor size={17} className="text-white" />
-        </div>
+        <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div>
           <h1 className="font-semibold text-[15px] leading-tight text-white">İhracat AI</h1>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Export Management</p>

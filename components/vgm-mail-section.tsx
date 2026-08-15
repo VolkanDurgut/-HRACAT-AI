@@ -79,26 +79,28 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
   if (!showVgmMail) return null;
 
   return (
-    <div className="p-4 rounded-xl border shadow-sm space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-white">VGM Maili</p>
-        <button onClick={() => setShowVgmMail(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-      </div>
-      <div>
-        <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Acente / Armator)</p>
-        <input value={vgmTo} onChange={(e) => setVgmTo(e.target.value)} placeholder="acente@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-      </div>
-      <div>
-        <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
-        <input value={vgmCc} onChange={(e) => setVgmCc(e.target.value)} placeholder="cc@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-      </div>
-      <p className="text-xs" style={{ color: TEXT_MUTED }}>Mail metninde konteynerlerin VGM sonuçları otomatik yer alır.</p>
-      <div className="flex gap-2">
-        <button onClick={handleVgmMailGonder} disabled={!vgmTo}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-          <Mail size={14} /> Mail Uygulamasini Ac
-        </button>
-        <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowVgmMail(false)}>
+      <div className="rounded-2xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-white">VGM Maili</p>
+          <button onClick={() => setShowVgmMail(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
+        </div>
+        <div>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Acente / Armator)</p>
+          <input value={vgmTo} onChange={(e) => setVgmTo(e.target.value)} placeholder="acente@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        </div>
+        <div>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
+          <input value={vgmCc} onChange={(e) => setVgmCc(e.target.value)} placeholder="cc@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        </div>
+        <p className="text-xs" style={{ color: TEXT_MUTED }}>Mail metninde konteynerlerin VGM sonuçları otomatik yer alır.</p>
+        <div className="flex gap-2">
+          <button onClick={handleVgmMailGonder} disabled={!vgmTo}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+            <Mail size={14} /> Mail Uygulamasini Ac
+          </button>
+          <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+        </div>
       </div>
     </div>
   );

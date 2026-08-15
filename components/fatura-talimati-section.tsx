@@ -357,48 +357,48 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
         onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }}
       />
 
-      {(showKonsimento || showFaturaTalimati) && (
-        <div className="space-y-4">
-          {showKonsimento && (
-            <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-white">Konsimento Talimati</p>
-                <button onClick={() => setShowKonsimento(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-              </div>
-              {konsimentoIcerik}
+      {showKonsimento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowKonsimento(false)}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-5 space-y-4 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Konsimento Talimati</p>
+              <button onClick={() => setShowKonsimento(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
-          )}
+            {konsimentoIcerik}
+          </div>
+        </div>
+      )}
 
-          {showFaturaTalimati && (
-            <div className="p-4 rounded-xl border shadow-sm space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
-                <button onClick={() => setShowFaturaTalimati(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-              </div>
-              <div>
-                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
-                <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-              </div>
-              <div>
-                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
-                <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-              </div>
-              <div>
-                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Konu</p>
-                <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-              </div>
-              <div>
-                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Metin</p>
-                <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-                  <Mail size={14} /> Mail Uygulamasini Ac
-                </button>
-                <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
-              </div>
+      {showFaturaTalimati && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowFaturaTalimati(false)}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-5 space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
+              <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
-          )}
+            <div>
+              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
+              <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            </div>
+            <div>
+              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
+              <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            </div>
+            <div>
+              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Konu</p>
+              <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            </div>
+            <div>
+              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Metin</p>
+              <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+                <Mail size={14} /> Mail Uygulamasini Ac
+              </button>
+              <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+            </div>
+          </div>
         </div>
       )}
     </>

@@ -149,11 +149,8 @@ export default function Sidebar() {
 
       <div className="px-3 pb-3 pt-2 border-t space-y-1" style={{ borderColor: BORDER }}>
         {user?.email && (
-          <div className="flex items-center gap-2.5 px-3 py-2">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: BORDER }}>
-              <User size={13} style={{ color: TEXT_MUTED }} />
-            </div>
-            <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>{user.email}</p>
+          <div className="px-3 py-2">
+            <p className="text-xs break-all leading-snug" style={{ color: TEXT_MUTED }}>{user.email}</p>
           </div>
         )}
         <button

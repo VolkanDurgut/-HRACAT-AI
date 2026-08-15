@@ -478,12 +478,21 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
     }
   };
 
+  // Cuval marka listesinde tek bir secenek varsa ve konteynere henuz marka atanmamissa,
+  // kullaniciya sormadan otomatik olarak o tek secenegi ata.
+  React.useEffect(() => {
+    if (!deger && secenekler.length === 1 && !kaydediyor) {
+      kaydet(secenekler[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deger, secenekler.length]);
+
   if (kaydediyor) return <span className="text-xs" style={{ color: TEXT_MUTED }}>Kaydediliyor...</span>;
 
   if (!duzenle) {
     return (
       <span className="cursor-pointer hover:text-emerald-400 text-sm" onClick={() => { setTaslak(deger || ""); setDuzenle(true); }} title="Düzenlemek için tıklayın">
-        {deger || <span style={{ color: "#4A5262" }}>-</span>}
+        {deger || <span className="text-amber-400 font-medium">+ Ekle</span>}
       </span>
     );
   }

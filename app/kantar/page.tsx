@@ -53,7 +53,7 @@ export default function KantarPage() {
     
     const { data: kontData } = await supabase
       .from("konteynerler")
-      .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no")
+      .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka")
       .eq("company_id", companyId);
 
     if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; }
@@ -91,7 +91,7 @@ export default function KantarPage() {
       .map((k) => ({
         ...k,
         dosya_no: dosyaMap[k.dosya_id].dosya_no,
-        marka: dosyaMap[k.dosya_id].marka,
+        marka: k.marka || dosyaMap[k.dosya_id].marka,
         booking_no: k.rezervasyon_id ? (rezIdMap[k.rezervasyon_id] || rezDosyaMap[k.dosya_id] || null) : (rezDosyaMap[k.dosya_id] || null),
         maskeli_musteri: maskeleMusteri(dosyaMap[k.dosya_id].alici_firma),
       })) as KonteynerRow[];
@@ -213,7 +213,7 @@ export default function KantarPage() {
                     <tr>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Mühür / Plaka</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Çuval / Dosya</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Rez No</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center w-24" style={{ color: TEXT_MUTED }}>İşlem</th>
@@ -231,7 +231,8 @@ export default function KantarPage() {
                           <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || "-"}</div>
                         </td>
                         <td className="px-4 py-2.5">
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>{k.dosya_no}</span>
+                          <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
+                          <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
                         </td>
                         <td className="px-4 py-2.5 text-xs text-white">{k.maskeli_musteri}</td>
                         <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{k.booking_no || "-"}</td>
@@ -287,7 +288,8 @@ export default function KantarPage() {
                             <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || "-"}</div>
                           </td>
                           <td className="px-4 py-2.5">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>{k.dosya_no}</span>
+                            <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
+                            <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
                           </td>
                           <td className="px-4 py-2.5 text-xs text-white">{k.maskeli_musteri}</td>
                           <td className="px-4 py-2.5 text-right">

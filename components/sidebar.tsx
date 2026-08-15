@@ -84,13 +84,13 @@ export default function Sidebar() {
 
   const navContent = (
     <>
-      <div className="px-5 py-5 border-b flex items-center gap-3" style={{ borderColor: BORDER }}>
+      <Link href="/dashboard" onClick={closeMobile} className="px-5 py-5 border-b flex items-center gap-3 hover:bg-white/5 transition-colors" style={{ borderColor: BORDER }}>
         <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div>
           <h1 className="font-semibold text-[15px] leading-tight text-white">İhracat AI</h1>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Export Management</p>
         </div>
-      </div>
+      </Link>
 
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {mainItems.map(renderItem)}

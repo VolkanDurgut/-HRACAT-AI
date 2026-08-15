@@ -9,6 +9,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import AcenteTeklifSection from "@/components/acente-teklif-section";
 import { Upload, FileText, Check, Loader2, Package, AlertCircle } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
 
@@ -249,39 +250,39 @@ export default function YeniDosyaPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: "#1B2B4B" }}>Yeni Ihracat Dosyasi Ac</h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-white">Yeni Ihracat Dosyasi Ac</h1>
+        <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
           Proforma faturayi yukleyin, sistem otomatik olarak ihracat dosyasini oluştursun.
         </p>
       </div>
 
       <div className="max-w-4xl">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">
             {error}
           </div>
         )}
 
         {step === "upload" && (
-          <div className="bg-white rounded-xl border shadow-sm p-8" style={{ borderColor: "#E2E8F0" }}>
+          <div className="rounded-xl border shadow-sm p-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer hover:border-amber-400 hover:bg-amber-50/30"
-              style={{ borderColor: pdfFile ? "#F59E0B" : "#CBD5E1" }}
+              className="border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer hover:border-amber-400 hover:bg-white/[0.03]"
+              style={{ borderColor: pdfFile ? "#F59E0B" : CARD_BORDER }}
               onClick={() => document.getElementById("pdf-input")?.click()}
             >
-              <Upload size={40} className="mx-auto text-slate-300 mb-4" />
+              <Upload size={40} className="mx-auto mb-4" style={{ color: "#4A5262" }} />
               {pdfFile ? (
                 <div className="flex items-center justify-center gap-2">
-                  <FileText size={20} className="text-amber-600" />
-                  <span className="text-sm font-medium text-slate-700">{pdfFile.name}</span>
-                  <Check size={16} className="text-green-500" />
+                  <FileText size={20} className="text-amber-400" />
+                  <span className="text-sm font-medium text-white">{pdfFile.name}</span>
+                  <Check size={16} className="text-green-400" />
                 </div>
               ) : (
                 <>
-                  <p className="text-slate-600 font-medium">PDF dosyanızı buraya sürükleyin</p>
-                  <p className="text-slate-400 text-sm mt-1">veya dosya seçmek için tıklayın (max 20MB)</p>
+                  <p className="font-medium" style={{ color: TEXT_MUTED }}>PDF dosyanızı buraya sürükleyin</p>
+                  <p className="text-sm mt-1" style={{ color: "#5A6272" }}>veya dosya seçmek için tıklayın (max 20MB)</p>
                 </>
               )}
               <input id="pdf-input" type="file" accept=".pdf" className="hidden" onChange={handleFileSelect} />
@@ -290,7 +291,7 @@ export default function YeniDosyaPage() {
               onClick={handleUpload}
               disabled={!pdfFile || loading}
               className="mt-6 w-full py-3 rounded-lg text-white font-medium text-sm transition-all duration-200 hover:opacity-90 disabled:opacity-40"
-              style={{ backgroundColor: "#1B2B4B" }}
+              style={{ backgroundColor: ACCENT }}
             >
               Dosyayi Olustur
             </button>
@@ -298,46 +299,46 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "reading" && (
-          <div className="bg-white rounded-xl border shadow-sm p-12 text-center" style={{ borderColor: "#E2E8F0" }}>
-            <Loader2 size={40} className="mx-auto text-amber-500 animate-spin mb-4" />
-            <p className="text-slate-700 font-medium">İhracat dosyanız hazırlanıyor</p>
-            <p className="text-slate-400 text-sm mt-1">Bu işlem birkaç saniye sürebilir</p>
+          <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <Loader2 size={40} className="mx-auto animate-spin mb-4 text-amber-400" />
+            <p className="text-white font-medium">İhracat dosyanız hazırlanıyor</p>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Bu işlem birkaç saniye sürebilir</p>
           </div>
         )}
 
         {step === "ana_siparis_check" && proformData && (
-          <div className="bg-white rounded-xl border shadow-sm p-8" style={{ borderColor: "#E2E8F0" }}>
+          <div className="rounded-xl border shadow-sm p-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             {mevcutAnaSiparis ? (
               <>
                 <div className="flex items-start gap-3 mb-5">
-                  <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
                     <Package size={20} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-800">Mevcut sipariş bulundu</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">
+                    <h3 className="font-semibold text-white">Mevcut sipariş bulundu</h3>
+                    <p className="text-sm mt-0.5" style={{ color: TEXT_MUTED }}>
                       <span className="font-medium">{mevcutAnaSiparis.proforma_no}</span> numaralı proformaya ait bir sipariş zaten kayıtlı.
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mb-5">
-                  <div className="p-3 rounded-lg bg-slate-50 border" style={{ borderColor: "#E2E8F0" }}>
-                    <p className="text-xs text-slate-400">Toplam Taahhüt</p>
-                    <p className="text-lg font-bold" style={{ color: "#1B2B4B" }}>{mevcutAnaSiparis.toplam_mts?.toLocaleString("tr-TR")} MTS</p>
+                  <div className="p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+                    <p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam Taahhüt</p>
+                    <p className="text-lg font-bold text-white">{mevcutAnaSiparis.toplam_mts?.toLocaleString("tr-TR")} MTS</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-slate-50 border" style={{ borderColor: "#E2E8F0" }}>
-                    <p className="text-xs text-slate-400">Gönderilmiş</p>
-                    <p className="text-lg font-bold text-green-600">{gonderilmisMts.toLocaleString("tr-TR")} MTS</p>
+                  <div className="p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+                    <p className="text-xs" style={{ color: TEXT_MUTED }}>Gönderilmiş</p>
+                    <p className="text-lg font-bold text-green-400">{gonderilmisMts.toLocaleString("tr-TR")} MTS</p>
                   </div>
-                  <div className="p-3 rounded-lg bg-amber-50 border" style={{ borderColor: "#FDE68A" }}>
-                    <p className="text-xs text-amber-600">Kalan</p>
-                    <p className="text-lg font-bold text-amber-700">{Math.max(0, (mevcutAnaSiparis.toplam_mts || 0) - gonderilmisMts).toLocaleString("tr-TR")} MTS</p>
+                  <div className="p-3 rounded-lg border bg-amber-500/10" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+                    <p className="text-xs text-amber-400">Kalan</p>
+                    <p className="text-lg font-bold text-amber-300">{Math.max(0, (mevcutAnaSiparis.toplam_mts || 0) - gonderilmisMts).toLocaleString("tr-TR")} MTS</p>
                   </div>
                 </div>
 
-                <p className="text-sm text-slate-600 mb-5">
-                  Bu yeni dosyayı (<strong>{getProformaMts(proformData).toLocaleString("tr-TR")} MTS</strong>) bu siparişin devamı olarak eklemek mi istiyorsunuz?
+                <p className="text-sm mb-5" style={{ color: TEXT_MUTED }}>
+                  Bu yeni dosyayı (<strong className="text-white">{getProformaMts(proformData).toLocaleString("tr-TR")} MTS</strong>) bu siparişin devamı olarak eklemek mi istiyorsunuz?
                 </p>
 
                 <div className="flex gap-3">
@@ -345,7 +346,7 @@ export default function YeniDosyaPage() {
                     onClick={handleDevamEt}
                     disabled={loading}
                     className="flex-1 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                    style={{ backgroundColor: "#1B2B4B" }}
+                    style={{ backgroundColor: ACCENT }}
                   >
                     {loading && <Loader2 size={14} className="animate-spin" />}
                     Evet, Siparişin Devamı
@@ -353,8 +354,8 @@ export default function YeniDosyaPage() {
                   <button
                     onClick={() => createDosya(proformData, null)}
                     disabled={loading}
-                    className="flex-1 py-2.5 rounded-lg text-slate-600 font-medium text-sm border hover:bg-slate-50 transition-all disabled:opacity-50"
-                    style={{ borderColor: "#E2E8F0" }}
+                    className="flex-1 py-2.5 rounded-lg font-medium text-sm border hover:bg-white/5 transition-all disabled:opacity-50"
+                    style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
                   >
                     Hayır, Bağımsız Dosya
                   </button>
@@ -363,28 +364,28 @@ export default function YeniDosyaPage() {
             ) : (
               <>
                 <div className="flex items-start gap-3 mb-5">
-                  <div className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                  <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 shrink-0">
                     <AlertCircle size={20} />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-slate-800">Yeni sipariş takibi başlatılsın mı?</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">
+                    <h3 className="font-semibold text-white">Yeni sipariş takibi başlatılsın mı?</h3>
+                    <p className="text-sm mt-0.5" style={{ color: TEXT_MUTED }}>
                       Bu proforma kısmi sevkiyatlarla (10+10+5 gibi) gönderilecekse, toplam taahhüt miktarını kaydedip takip edebiliriz.
                     </p>
                   </div>
                 </div>
 
                 <div className="mb-5">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Toplam Taahhüt Edilen Miktar (MTS)</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Toplam Taahhüt Edilen Miktar (MTS)</label>
                   <div className="relative">
                     <input
                       type="number"
                       value={yeniSiparisMts}
                       onChange={(e) => setYeniSiparisMts(e.target.value)}
-                      className="w-full px-3 py-2 pr-14 border rounded-lg text-sm"
-                      style={{ borderColor: "#E2E8F0" }}
+                      className="w-full px-3 py-2 pr-14 border rounded-lg text-sm text-white"
+                      style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none">MTS</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium pointer-events-none" style={{ color: TEXT_MUTED }}>MTS</span>
                   </div>
                 </div>
 
@@ -393,7 +394,7 @@ export default function YeniDosyaPage() {
                     onClick={handleYeniAnaSiparisOlustur}
                     disabled={loading}
                     className="flex-1 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                    style={{ backgroundColor: "#1B2B4B" }}
+                    style={{ backgroundColor: ACCENT }}
                   >
                     {loading && <Loader2 size={14} className="animate-spin" />}
                     Sipariş Takibini Başlat
@@ -401,8 +402,8 @@ export default function YeniDosyaPage() {
                   <button
                     onClick={() => createDosya(proformData, null)}
                     disabled={loading}
-                    className="flex-1 py-2.5 rounded-lg text-slate-600 font-medium text-sm border hover:bg-slate-50 transition-all disabled:opacity-50"
-                    style={{ borderColor: "#E2E8F0" }}
+                    className="flex-1 py-2.5 rounded-lg font-medium text-sm border hover:bg-white/5 transition-all disabled:opacity-50"
+                    style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
                   >
                     Hayır, Tek Seferlik Dosya
                   </button>
@@ -413,30 +414,30 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "success" && (
-          <div className="bg-white rounded-xl border shadow-sm p-12 text-center" style={{ borderColor: "#E2E8F0" }}>
-            <Check size={40} className="mx-auto text-green-500 mb-4" />
-            <p className="text-slate-700 font-medium">Tamamlandi!</p>
+          <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <Check size={40} className="mx-auto text-green-400 mb-4" />
+            <p className="text-white font-medium">Tamamlandi!</p>
           </div>
         )}
 
         {step === "reservation_choice" && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
-                <h3 className="font-semibold text-slate-800 mb-1">Rezervasyon Ekle</h3>
-                <p className="text-sm text-slate-500 mb-4">Booking no, cut-off tarihleri ve yukleme bilgilerini girin.</p>
+              <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <h3 className="font-semibold text-white mb-1">Rezervasyon Ekle</h3>
+                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Booking no, cut-off tarihleri ve yukleme bilgilerini girin.</p>
                 <button
                   onClick={() => router.push(`/dosya/${dosyaId}?tab=rezervasyon&action=new`)}
                   className="w-full py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
-                  style={{ backgroundColor: "#1B2B4B" }}
+                  style={{ backgroundColor: ACCENT }}
                 >
                   Rezervasyon Ekle
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl border shadow-sm p-6" style={{ borderColor: "#E2E8F0" }}>
-                <h3 className="font-semibold text-slate-800 mb-1">Acentelerden Teklif Al</h3>
-                <p className="text-sm text-slate-500 mb-4">Kayitli acentelerinize freight teklifi isteyin.</p>
+              <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <h3 className="font-semibold text-white mb-1">Acentelerden Teklif Al</h3>
+                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Kayitli acentelerinize freight teklifi isteyin.</p>
                 <AcenteTeklifSection dosyaId={dosyaId!} proformData={proformData} userId={user!.id} companyId={companyId!} />
               </div>
             </div>
@@ -446,76 +447,76 @@ export default function YeniDosyaPage() {
         {step === "review" && proformData && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4" style={{ borderColor: "#E2E8F0" }}>
-                <h3 className="font-semibold text-sm" style={{ color: "#1B2B4B" }}>Satici & Alici Bilgileri</h3>
+              <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <h3 className="font-semibold text-sm" style={{ color: "white" }}>Satici & Alici Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-slate-400">Satici Firma</p><p className="font-medium text-slate-700">{proformData.satici_firma}</p></div>
-                  <div><p className="text-xs text-slate-400">Alici Firma</p><p className="font-medium text-slate-700">{proformData.alici_firma}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Satici Firma</p><p className="font-medium text-white">{proformData.satici_firma}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Alici Firma</p><p className="font-medium text-white">{proformData.alici_firma}</p></div>
                 </div>
-                <h3 className="font-semibold text-sm pt-2" style={{ color: "#1B2B4B" }}>Proforma Bilgileri</h3>
+                <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Proforma Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-slate-400">Proforma No</p><p className="font-medium text-slate-700">{proformData.proforma_no}</p></div>
-                  <div><p className="text-xs text-slate-400">Proforma Tarihi</p><p className="font-medium text-slate-700">{proformData.proforma_tarihi}</p></div>
-                  <div><p className="text-xs text-slate-400">Gecerlilik Tarihi</p><p className="font-medium text-slate-700">{proformData.gecerlilik_tarihi}</p></div>
-                  <div><p className="text-xs text-slate-400">Lot No</p><p className="font-medium text-slate-700">{proformData.lot_no}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Proforma No</p><p className="font-medium text-white">{proformData.proforma_no}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Proforma Tarihi</p><p className="font-medium text-white">{proformData.proforma_tarihi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Gecerlilik Tarihi</p><p className="font-medium text-white">{proformData.gecerlilik_tarihi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Lot No</p><p className="font-medium text-white">{proformData.lot_no}</p></div>
                 </div>
-                <h3 className="font-semibold text-sm pt-2" style={{ color: "#1B2B4B" }}>Finansal</h3>
+                <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Finansal</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-slate-400">Toplam Tutar</p><p className="font-medium text-slate-700">{formatCurrency(proformData.toplam_tutar, proformData.para_birimi)}</p></div>
-                  <div><p className="text-xs text-slate-400">Toplam Miktar</p><p className="font-medium text-slate-700">{proformData.toplam_miktar || proformData.miktar} {proformData.miktar_birimi}</p></div>
-                  <div><p className="text-xs text-slate-400">Ambalaj</p><p className="font-medium text-slate-700">{proformData.ambalaj}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam Tutar</p><p className="font-medium text-white">{formatCurrency(proformData.toplam_tutar, proformData.para_birimi)}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam Miktar</p><p className="font-medium text-white">{proformData.toplam_miktar || proformData.miktar} {proformData.miktar_birimi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ambalaj</p><p className="font-medium text-white">{proformData.ambalaj}</p></div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4" style={{ borderColor: "#E2E8F0" }}>
-                <h3 className="font-semibold text-sm" style={{ color: "#1B2B4B" }}>Lojistik</h3>
+              <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <h3 className="font-semibold text-sm" style={{ color: "white" }}>Lojistik</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-slate-400">Varis Limani</p><p className="font-medium text-slate-700">{proformData.varis_limani}</p></div>
-                  <div><p className="text-xs text-slate-400">Yukleme Limani</p><p className="font-medium text-slate-700">{proformData.yuklenme_limani || proformData.yukleme_limani}</p></div>
-                  <div><p className="text-xs text-slate-400">Teslim Sekli</p><p className="font-medium text-slate-700">{proformData.teslim_sekli}</p></div>
-                  <div><p className="text-xs text-slate-400">Odeme Sekli</p><p className="font-medium text-slate-700">{proformData.odeme_sekli}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Varis Limani</p><p className="font-medium text-white">{proformData.varis_limani}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yukleme Limani</p><p className="font-medium text-white">{proformData.yuklenme_limani || proformData.yukleme_limani}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Teslim Sekli</p><p className="font-medium text-white">{proformData.teslim_sekli}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Odeme Sekli</p><p className="font-medium text-white">{proformData.odeme_sekli}</p></div>
                 </div>
-                <h3 className="font-semibold text-sm pt-2" style={{ color: "#1B2B4B" }}>Banka Bilgileri</h3>
+                <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Banka Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-slate-400">Hesap Adi</p><p className="font-medium text-slate-700">{proformData.banka_bilgileri?.hesap_adi || proformData.hesap_adi}</p></div>
-                  <div><p className="text-xs text-slate-400">Banka</p><p className="font-medium text-slate-700">{proformData.banka_bilgileri?.banka_adi || proformData.banka}</p></div>
-                  <div><p className="text-xs text-slate-400">SWIFT</p><p className="font-medium text-slate-700">{proformData.banka_bilgileri?.swift || proformData.swift}</p></div>
-                  <div><p className="text-xs text-slate-400">IBAN</p><p className="font-medium text-slate-700 break-all">{proformData.banka_bilgileri?.iban || proformData.iban}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Adi</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_adi || proformData.hesap_adi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Banka</p><p className="font-medium text-white">{proformData.banka_bilgileri?.banka_adi || proformData.banka}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>SWIFT</p><p className="font-medium text-white">{proformData.banka_bilgileri?.swift || proformData.swift}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>IBAN</p><p className="font-medium text-white break-all">{proformData.banka_bilgileri?.iban || proformData.iban}</p></div>
                 </div>
               </div>
             </div>
 
             {proformData.urun_detaylari && proformData.urun_detaylari.length > 0 && (
-              <div className="bg-white rounded-xl border shadow-sm overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
-                <div className="px-6 py-4 border-b" style={{ borderColor: "#E2E8F0" }}>
-                  <h3 className="font-semibold text-sm" style={{ color: "#1B2B4B" }}>Urun Detaylari</h3>
+              <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <div className="px-6 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
+                  <h3 className="font-semibold text-sm" style={{ color: "white" }}>Urun Detaylari</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b bg-slate-50" style={{ borderColor: "#E2E8F0" }}>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">URUN ADI</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500">AMBALAJ</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">MIKTAR (MTS)</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">BIRIM FIYAT</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">TOPLAM</th>
+                      <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>URUN ADI</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>AMBALAJ</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>MIKTAR (MTS)</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>BIRIM FIYAT</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>TOPLAM</th>
                       </tr>
                     </thead>
                     <tbody>
                       {proformData.urun_detaylari.map((item: any, i: number) => (
-                        <tr key={i} className="border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
-                          <td className="px-4 py-3 text-sm text-slate-700">{item.description || item.urun_adi}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{item.packaging_size || item.ambalaj_boyutu}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600 text-right">{item.quantity || item.miktar_mts}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600 text-right">{formatCurrency(item.unit_price || item.birim_fiyat_usd, proformData.para_birimi)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700 text-right font-medium">{formatCurrency(item.total_amount || item.toplam_tutar_usd, proformData.para_birimi)}</td>
+                        <tr key={i} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                          <td className="px-4 py-3 text-sm text-white">{item.description || item.urun_adi}</td>
+                          <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{item.packaging_size || item.ambalaj_boyutu}</td>
+                          <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{item.quantity || item.miktar_mts}</td>
+                          <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{formatCurrency(item.unit_price || item.birim_fiyat_usd, proformData.para_birimi)}</td>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-white">{formatCurrency(item.total_amount || item.toplam_tutar_usd, proformData.para_birimi)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-slate-50">
-                        <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "#1B2B4B" }}>TOPLAM</td>
-                        <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "#1B2B4B" }}>
+                      <tr style={{ backgroundColor: ROW_HEADER_BG }}>
+                        <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "white" }}>TOPLAM</td>
+                        <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: ACCENT }}>
                           {formatCurrency(proformData.urun_detaylari.reduce((s: number, u: any) => s + parseFloat(String(u.total_amount || u.toplam_tutar_usd || 0)), 0), proformData.para_birimi)}
                         </td>
                       </tr>
@@ -529,14 +530,14 @@ export default function YeniDosyaPage() {
               <button
                 onClick={() => router.push(`/dosya/${dosyaId}`)}
                 className="px-6 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
-                style={{ backgroundColor: "#1B2B4B" }}
+                style={{ backgroundColor: ACCENT }}
               >
                 Dosyayi Goruntule
               </button>
               <button
                 onClick={() => router.push("/panel")}
-                className="px-6 py-2.5 rounded-lg text-slate-600 font-medium text-sm border hover:bg-slate-50 transition-all"
-                style={{ borderColor: "#E2E8F0" }}
+                className="px-6 py-2.5 rounded-lg font-medium text-sm border hover:bg-white/5 transition-all"
+                style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
               >
                 Ana Panele Don
               </button>

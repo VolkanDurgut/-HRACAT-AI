@@ -349,10 +349,10 @@ export default function DashboardPage() {
                   if (toplamKont > 0 && !tumDbaHazir) eksikler.push(`${toplamKont - dbaYuklenen} DBA bekleniyor`);
                   if (eksikler.length === 0) return null;
                   return (
-                    <div className="px-4 py-1.5 border-t flex items-center gap-2 flex-wrap" style={{ borderColor: "#F1F5F9", backgroundColor: "#FFFBEB" }}>
-                      <AlertTriangle size={12} className="text-amber-500 shrink-0" />
+                    <div className="px-4 py-1.5 border-t flex items-center gap-2 flex-wrap" style={{ borderColor: CARD_BORDER }}>
+                      <AlertTriangle size={12} className="text-amber-400 shrink-0" />
                       {eksikler.map((e, i) => (
-                        <span key={i} className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">{e}</span>
+                        <span key={i} className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{e}</span>
                       ))}
                     </div>
                   );

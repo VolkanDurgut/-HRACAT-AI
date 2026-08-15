@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, SurecTakibi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatDateTimeTR, autoSuggestContainers } from "@/lib/cutoff-utils";
@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { DetailSkeleton } from "@/components/skeleton-loaders";
 import AppShell from "@/components/app-shell";
 import RezervasyonTab from "@/components/rezervasyon-tab";
-import KonteynerTab from "@/components/konteyner-tab";
+import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
 import BankaBilgileriCard from "@/components/banka-bilgileri-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
@@ -63,6 +63,7 @@ function DosyaDetailContent() {
   const [konteynerler, setKonteynerler] = useState<Konteyner[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>((searchParams.get("tab") as TabKey) || "proforma");
+  const konteynerTabRef = useRef<KonteynerTabHandle>(null);
 
   const fetchData = useCallback(async () => {
     if (!id || !user || !companyId) return; // companyId kontrolü eklendi
@@ -168,16 +169,59 @@ function DosyaDetailContent() {
             <h1 className="text-2xl font-bold text-white">📁 {dosya.dosya_no}</h1>
             <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Olusturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
           </div>
-          {yetkiler.sayfa_yetkileri.yeni_dosya && (
-            <button
-              onClick={handleDurumButtonClick}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                (dosya.durum === "Açık" || dosya.durum === "Acik") ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
-              }`}
-            >
-              {(dosya.durum === "Açık" || dosya.durum === "Acik") ? "Dosyayı Kapat" : "Dosyayı Yeniden Aç"}
-            </button>
-          )}
+          <div className="flex flex-col items-end gap-2">
+            {yetkiler.sayfa_yetkileri.yeni_dosya && (
+              <button
+                onClick={handleDurumButtonClick}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  (dosya.durum === "Açık" || dosya.durum === "Acik") ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                }`}
+              >
+                {(dosya.durum === "Açık" || dosya.durum === "Acik") ? "Dosyayı Kapat" : "Dosyayı Yeniden Aç"}
+              </button>
+            )}
+            {activeTab === "konteynerler" && (() => {
+              const vgmHazir = konteynerler.length > 0 && konteynerler.every((k) => !!k.vgm_kg);
+              const rezKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+              const faturaHazir = rezKontAdedi > 0 && konteynerler.length === rezKontAdedi;
+              const tumDolu = konteynerler.length > 0 && konteynerler.every((k) =>
+                k.net_agirlik_kg != null && (k as any).brut_agirlik_kg != null && (k as any).pieces != null
+              );
+              const konsimentoHazirBtn = faturaHazir && tumDolu;
+              const btnClass = (aktif: boolean) =>
+                `px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  aktif ? "text-white hover:opacity-90 cursor-pointer" : "cursor-not-allowed opacity-50"
+                }`;
+              return (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => konteynerTabRef.current?.acVgm()}
+                    disabled={!vgmHazir}
+                    className={btnClass(vgmHazir)}
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    VGM Gönder
+                  </button>
+                  <button
+                    onClick={() => konteynerTabRef.current?.acKonsimento()}
+                    disabled={!konsimentoHazirBtn}
+                    className={btnClass(konsimentoHazirBtn)}
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Konşimento Talimatı
+                  </button>
+                  <button
+                    onClick={() => konteynerTabRef.current?.acFatura()}
+                    disabled={!faturaHazir}
+                    className={btnClass(faturaHazir)}
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Fatura Talimatı
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -29,10 +29,12 @@ type Props = {
   companyId: string; // SaaS: şirket bazlı izolasyon
 };
 
-export default function FaturaTalimatiSection({
+export type FaturaTalimatiSectionHandle = { acKonsimento: () => void; acFatura: () => void };
+
+const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(function FaturaTalimatiSection({
   dosyaId, dosya, konteynerler, rezervasyonlar,
-  faturaTalimatiHazir, eklenenKonteynerAdedi, rezervasyonKonteynerAdedi, onRefresh, companyId,
-}: Props) {
+  faturaTalimatiHazir, rezervasyonKonteynerAdedi, onRefresh, companyId,
+}, ref) {
   const { showToast } = useToast();
 
   const [showFaturaTalimati, setShowFaturaTalimati] = useState(false);
@@ -52,14 +54,12 @@ export default function FaturaTalimatiSection({
   const konsimentoYuklemeTarihi = dosya.konsimento_yukleme_tarihi;
   const kontrolSonucu = dosya.konsimento_kontrol_sonucu as KontrolSonucu | null;
 
-  // Tüm konteynerlerin net, brüt ve kap adetlerinin dolu olup olmadığını kontrol ediyoruz
   const tumKonteynerlerDolu = konteynerler.length > 0 && konteynerler.every(k => 
     k.net_agirlik_kg != null && 
     (k as any).brut_agirlik_kg != null && 
     (k as any).pieces != null
   );
 
-  // Konşimento butonunun aktif olması için hem sayının tutması hem de verilerin tam olması gerekiyor
   const konsimentoHazir = faturaTalimatiHazir && tumKonteynerlerDolu;
 
   const buildKonu = () => [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani].filter(Boolean).join(" - ");
@@ -89,7 +89,6 @@ export default function FaturaTalimatiSection({
     }).join("\n");
     const konteynerSatirlari = konteynerler.map((k, i) => `  ${i + 1}. ${k.konteyner_no} (Muhur: ${k.muhur_no || "-"}, Tip: ${k.tip})`).join("\n");
 
-    // Sadece gercekten degeri olan satirlari ekleyen yardimci fonksiyon
     const satir = (label: string, value: string | number | null | undefined) => {
       if (value === null || value === undefined || value === "" || value === "-") return null;
       return `${label}: ${value}`;
@@ -209,8 +208,6 @@ export default function FaturaTalimatiSection({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Kontrol hatasi.");
 
-      // Liman/gemi adi gibi alanlarda birbirini iceren degerleri (orn. "MARPORT" / "ISTANBUL-MARPORT")
-      // AI bazen tutarsiz isaretleyebiliyor, burada kod seviyesinde kesin olarak filtreliyoruz.
       const normalize = (s: string) => s.toUpperCase().replace(/[^A-ZÇĞİÖŞÜ0-9]/g, "");
       const gercekUyusmazliklar = (data.uyusmazliklar || []).filter((u: any) => {
         const sis = normalize(String(u.sistemde || ""));
@@ -229,7 +226,6 @@ export default function FaturaTalimatiSection({
           : data.ozet,
       };
 
-      // Mevcut ham_veri'yi koruyarak notify bilgisini ekliyoruz
       const guncelHamVeri = {
         ...(dosya.ham_veri || {}),
         notify: data.notify || []
@@ -262,16 +258,31 @@ export default function FaturaTalimatiSection({
     onRefresh();
   };
 
+  const acKonsimento = () => {
+    if (konsimentoDosyaUrl) {
+      setShowKonsimento(true);
+    } else if (konsimentoHazir) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    acKonsimento,
+    acFatura: handleFaturaTalimatiAc,
+  }));
+
   const konsimentoIcerik = (
     <div className="space-y-3">
       {!konsimentoDosyaUrl && !kontrolEdiliyor ? (
-        <label className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]"
+          style={{ borderColor: CARD_BORDER }}
+        >
           <Upload size={28} style={{ color: TEXT_MUTED }} />
           <span className="text-sm font-medium text-white">Konsimento talimati PDF dosyasini secin</span>
           <span className="text-xs" style={{ color: TEXT_MUTED }}>veya surukleyip birakin</span>
-          <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }} />
-        </label>
+        </div>
       ) : (
         <div className="space-y-3">
           {konsimentoDosyaUrl && (
@@ -337,75 +348,61 @@ export default function FaturaTalimatiSection({
   );
 
   return (
-    <div className="pt-2 border-t space-y-4" style={{ borderColor: CARD_BORDER }}>
-      {!showKonsimento ? (
-        <div className="space-y-3">
-          {!konsimentoHazir && !konsimentoDosyaUrl ? (
-            <div>
-              <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed" style={{ color: TEXT_MUTED, backgroundColor: CARD_BORDER }}>
-                <FileText size={16} /> Konşimento Talimatı Yükle
-              </button>
-              <p className="text-xs mt-1.5 text-center" style={{ color: TEXT_MUTED }}>Aktif olması için tüm konteynerlerin kap, net ve brüt bilgileri girilmelidir.</p>
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }}
+      />
+
+      {(showKonsimento || showFaturaTalimati) && (
+        <div className="space-y-4">
+          {showKonsimento && (
+            <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-white">Konsimento Talimati</p>
+                <button onClick={() => setShowKonsimento(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
+              </div>
+              {konsimentoIcerik}
             </div>
-          ) : (
-            <button onClick={() => setShowKonsimento(true)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: ACCENT }}>
-              <FileText size={16} /> {konsimentoDosyaUrl ? "Konsimento Talimatini Goruntule" : "Konsimento Talimati Yukle"}
-            </button>
+          )}
+
+          {showFaturaTalimati && (
+            <div className="p-4 rounded-xl border shadow-sm space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
+                <button onClick={() => setShowFaturaTalimati(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
+              </div>
+              <div>
+                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
+                <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+              </div>
+              <div>
+                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
+                <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+              </div>
+              <div>
+                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Konu</p>
+                <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+              </div>
+              <div>
+                <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Metin</p>
+                <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+                  <Mail size={14} /> Mail Uygulamasini Ac
+                </button>
+                <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+              </div>
+            </div>
           )}
         </div>
-      ) : (
-        <div className="p-5 rounded-xl border shadow-sm space-y-4 animate-fade-in" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-white">Konsimento Talimati</p>
-            <button onClick={() => setShowKonsimento(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-          </div>
-          {konsimentoIcerik}
-        </div>
       )}
-
-      {!faturaTalimatiHazir ? (
-        <div className="mt-3">
-          <button disabled className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed" style={{ color: TEXT_MUTED, backgroundColor: CARD_BORDER }}>
-            <FileText size={16} /> Fatura Talimati Olustur
-          </button>
-          <p className="text-xs mt-1.5 text-center" style={{ color: TEXT_MUTED }}>{eklenenKonteynerAdedi} / {rezervasyonKonteynerAdedi || 0} konteyner eklendi</p>
-        </div>
-      ) : showFaturaTalimati ? (
-        <div className="mt-3 p-4 rounded-xl border shadow-sm space-y-3 animate-fade-in" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
-            <button onClick={() => setShowFaturaTalimati(false)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-          </div>
-          <div>
-            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
-            <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-          </div>
-          <div>
-            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>CC</p>
-            <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc1@firma.com" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-          </div>
-          <div>
-            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Konu</p>
-            <input value={konu} onChange={(e) => setKonu(e.target.value)} className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-          </div>
-          <div>
-            <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Metin</p>
-            <textarea value={metin} onChange={(e) => setMetin(e.target.value)} rows={14} className="w-full text-sm px-3 py-2 border rounded-lg font-mono resize-none text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-              <Mail size={14} /> Mail Uygulamasini Ac
-            </button>
-            <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <button onClick={handleFaturaTalimatiAc} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90" style={{ backgroundColor: ACCENT }}>
-            <FileText size={16} /> {talimatGonderildi ? "Fatura Talimatini Yeniden Gonder" : "Fatura Talimati Olustur"}
-          </button>
-          </div>
-      )}
-    </div>
+    </>
   );
-}
+});
+
+export default FaturaTalimatiSection;

@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase } from "@/lib/supabase";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { useKonteynerForm } from "@/lib/hooks/use-konteyner-form";
@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
-import VgmMailSection from "@/components/vgm-mail-section";
-import FaturaTalimatiSection from "@/components/fatura-talimati-section";
+import VgmMailSection, { VgmMailSectionHandle } from "@/components/vgm-mail-section";
+import FaturaTalimatiSection, { FaturaTalimatiSectionHandle } from "@/components/fatura-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
@@ -25,7 +25,20 @@ type Props = {
   companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
-export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId }: Props) {
+export type KonteynerTabHandle = { acVgm: () => void; acKonsimento: () => void; acFatura: () => void };
+
+const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab(
+  { dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId },
+  ref
+) {
+  const vgmRef = useRef<VgmMailSectionHandle>(null);
+  const faturaTalimatiRef = useRef<FaturaTalimatiSectionHandle>(null);
+
+  useImperativeHandle(ref, () => ({
+    acVgm: () => vgmRef.current?.ac(),
+    acKonsimento: () => faturaTalimatiRef.current?.acKonsimento(),
+    acFatura: () => faturaTalimatiRef.current?.acFatura(),
+  }));
   const markaListesi = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
   const varsayilanMarka = markaListesi.length === 1 ? markaListesi[0] : "";
 
@@ -154,18 +167,6 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
                 <p className="text-xs font-semibold" style={{ color: ACCENT }}>{dbaYuklenenSayisi}/{konteynerler.length}</p>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => scrollToBolum("vgm-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
-                  VGM Gönder
-                </button>
-                <button onClick={() => scrollToBolum("fatura-talimati-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
-                  Fatura Talimatı
-                </button>
-                <button onClick={() => scrollToBolum("fatura-talimati-bolumu")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
-                  Konşimento Talimatı
-                </button>
                 {konteynerler.length >= 2 && ilkKonteynerDolu && (
                   <button onClick={uygulaButonaTikla}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
@@ -430,34 +431,34 @@ export default function KonteynerTab({ dosyaId, dosya, konteynerler, rezervasyon
         </div>
       )}
 
-      <div id="vgm-bolumu">
-        <VgmMailSection
-          dosyaId={dosyaId}
-          dosya={dosya}
-          konteynerler={konteynerler}
-          rezervasyonlar={rezervasyonlar}
-          dbaYuklenenSayisi={dbaYuklenenSayisi}
-          onRefresh={onRefresh}
-          companyId={companyId}
-        />
-      </div>
+      <VgmMailSection
+        ref={vgmRef}
+        dosyaId={dosyaId}
+        dosya={dosya}
+        konteynerler={konteynerler}
+        rezervasyonlar={rezervasyonlar}
+        dbaYuklenenSayisi={dbaYuklenenSayisi}
+        onRefresh={onRefresh}
+        companyId={companyId}
+      />
 
-      <div id="fatura-talimati-bolumu">
-        <FaturaTalimatiSection
-          dosyaId={dosyaId}
-          dosya={dosya}
-          konteynerler={konteynerler}
-          rezervasyonlar={rezervasyonlar}
-          faturaTalimatiHazir={faturaTalimatiHazir}
-          eklenenKonteynerAdedi={eklenenKonteynerAdedi}
-          rezervasyonKonteynerAdedi={rezervasyonKonteynerAdedi}
-          onRefresh={onRefresh}
-          companyId={companyId}
-        />
-      </div>
+      <FaturaTalimatiSection
+        ref={faturaTalimatiRef}
+        dosyaId={dosyaId}
+        dosya={dosya}
+        konteynerler={konteynerler}
+        rezervasyonlar={rezervasyonlar}
+        faturaTalimatiHazir={faturaTalimatiHazir}
+        eklenenKonteynerAdedi={eklenenKonteynerAdedi}
+        rezervasyonKonteynerAdedi={rezervasyonKonteynerAdedi}
+        onRefresh={onRefresh}
+        companyId={companyId}
+      />
     </div>
   );
-}
+});
+
+export default KonteynerTab;
 // Konteyner bazinda cuval markasi hucresi.
 // Marka listesi doluysa acilir liste, bossa serbest metin olarak calisir.
 function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi }: {

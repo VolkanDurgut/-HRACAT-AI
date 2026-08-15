@@ -363,7 +363,7 @@ export default function AnalizPage() {
           <div>
             {enCokMusteriler.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokMusteriler.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                <div key={item.ad} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -386,7 +386,7 @@ export default function AnalizPage() {
           <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
             {enCokLimanlar.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokLimanlar.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                <div key={item.ad} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -409,7 +409,7 @@ export default function AnalizPage() {
           <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
             {enCokAcenteler.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               enCokAcenteler.map((item, i) => (
-                <div key={item.ad} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                <div key={item.ad} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -436,7 +436,7 @@ export default function AnalizPage() {
           <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
             {ulkeFiyat.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               ulkeFiyat.map((item, i) => (
-                <div key={item.liman} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                <div key={item.liman} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -460,7 +460,7 @@ export default function AnalizPage() {
           <div className="divide-y" style={{ borderColor: CARD_BORDER }}>
             {teslimSekli.length === 0 ? <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p> :
               teslimSekli.map((item, i) => (
-                <div key={item.tip} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                <div key={item.tip} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -485,7 +485,7 @@ export default function AnalizPage() {
             {transitSuresi.length === 0 ? (
               <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>ETA girilince hesaplanır</p>
             ) : transitSuresi.map((item, i) => (
-              <div key={item.liman} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+              <div key={item.liman} className={`px-4 py-2.5 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[10px] font-bold w-3 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}</span>
@@ -526,7 +526,7 @@ export default function AnalizPage() {
                   {gemiler.map((g, i) => (
                     <tr
                       key={g.ad}
-                      className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors"
+                      className={`border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`}
                       style={{ borderColor: CARD_BORDER }}
                       onClick={() => handleGemiClick(g.ad)}
                     >
@@ -560,8 +560,8 @@ export default function AnalizPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sonSevkiyatlar.map(d => (
-                    <tr key={d.id} className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
+                  {sonSevkiyatlar.map((d, i) => (
+                    <tr key={d.id} className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(i + 1, 8)}`} style={{ borderColor: CARD_BORDER }}>
                       <td className="px-4 py-2.5 text-xs font-medium text-white">{d.dosya_no}</td>
                       <td className="px-4 py-2.5 text-xs max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{d.alici_firma || "—"}</td>
                       <td className="px-4 py-2.5 text-xs max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>

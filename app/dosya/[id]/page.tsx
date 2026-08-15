@@ -410,6 +410,7 @@ function DosyaDetailContent() {
 
       {activeTab === "konteynerler" && (
         <KonteynerTab 
+          ref={konteynerTabRef}
           dosyaId={dosya.id} 
           dosya={dosya} 
           konteynerler={konteynerler} 

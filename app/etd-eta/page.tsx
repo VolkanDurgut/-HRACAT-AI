@@ -154,10 +154,10 @@ export default function EtdEtaPage() {
             <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-medium">{yaklasanlar.length}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {yaklasanlar.map(s => (
+            {yaklasanlar.map((s, idx) => (
               <div
                 key={s.rezervasyon_id}
-                className={`rounded-xl border p-4 shadow-sm ${s.kalanGun === 0 ? "border-red-500/40" : s.kalanGun <= 2 ? "border-orange-500/30" : "border-amber-500/25"}`}
+                className={`rounded-xl border p-4 shadow-sm animate-fade-up stagger-${Math.min(idx + 1, 8)} ${s.kalanGun === 0 ? "border-red-500/40" : s.kalanGun <= 2 ? "border-orange-500/30" : "border-amber-500/25"}`}
                 style={{ backgroundColor: CARD_BG }}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -189,15 +189,15 @@ export default function EtdEtaPage() {
 
       {/* Özet Kartlar */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-xl border shadow-sm p-4 animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>Toplam Sevkiyat</p>
           <p className="text-2xl font-bold text-white">{satirlar.length}</p>
         </div>
-        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-xl border shadow-sm p-4 animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>ETA Girilmiş</p>
           <p className="text-2xl font-bold text-green-400">{satirlar.length - eksikEtaSayisi}</p>
         </div>
-        <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: eksikEtaSayisi > 0 ? "#F87171" : CARD_BORDER }}>
+        <div className="rounded-xl border shadow-sm p-4 animate-fade-up stagger-3" style={{ backgroundColor: CARD_BG, borderColor: eksikEtaSayisi > 0 ? "#F87171" : CARD_BORDER }}>
           <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>ETA Eksik</p>
           <p className={`text-2xl font-bold ${eksikEtaSayisi > 0 ? "text-red-400" : ""}`} style={eksikEtaSayisi === 0 ? { color: TEXT_MUTED } : undefined}>{eksikEtaSayisi}</p>
         </div>
@@ -236,7 +236,7 @@ export default function EtdEtaPage() {
           <Loader2 size={32} className="animate-spin text-amber-500" />
         </div>
       ) : (
-        <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -257,13 +257,14 @@ export default function EtdEtaPage() {
                   <tr>
                     <td colSpan={9} className="text-center py-10" style={{ color: TEXT_MUTED }}>Kayıt bulunamadı</td>
                   </tr>
-                ) : filtered.map((s) => {
+                ) : filtered.map((s, idx) => {
                   const gun = s.eta ? kalanGun(s.eta) : null;
                   const yaklasan = gun !== null && gun >= 0 && gun <= 7;
+                  const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
                   return (
                     <tr
                       key={s.rezervasyon_id}
-                      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${!s.eta ? "bg-red-500/[0.06]" : yaklasan ? "bg-amber-500/[0.06]" : ""}`}
+                      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors animate-fade-up ${staggerClass} ${!s.eta ? "bg-red-500/[0.06]" : yaklasan ? "bg-amber-500/[0.06]" : ""}`}
                       style={{ borderColor: CARD_BORDER }}
                     >
                       <td className="px-3 py-2 font-medium text-white max-w-[150px] truncate">{s.alici_firma || "—"}</td>

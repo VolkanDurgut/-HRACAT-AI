@@ -256,7 +256,7 @@ function DosyaDetailContent() {
       <div key={activeTab} className="animate-fade-up">
       {activeTab === "proforma" && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fade-up stagger-1">
             <div className="rounded-xl border shadow-sm p-6 space-y-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Taraflar</h3>
@@ -317,7 +317,7 @@ function DosyaDetailContent() {
             </div>
           )}
             </div>
-            <div className="rounded-xl border shadow-sm p-6 space-y-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="rounded-xl border shadow-sm p-6 space-y-5 animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Lojistik</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -339,7 +339,9 @@ function DosyaDetailContent() {
               </div>
               <BankaBilgileriCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
             </div>
-          <EkBilgilerCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+          <div className="animate-fade-up stagger-3">
+            <EkBilgilerCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+          </div>
         </div>
       )}
 

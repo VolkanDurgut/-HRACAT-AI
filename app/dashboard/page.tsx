@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
 import {
   Ship, FileText, CheckCircle2, AlertTriangle, Clock,
-  Package, Mail, TrendingUp, ChevronRight, Anchor, ExternalLink
+  Package, Mail, TrendingUp, ChevronRight, Anchor, ExternalLink, Loader2
 } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 
@@ -124,9 +124,9 @@ export default function DashboardPage() {
     return (
       <AppShell>
         <div className="flex items-center justify-center py-20">
-          <div className="flex items-center gap-3 text-slate-400">
-            <Ship size={24} className="animate-bounce" />
-            <span className="text-sm">Yukleniyor...</span>
+          <div className="flex items-center gap-3" style={{ color: TEXT_MUTED }}>
+            <Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} />
+            <span className="text-sm">Yükleniyor...</span>
           </div>
         </div>
       </AppShell>

@@ -216,7 +216,7 @@ export default function AnalizPage() {
   if (loading) return (
     <AppShell>
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={22} className="animate-spin" style={{ color: TEXT_MUTED }} />
+        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
       </div>
     </AppShell>
   );

@@ -233,7 +233,7 @@ export default function EtdEtaPage() {
       {/* Tablo */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin text-amber-500" />
+          <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
         </div>
       ) : (
         <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

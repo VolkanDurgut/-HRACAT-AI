@@ -383,7 +383,7 @@ function DosyaDetailContent() {
 
 export default function DosyaDetailPage() {
   return (
-    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-emerald-500" /> </div></AppShell>}>
+    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: "#10B981" }} /></div></AppShell>}>
       <DosyaDetailContent />
     </Suspense>
   );

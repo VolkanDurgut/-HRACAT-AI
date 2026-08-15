@@ -137,7 +137,7 @@ function PanelContent() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin text-slate-300" />
+          <Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} />
         </div>
       ) : filteredDosyalar.length === 0 ? (
         <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />

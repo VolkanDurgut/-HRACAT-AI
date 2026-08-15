@@ -107,7 +107,7 @@ export default function YetkilendirmePage() {
   if (loading) return (
     <AppShell>
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-amber-500" />
+        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
       </div>
     </AppShell>
   );

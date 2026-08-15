@@ -139,7 +139,7 @@ export default function KantarPage() {
     return (
       <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
         <div className="flex items-center gap-3" style={{ color: TEXT_MUTED }}>
-          <Loader2 size={24} className="animate-spin" />
+          <Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} />
           <span>Yükleniyor...</span>
         </div>
       </div>

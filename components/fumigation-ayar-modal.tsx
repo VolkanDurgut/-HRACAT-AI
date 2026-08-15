@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase, FumigationAyari } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { Loader2, X, FlameKindling } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 type Props = {
   aliciFirma: string;
@@ -99,26 +100,27 @@ export default function FumigationAyarModal({ aliciFirma, open, onClose, onSaved
 
   if (!open) return null;
 
-  const inputClass = "w-full border rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400";
+  const inputClass = "w-full border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-400";
+  const inputStyle = { borderColor: CARD_BORDER, backgroundColor: CARD_BG };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" style={{ backgroundColor: CARD_BG }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "#E2E8F0" }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
           <div className="flex items-center gap-2">
-            <FlameKindling size={16} className="text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Fumigasyon Ayarları</h2>
+            <FlameKindling size={16} style={{ color: ACCENT }} />
+            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Fumigasyon Ayarları</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
             <X size={18} />
           </button>
         </div>
 
         {/* Firma bilgisi */}
         <div className="px-6 pt-4 pb-2">
-          <p className="text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">{aliciFirma}</span> için fumigasyon ayarları.
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>
+            <span className="font-semibold text-white">{aliciFirma}</span> için fumigasyon ayarları.
             Bu ayarlar aynı müşterinin gelecek dosyalarında otomatik kullanılır.
           </p>
         </div>
@@ -127,49 +129,50 @@ export default function FumigationAyarModal({ aliciFirma, open, onClose, onSaved
         <div className="px-6 py-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Fumigant</label>
-              <input className={inputClass} value={form.fumigant ?? ""} onChange={e => setForm(f => ({ ...f, fumigant: e.target.value }))} placeholder="ALPH3" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fumigant</label>
+              <input className={inputClass} style={inputStyle} value={form.fumigant ?? ""} onChange={e => setForm(f => ({ ...f, fumigant: e.target.value }))} placeholder="ALPH3" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Fumigation Dosage (gr/m3)</label>
-              <input className={inputClass} value={form.fumigasyon_dozu ?? ""} onChange={e => setForm(f => ({ ...f, fumigasyon_dozu: e.target.value }))} placeholder="3,54 gr/m3" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fumigation Dosage (gr/m3)</label>
+              <input className={inputClass} style={inputStyle} value={form.fumigasyon_dozu ?? ""} onChange={e => setForm(f => ({ ...f, fumigasyon_dozu: e.target.value }))} placeholder="3,54 gr/m3" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Temperature</label>
-            <input className={inputClass} value={form.sicaklik ?? ""} onChange={e => setForm(f => ({ ...f, sicaklik: e.target.value }))} placeholder="30" />
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Temperature</label>
+            <input className={inputClass} style={inputStyle} value={form.sicaklik ?? ""} onChange={e => setForm(f => ({ ...f, sicaklik: e.target.value }))} placeholder="30" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Commance Fumigation (Saat)</label>
-              <input className={inputClass} value={form.baslangic_saati ?? ""} onChange={e => setForm(f => ({ ...f, baslangic_saati: e.target.value }))} placeholder="10:00" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Commance Fumigation (Saat)</label>
+              <input className={inputClass} style={inputStyle} value={form.baslangic_saati ?? ""} onChange={e => setForm(f => ({ ...f, baslangic_saati: e.target.value }))} placeholder="10:00" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Completed Fumigation (Saat)</label>
-              <input className={inputClass} value={form.bitis_saati ?? ""} onChange={e => setForm(f => ({ ...f, bitis_saati: e.target.value }))} placeholder="10:00" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Completed Fumigation (Saat)</label>
+              <input className={inputClass} style={inputStyle} value={form.bitis_saati ?? ""} onChange={e => setForm(f => ({ ...f, bitis_saati: e.target.value }))} placeholder="10:00" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Min. Exp. Period</label>
-              <input className={inputClass} value={form.min_exp_period ?? ""} onChange={e => setForm(f => ({ ...f, min_exp_period: e.target.value }))} placeholder="120 HOURS" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Min. Exp. Period</label>
+              <input className={inputClass} style={inputStyle} value={form.min_exp_period ?? ""} onChange={e => setForm(f => ({ ...f, min_exp_period: e.target.value }))} placeholder="120 HOURS" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Aeration Period</label>
-              <input className={inputClass} value={form.aeration_period ?? ""} onChange={e => setForm(f => ({ ...f, aeration_period: e.target.value }))} placeholder="2 HOUR AFTER OPENING" />
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Aeration Period</label>
+              <input className={inputClass} style={inputStyle} value={form.aeration_period ?? ""} onChange={e => setForm(f => ({ ...f, aeration_period: e.target.value }))} placeholder="2 HOUR AFTER OPENING" />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t flex justify-end gap-2" style={{ borderColor: "#E2E8F0" }}>
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
+        <div className="px-6 py-4 border-t flex justify-end gap-2" style={{ borderColor: CARD_BORDER }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors" style={{ color: TEXT_MUTED }}>
             İptal
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors disabled:opacity-50"
+            style={{ backgroundColor: ACCENT }}
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             Kaydet

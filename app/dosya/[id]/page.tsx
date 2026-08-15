@@ -401,6 +401,7 @@ function DosyaDetailContent() {
       {activeTab === "rezervasyon" && (
         <RezervasyonTab 
           dosyaId={dosya.id} 
+          dosya={dosya}
           rezervasyonlar={rezervasyonlar} 
           onRefresh={fetchData} 
           onNavigateTab={setActiveTab}

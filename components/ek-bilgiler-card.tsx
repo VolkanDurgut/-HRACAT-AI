@@ -72,8 +72,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     marka_listesi: markaListesiText,
     lot_no: (dosya as any).lot_no || "",
     marka: (dosya as any).marka || "",
-    navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
-    lokal_masraf_tutari: (dosya as any).lokal_masraf_tutari?.toString() || "",
     beyanname_no: (dosya as any).beyanname_no || "",
     fatura_no: (dosya as any).fatura_no || "",
     fatura_tarihi: (dosya as any).fatura_tarihi || "",
@@ -105,8 +103,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       consignee: form.consignee || null,
       lot_no: form.lot_no || null,
       marka: form.marka || null,
-      navlun_tutari: form.navlun_tutari ? parseFloat(form.navlun_tutari) : null,
-      lokal_masraf_tutari: form.lokal_masraf_tutari ? parseFloat(form.lokal_masraf_tutari) : null,
       beyanname_no: form.beyanname_no || null,
       fatura_no: form.fatura_no || null,
       fatura_tarihi: form.fatura_tarihi || null,
@@ -239,8 +235,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           {mevcutMarkaListesi.length > 1 && (
             <CopyableField dark label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
           )}
-          <CopyableField dark label="Navlun (Konteyner Basi)" value={formatCurrency(navlunBirimFiyati, dosya.para_birimi)} />
-          <CopyableField dark label="Lokal Masraf (Konteyner Basi)" value={formatCurrency(lokalMasrafBirimFiyati, dosya.para_birimi)} />
+          
           <CopyableField dark label="Beyanname No" value={(dosya as any).beyanname_no} />
           <CopyableField dark label="Fatura No" value={(dosya as any).fatura_no} />
           <CopyableField dark label="Fatura Tarihi" value={formatDateTR((dosya as any).fatura_tarihi)} />
@@ -266,22 +261,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ek Bilgiler</h3>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutari (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
-          <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="orn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Basi, {dosya.para_birimi || "USD"})</label>
-          <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="orn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-      </div>
-      <p className="text-xs" style={{ color: TEXT_MUTED }}>
-        {konteynerAdedi > 0
-          ? `Rezervasyonda ${konteynerAdedi} konteyner var. Girilen fiyatlar bu adetle carpilip CIF'ten dusulup FOB hesaplanir.`
-          : "Rezervasyonda konteyner adedi tanimli degil, toplam tutarlar hesaplanamaz."}
-      </p>
 
       {renderUrunFiyatlari(true)}
 

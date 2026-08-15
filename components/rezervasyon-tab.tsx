@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Rezervasyon, MTS_PER_KONTEYNER } from "@/lib/supabase";
+import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER } from "@/lib/supabase";
 import { formatDateTR, getCutOffDays, getCutOffLabel } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -12,6 +12,7 @@ type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
 type Props = {
   dosyaId: string;
+  dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
   onRefresh: () => void;
   onNavigateTab: (tab: TabKey) => void;
@@ -23,6 +24,7 @@ const emptyForm = {
   beyanname_cutoff: "", beyanname_cutoff_saat: "", ekipman_alim_yeri: "", ekipman_alim_tarihi: "",
   yuklenme_limani: "", konteyner_adedi: 0,
   ardiyesiz_giris: "",
+  navlun_tutari: "", lokal_masraf_tutari: "",
 };
 
 const formatSaatInput = (value: string) => {
@@ -31,7 +33,7 @@ const formatSaatInput = (value: string) => {
   return digits.slice(0, 2) + ":" + digits.slice(2);
 };
 
-const buildFormFromRez = (rez: Rezervasyon) => ({
+const buildFormFromRez = (rez: Rezervasyon, dosya: Dosya) => ({
   booking_no: rez.booking_no || "",
   gemi_adi: (rez as any).gemi_adi || "",
   sefer_no: (rez as any).sefer_no || "",
@@ -46,6 +48,8 @@ const buildFormFromRez = (rez: Rezervasyon) => ({
   yuklenme_limani: rez.yuklenme_limani || "",
   konteyner_adedi: rez.konteyner_adedi || 0,
   ardiyesiz_giris: (rez as any).ardiyesiz_giris ? (rez as any).ardiyesiz_giris.split("T")[0] : "",
+  navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
+  lokal_masraf_tutari: (dosya as any).lokal_masraf_tutari?.toString() || "",
 });
 
 function buildPayload(form: typeof emptyForm) {
@@ -65,6 +69,37 @@ function buildPayload(form: typeof emptyForm) {
   };
 }
 
+function buildDosyaPayload(form: typeof emptyForm) {
+  return {
+    navlun_tutari: form.navlun_tutari ? parseFloat(form.navlun_tutari) : null,
+    lokal_masraf_tutari: form.lokal_masraf_tutari ? parseFloat(form.lokal_masraf_tutari) : null,
+  };
+}
+
+/** Tum alanlar doldurulmadan kayit yapilamaz. */
+function validateForm(form: typeof emptyForm): Record<string, string> {
+  const e: Record<string, string> = {};
+  const zorunlu = "Zorunlu alan";
+  if (!form.booking_no) e.booking_no = zorunlu;
+  else if (form.booking_no.length > 50) e.booking_no = "Maksimum 50 karakter";
+  if (!form.gemi_adi) e.gemi_adi = zorunlu;
+  if (!form.sefer_no) e.sefer_no = zorunlu;
+  if (!form.acente_ismi) e.acente_ismi = zorunlu;
+  if (!form.yuklenme_limani) e.yuklenme_limani = zorunlu;
+  if (!form.konteyner_adedi || form.konteyner_adedi <= 0) e.konteyner_adedi = zorunlu;
+  if (!form.gemi_kalkis_tarihi) e.gemi_kalkis_tarihi = zorunlu;
+  if (!form.talimat_cutoff) e.talimat_cutoff = zorunlu;
+  if (!form.talimat_cutoff_saat) e.talimat_cutoff_saat = zorunlu;
+  if (!form.beyanname_cutoff) e.beyanname_cutoff = zorunlu;
+  if (!form.beyanname_cutoff_saat) e.beyanname_cutoff_saat = zorunlu;
+  if (!form.ekipman_alim_tarihi) e.ekipman_alim_tarihi = zorunlu;
+  if (!form.ardiyesiz_giris) e.ardiyesiz_giris = zorunlu;
+  if (!form.ekipman_alim_yeri) e.ekipman_alim_yeri = zorunlu;
+  if (!form.navlun_tutari) e.navlun_tutari = zorunlu;
+  if (!form.lokal_masraf_tutari) e.lokal_masraf_tutari = zorunlu;
+  return e;
+}
+
 /**
  * Siparis takibi baslatilmis bir dosyada (ana_siparis_id dolu) rezervasyon
  * kaydedildiginde, dosyadaki TUM rezervasyonlarin konteyner adedi toplamina
@@ -75,13 +110,13 @@ function buildPayload(form: typeof emptyForm) {
  * gonderilen MTS uzerinden dogru tutari gosterir.
  * ana_siparis_id olmayan (tek seferlik) dosyalara hic dokunulmaz.
  */
-async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) { // companyId içeri alındı
+async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) {
   if (!companyId) return;
   const { data: dosya } = await supabase
     .from("ihracat_dosyalari")
     .select("ana_siparis_id")
     .eq("id", dosyaId)
-    .eq("company_id", companyId) // Şirket filtresi enjekte edildi
+    .eq("company_id", companyId)
     .maybeSingle();
   if (!dosya?.ana_siparis_id) return;
 
@@ -89,7 +124,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) { //
     .from("ana_siparisler")
     .select("toplam_mts, urun_detaylari_master")
     .eq("id", dosya.ana_siparis_id)
-    .eq("company_id", companyId) // Şirket filtresi enjekte edildi
+    .eq("company_id", companyId)
     .maybeSingle();
   const masterUrunler = (anaSiparis?.urun_detaylari_master as any[]) || [];
   const toplamSiparisMts = anaSiparis?.toplam_mts || 0;
@@ -99,7 +134,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) { //
     .from("rezervasyonlar")
     .select("konteyner_adedi")
     .eq("dosya_id", dosyaId)
-    .eq("company_id", companyId); // Şirket filtresi enjekte edildi
+    .eq("company_id", companyId);
   const toplamKonteynerAdedi = (tumRezervasyonlar || []).reduce((s, r: any) => s + (r.konteyner_adedi || 0), 0);
   if (toplamKonteynerAdedi <= 0) return;
 
@@ -128,78 +163,108 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) { //
     .from("ihracat_dosyalari")
     .update({ urun_detaylari: urunDetaylari, toplam_tutar: toplamTutar })
     .eq("id", dosyaId)
-    .eq("company_id", companyId); // Şirket kilidi enjekte edildi
+    .eq("company_id", companyId);
 }
 
-function RezervasyonFormFields({ form, update, updateSaat, errors }: {
+function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
   form: typeof emptyForm;
   update: (field: string, value: string | number) => void;
   updateSaat: (field: string, value: string) => void;
   errors: Record<string, string>;
+  dosya: Dosya;
 }) {
+  const hataGoster = (alan: string) => errors[alan] && <p className="text-xs text-red-400 mt-0.5">{errors[alan]}</p>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Booking No *</label>
         <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} maxLength={50} />
-        {errors.booking_no && <p className="text-xs text-red-400 mt-0.5">{errors.booking_no}</p>}
+        {hataGoster("booking_no")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Adi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Adi *</label>
         <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: NAVIOS AZURE" />
+        {hataGoster("gemi_adi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sefer No (Voyage No)</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sefer No (Voyage No) *</label>
         <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: 1BM21S1MA" />
+        {hataGoster("sefer_no")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Acente Ismi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Acente Ismi *</label>
         <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: MSC, CMA CGM" />
+        {hataGoster("acente_ismi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yukleme Limani</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yukleme Limani *</label>
         <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        {hataGoster("yuklenme_limani")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Konteyner Adedi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Konteyner Adedi *</label>
         <input type="number" min={0} value={form.konteyner_adedi} onChange={(e) => update("konteyner_adedi", parseInt(e.target.value) || 0)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        {hataGoster("konteyner_adedi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Kalkis Tarihi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Kalkis Tarihi *</label>
         <input type="date" value={form.gemi_kalkis_tarihi} onChange={(e) => update("gemi_kalkis_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        {hataGoster("gemi_kalkis_tarihi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Talimat Cut-Off *</label>
         <input type="date" value={form.talimat_cutoff} onChange={(e) => update("talimat_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        {hataGoster("talimat_cutoff")}
         {form.talimat_cutoff && (
-          <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          <>
+            <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            {hataGoster("talimat_cutoff_saat")}
+          </>
         )}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off *</label>
         <input type="date" value={form.beyanname_cutoff} onChange={(e) => update("beyanname_cutoff", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        {hataGoster("beyanname_cutoff")}
         {form.beyanname_cutoff && (
-          <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          <>
+            <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            {hataGoster("beyanname_cutoff_saat")}
+          </>
         )}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi *</label>
         <input type="date" value={form.ekipman_alim_tarihi} onChange={(e) => update("ekipman_alim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        {hataGoster("ekipman_alim_tarihi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi *</label>
         <input type="date" value={form.ardiyesiz_giris} onChange={(e) => update("ardiyesiz_giris", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        {hataGoster("ardiyesiz_giris")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri *</label>
         <input value={form.ekipman_alim_yeri} onChange={(e) => update("ekipman_alim_yeri", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        {hataGoster("ekipman_alim_yeri")}
+      </div>
+      <div>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutari (Konteyner Basi, {dosya.para_birimi || "USD"}) *</label>
+        <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="orn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        {hataGoster("navlun_tutari")}
+      </div>
+      <div>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Basi, {dosya.para_birimi || "USD"}) *</label>
+        <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="orn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        {hataGoster("lokal_masraf_tutari")}
       </div>
     </div>
   );
 }
 
-function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // companyId eklendi
+function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: {
   rez: Rezervasyon;
+  dosya: Dosya;
   onRefresh: () => void;
   onDeleteRequest: (target: { id: string; bookingNo: string }) => void;
   companyId: string;
@@ -220,21 +285,20 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
   };
 
   const handleEditStart = () => {
-    setForm(buildFormFromRez(rez));
+    setForm(buildFormFromRez(rez, dosya));
     setErrors({});
     setEditing(true);
   };
 
   const handleSave = async () => {
-    const e: Record<string, string> = {};
-    if (!form.booking_no) e.booking_no = "Booking no zorunlu";
-    else if (form.booking_no.length > 50) e.booking_no = "Maksimum 50 karakter";
+    const e = validateForm(form);
     setErrors(e);
     if (Object.keys(e).length > 0) return;
 
     setSaving(true);
-    await supabase.from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id).eq("company_id", companyId); // Şirket kilidi eklendi
-    await syncDevamEdenDosyaTutari(rez.dosya_id, companyId); // Şirket kimliği paslandı
+    await supabase.from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id).eq("company_id", companyId);
+    await supabase.from("ihracat_dosyalari").update(buildDosyaPayload(form)).eq("id", rez.dosya_id).eq("company_id", companyId);
+    await syncDevamEdenDosyaTutari(rez.dosya_id, companyId);
     showToast("Rezervasyon guncellendi.", "success");
     setSaving(false);
     setEditing(false);
@@ -256,7 +320,7 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
               </button>
             </div>
           </div>
-          <RezervasyonFormFields form={form} update={update} updateSaat={updateSaat} errors={errors} />
+          <RezervasyonFormFields form={form} update={update} updateSaat={updateSaat} errors={errors} dosya={dosya} />
         </div>
       </div>
     );
@@ -338,7 +402,7 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
   );
 }
 
-export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, companyId }: Props) { // companyId eklendi
+export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefresh, companyId }: Props) {
   const [showNewForm, setShowNewForm] = useState(false);
   const [savingNew, setSavingNew] = useState(false);
   const [newForm, setNewForm] = useState(emptyForm);
@@ -355,16 +419,25 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
     setNewForm((prev) => ({ ...prev, [field]: formatSaatInput(value) }));
   };
 
+  const handleAcNewForm = () => {
+    setNewForm({
+      ...emptyForm,
+      navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
+      lokal_masraf_tutari: (dosya as any).lokal_masraf_tutari?.toString() || "",
+    });
+    setNewErrors({});
+    setShowNewForm(true);
+  };
+
   const handleSaveNew = async () => {
-    const e: Record<string, string> = {};
-    if (!newForm.booking_no) e.booking_no = "Booking no zorunlu";
-    else if (newForm.booking_no.length > 50) e.booking_no = "Maksimum 50 karakter";
+    const e = validateForm(newForm);
     setNewErrors(e);
     if (Object.keys(e).length > 0) return;
 
     setSavingNew(true);
-    await supabase.from("rezervasyonlar").insert({ company_id: companyId, dosya_id: dosyaId, ...buildPayload(newForm) }); // company_id mühürlendi
-    await syncDevamEdenDosyaTutari(dosyaId, companyId); // companyId paslandı
+    await supabase.from("rezervasyonlar").insert({ company_id: companyId, dosya_id: dosyaId, ...buildPayload(newForm) });
+    await supabase.from("ihracat_dosyalari").update(buildDosyaPayload(newForm)).eq("id", dosyaId).eq("company_id", companyId);
+    await syncDevamEdenDosyaTutari(dosyaId, companyId);
     showToast("Rezervasyon eklendi.", "success");
     setShowNewForm(false);
     setNewForm(emptyForm);
@@ -374,7 +447,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await supabase.from("rezervasyonlar").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket kilidi eklendi
+    await supabase.from("rezervasyonlar").delete().eq("id", deleteTarget.id).eq("company_id", companyId);
     showToast(`${deleteTarget.bookingNo} silindi.`, "success");
     setDeleteTarget(null);
     onRefresh();
@@ -394,7 +467,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
       />
 
       {rezervasyonlar.map((rez) => (
-        <RezervasyonCard key={rez.id} rez={rez} onRefresh={onRefresh} onDeleteRequest={setDeleteTarget} companyId={companyId} /> // companyId eklendi
+        <RezervasyonCard key={rez.id} rez={rez} dosya={dosya} onRefresh={onRefresh} onDeleteRequest={setDeleteTarget} companyId={companyId} />
       ))}
 
       {!showNewForm ? (
@@ -402,7 +475,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
           {rezervasyonlar.length === 0 && (
             <EmptyState icon={<Package size={36} />} title="Henuz rezervasyon yok" description="Bu dosyaya bir rezervasyon ekleyin" />
           )}
-          <button onClick={() => { setNewForm(emptyForm); setShowNewForm(true); }}
+          <button onClick={handleAcNewForm}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors mt-2">
             <Plus size={16} /> Yeni Rezervasyon Ekle
           </button>
@@ -411,7 +484,7 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }}>
           <div className="rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <h4 className="font-semibold text-sm mb-4" style={{ color: "white" }}>Yeni Rezervasyon</h4>
-            <RezervasyonFormFields form={newForm} update={updateNew} updateSaat={updateNewSaat} errors={newErrors} />
+            <RezervasyonFormFields form={newForm} update={updateNew} updateSaat={updateNewSaat} errors={newErrors} dosya={dosya} />
             <div className="flex gap-3 mt-6">
               <button onClick={handleSaveNew} disabled={savingNew} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
                 {savingNew ? "Kaydediliyor..." : "Kaydet"}

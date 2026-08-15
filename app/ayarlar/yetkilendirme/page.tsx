@@ -119,7 +119,7 @@ export default function YetkilendirmePage() {
         <h1 className="text-xl font-bold text-white">Yetkilendirme</h1>
       </div>
 
-      <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -149,8 +149,8 @@ export default function YetkilendirmePage() {
               </tr>
             </thead>
             <tbody>
-              {kullanicilar.map((k) => (
-                <tr key={k.user_id} className="border-b last:border-0 hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
+              {kullanicilar.map((k, idx) => (
+                <tr key={k.user_id} className={`border-b last:border-0 hover:bg-white/[0.03] animate-fade-up stagger-${Math.min(idx + 1, 8)}`} style={{ borderColor: CARD_BORDER }}>
                   <td className="px-4 py-3">
                     <div>
                       <p className="text-xs font-medium text-white truncate max-w-[160px]">{k.email || k.user_id}</p>

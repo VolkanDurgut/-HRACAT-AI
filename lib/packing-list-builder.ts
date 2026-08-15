@@ -245,7 +245,14 @@ export function buildPackingListHtml(
     VARIS_LIMANI: safe(dosya.varis_limani),
     URETIM_TARIHI: dosya.uretim_tarihi ? escapeHtml(formatDateTR(dosya.uretim_tarihi)) : safe(null),
     SON_KULLANIM_TARIHI: dosya.son_kullanim_tarihi ? escapeHtml(formatDateTR(dosya.son_kullanim_tarihi)) : safe(null),
-    DETAYLI_AMBALAJ: safe((dosya as any).detayli_ambalaj || dosya.ambalaj),
+    DETAYLI_AMBALAJ: (() => {
+      const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
+      if (!raw) return safe(null);
+      if (totalPieces > 0) {
+        return safe(String(raw).replace(/^[\d.,]+/, totalPieces.toLocaleString("tr-TR")));
+      }
+      return safe(raw);
+    })(),
     LOT_NO: safe(dosya.lot_no),
     IMZA_HARUN: IMZA_HARUN,
     LOGO: LOGO_UNEX,

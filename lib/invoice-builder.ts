@@ -249,6 +249,22 @@ function buildSevkiyatYontemi(konteynerler: Konteyner[]): string {
 }
 
 /**
+ * Detayli ambalaj metnini (proformadan AI ile okunan, orn. "30,000 pieces of 25kg PP bags")
+ * baslangicindaki sayiyi, kullanicinin Konteynerler sekmesinde girdigi gercek "Kap Adeti"
+ * toplamiyla degistirerek dondurur. Cumlenin geri kalani (birim aciklamasi) aynen korunur.
+ */
+function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
+  const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
+  if (!raw) return safe(null);
+  const toplamKap = (konteynerler || []).reduce((s, k) => s + ((k as any).pieces || 0), 0);
+  if (toplamKap > 0) {
+    const guncellenmis = String(raw).replace(/^[\d.,]+/, toplamKap.toLocaleString("tr-TR"));
+    return safe(guncellenmis);
+  }
+  return safe(raw);
+}
+
+/**
  * Sistemdeki dosya/rezervasyon/konteyner verilerinden Commercial Invoice
  * HTML belgesini uretir. Tum serbest metin alanlari escapeHtml'den gecer,
  * tum sayisal/tarih alanlar formatCurrency/formatDateTR ile formatlanir.
@@ -276,7 +292,7 @@ export function buildCommercialInvoiceHtml(
     CONSIGNEE: safe((dosya as any).consignee),
     BL_NO: safe(dosya.bl_no),
     MARKA: safe(dosya.marka),
-    DETAYLI_AMBALAJ: safe((dosya as any).detayli_ambalaj || dosya.ambalaj),
+    DETAYLI_AMBALAJ: buildDetayliAmbalaj(dosya, konteynerler),
     SEVKIYAT_YONTEMI: buildSevkiyatYontemi(konteynerler),
     TESLIM_SEKLI: safe(dosya.teslim_sekli, ""),
     VARIS_LIMANI: safe(dosya.varis_limani, ""),

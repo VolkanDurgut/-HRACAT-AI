@@ -243,19 +243,21 @@ function RezervasyonCard({ rez, onRefresh, onDeleteRequest, companyId }: { // co
 
   if (editing) {
     return (
-      <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="font-semibold text-sm" style={{ color: "white" }}>Rezervasyonu Duzenle</h4>
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="text-green-400 hover:text-green-300 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50">
-              <Check size={12} /> {saving ? "Kaydediliyor..." : "Kaydet"}
-            </button>
-            <button onClick={() => setEditing(false)} className="hover:text-white text-xs font-medium inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
-              <X size={12} /> Iptal
-            </button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
+        <div className="rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-sm" style={{ color: "white" }}>Rezervasyonu Duzenle</h4>
+            <div className="flex gap-2">
+              <button onClick={handleSave} disabled={saving} className="text-green-400 hover:text-green-300 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50">
+                <Check size={12} /> {saving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button onClick={() => setEditing(false)} className="hover:text-white text-xs font-medium inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
+                <X size={12} /> Iptal
+              </button>
+            </div>
           </div>
+          <RezervasyonFormFields form={form} update={update} updateSaat={updateSaat} errors={errors} />
         </div>
-        <RezervasyonFormFields form={form} update={update} updateSaat={updateSaat} errors={errors} />
       </div>
     );
   }
@@ -406,16 +408,18 @@ export default function RezervasyonTab({ dosyaId, rezervasyonlar, onRefresh, com
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <h4 className="font-semibold text-sm mb-4" style={{ color: "white" }}>Yeni Rezervasyon</h4>
-          <RezervasyonFormFields form={newForm} update={updateNew} updateSaat={updateNewSaat} errors={newErrors} />
-          <div className="flex gap-3 mt-6">
-            <button onClick={handleSaveNew} disabled={savingNew} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
-              {savingNew ? "Kaydediliyor..." : "Kaydet"}
-            </button>
-            <button onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-              Iptal
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
+            <h4 className="font-semibold text-sm mb-4" style={{ color: "white" }}>Yeni Rezervasyon</h4>
+            <RezervasyonFormFields form={newForm} update={updateNew} updateSaat={updateNewSaat} errors={newErrors} />
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSaveNew} disabled={savingNew} className="px-5 py-2 rounded-lg text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                {savingNew ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              <button onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                Iptal
+              </button>
+            </div>
           </div>
         </div>
       )}

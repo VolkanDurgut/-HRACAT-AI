@@ -66,7 +66,7 @@ export default function InfoTooltip({
         type="button"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        onClick={(e) => e.preventDefault()}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
         className={`inline-flex items-center gap-1 ${color} transition-colors`}
       >
         <Icon size={size} />

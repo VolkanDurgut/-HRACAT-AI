@@ -145,64 +145,67 @@ export default function DashboardPage() {
       </div>
 
       {/* Ozet kartlar */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {[
-          { key: "aktif", label: "Aktif Dosya", value: aciklar.length, icon: <FileText size={18} />, color: ACCENT, bg: "#0F2A20", pulse: false },
-          { key: "rezervasyon", label: "Rezervasyon Bekleyen", value: bekleyenRez, icon: <Ship size={18} />, color: bekleyenRez > 0 ? "#F87171" : "#34D399", bg: bekleyenRez > 0 ? "#2A1519" : "#0F2A20", pulse: bekleyenRez > 0 },
-          { key: "kapali", label: "Kapalı Dosya", value: kapalilar.length, icon: <CheckCircle2 size={18} />, color: TEXT_MUTED, bg: CARD_BG, pulse: false },
+          { key: "aktif", label: "Aktif Dosya", value: aciklar.length, icon: <FileText size={18} />, color: ACCENT, bg: "#0F2A20", pulse: false, href: "/panel" },
+          { key: "rezervasyon", label: "Rezervasyon Bekleyen", value: bekleyenRez, icon: <Ship size={18} />, color: bekleyenRez > 0 ? "#F87171" : "#34D399", bg: bekleyenRez > 0 ? "#2A1519" : "#0F2A20", pulse: bekleyenRez > 0, href: "/panel?filter=rezervasyon" },
+          { key: "kapali", label: "Kapalı Dosya", value: kapalilar.length, icon: <CheckCircle2 size={18} />, color: TEXT_MUTED, bg: CARD_BG, pulse: false, href: "/ihracatlar" },
         ].map((m, idx) => (
-          <div key={m.label} className={`rounded-xl border shadow-sm p-4 animate-fade-up stagger-${idx + 1}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`p-1.5 rounded-lg ${m.pulse ? "animate-pulse" : ""}`} style={{ backgroundColor: m.bg, color: m.color }}>
-                {m.icon}
-              </div>
-              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>{m.label}</p>
-              {m.key === "rezervasyon" && bekleyenRez > 0 && (
-                <InfoTooltip variant="warning" position="bottom" width="w-72">
-                  <span className="font-semibold text-amber-600">Rezervasyon bekleyen dosyalar:</span>
-                  <ul className="mt-1.5 space-y-1.5">
-                    {aciklar.filter(d => d.rezervasyonlar.length === 0).map(({ dosya }) => {
-                      const urunler = (dosya.urun_detaylari as any[]) || [];
-                      const toplamMts = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
-                      return (
-                        <li key={dosya.id} className="text-slate-600">
-                          <span className="font-medium text-slate-800">{dosya.alici_firma || "Firma belirtilmemiş"}</span>
-                          {" — "}{dosya.varis_limani || "Varış limanı belirtilmemiş"}
-                          {toplamMts > 0 && ` — ${toplamMts.toLocaleString("tr-TR")} MTS`}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </InfoTooltip>
-              )}
-              {m.key === "aktif" && aciklar.length > 0 && (
-                <InfoTooltip variant="info" position="bottom" width="w-80">
-                  <span className="font-semibold text-slate-700">Aktif dosyalar:</span>
-                  <div className="mt-2 space-y-3 max-h-80 overflow-y-auto">
-                    {aciklar.map(({ dosya, rezervasyonlar }) => {
-                      const rez = rezervasyonlar[0];
-                      const tCutoff = getDaysUntil(rez?.talimat_cutoff || null);
-                      const bCutoff = getDaysUntil(rez?.beyanname_cutoff || null);
-                      return (
-                        <div key={dosya.id} className="pb-2 border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">Açık</span>
-                            <span className="font-semibold text-slate-800">{dosya.dosya_no}</span>
-                          </div>
-                          <p className="text-slate-500">{dosya.alici_firma || "-"} {rez?.konteyner_adedi ? `— ${rez.konteyner_adedi}x` : ""} {dosya.varis_limani ? `— ${dosya.varis_limani}` : ""}</p>
-                          {dosya.proforma_no && <p className="text-slate-400">Proforma: {dosya.proforma_no}</p>}
-                          {rez?.booking_no && <p className="text-slate-400">Booking: {rez.booking_no}{rez?.gemi_adi ? ` — ${rez.gemi_adi}` : ""}</p>}
-                          {rez?.gemi_kalkis_tarihi && <p className="text-slate-400">Kalkış: {formatDateTR(rez.gemi_kalkis_tarihi)}</p>}
-                          {tCutoff !== null && <p className="text-slate-400">Talimat Cut-Off: {tCutoff < 0 ? "Geçti" : `${tCutoff} gün`}</p>}
-                          {bCutoff !== null && <p className="text-slate-400">Beyanname Cut-Off: {bCutoff < 0 ? "Geçti" : `${bCutoff} gün`}</p>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </InfoTooltip>
-              )}
+          <div
+            key={m.label}
+            onClick={() => router.push(m.href)}
+            className={`rounded-xl border shadow-sm p-3 flex items-center gap-3 cursor-pointer hover:border-white/20 transition-colors animate-fade-up stagger-${idx + 1}`}
+            style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}
+          >
+            <div className={`p-1.5 rounded-lg shrink-0 ${m.pulse ? "animate-pulse" : ""}`} style={{ backgroundColor: m.bg, color: m.color }}>
+              {m.icon}
             </div>
-            <p className="text-2xl font-bold" style={{ color: m.color }}>{m.value}</p>
+            <p className="text-xs font-medium flex-1 truncate" style={{ color: TEXT_MUTED }}>{m.label}</p>
+            {m.key === "rezervasyon" && bekleyenRez > 0 && (
+              <InfoTooltip variant="warning" position="bottom" align="right" width="w-72">
+                <span className="font-semibold text-amber-600">Rezervasyon bekleyen dosyalar:</span>
+                <ul className="mt-1.5 space-y-1.5">
+                  {aciklar.filter(d => d.rezervasyonlar.length === 0).map(({ dosya }) => {
+                    const urunler = (dosya.urun_detaylari as any[]) || [];
+                    const toplamMts = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+                    return (
+                      <li key={dosya.id} className="text-slate-600">
+                        <span className="font-medium text-slate-800">{dosya.alici_firma || "Firma belirtilmemiş"}</span>
+                        {" — "}{dosya.varis_limani || "Varış limanı belirtilmemiş"}
+                        {toplamMts > 0 && ` — ${toplamMts.toLocaleString("tr-TR")} MTS`}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </InfoTooltip>
+            )}
+            {m.key === "aktif" && aciklar.length > 0 && (
+              <InfoTooltip variant="info" position="bottom" align="right" width="w-80">
+                <span className="font-semibold text-slate-700">Aktif dosyalar:</span>
+                <div className="mt-2 space-y-3 max-h-80 overflow-y-auto">
+                  {aciklar.map(({ dosya, rezervasyonlar }) => {
+                    const rez = rezervasyonlar[0];
+                    const tCutoff = getDaysUntil(rez?.talimat_cutoff || null);
+                    const bCutoff = getDaysUntil(rez?.beyanname_cutoff || null);
+                    return (
+                      <div key={dosya.id} className="pb-2 border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">Açık</span>
+                          <span className="font-semibold text-slate-800">{dosya.dosya_no}</span>
+                        </div>
+                        <p className="text-slate-500">{dosya.alici_firma || "-"} {rez?.konteyner_adedi ? `— ${rez.konteyner_adedi}x` : ""} {dosya.varis_limani ? `— ${dosya.varis_limani}` : ""}</p>
+                        {dosya.proforma_no && <p className="text-slate-400">Proforma: {dosya.proforma_no}</p>}
+                        {rez?.booking_no && <p className="text-slate-400">Booking: {rez.booking_no}{rez?.gemi_adi ? ` — ${rez.gemi_adi}` : ""}</p>}
+                        {rez?.gemi_kalkis_tarihi && <p className="text-slate-400">Kalkış: {formatDateTR(rez.gemi_kalkis_tarihi)}</p>}
+                        {tCutoff !== null && <p className="text-slate-400">Talimat Cut-Off: {tCutoff < 0 ? "Geçti" : `${tCutoff} gün`}</p>}
+                        {bCutoff !== null && <p className="text-slate-400">Beyanname Cut-Off: {bCutoff < 0 ? "Geçti" : `${bCutoff} gün`}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </InfoTooltip>
+            )}
+            <p className="text-xl font-bold shrink-0" style={{ color: m.color }}>{m.value}</p>
           </div>
         ))}
       </div>

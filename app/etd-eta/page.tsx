@@ -307,9 +307,9 @@ export default function EtdEtaPage() {
                             className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
                               s.eta
                                 ? yaklasan
-                                  ? "text-amber-700 bg-amber-100 hover:bg-amber-200"
-                                  : "text-green-700 bg-green-50 hover:bg-green-100"
-                                : "text-red-500 bg-red-50 hover:bg-red-100"
+                                  ? "text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
+                                  : "text-green-400 bg-green-500/10 hover:bg-green-500/20"
+                                : "text-red-400 bg-red-500/10 hover:bg-red-500/20"
                             }`}
                           >
                             {!s.eta && <AlertCircle size={10} />}

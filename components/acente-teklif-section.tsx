@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase, MTS_PER_KONTEYNER } from "@/lib/supabase";
 import { Plus, Mail, Pencil, Trash2, Check, RefreshCw, Loader2 } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type Acente = {
   id: string;
@@ -229,9 +230,9 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
   return (
     <div className="space-y-3">
       {acenteler.length === 0 && !showForm ? (
-        <p className="text-sm text-slate-400">Henüz acente eklenmemiş.</p>
+        <p className="text-sm" style={{ color: TEXT_MUTED }}>Henüz acente eklenmemiş.</p>
       ) : (
-        <div className="rounded-lg border overflow-hidden" style={{ borderColor: "#E2E8F0" }}>
+        <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           {siraliAcenteler.map((acente, idx) => {
             const gonderildi = !!acente.teklif?.son_gonderim_tarihi;
             const teklifVar = !!acente.teklif?.teklif_tarihi;
@@ -240,10 +241,10 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
             const isOpen = activePanel?.id === acente.id;
 
             return (
-              <div key={acente.id} className={idx > 0 ? "border-t" : ""} style={{ borderColor: "#F1F5F9" }}>
+              <div key={acente.id} className={idx > 0 ? "border-t" : ""} style={{ borderColor: CARD_BORDER }}>
                 <div
                   className="flex items-center gap-3 px-3 py-2.5"
-                  style={enUygun ? { backgroundColor: "#F0FDF4" } : undefined}
+                  style={enUygun ? { backgroundColor: "rgba(16,185,129,0.08)" } : undefined}
                 >
                   <div
                     className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -251,64 +252,64 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
                   />
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{acente.isim}</p>
+                    <p className="text-sm font-medium text-white truncate">{acente.isim}</p>
                     {gonderildi && !teklifVar && (
-                      <p className="text-[11px] text-slate-400">{formatTarih(acente.teklif!.son_gonderim_tarihi!)} tarihinde teklif istendi</p>
+                      <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{formatTarih(acente.teklif!.son_gonderim_tarihi!)} tarihinde teklif istendi</p>
                     )}
-                    {!gonderildi && <p className="text-[11px] text-slate-400">Bu dosya için teklif istenmedi</p>}
+                    {!gonderildi && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Bu dosya için teklif istenmedi</p>}
                   </div>
 
                   {teklifVar && (
                     <div className="text-right shrink-0">
-                      <p className={`text-sm font-semibold ${enUygun ? "text-green-700" : "text-slate-700"}`}>{acente.teklif!.teklif_fiyat}</p>
-                      {enUygun && <p className="text-[10px] font-medium text-green-600">En uygun</p>}
+                      <p className={`text-sm font-semibold ${enUygun ? "text-green-400" : "text-white"}`}>{acente.teklif!.teklif_fiyat}</p>
+                      {enUygun && <p className="text-[10px] font-medium text-green-400">En uygun</p>}
                     </div>
                   )}
 
                   <div className="flex items-center gap-1 shrink-0">
                     {!gonderildi && (
                       <button onClick={() => openMailPanel(acente, false)}
-                        className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50" title="Teklif iste">
+                        className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/10" title="Teklif iste">
                         <Mail size={14} />
                       </button>
                     )}
                     {gonderildi && !teklifVar && (
                       <>
                         <button onClick={() => openMailPanel(acente, true)}
-                          className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50" title="Hatırlatma gönder">
+                          className="p-1.5 rounded-md text-blue-400 hover:bg-blue-500/10" title="Hatırlatma gönder">
                           <RefreshCw size={14} />
                         </button>
                         <button onClick={() => openTeklifPanel(acente)}
-                          className="p-1.5 rounded-md text-green-600 hover:bg-green-50" title="Teklif geldi, kaydet">
+                          className="p-1.5 rounded-md text-green-400 hover:bg-green-500/10" title="Teklif geldi, kaydet">
                           <Check size={14} />
                         </button>
                       </>
                     )}
                     {teklifVar && (
                       <button onClick={() => openTeklifPanel(acente)}
-                        className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100" title="Teklifi düzenle">
+                        className="p-1.5 rounded-md hover:bg-white/10" style={{ color: TEXT_MUTED }} title="Teklifi düzenle">
                         <Pencil size={14} />
                       </button>
                     )}
-                    <button onClick={() => handleDelete(acente.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-50" title="Acenteyi sil">
+                    <button onClick={() => handleDelete(acente.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Acenteyi sil">
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
 
                 {isOpen && activePanel?.type === "mail" && (
-                  <div className="px-3 pb-3 space-y-2" style={{ backgroundColor: "#FAFBFC" }}>
-                    <p className="text-xs font-medium text-slate-500 pt-1">{isReminder ? "Hatırlatma maili" : "Teklif talebi"} → {acente.email}</p>
+                  <div className="px-3 pb-3 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }}>
+                    <p className="text-xs font-medium pt-1" style={{ color: TEXT_MUTED }}>{isReminder ? "Hatırlatma maili" : "Teklif talebi"} → {acente.email}</p>
                     <input value={mailKonusu} onChange={(e) => setMailKonusu(e.target.value)}
-                      className="w-full text-xs text-slate-700 bg-white border rounded-lg px-2.5 py-2" style={{ borderColor: "#E2E8F0" }} />
+                      className="w-full text-xs text-white border rounded-lg px-2.5 py-2" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     <textarea value={mailMetin} onChange={(e) => setMailMetin(e.target.value)}
-                      className="w-full text-xs text-slate-700 bg-white border rounded-lg p-2 resize-none" style={{ borderColor: "#E2E8F0" }} rows={5} />
+                      className="w-full text-xs text-white border rounded-lg p-2 resize-none" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} rows={5} />
                     <div className="flex gap-2">
                       <button onClick={() => handleMailGonder(acente)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: "#1B2B4B" }}>
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: ACCENT }}>
                         <Mail size={12} /> Mail Uygulamasını Aç
                       </button>
-                      <button onClick={() => setActivePanel(null)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">
+                      <button onClick={() => setActivePanel(null)} className="px-3 py-1.5 text-xs hover:text-white" style={{ color: TEXT_MUTED }}>
                         Vazgeç
                       </button>
                     </div>
@@ -316,29 +317,29 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
                 )}
 
                 {isOpen && activePanel?.type === "teklif" && (
-                  <div className="px-3 pb-3 space-y-2" style={{ backgroundColor: "#FAFBFC" }}>
-                    <p className="text-xs font-medium text-slate-500 pt-1">Teklif bilgileri</p>
+                  <div className="px-3 pb-3 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }}>
+                    <p className="text-xs font-medium pt-1" style={{ color: TEXT_MUTED }}>Teklif bilgileri</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex gap-1">
                         <select value={teklifForm.teklif_para_birimi} onChange={(e) => setTeklifForm({ ...teklifForm, teklif_para_birimi: e.target.value })}
-                          className="text-xs px-2 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }}>
+                          className="text-xs px-2 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
                           <option value="USD">USD</option>
                           <option value="EUR">EUR</option>
                         </select>
                         <input value={teklifForm.teklif_fiyat} onChange={(e) => setTeklifForm({ ...teklifForm, teklif_fiyat: e.target.value })}
-                          placeholder="Fiyat" className="flex-1 text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+                          placeholder="Fiyat" className="flex-1 text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                       </div>
                       <input value={teklifForm.teklif_gecerlilik} onChange={(e) => setTeklifForm({ ...teklifForm, teklif_gecerlilik: e.target.value })}
-                        placeholder="Geçerlilik (örn: 3 iş günü)" className="text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+                        placeholder="Geçerlilik (örn: 3 iş günü)" className="text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     </div>
                     <input value={teklifForm.teklif_notu} onChange={(e) => setTeklifForm({ ...teklifForm, teklif_notu: e.target.value })}
-                      placeholder="Not (opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+                      placeholder="Not (opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     <div className="flex gap-2">
                       <button onClick={() => handleTeklifKaydet(acente.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: "#1B2B4B" }}>
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: ACCENT }}>
                         <Check size={12} /> Kaydet
                       </button>
-                      <button onClick={() => setActivePanel(null)} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">
+                      <button onClick={() => setActivePanel(null)} className="px-3 py-1.5 text-xs hover:text-white" style={{ color: TEXT_MUTED }}>
                         Vazgeç
                       </button>
                     </div>
@@ -351,30 +352,30 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
       )}
 
       {showForm ? (
-        <div className="p-3 rounded-lg border bg-slate-50 space-y-2" style={{ borderColor: "#E2E8F0" }}>
-          <p className="text-xs font-semibold text-slate-700">{editTarget ? "Acente Düzenle" : "Yeni Acente"}</p>
+        <div className="p-3 rounded-lg border space-y-2" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
+          <p className="text-xs font-semibold text-white">{editTarget ? "Acente Düzenle" : "Yeni Acente"}</p>
           <input value={form.isim} onChange={(e) => setForm({ ...form, isim: e.target.value })}
-            placeholder="Acente adı (örn: Maersk)" className="w-full text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+            placeholder="Acente adı (örn: Maersk)" className="w-full text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="E-posta" type="email" className="w-full text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+            placeholder="E-posta" type="email" className="w-full text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           <input value={form.cc_emails} onChange={(e) => setForm({ ...form, cc_emails: e.target.value })}
-            placeholder="CC (virgülle ayırın, opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+            placeholder="CC (virgülle ayırın, opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           <input value={form.telefon} onChange={(e) => setForm({ ...form, telefon: e.target.value })}
-            placeholder="Telefon (opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg bg-white" style={{ borderColor: "#E2E8F0" }} />
+            placeholder="Telefon (opsiyonel)" className="w-full text-xs px-2.5 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
           <div className="flex gap-2">
             <button onClick={handleSave} disabled={saving || !form.isim || !form.email}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: "#1B2B4B" }}>
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
             <button onClick={() => { setShowForm(false); setEditTarget(null); setForm({ isim: "", email: "", telefon: "", cc_emails: "", notlar: "" }); }}
-              className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700">
+              className="px-3 py-1.5 text-xs hover:text-white" style={{ color: TEXT_MUTED }}>
               Vazgeç
             </button>
           </div>
         </div>
       ) : (
         <button onClick={() => setShowForm(true)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors">
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors">
           <Plus size={14} /> Yeni Acente Ekle
         </button>
       )}

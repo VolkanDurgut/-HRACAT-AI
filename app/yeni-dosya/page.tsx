@@ -264,7 +264,7 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "upload" && (
-          <div className="rounded-xl border shadow-sm p-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border shadow-sm p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
@@ -299,7 +299,7 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "reading" && (
-          <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <Loader2 size={40} className="mx-auto animate-spin mb-4 text-amber-400" />
             <p className="text-white font-medium">İhracat dosyanız hazırlanıyor</p>
             <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Bu işlem birkaç saniye sürebilir</p>
@@ -307,7 +307,7 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "ana_siparis_check" && proformData && (
-          <div className="rounded-xl border shadow-sm p-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border shadow-sm p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             {mevcutAnaSiparis ? (
               <>
                 <div className="flex items-start gap-3 mb-5">
@@ -414,14 +414,14 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "success" && (
-          <div className="rounded-xl border shadow-sm p-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <Check size={40} className="mx-auto text-green-400 mb-4" />
             <p className="text-white font-medium">Tamamlandi!</p>
           </div>
         )}
 
         {step === "reservation_choice" && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-up">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-white mb-1">Rezervasyon Ekle</h3>
@@ -445,7 +445,7 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "review" && proformData && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fade-up">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-sm" style={{ color: "white" }}>Satici & Alici Bilgileri</h3>

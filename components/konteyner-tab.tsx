@@ -39,7 +39,11 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
     acKonsimento: () => faturaTalimatiRef.current?.acKonsimento(),
     acFatura: () => faturaTalimatiRef.current?.acFatura(),
   }));
-  const markaListesi = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
+  const markaListesiManuel = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
+  const markaListesiUrunlerden = ((dosya.urun_detaylari as any[]) || [])
+    .map((u: any) => u.urun_adi || u.description)
+    .filter((v: any, i: number, arr: any[]) => v && arr.indexOf(v) === i); // essiz (dedup)
+  const markaListesi = markaListesiManuel.length > 0 ? markaListesiManuel : markaListesiUrunlerden;
   const varsayilanMarka = markaListesi.length === 1 ? markaListesi[0] : "";
 
   const {
@@ -203,7 +207,11 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
               </thead>
               <tbody>
                 {konteynerler.map((k, i) => {
-                  const markaListesi: string[] = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
+                  const markaListesiManuelSatir = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];
+                  const markaListesiUrunlerdenSatir = ((dosya.urun_detaylari as any[]) || [])
+                    .map((u: any) => u.urun_adi || u.description)
+                    .filter((v: any, i: number, arr: any[]) => v && arr.indexOf(v) === i);
+                  const markaListesi: string[] = markaListesiManuelSatir.length > 0 ? markaListesiManuelSatir : markaListesiUrunlerdenSatir;
                   const dbaVeri = k.dba_kontrol_sonucu as { uyusmazliklar?: string[] } | null;
                   const uyusmazlik = (dbaVeri?.uyusmazliklar?.length ?? 0) > 0;
                   return (

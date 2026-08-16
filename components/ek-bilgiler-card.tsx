@@ -73,11 +73,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     lot_no: (dosya as any).lot_no || "",
     marka: (dosya as any).marka || "",
     beyanname_no: (dosya as any).beyanname_no || "",
-    fatura_no: (dosya as any).fatura_no || "",
-    fatura_tarihi: (dosya as any).fatura_tarihi || "",
     bl_no: (dosya as any).bl_no || rezervasyonlar[0]?.booking_no || "",
-    diib_no: (dosya as any).diib_no || "",
-    diib_tarihi: (dosya as any).diib_tarihi || "",
     uretim_tarihi: (dosya as any).uretim_tarihi || "",
     son_kullanim_tarihi: (dosya as any).son_kullanim_tarihi || "",
     });
@@ -104,11 +100,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       lot_no: form.lot_no || null,
       marka: form.marka || null,
       beyanname_no: form.beyanname_no || null,
-      fatura_no: form.fatura_no || null,
-      fatura_tarihi: form.fatura_tarihi || null,
       bl_no: form.bl_no || null,
-      diib_no: form.diib_no || null,
-      diib_tarihi: form.diib_tarihi || null,
       uretim_tarihi: form.uretim_tarihi || null,
       son_kullanim_tarihi: form.son_kullanim_tarihi || null,
       // Mevcut ham_veri objesini bozmadan, düzenlediğimiz yeni notify listesini ekliyoruz
@@ -237,11 +229,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           )}
           
           <CopyableField dark label="Beyanname No" value={(dosya as any).beyanname_no} />
-          <CopyableField dark label="Fatura No" value={(dosya as any).fatura_no} />
-          <CopyableField dark label="Fatura Tarihi" value={formatDateTR((dosya as any).fatura_tarihi)} />
           <CopyableField dark label="BL No" value={(dosya as any).bl_no} />
-          <CopyableField dark label="DIIB No" value={(dosya as any).diib_no} />
-          <CopyableField dark label="DIIB Tarihi" value={formatDateTR((dosya as any).diib_tarihi)} />
           <CopyableField dark label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
           <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
         </div>
@@ -284,24 +272,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <input value={form.beyanname_no} onChange={(e) => update("beyanname_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fatura No</label>
-          <input value={form.fatura_no} onChange={(e) => update("fatura_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Fatura Tarihi</label>
-          <input type="date" value={form.fatura_tarihi} onChange={(e) => update("fatura_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
-        </div>
-        <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>BL No</label>
           <input value={form.bl_no} onChange={(e) => update("bl_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DIIB No</label>
-          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DIIB Tarihi</label>
-          <input type="date" value={form.diib_tarihi} onChange={(e) => update("diib_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Uretim Tarihi</label>
@@ -311,15 +283,16 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanim Tarihi</label>
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
-        
-        <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Consignee (Alıcı — firma adı ve adresi. Konşimento talimatı yüklenmediyse buradan elle girebilirsiniz.)</label>
-          <textarea value={form.consignee} onChange={(e) => update("consignee", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="ALICI FIRMA LTD.&#10;Adres satırı...&#10;Şehir, Ülke" />
-        </div>
 
-        <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Notify (Birden fazla Notify varsa aralarında bir boş satır bırakarak yazın)</label>
-          <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="Firma Adı A.Ş.&#10;Adres satırı...&#10;&#10;İkinci Notify Firma...&#10;Adres..." />
+        <div className="col-span-2 md:col-span-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Consignee (Alıcı)</label>
+            <textarea value={form.consignee} onChange={(e) => update("consignee", e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="ALICI FIRMA LTD.&#10;Adres satırı..." />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Notify (Bildirim Yapılacak Taraf)</label>
+            <textarea value={form.notify} onChange={(e) => update("notify", e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="Firma Adı A.Ş.&#10;Adres satırı..." />
+          </div>
         </div>
       </div>
 

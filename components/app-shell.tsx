@@ -50,9 +50,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#0B0F14" }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#0B0F14" }}>
       <Sidebar />
-      <main className="md:ml-[240px] min-h-screen">
+      <main className="md:ml-[240px] min-h-screen w-full max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>
       </main>
     </div>

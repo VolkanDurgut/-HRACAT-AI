@@ -143,6 +143,8 @@ function PanelContent() {
         <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
       ) : (
         <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <div className="overflow-x-auto">
+          <div className="min-w-[900px]">
           {/* Tablo başlığı */}
           <div className="grid text-[10px] font-semibold uppercase tracking-wide px-4 py-2.5 border-b" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}>
             <span>Proforma No</span>
@@ -250,6 +252,8 @@ function PanelContent() {
               </React.Fragment>
             );
           })}
+          </div>
+          </div>
         </div>
       )}
     </AppShell>

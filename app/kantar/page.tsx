@@ -208,6 +208,7 @@ export default function KantarPage() {
                 <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({bekleyenlerFiltreli.length})</span>
               </h2>
               <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
@@ -256,6 +257,7 @@ export default function KantarPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -268,6 +270,7 @@ export default function KantarPage() {
                 <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({tamamlananlarFiltreli.length})</span>
               </h2>
               <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
@@ -313,6 +316,7 @@ export default function KantarPage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

@@ -374,6 +374,7 @@ export default function DashboardPage() {
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Tamamlanan Dosyalar</h2>
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
@@ -408,6 +409,7 @@ export default function DashboardPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

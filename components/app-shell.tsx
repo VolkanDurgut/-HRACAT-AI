@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Sidebar from "@/components/sidebar";
+import DestekWidget from "@/components/destek-widget";
 import { Loader2 } from "lucide-react";
 
 const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYetkileri> = {
@@ -55,6 +56,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>
       </main>
+      <DestekWidget />
     </div>
   );
 }

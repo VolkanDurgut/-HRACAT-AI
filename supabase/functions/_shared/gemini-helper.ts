@@ -113,3 +113,47 @@ export function requireAuthToken(req: Request): string {
   }
   return authHeader.replace("Bearer ", "");
 }
+
+/**
+ * Gemini API'ye SADECE METİN (PDF olmadan) gönderir, modeller arasında fallback yapar.
+ * Destek sohbeti gibi düz metin tabanlı senaryolar için kullanılır.
+ *
+ * @param systemPrompt - Kalıcı talimat/persona metni
+ * @param conversationText - Önceki konuşma geçmişi + kullanıcının yeni mesajı, düz metin olarak
+ */
+export async function callGeminiTextOnly(systemPrompt: string, conversationText: string): Promise<string> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY ortam değişkeni ayarlanmamış. Lütfen API anahtarını yapılandırın.");
+  }
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: conversationText }] }],
+          generationConfig: { temperature: 0.6 },
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error(`Model ${model} failed: ${err}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text.trim();
+    } catch (e) {
+      console.error(`Model ${model} error:`, e);
+      continue;
+    }
+  }
+
+  throw new Error("Tüm Gemini modelleri başarısız oldu. Lütfen tekrar deneyin.");
+}

@@ -103,17 +103,17 @@ function PanelContent() {
 
   return (
     <AppShell>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between flex-wrap gap-y-2 gap-x-3">
         <div>
           <h1 className="text-base font-semibold text-white">Ana Panel</h1>
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filteredDosyalar.length} açık dosya</p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {filters.map((f) => (
             <button
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border whitespace-nowrap ${
                 activeFilter === f.key ? "text-white" : "hover:border-slate-500"
               }`}
               style={activeFilter === f.key ? { backgroundColor: ACCENT, borderColor: ACCENT } : { borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: CARD_BG }}
@@ -144,115 +144,124 @@ function PanelContent() {
       ) : (
         <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
-          <div className="min-w-[900px]">
-          {/* Tablo başlığı */}
-          <div className="grid text-[10px] font-semibold uppercase tracking-wide px-4 py-2.5 border-b" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}>
-            <span>Proforma No</span>
-            <span>Müşteri</span>
-            <span>Booking No</span>
-            <span>Gemi Kalkış</span>
-            <span>Konteyner</span>
-            <span>Talimat C/O</span>
-            <span>Beyanname C/O</span>
-            <span className="text-right">İşlemler</span>
-          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Kalkış</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Talimat C/O</th>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Beyanname C/O</th>
+                <th className="text-right px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredDosyalar.map((dosya, idx) => {
+                const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
+                const latestRez = dosya.rezervasyonlar[0] || null;
+                const hasRez = !!latestRez;
+                const tCutoff = latestRez?.talimat_cutoff ? getCutOffLabel(latestRez.talimat_cutoff) : null;
+                const bCutoff = latestRez?.beyanname_cutoff ? getCutOffLabel(latestRez.beyanname_cutoff) : null;
+                const konteynerAdedi = dosya.rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+                const eklenenKont = dosya.konteynerler.length;
+                const dbaTamamlanan = dosya.konteynerler.filter((k) => !!k.dba_dosya_url).length;
 
-          {/* Satırlar */}
-          {filteredDosyalar.map((dosya, idx) => {
-            const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
-            const latestRez = dosya.rezervasyonlar[0] || null;
-            const hasRez = !!latestRez;
-            const tCutoff = latestRez?.talimat_cutoff ? getCutOffLabel(latestRez.talimat_cutoff) : null;
-            const bCutoff = latestRez?.beyanname_cutoff ? getCutOffLabel(latestRez.beyanname_cutoff) : null;
-            const konteynerAdedi = dosya.rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
-            const eklenenKont = dosya.konteynerler.length;
-            const dbaTamamlanan = dosya.konteynerler.filter((k) => !!k.dba_dosya_url).length;
+                const akisAdimlari = [
+                  { label: "Rezervasyon", done: dosya.rezervasyonlar.length > 0 },
+                  { label: "Konteynerler", done: konteynerAdedi > 0 && eklenenKont >= konteynerAdedi },
+                  { label: "Fatura Kesildi", done: !!(dosya as any).fatura_no },
+                  { label: "Konşimento", done: !!dosya.konsimento_dosya_url },
+                  { label: "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
+                  { label: "VGM", done: dosya.konteynerler.some((k) => !!k.vgm_kg) },
+                ];
 
-            const akisAdimlari = [
-              { label: "Rezervasyon", done: dosya.rezervasyonlar.length > 0 },
-              { label: "Konteynerler", done: konteynerAdedi > 0 && eklenenKont >= konteynerAdedi },
-              { label: "Fatura Kesildi", done: !!(dosya as any).fatura_no },
-              { label: "Konşimento", done: !!dosya.konsimento_dosya_url },
-              { label: "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
-              { label: "VGM", done: dosya.konteynerler.some((k) => !!k.vgm_kg) },
-            ];
+                return (
+                  <React.Fragment key={dosya.id}>
+                    {/* Ana satır */}
+                    <tr className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-3 py-3 align-top">
+                        <span className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || dosya.dosya_no}</span>
+                      </td>
+                      <td className="px-3 py-3 align-top max-w-[220px]">
+                        <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>
+                        <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{dosya.varis_limani || ""}</p>
+                      </td>
+                      {!hasRez ? (
+                        <td className="px-3 py-3 align-top" colSpan={5}>
+                          <span className="text-xs font-medium text-amber-500 animate-pulse whitespace-nowrap">Henüz rezervasyon alınmadı</span>
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-3 py-3 align-top"><span className="text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.booking_no}</span></td>
+                          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span></td>
+                          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{konteynerAdedi > 0 ? `${eklenenKont}/${konteynerAdedi}` : "—"}</span></td>
+                          <td className="px-3 py-3 align-top">
+                            {tCutoff ? (
+                              <div>
+                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.talimat_cutoff!)}</p>
+                                <StatusBadge label={tCutoff.text} color={tCutoff.color} />
+                              </div>
+                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
+                          </td>
+                          <td className="px-3 py-3 align-top">
+                            {bCutoff ? (
+                              <div>
+                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.beyanname_cutoff!)}</p>
+                                <StatusBadge label={bCutoff.text} color={bCutoff.color} />
+                              </div>
+                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-3 py-3 align-top">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => router.push(`/dosya/${dosya.id}`)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            <ExternalLink size={12} /> Detay
+                          </button>
+                          {yetkiler.sayfa_yetkileri.yeni_dosya && (
+                            <button
+                              onClick={() => setDeleteTarget({ id: dosya.id, dosyaNo: dosya.dosya_no })}
+                              title="Sil"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
 
-            return (
-              <React.Fragment key={dosya.id}>
-                {/* Ana satır */}
-                <div
-                  className={`grid items-center px-4 py-3 border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
-                  style={{ borderColor: CARD_BORDER, gridTemplateColumns: "140px 1fr 120px 100px 100px 110px 110px 130px" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold" style={{ color: ACCENT }}>{dosya.proforma_no || dosya.dosya_no}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>
-                    <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{dosya.varis_limani || ""}</p>
-                  </div>
-                  {!hasRez
-                    ? <span className="text-xs font-medium text-amber-500 animate-pulse" style={{ gridColumn: "3 / span 5" }}>Henüz rezervasyon alınmadı</span>
-                    : <span className="text-xs font-mono" style={{ gridColumn: 3, color: TEXT_MUTED }}>{latestRez!.booking_no}</span>
-                  }
-                  {hasRez && <span className="text-xs" style={{ gridColumn: 4, color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span>}
-                  {hasRez && <span className="text-xs" style={{ gridColumn: 5, color: TEXT_MUTED }}>{konteynerAdedi > 0 ? `${eklenenKont}/${konteynerAdedi}` : "—"}</span>}
-                  <div style={{ gridColumn: 6 }}>
-                    {tCutoff ? (
-                      <div>
-                        <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.talimat_cutoff!)}</p>
-                        <StatusBadge label={tCutoff.text} color={tCutoff.color} />
-                      </div>
-                    ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                  </div>
-                  <div style={{ gridColumn: 7 }}>
-                    {bCutoff ? (
-                      <div>
-                        <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.beyanname_cutoff!)}</p>
-                        <StatusBadge label={bCutoff.text} color={bCutoff.color} />
-                      </div>
-                    ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                  </div>
-                  <div className="flex items-center justify-end gap-1.5" style={{ gridColumn: 8 }}>
-                    <button
-                      onClick={() => router.push(`/dosya/${dosya.id}`)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      <ExternalLink size={12} /> Detay
-                    </button>
-                    {yetkiler.sayfa_yetkileri.yeni_dosya && (
-                      <button
-                        onClick={() => setDeleteTarget({ id: dosya.id, dosyaNo: dosya.dosya_no })}
-                        title="Sil"
-                        className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Durum adımları — kompakt tek satır */}
-                <div className={`px-4 py-2 border-b flex items-center gap-1.5 flex-wrap ${staggerClass}`} style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                  {akisAdimlari.map((adim) => (
-                    <span
-                      key={adim.label}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-500/10 text-green-400" : ""}`}
-                      style={!adim.done ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : ""}`} style={!adim.done ? { backgroundColor: "#4A5262" } : undefined} />
-                      {adim.label}
-                    </span>
-                  ))}
-                  <span className="ml-auto text-[10px] truncate max-w-[35%]" style={{ color: TEXT_MUTED }}>
-                    {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}
-                  </span>
-                </div>
-              </React.Fragment>
-            );
-          })}
-          </div>
+                    {/* Durum adımları — kompakt tek satır */}
+                    <tr className={`border-b ${staggerClass}`} style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                      <td colSpan={8} className="px-4 py-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {akisAdimlari.map((adim) => (
+                            <span
+                              key={adim.label}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-500/10 text-green-400" : ""}`}
+                              style={!adim.done ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : ""}`} style={!adim.done ? { backgroundColor: "#4A5262" } : undefined} />
+                              {adim.label}
+                            </span>
+                          ))}
+                          <span className="text-[10px] truncate max-w-full sm:max-w-[320px]" style={{ color: TEXT_MUTED }}>
+                            {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
           </div>
         </div>
       )}

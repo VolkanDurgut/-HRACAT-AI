@@ -234,27 +234,27 @@ export default function DashboardPage() {
             const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
 
             return (
-              <div key={dosya.id} className={`rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div key={dosya.id} className={`rounded-xl border shadow-sm overflow-hidden animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 {/* Dosya baslik */}
-                <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#22c55e" }} />
+                <div className="px-4 py-2.5 border-b flex items-center justify-between flex-wrap gap-y-2 gap-x-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#22c55e" }} />
                     <div>
                       <p className="text-sm font-bold text-white">{dosya.dosya_no}</p>
                       <p className="text-xs" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</p>
                     </div>
                     {rez?.booking_no && (
-                      <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
+                      <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded whitespace-nowrap" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
                         {rez.booking_no}
                       </span>
                     )}
                     {rez?.gemi_adi && (
-                      <span className="text-xs flex items-center gap-1" style={{ color: TEXT_MUTED }}>
+                      <span className="text-xs flex items-center gap-1 whitespace-nowrap" style={{ color: TEXT_MUTED }}>
                         <Ship size={11} /> {rez.gemi_adi}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {talimatCutoffGun !== null && <CutoffBadge days={talimatCutoffGun} label="Talimat" />}
                     {beyannameCutoffGun !== null && <CutoffBadge days={beyannameCutoffGun} label="Beyanname" />}
                     <Link href={`/dosya/${dosya.id}`}
@@ -266,8 +266,8 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Akis adımlari */}
-                <div className="px-4 py-2">
-                  <div className="flex items-start gap-0">
+                <div className="px-4 py-2 overflow-x-auto">
+                  <div className="flex items-start gap-0 min-w-fit">
                     <AkisAdimi
                       tamamlandi={rezVar}
                       bekliyor={!rezVar}
@@ -378,13 +378,12 @@ export default function DashboardPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Dosya No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Alıcı</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Booking No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Gemi</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Kalkış</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}></th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya No</th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Alıcı</th>
+                  <th className="text-right px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kalkış</th>
+                  <th className="text-right px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -393,13 +392,12 @@ export default function DashboardPage() {
                   const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
                   return (
                     <tr key={dosya.id} className={`border-b last:border-0 opacity-70 hover:opacity-100 transition-opacity animate-fade-up ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
-                      <td className="px-4 py-3 text-sm font-medium text-white">{dosya.dosya_no}</td>
-                      <td className="px-4 py-3 text-xs max-w-[180px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</td>
-                      <td className="px-4 py-3 text-xs text-right" style={{ color: TEXT_MUTED }}>{rez?.konteyner_adedi || "-"}</td>
-                      <td className="px-4 py-3 text-xs font-mono" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "-"}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: TEXT_MUTED }}>{rez?.gemi_adi || "-"}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: TEXT_MUTED }}>{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 py-2.5 text-sm font-medium text-white whitespace-nowrap">{dosya.dosya_no}</td>
+                      <td className="px-2 py-2.5 text-xs max-w-[110px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.konteyner_adedi || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</td>
+                      <td className="px-2 py-2.5 text-right">
                         <Link href={`/dosya/${dosya.id}`} className="text-xs hover:text-amber-500" style={{ color: TEXT_MUTED }}>
                           <ChevronRight size={14} />
                         </Link>

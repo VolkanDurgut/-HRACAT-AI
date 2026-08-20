@@ -52,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#0B0F14" }}>
       <Sidebar />
-      <main className="md:ml-[240px] min-h-screen w-full max-w-full overflow-x-hidden">
+      <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>
       </main>
     </div>

@@ -234,27 +234,27 @@ export default function DashboardPage() {
             const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
 
             return (
-              <div key={dosya.id} className={`rounded-xl border shadow-sm overflow-hidden animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <div key={dosya.id} className={`rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 {/* Dosya baslik */}
-                <div className="px-4 py-2.5 border-b flex items-center justify-between flex-wrap gap-y-2 gap-x-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div className="px-4 py-2.5 border-b flex items-center justify-between gap-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#22c55e" }} />
-                    <div>
-                      <p className="text-sm font-bold text-white">{dosya.dosya_no}</p>
-                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{dosya.dosya_no}</p>
+                      <p className="text-xs truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</p>
                     </div>
                     {rez?.booking_no && (
-                      <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded whitespace-nowrap" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
+                      <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded whitespace-nowrap shrink-0" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
                         {rez.booking_no}
                       </span>
                     )}
                     {rez?.gemi_adi && (
-                      <span className="text-xs flex items-center gap-1 whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                      <span className="text-xs items-center gap-1 whitespace-nowrap shrink-0 hidden lg:flex" style={{ color: TEXT_MUTED }}>
                         <Ship size={11} /> {rez.gemi_adi}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 shrink-0">
                     {talimatCutoffGun !== null && <CutoffBadge days={talimatCutoffGun} label="Talimat" />}
                     {beyannameCutoffGun !== null && <CutoffBadge days={beyannameCutoffGun} label="Beyanname" />}
                     <Link href={`/dosya/${dosya.id}`}
@@ -266,8 +266,8 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Akis adımlari */}
-                <div className="px-4 py-2 overflow-x-auto">
-                  <div className="flex items-start gap-0 min-w-fit">
+                <div className="px-4 py-2">
+                  <div className="flex items-start gap-0">
                     <AkisAdimi
                       tamamlandi={rezVar}
                       bekliyor={!rezVar}

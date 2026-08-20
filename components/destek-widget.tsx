@@ -182,9 +182,12 @@ export default function DestekWidget() {
                   </p>
                 )}
                 {mesajlar.map((m) => (
-                  <div key={m.id} className={`flex ${m.gonderen === "kullanici" ? "justify-end" : "justify-start"}`}>
+                  <div key={m.id} className={`flex items-end gap-2 ${m.gonderen === "kullanici" ? "justify-end" : "justify-start"}`}>
+                    {m.gonderen === "asistan" && (
+                      <img src="/images/VolkanDurgut.webp" alt="Volkan Durgut" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                    )}
                     <div
-                      className="max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed text-white break-words"
+                      className="max-w-[76%] px-3 py-2 rounded-2xl text-sm leading-relaxed text-white break-words"
                       style={{ backgroundColor: m.gonderen === "kullanici" ? ACCENT : CARD_BORDER }}
                     >
                       {m.mesaj}
@@ -192,7 +195,8 @@ export default function DestekWidget() {
                   </div>
                 ))}
                 {yaziyor && (
-                  <div className="flex justify-start">
+                  <div className="flex items-end gap-2 justify-start">
+                    <img src="/images/VolkanDurgut.webp" alt="Volkan Durgut" className="w-6 h-6 rounded-full object-cover shrink-0" />
                     <div className="px-3 py-2 rounded-2xl text-xs flex items-center gap-1.5" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
                       <span>Volkan Durgut yazıyor</span>
                       <span className="flex gap-0.5">

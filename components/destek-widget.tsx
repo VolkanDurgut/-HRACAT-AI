@@ -77,22 +77,13 @@ export default function DestekWidget() {
 
   const karsilamaOynat = async () => {
     if (!user || !companyId) return;
-    const hitap = isim ? `${isim} Bey, ` : "";
 
     setYaziyor(true);
-    await gecikme(900);
-    const mesaj1 = `Teşekkürler ${hitap}söylediklerinizi anladık. Harekete geçiyoruz.`;
+    await gecikme(1000);
+    const mesaj1 = `Buyurun ${isim ? isim + " Bey, " : ""}size nasıl yardımcı olabilirim?`;
     setYaziyor(false);
     setMesajlar((prev) => [...prev, { id: `karsilama-1-${Date.now()}`, gonderen: "asistan", mesaj: mesaj1 }]);
     supabase.from("destek_mesajlari").insert({ company_id: companyId, user_id: user.id, gonderen: "asistan", mesaj: mesaj1 });
-
-    await gecikme(700);
-    setYaziyor(true);
-    await gecikme(1300);
-    const mesaj2 = `Buyurun ${isim ? isim + " Bey, " : ""}size nasıl yardımcı olabilirim?`;
-    setYaziyor(false);
-    setMesajlar((prev) => [...prev, { id: `karsilama-2-${Date.now()}`, gonderen: "asistan", mesaj: mesaj2 }]);
-    supabase.from("destek_mesajlari").insert({ company_id: companyId, user_id: user.id, gonderen: "asistan", mesaj: mesaj2 });
   };
 
   const gonder = async () => {

@@ -136,7 +136,7 @@ export async function callGeminiTextOnly(systemPrompt: string, conversationText:
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ parts: [{ text: conversationText }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 220 },
+          generationConfig: { temperature: 0.6, maxOutputTokens: 500 },
         }),
       });
 

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
-import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
+import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
@@ -194,7 +194,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       const path = `${dosyaId}/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Yukleme hatasi: ${uploadError.message}`);
-      const { data: urlData } = supabase.storage.from("konsimento-talimatlari").getPublicUrl(path);
+      const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       const formData = new FormData();
@@ -232,7 +232,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       };
 
       const { error: updateError } = await supabase.from("ihracat_dosyalari").update({
-        konsimento_dosya_url: urlData.publicUrl, konsimento_dosya_adi: file.name,
+        konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
         ham_veri: guncelHamVeri,

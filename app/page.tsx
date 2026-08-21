@@ -395,7 +395,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="font-bold text-slate-900">Volkan Durgut</div>
-                <div className="text-sm text-slate-500">İhracat Operasyon Yöneticisi</div>
+                <div className="text-sm text-slate-500">İhracat Operasyon</div>
               </div>
             </div>
           </div>

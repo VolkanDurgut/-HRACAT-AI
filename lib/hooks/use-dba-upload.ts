@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -59,9 +59,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
         .upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
 
-      const { data: urlData } = supabase.storage
-        .from('konsimento-talimatlari')
-        .getPublicUrl(path);
+      const dosyaUrl = await getGuvenliDosyaUrl('konsimento-talimatlari', path);
 
       // 2. Auth token al
       const { data: sessionData } = await supabase.auth.getSession();
@@ -114,7 +112,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
           plaka: dbaData.arac_plaka || null,
           tare_kg: dbaData.konteyner_dara_kg || null,
           vgm_kg: dbaData.dogrulanmis_brut_agirlik_kg || null,
-          dba_dosya_url: urlData.publicUrl,
+          dba_dosya_url: dosyaUrl,
           dba_dosya_adi: file.name,
           dba_yukleme_tarihi: new Date().toISOString(),
           dba_belge_no: dbaData.dba_belge_no || null,

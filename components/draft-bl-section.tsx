@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
@@ -79,7 +79,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       const path = `${dosya.id}/draft-bl/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
-      const { data: urlData } = supabase.storage.from("konsimento-talimatlari").getPublicUrl(path);
+      const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
 
       const formData = new FormData();
       formData.append("file", file);
@@ -126,7 +126,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       }
 
       await supabase.from("ihracat_dosyalari").update({
-        draft_bl_dosya_url: urlData.publicUrl,
+        draft_bl_dosya_url: dosyaUrl,
         draft_bl_dosya_adi: file.name,
         draft_bl_yukleme_tarihi: new Date().toISOString(),
         draft_bl_kontrol_sonucu: filtrelenmisData,

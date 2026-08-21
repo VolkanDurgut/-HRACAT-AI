@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
-import { supabase } from "@/lib/supabase";
+import { supabase, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { FileText, Pencil, Loader2 } from "lucide-react";
@@ -117,7 +117,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         console.error("Storage yukleme hatasi:", uploadError);
         showToast("Evrak arşive kaydedilemedi ama açılıyor.", "error");
       } else {
-        const { data: urlData } = supabase.storage.from("evraklar").getPublicUrl(storagePath);
+        const dosyaUrl = await getGuvenliDosyaUrl("evraklar", storagePath);
 
         const { data: mevcutKayit } = await supabase
           .from("dosya_evraklari")
@@ -129,7 +129,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
         if (mevcutKayit) {
           await supabase.from("dosya_evraklari").update({
-            dosya_url: urlData.publicUrl,
+            dosya_url: dosyaUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
           }).eq("id", mevcutKayit.id).eq("company_id", companyId); // SaaS: update de şirkete kilitli
@@ -137,7 +137,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           await supabase.from("dosya_evraklari").insert({
             dosya_id: dosya.id,
             evrak_tipi: evrakTipi,
-            dosya_url: urlData.publicUrl,
+            dosya_url: dosyaUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
             company_id: companyId, // SaaS: yeni kayda şirket mührü

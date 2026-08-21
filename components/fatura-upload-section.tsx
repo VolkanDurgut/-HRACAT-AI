@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote, FileType2, ExternalLink
@@ -76,7 +76,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const path = `fatura/${dosya.id}/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
-      const { data: urlData } = supabase.storage.from("konsimento-talimatlari").getPublicUrl(path);
+      const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
 
       const formData = new FormData();
       formData.append("file", file);
@@ -92,7 +92,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
 
       await supabase.from("ihracat_dosyalari").update({
-        fatura_dosya_url: urlData.publicUrl,
+        fatura_dosya_url: dosyaUrl,
         fatura_dosya_adi: file.name,
         fatura_yukleme_tarihi: new Date().toISOString(),
         fatura_kontrol_sonucu: data,

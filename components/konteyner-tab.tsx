@@ -87,7 +87,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   const { showToast } = useToast();
 
   const handleDbaKaldir = async (konteyner: Konteyner) => {
-    await kaldirDba(konteyner.id);
+    await kaldirDba(konteyner.id, konteyner.dba_dosya_url);
     onRefresh();
   };
 
@@ -98,7 +98,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   };
 
   const handleIrsaliyeKaldir = async (konteyner: Konteyner) => {
-    await kaldirIrsaliye(konteyner.id);
+    await kaldirIrsaliye(konteyner.id, konteyner.irsaliye_dosya_url);
     onRefresh();
   };
 

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type IrsaliyeYukleResult = {
@@ -11,7 +11,7 @@ type UseIrsaliyeUploadReturn = {
   yukleniyor: Record<string, boolean>;
   hatalar: Record<string, string>;
   yukleIrsaliye: (konteyner: { id: string; dosya_id: string; konteyner_no: string }, file: File) => Promise<IrsaliyeYukleResult>;
-  kaldirIrsaliye: (konteynerId: string) => Promise<void>;
+  kaldirIrsaliye: (konteynerId: string, irsaliyeDosyaUrl?: string | null) => Promise<void>;
   inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
 };
 
@@ -77,8 +77,9 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
     }
   }, [companyId]);
 
-  const kaldirIrsaliye = useCallback(async (konteynerId: string) => {
+  const kaldirIrsaliye = useCallback(async (konteynerId: string, irsaliyeDosyaUrl?: string | null) => {
     if (!companyId) return;
+    if (irsaliyeDosyaUrl) await depoDosyalariniTopluSil([irsaliyeDosyaUrl]); // storage'daki gercek dosya da temizlenir
     await supabase
       .from('konteynerler')
       .update({

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { supabase, Konteyner } from "@/lib/supabase";
+import { supabase, Konteyner, depoDosyalariniTopluSil } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 
 type FormState = {
@@ -84,6 +84,10 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
+    // Silinmeden once bu konteynerin DBA/irsaliye dosyalarini storage'dan temizle
+    const { data: mevcut } = await supabase
+      .from("konteynerler").select("dba_dosya_url, irsaliye_dosya_url").eq("id", deleteTarget.id).eq("company_id", companyId).maybeSingle();
+    if (mevcut) await depoDosyalariniTopluSil([mevcut.dba_dosya_url, mevcut.irsaliye_dosya_url]);
     const { error } = await supabase.from("konteynerler").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket kilidi eklendi
     if (error) {
       showToast(`Konteyner silinemedi: ${error.message}`, "error");

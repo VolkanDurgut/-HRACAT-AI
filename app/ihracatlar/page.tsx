@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/lib/toast-context";
@@ -250,6 +250,7 @@ export default function IhracatlarPage() {
       .maybeSingle();
     const anaSiparisId = dosyaData?.ana_siparis_id;
 
+    await dosyaninStorageDosyalariniSil(deleteTarget.id, companyId); // Silinmeden once storage'daki gercek dosyalar (PDF vb.) temizlenir
     const { error } = await supabase.from("ihracat_dosyalari").delete().eq("company_id", companyId).eq("id", deleteTarget.id);
     if (error) {
       showToast("Dosya silinirken hata oluştu.", "error");

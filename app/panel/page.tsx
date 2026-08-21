@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -75,6 +75,7 @@ function PanelContent() {
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari").select("ana_siparis_id").eq("id", deleteTarget.id).eq("company_id", companyId).maybeSingle(); // Şirket filtresi eklendi
     const anaSiparisId = dosyaData?.ana_siparis_id;
+    await dosyaninStorageDosyalariniSil(deleteTarget.id, companyId); // Silinmeden once storage'daki gercek dosyalar (PDF vb.) temizlenir
     const { error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket filtresi eklendi
     if (error) { showToast("Dosya silinirken hata olustu.", "error"); setDeleteTarget(null); return; }
     if (anaSiparisId) {

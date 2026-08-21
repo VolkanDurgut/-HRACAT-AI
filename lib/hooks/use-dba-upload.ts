@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -14,7 +14,7 @@ type UseDbaUploadReturn = {
   yukleniyor: Record<string, boolean>;
   hatalar: Record<string, string>;
   yukleDba: (konteyner: { id: string; dosya_id: string; konteyner_no: string }, file: File) => Promise<DbaYukleResult>;
-  kaldirDba: (konteynerId: string) => Promise<void>;
+  kaldirDba: (konteynerId: string, dbaDosyaUrl?: string | null) => Promise<void>;
   inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
 };
 
@@ -132,8 +132,9 @@ export function useDbaUpload(): UseDbaUploadReturn {
     }
   }, [companyId]);
 
-  const kaldirDba = useCallback(async (konteynerId: string) => {
+  const kaldirDba = useCallback(async (konteynerId: string, dbaDosyaUrl?: string | null) => {
     if (!companyId) return;
+    if (dbaDosyaUrl) await depoDosyalariniTopluSil([dbaDosyaUrl]); // storage'daki gercek dosya da temizlenir
     const { error } = await supabase
       .from('konteynerler')
       .update({

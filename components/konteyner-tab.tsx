@@ -2,10 +2,11 @@
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
 import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase } from "@/lib/supabase";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
+import { useIrsaliyeUpload } from "@/lib/hooks/use-irsaliye-upload";
 import { useKonteynerForm } from "@/lib/hooks/use-konteyner-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Trash2, Plus, X, CheckCircle2, AlertTriangle, Loader2, Download, Copy, ClipboardList, CopyPlus
+  Trash2, Plus, X, CheckCircle2, AlertTriangle, Loader2, Download, Copy, ClipboardList, CopyPlus, Upload
 } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
@@ -81,10 +82,23 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
 
   // DBA yukleme - ortak hook kullaniliyor
   const { yukleniyor: dbaYukleniyor, hatalar: dbaHata, yukleDba, kaldirDba, inputRefs: dbaInputRefs } = useDbaUpload();
+  // Irsaliye yukleme - DBA'nin tersi yonunde: burada yuklenir, Kantar panelinde gorunur
+  const { yukleniyor: irsaliyeYukleniyor, hatalar: irsaliyeHata, yukleIrsaliye, kaldirIrsaliye, inputRefs: irsaliyeInputRefs } = useIrsaliyeUpload();
   const { showToast } = useToast();
 
   const handleDbaKaldir = async (konteyner: Konteyner) => {
     await kaldirDba(konteyner.id);
+    onRefresh();
+  };
+
+  const handleIrsaliyeYukle = async (konteyner: Konteyner, file: File) => {
+    const sonuc = await yukleIrsaliye(konteyner, file);
+    if (sonuc.success) showToast("İrsaliye yüklendi, kantar panelinde görünecek.", "success");
+    onRefresh();
+  };
+
+  const handleIrsaliyeKaldir = async (konteyner: Konteyner) => {
+    await kaldirIrsaliye(konteyner.id);
     onRefresh();
   };
 
@@ -202,6 +216,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                   <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Kap Adeti</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>VGM</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>DBA</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>İrsaliye</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
@@ -291,6 +306,32 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                         )}
                         {dbaHata[k.id] && <p className="text-xs text-red-400 mt-0.5">{dbaHata[k.id]}</p>}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        {irsaliyeYukleniyor[k.id] ? (
+                          <Loader2 size={16} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
+                        ) : k.irsaliye_dosya_url ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <CheckCircle2 size={14} className="text-green-400" />
+                            <a href={k.irsaliye_dosya_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium hover:text-white" style={{ color: TEXT_MUTED }}
+                              title="İrsaliyeyi görüntüle / indir">
+                              <Download size={12} />
+                            </a>
+                            <button onClick={() => handleIrsaliyeKaldir(k)} className="hover:text-red-400" style={{ color: "#4A5262" }}>
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded border cursor-pointer text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                            style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+                            <Upload size={10} /> Yükle
+                            <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden"
+                              ref={(el) => { irsaliyeInputRefs.current[k.id] = el; }}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleIrsaliyeYukle(k, f); }} />
+                          </label>
+                        )}
+                        {irsaliyeHata[k.id] && <p className="text-xs text-red-400 mt-0.5">{irsaliyeHata[k.id]}</p>}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <button onClick={() => setDeleteTarget({ id: k.id, konteynerNo: k.konteyner_no })} className="hover:text-red-400" style={{ color: "#4A5262" }}>
                           <Trash2 size={15} />
@@ -313,7 +354,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                     <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
                       {toplamKapAdeti > 0 ? toplamKapAdeti.toLocaleString("tr-TR") : "-"}
                     </td>
-                    <td colSpan={3}></td>
+                    <td colSpan={4}></td>
                   </tr>
                 </tfoot>
               )}

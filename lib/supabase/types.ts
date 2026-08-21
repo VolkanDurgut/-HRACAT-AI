@@ -104,6 +104,10 @@ export type Konteyner = {
   dba_belge_no: string | null;
   pieces: number | null;
   brut_agirlik_kg: number | null;
+  marka: string | null;
+  irsaliye_dosya_url: string | null;
+  irsaliye_dosya_adi: string | null;
+  irsaliye_yukleme_tarihi: string | null;
 };
 
 export type Plaka = {

@@ -23,6 +23,9 @@ type KonteynerRow = {
   dba_yukleme_tarihi: string | null;
   dba_kontrol_sonucu: { uyusmazliklar?: string[] } | null;
   dba_belge_no: string | null;
+  irsaliye_dosya_url: string | null;
+  irsaliye_dosya_adi: string | null;
+  irsaliye_yukleme_tarihi: string | null;
   booking_no: string | null;
   marka: string | null;
   maskeli_musteri: string;
@@ -53,7 +56,7 @@ export default function KantarPage() {
     
     const { data: kontData } = await supabase
       .from("konteynerler")
-      .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka")
+      .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka, irsaliye_dosya_url, irsaliye_dosya_adi, irsaliye_yukleme_tarihi")
       .eq("company_id", companyId);
 
     if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; }
@@ -217,6 +220,7 @@ export default function KantarPage() {
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Çuval / Dosya</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Rez No</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center" style={{ color: TEXT_MUTED }}>İrsaliye</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center w-24" style={{ color: TEXT_MUTED }}>İşlem</th>
                     </tr>
                   </thead>
@@ -237,6 +241,17 @@ export default function KantarPage() {
                         </td>
                         <td className="px-4 py-2.5 text-xs text-white">{k.maskeli_musteri}</td>
                         <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{k.booking_no || "-"}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          {k.irsaliye_dosya_url ? (
+                            <a href={k.irsaliye_dosya_url} target="_blank" rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                              title="İrsaliyeyi görüntüle / indir / yazdır (açılan sekmede Ctrl+P)">
+                              <FileText size={11} /> Gör
+                            </a>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Yok</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-center">
                           {yukleniyor[k.id] ? (
                             <Loader2 size={14} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
@@ -278,6 +293,7 @@ export default function KantarPage() {
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-right" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center" style={{ color: TEXT_MUTED }}>İrsaliye</th>
                       <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center w-16" style={{ color: TEXT_MUTED }}>Durum</th>
                     </tr>
                   </thead>
@@ -298,6 +314,17 @@ export default function KantarPage() {
                           <td className="px-4 py-2.5 text-right">
                             <div className="text-[10px]" style={{ color: TEXT_MUTED }}>Dara: {k.tare_kg ? `${k.tare_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
                             <div className="text-xs font-bold text-white mt-0.5">VGM: {k.vgm_kg ? `${k.vgm_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {k.irsaliye_dosya_url ? (
+                              <a href={k.irsaliye_dosya_url} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
+                                title="İrsaliyeyi görüntüle / indir / yazdır (açılan sekmede Ctrl+P)">
+                                <FileText size={11} /> Gör
+                              </a>
+                            ) : (
+                              <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Yok</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <div className="flex items-center justify-center gap-2">

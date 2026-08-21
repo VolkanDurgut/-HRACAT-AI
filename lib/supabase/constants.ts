@@ -39,3 +39,14 @@ export const AKIS_ADIMLARI = [
   { key: 'dba', label: 'DBA' },
   { key: 'vgm', label: 'VGM' },
 ] as const;
+
+// Liste/özet sayfalari (panel, ihracatlar, dashboard, analiz) icin dosya
+// kolon listesi. select("*") yerine bunu kullaniyoruz: agir JSONB alanlari
+// (ham_veri, kontrol_sonuclari, sevkiyat_evraklari) bu sayfalarda hic
+// render edilmiyor, sadece dosya detay sayfasinda kullaniliyor - o yuzden
+// listelerde cekilmeleri gereksiz network yukudur. Veri buyudukce
+// (yillar boyunca AI kontrol sonuclari ve ham proforma verisi biriktikce)
+// bu fark buyuyecektir. Yeni bir alan eklerken: sadece dosya DETAY
+// sayfasinda kullanilacaksa buraya EKLEME.
+export const DOSYA_LISTE_KOLONLARI =
+  'id, dosya_no, durum, olusturma_tarihi, satici_firma, alici_firma, urun_tanimi, toplam_tutar, para_birimi, proforma_no, proforma_tarihi, yuklenme_limani, varis_limani, teslim_sekli, odeme_sekli, gecerlilik_tarihi, miktar, miktar_birimi, ambalaj, lot_no, urun_detaylari, toplam_konteyner, created_by, marka, beyanname_no, fatura_no, fatura_tarihi, bl_no, diib_no, diib_tarihi, uretim_tarihi, son_kullanim_tarihi, navlun_tutari, fatura_talimati_gonderildi, konsimento_dosya_url, konsimento_dosya_adi, konsimento_yukleme_tarihi, vgm_gonderildi, ana_siparis_id, fatura_dosya_url, fatura_dosya_adi, fatura_yukleme_tarihi, consignee, alici_adresi, detayli_ambalaj, hesap_adi, banka, swift, hesap_numarasi, iban';

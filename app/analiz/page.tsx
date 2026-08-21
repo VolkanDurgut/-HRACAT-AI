@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import AppShell from "@/components/app-shell";
 import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck } from "lucide-react";
@@ -39,9 +39,10 @@ export default function AnalizPage() {
     if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
-      .select("*")
+      .select(DOSYA_LISTE_KOLONLARI)
       .eq("company_id", companyId) // Sadece bu şirketin dosyaları analize dahil edilir
-      .order("olusturma_tarihi", { ascending: true });
+      .order("olusturma_tarihi", { ascending: true })
+      .returns<Dosya[]>();
       
     if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setLoading(false); return; }
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/lib/toast-context";
@@ -30,32 +30,97 @@ export default function IhracatlarPage() {
   const [selectedDosya, setSelectedDosya] = useState<DosyaWithRelations | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
 
-  const fetchDosyalar = useCallback(async () => {
-    if (!user || !companyId) return;
-    const { data: dosyaData } = await supabase
-      .from("ihracat_dosyalari")
-      .select("*")
-      .eq("company_id", companyId)
-      .or("durum.eq.Kapalı,durum.eq.Kapali")
-      .order("olusturma_tarihi", { ascending: false });
+  const SAYFA_BOYUTU = 50;
+  const [dahaFazlaVar, setDahaFazlaVar] = useState(true);
+  const [dahaFazlaYukleniyor, setDahaFazlaYukleniyor] = useState(false);
+  const [aramaSonuclari, setAramaSonuclari] = useState<DosyaWithRelations[] | null>(null);
+  const [aramaYukleniyor, setAramaYukleniyor] = useState(false);
 
-    if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setLoading(false); return; }
-
-    const dosyaIds = dosyaData.map((d: Dosya) => d.id);
+  // Dosya satirlarina iliskili rezervasyon/konteyner verisini ekler. Sayfalama
+  // ve arama akislarinin ikisi de bu ortak fonksiyonu kullanir.
+  const zenginlestir = useCallback(async (dosyaList: Dosya[]): Promise<DosyaWithRelations[]> => {
+    if (dosyaList.length === 0 || !companyId) return [];
+    const dosyaIds = dosyaList.map((d) => d.id);
     const [{ data: rezData }, { data: kontData }] = await Promise.all([
       supabase.from("rezervasyonlar").select("*").eq("company_id", companyId).in("dosya_id", dosyaIds),
       supabase.from("konteynerler").select("*").eq("company_id", companyId).in("dosya_id", dosyaIds),
     ]);
-
-    const enriched = dosyaData.map((d: Dosya) => ({
+    return dosyaList.map((d) => ({
       ...d,
       rezervasyonlar: (rezData || []).filter((r: Rezervasyon) => r.dosya_id === d.id),
       konteynerler: (kontData || []).filter((k: Konteyner) => k.dosya_id === d.id),
     }));
+  }, [companyId]);
 
+  // Arsiv sinirsiz buyuyebilecegi icin varsayilan olarak SADECE ilk sayfa
+  // (en son kapanan SAYFA_BOYUTU dosya) cekilir. "Daha Fazla Yukle" ile
+  // devami getirilir. Arama yapilirken ise asagidaki ayri efekt TUM
+  // arsivde sunucu tarafinda arama yapar - sayfalama arama kapsamini
+  // daraltmaz.
+  const fetchDosyalar = useCallback(async () => {
+    if (!user || !companyId) return;
+    setLoading(true);
+    const { data: dosyaData } = await supabase
+      .from("ihracat_dosyalari")
+      .select(DOSYA_LISTE_KOLONLARI)
+      .eq("company_id", companyId)
+      .or("durum.eq.Kapalı,durum.eq.Kapali")
+      .order("olusturma_tarihi", { ascending: false })
+      .range(0, SAYFA_BOYUTU - 1)
+      .returns<Dosya[]>();
+
+    if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setDahaFazlaVar(false); setLoading(false); return; }
+
+    setDahaFazlaVar(dosyaData.length === SAYFA_BOYUTU);
+    const enriched = await zenginlestir(dosyaData);
     setDosyalar(enriched);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user, companyId, zenginlestir]);
+
+  const dahaFazlaYukle = useCallback(async () => {
+    if (!companyId || dahaFazlaYukleniyor || !dahaFazlaVar) return;
+    setDahaFazlaYukleniyor(true);
+    const { data: dosyaData } = await supabase
+      .from("ihracat_dosyalari")
+      .select(DOSYA_LISTE_KOLONLARI)
+      .eq("company_id", companyId)
+      .or("durum.eq.Kapalı,durum.eq.Kapali")
+      .order("olusturma_tarihi", { ascending: false })
+      .range(dosyalar.length, dosyalar.length + SAYFA_BOYUTU - 1)
+      .returns<Dosya[]>();
+
+    if (!dosyaData || dosyaData.length === 0) { setDahaFazlaVar(false); setDahaFazlaYukleniyor(false); return; }
+
+    setDahaFazlaVar(dosyaData.length === SAYFA_BOYUTU);
+    const enriched = await zenginlestir(dosyaData);
+    setDosyalar((prev) => [...prev, ...enriched]);
+    setDahaFazlaYukleniyor(false);
+  }, [companyId, dosyalar.length, dahaFazlaVar, dahaFazlaYukleniyor, zenginlestir]);
+
+  // Arama: varsayilan sayfali listeyi degil, TUM kapali arsivi sunucu
+  // tarafinda tarar. Boylece kullanici henuz yuklenmemis eski bir dosyayi
+  // de arayabilir.
+  useEffect(() => {
+    if (!search.trim() || !companyId) { setAramaSonuclari(null); return; }
+    const zamanlayici = setTimeout(async () => {
+      setAramaYukleniyor(true);
+      const terim = `%${search.trim()}%`;
+      const { data: dosyaData } = await supabase
+        .from("ihracat_dosyalari")
+        .select(DOSYA_LISTE_KOLONLARI)
+        .eq("company_id", companyId)
+        .or("durum.eq.Kapalı,durum.eq.Kapali")
+        .or(`dosya_no.ilike.${terim},alici_firma.ilike.${terim},satici_firma.ilike.${terim},proforma_no.ilike.${terim},urun_tanimi.ilike.${terim},varis_limani.ilike.${terim},bl_no.ilike.${terim},marka.ilike.${terim}`)
+        .order("olusturma_tarihi", { ascending: false })
+        .limit(100)
+        .returns<Dosya[]>();
+
+      const enriched = await zenginlestir(dosyaData || []);
+      setAramaSonuclari(enriched);
+      setAramaYukleniyor(false);
+    }, 300);
+    return () => clearTimeout(zamanlayici);
+  }, [search, companyId, zenginlestir]);
 
   const fetchAcikSiparisler = useCallback(async () => {
     if (!user || !companyId) return;
@@ -171,13 +236,8 @@ export default function IhracatlarPage() {
   };
 
   const filteredDosyalar = useMemo(() => {
-    if (!search.trim()) return dosyalar;
-    const term = search.trim().toLowerCase();
-    return dosyalar.filter((d) =>
-      [d.dosya_no, d.alici_firma, d.satici_firma, d.proforma_no, d.urun_tanimi, d.varis_limani, d.bl_no, d.marka]
-        .some((field) => field?.toLowerCase().includes(term))
-    );
-  }, [dosyalar, search]);
+    return aramaSonuclari !== null ? aramaSonuclari : dosyalar;
+  }, [dosyalar, aramaSonuclari]);
   const handleDelete = async () => {
     if (!deleteTarget || !companyId) return;
 
@@ -318,7 +378,7 @@ export default function IhracatlarPage() {
         />
       </div>
 
-      {loading ? (
+      {(loading || (search.trim() !== "" && aramaYukleniyor)) ? (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="rounded-xl border p-4 animate-pulse" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
@@ -333,6 +393,7 @@ export default function IhracatlarPage() {
           description={search ? "Arama kriterlerinizi değiştirmeyi deneyin" : "Henüz kapatılmış bir ihracat dosyanız yok"}
         />
       ) : (
+        <>
         <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -394,6 +455,20 @@ export default function IhracatlarPage() {
             </table>
           </div>
         </div>
+        {aramaSonuclari === null && dahaFazlaVar && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={dahaFazlaYukle}
+              disabled={dahaFazlaYukleniyor}
+              className="px-4 py-2 rounded-lg border text-xs font-semibold flex items-center gap-2 hover:bg-white/5 transition-colors disabled:opacity-60"
+              style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
+            >
+              {dahaFazlaYukleniyor && <Loader2 size={14} className="animate-spin" />}
+              {dahaFazlaYukleniyor ? "Yükleniyor..." : "Daha Fazla Yükle"}
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {selectedDosya && (

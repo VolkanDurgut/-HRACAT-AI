@@ -26,4 +26,5 @@ export {
   SEVKIYAT_EVRAKLARI,
   DOSYA_DURUM,
   AKIS_ADIMLARI,
+  DOSYA_LISTE_KOLONLARI,
 } from './supabase/constants';

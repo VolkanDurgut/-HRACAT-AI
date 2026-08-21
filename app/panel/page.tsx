@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -34,10 +34,11 @@ function PanelContent() {
     if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
-      .select("*")
+      .select(DOSYA_LISTE_KOLONLARI)
       .eq("company_id", companyId) // Sadece giriş yapan şirketin dosyaları çekilir
       .or("durum.eq.Açık,durum.eq.Acik")
-      .order("olusturma_tarihi", { ascending: false });
+      .order("olusturma_tarihi", { ascending: false })
+      .returns<Dosya[]>();
 
     if (!dosyaData) { setDosyalar([]); setLoading(false); return; }
 

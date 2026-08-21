@@ -53,32 +53,40 @@ export default function KantarPage() {
 
   const fetchKonteynerler = useCallback(async () => {
     if (!user || !companyId) return;
-    
-    const { data: kontData } = await supabase
-      .from("konteynerler")
-      .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka, irsaliye_dosya_url, irsaliye_dosya_adi, irsaliye_yukleme_tarihi")
-      .eq("company_id", companyId);
 
-    if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; }
-
-    const dosyaIds = Array.from(new Set(kontData.map((k) => k.dosya_id)));
+    // ONCE sadece ACIK dosyalar cekilir. Kantar panelinin ilgi alani zaten
+    // yalnizca acik (henuz sevk edilmemis) dosyalarin konteynerleridir - bu
+    // sayede konteynerler tablosunun tum tarihcesi degil, sadece guncel alt
+    // kume cekilir. Sirket yillar boyunca veri biriktirdikce bu sayfa
+    // yavaslamaz, cunku "acik dosya" sayisi dogasi geregi sinirlidir.
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("id, dosya_no, durum, marka, alici_firma")
-      .in("id", dosyaIds)
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik");
 
+    if (!dosyaData || dosyaData.length === 0) { setKonteynerler([]); setLoading(false); return; }
+
+    const dosyaIds = dosyaData.map((d) => d.id);
     const dosyaMap: Record<string, { dosya_no: string; marka: string | null; alici_firma: string | null }> = {};
-    (dosyaData || []).forEach((d: any) => { dosyaMap[d.id] = { dosya_no: d.dosya_no, marka: d.marka, alici_firma: d.alici_firma }; });
+    dosyaData.forEach((d: any) => { dosyaMap[d.id] = { dosya_no: d.dosya_no, marka: d.marka, alici_firma: d.alici_firma }; });
 
     // REZERVASYON BULMA - İYİLEŞTİRİLDİ
     // Konteynerin rezervasyon_id'si boş olsa bile, dosya üzerinden booking no bulur.
-    const { data: rezData } = await supabase
-      .from("rezervasyonlar")
-      .select("id, booking_no, dosya_id")
-      .in("dosya_id", dosyaIds)
-      .eq("company_id", companyId);
+    const [{ data: kontData }, { data: rezData }] = await Promise.all([
+      supabase
+        .from("konteynerler")
+        .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka, irsaliye_dosya_url, irsaliye_dosya_adi, irsaliye_yukleme_tarihi")
+        .eq("company_id", companyId)
+        .in("dosya_id", dosyaIds),
+      supabase
+        .from("rezervasyonlar")
+        .select("id, booking_no, dosya_id")
+        .eq("company_id", companyId)
+        .in("dosya_id", dosyaIds),
+    ]);
+
+    if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; }
 
     const rezDosyaMap: Record<string, string> = {};
     const rezIdMap: Record<string, string> = {};
@@ -90,7 +98,6 @@ export default function KantarPage() {
     });
 
     const enriched = (kontData as any[])
-      .filter((k) => dosyaMap[k.dosya_id])
       .map((k) => ({
         ...k,
         dosya_no: dosyaMap[k.dosya_id].dosya_no,
@@ -111,7 +118,7 @@ export default function KantarPage() {
     if (!user || !companyId) return;
     const channel = supabase
       .channel("kantar-konteynerler")
-      .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler", filter: `company_id=eq.${companyId}` }, () => {
         fetchKonteynerler();
       })
       .subscribe();

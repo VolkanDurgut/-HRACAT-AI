@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -85,9 +85,10 @@ export default function DashboardPage() {
     if (!user || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
-      .select("*")
+      .select(DOSYA_LISTE_KOLONLARI)
       .eq("company_id", companyId) // Sadece bu şirketin dosyaları kontrol merkezine gelir
-      .order("olusturma_tarihi", { ascending: false });
+      .order("olusturma_tarihi", { ascending: false })
+      .returns<Dosya[]>();
     if (!dosyaData) { setDurumlar([]); setLoading(false); return; } // Temiz sıfırlama
 
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);

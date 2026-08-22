@@ -188,6 +188,7 @@ export default function YeniDosyaPage() {
           hesap_adi: extracted.hesap_adi || null,
           banka: extracted.banka || null,
           swift: extracted.swift || null,
+          hesap_numarasi: extracted.hesap_numarasi || null,
           iban: extracted.iban || null,
           ham_veri: extracted as unknown as Record<string, unknown>,
           urun_detaylari: extracted.urun_detaylari || [],
@@ -481,6 +482,7 @@ export default function YeniDosyaPage() {
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Adi</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_adi || proformData.hesap_adi}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Banka</p><p className="font-medium text-white">{proformData.banka_bilgileri?.banka_adi || proformData.banka}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>SWIFT</p><p className="font-medium text-white">{proformData.banka_bilgileri?.swift || proformData.swift}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Numarası</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_numarasi || proformData.hesap_numarasi}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>IBAN</p><p className="font-medium text-white break-all">{proformData.banka_bilgileri?.iban || proformData.iban}</p></div>
                 </div>
               </div>

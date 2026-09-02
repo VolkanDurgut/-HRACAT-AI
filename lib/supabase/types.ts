@@ -178,7 +178,7 @@ export function getDosyaAkisDurumu(
   const rezervasyonVar = rezervasyonlar.length > 0;
   const rezervasyonKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const konteynerlerTamam = rezervasyonKontAdedi > 0 && konteynerler.length === rezervasyonKontAdedi;
-  const faturaTalimatGonderildi = !!dosya.fatura_talimati_gonderildi;
+  const faturaKesildi = !!dosya.fatura_dosya_url;
   const konsimentoVar = !!dosya.konsimento_dosya_url;
   const tumDbaHazir = konteynerler.length > 0 && konteynerler.every(k => !!k.dba_dosya_url);
   const vgmGonderildi = !!dosya.vgm_gonderildi;
@@ -186,7 +186,7 @@ export function getDosyaAkisDurumu(
   return {
     rezervasyonVar,
     konteynerlerTamam,
-    faturaTalimatGonderildi,
+    faturaKesildi,
     konsimentoVar,
     tumDbaHazir,
     vgmGonderildi,

@@ -15,6 +15,7 @@ type KontrolSonucu = {
   ozet: string;
   consignee?: string;
   notify?: string[];
+  bl_no?: string;
 };
 
 type Props = {
@@ -235,6 +236,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
         konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
+        bl_no: data.bl_no || dosya.bl_no,
         ham_veri: guncelHamVeri,
       }).eq("id", dosyaId).eq("company_id", companyId);
       if (updateError) throw new Error(`Sonuc kaydedilemedi: ${updateError.message}`);

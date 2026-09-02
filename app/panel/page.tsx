@@ -174,7 +174,6 @@ function PanelContent() {
                   { label: "Rezervasyon", done: dosya.rezervasyonlar.length > 0 },
                   { label: "Konteynerler", done: konteynerAdedi > 0 && eklenenKont >= konteynerAdedi },
                   { label: "Fatura Kesildi", done: !!(dosya as any).fatura_no },
-                  { label: "Konşimento", done: !!dosya.konsimento_dosya_url },
                   { label: "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
                   { label: "VGM", done: dosya.konteynerler.some((k) => !!k.vgm_kg) },
                 ];

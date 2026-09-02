@@ -223,7 +223,6 @@ export default function DashboardPage() {
             const rez = rezervasyonlar[0];
             const rezVar = rezervasyonlar.length > 0;
             const faturaKesildi = !!dosya.fatura_dosya_url;
-            const konsimentoVar = !!dosya.konsimento_dosya_url;
             const toplamKont = konteynerler.length;
             const dbaYuklenen = konteynerler.filter(k => k.dba_dosya_url).length;
             const tumDbaHazir = toplamKont > 0 && dbaYuklenen === toplamKont;
@@ -327,18 +326,6 @@ export default function DashboardPage() {
                       ) : undefined}
                     />
                     <AkisConnector tamamlandi={faturaKesildi} />
-                    <AkisAdimi
-                      tamamlandi={konsimentoVar}
-                      bekliyor={faturaKesildi && !konsimentoVar}
-                      label="Konşimento"
-                      tooltip={konsimentoVar && dosya.konsimento_dosya_url ? (
-                        <a href={dosya.konsimento_dosya_url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-xs font-medium text-amber-700 hover:text-amber-800 pointer-events-auto">
-                          <FileText size={14} /> Konşimentoyu Aç
-                        </a>
-                      ) : undefined}
-                    />
-                    <AkisConnector tamamlandi={tumDbaHazir} />
                     <AkisAdimi tamamlandi={tumDbaHazir} bekliyor={!tumDbaHazir && toplamKont > 0} label="DBA" sublabel={toplamKont > 0 ? `${dbaYuklenen}/${toplamKont}` : undefined} />
                   </div>
                 </div>
@@ -349,7 +336,6 @@ export default function DashboardPage() {
                   if (!rezVar) eksikler.push("Rezervasyon girilmedi");
                   if (rezVar && !konteynerlerTamam) eksikler.push(`${rezervasyonKontAdedi - toplamKont} konteyner eksik`);
                   if (konteynerlerTamam && !faturaKesildi) eksikler.push("Fatura henüz kesilmedi");
-                  if (faturaKesildi && !konsimentoVar) eksikler.push("Konşimento talimatı yüklenmedi");
                   if (toplamKont > 0 && !tumDbaHazir) eksikler.push(`${toplamKont - dbaYuklenen} DBA bekleniyor`);
                   if (eksikler.length === 0) return null;
                   return (

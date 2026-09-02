@@ -121,6 +121,15 @@ export default function DashboardPage() {
 
   const bekleyenRez = aciklar.filter(d => d.rezervasyonlar.length === 0).length;
 
+  // Bugun DBA'si yuklenen (sevk edilen) konteyner sayisi - yerel gun sinirlari ile
+  const bugunBaslangic = new Date(); bugunBaslangic.setHours(0, 0, 0, 0);
+  const bugunBitis = new Date(bugunBaslangic); bugunBitis.setDate(bugunBitis.getDate() + 1);
+  const bugunYuklenenSayisi = durumlar.reduce((toplam, d) => toplam + d.konteynerler.filter(k => {
+    if (!k.dba_yukleme_tarihi) return false;
+    const t = new Date(k.dba_yukleme_tarihi).getTime();
+    return t >= bugunBaslangic.getTime() && t < bugunBitis.getTime();
+  }).length, 0);
+
   if (loading) {
     return (
       <AppShell>
@@ -209,6 +218,27 @@ export default function DashboardPage() {
             <p className="text-xl font-bold shrink-0" style={{ color: m.color }}>{m.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Gunluk Kantar Raporu - yeni sekmede acilir, yazdirmaya/PDF'e uygun ayri bir sayfa */}
+      <div className="rounded-xl border shadow-sm p-4 mb-8 flex items-center justify-between gap-3 flex-wrap"
+        style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg shrink-0" style={{ backgroundColor: "#0F2A20", color: ACCENT }}>
+            <FileText size={18} />
+          </div>
+          <div>
+            <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>Bugün Yüklenen</p>
+            <p className="text-xl font-bold" style={{ color: ACCENT }}>{bugunYuklenenSayisi} <span className="text-sm font-medium" style={{ color: TEXT_MUTED }}>konteyner</span></p>
+          </div>
+        </div>
+        <button
+          onClick={() => window.open("/rapor/gunluk", "_blank")}
+          className="text-sm font-semibold px-4 py-2 rounded-lg text-white hover:brightness-110 transition-all"
+          style={{ backgroundColor: ACCENT }}
+        >
+          Günlük Rapor
+        </button>
       </div>
 
       {/* Aktif dosyalar - akis durumu */}

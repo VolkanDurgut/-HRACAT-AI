@@ -47,16 +47,20 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 }
 
 export default function YetkilendirmePage() {
-  const { yetkiler, user, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, isSuperAdmin, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [kullanicilar, setKullanicilar] = useState<KullaniciYetki[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // Bu sayfa artık "sayfa_yetkileri.ayarlar" bayrağıyla DEĞİL, sabit süper-admin
+  // e-posta listesiyle korunuyor (bkz. lib/auth-context.tsx). AppShell zaten
+  // aynı kontrolü merkezi olarak yapıp içeriği render etmeden yönlendiriyor;
+  // buradaki kontrol ikinci bir güvenlik katmanı (defense-in-depth).
   useEffect(() => {
-    if (!yetkiler.sayfa_yetkileri.ayarlar) router.push("/panel");
-  }, [yetkiler, router]);
+    if (!authLoading && !isSuperAdmin) router.replace("/panel");
+  }, [authLoading, isSuperAdmin, router]);
 
   const fetchKullanicilar = useCallback(async () => {
     if (!user || !companyId) return; // Güvenlik duvarı kontrolü

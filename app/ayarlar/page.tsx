@@ -46,19 +46,24 @@ const SEKME_ETIKETLER: Record<string, string> = {
 };
 
 export default function AyarlarPage() {
-  const { yetkiler, user } = useAuth();
+  const { user, isSuperAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
   const [kullanicilar, setKullanicilar] = useState<KullaniciYetki[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
-  // Yetkisi yoksa ana panele yönlendir
+  // NOT: Bu sayfa (/ayarlar) görünürde "/ayarlar/yetkilendirme" ile aynı işi
+  // yapan, artık kullanılmayan eski bir kopya gibi duruyor ve
+  // "supabase.auth.admin.listUsers()" çağırıyor — bu, anon key ile client
+  // tarafında ÇALIŞMAZ (service role gerektirir). Kaldırılması önerilir; şimdilik
+  // en azından erişimi süper admin listesine kilitliyoruz (defense-in-depth,
+  // ana kontrol AppShell'de).
   useEffect(() => {
-    if (!yetkiler.sayfa_yetkileri.ayarlar) {
-      router.push("/panel");
+    if (!authLoading && !isSuperAdmin) {
+      router.replace("/panel");
     }
-  }, [yetkiler, router]);
+  }, [authLoading, isSuperAdmin, router]);
 
   const fetchKullanicilar = useCallback(async () => {
     // Tüm kullanıcı yetkilerini çek

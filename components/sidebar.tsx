@@ -37,7 +37,7 @@ const TEXT_MUTED = "#8B95A5";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { signOut, user, yetkiler } = useAuth();
+  const { signOut, user, yetkiler, isSuperAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
@@ -101,8 +101,8 @@ export default function Sidebar() {
 
         {opsItems.map(renderItem)}
 
-        {/* Ayarlar accordion */}
-        {yetkiler.sayfa_yetkileri.ayarlar ? (
+        {/* Ayarlar accordion — SADECE süper admin e-postaları görebilir (bkz. lib/auth-context.tsx) */}
+        {isSuperAdmin ? (
           <div>
             <button
               onClick={() => setAyarlarAcik(!ayarlarAcik)}
@@ -135,16 +135,7 @@ export default function Sidebar() {
               </div>
             )}
           </div>
-        ) : (
-          <div
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed select-none opacity-40"
-            style={{ color: TEXT_MUTED }}
-            title="Bu bölüme erişim yetkiniz yok"
-          >
-            <span className="shrink-0"><Settings size={18} /></span>
-            <span>Ayarlar</span>
-          </div>
-        )}
+        ) : null /* Süper admin değilse Ayarlar/Yetkilendirme menüde hiç görünmez — soluk placeholder bile göstermiyoruz */}
       </nav>
 
       <div className="px-3 pb-3 pt-2 border-t space-y-1" style={{ borderColor: BORDER }}>

@@ -29,6 +29,26 @@ export type KullaniciYetkileri = {
   sekme_yetkileri: SekmeYetkileri;
 };
 
+// ----------------------------------------------------------------------------
+// SÜPER ADMİN E-POSTALARI — Yetkilendirme (kullanıcı izinleri yönetim) sayfası
+// SADECE bu e-postalarla giriş yapan hesaplarda görünür/erişilebilir olmalı.
+// "ayarlar" sayfa yetkisi (kullanici_yetkileri.sayfa_yetkileri.ayarlar) artık bu
+// sayfaya erişim için YETERLİ DEĞİL — o alan başka amaçlarla DB'de kalabilir,
+// ama gerçek erişim kontrolü burada, kod seviyesinde sabitlenmiş e-posta
+// listesiyle yapılır. Değiştirmek isterseniz sadece bu listeyi güncelleyin.
+// ----------------------------------------------------------------------------
+const SUPER_ADMIN_EMAILS = [
+  "volkandurgut.tr@gmail.com",
+  "buraktuncay@unex.com.tr",
+];
+
+const SUPER_ADMIN_EMAILS_LOWER = SUPER_ADMIN_EMAILS.map(e => e.toLowerCase());
+
+export function isSuperAdmin(email?: string | null): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS_LOWER.includes(email.trim().toLowerCase());
+}
+
 const VARSAYILAN_YETKILER: KullaniciYetkileri = {
   sayfa_yetkileri: {
     dashboard: true,
@@ -55,6 +75,7 @@ type AuthContextType = {
   rol: Rol;
   companyId: string | null; // Şirket bazlı izolasyon için eklendi
   yetkiler: KullaniciYetkileri;
+  isSuperAdmin: boolean; // Yetkilendirme sayfasına erişim — sabit e-posta listesine göre
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
@@ -66,6 +87,7 @@ const AuthContext = createContext<AuthContextType>({
   rol: null,
   companyId: null, // Şirket bazlı izolasyon için eklendi
   yetkiler: VARSAYILAN_YETKILER,
+  isSuperAdmin: false,
   signIn: async () => ({ error: null }),
   signOut: async () => {},
 });
@@ -78,38 +100,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [companyId, setCompanyId] = useState<string | null>(null); // Şirket state'i eklendi
   const [yetkiler, setYetkiler] = useState<KullaniciYetkileri>(VARSAYILAN_YETKILER);
 
+  // ÖNEMLİ — RACE CONDITION DÜZELTMESİ:
+  // Bu fonksiyon artık "loading" bayrağını YÖNETMİYOR; sadece veriyi çekip
+  // state'e yazıyor ve Promise'i geri döndürüyor. Çağıran taraf (useEffect
+  // içindeki iki akış), bu Promise TAMAMLANMADAN "setLoading(false)"
+  // ÇAĞIRMAMALI. Aksi halde `yetkiler` hâlâ VARSAYILAN_YETKILER (izin
+  // bazında neredeyse hepsi true) iken sayfa "yükleniyor" ekranından çıkıp
+  // içeriği gösteriyor — kısıtlı bir kullanıcı, gerçek (kısıtlayıcı) izinler
+  // veritabanından gelene kadarki o kısa pencerede tam yetkiliymiş gibi
+  // davranan bir arayüz görüyordu. Aşağıdaki değişiklikle "loading" sadece
+  // hem oturum hem GERÇEK yetkiler tam olarak belli olduğunda false olur.
   const fetchRolVeYetkiler = async (userId: string) => {
-    const [rolRes, yetkiRes] = await Promise.all([
-      // Kritik Değişiklik: "rol" bilgisinin yanına veritabanına eklediğimiz "company_id" kolonunu da ekledik
-      supabase.from("kullanici_rolleri").select("rol, company_id").eq("user_id", userId).single(),
-      supabase.from("kullanici_yetkileri").select("sayfa_yetkileri, sekme_yetkileri").eq("user_id", userId).single(),
-    ]);
-    setRol((rolRes.data?.rol as Rol) ?? null);
-    setCompanyId(rolRes.data?.company_id ?? null); // Şirket ID'si state'e yazıldı
-    if (yetkiRes.data) {
+    try {
+      const [rolRes, yetkiRes] = await Promise.all([
+        // Kritik Değişiklik: "rol" bilgisinin yanına veritabanına eklediğimiz "company_id" kolonunu da ekledik
+        supabase.from("kullanici_rolleri").select("rol, company_id").eq("user_id", userId).single(),
+        supabase.from("kullanici_yetkileri").select("sayfa_yetkileri, sekme_yetkileri").eq("user_id", userId).single(),
+      ]);
+      setRol((rolRes.data?.rol as Rol) ?? null);
+      setCompanyId(rolRes.data?.company_id ?? null); // Şirket ID'si state'e yazıldı
+      if (yetkiRes.data) {
+        setYetkiler({
+          sayfa_yetkileri: { ...VARSAYILAN_YETKILER.sayfa_yetkileri, ...yetkiRes.data.sayfa_yetkileri },
+          sekme_yetkileri: { ...VARSAYILAN_YETKILER.sekme_yetkileri, ...yetkiRes.data.sekme_yetkileri },
+        });
+      } else {
+        // Kayıt bulunamadıysa (örn. yeni kullanıcı, henüz trigger çalışmadıysa)
+        // GÜVENLİ TARAF: varsayılan (geniş yetkili) obje yerine HER ŞEYİ KAPALI
+        // bir obje kullanılır. Böylece bir DB hatası/gecikmesi asla fazladan
+        // yetki sızdırmaz; olsa olsa kullanıcı geçici olarak hiçbir sayfayı
+        // göremez ki bu, tersinden çok daha güvenli bir varsayılan.
+        setYetkiler({
+          sayfa_yetkileri: {
+            dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
+            kantar: false, analiz: false, ayarlar: false, etd_eta: false,
+          },
+          sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
+        });
+      }
+    } catch (err) {
+      console.error("fetchRolVeYetkiler hata:", err);
+      // Hata durumunda da güvenli taraf: erişimi genişletme, daraltma.
       setYetkiler({
-        sayfa_yetkileri: { ...VARSAYILAN_YETKILER.sayfa_yetkileri, ...yetkiRes.data.sayfa_yetkileri },
-        sekme_yetkileri: { ...VARSAYILAN_YETKILER.sekme_yetkileri, ...yetkiRes.data.sekme_yetkileri },
+        sayfa_yetkileri: {
+          dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
+          kantar: false, analiz: false, ayarlar: false, etd_eta: false,
+        },
+        sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
       });
-    } else {
-      setYetkiler(VARSAYILAN_YETKILER);
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchRolVeYetkiler(session.user.id);
-      setLoading(false);
+      if (session?.user) {
+        await fetchRolVeYetkiler(session.user.id); // artık BEKLENİYOR
+      }
+      setLoading(false); // yetkiler tam yüklendikten SONRA loading kapanır
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          fetchRolVeYetkiler(session.user.id);
+          await fetchRolVeYetkiler(session.user.id); // artık BEKLENİYOR
         } else {
           setRol(null);
           setCompanyId(null); // Çıkış yapıldığında şirket bilgisi de sıfırlandı
@@ -154,7 +211,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     // State'e aldığımız companyId'yi buraya ekleyerek tüm alt bileşenlerin kullanımına açıyoruz
-    <AuthContext.Provider value={{ user, session, loading, rol, companyId, yetkiler, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, rol, companyId, yetkiler, isSuperAdmin: isSuperAdmin(user?.email), signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

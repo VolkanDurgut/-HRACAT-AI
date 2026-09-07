@@ -1,14 +1,15 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
 import { supabase, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
-import { FileText, Pencil, Loader2 } from "lucide-react";
+import { FileText, Pencil, Loader2, Eye, CheckCircle2 } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
+import { draftFiligranEkle, draftFiligranKaldir } from "@/lib/watermark";
 import {
   checkCommercialInvoiceReadiness,
   checkPackingListReadiness,
@@ -43,6 +44,16 @@ function storageDosyaAdi(siraNo: number, evrakKisa: string, dosya: Dosya, rezerv
   return turkceSadelestir(ham).replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") + ".html";
 }
 
+// Uc evrak turunun sabit meta bilgisi - hem ilk uretimde hem "Orijinali Olustur"
+// akisinda AYNI storage yolunu/adini yeniden turetmek icin kullanilir.
+const EVRAK_META: Record<"ci" | "pl" | "fc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
+  ci: { evrakTipi: "commercial_invoice", siraNo: 1, evrakKisa: "commercial_invoice", evrakAdi: "COMMERCIAL INVOICE" },
+  pl: { evrakTipi: "packing_list", siraNo: 2, evrakKisa: "packing_list", evrakAdi: "PACKING LIST" },
+  fc: { evrakTipi: "fumigation", siraNo: 8, evrakKisa: "fumigation", evrakAdi: "FUMIGATION" },
+};
+
+type EvrakDurumu = { durum: "taslak" | "orijinal"; dosya_url: string; dosya_adi: string } | null;
+
 type Props = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
@@ -57,6 +68,10 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
   // Hangi evrak hazirlaniyor: "ci" | "pl" | "fc" | null (her buton kendi loading'ini gosterir)
   const [yukleniyor, setYukleniyor] = useState<"ci" | "pl" | "fc" | null>(null);
+  // "Orijinali Olustur" islemi icin ayri, evrak_tipi bazli loading durumu
+  const [orijinalYukleniyor, setOrijinalYukleniyor] = useState<Record<string, boolean>>({});
+  // Her evrak_tipi icin mevcut kayit durumu (taslak/orijinal/hic yok)
+  const [durumlar, setDurumlar] = useState<Record<string, EvrakDurumu>>({});
 
   const ciHazirlik = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
   const plHazirlik = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
@@ -78,7 +93,29 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     fetchAyar();
   }, [dosya.alici_firma, companyId]);
 
-  const kaydetVeAc = async (html: string, evrakTipi: string, storageAdi: string, gosterilenAd: string) => {
+  // Mevcut evrak durumlarini (taslak/orijinal) yukle - hem ilk acilista hem
+  // bir islemden sonra tazelemek icin.
+  const durumlariYukle = useCallback(async () => {
+    if (!companyId) return;
+    const { data } = await supabase
+      .from("dosya_evraklari")
+      .select("evrak_tipi, durum, dosya_url, dosya_adi")
+      .eq("dosya_id", dosya.id)
+      .eq("company_id", companyId)
+      .in("evrak_tipi", ["commercial_invoice", "packing_list", "fumigation"]);
+
+    const map: Record<string, EvrakDurumu> = {};
+    (data || []).forEach((kayit: any) => {
+      map[kayit.evrak_tipi] = { durum: kayit.durum, dosya_url: kayit.dosya_url, dosya_adi: kayit.dosya_adi };
+    });
+    setDurumlar(map);
+  }, [dosya.id, companyId]);
+
+  useEffect(() => {
+    durumlariYukle();
+  }, [durumlariYukle]);
+
+  const kaydetVeAc = async (html: string, evrakTipi: string, storageAdi: string, gosterilenAd: string, durum: "taslak" | "orijinal") => {
     const temizIsim = gosterilenAd.replace(".html", "");
     const guncelHtml = html.replace(/<title>.*?<\/title>/i, `<title>${temizIsim}</title>`);
 
@@ -132,17 +169,19 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             dosya_url: dosyaUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
+            durum,
           }).eq("id", mevcutKayit.id).eq("company_id", companyId); // SaaS: update de şirkete kilitli
         } else {
-          await supabase.from("dosya_evraklari").insert({
-            dosya_id: dosya.id,
+          await supabase.from("dosya_evraklari").insert({            dosya_id: dosya.id,
             evrak_tipi: evrakTipi,
             dosya_url: dosyaUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
+            durum,
             company_id: companyId, // SaaS: yeni kayda şirket mührü
           });
         }
+        await durumlariYukle();
       }
     } catch (err) {
       console.error("Evrak kaydetme hatasi:", err);
@@ -152,117 +191,131 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     acBlobIle();
   };
 
-  const handleCommercialInvoiceOlustur = async () => {
+  const handleOlustur = async (tip: "ci" | "pl" | "fc") => {
     if (yukleniyor) return; // Cift tiklama koruması
-    setYukleniyor("ci");
+    setYukleniyor(tip);
     try {
-      const html = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
-      await kaydetVeAc(html, "commercial_invoice",
-        storageDosyaAdi(1, "commercial_invoice", dosya, rezervasyonlar),
-        gosterilecekDosyaAdi(1, "COMMERCIAL INVOICE", dosya, rezervasyonlar));
+      const meta = EVRAK_META[tip];
+      let htmlHam: string;
+      if (tip === "ci") htmlHam = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
+      else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
+      else htmlHam = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
+
+      // Ilk uretim HER ZAMAN taslak (DRAFT filigranli) olarak kaydedilir.
+      // Musteri onayindan sonra "Orijinali Olustur" ile filigran kaldirilir.
+      const htmlTaslak = draftFiligranEkle(htmlHam);
+      await kaydetVeAc(htmlTaslak, meta.evrakTipi,
+        storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
+        gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),
+        "taslak");
     } catch (err) {
-      console.error("Commercial Invoice olusturma hatasi:", err);
-      showToast("Commercial Invoice oluşturulamadı.", "error");
+      console.error("Evrak olusturma hatasi:", err);
+      showToast("Evrak oluşturulamadı.", "error");
     } finally {
       setYukleniyor(null);
     }
   };
 
-  const handlePackingListOlustur = async () => {
-    if (yukleniyor) return; // Cift tiklama koruması
-    setYukleniyor("pl");
-    try {
-      const html = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
-      await kaydetVeAc(html, "packing_list",
-        storageDosyaAdi(2, "packing_list", dosya, rezervasyonlar),
-        gosterilecekDosyaAdi(2, "PACKING LIST", dosya, rezervasyonlar));
-    } catch (err) {
-      console.error("Packing List olusturma hatasi:", err);
-      showToast("Packing List oluşturulamadı.", "error");
-    } finally {
-      setYukleniyor(null);
-    }
-  };
+  // "Orijinali Olustur": musterinin onayladigi TASLAGIN AYNISINI alip sadece
+  // filigranini kaldirir - sifirdan yeniden URETMEZ. Boylece gonderilen orijinal,
+  // onaylanan taslaktan asla farkli olmaz (ihracat/gumruk/banka evraklarinda
+  // bu tutarlilik kritik onemde).
+  const handleOrijinalYap = async (tip: "ci" | "pl" | "fc") => {
+    const meta = EVRAK_META[tip];
+    const mevcut = durumlar[meta.evrakTipi];
+    if (!mevcut || mevcut.durum !== "taslak" || orijinalYukleniyor[meta.evrakTipi]) return;
 
-  const handleFumigationOlustur = async () => {
-    if (yukleniyor) return; // Cift tiklama koruması
-    setYukleniyor("fc");
+    setOrijinalYukleniyor((prev) => ({ ...prev, [meta.evrakTipi]: true }));
     try {
-      const html = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
-      await kaydetVeAc(html, "fumigation",
-        storageDosyaAdi(8, "fumigation", dosya, rezervasyonlar),
-        gosterilecekDosyaAdi(8, "FUMIGATION", dosya, rezervasyonlar));
+      const res = await fetch(mevcut.dosya_url);
+      if (!res.ok) throw new Error("Taslak evrak indirilemedi.");
+      const htmlTaslak = await res.text();
+      const htmlTemiz = draftFiligranKaldir(htmlTaslak);
+
+      await kaydetVeAc(htmlTemiz, meta.evrakTipi,
+        storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
+        gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),
+        "orijinal");
+      showToast(`${meta.evrakAdi} orijinal (filigransız) hale getirildi.`, "success");
     } catch (err) {
-      console.error("Fumigation olusturma hatasi:", err);
-      showToast("Fumigation Certificate oluşturulamadı.", "error");
+      console.error("Orijinal yapma hatasi:", err);
+      showToast("Evrak orijinal hale getirilemedi.", "error");
     } finally {
-      setYukleniyor(null);
+      setOrijinalYukleniyor((prev) => ({ ...prev, [meta.evrakTipi]: false }));
     }
   };
 
   const btnClass = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors";
   const iconBtnClass = "inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors";
 
+  /** Uc evrak turu icin ortak render mantigi: hazir degilse uyari, hazirsa
+   * durum rozeti + Olustur/Yeniden Olustur + Orijinali Olustur butonlari. */
+  const renderEvrakButonlari = (tip: "ci" | "pl" | "fc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
+    if (!hazirlik.hazir) {
+      return (
+        <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
+          <span className="font-semibold text-amber-600">{etiket} eksik bilgiler:</span> {hazirlik.eksikler.join(", ")}
+        </InfoTooltip>
+      );
+    }
+    const meta = EVRAK_META[tip];
+    const kayit = durumlar[meta.evrakTipi];
+    const buOrijinalYukleniyor = !!orijinalYukleniyor[meta.evrakTipi];
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {kayit && (
+          <>
+            <span
+              className={
+                "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold " +
+                (kayit.durum === "taslak" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200")
+              }
+            >
+              {kayit.durum === "taslak" ? "TASLAK" : <><CheckCircle2 size={10} /> ORİJİNAL</>}
+            </span>
+            <a href={kayit.dosya_url} target="_blank" rel="noopener noreferrer" className={iconBtnClass} title="Mevcut evrağı görüntüle">
+              <Eye size={14} />
+            </a>
+          </>
+        )}
+        <button
+          onClick={() => handleOlustur(tip)}
+          disabled={yukleniyor !== null}
+          className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
+        >
+          {yukleniyor === tip ? (
+            <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
+          ) : (
+            <><FileText size={12} /> {kayit ? "Taslağı Yenile" : etiket}</>
+          )}
+        </button>
+        {kayit?.durum === "taslak" && (
+          <button
+            onClick={() => handleOrijinalYap(tip)}
+            disabled={buOrijinalYukleniyor}
+            title="Müşteri onayı alındıktan sonra filigransız orijinali oluşturur"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {buOrijinalYukleniyor ? (
+              <><Loader2 size={12} className="animate-spin" /> Oluşturuluyor...</>
+            ) : (
+              <><CheckCircle2 size={12} /> Orijinali Oluştur</>
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
-      <div className="flex items-center gap-1">
-        {(show === "ci" || show === "both") && (
-          ciHazirlik.hazir ? (
-            <button
-              onClick={handleCommercialInvoiceOlustur}
-              disabled={yukleniyor !== null}
-              className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
-            >
-              {yukleniyor === "ci" ? (
-                <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
-              ) : (
-                <><FileText size={12} /> Commercial Invoice</>
-              )}
-            </button>
-          ) : (
-            <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-              <span className="font-semibold text-amber-600">Commercial Invoice eksik bilgiler:</span> {ciHazirlik.eksikler.join(", ")}
-            </InfoTooltip>
-          )
-        )}
-        {(show === "pl" || show === "both") && (
-          plHazirlik.hazir ? (
-            <button
-              onClick={handlePackingListOlustur}
-              disabled={yukleniyor !== null}
-              className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
-            >
-              {yukleniyor === "pl" ? (
-                <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
-              ) : (
-                <><FileText size={12} /> Packing List</>
-              )}
-            </button>
-          ) : (
-            <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-              <span className="font-semibold text-amber-600">Packing List eksik bilgiler:</span> {plHazirlik.eksikler.join(", ")}
-            </InfoTooltip>
-          )
-        )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {(show === "ci" || show === "both") && renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
+        {(show === "pl" || show === "both") && renderEvrakButonlari("pl", plHazirlik, "Packing List")}
         {(show === "fc" || show === "both") && (
-          <div className="flex items-center gap-1">
-            {fcHazirlik.hazir ? (
-              <button
-                onClick={handleFumigationOlustur}
-                disabled={yukleniyor !== null}
-                className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
-              >
-                {yukleniyor === "fc" ? (
-                  <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
-                ) : (
-                  <><FileText size={12} /> Fumigation Cert.</>
-                )}
-              </button>
-            ) : (
-              <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-                <span className="font-semibold text-amber-600">Fumigation Certificate eksik bilgiler:</span> {fcHazirlik.eksikler.join(", ")}
-              </InfoTooltip>
-            )}
+          <div className="flex items-center gap-1.5">
+            {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
             {/* Kalem butonu - her zaman görünür, ayar modalını açar */}
             <button
               onClick={() => setAyarModalAcik(true)}

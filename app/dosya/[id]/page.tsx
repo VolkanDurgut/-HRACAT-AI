@@ -20,6 +20,7 @@ import { Loader2, Package, FileCheck, Copy } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
+import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
 import DraftBlSection from "@/components/draft-bl-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
@@ -356,7 +357,8 @@ function DosyaDetailContent() {
               <Package size={16} style={{ color: ACCENT }} />
               <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>İhracat Evrakları</h3>
             </div>
-            <div className="p-4">
+            <div className="p-4 space-y-3">
+              <TaslakEvrakMailSection dosya={dosya} companyId={companyId} />
               {(dosya.sevkiyat_evraklari || []).length > 0 ? (
                 <div className="space-y-2">
                   {EVRAK_SIRASI.map((tanim, i) => {

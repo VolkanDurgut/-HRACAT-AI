@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { useRouter } from "next/navigation";
@@ -175,6 +176,12 @@ export default function IhracatlarPage() {
   }, [user, companyId]);
 
   useEffect(() => { fetchDosyalar(); fetchAcikSiparisler(); }, [fetchDosyalar, fetchAcikSiparisler]);
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.ihracatlar) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
 
   const handleSipariseDevamEt = async (siparis: AnaSiparisWithProgress) => {
     if (!user || !companyId) return;

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import AppShell from "@/components/app-shell";
@@ -28,7 +30,8 @@ function HBar({ value, max, color = NAVY }: { value: number; max: number; color?
 }
 
 export default function AnalizPage() {
-  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
+  const router = useRouter();
   const [dosyalar, setDosyalar] = useState<DosyaFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [yilFiltre, setYilFiltre] = useState("Tümü");
@@ -59,6 +62,12 @@ export default function AnalizPage() {
   }, [user, companyId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.analiz) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
 
   const filtrelenmis = useMemo(() => {
     let liste = dosyalar;

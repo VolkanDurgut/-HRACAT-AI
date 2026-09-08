@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils"; 
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
@@ -35,7 +37,8 @@ function kalanGun(eta: string): number {
 }
 
 export default function EtdEtaPage() {
-  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
+  const router = useRouter();
   const { showToast } = useToast();
   const [satirlar, setSatirlar] = useState<SevkiyatSatir[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,12 @@ export default function EtdEtaPage() {
   }, [user, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.etd_eta) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
 
   const handleEtaKaydet = async (rezervasyonId: string, etaValue: string) => {
     setSaving(rezervasyonId);

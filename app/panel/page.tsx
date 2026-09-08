@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
@@ -69,6 +70,12 @@ function PanelContent() {
   }, [user, companyId]);
 
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.panel) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
 
   const handleDelete = async () => {
     if (!deleteTarget || !companyId) return;

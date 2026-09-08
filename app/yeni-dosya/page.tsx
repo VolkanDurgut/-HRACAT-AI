@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/cutoff-utils";
@@ -14,10 +15,16 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
 
 export default function YeniDosyaPage() {
-  const { user, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>("upload");
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.yeni_dosya) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

@@ -1,7 +1,7 @@
 // Ortak Gemini yardimci modulu
 // Hem dba-oku hem konsimento-kontrol Edge Function'lari tarafindan kullanilir
 
-export const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+export const GEMINI_MODELS = ["gemini-2.5-flash"];
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

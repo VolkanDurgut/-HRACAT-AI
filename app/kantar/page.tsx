@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
@@ -44,7 +46,8 @@ function maskeleMusteri(isim: string | null | undefined): string {
 }
 
 export default function KantarPage() {
-  const { user, companyId } = useAuth();
+  const { user, companyId, yetkiler } = useAuth();
+  const router = useRouter();
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [arama, setArama] = useState("");
@@ -98,6 +101,7 @@ export default function KantarPage() {
     });
 
     const enriched = (kontData as any[])
+      .filter((k) => !!dosyaMap[k.dosya_id]) // Tutarsizlik durumunda (dosya kapanmis/silinmis) coken degil, o satiri atlar
       .map((k) => ({
         ...k,
         dosya_no: dosyaMap[k.dosya_id].dosya_no,
@@ -113,6 +117,12 @@ export default function KantarPage() {
   useEffect(() => { 
     if (user && companyId) fetchKonteynerler(); 
   }, [fetchKonteynerler, user, companyId]);
+
+  useEffect(() => {
+    if (!yetkiler.sayfa_yetkileri.kantar) {
+      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+    }
+  }, [yetkiler, router]);
 
   useEffect(() => {
     if (!user || !companyId) return;
@@ -269,7 +279,11 @@ export default function KantarPage() {
                                 <Upload size={10} className="text-amber-400" /> DBA
                                 <input type="file" accept="application/pdf" className="hidden"
                                   ref={(el) => { inputRefs.current[k.id] = el; }}
-                                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleDbaYukle(k, f); }} />
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) handleDbaYukle(k, f);
+                                    e.target.value = ""; // Basarisiz denemeden sonra AYNI dosyanin tekrar secilebilmesi icin sart - yoksa tarayici "degisiklik yok" sanip onChange'i bir daha tetiklemez
+                                  }} />
                               </label>
                               {hatalar[k.id] && <p className="text-[9px] text-red-400 leading-tight mt-1 max-w-[90px] mx-auto truncate" title={hatalar[k.id]}>{hatalar[k.id]}</p>}
                             </div>

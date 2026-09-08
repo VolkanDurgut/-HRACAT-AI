@@ -176,15 +176,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    const interval = setInterval(() => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) fetchRolVeYetkiler(session.user.id);
-      });
-    }, 60000);
+    // NOT (2026-09-08): Burada daha once, admin baska bir kullanicinin
+    // yetkisini degistirdiginde acik sekmenin bunu 60sn icinde fark etmesini
+    // saglayan bir setInterval + supabase.auth.getSession() dongusu vardi.
+    // Bu, Supabase SDK'sinin KENDI ic oturum yenileme mekanizmasiyla ayni
+    // anda calisip "refresh token rotation" celismesine yol aciyordu:
+    // "AuthApiError: Invalid Refresh Token: Refresh Token Not Found" hatasi
+    // ile oturum bozuluyor, ardindan TUM veritabani islemleri (konteyner
+    // eklemek dahil) sessizce askida kaliyordu. Asagidaki onAuthStateChange
+    // zaten SDK token'i kendiliginden yeniledigi her an (TOKEN_REFRESHED)
+    // tetiklenip fetchRolVeYetkiler'i calistiriyor - yani bu interval hem
+    // gereksizdi hem de zararliydi, kaldirildi.
 
     return () => {
       subscription.unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 

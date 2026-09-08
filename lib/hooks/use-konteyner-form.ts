@@ -61,26 +61,43 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
   const handleSave = useCallback(async () => {
     if (!validate()) return;
     setSaving(true);
-    const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
-    const { error } = await supabase.from("konteynerler").insert({
-      company_id: companyId, // Yeni konteyner şirkete zimmetlendi
-      dosya_id: dosyaId,
-      konteyner_no: cleaned,
-      muhur_no: form.muhur_no || null,
-      tip: form.tip,
-      rezervasyon_id: form.rezervasyon_id || null,
-      marka: form.marka || varsayilanMarka || null,
-    });
-    setSaving(false);
-    if (error) {
-      showToast(`Konteyner eklenemedi: ${error.message}`, "error");
-      return;
+    
+    try {
+      const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
+      
+      const payload = [{
+        company_id: companyId,
+        dosya_id: dosyaId,
+        konteyner_no: cleaned,
+        muhur_no: form.muhur_no || null,
+        tip: form.tip,
+        rezervasyon_id: form.rezervasyon_id || null,
+        marka: form.marka || varsayilanMarka || null,
+      }];
+
+      // SENIOR DEBUG: API sessizce takılırsa 8 saniye sonra zorla hata fırlatacak yarış (race) mekanizması
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Supabase API isteği zaman aşımına uğradı. Veritabanı kilitli olabilir.")), 8000)
+      );
+
+      const requestPromise = supabase.from("konteynerler").insert(payload).select();
+
+      // İki işlemden hangisi önce biterse o kabul edilir
+      const { error } = await Promise.race([requestPromise, timeoutPromise]) as any;
+      
+      if (error) throw error; 
+      
+      setShowForm(false);
+      setForm({ ...EMPTY_FORM, marka: varsayilanMarka });
+      showToast("Konteyner eklendi.", "success");
+      onRefresh();
+    } catch (err: any) {
+      console.error("Kayıt İşlemi Çöktü:", err);
+      showToast(`Konteyner eklenemedi: ${err?.message || "Bilinmeyen bir hata oluştu."}`, "error");
+    } finally {
+      setSaving(false); 
     }
-    setShowForm(false);
-    setForm({ ...EMPTY_FORM, marka: varsayilanMarka });
-    showToast("Konteyner eklendi.", "success");
-    onRefresh();
-  }, [validate, form, companyId, dosyaId, showToast, onRefresh]);
+  }, [validate, form, companyId, dosyaId, varsayilanMarka, showToast, onRefresh]);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;

@@ -58,14 +58,14 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     return Object.keys(e).length === 0;
   }, [form.konteyner_no]);
 
-  const handleSave = useCallback(async () => {
+    const handleSave = useCallback(async () => {
     if (!validate()) return;
     setSaving(true);
-    
+
     try {
       const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
-      
-      const payload = [{
+
+      const payload = {
         company_id: companyId,
         dosya_id: dosyaId,
         konteyner_no: cleaned,
@@ -73,18 +73,10 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
         tip: form.tip,
         rezervasyon_id: form.rezervasyon_id || null,
         marka: form.marka || varsayilanMarka || null,
-      }];
+      };
 
-      // SENIOR DEBUG: API sessizce takılırsa 8 saniye sonra zorla hata fırlatacak yarış (race) mekanizması
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Supabase API isteği zaman aşımına uğradı. Veritabanı kilitli olabilir.")), 8000)
-      );
+      const { error } = await supabase.from("konteynerler").insert(payload);
 
-      const requestPromise = supabase.from("konteynerler").insert(payload).select();
-
-      // İki işlemden hangisi önce biterse o kabul edilir
-      const { error } = await Promise.race([requestPromise, timeoutPromise]) as any;
-      
       if (error) throw error; 
       
       setShowForm(false);

@@ -57,6 +57,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         tip: k.tip,
         net_agirlik_kg: k.net_agirlik_kg,
         brut_agirlik_kg: (k as any).brut_agirlik_kg,
+        tare_kg: k.tare_kg,
         kap_adeti: (k as any).pieces,
       })),
       beyanname_no: dosya.beyanname_no,

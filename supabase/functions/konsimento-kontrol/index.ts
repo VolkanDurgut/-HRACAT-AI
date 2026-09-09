@@ -33,6 +33,11 @@ Karşılaştırmada şu noktalara dikkat et:
   - "POLAR ECUADOR" ile "POLAR ECUADOR 627W" aynı gemidir (sefer numarası eklenmiş), uyumsuzluk DEĞİLDİR.
   - Sadece TAMAMEN FARKLI bir liman veya gemi adı varsa (örn. "MARPORT" ile "AMBARLI" gibi alakasız isimler) bunu gerçek bir uyumsuzluk olarak bildir.
 - KONTEYNER KARŞILAŞTIRMASI (kritik): Dosyadaki her konteynerin Konteyner No, Mühür No, Net Ağırlık (KG), Brüt Ağırlık (KG), ve Kap/Parça Adedini, sistemdeki "konteynerler" listesiyle TEK TEK eşleştirip karşılaştır. Eşleştirme konteyner numarasına göre yapılır.
+- AĞIRLIK SÜTUNLARININ DOĞRU EŞLEŞTİRİLMESİ (çok önemli, sık hata kaynağı): Konşimento/taslak konşimento belgelerinde çoğu zaman AYRI bir "Net Weight" sütunu BULUNMAZ - sadece "Gross Weight" veya "Gross Weight Cargo" ile ayrı bir "Tare" sütunu bulunur.
+  - Böyle bir durumda, belgedeki "Gross Weight"/"Gross Weight Cargo" değerini sistemdeki "brut_agirlik_kg" (Brüt Ağırlık) alanıyla DOĞRUDAN karşılaştır.
+  - Belgedeki "Tare" değerini sistemdeki "tare_kg" (Dara) alanıyla DOĞRUDAN karşılaştır.
+  - KESİNLİKLE "Gross Weight - Tare" işlemi yaparak kendiliğinden bir "net ağırlık" TÜRETME ve bunu sistemin "net_agirlik_kg" alanıyla kıyaslama - belge açıkça ayrı bir "Net Weight" sütunu içermiyorsa bu karşılaştırmayı hiç yapma. Bu tür bir öz-türetme, Brüt ile Net'i birbirine karıştırıp Dara'yı iki kez düşürerek YANLIŞ bir uyumsuzluk bildirmene yol açar.
+  - Belgede açıkça ayrı "Net Weight" sütunu VARSA, o zaman bunu sistemin "net_agirlik_kg" alanıyla karşılaştır.
 - Konteyner veya mühür numaralarında tek bir karakter farkı bile varsa bunu mutlaka uyumsuzluk olarak bildir, bu kritik bir hatadır.
 - Net/Brüt ağırlık veya kap adedinde fark varsa (sistemde kayıtlı değerle dosyadaki değer farklıysa), bunu da uyumsuzluk olarak bildir; hangi konteynere ait olduğunu "alan" kısmında belirt (örnek: "MRKU7041920 - Net Ağırlık").
 - Sistemde bir konteyner için Net/Brüt/Kap Adeti henüz hiç girilmemişse (boş/null ise), bunu uyumsuzluk SAYMA, çünkü bu bilgi henüz idari personel tarafından girilmemiş olabilir.

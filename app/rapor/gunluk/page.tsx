@@ -26,6 +26,36 @@ function bugunTarihStr() {
   return new Date(d.getTime() - yerelOfset).toISOString().slice(0, 10);
 }
 
+/**
+ * DBA belgesinden yapay zeka ile cikarilan "DD.MM.YYYY HH:MM:SS" formatindaki
+ * GERCEK tartim tarihini { gun, saat } olarak ayristirir. Bu, konteynerin
+ * SISTEME NE ZAMAN YUKLENDIGINDEN (dba_yukleme_tarihi) FARKLI bir bilgidir -
+ * personel belgeyi ertesi gun/gec yukleyebilir, bu durumda konteyner yanlis
+ * gune dusmemesi icin belgedeki gercek tarih esas alinir. Format tanınamazsa
+ * (nadir AI cikarim hatasi) null doner ve cagiran kod yukleme tarihine
+ * guvenli sekilde geri doner - hicbir konteyner raporda sessizce kaybolmaz.
+ */
+function tartimTarihiAyristir(deger: string | null | undefined): { gun: string; saat: string } | null {
+  if (!deger) return null;
+  const eslesme = deger.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})[ ,T]+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!eslesme) return null;
+  const [, gg, aa, yyyy, ss, dd, sn] = eslesme;
+  return { gun: `${yyyy}-${aa}-${gg}`, saat: `${ss}:${dd}:${sn || "00"}` };
+}
+
+/** Bir konteyner icin raporda kullanilacak "efektif gun/saat" bilgisini dondurur:
+ *  once DBA belgesindeki gercek tartim tarihi denenir, o yoksa/bozuksa
+ *  (Turkiye saatine cevrilmis) sistem yukleme tarihine guvenli sekilde doner. */
+function efektifTartimBilgisi(dbaKontrolSonucu: any, dbaYuklemeTarihi: string | null): { gun: string; saat: string } | null {
+  const aiTarihi = tartimTarihiAyristir(dbaKontrolSonucu?.tartim_tarih_saat);
+  if (aiTarihi) return aiTarihi;
+  if (!dbaYuklemeTarihi) return null;
+  const yuklemeDate = new Date(dbaYuklemeTarihi);
+  const gun = yuklemeDate.toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const saat = yuklemeDate.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour12: false });
+  return { gun, saat };
+}
+
 export default function GunlukRaporSayfasi() {
   const { user, loading: authLoading, companyId } = useAuth();
   const router = useRouter();
@@ -48,25 +78,25 @@ export default function GunlukRaporSayfasi() {
       .from("companies").select("company_name").eq("id", companyId).maybeSingle();
     setCompanyName(sirket?.company_name || "");
 
-    // BOLUM 1: Secili gunde DBA'si yuklenen (yani sevk edilen) konteynerler
-    // Not: new Date("YYYY-MM-DDT00:00:00") tarayicinin YEREL saat dilimini kullanarak
-    // parse edilir, .toISOString() ile doğru UTC karsiligina cevrilir - boylece
-    // Turkiye saatiyle (UTC+3) gece gec saatte yuklenen bir konteyner yanlis gune dusmez.
-    const gunBaslangicDate = new Date(`${tarih}T00:00:00`);
-    const gunBitisDate = new Date(`${tarih}T00:00:00`);
-    gunBitisDate.setDate(gunBitisDate.getDate() + 1);
-    const gunBaslangic = gunBaslangicDate.toISOString();
-    const gunBitis = gunBitisDate.toISOString();
+    // BOLUM 1: Secili gunde GERCEKTEN tartilan (yani sevk edilen) konteynerler.
+    // ONEMLI: dba_yukleme_tarihi (sisteme yukleme zamani) yerine, DBA belgesinden
+    // AI ile cikarilan GERCEK tartim tarihi (dba_kontrol_sonucu.tartim_tarih_saat)
+    // esas alinir - personel belgeyi ertesi gun yuklerse konteyner yanlis rapora
+    // dusmesin diye SQL'de tarih filtresi UYGULANMAZ, sirkete ait TUM DBA'si
+    // yuklenmis konteynerler cekilip dogru gune JS tarafinda atanir.
     const { data: bugunData } = await supabase
       .from("konteynerler")
-      .select("id, konteyner_no, muhur_no, plaka, tare_kg, vgm_kg, dba_yukleme_tarihi")
+      .select("id, konteyner_no, muhur_no, plaka, tare_kg, vgm_kg, dba_yukleme_tarihi, dba_kontrol_sonucu")
       .eq("company_id", companyId)
-      .gte("dba_yukleme_tarihi", gunBaslangic)
-      .lt("dba_yukleme_tarihi", gunBitis)
-      .order("dba_yukleme_tarihi", { ascending: true });
+      .not("dba_dosya_url", "is", null);
+
+    const buGuneAitOlanlar = (bugunData || [])
+      .map((k: any) => ({ ...k, efektif: efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi) }))
+      .filter((k) => k.efektif?.gun === tarih)
+      .sort((a, b) => (a.efektif?.saat || "").localeCompare(b.efektif?.saat || ""));
 
     setBugunYuklenenler(
-      (bugunData || []).map((k: any) => ({
+      buGuneAitOlanlar.map((k: any) => ({
         id: k.id,
         konteyner_no: k.konteyner_no,
         muhur_no: k.muhur_no,

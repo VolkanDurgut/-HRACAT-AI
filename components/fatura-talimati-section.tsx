@@ -178,6 +178,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
         tip: k.tip,
         net_agirlik_kg: k.net_agirlik_kg,
         brut_agirlik_kg: (k as any).brut_agirlik_kg,
+        tare_kg: k.tare_kg,
         kap_adeti: (k as any).pieces,
       })),
       beyanname_no: dosya.beyanname_no, fatura_no: dosya.fatura_no, bl_no: dosya.bl_no, diib_no: dosya.diib_no,

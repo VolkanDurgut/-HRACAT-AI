@@ -311,7 +311,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         </div>
       )}
 
-      {Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || fcHazirlik.hazir) && (
+      {show === "both" && Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || fcHazirlik.hazir) && (
         <p className="text-[11px] mt-1.5" style={{ color: "#94a3b8" }}>
           İşlem sırası: önce <strong>Draft</strong> ile filigranlı taslağı hazırlayın → müşteriye onaya gönderin → onay gelince <strong>Orijinal</strong> butonuna basın.
         </p>

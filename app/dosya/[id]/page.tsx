@@ -26,6 +26,7 @@ import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { indirVgmPdf } from "@/lib/vgm-pdf-builder";
 import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
+import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
@@ -312,9 +313,12 @@ function DosyaDetailContent() {
             <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
-              <Package size={16} style={{ color: ACCENT }} />
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>İhracat Evrakları</h3>
+            <div className="px-6 py-4 border-b flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
+              <div className="flex items-center gap-2">
+                <Package size={16} style={{ color: ACCENT }} />
+                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>İhracat Evrakları</h3>
+              </div>
+              <TaslakOnayButonu dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} />
             </div>
             <div className="p-4 space-y-3">
               <TaslakEvrakMailSection dosya={dosya} companyId={companyId} />

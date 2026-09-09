@@ -24,6 +24,7 @@ import { Loader2, Package, FileCheck, Copy } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
+import { indirVgmPdf } from "@/lib/vgm-pdf-builder";
 import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
 import DraftBlSection from "@/components/draft-bl-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -206,6 +207,17 @@ function DosyaDetailContent() {
                     style={{ backgroundColor: ACCENT }}
                   >
                     VGM Gönder
+                  </button>
+                  <button
+                    onClick={() => indirVgmPdf(dosya, rezervasyonlar, konteynerler)}
+                    disabled={!vgmHazir}
+                    title="VGM raporunu PDF olarak indir"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      vgmHazir ? "hover:bg-white/5 cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                    style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                  >
+                    VGM İndir
                   </button>
                   <button
                     onClick={() => konteynerTabRef.current?.acKonsimento()}

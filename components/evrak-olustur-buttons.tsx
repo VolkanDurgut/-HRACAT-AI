@@ -4,12 +4,12 @@ import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
 import { supabase, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
-import { FileText, Pencil, Loader2, Eye, CheckCircle2 } from "lucide-react";
+import { FileText, Pencil, Loader2, CheckCircle2 } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
-import { draftFiligranEkle, draftFiligranKaldir } from "@/lib/watermark";
+import { draftFiligranEkle } from "@/lib/watermark";
 import {
   checkCommercialInvoiceReadiness,
   checkPackingListReadiness,
@@ -67,10 +67,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const { companyId } = useAuth(); // SaaS: şirket bazlı izolasyon için company_id kaynağı
   const [fumigationAyar, setFumigationAyar] = useState<FumigationAyari | null>(null);
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
-  // Hangi evrak hazirlaniyor: "ci" | "pl" | "fc" | null (her buton kendi loading'ini gosterir)
-  const [yukleniyor, setYukleniyor] = useState<"ci" | "pl" | "fc" | null>(null);
-  // "Orijinali Olustur" islemi icin ayri, evrak_tipi bazli loading durumu
-  const [orijinalYukleniyor, setOrijinalYukleniyor] = useState<Record<string, boolean>>({});
+  // "ci-taslak" | "ci-orijinal" | "pl-taslak" ... formatinda - hangi butonun yuklendigini gosterir
+  const [yukleniyor, setYukleniyor] = useState<string | null>(null);
   // Her evrak_tipi icin mevcut kayit durumu (taslak/orijinal/hic yok)
   const [durumlar, setDurumlar] = useState<Record<string, EvrakDurumu>>({});
   // ORIJINAL onaylanmis bir evragi yanlislikla tekrar taslaga cevirmeyi
@@ -123,10 +121,6 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     const temizIsim = gosterilenAd.replace(".html", "");
     const guncelHtml = html.replace(/<title>.*?<\/title>/i, `<title>${temizIsim}</title>`);
 
-    // Evragi her zaman Blob URL ile ac. Bu yontem:
-    //  - render'i garanti eder (content-type text/html, storage davranisindan bagimsiz),
-    //  - Ctrl+P'de dosya adini dogru gosterir (gercek bir blob: URL'i, <title>'dan gelir),
-    //  - storage/internet yavas olsa bile aninda acilir.
     const acBlobIle = () => {
       const blob = new Blob([guncelHtml], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -134,15 +128,11 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       if (!win) {
         showToast("Açılır pencere engellendi. Lütfen tarayıcı ayarlarından izin verin.", "error");
       }
-      // Bellek sizmasini onlemek icin bir sure sonra blob URL'ini serbest birak.
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
 
-    // Arsivleme: evragi Supabase Storage'a kaydet + dosya_evraklari kaydini guncelle.
-    // Bu adim basarisiz olsa bile (asagida) evrak yine de acilir.
     try {
       if (!companyId) {
-        // Şirket bilgisi yoksa arşive yazma (NULL company_id kaydı oluşmasın); evrak yine de açılır.
         console.warn("companyId yok, evrak arşive kaydedilmedi ama açılıyor.");
         acBlobIle();
         return;
@@ -152,7 +142,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
       const { error: uploadError } = await supabase.storage
         .from("evraklar")
-        .upload(storagePath, blob, { contentType: "text/html; charset=utf-8", upsert: true });
+        .upload(storagePath, blob, { contentType: "text/html; charset=utf-8", upsert: true, cacheControl: "0" });
 
       if (uploadError) {
         console.error("Storage yukleme hatasi:", uploadError);
@@ -165,7 +155,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           .select("id")
           .eq("dosya_id", dosya.id)
           .eq("evrak_tipi", evrakTipi)
-          .eq("company_id", companyId) // SaaS: şirket bazlı izolasyon
+          .eq("company_id", companyId)
           .maybeSingle();
 
         if (mevcutKayit) {
@@ -174,30 +164,34 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
             durum,
-          }).eq("id", mevcutKayit.id).eq("company_id", companyId); // SaaS: update de şirkete kilitli
+          }).eq("id", mevcutKayit.id).eq("company_id", companyId);
         } else {
-          await supabase.from("dosya_evraklari").insert({            dosya_id: dosya.id,
+          await supabase.from("dosya_evraklari").insert({
+            dosya_id: dosya.id,
             evrak_tipi: evrakTipi,
             dosya_url: dosyaUrl,
             dosya_adi: gosterilenAd,
             yukleme_tarihi: new Date().toISOString(),
             durum,
-            company_id: companyId, // SaaS: yeni kayda şirket mührü
+            company_id: companyId,
           });
         }
         await durumlariYukle();
       }
     } catch (err) {
-      console.error("Evrak kaydetme hatasi:", err);
-      showToast("Evrak arşive kaydedilemedi ama açılıyor. Lütfen tekrar deneyin.", "error");
+      console.error("Evrak kaydetme hatasi:", err);      showToast("Evrak arşive kaydedilemedi ama açılıyor. Lütfen tekrar deneyin.", "error");
     }
 
-    // Arsivleme sonucu ne olursa olsun evrak her zaman acilir.    acBlobIle();
+    // Arsivleme sonucu ne olursa olsun evrak her zaman acilir.
+    acBlobIle();
   };
 
-  const handleOlustur = async (tip: "ci" | "pl" | "fc") => {
+  // Draft VE Orijinal, HER ZAMAN ayni kaynaktan (dosya/rezervasyon/konteyner
+  // verisinden) taze olarak uretilir - tek fark filigran eklenip eklenmemesi.
+  // Boylece iki ayri, birbirinden bagimsiz ve her zaman guvenilir buton olur.
+  const uretVeKaydet = async (tip: "ci" | "pl" | "fc", durum: "taslak" | "orijinal") => {
     if (yukleniyor) return; // Cift tiklama koruması
-    setYukleniyor(tip);
+    setYukleniyor(`${tip}-${durum}`);
     try {
       const meta = EVRAK_META[tip];
       let htmlHam: string;
@@ -205,13 +199,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
       else htmlHam = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
 
-      // Ilk uretim HER ZAMAN taslak (DRAFT filigranli) olarak kaydedilir.
-      // Musteri onayindan sonra "Orijinali Olustur" ile filigran kaldirilir.
-      const htmlTaslak = draftFiligranEkle(htmlHam);
-      await kaydetVeAc(htmlTaslak, meta.evrakTipi,
+      const html = durum === "taslak" ? draftFiligranEkle(htmlHam) : htmlHam;
+      await kaydetVeAc(html, meta.evrakTipi,
         storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
         gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),
-        "taslak");
+        durum);
+      showToast(`${meta.evrakAdi} ${durum === "taslak" ? "taslak (filigranlı)" : "orijinal (filigransız)"} olarak oluşturuldu.`, "success");
     } catch (err) {
       console.error("Evrak olusturma hatasi:", err);
       showToast("Evrak oluşturulamadı.", "error");
@@ -220,56 +213,26 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     }
   };
 
-  // "Orijinali Olustur": musterinin onayladigi TASLAGIN AYNISINI alip sadece
-  // filigranini kaldirir - sifirdan yeniden URETMEZ. Boylece gonderilen orijinal,
-  // onaylanan taslaktan asla farkli olmaz (ihracat/gumruk/banka evraklarinda
-  // bu tutarlilik kritik onemde).
-  const handleOrijinalYap = async (tip: "ci" | "pl" | "fc") => {
-    const meta = EVRAK_META[tip];
-    const mevcut = durumlar[meta.evrakTipi];
-    if (!mevcut || mevcut.durum !== "taslak" || orijinalYukleniyor[meta.evrakTipi]) return;
-
-    setOrijinalYukleniyor((prev) => ({ ...prev, [meta.evrakTipi]: true }));
-    try {
-      const res = await fetch(mevcut.dosya_url);
-      if (!res.ok) throw new Error("Taslak evrak indirilemedi.");
-      const htmlTaslak = await res.text();
-      const htmlTemiz = draftFiligranKaldir(htmlTaslak);
-
-      await kaydetVeAc(htmlTemiz, meta.evrakTipi,
-        storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
-        gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),
-        "orijinal");
-      showToast(`${meta.evrakAdi} orijinal (filigransız) hale getirildi.`, "success");
-    } catch (err) {
-      console.error("Orijinal yapma hatasi:", err);
-      showToast("Evrak orijinal hale getirilemedi.", "error");
-    } finally {
-      setOrijinalYukleniyor((prev) => ({ ...prev, [meta.evrakTipi]: false }));
-    }
-  };
-
-  // "Olustur"/"Taslagi Yenile" butonuna tiklandiginda cagrilir. Eger evrak
-  // zaten ORIJINAL (onaylanmis) durumdaysa, dogrudan yeniden uretmez -
-  // once kullanicidan acik bir onay ister. Boylece muhasebe/ihracat personeli
-  // yanlislikla onaylanmis bir evragi tekrar DRAFT filigranli hale
-  // dondurmez (bu, gumruk/banka surecinde ciddi karisikliga yol acabilir).
-  const handleOlusturTiklandi = (tip: "ci" | "pl" | "fc") => {
+  // Butona tiklandiginda cagrilir. Eger evrak zaten ORIJINAL (onaylanmis)
+  // durumdaysa ve kullanici DRAFT'a basarsa, dogrudan uretmez - once acik
+  // bir onay ister. Boylece muhasebe/ihracat personeli yanlislikla
+  // onaylanmis bir evragi tekrar filigranli hale dondurmez (gumruk/banka
+  // surecinde ciddi karisikliga yol acabilir).
+  const handleTiklandi = (tip: "ci" | "pl" | "fc", durum: "taslak" | "orijinal") => {
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
-    if (kayit?.durum === "orijinal") {
+    if (durum === "taslak" && kayit?.durum === "orijinal") {
       setYenidenTaslakConfirm(tip);
     } else {
-      handleOlustur(tip);
+      uretVeKaydet(tip, durum);
     }
   };
 
   const btnClass = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors";
-  const btnClassMuted = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200 transition-colors";
   const iconBtnClass = "inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors";
 
   /** Uc evrak turu icin ortak render mantigi: hazir degilse uyari, hazirsa
-   * durum rozeti + Olustur/Yeniden Olustur + Orijinali Olustur butonlari. */
+   * durum rozeti + Draft + Orijinal butonlari. */
   const renderEvrakButonlari = (tip: "ci" | "pl" | "fc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
     if (!hazirlik.hazir) {
       return (
@@ -280,53 +243,33 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     }
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
-    const buOrijinalYukleniyor = !!orijinalYukleniyor[meta.evrakTipi];
 
     return (
       <div className="flex items-center gap-1.5">
-        {kayit && (
-          <>
-            <span
-              className={
-                "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold " +
-                (kayit.durum === "taslak" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200")
-              }
-            >
-              {kayit.durum === "taslak" ? "TASLAK" : <><CheckCircle2 size={10} /> ORİJİNAL</>}
-            </span>
-            <a href={kayit.dosya_url} target="_blank" rel="noopener noreferrer" className={iconBtnClass} title="Mevcut evrağı görüntüle">
-              <Eye size={14} />
-            </a>
-          </>
-        )}
         <button
-          onClick={() => handleOlusturTiklandi(tip)}
+          onClick={() => handleTiklandi(tip, "taslak")}
           disabled={yukleniyor !== null}
-          title={kayit?.durum === "orijinal" ? "Dikkat: Onaylanmış orijinali tekrar taslağa çevirir" : undefined}
-          className={(kayit?.durum === "orijinal" ? btnClassMuted : btnClass) + " disabled:opacity-60 disabled:cursor-not-allowed"}
+          title={kayit?.durum === "orijinal" ? "Dikkat: Onaylanmış orijinali tekrar taslağa (filigranlı) çevirir" : "Filigranlı taslak oluşturur"}
+          className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
         >
-          {yukleniyor === tip ? (
+          {yukleniyor === `${tip}-taslak` ? (
             <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
-          ) : kayit?.durum === "orijinal" ? (
-            <><FileText size={12} /> Yeniden Taslak Oluştur</>
           ) : (
-            <><FileText size={12} /> {kayit ? "Taslağı Yenile" : etiket}</>
+            <><FileText size={12} /> Draft</>
           )}
         </button>
-        {kayit?.durum === "taslak" && (
-          <button
-            onClick={() => handleOrijinalYap(tip)}
-            disabled={buOrijinalYukleniyor}
-            title="Müşteri onayı alındıktan sonra filigransız orijinali oluşturur"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {buOrijinalYukleniyor ? (
-              <><Loader2 size={12} className="animate-spin" /> Oluşturuluyor...</>
-            ) : (
-              <><CheckCircle2 size={12} /> Orijinali Oluştur</>
-            )}
-          </button>
-        )}
+        <button
+          onClick={() => handleTiklandi(tip, "orijinal")}
+          disabled={yukleniyor !== null}
+          title="Filigransız orijinal evrağı oluşturur"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {yukleniyor === `${tip}-orijinal` ? (
+            <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
+          ) : (
+            <><CheckCircle2 size={12} /> Orijinal</>
+          )}
+        </button>
       </div>
     );
   };
@@ -334,20 +277,17 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   return (
     <>
       {show === "both" ? (
-        // Dar alanlarda (ör. Ihracatlar hizli onizleme paneli) uc evrak turu
-        // ayni satirda sikisip karismasin diye her biri kendi etiketli
-        // satirinda, alt alta gosterilir.
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-medium shrink-0" style={{ color: "#94a3b8" }}>Commercial Invoice</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Commercial Invoice</span>
             {renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
           </div>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-medium shrink-0" style={{ color: "#94a3b8" }}>Packing List</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Packing List</span>
             {renderEvrakButonlari("pl", plHazirlik, "Packing List")}
           </div>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs font-medium shrink-0" style={{ color: "#94a3b8" }}>Fumigation Cert.</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Fumigation Cert.</span>
             <div className="flex items-center gap-1.5">
               {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
               <button onClick={() => setAyarModalAcik(true)} className={iconBtnClass} title="Fumigasyon ayarlarını düzenle">
@@ -357,8 +297,6 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           </div>
         </div>
       ) : (
-        // Dosya detay sayfasinda oldugu gibi TEK bir evrak turu icin kompakt gosterim -
-        // burada ust satirda zaten evrak adi ayrica gosterildigi icin tekrar etiketlenmez.
         <div className="flex items-center gap-2 flex-wrap">
           {show === "ci" && renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
           {show === "pl" && renderEvrakButonlari("pl", plHazirlik, "Packing List")}
@@ -373,14 +311,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         </div>
       )}
 
-      {/* Kullaniciya surecin nasil isledigini hatirlatan, gosterisiz bir ipucu */}
       {Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || fcHazirlik.hazir) && (
         <p className="text-[11px] mt-1.5" style={{ color: "#94a3b8" }}>
-          İşlem sırası: önce <strong>Oluştur</strong> ile taslağı (DRAFT filigranlı) hazırlayın → müşteriye onaya gönderin → onay gelince <strong>Orijinali Oluştur</strong> butonuna basın.
+          İşlem sırası: önce <strong>Draft</strong> ile filigranlı taslağı hazırlayın → müşteriye onaya gönderin → onay gelince <strong>Orijinal</strong> butonuna basın.
         </p>
       )}
 
-      {/* Fumigation ayar modali */}
       {dosya.alici_firma && (
         <FumigationAyarModal
           aliciFirma={dosya.alici_firma}
@@ -390,7 +326,6 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         />
       )}
 
-      {/* Orijinal onayli bir evragi tekrar taslaga cevirme onayi */}
       <ConfirmDialog
         open={yenidenTaslakConfirm !== null}
         onOpenChange={(open) => { if (!open) setYenidenTaslakConfirm(null); }}
@@ -401,7 +336,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         onConfirm={() => {
           const tip = yenidenTaslakConfirm;
           setYenidenTaslakConfirm(null);
-          if (tip) handleOlustur(tip);
+          if (tip) uretVeKaydet(tip, "taslak");
         }}
         destructive
       />

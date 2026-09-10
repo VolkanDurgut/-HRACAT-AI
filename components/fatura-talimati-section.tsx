@@ -163,15 +163,12 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   };
 
   // Modal hic acilmadan, dogrudan PDF indirir - VGM Indir ile ayni davranis
-  // (her zaman gorunen ust bar butonu icin). Metin/Konu, gonderme akisiyla
-  // BIREBIR AYNI mantikla uretilir (once kaydedilmis versiyon varsa o, yoksa
-  // varsayilan buildMetin/buildKonu) - boylece indirilen PDF ile gonderilecek
-  // mail her zaman tutarli olur.
+  // (her zaman gorunen ust bar butonu icin). PDF artik metin/konu'dan degil,
+  // dogrudan guncel sistem verisinden (kart tasarimi) uretilir - boylece PDF
+  // her zaman en guncel dosya/konteyner bilgisini yansitir.
   const handleFaturaTalimatiIndir = () => {
     if (!faturaTalimatiHazir) return;
-    const konuGuncel = buildKonu();
-    const metinGuncel = (dosya as any).fatura_talimati_metni || buildMetin();
-    indirFaturaTalimatiPdf(dosya.dosya_no, konuGuncel, metinGuncel);
+    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler);
   };
 
   const handleMailGonder = async () => {
@@ -224,7 +221,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 <Mail size={14} /> Mail Uygulamasini Ac
               </button>
-              <button onClick={() => indirFaturaTalimatiPdf(dosya.dosya_no, konu, metin)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatini PDF olarak indir">
+              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatini PDF olarak indir">
                 <Download size={14} /> Fatura Talimati Indir
               </button>
               <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>

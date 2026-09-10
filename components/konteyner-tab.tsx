@@ -26,7 +26,7 @@ type Props = {
   companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
-export type KonteynerTabHandle = { acVgm: () => void; acKonsimento: () => void; acFatura: () => void };
+export type KonteynerTabHandle = { acVgm: () => void; acFatura: () => void };
 
 const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab(
   { dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId },
@@ -37,7 +37,6 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
 
   useImperativeHandle(ref, () => ({
     acVgm: () => vgmRef.current?.ac(),
-    acKonsimento: () => faturaTalimatiRef.current?.acKonsimento(),
     acFatura: () => faturaTalimatiRef.current?.acFatura(),
   }));
   const markaListesiManuel = ((dosya as any)?.ham_veri?.marka_listesi || []) as string[];

@@ -28,6 +28,7 @@ import { indirVgmPdf } from "@/lib/vgm-pdf-builder";
 import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
 import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
+import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
@@ -191,10 +192,6 @@ function DosyaDetailContent() {
               const vgmHazir = konteynerler.length > 0 && konteynerler.every((k) => !!k.vgm_kg);
               const rezKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
               const faturaHazir = rezKontAdedi > 0 && konteynerler.length === rezKontAdedi;
-              const tumDolu = konteynerler.length > 0 && konteynerler.every((k) =>
-                k.net_agirlik_kg != null && (k as any).brut_agirlik_kg != null && (k as any).pieces != null
-              );
-              const konsimentoHazirBtn = faturaHazir && tumDolu;
               const btnClass = (aktif: boolean) =>
                 `px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   aktif ? "text-white hover:opacity-90 cursor-pointer" : "cursor-not-allowed opacity-50"
@@ -219,14 +216,6 @@ function DosyaDetailContent() {
                     style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
                   >
                     VGM İndir
-                  </button>
-                  <button
-                    onClick={() => konteynerTabRef.current?.acKonsimento()}
-                    disabled={!konsimentoHazirBtn}
-                    className={btnClass(konsimentoHazirBtn)}
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    Konşimento Talimatı
                   </button>
                   <button
                     onClick={() => konteynerTabRef.current?.acFatura()}
@@ -310,6 +299,7 @@ function DosyaDetailContent() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+            <KonsimentoTalimatiSection dosyaId={dosya.id} dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

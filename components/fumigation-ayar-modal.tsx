@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { supabase, FumigationAyari } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { Loader2, X, FlameKindling } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -24,17 +25,19 @@ const VARSAYILAN: Omit<FumigationAyari, "id" | "alici_firma" | "updated_at"> = {
 
 export default function FumigationAyarModal({ aliciFirma, open, onClose, onSaved }: Props) {
   const { showToast } = useToast();
+  const { companyId } = useAuth(); // SaaS: kayit/insert'te sirket izolasyonu icin gerekli
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ ...VARSAYILAN });
 
   // Modal acilinca mevcut ayarlari yukle
   useEffect(() => {
-    if (!open || !aliciFirma) return;
+    if (!open || !aliciFirma || !companyId) return;
     const fetchAyar = async () => {
       const { data } = await supabase
         .from("fumigation_ayarlari")
         .select("*")
         .eq("alici_firma", aliciFirma)
+        .eq("company_id", companyId)
         .single();
       if (data) {
         setForm({
@@ -51,15 +54,20 @@ export default function FumigationAyarModal({ aliciFirma, open, onClose, onSaved
       }
     };
     fetchAyar();
-  }, [open, aliciFirma]);
+  }, [open, aliciFirma, companyId]);
 
   const handleSave = async () => {
+    if (!companyId) {
+      showToast("Şirket bilgisi henüz yüklenmedi. Lütfen birkaç saniye sonra tekrar deneyin.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const { data: mevcut } = await supabase
         .from("fumigation_ayarlari")
         .select("id")
         .eq("alici_firma", aliciFirma)
+        .eq("company_id", companyId)
         .single();
 
       let saved: FumigationAyari | null = null;
@@ -75,9 +83,12 @@ export default function FumigationAyarModal({ aliciFirma, open, onClose, onSaved
         saved = data;
         saveError = error?.message || null;
       } else {
+        // İlk kayit: company_id MUTLAKA gonderilmeli - RLS "insert_own_company"
+        // politikasi (with_check: company_id = auth_company_id()) bunu zorunlu
+        // kilar, eksik gonderilirse "new row violates row-level security policy" hatasi alinir.
         const { data, error } = await supabase
           .from("fumigation_ayarlari")
-          .insert({ alici_firma: aliciFirma, ...form, updated_at: new Date().toISOString() })
+          .insert({ alici_firma: aliciFirma, company_id: companyId, ...form, updated_at: new Date().toISOString() })
           .select()
           .single();
         saved = data;

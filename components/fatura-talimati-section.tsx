@@ -3,8 +3,9 @@ import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
-import { Mail, X } from "lucide-react";
+import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
 
 type Props = {
   dosyaId: string;
@@ -18,7 +19,7 @@ type Props = {
   companyId: string; // SaaS: şirket bazlı izolasyon
 };
 
-export type FaturaTalimatiSectionHandle = { acFatura: () => void };
+export type FaturaTalimatiSectionHandle = { acFatura: () => void; indirFaturaTalimati: () => void };
 
 const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(function FaturaTalimatiSection({
   dosyaId, dosya, konteynerler, rezervasyonlar,
@@ -161,6 +162,18 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     setShowFaturaTalimati(true);
   };
 
+  // Modal hic acilmadan, dogrudan PDF indirir - VGM Indir ile ayni davranis
+  // (her zaman gorunen ust bar butonu icin). Metin/Konu, gonderme akisiyla
+  // BIREBIR AYNI mantikla uretilir (once kaydedilmis versiyon varsa o, yoksa
+  // varsayilan buildMetin/buildKonu) - boylece indirilen PDF ile gonderilecek
+  // mail her zaman tutarli olur.
+  const handleFaturaTalimatiIndir = () => {
+    if (!faturaTalimatiHazir) return;
+    const konuGuncel = buildKonu();
+    const metinGuncel = (dosya as any).fatura_talimati_metni || buildMetin();
+    indirFaturaTalimatiPdf(dosya.dosya_no, konuGuncel, metinGuncel);
+  };
+
   const handleMailGonder = async () => {
     const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : "";
     window.open(`mailto:${to}?subject=${encodeURIComponent(konu)}${ccPart}&body=${encodeURIComponent(metin)}`);
@@ -179,6 +192,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
 
   useImperativeHandle(ref, () => ({
     acFatura: handleFaturaTalimatiAc,
+    indirFaturaTalimati: handleFaturaTalimatiIndir,
   }));
 
   return (
@@ -209,6 +223,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
             <div className="flex gap-2">
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 <Mail size={14} /> Mail Uygulamasini Ac
+              </button>
+              <button onClick={() => indirFaturaTalimatiPdf(dosya.dosya_no, konu, metin)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatini PDF olarak indir">
+                <Download size={14} /> Fatura Talimati Indir
               </button>
               <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
             </div>

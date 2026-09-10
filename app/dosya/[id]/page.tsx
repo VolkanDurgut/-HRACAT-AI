@@ -218,6 +218,17 @@ function DosyaDetailContent() {
                     VGM İndir
                   </button>
                   <button
+                    onClick={() => konteynerTabRef.current?.indirFaturaTalimati()}
+                    disabled={!faturaHazir}
+                    title="Fatura talimatını PDF olarak indir"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      faturaHazir ? "hover:bg-white/5 cursor-pointer" : "cursor-not-allowed opacity-50"
+                    }`}
+                    style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                  >
+                    Fatura Talimatı İndir
+                  </button>
+                  <button
                     onClick={() => konteynerTabRef.current?.acFatura()}
                     disabled={!faturaHazir}
                     className={btnClass(faturaHazir)}

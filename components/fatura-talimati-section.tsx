@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
-import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -55,11 +55,32 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
     const urunSatirlari = urunler.map((u: any) => {
       const ad = u.urun_adi || u.description || "Urun";
+      // Ayni urun adiyla farkli ambalaj boyutunda (orn. 25 KG / 50 KG) birden
+      // fazla kalem olabilir - ayirt edilebilmesi icin ambalaj boyutu da yazilir.
+      const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size;
       const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
       const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
-      return `  - ${ad}: CIF ${formatCurrency(cifBirim, dosya.para_birimi)}${fobBirim !== null ? ` / FOB ${formatCurrency(fobBirim, dosya.para_birimi)}` : ""}`;
+      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: CIF ${formatCurrency(cifBirim, dosya.para_birimi)}${fobBirim !== null ? ` / FOB ${formatCurrency(fobBirim, dosya.para_birimi)}` : ""}`;
     }).join("\n");
-    const konteynerSatirlari = konteynerler.map((k, i) => `  ${i + 1}. ${k.konteyner_no} (Muhur: ${k.muhur_no || "-"}, Tip: ${k.tip})`).join("\n");
+    const konteynerSatirlari = konteynerler.map((k, i) => {
+      // Muhur/Tip/Marka/Kap/Net/Brut/VGM/Tartim Tarihi - sadece dolu olanlar yazilir.
+      const detaylar = [
+        k.muhur_no ? `Muhur: ${k.muhur_no}` : null,
+        k.tip ? `Tip: ${k.tip}` : null,
+        (k as any).marka ? `Marka: ${(k as any).marka}` : null,
+        (k as any).pieces ? `Kap: ${Number((k as any).pieces).toLocaleString("tr-TR")}` : null,
+        k.net_agirlik_kg ? `Net: ${Number(k.net_agirlik_kg).toLocaleString("tr-TR")} KG` : null,
+        (k as any).brut_agirlik_kg ? `Brut: ${Number((k as any).brut_agirlik_kg).toLocaleString("tr-TR")} KG` : null,
+        (k as any).vgm_kg ? `VGM: ${Number((k as any).vgm_kg).toLocaleString("tr-TR")} KG` : null,
+        ((k as any).dba_kontrol_sonucu as any)?.tartim_tarih_saat ? `Tartim Tarihi: ${((k as any).dba_kontrol_sonucu as any).tartim_tarih_saat}` : null,
+      ].filter(Boolean).join(", ");
+      return `  ${i + 1}. ${k.konteyner_no}${detaylar ? ` (${detaylar})` : ""}`;
+    }).join("\n");
+
+    // Konteynerlerin toplam Net/Brut/Kap adedi - manuel formdaki TOPLAM satirina karsilik gelir.
+    const toplamNet = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
+    const toplamBrut = konteynerler.reduce((s, k) => s + ((k as any).brut_agirlik_kg || 0), 0);
+    const toplamKap = konteynerler.reduce((s, k) => s + ((k as any).pieces || 0), 0);
 
     const satir = (label: string, value: string | number | null | undefined) => {
       if (value === null || value === undefined || value === "" || value === "-") return null;
@@ -72,7 +93,12 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Satici Firma", dosya.satici_firma),
       satir("Marka", dosya.marka),
       satir("Proforma No", dosya.proforma_no),
+      satir("Ambalaj", dosya.detayli_ambalaj || dosya.ambalaj),
     ].filter(Boolean).join("\n");
+
+    const beyannameSuresi = rez?.beyanname_cutoff
+      ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`
+      : null;
 
     const lojistikBilgileri = [
       satir("Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani),
@@ -81,6 +107,18 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Gemi Adi", rez?.gemi_adi),
       satir("Acente", rez?.acente_ismi),
       satir("Booking No", rez?.booking_no),
+      satir("Beyanname Teslim Suresi", beyannameSuresi),
+    ].filter(Boolean).join("\n");
+
+    // Navlun/Lokal Masraf birim ve toplam degerleri ile "All in Navlun Fiyati"
+    // (ikisinin konteyner basina toplami) ve Araci Banka - ayri bir bolumde.
+    const allInNavlun = navlunBirim != null && lokalMasrafBirim != null ? navlunBirim + lokalMasrafBirim : null;
+    const maliyetBilgileri = [
+      satir("Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null),
+      satir("Toplam Navlun Fiyati", navlunToplam !== null ? formatCurrency(navlunToplam, dosya.para_birimi) : null),
+      satir("Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null),
+      satir("All in Navlun Fiyati (Konteyner Basina)", allInNavlun !== null ? formatCurrency(allInNavlun, dosya.para_birimi) : null),
+      satir("Araci Banka", dosya.banka),
     ].filter(Boolean).join("\n");
 
     const toplamFobStr = toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : null;
@@ -99,11 +137,16 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Son Kullanim Tarihi", dosya.son_kullanim_tarihi ? formatDateTR(dosya.son_kullanim_tarihi) : null),
     ].filter(Boolean).join("\n");
 
+    const konteynerToplamSatiri = (toplamNet || toplamBrut || toplamKap)
+      ? `\n\n  TOPLAM: ${konteynerler.length} Konteyner${toplamKap ? `, ${toplamKap.toLocaleString("tr-TR")} Kap` : ""}${toplamNet ? `, ${toplamNet.toLocaleString("tr-TR")} KG Net` : ""}${toplamBrut ? `, ${toplamBrut.toLocaleString("tr-TR")} KG Brut` : ""}`
+      : "";
+
     const bolumler = [
       `DOSYA BILGILERI\n${dosyaBilgileri}`,
       lojistikBilgileri ? `LOJISTIK BILGILERI\n${lojistikBilgileri}` : null,
+      maliyetBilgileri ? `MALIYET VE BANKA BILGILERI\n${maliyetBilgileri}` : null,
       `URUN VE FIYAT BILGILERI\n${urunFiyatBilgileri}`,
-      `KONTEYNER BILGILERI (${konteynerler.length} adet)\n${konteynerSatirlari || "  -"}`,
+      `KONTEYNER BILGILERI (${konteynerler.length} adet)\n${konteynerSatirlari || "  -"}${konteynerToplamSatiri}`,
       evrakTarihBilgileri ? `EVRAK VE TARIH BILGILERI\n${evrakTarihBilgileri}` : null,
     ].filter(Boolean).join("\n\n");
 

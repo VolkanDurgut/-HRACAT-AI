@@ -114,6 +114,10 @@ export default function KonsimentoTalimatiSection({
           : data.ozet,
       };
 
+      // Draft BL daha once BL No'yu "yetkili kaynak" olarak isaretlemisse
+      // (bkz. draft-bl-section.tsx), o deger her zaman ustun sayilir ve
+      // Konsimento Talimati bu alanin uzerine yazmaz.
+      const draftBlYetkiliMi = (dosya.ham_veri as any)?.bl_no_kaynak === "draft_bl";
       const guncelHamVeri = {
         ...(dosya.ham_veri || {}),
         notify: data.notify || []
@@ -123,7 +127,7 @@ export default function KonsimentoTalimatiSection({
         konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
-        bl_no: data.bl_no || dosya.bl_no,
+        bl_no: draftBlYetkiliMi ? dosya.bl_no : (data.bl_no || dosya.bl_no),
         ham_veri: guncelHamVeri,
       }).eq("id", dosyaId).eq("company_id", companyId);
       if (updateError) throw new Error(`Sonuc kaydedilemedi: ${updateError.message}`);

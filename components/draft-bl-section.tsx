@@ -125,6 +125,13 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       if (data.consignee) {
         guncelHamVeri.consignee_kaynak = "draft_bl";
       }
+      if (data.bl_no) {
+        // Draft BL'den bir BL No okunduysa, bunu "yetkili kaynak" olarak isaretle.
+        // Boylece konsimento-talimati-section.tsx, bu isaretlendikten sonra
+        // kendi okudugu BL No ile bu degerin uzerine ASLA yazmaz - Draft BL
+        // her zaman ustun sayilir (talep edilen kural).
+        guncelHamVeri.bl_no_kaynak = "draft_bl";
+      }
 
       await supabase.from("ihracat_dosyalari").update({
         draft_bl_dosya_url: dosyaUrl,

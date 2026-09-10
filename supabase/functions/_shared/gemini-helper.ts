@@ -3,6 +3,22 @@
 
 export const GEMINI_MODELS = ["gemini-2.5-flash"];
 
+/** Belirtilen milisaniye kadar bekler (yeniden deneme aralari icin). */
+function gecikme(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** HTTP durum kodu, TEKRAR DENENINCE duzelme ihtimali olan gecici bir
+ * hatayi mi gosteriyor (yogunluk/asiri istek/gecici sunucu hatasi),
+ * yoksa kalici bir hatayi mi (ornegin gecersiz istek) gosteriyor. */
+function geciciHataMi(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+/** Kullaniciya gosterilecek son hata mesaji - herhangi bir yapay zeka
+ * saglayicisinin/model adinin ic detayini ASLA disari sizdirmaz. */
+const SON_HATA_MESAJI = "Belge okuma servisinde geçici bir yoğunluk yaşandı. Lütfen birkaç saniye sonra tekrar deneyin.";
+
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -41,44 +57,55 @@ export async function callGeminiWithPdf<T>(
   }
 
   for (const model of GEMINI_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: base64Pdf } },
-            ],
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: "application/json",
-          },
-        }),
-      });
+    const MAKS_DENEME = 3;
+    for (let deneme = 1; deneme <= MAKS_DENEME; deneme++) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: mimeType, data: base64Pdf } },
+              ],
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: "application/json",
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        const err = await response.text();
-        console.error(`Model ${model} failed: ${err}`);
-        continue;
+        if (!response.ok) {
+          const err = await response.text();
+          console.error(`Model ${model} deneme ${deneme}/${MAKS_DENEME} basarisiz (${response.status}): ${err}`);
+          if (geciciHataMi(response.status) && deneme < MAKS_DENEME) {
+            await gecikme(deneme * 1500);
+            continue;
+          }
+          break;
+        }
+
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) break;
+
+        const parsed = JSON.parse(text);
+        if (validate(parsed)) return parsed;
+        break;
+      } catch (e) {
+        console.error(`Model ${model} deneme ${deneme}/${MAKS_DENEME} hata:`, e);
+        if (deneme < MAKS_DENEME) {
+          await gecikme(deneme * 1500);
+          continue;
+        }
       }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) continue;
-
-      const parsed = JSON.parse(text);
-      if (validate(parsed)) return parsed;
-    } catch (e) {
-      console.error(`Model ${model} error:`, e);
-      continue;
     }
   }
 
-  throw new Error("Tüm Gemini modelleri başarısız oldu. Lütfen tekrar deneyin.");
+  throw new Error(SON_HATA_MESAJI);
 }
 
 /**
@@ -128,32 +155,43 @@ export async function callGeminiTextOnly(systemPrompt: string, conversationText:
   }
 
   for (const model of GEMINI_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ parts: [{ text: conversationText }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 500 },
-        }),
-      });
+    const MAKS_DENEME = 3;
+    for (let deneme = 1; deneme <= MAKS_DENEME; deneme++) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: conversationText }] }],
+            generationConfig: { temperature: 0.6, maxOutputTokens: 500 },
+          }),
+        });
 
-      if (!response.ok) {
-        const err = await response.text();
-        console.error(`Model ${model} failed: ${err}`);
-        continue;
+        if (!response.ok) {
+          const err = await response.text();
+          console.error(`Model ${model} deneme ${deneme}/${MAKS_DENEME} basarisiz (${response.status}): ${err}`);
+          if (geciciHataMi(response.status) && deneme < MAKS_DENEME) {
+            await gecikme(deneme * 1500);
+            continue;
+          }
+          break;
+        }
+
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text.trim();
+        break;
+      } catch (e) {
+        console.error(`Model ${model} deneme ${deneme}/${MAKS_DENEME} hata:`, e);
+        if (deneme < MAKS_DENEME) {
+          await gecikme(deneme * 1500);
+          continue;
+        }
       }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text.trim();
-    } catch (e) {
-      console.error(`Model ${model} error:`, e);
-      continue;
     }
   }
 
-  throw new Error("Tüm Gemini modelleri başarısız oldu. Lütfen tekrar deneyin.");
+  throw new Error(SON_HATA_MESAJI);
 }

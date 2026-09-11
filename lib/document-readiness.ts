@@ -66,6 +66,37 @@ export function checkPackingListReadiness(
 }
 
 /**
+ * Certificate of Origin (Menşe Şahadetnamesi) icin gerekli tum alanlarin
+ * dolu olup olmadigini kontrol eder.
+ */
+export function checkCertificateOfOriginReadiness(
+  dosya: Dosya,
+  rezervasyonlar: Rezervasyon[],
+  konteynerler: Konteyner[]
+): ReadinessResult {
+  const eksikler: string[] = [];
+
+  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
+  if (!dosya.urun_tanimi) eksikler.push("Ürün Tanımı");
+  if (!dosya.detayli_ambalaj && !dosya.ambalaj) eksikler.push("Ambalaj");
+  if (!dosya.lot_no) eksikler.push("Lot No");
+
+  const rez = rezervasyonlar[0];
+  if (!rez?.booking_no) eksikler.push("Booking No (Rezervasyon No)");
+
+  if (konteynerler.length === 0) {
+    eksikler.push("Konteyner Bilgileri");
+  } else {
+    const eksikNet  = konteynerler.some((k) => !k.net_agirlik_kg);
+    const eksikBrut = konteynerler.some((k) => !(k as any).brut_agirlik_kg);
+    if (eksikNet)  eksikler.push("Net Ağırlık (bir veya daha fazla konteynerde eksik)");
+    if (eksikBrut) eksikler.push("Brüt Ağırlık (bir veya daha fazla konteynerde eksik)");
+  }
+
+  return { hazir: eksikler.length === 0, eksikler };
+}
+
+/**
  * Fumigation Certificate icin gerekli tum alanlarin dolu olup olmadigini kontrol eder.
  * Konteyner Net/Brut agirlik alanlari ayri ayri kontrol edilir.
  * Not: Fumigasyon detaylari (fumigant, doz, tarihler vb.) ham_veri uzerinden gelir

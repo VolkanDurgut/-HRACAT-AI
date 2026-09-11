@@ -9,11 +9,13 @@ import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
+import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
 import { draftFiligranEkle } from "@/lib/watermark";
 import {
   checkCommercialInvoiceReadiness,
   checkPackingListReadiness,
   checkFumigationReadiness,
+  checkCertificateOfOriginReadiness,
 } from "@/lib/document-readiness";
 import FumigationAyarModal from "@/components/fumigation-ayar-modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -47,10 +49,11 @@ function storageDosyaAdi(siraNo: number, evrakKisa: string, dosya: Dosya, rezerv
 
 // Uc evrak turunun sabit meta bilgisi - hem ilk uretimde hem "Orijinali Olustur"
 // akisinda AYNI storage yolunu/adini yeniden turetmek icin kullanilir.
-const EVRAK_META: Record<"ci" | "pl" | "fc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
-  ci: { evrakTipi: "commercial_invoice", siraNo: 1, evrakKisa: "commercial_invoice", evrakAdi: "COMMERCIAL INVOICE" },
-  pl: { evrakTipi: "packing_list", siraNo: 2, evrakKisa: "packing_list", evrakAdi: "PACKING LIST" },
-  fc: { evrakTipi: "fumigation", siraNo: 8, evrakKisa: "fumigation", evrakAdi: "FUMIGATION" },
+const EVRAK_META: Record<"ci" | "pl" | "coo" | "fc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
+  ci:  { evrakTipi: "commercial_invoice",     siraNo: 1, evrakKisa: "commercial_invoice",     evrakAdi: "COMMERCIAL INVOICE" },
+  pl:  { evrakTipi: "packing_list",           siraNo: 2, evrakKisa: "packing_list",           evrakAdi: "PACKING LIST" },
+  coo: { evrakTipi: "certificate_of_origin",  siraNo: 4, evrakKisa: "certificate_of_origin",  evrakAdi: "CERTIFICATE OF ORIGIN" },
+  fc:  { evrakTipi: "fumigation",             siraNo: 8, evrakKisa: "fumigation",             evrakAdi: "FUMIGATION" },
 };
 
 type EvrakDurumu = { durum: "taslak" | "orijinal"; dosya_url: string; dosya_adi: string } | null;
@@ -59,7 +62,7 @@ type Props = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
   konteynerler: Konteyner[];
-  show?: "ci" | "pl" | "fc" | "both";
+  show?: "ci" | "pl" | "coo" | "fc" | "both";
 };
 
 export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerler, show = "both" }: Props) {
@@ -73,11 +76,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const [durumlar, setDurumlar] = useState<Record<string, EvrakDurumu>>({});
   // ORIJINAL onaylanmis bir evragi yanlislikla tekrar taslaga cevirmeyi
   // onlemek icin: bu durumda once onay istenir.
-  const [yenidenTaslakConfirm, setYenidenTaslakConfirm] = useState<"ci" | "pl" | "fc" | null>(null);
+  const [yenidenTaslakConfirm, setYenidenTaslakConfirm] = useState<"ci" | "pl" | "coo" | "fc" | null>(null);
 
-  const ciHazirlik = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
-  const plHazirlik = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
-  const fcHazirlik = checkFumigationReadiness(dosya, rezervasyonlar, konteynerler);
+  const ciHazirlik  = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
+  const plHazirlik  = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
+  const cooHazirlik = checkCertificateOfOriginReadiness(dosya, rezervasyonlar, konteynerler);
+  const fcHazirlik  = checkFumigationReadiness(dosya, rezervasyonlar, konteynerler);
 
   // Musteri bazli fumigation ayarlarini yukle
   useEffect(() => {
@@ -104,7 +108,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       .select("evrak_tipi, durum, dosya_url, dosya_adi")
       .eq("dosya_id", dosya.id)
       .eq("company_id", companyId)
-      .in("evrak_tipi", ["commercial_invoice", "packing_list", "fumigation"]);
+      .in("evrak_tipi", ["commercial_invoice", "packing_list", "certificate_of_origin", "fumigation"]);
 
     const map: Record<string, EvrakDurumu> = {};
     (data || []).forEach((kayit: any) => {
@@ -189,7 +193,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // Draft VE Orijinal, HER ZAMAN ayni kaynaktan (dosya/rezervasyon/konteyner
   // verisinden) taze olarak uretilir - tek fark filigran eklenip eklenmemesi.
   // Boylece iki ayri, birbirinden bagimsiz ve her zaman guvenilir buton olur.
-  const uretVeKaydet = async (tip: "ci" | "pl" | "fc", durum: "taslak" | "orijinal") => {
+  const uretVeKaydet = async (tip: "ci" | "pl" | "coo" | "fc", durum: "taslak" | "orijinal") => {
     if (yukleniyor) return; // Cift tiklama koruması
     setYukleniyor(`${tip}-${durum}`);
     try {
@@ -197,6 +201,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       let htmlHam: string;
       if (tip === "ci") htmlHam = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
+      else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
       else htmlHam = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
 
       const html = durum === "taslak" ? draftFiligranEkle(htmlHam) : htmlHam;
@@ -218,7 +223,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // bir onay ister. Boylece muhasebe/ihracat personeli yanlislikla
   // onaylanmis bir evragi tekrar filigranli hale dondurmez (gumruk/banka
   // surecinde ciddi karisikliga yol acabilir).
-  const handleTiklandi = (tip: "ci" | "pl" | "fc", durum: "taslak" | "orijinal") => {
+  const handleTiklandi = (tip: "ci" | "pl" | "coo" | "fc", durum: "taslak" | "orijinal") => {
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
     if (durum === "taslak" && kayit?.durum === "orijinal") {
@@ -233,7 +238,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
   /** Uc evrak turu icin ortak render mantigi: hazir degilse uyari, hazirsa
    * durum rozeti + Draft + Orijinal butonlari. */
-  const renderEvrakButonlari = (tip: "ci" | "pl" | "fc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
+  const renderEvrakButonlari = (tip: "ci" | "pl" | "coo" | "fc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
     if (!hazirlik.hazir) {
       return (
         <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
@@ -287,6 +292,10 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             {renderEvrakButonlari("pl", plHazirlik, "Packing List")}
           </div>
           <div className="flex items-center gap-3">
+            <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Certificate of Origin</span>
+            {renderEvrakButonlari("coo", cooHazirlik, "Certificate of Origin")}
+          </div>
+          <div className="flex items-center gap-3">
             <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Fumigation Cert.</span>
             <div className="flex items-center gap-1.5">
               {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
@@ -300,6 +309,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         <div className="flex items-center gap-2 flex-wrap">
           {show === "ci" && renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
           {show === "pl" && renderEvrakButonlari("pl", plHazirlik, "Packing List")}
+          {show === "coo" && renderEvrakButonlari("coo", cooHazirlik, "Certificate of Origin")}
           {show === "fc" && (
             <div className="flex items-center gap-1.5">
               {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
@@ -311,7 +321,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         </div>
       )}
 
-      {show === "both" && Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || fcHazirlik.hazir) && (
+      {show === "both" && Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || cooHazirlik.hazir || fcHazirlik.hazir) && (
         <p className="text-[11px] mt-1.5" style={{ color: "#94a3b8" }}>
           İşlem sırası: önce <strong>Draft</strong> ile filigranlı taslağı hazırlayın → müşteriye onaya gönderin → onay gelince <strong>Orijinal</strong> butonuna basın.
         </p>

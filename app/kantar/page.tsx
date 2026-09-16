@@ -51,6 +51,7 @@ export default function KantarPage() {
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [arama, setArama] = useState("");
+  const [secilenGun, setSecilenGun] = useState<string | null>(null);
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -157,7 +158,42 @@ export default function KantarPage() {
   };
 
   const bekleyenlerFiltreli = aramaFiltre(bekleyenler);
-  const tamamlananlarFiltreli = aramaFiltre(tamamlananlar);
+
+  // Gun bazli filtre: DBA'nin YUKLENDIGI gune gore (dba_yukleme_tarihi).
+  // Tarayicinin yerel saat dilimini kullanir (Turkiye), UTC'de saklanan
+  // zaman damgasi otomatik olarak dogru gune donusur.
+  const gunAnahtari = (tarihStr: string) => {
+    const d = new Date(tarihStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const bugunAnahtari = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const dunAnahtari = (() => {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const gunEtiketi = (anahtar: string) => {
+    if (anahtar === bugunAnahtari) return "Bugün";
+    if (anahtar === dunAnahtari) return "Dün";
+    const [yil, ay, gun] = anahtar.split("-").map(Number);
+    return new Date(yil, ay - 1, gun).toLocaleDateString("tr-TR", { day: "numeric", month: "long" });
+  };
+  const gunSayilari: Record<string, number> = {};
+  tamamlananlar.forEach((k) => {
+    if (!k.dba_yukleme_tarihi) return;
+    const anahtar = gunAnahtari(k.dba_yukleme_tarihi);
+    gunSayilari[anahtar] = (gunSayilari[anahtar] || 0) + 1;
+  });
+  const gunler = Object.keys(gunSayilari).sort().reverse(); // en yeni once
+
+  const gunFiltre = (list: KonteynerRow[]) => {
+    if (!secilenGun) return list;
+    return list.filter((k) => k.dba_yukleme_tarihi && gunAnahtari(k.dba_yukleme_tarihi) === secilenGun);
+  };
+
+  const tamamlananlarFiltreli = gunFiltre(aramaFiltre(tamamlananlar));
 
   if (loading) {
     return (
@@ -299,12 +335,40 @@ export default function KantarPage() {
           )}
 
           {/* Tamamlanan DBA'lar - tek liste */}
-          {tamamlananlarFiltreli.length > 0 && (
+          {tamamlananlar.length > 0 && (
             <div className="space-y-3">
               <h2 className="text-sm font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> DBA Tamamlanan Konteynerler
                 <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({tamamlananlarFiltreli.length})</span>
               </h2>
+
+              {gunler.length > 1 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => setSecilenGun(null)}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors"
+                    style={secilenGun === null ? { backgroundColor: ACCENT, borderColor: ACCENT, color: "white" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                  >
+                    Tümü ({tamamlananlar.length})
+                  </button>
+                  {gunler.map((gun) => (
+                    <button
+                      key={gun}
+                      onClick={() => setSecilenGun(gun === secilenGun ? null : gun)}
+                      className="px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors"
+                      style={secilenGun === gun ? { backgroundColor: ACCENT, borderColor: ACCENT, color: "white" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                    >
+                      {gunEtiketi(gun)} ({gunSayilari[gun]})
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {tamamlananlarFiltreli.length === 0 ? (
+                <div className="rounded-xl border p-6 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                  <p className="text-xs" style={{ color: TEXT_MUTED }}>Seçilen gün / aramayla eşleşen DBA belgesi bulunamadı.</p>
+                </div>
+              ) : (
               <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -366,6 +430,7 @@ export default function KantarPage() {
                 </table>
                 </div>
               </div>
+              )}
             </div>
           )}
 

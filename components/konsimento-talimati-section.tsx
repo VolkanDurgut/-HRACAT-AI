@@ -137,6 +137,19 @@ export default function KonsimentoTalimatiSection({
     } finally { setKontrolEdiliyor(false); }
   };
 
+  const handleTekrarDene = async () => {
+    if (konsimentoDosyaUrl) {
+      // Veritabaninda zaten bir kayit var (ornegin uyusmazlik tespit edilmisti) -
+      // eskisi gibi temizleyip yeniden yuklemeye izin ver.
+      await handleYenidenYukle();
+    } else {
+      // Hic DB'ye yazilamadi (ornegin Gemini gecici hata verdi) - sadece yerel
+      // hata durumunu temizle, kullanici dosyayi hemen tekrar secebilsin.
+      setKontrolHata(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleYenidenYukle = async () => {
     setKontrolHata(null);
     const { error } = await supabase.from("ihracat_dosyalari").update({
@@ -166,13 +179,24 @@ export default function KonsimentoTalimatiSection({
           onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }}
         />
 
-        {!konsimentoHazir && !konsimentoDosyaUrl && (
+        {!kontrolEdiliyor && kontrolHata && (
+          <div className="p-3 rounded-lg border bg-amber-500/10 space-y-2" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
+            <p className="text-sm font-medium text-amber-400">Kontrol yapılamadı</p>
+            <p className="text-xs text-amber-300">{kontrolHata}</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>
+              Not: Dosya sisteme yüklendi, sadece AI kontrolü tamamlanamadı (genellikle geçici bir yoğunluktan kaynaklanır). Birkaç saniye sonra tekrar deneyebilirsiniz.
+            </p>
+            <button onClick={handleTekrarDene} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"><RotateCcw size={12} /> Tekrar Dene</button>
+          </div>
+        )}
+
+        {!kontrolEdiliyor && !kontrolHata && !konsimentoHazir && !konsimentoDosyaUrl && (
           <p className="text-xs" style={{ color: TEXT_MUTED }}>
             Anlamlı bir kontrol için önce rezervasyondaki tüm konteynerlerin dosyaya eklenmiş olması gerekir.
           </p>
         )}
 
-        {konsimentoHazir && !konsimentoDosyaUrl && !kontrolEdiliyor && (
+        {!kontrolEdiliyor && !kontrolHata && konsimentoHazir && !konsimentoDosyaUrl && (
           <div
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]"
@@ -191,7 +215,7 @@ export default function KonsimentoTalimatiSection({
           </div>
         )}
 
-        {konsimentoDosyaUrl && (
+        {!kontrolEdiliyor && !kontrolHata && konsimentoDosyaUrl && (
           <div className="mt-2 space-y-2">
             <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
               <FileText size={16} className="shrink-0" style={{ color: TEXT_MUTED }} />
@@ -199,14 +223,6 @@ export default function KonsimentoTalimatiSection({
               {konsimentoYuklemeTarihi && <span className="text-xs shrink-0 hidden sm:inline" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(konsimentoYuklemeTarihi)}</span>}
               <button onClick={handleYenidenYukle} className="hover:text-white shrink-0" style={{ color: TEXT_MUTED }} title="Konşimento talimatını kaldır"><X size={16} /></button>
             </div>
-
-            {kontrolHata && (
-              <div className="p-3 rounded-lg border bg-amber-500/10 space-y-2" style={{ borderColor: "rgba(251,191,36,0.35)" }}>
-                <p className="text-sm font-medium text-amber-400">Kontrol yapılamadı</p>
-                <p className="text-xs text-amber-300">{kontrolHata}</p>
-                <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"><RotateCcw size={12} /> Tekrar Dene</button>
-              </div>
-            )}
 
             {kontrolSonucu && kontrolSonucu.uyumlu && (
               <div className="p-3 rounded-lg border-2 border-green-500/40" style={{ backgroundColor: ROW_HEADER_BG }}>
@@ -241,7 +257,7 @@ export default function KonsimentoTalimatiSection({
                     ))}
                   </div>
                 )}
-                <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20"><RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle</button>
+                <button onClick={handleTekrarDene} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20"><RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle</button>
               </div>
             )}
           </div>

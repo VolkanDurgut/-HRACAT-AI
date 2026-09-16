@@ -57,12 +57,13 @@ const COMPANY_ADDRESS = "İSTİKLAL MAHALLESİ CEMAL ÜNLÜSARAÇ CADDESİ\nNO:2
  */
 function buildPlantProtectionBolgesi(limanAdi: string | null | undefined): string {
   if (!limanAdi) return safe(null);
-  const normalized = limanAdi.toUpperCase().trim().replace(/İ/g, "I");
+  const temizAd = limanAdi.trim();
+  const normalized = temizAd.toUpperCase().replace(/İ/g, "I");
   const ambarliGrubu = ["MARPORT", "MARDAŞ", "MARDAS", "KUMPORT", "AMBARLI", "AMBARLI PORT"];
   const asyaportGrubu = ["ASYAPORT"];
-  if (ambarliGrubu.some((p) => normalized.includes(p))) return "ISTANBUL / AMBARLI";
-  if (asyaportGrubu.some((p) => normalized.includes(p))) return "TEKİRDAĞ / ASYAPORT";
-  return escapeHtml(limanAdi.trim()); // Bilinmeyen liman - oldugu gibi goster
+  if (ambarliGrubu.some((p) => normalized.includes(p))) return `${escapeHtml(temizAd.toUpperCase())} ISTANBUL / AMBARLI`;
+  if (asyaportGrubu.some((p) => normalized.includes(p))) return `${escapeHtml(temizAd.toUpperCase())} TEKİRDAĞ / ASYAPORT`;
+  return escapeHtml(temizAd); // Bilinmeyen liman - oldugu gibi goster
 }
 
 function buildNetAgirlikToplam(konteynerler: Konteyner[]): string {

@@ -72,7 +72,20 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
     setSaving(true);
     // Tamamen bos birakilmis satirlari (hicbir alani doldurulmamis) kaydetmeden onceki temizlik
     const temizSatirlar = satirlar.filter((u) => u.urun_adi.trim() || u.miktar_mts.trim() || u.birim_fiyat_usd.trim());
-    await supabase.from("ihracat_dosyalari").update({ urun_detaylari: temizSatirlar }).eq("id", dosya.id).eq("company_id", companyId);
+
+    // Urun listesindeki degisiklik, dosya seviyesindeki OZET alanlarina (Lojistik
+    // karti "Toplam Miktar", Odeme karti "Toplam Tutar") da yansitilmali - aksi
+    // halde bu alanlar eski (artik gecersiz) degerde kalir. Her satirin
+    // miktar/toplam degerini toplayip dosyanin miktar ve toplam_tutar
+    // kolonlarini da AYNI kaydetme isleminde guncelliyoruz.
+    const toplamMiktar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.miktar_mts).replace(",", ".")) || 0), 0);
+    const toplamTutar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.toplam_tutar_usd).replace(",", ".")) || 0), 0);
+
+    await supabase.from("ihracat_dosyalari").update({
+      urun_detaylari: temizSatirlar,
+      miktar: temizSatirlar.length > 0 ? String(parseFloat(toplamMiktar.toFixed(3))) : null,
+      toplam_tutar: temizSatirlar.length > 0 ? parseFloat(toplamTutar.toFixed(2)) : null,
+    }).eq("id", dosya.id).eq("company_id", companyId);
     showToast("Urun detaylari güncellendi.", "success");
     setSaving(false);
     setEditing(false);

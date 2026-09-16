@@ -172,8 +172,22 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
 </html>`;
 
 function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { rows: string; totalPieces: number; totalNett: number; totalGross: number } {
-  const urunAdi = safe(dosya.urun_tanimi, "-");
-  const marka = safe(dosya.marka, "-");
+  const varsayilanUrunAdi = safe(dosya.urun_tanimi, "-");
+  const varsayilanMarka = safe(dosya.marka, "-");
+  const urunler = (dosya.urun_detaylari as any[]) || [];
+
+  // Ayni dosyada birden fazla urun/marka olabilir (ornegin SAAD + ASLI ayni
+  // konteyner setinde). Her konteyner KENDI yukledigi markaya gore dogru urun
+  // aciklamasini gostermeli - hepsine tek bir sabit deger basilmamali.
+  const konteynerUrunAciklamasi = (konteynerMarka: string | null | undefined): string => {
+    if (!konteynerMarka || urunler.length === 0) return varsayilanUrunAdi;
+    const eslesen = urunler.find((u) => {
+      const ad = String(u.urun_adi || u.description || "").toUpperCase();
+      return ad.includes(String(konteynerMarka).toUpperCase());
+    });
+    const urunAdi = eslesen?.urun_adi || eslesen?.description;
+    return urunAdi ? escapeHtml(String(urunAdi)) : varsayilanUrunAdi;
+  };
 
   let totalPieces = 0;
   let totalNett = 0;
@@ -196,10 +210,12 @@ function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { row
       totalPieces += pieces;
       totalNett += nett;
       totalGross += gross;
+      const buKonteynerMarka = (k as any).marka ? escapeHtml(String((k as any).marka)) : varsayilanMarka;
+      const buKonteynerUrunAdi = konteynerUrunAciklamasi((k as any).marka);
       return `<tr>
         <td style="text-align:center;">${idx + 1}</td>
-        <td>${urunAdi}</td>
-        <td style="text-align:center;">${marka}</td>
+        <td>${buKonteynerUrunAdi}</td>
+        <td style="text-align:center;">${buKonteynerMarka}</td>
         <td class="num">${safe(k.konteyner_no)}</td>
         <td class="num">${safe(k.muhur_no)}</td>
         <td class="num">${pieces ? pieces.toLocaleString("tr-TR") : "-"}</td>

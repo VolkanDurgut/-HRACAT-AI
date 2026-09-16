@@ -253,6 +253,20 @@ function buildSevkiyatYontemi(konteynerler: Konteyner[]): string {
  * baslangicindaki sayiyi, kullanicinin Konteynerler sekmesinde girdigi gercek "Kap Adeti"
  * toplamiyla degistirerek dondurur. Cumlenin geri kalani (birim aciklamasi) aynen korunur.
  */
+/**
+ * Ayni dosyada birden fazla marka/urun olabilir (ornegin SAAD + ASLI ayni
+ * konteyner setinde). Konteynerlerin KENDI marka alanlarindaki farkli
+ * degerleri birlestirip gosterir (ör. "SAAD & ASLI"). Hicbir konteynerde
+ * marka girilmemisse, eskisi gibi dosya.marka'ya (tek deger) doner.
+ */
+function buildMarkaListesi(dosya: Dosya, konteynerler: Konteyner[]): string {
+  const markalar = Array.from(
+    new Set((konteynerler || []).map((k) => (k as any).marka).filter((m): m is string => !!m && String(m).trim() !== ""))
+  );
+  if (markalar.length === 0) return safe(dosya.marka);
+  return escapeHtml(markalar.join(" & "));
+}
+
 function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
   const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
   if (!raw) return safe(null);
@@ -291,7 +305,7 @@ export function buildCommercialInvoiceHtml(
     ALICI_ADRES: safe((dosya as any).alici_adresi),
     CONSIGNEE: safe((dosya as any).consignee),
     BL_NO: safe(dosya.bl_no),
-    MARKA: safe(dosya.marka),
+    MARKA: buildMarkaListesi(dosya, konteynerler),
     DETAYLI_AMBALAJ: buildDetayliAmbalaj(dosya, konteynerler),
     SEVKIYAT_YONTEMI: buildSevkiyatYontemi(konteynerler),
     TESLIM_SEKLI: safe(dosya.teslim_sekli, ""),

@@ -131,6 +131,33 @@ export function checkPhytosanitaryCertificateReadiness(
 }
 
 /**
+ * Health Certificate (Sağlık Sertifikası) icin gerekli tum alanlarin dolu
+ * olup olmadigini kontrol eder.
+ */
+export function checkHealthCertificateReadiness(
+  dosya: Dosya,
+  rezervasyonlar: Rezervasyon[],
+  konteynerler: Konteyner[]
+): ReadinessResult {
+  const eksikler: string[] = [];
+
+  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
+  if (!dosya.lot_no) eksikler.push("Lot No");
+  if (!dosya.son_kullanim_tarihi) eksikler.push("Son Kullanım Tarihi");
+  if (!dosya.ambalaj) eksikler.push("Ambalaj");
+  if (!dosya.yuklenme_limani && !rezervasyonlar[0]?.yuklenme_limani) eksikler.push("Yükleme Limanı");
+
+  if (konteynerler.length === 0) {
+    eksikler.push("Konteyner Bilgileri");
+  } else {
+    const eksikNet = konteynerler.some((k) => !k.net_agirlik_kg);
+    if (eksikNet) eksikler.push("Net Ağırlık (bir veya daha fazla konteynerde eksik)");
+  }
+
+  return { hazir: eksikler.length === 0, eksikler };
+}
+
+/**
  * Fumigation Certificate icin gerekli tum alanlarin dolu olup olmadigini kontrol eder.
  * Konteyner Net/Brut agirlik alanlari ayri ayri kontrol edilir.
  * Not: Fumigasyon detaylari (fumigant, doz, tarihler vb.) ham_veri uzerinden gelir

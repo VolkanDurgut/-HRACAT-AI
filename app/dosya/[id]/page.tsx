@@ -20,7 +20,7 @@ import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, Copy } from "lucide-react";
+import { Loader2, Package, FileCheck, Copy, ExternalLink } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -41,7 +41,7 @@ type FaturaKontrolSonucu = {
   fatura_tarihi: string;
 };
 
-type EvrakTuru = "ci" | "pl" | "coo" | "phyto" | "fc";
+type EvrakTuru = "ci" | "pl" | "coo" | "phyto" | "health" | "fc";
 
 const EVRAK_SIRASI: { anahtar: string; baslik: string; evrakTuru?: EvrakTuru }[] = [
   { anahtar: "Commercial Invoice", baslik: "Commercial Invoice", evrakTuru: "ci" },
@@ -49,7 +49,7 @@ const EVRAK_SIRASI: { anahtar: string; baslik: string; evrakTuru?: EvrakTuru }[]
   { anahtar: "Bill of Lading", baslik: "Bill of Lading" },
   { anahtar: "Certificate of Origin", baslik: "Certificate of Origin", evrakTuru: "coo" },
   { anahtar: "Phytosanitary", baslik: "Phytosanitary Certificate", evrakTuru: "phyto" },
-  { anahtar: "Health Certificate", baslik: "Health Certificate" },
+  { anahtar: "Health Certificate", baslik: "Health Certificate", evrakTuru: "health" },
   { anahtar: "Quality And Weight", baslik: "Quality Certificate" },
   { anahtar: "Fumigation", baslik: "Fumigation Certificate", evrakTuru: "fc" },
   { anahtar: "Photographic Loading", baslik: "Final Loading Report" },
@@ -343,6 +343,17 @@ function DosyaDetailContent() {
                         <div className="flex items-center gap-2 shrink-0">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
+                          ) : tanim.anahtar === "Bill of Lading" && (dosya as any).draft_bl_dosya_url ? (
+                            <a
+                              href={(dosya as any).draft_bl_dosya_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                              title="Draft BL'yi yeni sekmede aç"
+                            >
+                              <ExternalLink size={12} /> Görüntüle
+                            </a>
                           ) : (
                             <button
                               onClick={async () => { await navigator.clipboard.writeText(orijinalMetin); }}

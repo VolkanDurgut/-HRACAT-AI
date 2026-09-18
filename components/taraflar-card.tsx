@@ -59,7 +59,7 @@ export default function TaraflarCard({ dosya, onRefresh, companyId }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Taraflar</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Taraflar</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
           <Pencil size={12} /> Duzenle
         </button>

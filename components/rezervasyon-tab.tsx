@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER } from "@/lib/supabase";
-import { formatDateTR, getCutOffDays, getCutOffLabel } from "@/lib/cutoff-utils";
+import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -369,7 +369,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
             {rez.talimat_cutoff ? (
               <div>
                 <p className="font-medium text-white">{formatDateTR(rez.talimat_cutoff)}</p>
-                <p style={{ color: TEXT_MUTED }}>{new Date(rez.talimat_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                <p style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</p>
               </div>
             ) : <p className="font-medium text-white">-</p>}
           </div>
@@ -378,7 +378,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
             {rez.beyanname_cutoff ? (
               <div>
                 <p className="font-medium text-white">{formatDateTR(rez.beyanname_cutoff)}</p>
-                <p style={{ color: TEXT_MUTED }}>{new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}</p>
+                <p style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</p>
               </div>
             ) : <p className="font-medium text-white">-</p>}
           </div>

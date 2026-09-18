@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -98,7 +98,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     ].filter(Boolean).join("\n");
 
     const beyannameSuresi = rez?.beyanname_cutoff
-      ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`
+      ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${formatCutoffSaat(rez.beyanname_cutoff)}`
       : null;
 
     const lojistikBilgileri = [

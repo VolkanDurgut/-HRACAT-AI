@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
-import { formatCurrency, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat } from "@/lib/cutoff-utils";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -97,7 +97,7 @@ function ciz(
   ]);
 
   const beyannameSuresi = rez?.beyanname_cutoff
-    ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${new Date(rez.beyanname_cutoff).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`
+    ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${formatCutoffSaat(rez.beyanname_cutoff)}`
     : null;
   bolumTablosu("LOJISTIK BILGILERI", [
     ["Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani],

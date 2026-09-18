@@ -1,8 +1,43 @@
+/**
+ * Tarih/saat metninden (hem duz "YYYY-MM-DD" tarih hem "YYYY-MM-DDTHH:MM:SS+TZ"
+ * bicimini destekler) sadece takvim tarihini HAM olarak cikartir - herhangi bir
+ * saat dilimi donusumu YAPMADAN.
+ *
+ * Neden gerekli: talimat_cutoff / beyanname_cutoff veritabaninda timestamptz
+ * olarak saklaniyor ama kaydedilirken saat dilimi belirtilmiyor (bkz.
+ * rezervasyon-tab.tsx). Postgres bu durumda degeri UTC sanip "+00" etiketiyle
+ * kaydediyor - ama deger aslinda kullanicinin girdigi YEREL (Turkiye) saatidir.
+ * new Date(...) ile ayristirmak bu degeri yanlislikla tekrar yerel saate CEVIRIR
+ * (3 saat ileri kayar) - ozellikle gec saatlerde (ör. 22:00+) takvim gununu bile
+ * bir sonraki gune kaydirabilir. Bu fonksiyon metinden dogrudan okuyarak bu
+ * riski tamamen ortadan kaldirir; duz "date" alanlari icin de zararsizdir.
+ */
+function ayristirHamTarih(dateStr: string): { yil: number; ay: number; gun: number } | null {
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return { yil: parseInt(m[1], 10), ay: parseInt(m[2], 10), gun: parseInt(m[3], 10) };
+}
+
+/**
+ * talimat_cutoff / beyanname_cutoff gibi "yanlislikla UTC etiketli ama aslinda
+ * yerel" timestamptz alanlarindan saat:dakika kismini DOGRUDAN metinden okur -
+ * new Date(...) ile ayristirip yerel saate CEVIRMEZ. Bu, 16:00 girilen bir
+ * cutoff saatinin ekranda 19:00 olarak gorunmesine neden olan hatanin duzeltmesidir.
+ */
+export function formatCutoffSaat(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  const m = dateStr.match(/T(\d{2}):(\d{2})/);
+  if (!m) return "-";
+  return `${m[1]}:${m[2]}`;
+}
+
 export function getCutOffDays(dateStr: string | null): number | null {
   if (!dateStr) return null;
+  const p = ayristirHamTarih(dateStr);
+  if (!p) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const cutoff = new Date(dateStr);
+  const cutoff = new Date(p.yil, p.ay - 1, p.gun);
   cutoff.setHours(0, 0, 0, 0);
   return Math.ceil((cutoff.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }

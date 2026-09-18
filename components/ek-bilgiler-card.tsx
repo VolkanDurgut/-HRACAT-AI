@@ -190,7 +190,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     return (
       <div className="rounded-xl border shadow-sm p-6 space-y-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
-          <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ek Bilgiler</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Ek Bilgiler</h3>
           <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
             <Pencil size={12} /> Duzenle
           </button>

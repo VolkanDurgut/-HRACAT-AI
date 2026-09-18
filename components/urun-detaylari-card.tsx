@@ -97,7 +97,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
   return (
     <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Urun Detaylari</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Urun Detaylari</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
           <Pencil size={12} /> Duzenle
         </button>

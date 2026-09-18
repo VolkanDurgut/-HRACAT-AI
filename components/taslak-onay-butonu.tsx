@@ -4,7 +4,13 @@ import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { FileArchive, Loader2 } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
-import { checkCommercialInvoiceReadiness, checkPackingListReadiness } from "@/lib/document-readiness";
+import {
+  checkCommercialInvoiceReadiness,
+  checkPackingListReadiness,
+  checkCertificateOfOriginReadiness,
+  checkPhytosanitaryCertificateReadiness,
+  checkHealthCertificateReadiness,
+} from "@/lib/document-readiness";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 
 type Props = {
@@ -19,13 +25,19 @@ export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }
 
   const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
 
-  const ciHazir = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
-  const plHazir = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
+  const ciHazir    = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
+  const plHazir    = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
+  const cooHazir   = checkCertificateOfOriginReadiness(dosya, rezervasyonlar, konteynerler);
+  const phytoHazir = checkPhytosanitaryCertificateReadiness(dosya, rezervasyonlar, konteynerler);
+  const healthHazir = checkHealthCertificateReadiness(dosya, rezervasyonlar, konteynerler);
 
   const eksikler: string[] = [
     ...(!ciHazir.hazir ? ciHazir.eksikler : []),
     ...(!plHazir.hazir ? plHazir.eksikler : []),
     ...(!draftBlUrl ? ["Draft BL yüklenmemiş"] : []),
+    ...(!cooHazir.hazir ? cooHazir.eksikler : []),
+    ...(!phytoHazir.hazir ? phytoHazir.eksikler : []),
+    ...(!healthHazir.hazir ? healthHazir.eksikler : []),
   ];
   const hazir = eksikler.length === 0;
 
@@ -47,7 +59,7 @@ export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }
     <button
       onClick={handleTiklandi}
       disabled={!hazir || indiriliyor}
-      title={!hazir ? `Eksik: ${eksikler.join(", ")}` : "Commercial Invoice + Packing List + Draft BL'i tek ZIP olarak indir"}
+      title={!hazir ? `Eksik: ${eksikler.join(", ")}` : "Commercial Invoice + Packing List + Draft BL + Certificate of Origin + Phytosanitary + Health Certificate'i tek ZIP olarak indir"}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5"
       style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
     >

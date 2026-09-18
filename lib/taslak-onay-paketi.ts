@@ -2,6 +2,9 @@ import JSZip from "jszip";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
+import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
+import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
+import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
 import { draftFiligranEkle } from "@/lib/watermark";
 import { htmlToPdfBlob } from "@/lib/html-to-pdf";
 
@@ -37,6 +40,18 @@ export async function indirTaslakOnayPaketi(
   if (!blRes.ok) throw new Error("Draft BL dosyası indirilemedi.");
   const blBlob = await blRes.blob();
   zip.file(`3_Draft_BL_${dosyaKisaAd}.pdf`, blBlob);
+
+  const cooHtml = draftFiligranEkle(buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler));
+  const cooPdf = await htmlToPdfBlob(cooHtml);
+  zip.file(`4_Certificate_of_Origin_DRAFT_${dosyaKisaAd}.pdf`, cooPdf);
+
+  const phytoHtml = draftFiligranEkle(buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const phytoPdf = await htmlToPdfBlob(phytoHtml);
+  zip.file(`5_Phytosanitary_Certificate_DRAFT_${dosyaKisaAd}.pdf`, phytoPdf);
+
+  const healthHtml = draftFiligranEkle(buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const healthPdf = await htmlToPdfBlob(healthHtml);
+  zip.file(`6_Health_Certificate_DRAFT_${dosyaKisaAd}.pdf`, healthPdf);
 
   const zipBlob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(zipBlob);

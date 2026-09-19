@@ -1,116 +1,96 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { X, Send, Loader2 } from "lucide-react";
+import { X, Loader2, Paperclip, Send, CheckCircle2, AlertTriangle, Lightbulb, Frown, Trash2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
-type Mesaj = {
-  id: string;
-  gonderen: "kullanici" | "asistan";
-  mesaj: string;
-};
+type GeriBildirimTuru = "sorun" | "oneri" | "sikayet";
 
-const ALTI_SAAT_MS = 6 * 60 * 60 * 1000;
+const TUR_SECENEKLERI: { deger: GeriBildirimTuru; etiket: string; icon: React.ReactNode; renk: string }[] = [
+  { deger: "sorun", etiket: "Sorun", icon: <AlertTriangle size={15} />, renk: "#F59E0B" },
+  { deger: "oneri", etiket: "Öneri", icon: <Lightbulb size={15} />, renk: "#10B981" },
+  { deger: "sikayet", etiket: "Şikayet", icon: <Frown size={15} />, renk: "#DC2626" },
+];
 
-/** Önce Supabase'deki gerçek "full_name" bilgisini kullanır, yoksa e-postadan türetir. Backend'deki (destek-asistan) isimTuret ile birebir aynı mantık. */
-function isimTuret(email: string | undefined | null, fullName?: string | null): string {
-  if (fullName && fullName.trim()) {
-    return fullName.trim().split(/\s+/)[0];
-  }
-  if (!email) return "";
-  const yerel = email.split("@")[0] || "";
-  const ilkParca = yerel.split(/[._-]/)[0] || yerel;
-  if (!ilkParca) return "";
-  return ilkParca.charAt(0).toLocaleUpperCase("tr-TR") + ilkParca.slice(1).toLocaleLowerCase("tr-TR");
-}
+const MAKS_DOSYA_BOYUTU = 8 * 1024 * 1024; // 8 MB
 
 export default function DestekWidget() {
   const { user, companyId } = useAuth();
   const [acik, setAcik] = useState(false);
-  const [mesajlar, setMesajlar] = useState<Mesaj[]>([]);
-  const [yukleniyor, setYukleniyor] = useState(false);
-  const [yukluGecmis, setYukluGecmis] = useState(false);
-  const [yaziyor, setYaziyor] = useState(false);
-  const [girdi, setGirdi] = useState("");
+  const [tur, setTur] = useState<GeriBildirimTuru>("sorun");
+  const [mesaj, setMesaj] = useState("");
+  const [dosya, setDosya] = useState<File | null>(null);
   const [gonderiliyor, setGonderiliyor] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [gonderildi, setGonderildi] = useState(false);
+  const dosyaInputRef = useRef<HTMLInputElement>(null);
 
-  const isim = isimTuret(user?.email, (user as any)?.user_metadata?.full_name || (user as any)?.user_metadata?.name);
-
-  useEffect(() => {
-    if (acik && !yukluGecmis && user && companyId) {
-      gecmisiYukle();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acik]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [mesajlar, yaziyor]);
-
-  const gecikme = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const gecmisiYukle = async () => {
-    if (!user || !companyId) return;
-    setYukleniyor(true);
-    const { data } = await supabase
-      .from("destek_mesajlari")
-      .select("id, gonderen, mesaj, created_at")
-      .eq("user_id", user.id)
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: true })
-      .limit(100);
-
-    const kayitlar = data || [];
-    setMesajlar(kayitlar.map((k: any) => ({ id: k.id, gonderen: k.gonderen, mesaj: k.mesaj })));
-    setYukleniyor(false);
-    setYukluGecmis(true);
-
-    const sonKayit = kayitlar[kayitlar.length - 1];
-    const yeniOturum = !sonKayit || Date.now() - new Date(sonKayit.created_at).getTime() > ALTI_SAAT_MS;
-    if (yeniOturum) {
-      karsilamaOynat();
-    }
+  const panelKapat = () => {
+    setAcik(false);
+    // Panel kapandiktan sonra bir sonraki acilista temiz form gorunsun
+    setTimeout(() => {
+      setTur("sorun");
+      setMesaj("");
+      setDosya(null);
+      setHata(null);
+      setGonderildi(false);
+    }, 300);
   };
 
-  const karsilamaOynat = async () => {
-    if (!user || !companyId) return;
-
-    setYaziyor(true);
-    await gecikme(1000);
-    const mesaj1 = `Buyurun ${isim ? isim + " Bey, " : ""}size nasıl yardımcı olabilirim?`;
-    setYaziyor(false);
-    setMesajlar((prev) => [...prev, { id: `karsilama-1-${Date.now()}`, gonderen: "asistan", mesaj: mesaj1 }]);
-    supabase.from("destek_mesajlari").insert({ company_id: companyId, user_id: user.id, gonderen: "asistan", mesaj: mesaj1 });
+  const dosyaSec = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const secilen = e.target.files?.[0];
+    if (!secilen) return;
+    if (secilen.size > MAKS_DOSYA_BOYUTU) {
+      setHata("Dosya boyutu 8 MB'ı geçemez.");
+      e.target.value = "";
+      return;
+    }
+    setHata(null);
+    setDosya(secilen);
   };
 
   const gonder = async () => {
-    const metin = girdi.trim();
-    if (!metin || gonderiliyor) return;
-    setGirdi("");
-    setMesajlar((prev) => [...prev, { id: `yerel-${Date.now()}`, gonderen: "kullanici", mesaj: metin }]);
+    const metin = mesaj.trim();
+    if (!metin) {
+      setHata("Lütfen mesajınızı yazın.");
+      return;
+    }
+    if (!user || !companyId) return;
+
     setGonderiliyor(true);
-    setYaziyor(true);
+    setHata(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      let ekDosyaYolu: string | null = null;
+      let ekDosyaAdi: string | null = null;
+
+      if (dosya) {
+        const guvenliAd = dosya.name
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/ş/gi, "s").replace(/ğ/gi, "g").replace(/ı/gi, "i")
+          .replace(/ö/gi, "o").replace(/ü/gi, "u").replace(/ç/gi, "c")
+          .replace(/[^a-zA-Z0-9._-]/g, "_");
+        const yol = `${companyId}/${user.id}/${Date.now()}_${guvenliAd}`;
+        const { error: yuklemeHatasi } = await supabase.storage.from("geri-bildirim-ekleri").upload(yol, dosya);
+        if (yuklemeHatasi) throw new Error(`Dosya yüklenemedi: ${yuklemeHatasi.message}`);
+        ekDosyaYolu = yol;
+        ekDosyaAdi = dosya.name;
+      }
+
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/destek-asistan`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${supabaseUrl}/functions/v1/geri-bildirim-gonder`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ mesaj: metin }),
+        body: JSON.stringify({ tur, mesaj: metin, ek_dosya_yolu: ekDosyaYolu, ek_dosya_adi: ekDosyaAdi }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Bir sorun oluştu.");
-      setYaziyor(false);
-      setMesajlar((prev) => [...prev, { id: `cevap-${Date.now()}`, gonderen: "asistan", mesaj: data.cevap }]);
-    } catch {
-      setYaziyor(false);
-      setMesajlar((prev) => [
-        ...prev,
-        { id: `hata-${Date.now()}`, gonderen: "asistan", mesaj: "Şu anda mesajınızı iletemedim, lütfen birazdan tekrar deneyin." },
-      ]);
+      if (!response.ok) throw new Error(data.error || "Bildiriminiz gönderilemedi.");
+
+      setGonderildi(true);
+    } catch (e: any) {
+      setHata(e?.message || "Bir sorun oluştu, lütfen tekrar deneyin.");
     } finally {
       setGonderiliyor(false);
     }
@@ -142,7 +122,7 @@ export default function DestekWidget() {
 
       {acik && (
         <div
-          className="fixed bottom-5 right-5 z-[70] w-[360px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-3rem)] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-fade-in"
+          className="fixed bottom-5 right-5 z-[70] w-[360px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-3rem)] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-fade-in"
           style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ borderColor: CARD_BORDER }}>
@@ -151,79 +131,117 @@ export default function DestekWidget() {
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white truncate">Volkan Durgut</p>
                 <p className="text-[11px] flex items-center gap-1" style={{ color: TEXT_MUTED }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" /> Destek
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" /> Sorun / Öneri / Şikayet
                 </p>
               </div>
             </div>
-            <button onClick={() => setAcik(false)} className="p-1 hover:text-white transition-colors shrink-0" style={{ color: TEXT_MUTED }}>
+            <button onClick={panelKapat} className="p-1 hover:text-white transition-colors shrink-0" style={{ color: TEXT_MUTED }}>
               <X size={18} />
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {yukleniyor ? (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 size={20} className="animate-spin" style={{ color: ACCENT }} />
-              </div>
-            ) : (
-              <>
-                {mesajlar.length === 0 && (
-                  <p className="text-xs text-center mt-4" style={{ color: TEXT_MUTED }}>
-                    Bir mesaj yazarak destek sohbetini başlatabilirsiniz.
-                  </p>
-                )}
-                {mesajlar.map((m) => (
-                  <div key={m.id} className={`flex items-end gap-2 ${m.gonderen === "kullanici" ? "justify-end" : "justify-start"}`}>
-                    {m.gonderen === "asistan" && (
-                      <img src="/images/VolkanDurgut.webp" alt="Volkan Durgut" className="w-6 h-6 rounded-full object-cover shrink-0" />
-                    )}
-                    <div
-                      className="max-w-[76%] px-3 py-2 rounded-2xl text-sm leading-relaxed text-white break-words"
-                      style={{ backgroundColor: m.gonderen === "kullanici" ? ACCENT : CARD_BORDER }}
+          {gonderildi ? (
+            <div className="flex flex-col items-center text-center px-6 py-8 gap-3">
+              <img
+                src="/images/VolkanDurgut.webp"
+                alt="Volkan Durgut"
+                className="w-16 h-16 rounded-full object-cover"
+                style={{ border: `2px solid ${ACCENT}` }}
+              />
+              <CheckCircle2 size={26} style={{ color: ACCENT }} />
+              <p className="text-sm text-white font-medium leading-relaxed">
+                Mesajınız bana ulaştı, teşekkür ederim.
+              </p>
+              <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+                En kısa sürede inceleyip dönüş yapacağım.
+                <br />— Volkan Durgut
+              </p>
+              <button
+                onClick={panelKapat}
+                className="mt-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: ACCENT }}
+              >
+                Kapat
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              <div>
+                <p className="text-xs font-medium mb-1.5" style={{ color: TEXT_MUTED }}>Bildirim türü</p>
+                <div className="flex gap-1.5">
+                  {TUR_SECENEKLERI.map((s) => (
+                    <button
+                      key={s.deger}
+                      onClick={() => setTur(s.deger)}
+                      className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] font-medium border transition-colors"
+                      style={{
+                        borderColor: tur === s.deger ? s.renk : CARD_BORDER,
+                        backgroundColor: tur === s.deger ? `${s.renk}1A` : "transparent",
+                        color: tur === s.deger ? s.renk : TEXT_MUTED,
+                      }}
                     >
-                      {m.mesaj}
-                    </div>
-                  </div>
-                ))}
-                {yaziyor && (
-                  <div className="flex items-end gap-2 justify-start">
-                    <img src="/images/VolkanDurgut.webp" alt="Volkan Durgut" className="w-6 h-6 rounded-full object-cover shrink-0" />
-                    <div className="px-3 py-2 rounded-2xl text-xs flex items-center gap-1.5" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
-                      <span>Volkan Durgut yazıyor</span>
-                      <span className="flex gap-0.5">
-                        <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1 h-1 rounded-full bg-current animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+                      {s.icon}
+                      {s.etiket}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2 px-3 py-3 border-t shrink-0" style={{ borderColor: CARD_BORDER }}>
-            <input
-              type="text"
-              value={girdi}
-              onChange={(e) => setGirdi(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") gonder();
-              }}
-              placeholder="Mesajınızı yazın..."
-              disabled={gonderiliyor}
-              className="flex-1 px-3 py-2 rounded-lg text-sm text-white placeholder:text-slate-500 outline-none disabled:opacity-50"
-              style={{ backgroundColor: "#0F131A", border: `1px solid ${CARD_BORDER}` }}
-            />
-            <button
-              onClick={gonder}
-              disabled={gonderiliyor || !girdi.trim()}
-              className="p-2 rounded-lg text-white transition-opacity disabled:opacity-40 shrink-0"
-              style={{ backgroundColor: ACCENT }}
-            >
-              {gonderiliyor ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            </button>
-          </div>
+              <div>
+                <p className="text-xs font-medium mb-1.5" style={{ color: TEXT_MUTED }}>Mesajınız</p>
+                <textarea
+                  value={mesaj}
+                  onChange={(e) => setMesaj(e.target.value)}
+                  placeholder="Karşılaştığınız sorunu, önerinizi ya da şikayetinizi buraya yazın..."
+                  rows={5}
+                  maxLength={5000}
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder:text-slate-500 outline-none resize-none"
+                  style={{ backgroundColor: "#0F131A", border: `1px solid ${CARD_BORDER}` }}
+                />
+              </div>
+
+              <div>
+                {dosya ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>
+                    <Paperclip size={15} className="shrink-0" style={{ color: ACCENT }} />
+                    <span className="truncate flex-1 text-xs text-white">{dosya.name}</span>
+                    <button
+                      onClick={() => { setDosya(null); if (dosyaInputRef.current) dosyaInputRef.current.value = ""; }}
+                      className="shrink-0 p-1 rounded hover:bg-white/10 transition-colors"
+                      style={{ color: TEXT_MUTED }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className="flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]"
+                    style={{ borderColor: CARD_BORDER }}
+                  >
+                    <Paperclip size={15} style={{ color: TEXT_MUTED }} />
+                    <span className="text-xs font-medium" style={{ color: TEXT_MUTED }}>Ekran görüntüsü / dosya ekle</span>
+                    <input ref={dosyaInputRef} type="file" onChange={dosyaSec} className="hidden" accept="image/*,.pdf" />
+                  </label>
+                )}
+              </div>
+
+              {hata && <p className="text-xs" style={{ color: "#DC2626" }}>{hata}</p>}
+            </div>
+          )}
+
+          {!gonderildi && (
+            <div className="px-4 py-3 border-t shrink-0" style={{ borderColor: CARD_BORDER }}>
+              <button
+                onClick={gonder}
+                disabled={gonderiliyor || !mesaj.trim()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: ACCENT }}
+              >
+                {gonderiliyor ? <Loader2 size={16} className="animate-spin" /> : <Send size={15} />}
+                {gonderiliyor ? "Gönderiliyor..." : "Gönder"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

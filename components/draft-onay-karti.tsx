@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -8,6 +8,12 @@ import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 import { buildDraftOnayMailtoUrl, draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
+import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
+import { buildPackingListHtml } from "@/lib/packing-list-builder";
+import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
+import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
+import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
+import { draftFiligranEkle } from "@/lib/watermark";
 
 const EVRAK_ADLARI: Record<string, string> = {
   commercial_invoice: "Commercial Invoice",
@@ -16,8 +22,6 @@ const EVRAK_ADLARI: Record<string, string> = {
   phytosanitary: "Phytosanitary Certificate",
   health_certificate: "Health Certificate",
 };
-
-type TaslakEvrak = { evrak_tipi: string; dosya_url: string; dosya_adi: string };
 
 type Props = {
   dosya: Dosya;
@@ -35,7 +39,6 @@ type Props = {
 export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, onRefresh }: Props) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [taslakEvraklar, setTaslakEvraklar] = useState<TaslakEvrak[]>([]);
   const [onaylaniyor, setOnaylaniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
 
@@ -44,42 +47,28 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const rez = rezervasyonlar[0];
   const aliciEmail = draftOnayAliciEmailAl(dosya);
 
-  const taslaklariYukle = useCallback(async () => {
-    const { data } = await supabase
-      .from("dosya_evraklari")
-      .select("evrak_tipi, dosya_url, dosya_adi")
-      .eq("dosya_id", dosya.id)
-      .eq("company_id", companyId)
-      .eq("durum", "taslak")
-      .in("evrak_tipi", Object.keys(EVRAK_ADLARI));
-    setTaslakEvraklar(data || []);
-  }, [dosya.id, companyId]);
-
-  useEffect(() => {
-    taslaklariYukle();
-  }, [taslaklariYukle]);
-
-  // Taslak evraklar HTML olarak saklanıyor. Dogrudan <a href> ile acinca
-  // depolama servisi bunu duz metin/kaynak kod olarak gosterebiliyor. Bunun
-  // onune gecmek icin icerigi fetch edip, ACIKCA "text/html" turunde bir Blob
-  // olarak aciyoruz - evrak-olustur-buttons.tsx'teki uretim aninda calisan
-  // goruntuleme ile BIREBIR AYNI yontem.
-  const evrakGoruntule = useCallback(
-    async (url: string) => {
+  // "İlgili Evraklar" onizlemesi, "Taslak Onay Paketi İndir" butonuyla
+  // (bkz. lib/taslak-onay-paketi.ts) BIREBIR AYNI yontemi kullanir: belge
+  // onceden dosya_evraklari tablosuna KAYDEDILMIS olmasa bile, mevcut
+  // dosya/rezervasyon/konteyner verisinden aninda uretilip DRAFT
+  // filigraniyla goruntulenir. Bu satir zaten sadece tamEvrakSetiHazirMi
+  // testini gecmis (bkz. app/draft-onay/page.tsx) dosyalar icin render
+  // edildigi icin, veri eksikligi riski yoktur - buton her zaman calisir.
+  const evrakGoruntuleUret = useCallback(
+    (builder: (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => string) => {
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Evrak alınamadı");
-        const html = await res.text();
+        const html = draftFiligranEkle(builder(dosya, rezervasyonlar, konteynerler));
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const blobUrl = URL.createObjectURL(blob);
         const win = window.open(blobUrl, "_blank");
         if (!win) showToast("Açılır pencere engellendi. Lütfen tarayıcı ayarlarından izin verin.", "error");
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      } catch {
-        showToast("Evrak açılamadı.", "error");
+      } catch (err) {
+        console.error("Taslak evrak uretme hatasi:", err);
+        showToast("Evrak üretilemedi. Lütfen dosya bilgilerini kontrol edin.", "error");
       }
     },
-    [showToast]
+    [dosya, rezervasyonlar, konteynerler, showToast]
   );
 
   const handlePaketIndir = async () => {
@@ -141,24 +130,19 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const onayTarihi = (dosya as any).draft_onay_tarihi as string | null;
   const durumTitle = onaylandi ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}` : undefined;
 
-  // İlgili Evraklar sabit sırada gösterilir (DB'den geldiği sıradan bağımsız):
-  // 1) Commercial Invoice, 2) Packing List, 3) Draft BL, 4) Certificate of
-  // Origin, 5) Phytosanitary, 6) Health Certificate.
-  const taslakBul = (tip: string) => taslakEvraklar.find((t) => t.evrak_tipi === tip);
-  const ci = taslakBul("commercial_invoice");
-  const pl = taslakBul("packing_list");
-  const coo = taslakBul("certificate_of_origin");
-  const phyto = taslakBul("phytosanitary");
-  const health = taslakBul("health_certificate");
-
+  // İlgili Evraklar sabit sırada gösterilir: 1) Commercial Invoice,
+  // 2) Packing List, 3) Draft BL, 4) Certificate of Origin, 5) Phytosanitary,
+  // 6) Health Certificate. Bu satır zaten tamEvrakSetiHazirMi testini geçmiş
+  // dosyalar için render edildiğinden (bkz. app/draft-onay/page.tsx), Draft
+  // BL harici 5 evrak her zaman üretilebilir durumdadır ve koşulsuz gösterilir.
   type EvrakGosterim = { key: string; title: string; href?: string; onClick?: () => void };
   const evrakListesiHam: (EvrakGosterim | null)[] = [
-    ci ? { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntule(ci.dosya_url) } : null,
-    pl ? { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntule(pl.dosya_url) } : null,
+    { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntuleUret(buildCommercialInvoiceHtml) },
+    { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntuleUret(buildPackingListHtml) },
     draftBlUrl ? { key: "draftbl", title: draftBlAdi || "Draft BL", href: draftBlUrl } : null,
-    coo ? { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntule(coo.dosya_url) } : null,
-    phyto ? { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntule(phyto.dosya_url) } : null,
-    health ? { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntule(health.dosya_url) } : null,
+    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml) },
+    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml) },
+    { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml) },
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 

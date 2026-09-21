@@ -36,8 +36,13 @@ function tamEvrakSetiHazirMi(dosya: Dosya, rezervasyonlar: Rezervasyon[], kontey
   );
 }
 
-/** Bekleyenler once, onaylanıp gönderilmeyi bekleyenler sonra, gönderilmisler en sonda. */
+/**
+ * Bekleyenler once, gonderime hazir olanlar sonra, musteri yanitini
+ * bekleyenler (sari) daha sonra, musteri onayi gelmis olanlar (yesil)
+ * en sonda gosterilir - boylece aktif takip gerektiren dosyalar ustte kalir.
+ */
 function siraDegeri(d: DosyaWithRelations): number {
+  if ((d as any).draft_musteri_onayi_alindi) return 3;
   if ((d as any).draft_mail_gonderildi) return 2;
   if ((d as any).draft_onaylandi) return 1;
   return 0;

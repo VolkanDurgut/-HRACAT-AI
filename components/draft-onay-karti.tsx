@@ -3,7 +3,7 @@ import React, { useState, useCallback } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2 } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
@@ -41,6 +41,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const { showToast } = useToast();
   const [onaylaniyor, setOnaylaniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
+  const [musteriOnayiKaydediliyor, setMusteriOnayiKaydediliyor] = useState(false);
 
   const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
   const draftBlAdi = (dosya as any).draft_bl_dosya_adi as string | null;
@@ -113,7 +114,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     window.open(buildDraftOnayMailtoUrl(dosya, rezervasyonlar));
     const { error } = await supabase
       .from("ihracat_dosyalari")
-      .update({ draft_mail_gonderildi: true })
+      .update({ draft_mail_gonderildi: true, draft_mail_gonderildi_tarihi: new Date().toISOString() })
       .eq("id", dosya.id)
       .eq("company_id", companyId);
     if (error) {
@@ -124,11 +125,42 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     onRefresh();
   };
 
+  // Musterinin FIILEN onay verdigini isaretler. Bu, ic ekibin "Onayla" ile
+  // isaretledigi "gonderime hazir" durumundan AYRI bir kavramdir - biri ekibin
+  // taslagi musteriye gondermeye hazir oldugunu, digeri musterinin bu taslagi
+  // gercekten onayladigini gosterir. Ikisi karistirilmamalidir.
+  const handleMusteriOnayiGeldi = async () => {
+    setMusteriOnayiKaydediliyor(true);
+    const { error } = await supabase
+      .from("ihracat_dosyalari")
+      .update({
+        draft_musteri_onayi_alindi: true,
+        draft_musteri_onayi_tarihi: new Date().toISOString(),
+        draft_musteri_onayi_isaretleyen: user?.email || null,
+      })
+      .eq("id", dosya.id)
+      .eq("company_id", companyId);
+    setMusteriOnayiKaydediliyor(false);
+    if (error) {
+      showToast(`Müşteri onayı kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Müşteri onayı kaydedildi.", "success");
+    onRefresh();
+  };
+
   const onaylandi = !!(dosya as any).draft_onaylandi;
   const mailGonderildi = !!(dosya as any).draft_mail_gonderildi;
+  const musteriOnayiAlindi = !!(dosya as any).draft_musteri_onayi_alindi;
   const onaylayan = (dosya as any).draft_onaylayan as string | null;
   const onayTarihi = (dosya as any).draft_onay_tarihi as string | null;
-  const durumTitle = onaylandi ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}` : undefined;
+  const musteriOnayiIsaretleyen = (dosya as any).draft_musteri_onayi_isaretleyen as string | null;
+  const musteriOnayiTarihi = (dosya as any).draft_musteri_onayi_tarihi as string | null;
+  const durumTitle = musteriOnayiAlindi
+    ? `Müşteri onayını işaretleyen: ${musteriOnayiIsaretleyen || "-"}${musteriOnayiTarihi ? " · " + formatDateTimeTR(musteriOnayiTarihi) : ""}`
+    : onaylandi
+    ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}`
+    : undefined;
 
   // İlgili Evraklar sabit sırada gösterilir: 1) Commercial Invoice,
   // 2) Packing List, 3) Draft BL, 4) Certificate of Origin, 5) Phytosanitary,
@@ -188,17 +220,21 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         )}
       </td>
       <td className="px-2.5 py-2.5 whitespace-nowrap" title={durumTitle}>
-        {mailGonderildi ? (
+        {musteriOnayiAlindi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-            <CheckCircle2 size={11} /> Gönderildi
+            <CheckCircle2 size={11} /> Onay Geldi
+          </span>
+        ) : mailGonderildi ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
+            <AlertTriangle size={11} /> Yanıt Bekleniyor
           </span>
         ) : onaylandi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: ACCENT, backgroundColor: `${ACCENT}1A` }}>
-            <ThumbsUp size={11} /> Onaylandı
+            <ThumbsUp size={11} /> Gönderime Hazır
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-            <AlertTriangle size={11} /> Bekliyor
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}>
+            Bekliyor
           </span>
         )}
       </td>
@@ -234,6 +270,17 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           >
             <Mail size={12} /> Mail
           </button>
+          {mailGonderildi && !musteriOnayiAlindi && (
+            <button
+              type="button"
+              onClick={handleMusteriOnayiGeldi}
+              disabled={musteriOnayiKaydediliyor}
+              title="Müşteriden onay maili/cevabı geldiğinde işaretleyin"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-500 disabled:opacity-50 transition-colors"
+            >
+              {musteriOnayiKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Müşteri Onayladı
+            </button>
+          )}
         </div>
       </td>
     </tr>

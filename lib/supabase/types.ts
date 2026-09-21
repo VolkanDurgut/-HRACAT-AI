@@ -57,6 +57,10 @@ export type Dosya = {
   draft_onaylayan: string | null;
   draft_onay_tarihi: string | null;
   draft_mail_gonderildi: boolean | null;
+  draft_mail_gonderildi_tarihi: string | null;
+  draft_musteri_onayi_alindi: boolean | null;
+  draft_musteri_onayi_tarihi: string | null;
+  draft_musteri_onayi_isaretleyen: string | null;
 };
 
 export type UrunDetay = {

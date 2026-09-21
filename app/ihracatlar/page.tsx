@@ -59,7 +59,7 @@ export default function IhracatlarPage() {
   // arsivde sunucu tarafinda arama yapar - sayfalama arama kapsamini
   // daraltmaz.
   const fetchDosyalar = useCallback(async () => {
-    if (!user || !companyId) return;
+    if (!user?.id || !companyId) return;
     setLoading(true);
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
@@ -76,7 +76,7 @@ export default function IhracatlarPage() {
     const enriched = await zenginlestir(dosyaData);
     setDosyalar(enriched);
     setLoading(false);
-  }, [user, companyId, zenginlestir]);
+  }, [user?.id, companyId, zenginlestir]);
 
   const dahaFazlaYukle = useCallback(async () => {
     if (!companyId || dahaFazlaYukleniyor || !dahaFazlaVar) return;
@@ -124,7 +124,7 @@ export default function IhracatlarPage() {
   }, [search, companyId, zenginlestir]);
 
   const fetchAcikSiparisler = useCallback(async () => {
-    if (!user || !companyId) return;
+    if (!user?.id || !companyId) return;
     const { data: siparisler } = await supabase
       .from("ana_siparisler")
       .select("*")
@@ -173,7 +173,7 @@ export default function IhracatlarPage() {
     const acikOlanlar = withProgress.filter((s) => (s.toplam_mts || 0) - s.gonderilmisMts > 0.01);
     setAcikSiparisler(acikOlanlar);
     setSiparisLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchDosyalar(); fetchAcikSiparisler(); }, [fetchDosyalar, fetchAcikSiparisler]);
 

@@ -56,7 +56,7 @@ export default function KantarPage() {
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
   const fetchKonteynerler = useCallback(async () => {
-    if (!user || !companyId) return;
+    if (!user?.id || !companyId) return;
 
     // ONCE sadece ACIK dosyalar cekilir. Kantar panelinin ilgi alani zaten
     // yalnizca acik (henuz sevk edilmemis) dosyalarin konteynerleridir - bu
@@ -113,11 +113,11 @@ export default function KantarPage() {
 
     setKonteynerler(enriched);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
-  useEffect(() => { 
-    if (user && companyId) fetchKonteynerler(); 
-  }, [fetchKonteynerler, user, companyId]);
+  useEffect(() => {
+    if (user?.id && companyId) fetchKonteynerler();
+  }, [fetchKonteynerler, user?.id, companyId]);
 
   useEffect(() => {
     if (!yetkiler.sayfa_yetkileri.kantar) {
@@ -126,7 +126,7 @@ export default function KantarPage() {
   }, [yetkiler, router]);
 
   useEffect(() => {
-    if (!user || !companyId) return;
+    if (!user?.id || !companyId) return;
     const channel = supabase
       .channel("kantar-konteynerler")
       .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler", filter: `company_id=eq.${companyId}` }, () => {
@@ -134,7 +134,7 @@ export default function KantarPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchKonteynerler, user, companyId]);
+  }, [fetchKonteynerler, user?.id, companyId]);
 
   const handleDbaYukle = async (konteyner: KonteynerRow, file: File) => {
     await yukleDba(konteyner, file);

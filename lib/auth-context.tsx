@@ -15,6 +15,7 @@ export type SayfaYetkileri = {
   analiz: boolean;
   ayarlar: boolean;
   etd_eta: boolean;
+  draft_onay: boolean;
 };
 
 export type SekmeYetkileri = {
@@ -59,6 +60,7 @@ const VARSAYILAN_YETKILER: KullaniciYetkileri = {
     analiz: true,
     ayarlar: false,
     etd_eta: true,
+    draft_onay: true,
   },
   sekme_yetkileri: {
     proforma: true,
@@ -133,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setYetkiler({
           sayfa_yetkileri: {
             dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
-            kantar: false, analiz: false, ayarlar: false, etd_eta: false,
+            kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false,
           },
           sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
         });
@@ -144,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setYetkiler({
         sayfa_yetkileri: {
           dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
-          kantar: false, analiz: false, ayarlar: false, etd_eta: false,
+          kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false,
         },
         sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
       });

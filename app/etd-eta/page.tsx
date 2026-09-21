@@ -48,7 +48,7 @@ export default function EtdEtaPage() {
   const [saving, setSaving] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    if (!user || !companyId) return; // companyId kontrolü eklendi
+    if (!user?.id || !companyId) return; // companyId kontrolü eklendi
     const { data: rezData } = await supabase
       .from("rezervasyonlar")
       .select("id, dosya_id, booking_no, gemi_adi, sefer_no, acente_ismi, yuklenme_limani, konteyner_adedi, gemi_kalkis_tarihi, eta, eta_guncelleme_tarihi")
@@ -89,7 +89,7 @@ export default function EtdEtaPage() {
 
     setSatirlar(rows);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

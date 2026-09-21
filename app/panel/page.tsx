@@ -32,7 +32,7 @@ function PanelContent() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
 
   const fetchDosyalar = useCallback(async () => {
-    if (!user || !companyId) return; // companyId kontrolü eklendi
+    if (!user?.id || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select(DOSYA_LISTE_KOLONLARI)
@@ -67,7 +67,7 @@ function PanelContent() {
     }));
     setDosyalar(enriched);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
 

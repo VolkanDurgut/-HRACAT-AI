@@ -16,6 +16,7 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/etd-eta": "etd_eta",
   "/analiz": "analiz",
   "/kantar": "kantar",
+  "/draft-onay": "draft_onay",
 };
 
 // "/ayarlar" (ve alt sayfaları, örn. /ayarlar/yetkilendirme) BİLEREK yukarıdaki

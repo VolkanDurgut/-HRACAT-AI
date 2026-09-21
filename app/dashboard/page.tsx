@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!user || !companyId) return; // companyId kontrolü eklendi
+    if (!user?.id || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select(DOSYA_LISTE_KOLONLARI)
@@ -106,7 +106,7 @@ export default function DashboardPage() {
 
     setDurumlar(combined);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

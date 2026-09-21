@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2 } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -18,6 +18,7 @@ const mainItems: MenuItem[] = [
   { label: "Ana Panel",     href: "/panel",       icon: <FolderOpen size={18} />,      yetkiKey: "panel" },
   { label: "Yeni Dosya Aç", href: "/yeni-dosya", icon: <FolderPlus size={18} />,      yetkiKey: "yeni_dosya" },
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
+  { label: "Draft Onay",    href: "/draft-onay",  icon: <FileCheck2 size={18} />,      yetkiKey: "draft_onay" },
 ];
 
 const opsItems: MenuItem[] = [

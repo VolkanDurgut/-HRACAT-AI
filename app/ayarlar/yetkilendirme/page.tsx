@@ -25,6 +25,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   kantar:     "Kantar Paneli",
   analiz:     "Analiz",
   ayarlar:    "Ayarlar",
+  draft_onay: "Draft Onay",
 };
 
 const SEKME_ETIKETLER: Record<string, string> = {
@@ -63,7 +64,7 @@ export default function YetkilendirmePage() {
   }, [authLoading, isSuperAdmin, router]);
 
   const fetchKullanicilar = useCallback(async () => {
-    if (!user || !companyId) return; // Güvenlik duvarı kontrolü
+    if (!user?.id || !companyId) return; // Güvenlik duvarı kontrolü
 
     const { data } = await supabase
       .from("kullanici_yetkileri")
@@ -81,7 +82,7 @@ export default function YetkilendirmePage() {
 
     setKullanicilar(sorted);
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchKullanicilar(); }, [fetchKullanicilar]);
 

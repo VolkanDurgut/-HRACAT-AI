@@ -39,7 +39,7 @@ export default function AnalizPage() {
   const [gemiModal, setGemiModal] = useState<GemiModal | null>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!user || !companyId) return; // companyId kontrolü eklendi
+    if (!user?.id || !companyId) return; // companyId kontrolü eklendi
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select(DOSYA_LISTE_KOLONLARI)
@@ -59,7 +59,7 @@ export default function AnalizPage() {
       konteynerler: (kontData || []).filter((k: Konteyner) => k.dosya_id === d.id),
     })));
     setLoading(false);
-  }, [user, companyId]);
+  }, [user?.id, companyId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 

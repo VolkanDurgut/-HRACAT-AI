@@ -53,6 +53,10 @@ export type Dosya = {
   swift: string | null;
   hesap_numarasi: string | null;
   iban: string | null;
+  draft_onaylandi: boolean | null;
+  draft_onaylayan: string | null;
+  draft_onay_tarihi: string | null;
+  draft_mail_gonderildi: boolean | null;
 };
 
 export type UrunDetay = {

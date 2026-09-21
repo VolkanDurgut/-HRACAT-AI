@@ -64,14 +64,12 @@ export default function KantarPage() {
     // kume cekilir. Sirket yillar boyunca veri biriktirdikce bu sayfa
     // yavaslamaz, cunku "acik dosya" sayisi dogasi geregi sinirlidir.
     const { data: dosyaData } = await supabase
-      .from("ihracat_dosyalari")
-      .select("id, dosya_no, durum, marka, alici_firma")
-      .eq("company_id", companyId)
+      .rpc("kantar_dosya_listesi")
       .or("durum.eq.Açık,durum.eq.Acik");
 
     if (!dosyaData || dosyaData.length === 0) { setKonteynerler([]); setLoading(false); return; }
 
-    const dosyaIds = dosyaData.map((d) => d.id);
+    const dosyaIds = dosyaData.map((d: any) => d.id);
     const dosyaMap: Record<string, { dosya_no: string; marka: string | null; alici_firma: string | null }> = {};
     dosyaData.forEach((d: any) => { dosyaMap[d.id] = { dosya_no: d.dosya_no, marka: d.marka, alici_firma: d.alici_firma }; });
 

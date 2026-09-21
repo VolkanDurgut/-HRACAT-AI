@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -37,6 +38,7 @@ type Props = {
  * zaten alışık olduğu görünümü korumak.
  */
 export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, onRefresh }: Props) {
+  const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
   const [onaylaniyor, setOnaylaniyor] = useState(false);
@@ -180,7 +182,17 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
 
   return (
     <tr className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
-      <td className="px-2.5 py-2.5 text-xs font-semibold text-white whitespace-nowrap">{dosya.dosya_no}</td>
+      <td className="px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => router.push(`/dosya/${dosya.id}`)}
+          title="İlgili ihracat dosyasını aç"
+          className="hover:underline transition-colors"
+          style={{ color: ACCENT }}
+        >
+          {dosya.dosya_no}
+        </button>
+      </td>
       <td className="px-2.5 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "—"}</td>
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</td>
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</td>

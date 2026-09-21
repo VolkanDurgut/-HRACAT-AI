@@ -52,21 +52,21 @@ export function isSuperAdmin(email?: string | null): boolean {
 
 const VARSAYILAN_YETKILER: KullaniciYetkileri = {
   sayfa_yetkileri: {
-    dashboard: true,
-    panel: true,
-    yeni_dosya: true,
-    ihracatlar: true,
-    kantar: true,
-    analiz: true,
+    dashboard: false,
+    panel: false,
+    yeni_dosya: false,
+    ihracatlar: false,
+    kantar: false,
+    analiz: false,
     ayarlar: false,
-    etd_eta: true,
-    draft_onay: true,
+    etd_eta: false,
+    draft_onay: false,
   },
   sekme_yetkileri: {
-    proforma: true,
-    evraklar: true,
-    rezervasyon: true,
-    konteynerler: true,
+    proforma: false,
+    evraklar: false,
+    rezervasyon: false,
+    konteynerler: false,
   },
 };
 

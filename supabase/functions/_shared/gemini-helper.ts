@@ -20,7 +20,7 @@ function geciciHataMi(status: number): boolean {
 const SON_HATA_MESAJI = "Belge okuma servisinde geçici bir yoğunluk yaşandı. Lütfen birkaç saniye sonra tekrar deneyin.";
 
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ihracatasistanim.com",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };

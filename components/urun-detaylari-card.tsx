@@ -104,7 +104,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
       </div>
       {gosterilecekSatirlar.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                 <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Urun Adi</th>

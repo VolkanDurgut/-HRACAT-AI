@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
-import { formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatDateTimeTR, formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 import { buildDraftOnayMailtoUrl, draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
@@ -238,6 +238,8 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           </span>
         )}
       </td>
+      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.gemi_kalkis_tarihi || null)}</td>
+      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.eta || null)}</td>
       <td className="px-2.5 py-2.5">
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <button

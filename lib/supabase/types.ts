@@ -79,6 +79,8 @@ export type Rezervasyon = {
   acente_ismi: string | null;
   sefer_no: string | null;
   gemi_kalkis_tarihi: string | null;
+  eta: string | null;
+  eta_guncelleme_tarihi: string | null;
   talimat_cutoff: string | null;
   beyanname_cutoff: string | null;
   ardiyesiz_giris: string | null;

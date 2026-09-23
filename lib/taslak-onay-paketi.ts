@@ -41,15 +41,15 @@ export async function indirTaslakOnayPaketi(
   const blBlob = await blRes.blob();
   zip.file(`3_Draft_BL_${dosyaKisaAd}.pdf`, blBlob);
 
-  const cooHtml = draftFiligranEkle(buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler));
+  const cooHtml = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
   const cooPdf = await htmlToPdfBlob(cooHtml);
   zip.file(`4_Certificate_of_Origin_DRAFT_${dosyaKisaAd}.pdf`, cooPdf);
 
-  const phytoHtml = draftFiligranEkle(buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const phytoHtml = buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler);
   const phytoPdf = await htmlToPdfBlob(phytoHtml);
   zip.file(`5_Phytosanitary_Certificate_DRAFT_${dosyaKisaAd}.pdf`, phytoPdf);
 
-  const healthHtml = draftFiligranEkle(buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const healthHtml = buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler);
   const healthPdf = await htmlToPdfBlob(healthHtml);
   zip.file(`6_Health_Certificate_DRAFT_${dosyaKisaAd}.pdf`, healthPdf);
 

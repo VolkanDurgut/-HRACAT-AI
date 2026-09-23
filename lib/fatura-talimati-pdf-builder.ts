@@ -115,9 +115,10 @@ function ciz(
   const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
   const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
   const allInNavlun = navlunBirim != null && lokalMasrafBirim != null ? navlunBirim + lokalMasrafBirim : null;
+  const netNavlunToplam = navlunToplam !== null ? navlunToplam - (lokalMasrafToplam ?? 0) : null;
   bolumTablosu("MALIYET VE BANKA BILGILERI", [
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
-    ["Toplam Navlun Fiyati", navlunToplam !== null ? formatCurrency(navlunToplam, dosya.para_birimi) : null],
+    ["Toplam Navlun Fiyati", netNavlunToplam !== null ? formatCurrency(netNavlunToplam, dosya.para_birimi) : null],
     ["Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null],
     ["All in Navlun Fiyati (Konteyner Basina)", allInNavlun !== null ? formatCurrency(allInNavlun, dosya.para_birimi) : null],
     ["Araci Banka", dosya.banka],
@@ -126,29 +127,39 @@ function ciz(
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---
   const urunler = (dosya.urun_detaylari as any[]) || [];
   const toplamCif = urunler.reduce((s, u) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
+      const toplamMiktar = urunler.reduce((s, u) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
   const toplamDusulecek =
     navlunToplam !== null && lokalMasrafToplam !== null ? navlunToplam - lokalMasrafToplam : navlunToplam !== null ? navlunToplam : 0;
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
   const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+      const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
 
   const urunRows = urunler.map((u) => {
     const ad = u.urun_adi || u.description || "Urun";
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "-";
     const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-    return [ad, ambalajBoyutu, formatCurrency(cifBirim, dosya.para_birimi)];
+        const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
+    return [ad, ambalajBoyutu, formatCurrency(cifBirim, dosya.para_birimi), fobBirim !== null ? formatCurrency(fobBirim, dosya.para_birimi) : "-"];
   });
 
   if (urunRows.length > 0) {
     autoTable(doc, {
       startY: y,
-      head: [[{ content: "URUN VE FIYAT BILGILERI", colSpan: 3 }]],
+      head: [
+            [{ content: "URUN VE FIYAT BILGILERI", colSpan: 4 }],
+            [
+              { content: "Urun", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: "Ambalaj", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: "CIF Birim Fiyat", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: "FOB Birim Fiyat", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+            ],
+          ],
       body: urunRows,
       theme: "grid",
       styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu },
       headStyles: { fillColor: LACIVERT, textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
       foot: [
-        ["Toplam CIF", "", formatCurrency(toplamCif, dosya.para_birimi)],
-        ["Toplam FOB", "", toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : "-"],
+        ["Toplam", "", formatCurrency(toplamCif, dosya.para_birimi), toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : "-"],
       ],
       footStyles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "bold", fontSize: fontBoyu },
       margin: { left: marginX, right: marginX, bottom: 10 },

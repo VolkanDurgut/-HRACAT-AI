@@ -31,6 +31,13 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
     miktar: dosya.miktar || "",
     miktar_birimi: dosya.miktar_birimi || "",
     ambalaj: dosya.ambalaj || "",
+    // Fatura Talimati ve tum evrak uretici modulleri (invoice-builder,
+    // packing-list-builder vb.) "Ambalaj" alaninda detayli_ambalaj'i, o
+    // bos ise ambalaj'i kullanir (bkz. fatura-talimati-pdf-builder.ts).
+    // detayli_ambalaj dolu oldugu surece, yukaridaki "Ambalaj" kutusunun
+    // duzenlenmesi evraklara YANSIMAZ - bu yuzden ayri, acikca etiketli
+    // bir alan olarak burada duzenlenebilir kilindi.
+    detayli_ambalaj: dosya.detayli_ambalaj || "",
   });
   const [form, setForm] = useState(buildEmptyForm);
 
@@ -53,11 +60,16 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
       miktar: form.miktar || null,
       miktar_birimi: form.miktar_birimi || null,
       ambalaj: form.ambalaj || null,
+      detayli_ambalaj: form.detayli_ambalaj || null,
       ham_veri: guncelHamVeri,
     };
-    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId);
-    showToast("Lojistik bilgileri güncellendi.", "success");
+    const { error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId);
     setSaving(false);
+    if (error) {
+      showToast(`Lojistik bilgileri kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Lojistik bilgileri güncellendi.", "success");
     setEditing(false);
     onRefresh();
   };
@@ -78,6 +90,9 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
         <CopyableField dark label="Sevkiyat Suresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />
         <CopyableField dark label="Toplam Miktar" value={dosya.miktar ? `${dosya.miktar} ${dosya.miktar_birimi || "MTS"}` : null} />
         <CopyableField dark label="Ambalaj" value={dosya.ambalaj} />
+        <div className="col-span-2">
+          <CopyableField dark label="Detaylı Ambalaj (Evraklarda Görünen)" value={dosya.detayli_ambalaj} />
+        </div>
       </div>
 
       {editing && (
@@ -115,6 +130,12 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
               <div className="col-span-2">
                 <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ambalaj</label>
                 <input value={form.ambalaj} onChange={(e) => update("ambalaj", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
+                  Detaylı Ambalaj <span className="normal-case font-normal">(doluysa Fatura Talimatı ve tüm evraklarda "Ambalaj" olarak bu kullanılır, yukarıdaki "Ambalaj" alanının yerine geçer)</span>
+                </label>
+                <textarea value={form.detayli_ambalaj} onChange={(e) => update("detayli_ambalaj", e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="5.000 PIECES OF 25 KG PP BAGS (SAAD BRAND)" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">

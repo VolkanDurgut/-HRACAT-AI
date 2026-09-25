@@ -1,13 +1,20 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2 } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
-import { formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatDateTimeTR, formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 import { buildDraftOnayMailtoUrl, draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
+import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
+import { buildPackingListHtml } from "@/lib/packing-list-builder";
+import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
+import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
+import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
+import { draftFiligranEkle } from "@/lib/watermark";
 
 const EVRAK_ADLARI: Record<string, string> = {
   commercial_invoice: "Commercial Invoice",
@@ -16,8 +23,6 @@ const EVRAK_ADLARI: Record<string, string> = {
   phytosanitary: "Phytosanitary Certificate",
   health_certificate: "Health Certificate",
 };
-
-type TaslakEvrak = { evrak_tipi: string; dosya_url: string; dosya_adi: string };
 
 type Props = {
   dosya: Dosya;
@@ -33,53 +38,40 @@ type Props = {
  * zaten alışık olduğu görünümü korumak.
  */
 export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, onRefresh }: Props) {
+  const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [taslakEvraklar, setTaslakEvraklar] = useState<TaslakEvrak[]>([]);
   const [onaylaniyor, setOnaylaniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
+  const [musteriOnayiKaydediliyor, setMusteriOnayiKaydediliyor] = useState(false);
 
   const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
   const draftBlAdi = (dosya as any).draft_bl_dosya_adi as string | null;
   const rez = rezervasyonlar[0];
   const aliciEmail = draftOnayAliciEmailAl(dosya);
 
-  const taslaklariYukle = useCallback(async () => {
-    const { data } = await supabase
-      .from("dosya_evraklari")
-      .select("evrak_tipi, dosya_url, dosya_adi")
-      .eq("dosya_id", dosya.id)
-      .eq("company_id", companyId)
-      .eq("durum", "taslak")
-      .in("evrak_tipi", Object.keys(EVRAK_ADLARI));
-    setTaslakEvraklar(data || []);
-  }, [dosya.id, companyId]);
-
-  useEffect(() => {
-    taslaklariYukle();
-  }, [taslaklariYukle]);
-
-  // Taslak evraklar HTML olarak saklanıyor. Dogrudan <a href> ile acinca
-  // depolama servisi bunu duz metin/kaynak kod olarak gosterebiliyor. Bunun
-  // onune gecmek icin icerigi fetch edip, ACIKCA "text/html" turunde bir Blob
-  // olarak aciyoruz - evrak-olustur-buttons.tsx'teki uretim aninda calisan
-  // goruntuleme ile BIREBIR AYNI yontem.
-  const evrakGoruntule = useCallback(
-    async (url: string) => {
+  // "İlgili Evraklar" onizlemesi, "Taslak Onay Paketi İndir" butonuyla
+  // (bkz. lib/taslak-onay-paketi.ts) BIREBIR AYNI yontemi kullanir: belge
+  // onceden dosya_evraklari tablosuna KAYDEDILMIS olmasa bile, mevcut
+  // dosya/rezervasyon/konteyner verisinden aninda uretilip DRAFT
+  // filigraniyla goruntulenir. Bu satir zaten sadece tamEvrakSetiHazirMi
+  // testini gecmis (bkz. app/draft-onay/page.tsx) dosyalar icin render
+  // edildigi icin, veri eksikligi riski yoktur - buton her zaman calisir.
+  const evrakGoruntuleUret = useCallback(
+    (builder: (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => string) => {
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Evrak alınamadı");
-        const html = await res.text();
+        const html = draftFiligranEkle(builder(dosya, rezervasyonlar, konteynerler));
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const blobUrl = URL.createObjectURL(blob);
         const win = window.open(blobUrl, "_blank");
         if (!win) showToast("Açılır pencere engellendi. Lütfen tarayıcı ayarlarından izin verin.", "error");
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-      } catch {
-        showToast("Evrak açılamadı.", "error");
+      } catch (err) {
+        console.error("Taslak evrak uretme hatasi:", err);
+        showToast("Evrak üretilemedi. Lütfen dosya bilgilerini kontrol edin.", "error");
       }
     },
-    [showToast]
+    [dosya, rezervasyonlar, konteynerler, showToast]
   );
 
   const handlePaketIndir = async () => {
@@ -124,7 +116,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     window.open(buildDraftOnayMailtoUrl(dosya, rezervasyonlar));
     const { error } = await supabase
       .from("ihracat_dosyalari")
-      .update({ draft_mail_gonderildi: true })
+      .update({ draft_mail_gonderildi: true, draft_mail_gonderildi_tarihi: new Date().toISOString() })
       .eq("id", dosya.id)
       .eq("company_id", companyId);
     if (error) {
@@ -135,36 +127,72 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     onRefresh();
   };
 
+  // Musterinin FIILEN onay verdigini isaretler. Bu, ic ekibin "Onayla" ile
+  // isaretledigi "gonderime hazir" durumundan AYRI bir kavramdir - biri ekibin
+  // taslagi musteriye gondermeye hazir oldugunu, digeri musterinin bu taslagi
+  // gercekten onayladigini gosterir. Ikisi karistirilmamalidir.
+  const handleMusteriOnayiGeldi = async () => {
+    setMusteriOnayiKaydediliyor(true);
+    const { error } = await supabase
+      .from("ihracat_dosyalari")
+      .update({
+        draft_musteri_onayi_alindi: true,
+        draft_musteri_onayi_tarihi: new Date().toISOString(),
+        draft_musteri_onayi_isaretleyen: user?.email || null,
+      })
+      .eq("id", dosya.id)
+      .eq("company_id", companyId);
+    setMusteriOnayiKaydediliyor(false);
+    if (error) {
+      showToast(`Müşteri onayı kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Müşteri onayı kaydedildi.", "success");
+    onRefresh();
+  };
+
   const onaylandi = !!(dosya as any).draft_onaylandi;
   const mailGonderildi = !!(dosya as any).draft_mail_gonderildi;
+  const musteriOnayiAlindi = !!(dosya as any).draft_musteri_onayi_alindi;
   const onaylayan = (dosya as any).draft_onaylayan as string | null;
   const onayTarihi = (dosya as any).draft_onay_tarihi as string | null;
-  const durumTitle = onaylandi ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}` : undefined;
+  const musteriOnayiIsaretleyen = (dosya as any).draft_musteri_onayi_isaretleyen as string | null;
+  const musteriOnayiTarihi = (dosya as any).draft_musteri_onayi_tarihi as string | null;
+  const durumTitle = musteriOnayiAlindi
+    ? `Müşteri onayını işaretleyen: ${musteriOnayiIsaretleyen || "-"}${musteriOnayiTarihi ? " · " + formatDateTimeTR(musteriOnayiTarihi) : ""}`
+    : onaylandi
+    ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}`
+    : undefined;
 
-  // İlgili Evraklar sabit sırada gösterilir (DB'den geldiği sıradan bağımsız):
-  // 1) Commercial Invoice, 2) Packing List, 3) Draft BL, 4) Certificate of
-  // Origin, 5) Phytosanitary, 6) Health Certificate.
-  const taslakBul = (tip: string) => taslakEvraklar.find((t) => t.evrak_tipi === tip);
-  const ci = taslakBul("commercial_invoice");
-  const pl = taslakBul("packing_list");
-  const coo = taslakBul("certificate_of_origin");
-  const phyto = taslakBul("phytosanitary");
-  const health = taslakBul("health_certificate");
-
+  // İlgili Evraklar sabit sırada gösterilir: 1) Commercial Invoice,
+  // 2) Packing List, 3) Draft BL, 4) Certificate of Origin, 5) Phytosanitary,
+  // 6) Health Certificate. Bu satır zaten tamEvrakSetiHazirMi testini geçmiş
+  // dosyalar için render edildiğinden (bkz. app/draft-onay/page.tsx), Draft
+  // BL harici 5 evrak her zaman üretilebilir durumdadır ve koşulsuz gösterilir.
   type EvrakGosterim = { key: string; title: string; href?: string; onClick?: () => void };
   const evrakListesiHam: (EvrakGosterim | null)[] = [
-    ci ? { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntule(ci.dosya_url) } : null,
-    pl ? { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntule(pl.dosya_url) } : null,
+    { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntuleUret(buildCommercialInvoiceHtml) },
+    { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntuleUret(buildPackingListHtml) },
     draftBlUrl ? { key: "draftbl", title: draftBlAdi || "Draft BL", href: draftBlUrl } : null,
-    coo ? { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntule(coo.dosya_url) } : null,
-    phyto ? { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntule(phyto.dosya_url) } : null,
-    health ? { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntule(health.dosya_url) } : null,
+    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml) },
+    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml) },
+    { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml) },
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 
   return (
     <tr className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
-      <td className="px-2.5 py-2.5 text-xs font-semibold text-white whitespace-nowrap">{dosya.dosya_no}</td>
+      <td className="px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => router.push(`/dosya/${dosya.id}`)}
+          title="İlgili ihracat dosyasını aç"
+          className="hover:underline transition-colors"
+          style={{ color: ACCENT }}
+        >
+          {dosya.dosya_no}
+        </button>
+      </td>
       <td className="px-2.5 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "—"}</td>
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</td>
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</td>
@@ -204,20 +232,26 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         )}
       </td>
       <td className="px-2.5 py-2.5 whitespace-nowrap" title={durumTitle}>
-        {mailGonderildi ? (
+        {musteriOnayiAlindi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-            <CheckCircle2 size={11} /> Gönderildi
+            <CheckCircle2 size={11} /> Onay Geldi
+          </span>
+        ) : mailGonderildi ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
+            <AlertTriangle size={11} /> Yanıt Bekleniyor
           </span>
         ) : onaylandi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: ACCENT, backgroundColor: `${ACCENT}1A` }}>
-            <ThumbsUp size={11} /> Onaylandı
+            <ThumbsUp size={11} /> Gönderime Hazır
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-            <AlertTriangle size={11} /> Bekliyor
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}>
+            Bekliyor
           </span>
         )}
       </td>
+      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.gemi_kalkis_tarihi || null)}</td>
+      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.eta || null)}</td>
       <td className="px-2.5 py-2.5">
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <button
@@ -250,6 +284,17 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           >
             <Mail size={12} /> Mail
           </button>
+          {mailGonderildi && !musteriOnayiAlindi && (
+            <button
+              type="button"
+              onClick={handleMusteriOnayiGeldi}
+              disabled={musteriOnayiKaydediliyor}
+              title="Müşteriden onay maili/cevabı geldiğinde işaretleyin"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-500 disabled:opacity-50 transition-colors"
+            >
+              {musteriOnayiKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Müşteri Onayladı
+            </button>
+          )}
         </div>
       </td>
     </tr>

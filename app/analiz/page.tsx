@@ -523,7 +523,7 @@ export default function AnalizPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="min-w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>#</th>
@@ -559,7 +559,7 @@ export default function AnalizPage() {
               <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="min-w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>

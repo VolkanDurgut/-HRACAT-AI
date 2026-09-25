@@ -201,7 +201,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
           )}
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="min-w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   <th className="text-left px-4 py-3 text-xs font-semibold w-8" style={{ color: TEXT_MUTED }}>No</th>

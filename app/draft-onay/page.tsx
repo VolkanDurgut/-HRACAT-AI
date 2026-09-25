@@ -36,8 +36,13 @@ function tamEvrakSetiHazirMi(dosya: Dosya, rezervasyonlar: Rezervasyon[], kontey
   );
 }
 
-/** Bekleyenler once, onaylanıp gönderilmeyi bekleyenler sonra, gönderilmisler en sonda. */
+/**
+ * Bekleyenler once, gonderime hazir olanlar sonra, musteri yanitini
+ * bekleyenler (sari) daha sonra, musteri onayi gelmis olanlar (yesil)
+ * en sonda gosterilir - boylece aktif takip gerektiren dosyalar ustte kalir.
+ */
 function siraDegeri(d: DosyaWithRelations): number {
+  if ((d as any).draft_musteri_onayi_alindi) return 3;
   if ((d as any).draft_mail_gonderildi) return 2;
   if ((d as any).draft_onaylandi) return 1;
   return 0;
@@ -130,7 +135,7 @@ export default function DraftOnayPage() {
         ) : (
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="min-w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya No</th>
@@ -139,6 +144,8 @@ export default function DraftOnayPage() {
                     <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
                     <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>İlgili Evraklar</th>
                     <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
+                    <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Kalkış</th>
+                    <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
                     <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Aksiyonlar</th>
                   </tr>
                 </thead>

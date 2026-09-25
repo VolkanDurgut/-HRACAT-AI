@@ -81,13 +81,21 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
     const toplamMiktar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.miktar_mts).replace(",", ".")) || 0), 0);
     const toplamTutar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.toplam_tutar_usd).replace(",", ".")) || 0), 0);
 
-    await supabase.from("ihracat_dosyalari").update({
+    const { error } = await supabase.from("ihracat_dosyalari").update({
       urun_detaylari: temizSatirlar,
       miktar: temizSatirlar.length > 0 ? String(parseFloat(toplamMiktar.toFixed(3))) : null,
       toplam_tutar: temizSatirlar.length > 0 ? parseFloat(toplamTutar.toFixed(2)) : null,
     }).eq("id", dosya.id).eq("company_id", companyId);
-    showToast("Urun detaylari güncellendi.", "success");
     setSaving(false);
+    // KRITIK: hata kontrolu yapilmadan basari mesaji gosterilirse, kayit
+    // basarisiz olsa bile (RLS, ag kesintisi vb.) kullanici degisikligin
+    // islendigini sanir ve modal kapanir - eski veri sessizce kalmaya devam
+    // eder. Hata varsa modali ACIK birak, kullanici tekrar deneyebilsin.
+    if (error) {
+      showToast(`Urun detaylari kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Urun detaylari güncellendi.", "success");
     setEditing(false);
     onRefresh();
   };
@@ -104,7 +112,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
       </div>
       {gosterilecekSatirlar.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                 <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Urun Adi</th>

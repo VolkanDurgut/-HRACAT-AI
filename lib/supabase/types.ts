@@ -57,6 +57,10 @@ export type Dosya = {
   draft_onaylayan: string | null;
   draft_onay_tarihi: string | null;
   draft_mail_gonderildi: boolean | null;
+  draft_mail_gonderildi_tarihi: string | null;
+  draft_musteri_onayi_alindi: boolean | null;
+  draft_musteri_onayi_tarihi: string | null;
+  draft_musteri_onayi_isaretleyen: string | null;
 };
 
 export type UrunDetay = {
@@ -75,6 +79,8 @@ export type Rezervasyon = {
   acente_ismi: string | null;
   sefer_no: string | null;
   gemi_kalkis_tarihi: string | null;
+  eta: string | null;
+  eta_guncelleme_tarihi: string | null;
   talimat_cutoff: string | null;
   beyanname_cutoff: string | null;
   ardiyesiz_giris: string | null;

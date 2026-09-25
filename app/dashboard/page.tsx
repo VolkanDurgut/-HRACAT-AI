@@ -392,7 +392,7 @@ export default function DashboardPage() {
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="min-w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
                   <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya No</th>

@@ -6,6 +6,7 @@ import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
+import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 
 type Props = {
   dosyaId: string;
@@ -98,6 +99,10 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Marka", dosya.marka),
       satir("Proforma No", dosya.proforma_no),
       satir("Ambalaj", dosya.detayli_ambalaj || dosya.ambalaj),
+      // Muhasebe talebi: Net/Brut toplam agirlik icin ayri, etiketli bir satir
+      // (25.09.2026) - PDF'teki DOSYA BILGILERI bolumundeki yeni satirlarla tutarli.
+      satir("Net Agirlik", toplamNet ? `${toplamNet.toLocaleString("tr-TR")} KG` : null),
+      satir("Brut Agirlik", toplamBrut ? `${toplamBrut.toLocaleString("tr-TR")} KG` : null),
     ].filter(Boolean).join("\n");
 
     const beyannameSuresi = rez?.beyanname_cutoff
@@ -124,7 +129,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Toplam Navlun Fiyati", navlunToplam !== null ? formatCurrency(navlunToplam, dosya.para_birimi) : null),
       satir("Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null),
       satir("All in Navlun Fiyati (Konteyner Basina)", allInNavlun !== null ? formatCurrency(allInNavlun, dosya.para_birimi) : null),
-      satir("Araci Banka", dosya.banka),
+      // Talep (25.09.2026): Fatura Talimatinda Araci Banka HER ZAMAN sabit
+      // deger - dosya.banka'ya (proformada secilebilen alan) DOKUNULMAZ.
+      satir("Araci Banka", FATURA_TALIMATI_SABIT_BANKA),
     ].filter(Boolean).join("\n");
 
     const toplamFobStr = toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : null;

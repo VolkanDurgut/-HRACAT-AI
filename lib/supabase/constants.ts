@@ -1,5 +1,12 @@
 export const KONTEYNER_TIPLERI = ['20DC', '40DC', '40HC', '20RF', '40RF'] as const;
 
+// Fatura Talimatinda gosterilen "Araci Banka" HER ZAMAN bu sabit deger olacak
+// (talep: 25.09.2026) - dosyanin kendi `banka` alanina DOKUNULMAZ, o alan
+// proformada/Commercial Invoice'ta hangi banka gosterilecegini secmek icin
+// serbest kalmaya devam eder. Bu sabit SADECE Fatura Talimati PDF'i ve
+// e-posta metninde kullanilir.
+export const FATURA_TALIMATI_SABIT_BANKA = 'DENIZBANK A.S.';
+
 export const MTS_PER_KONTEYNER = 25;
 
 export const SUREC_ADIMLARI: Record<number, string> = {

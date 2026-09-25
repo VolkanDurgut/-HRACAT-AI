@@ -4,6 +4,7 @@ import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
+import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -37,6 +38,13 @@ function ciz(
 
   const rez = rezervasyonlar[0];
   const rezervasyonKonteynerAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+
+  // Net/Brut toplamlari en basta hesaplanir: hem DOSYA BILGILERI'ndeki ozet
+  // satirinda (muhasebe talebi: ayri, tek bakista gorulur bir satir), hem de
+  // asagidaki Konteyner tablosunun TOPLAM satirinda kullanilir - iki yerde de
+  // AYNI degerin gosterildiginden emin olmak icin tek noktadan hesaplanir.
+  const toplamNetKg = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
+  const toplamBrutKg = konteynerler.reduce((s, k) => s + ((k as any).brut_agirlik_kg || 0), 0);
 
   const marginX = 14;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -94,6 +102,10 @@ function ciz(
     ["Marka", dosya.marka],
     ["Proforma No", dosya.proforma_no],
     ["Ambalaj", dosya.detayli_ambalaj || dosya.ambalaj],
+    // Muhasebe talebi: Net/Brut agirlik, konteyner tablosuna girmeden de tek
+    // bakista gorulebilsin diye burada ayrica ozetlenir.
+    ["Net Agirlik", toplamNetKg ? `${toplamNetKg.toLocaleString("tr-TR")} KG` : null],
+    ["Brut Agirlik", toplamBrutKg ? `${toplamBrutKg.toLocaleString("tr-TR")} KG` : null],
   ]);
 
   const beyannameSuresi = rez?.beyanname_cutoff
@@ -121,7 +133,10 @@ function ciz(
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
     ["Toplam Navlun Fiyati", netNavlunToplam !== null ? formatCurrency(netNavlunToplam, dosya.para_birimi) : null],
     ["Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null],
-    ["Araci Banka", dosya.banka],
+    // Talep: Fatura Talimatinda Araci Banka HER ZAMAN sabit (dosya.banka
+    // DEGIL) - proformada/Commercial Invoice'ta gosterilen banka bundan
+    // etkilenmez, o alan bagimsiz kalir.
+    ["Araci Banka", FATURA_TALIMATI_SABIT_BANKA],
   ]);
 
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---
@@ -172,8 +187,8 @@ function ciz(
 
   // --- Konteyner tablosu (gercek sutunlu tablo + TOPLAM satiri) ---
   if (konteynerler.length > 0) {
-    const toplamNet = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
-    const toplamBrut = konteynerler.reduce((s, k) => s + ((k as any).brut_agirlik_kg || 0), 0);
+    // toplamNetKg/toplamBrutKg yukarida, fonksiyonun basinda hesaplandi
+    // (DOSYA BILGILERI ozet satiriyla ayni degeri paylasmak icin).
     const toplamKap = konteynerler.reduce((s, k) => s + ((k as any).pieces || 0), 0);
     const toplamVgm = konteynerler.reduce((s, k) => s + ((k as any).vgm_kg || 0), 0);
 
@@ -200,8 +215,10 @@ function ciz(
       foot: [[
         "", "", "", "", "TOPLAM",
         toplamKap ? toplamKap.toLocaleString("tr-TR") : "",
-        toplamNet ? toplamNet.toLocaleString("tr-TR") : "",
-        toplamBrut ? toplamBrut.toLocaleString("tr-TR") : "",
+        // Muhasebe talebi: Net/Brut toplam degerlerinin yanina birim (KG)
+        // eklendi, tek basina bir sayi olarak kalmasin.
+        toplamNetKg ? `${toplamNetKg.toLocaleString("tr-TR")} KG` : "",
+        toplamBrutKg ? `${toplamBrutKg.toLocaleString("tr-TR")} KG` : "",
         toplamVgm ? toplamVgm.toLocaleString("tr-TR") : "",
         "",
       ]],

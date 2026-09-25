@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
-import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -102,7 +102,9 @@ function ciz(
   bolumTablosu("LOJISTIK BILGILERI", [
     ["Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani],
     ["Varis Limani", dosya.varis_limani],
+    ["Ulke", ulkeAyikla(dosya.varis_limani)],
     ["Teslim Sekli", dosya.teslim_sekli],
+    ["Odeme Sekli", (dosya as any).gumruk_odeme_sekli],
     ["Gemi Adi", rez?.gemi_adi],
     ["Acente", rez?.acente_ismi],
     ["Booking No", rez?.booking_no ? rez.booking_no.trim() : null],
@@ -137,7 +139,10 @@ function ciz(
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "-";
     const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
         const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
-    return [ad, ambalajBoyutu, formatCurrency(cifBirim, dosya.para_birimi), fobBirim !== null ? formatCurrency(fobBirim, dosya.para_birimi) : "-"];
+    // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu 3 ondalikli
+    // ve para birimi sembolsuz gosterilir (orn. "0,460") - sistemde TON (MT)
+    // basina tutulan deger degismez, sadece bu tablodaki goruntuleme boyle.
+    return [ad, ambalajBoyutu, formatBirimFiyatKg(cifBirim), fobBirim !== null ? formatBirimFiyatKg(fobBirim) : "-"];
   });
 
   if (urunRows.length > 0) {
@@ -148,8 +153,8 @@ function ciz(
             [
               { content: "Urun", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
               { content: "Ambalaj", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
-              { content: "CIF Birim Fiyat", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
-              { content: "FOB Birim Fiyat", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: `CIF Birim Fiyat (${dosya.para_birimi || "USD"}/KG)`, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: `FOB Birim Fiyat (${dosya.para_birimi || "USD"}/KG)`, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
             ],
           ],
       body: urunRows,
@@ -216,7 +221,7 @@ function ciz(
   bolumTablosu("EVRAK VE TARIH BILGILERI", [
     ["Beyanname No", dosya.beyanname_no],
     ["BL No", dosya.bl_no],
-    ["DIIB No", dosya.diib_no],
+    ["Diib Bilgisi", formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)],
     ["Uretim Tarihi", dosya.uretim_tarihi ? formatDateTR(dosya.uretim_tarihi) : null],
     ["Son Kullanim Tarihi", dosya.son_kullanim_tarihi ? formatDateTR(dosya.son_kullanim_tarihi) : null],
   ]);

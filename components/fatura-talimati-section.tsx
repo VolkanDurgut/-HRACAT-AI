@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -61,7 +61,10 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size;
       const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
       const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
-      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: CIF ${formatCurrency(cifBirim, dosya.para_birimi)}${fobBirim !== null ? ` / FOB ${formatCurrency(fobBirim, dosya.para_birimi)}` : ""}`;
+      // Muhasebe talebi: birim fiyatlar KG basina, virgullu 3 ondalikli, para
+      // birimi sembolsuz (orn. "0,460") - PDF versiyonuyla tutarli.
+      const birim = dosya.para_birimi || "USD";
+      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
     }).join("\n");
     const konteynerSatirlari = konteynerler.map((k, i) => {
       // Muhur/Tip/Marka/Kap/Net/Brut/VGM/Tartim Tarihi - sadece dolu olanlar yazilir.
@@ -104,7 +107,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const lojistikBilgileri = [
       satir("Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani),
       satir("Varis Limani", dosya.varis_limani),
+      satir("Ulke", ulkeAyikla(dosya.varis_limani)),
       satir("Teslim Sekli", dosya.teslim_sekli),
+      satir("Odeme Sekli", (dosya as any).gumruk_odeme_sekli),
       satir("Gemi Adi", rez?.gemi_adi),
       satir("Acente", rez?.acente_ismi),
       satir("Booking No", rez?.booking_no),
@@ -132,8 +137,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const evrakTarihBilgileri = [
       satir("Beyanname No", dosya.beyanname_no),
       satir("BL No", dosya.bl_no),
-      satir("DIIB No", dosya.diib_no),
-      satir("DIIB Tarihi", dosya.diib_tarihi ? formatDateTR(dosya.diib_tarihi) : null),
+      satir("Diib Bilgisi", formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)),
       satir("Uretim Tarihi", dosya.uretim_tarihi ? formatDateTR(dosya.uretim_tarihi) : null),
       satir("Son Kullanim Tarihi", dosya.son_kullanim_tarihi ? formatDateTR(dosya.son_kullanim_tarihi) : null),
     ].filter(Boolean).join("\n");

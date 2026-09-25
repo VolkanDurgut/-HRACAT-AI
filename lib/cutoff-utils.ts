@@ -96,6 +96,49 @@ export function formatCurrency(amount: number | null, currency: string | null): 
   }).format(amount);
 }
 
+/**
+ * Sistemde urun birim fiyatlari TON (MT) basina tutulur (orn. $460/MT). Fatura
+ * Talimatinda muhasebe KG basina, 3 ondalikli, virgullu ve para birimi
+ * sembolsuz format bekliyor (orn. "0,460"). Bu fonksiyon SADECE goruntuleme
+ * icindir - veritabanindaki MT bazli deger degismez, hicbir hesaplamada
+ * kullanilmaz.
+ */
+export function formatBirimFiyatKg(tutarPerMt: number | null | undefined): string {
+  if (tutarPerMt === null || tutarPerMt === undefined || isNaN(tutarPerMt)) return "-";
+  return new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(tutarPerMt / 1000);
+}
+
+/**
+ * "Varis Limani" alani proforma-oku AI'i tarafindan "Liman, Ulke" biciminde
+ * (orn. "Djibouti Port, Djibouti") tek bir serbest metin olarak dolduruluyor.
+ * Ulke, muhasebenin kolayca gorebilmesi icin Fatura Talimatinda AYRI, etiketli
+ * bir satir olarak da gosterilir - bu fonksiyon metni bozmadan sondaki virgul
+ * sonrasini ulke olarak ayiklar. Virgul yoksa (ulke ayirt edilemiyorsa) null
+ * doner - "liman adini ulke gibi tekrar gostermek" yanlis bilgi olur.
+ */
+export function ulkeAyikla(varisLimani: string | null | undefined): string | null {
+  if (!varisLimani) return null;
+  const parcalar = varisLimani.split(",");
+  if (parcalar.length < 2) return null;
+  const ulke = parcalar[parcalar.length - 1].trim();
+  return ulke || null;
+}
+
+/**
+ * DIIB No ve DIIB Tarihini tek bir satirda birlestirir (muhasebenin istedigi
+ * bicim: "DIIB NO: <no>   TARIH: <tarih>"). Ikisi de bos ise null doner
+ * (satir hic gosterilmez); sadece biri doluysa yine de gosterilir.
+ */
+export function formatDiibBilgisi(diibNo: string | null | undefined, diibTarihi: string | null | undefined): string | null {
+  const parcalar: string[] = [];
+  if (diibNo) parcalar.push(`DİİB NO: ${diibNo}`);
+  if (diibTarihi) parcalar.push(`TARİH: ${formatDateTR(diibTarihi)}`);
+  return parcalar.length > 0 ? parcalar.join("   ") : null;
+}
+
 export function autoSuggestContainers(totalMiktar: number | null): number | null {
   if (!totalMiktar || totalMiktar <= 0) return null;
   return Math.ceil(totalMiktar / 25);

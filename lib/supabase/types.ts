@@ -14,6 +14,11 @@ export type Dosya = {
   varis_limani: string | null;
   teslim_sekli: string | null;
   odeme_sekli: string | null;
+  // Gumruk/dis ticaret odeme sekli siniflandirmasi (Mal Mukabili / Akreditif /
+  // Vesaik Mukabili / Pesin vb.). "odeme_sekli" alanindan KASITLI AYRI -
+  // o alan Commercial Invoice'ta kullanilan, bankaya giden detayli odeme
+  // talimati metnidir, buna dokunulmaz. Bkz. migration 20260925130000.
+  gumruk_odeme_sekli: string | null;
   ham_veri: Record<string, unknown> | null;
   gecerlilik_tarihi: string | null;
   miktar: string | null;

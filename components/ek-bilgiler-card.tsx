@@ -76,6 +76,15 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     bl_no: (dosya as any).bl_no || rezervasyonlar[0]?.booking_no || "",
     uretim_tarihi: (dosya as any).uretim_tarihi || "",
     son_kullanim_tarihi: (dosya as any).son_kullanim_tarihi || "",
+    // DIIB No/Tarihi normalde sadece fatura yuklenip AI ile okundugunda dolar
+    // (bkz. fatura-upload-section.tsx) - ama Fatura Talimati faturadan ONCE
+    // gonderildigi icin o an henuz bilinmeyebilir. DIIB limiti doldugunda
+    // yenilendigi icin burada elle de girilebilir/guncellenebilir olmasi gerekiyor.
+    diib_no: (dosya as any).diib_no || "",
+    diib_tarihi: (dosya as any).diib_tarihi || "",
+    // Gumruk/dis ticaret odeme sekli siniflandirmasi (Mal Mukabili vb.) -
+    // "odeme_sekli" alanindan AYRI, bkz. migration 20260925130000.
+    gumruk_odeme_sekli: (dosya as any).gumruk_odeme_sekli || "",
     });
 
   const [form, setForm] = useState(buildEmptyForm);
@@ -103,6 +112,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       bl_no: form.bl_no || null,
       uretim_tarihi: form.uretim_tarihi || null,
       son_kullanim_tarihi: form.son_kullanim_tarihi || null,
+      diib_no: form.diib_no || null,
+      diib_tarihi: form.diib_tarihi || null,
+      gumruk_odeme_sekli: form.gumruk_odeme_sekli || null,
       // Mevcut ham_veri objesini bozmadan, düzenlediğimiz yeni notify listesini ekliyoruz
       ham_veri: {
         ...(dosya.ham_veri as any || {}),
@@ -112,9 +124,15 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       }
     };
 
-    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId); // Şirket kilidi enjekte edildi
-    showToast("Ek bilgiler guncellendi.", "success");
+    const { error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId); // Şirket kilidi enjekte edildi
     setSaving(false);
+    // Onceki fatura talimati hatasindan ogrenildi: hata kontrolu yapilmadan
+    // basari mesaji gosterilirse, kayit sessizce basarisiz olabilir.
+    if (error) {
+      showToast(`Ek bilgiler kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Ek bilgiler guncellendi.", "success");
     setEditing(false);
     onRefresh();
   };
@@ -232,6 +250,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <CopyableField dark label="BL No" value={(dosya as any).bl_no} />
           <CopyableField dark label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
           <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
+          <CopyableField dark label="DİİB No" value={(dosya as any).diib_no} />
+          <CopyableField dark label="DİİB Tarihi" value={(dosya as any).diib_tarihi ? formatDateTR((dosya as any).diib_tarihi) : null} />
+          <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={(dosya as any).gumruk_odeme_sekli} />
         </div>
 
         {odenecekTutar !== null && (
@@ -282,6 +303,20 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanim Tarihi</label>
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB No</label>
+          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} placeholder="2026-D2-04219" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB Tarihi</label>
+          <input type="date" value={form.diib_tarihi} onChange={(e) => update("diib_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
+            Ödeme Şekli <span className="normal-case font-normal">(Fatura Talimatında gösterilir — Mal Mukabili / Akreditif / Vesaik Mukabili / Peşin vb.)</span>
+          </label>
+          <input value={form.gumruk_odeme_sekli} onChange={(e) => update("gumruk_odeme_sekli", e.target.value)} placeholder="Mal Mukabili" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
 
         <div className="col-span-2 md:col-span-3 grid grid-cols-2 gap-3">

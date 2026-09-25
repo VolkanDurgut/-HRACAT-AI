@@ -8,6 +8,10 @@ import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
 import { draftFiligranEkle } from "@/lib/watermark";
 import { htmlToPdfBlob } from "@/lib/html-to-pdf";
 
+function guvenliParca(ham: string | null | undefined, yedek: string): string {
+  return (ham || yedek).trim().replace(/[\/\\:*?"<>|]/g, "");
+}
+
 function guvenliDosyaAdi(ham: string | null | undefined, yedek: string): string {
   return (ham || yedek).replace(/[^a-zA-Z0-9_-]/g, "_");
 }
@@ -27,31 +31,33 @@ export async function indirTaslakOnayPaketi(
 ): Promise<void> {
   const zip = new JSZip();
   const dosyaKisaAd = guvenliDosyaAdi(dosya.dosya_no, "dosya");
+  const bookingNo = guvenliParca(rezervasyonlar[0]?.booking_no, "BOOKING");
+  const proformaNo = guvenliParca(dosya.proforma_no, "PROFORMA");
 
   const ciHtml = draftFiligranEkle(buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler));
   const ciPdf = await htmlToPdfBlob(ciHtml);
-  zip.file(`1_Commercial_Invoice_DRAFT_${dosyaKisaAd}.pdf`, ciPdf);
+  zip.file(`DRAFT- 1- INVOICE- ${bookingNo}- ${proformaNo}.pdf`, ciPdf);
 
   const plHtml = draftFiligranEkle(buildPackingListHtml(dosya, rezervasyonlar, konteynerler));
   const plPdf = await htmlToPdfBlob(plHtml);
-  zip.file(`2_Packing_List_DRAFT_${dosyaKisaAd}.pdf`, plPdf);
+  zip.file(`DRAFT- 2- PACKING- ${bookingNo}- ${proformaNo}.pdf`, plPdf);
 
   const blRes = await fetch(draftBlUrl);
   if (!blRes.ok) throw new Error("Draft BL dosyası indirilemedi.");
   const blBlob = await blRes.blob();
-  zip.file(`3_Draft_BL_${dosyaKisaAd}.pdf`, blBlob);
+  zip.file(`DRAFT- 3- BL- ${bookingNo}- ${proformaNo}.pdf`, blBlob);
 
-  const cooHtml = draftFiligranEkle(buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler));
+  const cooHtml = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
   const cooPdf = await htmlToPdfBlob(cooHtml);
-  zip.file(`4_Certificate_of_Origin_DRAFT_${dosyaKisaAd}.pdf`, cooPdf);
+  zip.file(`DRAFT- 4- COO- ${bookingNo}- ${proformaNo}.pdf`, cooPdf);
 
-  const phytoHtml = draftFiligranEkle(buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const phytoHtml = buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler);
   const phytoPdf = await htmlToPdfBlob(phytoHtml);
-  zip.file(`5_Phytosanitary_Certificate_DRAFT_${dosyaKisaAd}.pdf`, phytoPdf);
+  zip.file(`DRAFT- 5- PHYTO- ${bookingNo}- ${proformaNo}.pdf`, phytoPdf);
 
-  const healthHtml = draftFiligranEkle(buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler));
+  const healthHtml = buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler);
   const healthPdf = await htmlToPdfBlob(healthHtml);
-  zip.file(`6_Health_Certificate_DRAFT_${dosyaKisaAd}.pdf`, healthPdf);
+  zip.file(`DRAFT- 6- HEALTH- ${bookingNo}- ${proformaNo}.pdf`, healthPdf);
 
   const zipBlob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(zipBlob);

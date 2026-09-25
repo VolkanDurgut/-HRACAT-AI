@@ -58,9 +58,10 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   // testini gecmis (bkz. app/draft-onay/page.tsx) dosyalar icin render
   // edildigi icin, veri eksikligi riski yoktur - buton her zaman calisir.
   const evrakGoruntuleUret = useCallback(
-    (builder: (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => string) => {
+    (builder: (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => string, filigranUygula: boolean = true) => {
       try {
-        const html = draftFiligranEkle(builder(dosya, rezervasyonlar, konteynerler));
+        const htmlHam = builder(dosya, rezervasyonlar, konteynerler);
+        const html = filigranUygula ? draftFiligranEkle(htmlHam) : htmlHam;
         const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const blobUrl = URL.createObjectURL(blob);
         const win = window.open(blobUrl, "_blank");
@@ -174,9 +175,9 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntuleUret(buildCommercialInvoiceHtml) },
     { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntuleUret(buildPackingListHtml) },
     draftBlUrl ? { key: "draftbl", title: draftBlAdi || "Draft BL", href: draftBlUrl } : null,
-    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml) },
-    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml) },
-    { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml) },
+    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml, false) },
+    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml, false) },
+    { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml, false) },
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 

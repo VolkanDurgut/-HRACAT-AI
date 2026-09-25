@@ -214,7 +214,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       else if (tip === "health") htmlHam = buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler);
       else htmlHam = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
 
-      const html = durum === "taslak" ? draftFiligranEkle(htmlHam) : htmlHam;
+      const filigranliTurler: Array<typeof tip> = ["ci", "pl", "fc"];
+      const html = durum === "taslak" && filigranliTurler.includes(tip) ? draftFiligranEkle(htmlHam) : htmlHam;
       await kaydetVeAc(html, meta.evrakTipi,
         storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
         gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),

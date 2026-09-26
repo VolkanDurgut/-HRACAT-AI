@@ -298,7 +298,7 @@ export default function Home() {
                 <h3 className="font-bold text-slate-900">Sıfır Hata Evraklar</h3>
               </div>
               <p className="text-sm text-slate-500 leading-relaxed">
-                Her projeye tam entegre evrak üreticisi. Commercial Invoice, Packing List ve sertifikalarınızı saniyeler içinde PDF'e dönüştürün.
+                Her projeye tam entegre evrak üreticisi. Commercial Invoice, Packing List ve sertifikalarınızı saniyeler içinde PDF&apos;e dönüştürün.
               </p>
             </div>
 
@@ -328,7 +328,7 @@ export default function Home() {
             <div className="col-span-1 p-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
               <div className="flex items-center gap-2 mb-4">
                 <Building2 size={18} className="text-slate-700" />
-                <h3 className="font-bold text-slate-900">Acente API'leri</h3>
+                <h3 className="font-bold text-slate-900">Acente API&apos;leri</h3>
               </div>
               <p className="text-sm text-slate-500 leading-relaxed">
                 Farklı acentelerden navlun tekliflerini tek merkezde toplayın. Anında kullanıma hazır operasyonel paneller.
@@ -387,7 +387,7 @@ export default function Home() {
           <div className="p-8 md:p-12 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-emerald-500/30 transition-colors">
             <Quote className="text-slate-200 w-10 h-10 mb-6" />
             <p className="text-xl md:text-2xl font-medium text-slate-800 leading-relaxed mb-8">
-              "Alternatiflere baktık ve İhracat AI'ı seçtik çünkü inanılmaz basit ve tüm sevkiyat sürecimizi kapsıyor. Operasyon süremizi %80 kısalttı ve sıfır hata ile çalışmamızı sağladı."
+              &quot;Alternatiflere baktık ve İhracat AI&apos;ı seçtik çünkü inanılmaz basit ve tüm sevkiyat sürecimizi kapsıyor. Operasyon süremizi %80 kısalttı ve sıfır hata ile çalışmamızı sağladı.&quot;
             </p>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
@@ -446,7 +446,7 @@ export default function Home() {
           <div>
             <h4 className="font-bold text-slate-900 mb-4">Çözümler</h4>
             <ul className="space-y-3 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">KOBİ'ler</a></li>
+              <li><a href="#" className="hover:text-emerald-600 transition-colors">KOBİ&apos;ler</a></li>
               <li><a href="#" className="hover:text-emerald-600 transition-colors">Kurumsal İhracatçılar</a></li>
               <li><a href="#" className="hover:text-emerald-600 transition-colors">Lojistik Acenteleri</a></li>
               <li><a href="#" className="hover:text-emerald-600 transition-colors">Gümrük Müşavirleri</a></li>

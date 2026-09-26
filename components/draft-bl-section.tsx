@@ -246,7 +246,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
               <div className="p-3 rounded-lg border-2 border-red-500/40 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }}>
                 <div className="flex items-center gap-2">
                   <AlertTriangle size={16} className="text-red-400" />
-                  <p className="text-sm font-semibold text-red-400">Draft BL'de uyuşmazlık tespit edildi</p>
+                  <p className="text-sm font-semibold text-red-400">Draft BL&apos;de uyuşmazlık tespit edildi</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
                 {kontrolSonucu.uyusmazliklar?.length > 0 && (
@@ -255,7 +255,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
                       <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
                         <p className="font-medium text-red-400">{u.alan}</p>
                         <p className="text-red-300">Sistemde: <span className="font-mono">{u.sistemde}</span></p>
-                        <p className="text-red-300">Draft BL'de: <span className="font-mono">{u.dosyada}</span></p>
+                        <p className="text-red-300">Draft BL&apos;de: <span className="font-mono">{u.dosyada}</span></p>
                       </div>
                     ))}
                   </div>

@@ -448,7 +448,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
             <p className="text-sm font-semibold text-white">Toplu Konteyner Ekle</p>
             <button onClick={() => setShowTopluForm(false)} className="hover:text-white" style={{ color: TEXT_MUTED }}><X size={16} /></button>
           </div>
-          <p className="text-xs" style={{ color: TEXT_MUTED }}>Excel'den kopyaladığınız konteyner ve mühür numaralarını yapıştırın. Her satır bir konteyner, iki sütun arasında Tab olmalı.</p>
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>Excel&apos;den kopyaladığınız konteyner ve mühür numaralarını yapıştırın. Her satır bir konteyner, iki sütun arasında Tab olmalı.</p>
           <textarea
             value={topluMetin}
             onChange={(e) => setTopluMetin(e.target.value)}

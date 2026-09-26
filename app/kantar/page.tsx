@@ -442,7 +442,7 @@ export default function KantarPage() {
           {konteynerler.length > 0 && bekleyenlerFiltreli.length === 0 && tamamlananlarFiltreli.length === 0 && (
             <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <Search size={40} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
-              <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>"{arama}" ile eşleşen konteyner bulunamadı.</p>
+              <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>&quot;{arama}&quot; ile eşleşen konteyner bulunamadı.</p>
             </div>
           )}
           

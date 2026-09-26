@@ -159,7 +159,7 @@ export default function EtdEtaPage() {
         <div className="mb-5">
           <div className="flex items-center gap-2 mb-2">
             <Bell size={14} className="text-amber-500" />
-            <h2 className="text-sm font-semibold text-white">ETA'sı Yaklaşan Sevkiyatlar</h2>
+            <h2 className="text-sm font-semibold text-white">ETA&apos;sı Yaklaşan Sevkiyatlar</h2>
             <span className="text-xs bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full font-medium">{yaklasanlar.length}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

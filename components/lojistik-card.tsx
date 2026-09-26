@@ -133,7 +133,7 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
-                  Detaylı Ambalaj <span className="normal-case font-normal">(doluysa Fatura Talimatı ve tüm evraklarda "Ambalaj" olarak bu kullanılır, yukarıdaki "Ambalaj" alanının yerine geçer)</span>
+                  Detaylı Ambalaj <span className="normal-case font-normal">(doluysa Fatura Talimatı ve tüm evraklarda &quot;Ambalaj&quot; olarak bu kullanılır, yukarıdaki &quot;Ambalaj&quot; alanının yerine geçer)</span>
                 </label>
                 <textarea value={form.detayli_ambalaj} onChange={(e) => update("detayli_ambalaj", e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="5.000 PIECES OF 25 KG PP BAGS (SAAD BRAND)" />
               </div>

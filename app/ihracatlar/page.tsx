@@ -10,7 +10,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
-import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2 } from "lucide-react";
+import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -489,6 +489,21 @@ export default function IhracatlarPage() {
                 <p className="text-xs" style={{ color: TEXT_MUTED }}>{formatDateTR(selectedDosya.olusturma_tarihi)}</p>
               </div>
               <div className="flex items-center gap-2">
+                {/* Talep (26.09.2026): orijinal proforma PDF'ini goruntuleme - sadece
+                    PDF'i storage'a kaydedilmis dosyalarda gorunur (26.09.2026 sonrasi
+                    acilanlar). */}
+                {(selectedDosya as any).proforma_dosya_url && (
+                  <a
+                    href={(selectedDosya as any).proforma_dosya_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:text-white"
+                    style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
+                    title="Proformayı yeni sekmede aç"
+                  >
+                    <FileText size={12} /> Proformayı Görüntüle
+                  </a>
+                )}
                 <button
                   onClick={() => router.push(`/dosya/${selectedDosya.id}`)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"

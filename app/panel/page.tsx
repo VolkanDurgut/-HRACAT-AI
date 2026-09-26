@@ -10,7 +10,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, Loader2 } from "lucide-react";
+import { Trash2, ExternalLink, FolderX, Loader2, FileText } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
@@ -239,6 +239,21 @@ function PanelContent() {
                       )}
                       <td className="px-3 py-3 align-top">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Talep (26.09.2026): orijinal proforma PDF'ini hizli goruntuleme.
+                              Sadece PDF storage'a kaydedilmis dosyalarda gorunur - bu ozellik
+                              26.09.2026'da eklendi, oncesindeki dosyalarda PDF yok. */}
+                          {(dosya as any).proforma_dosya_url && (
+                            <a
+                              href={(dosya as any).proforma_dosya_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Proformayı Görüntüle"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:opacity-90"
+                              style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
+                            >
+                              <FileText size={13} />
+                            </a>
+                          )}
                           <button
                             onClick={() => router.push(`/dosya/${dosya.id}`)}
                             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"

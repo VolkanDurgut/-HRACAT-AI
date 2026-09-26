@@ -20,7 +20,7 @@ import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, Copy, ExternalLink } from "lucide-react";
+import { Loader2, Package, FileCheck, Copy, ExternalLink, FileText } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -280,7 +280,24 @@ function DosyaDetailContent() {
                 <TaraflarCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Proforma</h3>
+                <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Proforma</h3>
+                  {/* Talep (26.09.2026): orijinal proforma PDF'ini goruntuleme. Sadece
+                      PDF'i storage'a kaydedilmis dosyalarda gorunur (26.09.2026 sonrasi
+                      acilanlar - oncesindeki dosyalarda PDF geriye donuk eklenemez). */}
+                  {(dosya as any).proforma_dosya_url && (
+                    <a
+                      href={(dosya as any).proforma_dosya_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors hover:text-white"
+                      style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
+                      title="Orijinal proforma PDF'ini yeni sekmede aç"
+                    >
+                      <FileText size={12} /> Proformayı Görüntüle
+                    </a>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <CopyableField dark label="Proforma No" value={dosya.proforma_no} />
                   <CopyableField dark label="Proforma Tarihi" value={formatDateTR(dosya.proforma_tarihi)} />

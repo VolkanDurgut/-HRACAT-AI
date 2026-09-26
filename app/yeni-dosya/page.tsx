@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis } from "@/lib/supabase";
+import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -223,6 +223,30 @@ export default function YeniDosyaPage() {
 
       if (dbError) throw dbError;
       setDosyaId(data.id);
+
+      // Orijinal proforma PDF'ini storage'a yukle (talep: 26.09.2026 - "Proforma
+      // Goruntule/Incele" butonu icin). BEST-EFFORT: basarisiz olsa bile dosya
+      // olusturma akisini DURDURMAZ, sadece o dosya icin goruntuleme butonu
+      // gorunmez kalir - ana islem (dosya kaydi) her zaman onceliklidir.
+      if (pdfFile) {
+        try {
+          const guvenliAd = pdfFile.name
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .replace(/ş/gi, "s").replace(/ğ/gi, "g").replace(/ı/gi, "i")
+            .replace(/ö/gi, "o").replace(/ü/gi, "u").replace(/ç/gi, "c")
+            .replace(/[^a-zA-Z0-9._-]/g, "_");
+          const path = `${data.id}/proforma/${Date.now()}_${guvenliAd}`;
+          const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, pdfFile);
+          if (!uploadError) {
+            const proformaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
+            await supabase.from("ihracat_dosyalari")
+              .update({ proforma_dosya_url: proformaUrl, proforma_dosya_adi: pdfFile.name })
+              .eq("id", data.id).eq("company_id", companyId);
+          }
+        } catch {
+          // Sessizce yut - proforma PDF yedeklemesi ikincil bir islem.
+        }
+      }
 
       setStep("success");
       showToast("Dosya olusturuldu!", "success");

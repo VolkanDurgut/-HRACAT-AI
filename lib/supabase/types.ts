@@ -10,6 +10,11 @@ export type Dosya = {
   para_birimi: string | null;
   proforma_no: string | null;
   proforma_tarihi: string | null;
+  // Yeni Dosya Ac akisinda yuklenen orijinal proforma PDF'i - storage'daki
+  // imzali URL'i ve gorunen adi. 26.09.2026'da eklendi, o tarihten ONCE
+  // acilmis dosyalarda bos olabilir (bkz. migration proforma_dosya_url).
+  proforma_dosya_url: string | null;
+  proforma_dosya_adi: string | null;
   yuklenme_limani: string | null;
   varis_limani: string | null;
   teslim_sekli: string | null;

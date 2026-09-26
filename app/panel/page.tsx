@@ -181,7 +181,9 @@ function PanelContent() {
                   { label: "Rezervasyon", done: dosya.rezervasyonlar.length > 0 },
                   { label: "Konteynerler", done: konteynerAdedi > 0 && eklenenKont >= konteynerAdedi },
                   { label: "Fatura Kesildi", done: !!(dosya as any).fatura_no },
-                  { label: "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
+                  // DBA rozeti artik sayisal - kac konteynerin doldugunu ("dolu")
+                  // eklenen konteyner sayisina oranla gosterir (talep: 26.09.2026).
+                  { label: eklenenKont > 0 ? `DBA ${dbaTamamlanan}/${eklenenKont}` : "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
                   { label: "VGM", done: dosya.konteynerler.some((k) => !!k.vgm_kg) },
                 ];
 
@@ -204,7 +206,19 @@ function PanelContent() {
                         <>
                           <td className="px-3 py-3 align-top"><span className="text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.booking_no}</span></td>
                           <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span></td>
-                          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{konteynerAdedi > 0 ? `${eklenenKont}/${konteynerAdedi}` : "—"}</span></td>
+                          <td className="px-3 py-3 align-top">
+                            {konteynerAdedi > 0 ? (
+                              <div>
+                                <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{eklenenKont}/{konteynerAdedi} <span className="text-[10px]" style={{ color: "#4A5262" }}>alınan</span></p>
+                                {/* Talep (26.09.2026): kac konteynerin DBA belgesi yuklenerek
+                                    "dolu" olarak isaretlendigini de panelden gorebilmek icin
+                                    eklendi - salt goruntuleme, hicbir veri degismiyor. */}
+                                {eklenenKont > 0 && (
+                                  <p className="text-[10px] whitespace-nowrap" style={{ color: dbaTamamlanan >= eklenenKont ? "#4ADE80" : TEXT_MUTED }}>{dbaTamamlanan}/{eklenenKont} dolu</p>
+                                )}
+                              </div>
+                            ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
+                          </td>
                           <td className="px-3 py-3 align-top">
                             {tCutoff ? (
                               <div>

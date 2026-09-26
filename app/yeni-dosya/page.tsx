@@ -36,6 +36,16 @@ export default function YeniDosyaPage() {
   const [gonderilmisMts, setGonderilmisMts] = useState<number>(0);
   const [yeniSiparisMts, setYeniSiparisMts] = useState<string>("");
 
+  // Ayarlar > Ihracat Ayarlari'nda tanimli varsayilan DIIB No - yeni acilan
+  // her dosyaya baslangic degeri olarak atanir (talep: 26.09.2026). Sadece
+  // OKUMA yapar, o sayfadaki degeri degistirmez.
+  const [varsayilanDiibNo, setVarsayilanDiibNo] = useState<string | null>(null);
+  useEffect(() => {
+    if (!companyId) return;
+    supabase.from("companies").select("varsayilan_diib_no").eq("id", companyId).single()
+      .then(({ data }) => setVarsayilanDiibNo((data as any)?.varsayilan_diib_no || null));
+  }, [companyId]);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
@@ -197,6 +207,10 @@ export default function YeniDosyaPage() {
           swift: extracted.swift || null,
           hesap_numarasi: extracted.hesap_numarasi || null,
           iban: extracted.iban || null,
+          // Ayarlar > Ihracat Ayarlari'ndaki sabit deger - dosya bazinda Ek
+          // Bilgiler'den sonradan degistirilebilir, burasi sadece baslangic
+          // degeridir (talep: 26.09.2026).
+          diib_no: varsayilanDiibNo,
           ham_veri: extracted as unknown as Record<string, unknown>,
           urun_detaylari: extracted.urun_detaylari || [],
           sevkiyat_evraklari: extracted.sevkiyat_evraklari?.length ? extracted.sevkiyat_evraklari : SEVKIYAT_EVRAKLARI,

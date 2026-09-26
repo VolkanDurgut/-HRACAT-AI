@@ -76,12 +76,14 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     bl_no: (dosya as any).bl_no || rezervasyonlar[0]?.booking_no || "",
     uretim_tarihi: (dosya as any).uretim_tarihi || "",
     son_kullanim_tarihi: (dosya as any).son_kullanim_tarihi || "",
-    // DIIB No/Tarihi normalde sadece fatura yuklenip AI ile okundugunda dolar
-    // (bkz. fatura-upload-section.tsx) - ama Fatura Talimati faturadan ONCE
-    // gonderildigi icin o an henuz bilinmeyebilir. DIIB limiti doldugunda
-    // yenilendigi icin burada elle de girilebilir/guncellenebilir olmasi gerekiyor.
+    // DIIB No normalde sadece fatura yuklenip AI ile okundugunda dolar (bkz.
+    // fatura-upload-section.tsx) - ama Fatura Talimati faturadan ONCE
+    // gonderildigi icin o an henuz bilinmeyebilir. Yeni dosyalarda Ayarlar >
+    // Ihracat Ayarlari'ndaki varsayilan deger otomatik atanir (bkz.
+    // app/yeni-dosya/page.tsx); DIIB limiti dolup degistiginde burada elle de
+    // guncellenebilir olmasi gerekiyor. Tarih artik ayri bir alan degil - bu
+    // kutuya elle, DIIB No ile birlikte yaziliyor (26.09.2026 talebi).
     diib_no: (dosya as any).diib_no || "",
-    diib_tarihi: (dosya as any).diib_tarihi || "",
     // Gumruk/dis ticaret odeme sekli siniflandirmasi (Mal Mukabili vb.) -
     // "odeme_sekli" alanindan AYRI, bkz. migration 20260925130000.
     gumruk_odeme_sekli: (dosya as any).gumruk_odeme_sekli || "",
@@ -113,7 +115,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       uretim_tarihi: form.uretim_tarihi || null,
       son_kullanim_tarihi: form.son_kullanim_tarihi || null,
       diib_no: form.diib_no || null,
-      diib_tarihi: form.diib_tarihi || null,
       gumruk_odeme_sekli: form.gumruk_odeme_sekli || null,
       // Mevcut ham_veri objesini bozmadan, düzenlediğimiz yeni notify listesini ekliyoruz
       ham_veri: {
@@ -251,7 +252,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <CopyableField dark label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
           <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
           <CopyableField dark label="DİİB No" value={(dosya as any).diib_no} />
-          <CopyableField dark label="DİİB Tarihi" value={(dosya as any).diib_tarihi ? formatDateTR((dosya as any).diib_tarihi) : null} />
           <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={(dosya as any).gumruk_odeme_sekli} />
         </div>
 
@@ -306,11 +306,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB No</label>
-          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} placeholder="2026-D2-04219" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB Tarihi</label>
-          <input type="date" value={form.diib_tarihi} onChange={(e) => update("diib_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
+          {/* Muhasebe talebi (26.09.2026): ayri bir "DIIB Tarihi" alanina gerek
+              yok - tarih zaten bu kutuya elle DIIB No ile birlikte yapistiriliyor
+              ve formatDiibBilgisi() bunu oldugu gibi gosteriyor. Yeni dosyalarda
+              varsayilan deger Ayarlar > Ihracat Ayarlari sayfasindan gelir. */}
+          <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} placeholder="2026-D2-04219  19.08.2026" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>

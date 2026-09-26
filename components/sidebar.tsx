@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2 } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -29,6 +29,7 @@ const opsItems: MenuItem[] = [
 
 const ayarlarAltMenu = [
   { label: "Yetkilendirme", href: "/ayarlar/yetkilendirme", icon: <ShieldCheck size={15} /> },
+  { label: "İhracat Ayarları", href: "/ayarlar/ihracat", icon: <FileCog size={15} /> },
 ];
 
 const NAVY = "#10B981";

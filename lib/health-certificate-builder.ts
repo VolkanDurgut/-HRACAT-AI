@@ -135,6 +135,36 @@ function buildNetAgirlikToplam(konteynerler: Konteyner[]): string {
   return escapeHtml(toplam.toLocaleString("tr-TR") + " KGS");
 }
 
+/**
+ * "10. Birim Net Ağırlığı" alanı icin dogru kaynak.
+ *
+ * Kok neden incelemesi (28.09.2026, IHR-2026-0083 Health Certificate):
+ * bu alan onceden dogrudan dosya.ambalaj kolonundan besleniyordu. dosya.ambalaj
+ * bazi dosyalarda ("25 KG PP Bag" gibi) tesadufen agirlik bilgisi de
+ * icerdigi icin dogru gorunuyordu, ama bu garanti degil - dosya.ambalaj sadece
+ * ambalaj TURUNU ("PP BAGS" gibi) tutabilir, agirlik bilgisi hic olmayabilir
+ * (IHR-2026-0081 ve IHR-2026-0083'te oldugu gibi). Halbuki birim agirlik bilgisi
+ * guvenilir sekilde Urun Detaylari satirlarindaki ambalaj_boyutu/packaging_size
+ * alaninda tutuluyor (ör. "25 KG") - bu fonksiyon o alani kullanir.
+ *
+ * Birden fazla urun satirinda FARKLI ambalaj boyutlari varsa (ör. hem 25 KG
+ * hem 50 KG), ikisini de " / " ile ayirip gosterir - tek bir boyutu digerinin
+ * yerine sessizce yazip veri kaybina yol acmamak icin.
+ *
+ * Urun Detaylari hic doldurulmamissa (bos dosya), eski davranisa (dosya.ambalaj)
+ * geri duser - hicbir dosya icin "-" gosterip geriye gidis yaratmaz.
+ */
+function buildBirimNetAgirlik(dosya: Dosya): string {
+  const urunler = ((dosya as any).urun_detaylari as any[]) || [];
+  const boyutlar = urunler
+    .map((u) => u.ambalaj_boyutu || u.packaging_size)
+    .filter((v) => v !== null && v !== undefined && String(v).trim() !== "")
+    .map((v) => String(v).trim());
+  const benzersizBoyutlar = Array.from(new Set(boyutlar));
+  if (benzersizBoyutlar.length > 0) return safe(benzersizBoyutlar.join(" / "));
+  return safe(dosya.ambalaj);
+}
+
 const SHEET_WIDTH = 800;
 const SHEET_HEIGHT = Math.round(SHEET_WIDTH * (1556 / 1100)); // 1132, ayni A4 orani
 
@@ -253,7 +283,7 @@ export function buildHealthCertificateHtml(
     CONSIGNEE_FONT: String(consigneeFont),
     LOT_NR:       safe(dosya.lot_no),
     SKT:          dosya.son_kullanim_tarihi ? safe(new Date(dosya.son_kullanim_tarihi).toLocaleDateString("tr-TR")) : safe(null),
-    BIRIM_NET:    safe(dosya.ambalaj),
+    BIRIM_NET:    buildBirimNetAgirlik(dosya),
     DIS_AMBALAJ:  safe(birimNet),
     NET_MIKTAR:   buildNetAgirlikToplam(konteynerler),
   };

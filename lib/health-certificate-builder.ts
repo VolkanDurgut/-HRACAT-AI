@@ -165,6 +165,26 @@ function buildNetAgirlikToplam(konteynerler: Konteyner[]): string {
 }
 
 /**
+ * "11. Dis Ambalaj Adedi" alani icin: sadece toplam kap/çuval adedi + "ÇUVAL / BAG"
+ * sabit ibaresi gosterilir (kullanici karari, 28.09.2026, IHR-2026-0083).
+ * Onceden bu alanda tum detayli ambalaj cumlesi ("5.000 PIECES OF 25 KG PP
+ * BAGS (SAAD BRAND)" gibi) gosteriliyordu; artik sadece rakam + ÇUVAL / BAG.
+ *
+ * Toplam kap adedi, konteynerler tablosundaki pieces alanlarinin toplamindan
+ * hesaplanir - bu, projede PACKAGING toplamlari icin zaten kullanilan
+ * GUVENILIR kaynaktir (bkz. invoice-builder.ts / packing-list-builder.ts
+ * TOTAL PACKAGING satirlari, ayni mantik). Konteyner verisi yoksa/toplam
+ * 0 ise, eski davranisa (detayli ambalaj / ambalaj metni) geri duser -
+ * veri kaybi olmaz.
+ */
+function buildToplamKapAdedi(konteynerler: Konteyner[], yedekMetin: string): string {
+  if (!konteynerler || konteynerler.length === 0) return safe(yedekMetin);
+  const toplamKap = konteynerler.reduce((acc, k) => acc + ((k as any).pieces || 0), 0);
+  if (toplamKap === 0) return safe(yedekMetin);
+  return escapeHtml(toplamKap.toLocaleString("tr-TR") + " ÇUVAL / BAG");
+}
+
+/**
  * "10. Birim Net Ağırlığı" alanı icin dogru kaynak.
  *
  * Kok neden incelemesi (28.09.2026, IHR-2026-0083 Health Certificate):
@@ -299,7 +319,9 @@ export function buildHealthCertificateHtml(
 ): string {
   const rez = rezervasyonlar[0];
   const limanAdi = dosya.yuklenme_limani || rez?.yuklenme_limani;
-  const birimNet = (dosya as any).detayli_ambalaj || dosya.ambalaj; // "25 KG" gibi birim agirlik bilgisini icerir
+  // buildToplamKapAdedi konteyner verisinden toplam kap adedini bulamazsa
+  // (ör. konteyner hic girilmemis), eski detayli ambalaj metnine geri duser.
+  const disAmbalajYedek = (dosya as any).detayli_ambalaj || dosya.ambalaj;
 
   const consigneeSatirlari = dosya.consignee ? buildKisaAliciAdresi(dosya.consignee) : "";
   const consigneeFont = consigneeSatirlari ? hesaplaConsigneeFontBoyutu(consigneeSatirlari) : 10;
@@ -313,7 +335,7 @@ export function buildHealthCertificateHtml(
     LOT_NR:       safe(dosya.lot_no),
     SKT:          dosya.son_kullanim_tarihi ? safe(new Date(dosya.son_kullanim_tarihi).toLocaleDateString("tr-TR")) : safe(null),
     BIRIM_NET:    buildBirimNetAgirlik(dosya),
-    DIS_AMBALAJ:  safe(birimNet),
+    DIS_AMBALAJ:  buildToplamKapAdedi(konteynerler, disAmbalajYedek),
     NET_MIKTAR:   buildNetAgirlikToplam(konteynerler),
   };
 

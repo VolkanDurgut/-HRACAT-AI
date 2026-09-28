@@ -57,6 +57,15 @@ function bolLogicalSatirlara(metin: string): string {
   // (genelde ulke adi baslar) yeni bir satir basi ekle - herhangi bir ulke
   // adina ozel degil, PO Box kalibinin kendisine dayanan genel bir kural.
   sonuc = sonuc.replace(/\b(P\.?\s*O\.?\s*Box\s*:?\s*\d+)\s+/i, "$1\n");
+  // Vergi/sirket kimlik no (NIF, TAX ID, VAT, TIN vb.) genelde en sona,
+  // adres/ulke bilgisinin hemen ardina eklenir ve o satiri asiri uzatip
+  // TUM bloğun fontunu gereksiz yere kucultur (kok neden incelemesi:
+  // 28.09.2026, IHR-2026-0081 Health Certificate - "...DJIBOUTI VILLE,
+  // REPUBLIC OF DJIBOUTI. NIF:1001465 / TAX ID:1001465" tek satirda 96
+  // karakterdi, fontu 10px'ten 7,5px'e dusuruyordu). Bu etiketlerden ilki
+  // gorulmeden once satir basi eklenir - NIF ve TAX ID ayni satirda
+  // birlikte kalmaya devam eder (Tel/WhatsApp grubuyla ayni mantik).
+  sonuc = sonuc.replace(/\s*(?=\bNIF\s*:|\bTAX\s*ID\s*:|\bVAT\s*(?:NO\.?)?\s*:|\bTIN\s*:)/i, "\n");
   return sonuc
     .split("\n")
     .map((satir) => satir.trim())
@@ -175,7 +184,17 @@ const HEALTH_TEMPLATE = `<!DOCTYPE html>
   #f-uretici     { top: 21.0%; left: 10%;    width: 29%;  font-size: 10px; }
   #f-ihracatci   { top: 24.0%; left: 51%;   width: 59%;  font-size: 10px; }
   #f-bolge       { top: 34.8%; left: 10%;    width: 22%;  font-size: 10px; white-space: nowrap; }
-  #f-consignee   { top: 31.6%; left: 52%;   width: 93%;  font-size: __CONSIGNEE_FONT__px; line-height: 1.15; }
+  /* Genislik onceden 93% idi: left:52% ile toplamda 145% ediyordu, yani
+     kutu SAYFANIN SAGINDAN TASIYORDU. Sayfa (.sheet) overflow:hidden
+     oldugu icin, kisa bir satir (93%'luk genislige sigacak kadar kisa
+     ama sayfanin fiziksel sinirindan uzun) OTOMATIK SATIR KAYDIRMAYA
+     UGRAMADAN sayfa kenarinda KIRPILIYOR, metnin sonu (ör. vergi/TAX ID
+     numarasi) tamamen kayboluyordu - kok neden incelemesi: 28.09.2026,
+     IHR-2026-0081 Health Certificate. Form gorselindeki gercek tablo
+     sinirlari piksel bazli olculerek (bkz. saglik-arka-plan-govseli)
+     dogru deger (~%39, kutunun sag kenari sayfa/tablo sinirinin
+     GERCEKTEN bittigi yerde, ~%91) bulundu. */
+  #f-consignee   { top: 31.6%; left: 52%;   width: 39%;  font-size: __CONSIGNEE_FONT__px; line-height: 1.15; }
   #f-urun        { top: 40.3%; left: 25%;    width: 26%;  font-size: 10px; line-height: 1.0; white-space: nowrap; }
   #f-lot         { top: 39.3%; left: 55.5%; width: 15%;  font-size: 10px; }
   #f-skt         { top: 39.3%; left: 72.5%; width: 17%;  font-size: 10px; }

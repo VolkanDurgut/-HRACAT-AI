@@ -177,7 +177,12 @@ function ciz(
       styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu },
       headStyles: { fillColor: LACIVERT, textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
       foot: [
-        ["Toplam", "", formatCurrency(toplamCif, dosya.para_birimi), toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : "-"],
+        [
+          "Toplam",
+          "",
+          `${formatCurrency(toplamCif, dosya.para_birimi)} ${dosya.para_birimi || "USD"}`,
+          toplamFob !== null ? `${formatCurrency(toplamFob, dosya.para_birimi)} ${dosya.para_birimi || "USD"}` : "-",
+        ],
       ],
       footStyles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "bold", fontSize: fontBoyu },
       margin: { left: marginX, right: marginX, bottom: 10 },

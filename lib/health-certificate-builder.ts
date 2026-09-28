@@ -74,6 +74,35 @@ function bolLogicalSatirlara(metin: string): string {
 }
 
 /**
+ * Health Certificate'in "6. Alicinin Adi ve Adresi" alani icin, kullanicinin
+ * acik karari (28.09.2026, IHR-2026-0083): bu resmi saglik sertifikasinda
+ * sadece firma adi + adres gosterilir, telefon/WhatsApp/fax/email/vergi no
+ * gibi iletisim bilgilerine GEREK YOK - hem gereksiz hem de kutuya
+ * sigmasini zorlastiriyor. Diger belgeler (Certificate of Origin,
+ * Phytosanitary Certificate vb.) consignee bilgisini TAM haliyle gostermeye
+ * devam eder; bu KISALTMA SADECE Health Certificate'e ozeldir.
+ *
+ * Yontem: metinde ilk iletisim/vergi etiketi (Tel/Phone/WhatsApp/Fax/Email/
+ * NIF/TAX ID/VAT/TIN) nerede baslarsa, metni ORADAN itibaren keser - cunku
+ * standart/duzgun girilmis bir adres bloğunda iletisim bilgisi HER ZAMAN
+ * adresin sonunda gelir (ör. "...REPUBLIQUE DE DJIBOUTI TEL OFFICE: ...").
+ * NOT: Eger bir dosyanin consignee metni bu standart sirayi izlemiyorsa
+ * (iletisim bilgisi adresin ORTASINDA/basinda geciyorsa), bu fonksiyon
+ * adresin bir kismini da kesebilir - boyle bir durum tespit edilirse ayrica
+ * degerlendirilip o dosyanin consignee verisi duzeltilmelidir.
+ */
+function buildKisaAliciAdresi(consignee: string): string {
+  const iletisimEtiketiDesen = /\bTel(?:\s*(?:Office|No\.?))?\s*:|\bPhone\s*:|\bWhatsApp\s*:|\bFax\s*:|\bEmails?(?:\s*ID)?\s*:|\bNIF\s*:|\bTAX\s*ID\s*:|\bVAT\s*(?:NO\.?)?\s*:|\bTIN\s*:/i;
+  const kesmeNoktasi = consignee.search(iletisimEtiketiDesen);
+  let sonuc = kesmeNoktasi === -1 ? consignee : consignee.slice(0, kesmeNoktasi);
+  // Kesim sonrasi kalabilecek virgul/bosluk/nokta artiklarini temizle.
+  sonuc = sonuc.trim().replace(/[,\s]+$/, "");
+  // Okunakli olmasi icin: PO Box'tan sonra (genelde ulke adi baslar) satir basi.
+  sonuc = sonuc.replace(/\b(P\.?\s*O\.?\s*Box\s*:?\s*\d+)\s+/i, "$1\n");
+  return sonuc;
+}
+
+/**
  * Alici adresi musteriden musteriye COK degisken uzunlukta olabilir. Sabit
  * bir font boyutu, bugun dogru olsa bile YARIN daha uzun bir adres geldiginde
  * kutunun disina tasabilir. Bu yuzden font boyutu, bolunmus satirlarin TOPLAM
@@ -272,7 +301,7 @@ export function buildHealthCertificateHtml(
   const limanAdi = dosya.yuklenme_limani || rez?.yuklenme_limani;
   const birimNet = (dosya as any).detayli_ambalaj || dosya.ambalaj; // "25 KG" gibi birim agirlik bilgisini icerir
 
-  const consigneeSatirlari = dosya.consignee ? bolLogicalSatirlara(dosya.consignee) : "";
+  const consigneeSatirlari = dosya.consignee ? buildKisaAliciAdresi(dosya.consignee) : "";
   const consigneeFont = consigneeSatirlari ? hesaplaConsigneeFontBoyutu(consigneeSatirlari) : 10;
 
   const replacements: Record<string, string> = {

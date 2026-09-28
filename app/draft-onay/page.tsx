@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, isDosyaAcik } from "@/lib/supabase";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import DraftOnayKarti from "@/components/draft-onay-karti";
@@ -57,10 +57,11 @@ export default function DraftOnayPage() {
     if (!user?.id || !companyId) return;
     setLoading(true);
 
-    // Not: Durum (Açık/Kapalı) filtresi BİLEREK YOK - draft evrakları hazır
-    // olan dosyalar Kapalı durumda da olabilir. Bunun yerine performans icin
-    // sadece Draft BL yuklenmis dosyalarla sinirliyoruz (tam evrak seti zaten
-    // Draft BL olmadan mumkun degil - bkz. tamEvrakSetiHazirMi).
+    // Kullanici karari (28.09.2026): Draft Onay sayfasinda SADECE ACIK
+    // dosyalar gosterilir - Kapali dosyalar (draft evraklari daha once
+    // tamamlanmis olsa bile) artik bu listede yer almaz. Durum kontrolu
+    // asagida isDosyaAcik() ile yapiliyor (hem "Açık" hem eski "Acik" ASCII
+    // yazimini taniyan, projede zaten var olan ortak fonksiyon).
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari")
       .select("*")
@@ -98,7 +99,9 @@ export default function DraftOnayPage() {
       konteynerler: kontMap[d.id] || [],
     }));
 
-    const hazirOlanlar = zenginlesmis.filter((d) => tamEvrakSetiHazirMi(d, d.rezervasyonlar, d.konteynerler));
+    const hazirOlanlar = zenginlesmis.filter(
+      (d) => isDosyaAcik(d) && tamEvrakSetiHazirMi(d, d.rezervasyonlar, d.konteynerler)
+    );
     hazirOlanlar.sort((a, b) => siraDegeri(a) - siraDegeri(b));
 
     setDosyalar(hazirOlanlar);

@@ -45,6 +45,9 @@ export type Dosya = {
   son_kullanim_tarihi: string | null;
   navlun_tutari: number | null;
   fatura_talimati_gonderildi: boolean | null;
+  // Bu sevkiyat icin ECTN basvurusu yapilacak mi (talep: 28.09.2026). true ise
+  // Commercial Invoice'a TOTAL FOB/FREIGHT/TOTAL CFR satirlari eklenir.
+  ectn_basvurusu: boolean | null;
   konsimento_dosya_url: string | null;
   konsimento_dosya_adi: string | null;
   konsimento_yukleme_tarihi: string | null;

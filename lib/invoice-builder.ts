@@ -1,5 +1,5 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
-import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, limanAdiAyikla } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 
 /**
@@ -178,6 +178,7 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
 
     <div class="totals-block">
       <table>
+        __ECTN_SATIRLARI__
         <tr><td class="label">ADVANCE PAYMENT</td><td class="value">__AVANS_TUTARI__</td></tr>
         <tr class="grand-total"><td class="label">TOTAL</td><td class="value">__TOPLAM_TUTAR__</td></tr>
       </table>
@@ -279,6 +280,40 @@ function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
 }
 
 /**
+ * ECTN basvurusu isaretli dosyalarda (dosya.ectn_basvurusu) Commercial
+ * Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR <liman> satirlari eklenir
+ * (talep: 28.09.2026). Isaretli DEGILSE bos string doner - belge birebir
+ * eskisi gibi kalir. FREIGHT, Fatura Talimatindaki ile AYNI hesap
+ * mantigini kullanir: navlun_tutari (konteyner basina) * konteyner adedi.
+ * CFR satiri, hem FOB hem FREIGHT bilinmeden gosterilmez - eksik/yaniltici
+ * tutar gostermemek icin.
+ */
+function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
+  if (!(dosya as any).ectn_basvurusu) return "";
+
+  const fobToplam = dosya.toplam_tutar;
+  const rez = rezervasyonlar[0];
+  const navlunBirim = (dosya as any).navlun_tutari;
+  const konteynerAdedi = rez?.konteyner_adedi || 0;
+  const navlunToplam = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
+  const limanAdi = limanAdiAyikla(dosya.varis_limani);
+
+  const satirlar: string[] = [];
+  if (fobToplam !== null && fobToplam !== undefined) {
+    satirlar.push(`<tr><td class="label">TOTAL FOB</td><td class="value">${escapeHtml(formatCurrency(fobToplam, dosya.para_birimi))}</td></tr>`);
+  }
+  if (navlunToplam !== null) {
+    satirlar.push(`<tr><td class="label">FREIGHT</td><td class="value">${escapeHtml(formatCurrency(navlunToplam, dosya.para_birimi))}</td></tr>`);
+  }
+  if (fobToplam !== null && fobToplam !== undefined && navlunToplam !== null) {
+    const cfrToplam = fobToplam + navlunToplam;
+    const cfrEtiket = limanAdi ? `TOTAL CFR ${escapeHtml(limanAdi)}` : "TOTAL CFR";
+    satirlar.push(`<tr><td class="label">${cfrEtiket}</td><td class="value">${escapeHtml(formatCurrency(cfrToplam, dosya.para_birimi))}</td></tr>`);
+  }
+  return satirlar.join("\n");
+}
+
+/**
  * Sistemdeki dosya/rezervasyon/konteyner verilerinden Commercial Invoice
  * HTML belgesini uretir. Tum serbest metin alanlari escapeHtml'den gecer,
  * tum sayisal/tarih alanlar formatCurrency/formatDateTR ile formatlanir.
@@ -329,6 +364,7 @@ export function buildCommercialInvoiceHtml(
     html = html.split(`__${key}__`).join(value);
   }
   html = html.replace("__URUN_SATIRLARI__", buildUrunSatirlari(dosya));
+  html = html.replace("__ECTN_SATIRLARI__", buildEctnSatirlari(dosya, rezervasyonlar));
 
   return html;
 }

@@ -76,6 +76,13 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const { companyId } = useAuth(); // SaaS: şirket bazlı izolasyon için company_id kaynağı
   const [fumigationAyar, setFumigationAyar] = useState<FumigationAyari | null>(null);
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
+  // ECTN basvurusu isaretlendiyse Commercial Invoice'a TOTAL FOB/FREIGHT/
+  // TOTAL CFR satirlari eklenir (talep: 28.09.2026). Yerel state - dosya
+  // prop'u disaridan (parent) yenilenmeden ONCE bile bir sonraki Draft/
+  // Orijinal tiklamasinda hemen yeni degeri kullanabilmek icin.
+  const dosyaEctnBasvurusu = !!(dosya as any).ectn_basvurusu;
+  const [ectnBasvurusu, setEctnBasvurusu] = useState<boolean>(dosyaEctnBasvurusu);
+  useEffect(() => { setEctnBasvurusu(dosyaEctnBasvurusu); }, [dosya.id, dosyaEctnBasvurusu]);
   // "ci-taslak" | "ci-orijinal" | "pl-taslak" ... formatinda - hangi butonun yuklendigini gosterir
   const [yukleniyor, setYukleniyor] = useState<string | null>(null);
   // Her evrak_tipi icin mevcut kayit durumu (taslak/orijinal/hic yok)
@@ -207,7 +214,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     try {
       const meta = EVRAK_META[tip];
       let htmlHam: string;
-      if (tip === "ci") htmlHam = buildCommercialInvoiceHtml(dosya, rezervasyonlar, konteynerler);
+      if (tip === "ci") htmlHam = buildCommercialInvoiceHtml({ ...dosya, ectn_basvurusu: ectnBasvurusu } as Dosya, rezervasyonlar, konteynerler);
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "phyto") htmlHam = buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler);
@@ -234,6 +241,17 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // bir onay ister. Boylece muhasebe/ihracat personeli yanlislikla
   // onaylanmis bir evragi tekrar filigranli hale dondurmez (gumruk/banka
   // surecinde ciddi karisikliga yol acabilir).
+  const handleEctnToggle = async (value: boolean) => {
+    const onceki = ectnBasvurusu;
+    setEctnBasvurusu(value); // aninda yansit - butonlar hep guncel degeri kullanir
+    if (!companyId) return;
+    const { error } = await supabase.from("ihracat_dosyalari").update({ ectn_basvurusu: value }).eq("id", dosya.id).eq("company_id", companyId);
+    if (error) {
+      setEctnBasvurusu(onceki); // basarisizsa geri al
+      showToast(`ECTN ayarı kaydedilemedi: ${error.message}`, "error");
+    }
+  };
+
   const handleTiklandi = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc", durum: "taslak" | "orijinal") => {
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
@@ -290,13 +308,23 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     );
   };
 
+  /** ECTN basvurusu isaretleme kutusu - sadece Commercial Invoice'in yaninda
+   * gosterilir (talep: 28.09.2026). */
+  const ectnCheckbox = (
+    <label className="inline-flex items-center gap-1.5 text-[11px] cursor-pointer select-none" style={{ color: "#94a3b8" }} title="İşaretlenirse Commercial Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR satırları eklenir">
+      <input type="checkbox" checked={ectnBasvurusu} onChange={(e) => handleEctnToggle(e.target.checked)} className="w-3.5 h-3.5" />
+      ECTN başvurusu yapılacak
+    </label>
+  );
+
   return (
     <>
       {show === "both" ? (
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Commercial Invoice</span>
             {renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
+            {ectnCheckbox}
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Packing List</span>
@@ -326,7 +354,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         </div>
       ) : (
         <div className="flex items-center gap-2 flex-wrap">
-          {show === "ci" && renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}
+          {show === "ci" && (<>{renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}{ectnCheckbox}</>)}
           {show === "pl" && renderEvrakButonlari("pl", plHazirlik, "Packing List")}
           {show === "coo" && renderEvrakButonlari("coo", cooHazirlik, "Certificate of Origin")}
           {show === "phyto" && renderEvrakButonlari("phyto", phytoHazirlik, "Phytosanitary Certificate")}

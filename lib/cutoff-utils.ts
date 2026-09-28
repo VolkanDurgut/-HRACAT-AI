@@ -128,6 +128,23 @@ export function ulkeAyikla(varisLimani: string | null | undefined): string | nul
 }
 
 /**
+ * "Varis Limani" alanindan ("Liman, Ulke" bicimi, orn. "Djibouti Port,
+ * Djibouti") CFR incoterm'inde kullanilacak LIMAN adini ayiklar - ulkeyi
+ * DEGIL, cunku CFR her zaman isimlendirilmis bir varis LIMANINA gore
+ * tanimlanir (orn. "Berbera Port, Somalia" icin CFR BERBERA denir, CFR
+ * SOMALIA degil). Sondaki " Port"/" PORT" ekini atar ve buyuk harfe
+ * cevirir (talep: 28.09.2026, ECTN Commercial Invoice). Virgul yoksa
+ * (liman ayirt edilemiyorsa) null doner.
+ */
+export function limanAdiAyikla(varisLimani: string | null | undefined): string | null {
+  if (!varisLimani) return null;
+  const parcalar = varisLimani.split(",");
+  if (parcalar.length < 2) return null;
+  const liman = parcalar[0].trim().replace(/\s+port$/i, "").trim();
+  return liman ? liman.toUpperCase() : null;
+}
+
+/**
  * DIIB No ve DIIB Tarihini tek bir satirda birlestirir (muhasebenin istedigi
  * bicim: "DIIB NO: <no>   TARIH: <tarih>"). Ikisi de bos ise null doner
  * (satir hic gosterilmez); sadece biri doluysa yine de gosterilir.

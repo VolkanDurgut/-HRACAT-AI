@@ -1,5 +1,5 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, limanAdiAyikla } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, limanAdiAyikla, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 
 /**
@@ -271,6 +271,13 @@ function buildMarkaListesi(dosya: Dosya, konteynerler: Konteyner[]): string {
 function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
   const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
   if (!raw) return safe(null);
+  // Coklu ambalaj/urun segmenti iceren metinlerde (ör. "2.000 PIECES 25 KG...,
+  // 1.000 PIECES OF 50 KG...") konteynerlerin TOPLAM kap adedini metnin
+  // basina yapistirmak YANLIS sonuc uretir - sistemde hangi konteynerin hangi
+  // segmente ait oldugu bilgisi tutulmuyor (kok neden incelemesi: 28.09.2026,
+  // IHR-2026-0081). Bu durumda metne DOKUNULMAZ, kullanicinin Dosya Detay'da
+  // girdigi hali aynen gosterilir.
+  if (detayliAmbalajCokluSegmentli(String(raw))) return safe(raw);
   const toplamKap = (konteynerler || []).reduce((s, k) => s + ((k as any).pieces || 0), 0);
   if (toplamKap > 0) {
     const guncellenmis = String(raw).replace(/^[\d.,]+/, toplamKap.toLocaleString("tr-TR"));

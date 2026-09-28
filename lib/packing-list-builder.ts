@@ -1,5 +1,5 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
-import { formatDateTR } from "@/lib/cutoff-utils";
+import { formatDateTR, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 
 /** HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi). */
@@ -264,6 +264,11 @@ export function buildPackingListHtml(
     DETAYLI_AMBALAJ: (() => {
       const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
       if (!raw) return safe(null);
+      // Coklu ambalaj/urun segmenti iceren metinlerde toplam kap adedini
+      // metnin basina yapistirmak YANLIS sonuc uretir - bkz.
+      // lib/invoice-builder.ts buildDetayliAmbalaj (kok neden incelemesi:
+      // 28.09.2026, IHR-2026-0081). Ayni koruma burada da uygulanir.
+      if (detayliAmbalajCokluSegmentli(String(raw))) return safe(raw);
       if (totalPieces > 0) {
         return safe(String(raw).replace(/^[\d.,]+/, totalPieces.toLocaleString("tr-TR")));
       }

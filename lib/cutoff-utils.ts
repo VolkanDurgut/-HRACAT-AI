@@ -156,6 +156,25 @@ export function formatDiibBilgisi(diibNo: string | null | undefined, diibTarihi:
   return parcalar.length > 0 ? parcalar.join("   ") : null;
 }
 
+/**
+ * "Detayli Ambalaj" metninde BIRDEN FAZLA ambalaj/urun segmenti olup olmadigini
+ * tespit eder (orn. "2.000 PIECES 25 KG PP BAG, 1.000 PIECES OF 50 KG PP
+ * BAGS" - iki AYRI kap sayisi). Konteynerler sekmesindeki toplam kap adedi
+ * (tum konteynerlerin "pieces" toplami) TEK bir sayidir ve sistemde hangi
+ * konteynerin hangi urun/ambalaj tipine ait oldugu bilgisi TUTULMADIGI icin,
+ * coklu segmentli metinlerde bu toplami metnin basina yapistirmak metni
+ * BOZAR ve YANLIS bilgi uretir (kok neden incelemesi: 28.09.2026, IHR-2026-0081
+ * - "2.000"in yanlislikla 4 konteynerin toplami olan "3.000" ile
+ * degistirilmesi). Commercial Invoice ve Packing List uretimi, coklu segment
+ * tespit ederse OTOMATIK DUZELTMEYI ATLAMALI ve kullanicinin Dosya Detay'da
+ * girdigi metni OLDUGU GIBI kullanmalidir - bkz. invoice-builder.ts
+ * buildDetayliAmbalaj, packing-list-builder.ts buildPackingListHtml.
+ */
+export function detayliAmbalajCokluSegmentli(metin: string): boolean {
+  const eslesmeler = metin.match(/\d[\d.,]*\s*(PIECES|PCS|BAGS?|ADET)/gi);
+  return !!eslesmeler && eslesmeler.length > 1;
+}
+
 export function autoSuggestContainers(totalMiktar: number | null): number | null {
   if (!totalMiktar || totalMiktar <= 0) return null;
   return Math.ceil(totalMiktar / 25);

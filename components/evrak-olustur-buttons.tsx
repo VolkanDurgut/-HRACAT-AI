@@ -22,6 +22,7 @@ import {
   checkHealthCertificateReadiness,
 } from "@/lib/document-readiness";
 import FumigationAyarModal from "@/components/fumigation-ayar-modal";
+import EctnDegerleriModal, { EctnOverrideDegerleri } from "@/components/ectn-degerleri-modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /** Turkce karakterleri Latin karsiliklariyla degistirir. */
@@ -83,6 +84,23 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const dosyaEctnBasvurusu = !!(dosya as any).ectn_basvurusu;
   const [ectnBasvurusu, setEctnBasvurusu] = useState<boolean>(dosyaEctnBasvurusu);
   useEffect(() => { setEctnBasvurusu(dosyaEctnBasvurusu); }, [dosya.id, dosyaEctnBasvurusu]);
+  // ECTN satirlarinin manuel girilmis degerleri (talep: 28.09.2026). NULL ise
+  // otomatik hesaplanir - bkz. lib/invoice-builder.ts. "Duzenle" modalindan
+  // kaydedilince buradaki yerel state de aninda guncellenir, boylece dosya
+  // prop'u disaridan yenilenmeden once bile bir sonraki Draft/Orijinal
+  // tiklamasi guncel degerleri kullanir.
+  const dosyaEctnFobOverride = (dosya as any).ectn_fob_override ?? null;
+  const dosyaEctnFreightOverride = (dosya as any).ectn_freight_override ?? null;
+  const dosyaEctnCfrOverride = (dosya as any).ectn_cfr_override ?? null;
+  const [ectnFobOverride, setEctnFobOverride] = useState<number | null>(dosyaEctnFobOverride);
+  const [ectnFreightOverride, setEctnFreightOverride] = useState<number | null>(dosyaEctnFreightOverride);
+  const [ectnCfrOverride, setEctnCfrOverride] = useState<number | null>(dosyaEctnCfrOverride);
+  useEffect(() => {
+    setEctnFobOverride(dosyaEctnFobOverride);
+    setEctnFreightOverride(dosyaEctnFreightOverride);
+    setEctnCfrOverride(dosyaEctnCfrOverride);
+  }, [dosya.id, dosyaEctnFobOverride, dosyaEctnFreightOverride, dosyaEctnCfrOverride]);
+  const [ectnModalAcik, setEctnModalAcik] = useState(false);
   // "ci-taslak" | "ci-orijinal" | "pl-taslak" ... formatinda - hangi butonun yuklendigini gosterir
   const [yukleniyor, setYukleniyor] = useState<string | null>(null);
   // Her evrak_tipi icin mevcut kayit durumu (taslak/orijinal/hic yok)
@@ -214,7 +232,13 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     try {
       const meta = EVRAK_META[tip];
       let htmlHam: string;
-      if (tip === "ci") htmlHam = buildCommercialInvoiceHtml({ ...dosya, ectn_basvurusu: ectnBasvurusu } as Dosya, rezervasyonlar, konteynerler);
+      if (tip === "ci") htmlHam = buildCommercialInvoiceHtml({
+        ...dosya,
+        ectn_basvurusu: ectnBasvurusu,
+        ectn_fob_override: ectnFobOverride,
+        ectn_freight_override: ectnFreightOverride,
+        ectn_cfr_override: ectnCfrOverride,
+      } as Dosya, rezervasyonlar, konteynerler);
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "phyto") htmlHam = buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler);
@@ -309,12 +333,25 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   };
 
   /** ECTN basvurusu isaretleme kutusu - sadece Commercial Invoice'in yaninda
-   * gosterilir (talep: 28.09.2026). */
+   * gosterilir (talep: 28.09.2026). Isaretliyken yaninda cikan kalem ikonu,
+   * ECTN satirlarinin degerlerini elle duzeltme modalini acar. */
   const ectnCheckbox = (
-    <label className="inline-flex items-center gap-1.5 text-[11px] cursor-pointer select-none" style={{ color: "#94a3b8" }} title="İşaretlenirse Commercial Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR satırları eklenir">
-      <input type="checkbox" checked={ectnBasvurusu} onChange={(e) => handleEctnToggle(e.target.checked)} className="w-3.5 h-3.5" />
-      ECTN başvurusu yapılacak
-    </label>
+    <div className="inline-flex items-center gap-1">
+      <label className="inline-flex items-center gap-1.5 text-[11px] cursor-pointer select-none" style={{ color: "#94a3b8" }} title="İşaretlenirse Commercial Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR satırları eklenir">
+        <input type="checkbox" checked={ectnBasvurusu} onChange={(e) => handleEctnToggle(e.target.checked)} className="w-3.5 h-3.5" />
+        ECTN başvurusu yapılacak
+      </label>
+      {ectnBasvurusu && (
+        <button
+          type="button"
+          onClick={() => setEctnModalAcik(true)}
+          className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+          title="ECTN tutarlarını (TOTAL FOB / FREIGHT / TOTAL CFR) elle düzenle"
+        >
+          <Pencil size={11} />
+        </button>
+      )}
+    </div>
   );
 
   return (
@@ -384,6 +421,23 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           onSaved={(ayar) => setFumigationAyar(ayar)}
         />
       )}
+
+      <EctnDegerleriModal
+        dosya={{
+          ...dosya,
+          ectn_fob_override: ectnFobOverride,
+          ectn_freight_override: ectnFreightOverride,
+          ectn_cfr_override: ectnCfrOverride,
+        } as Dosya}
+        rezervasyonlar={rezervasyonlar}
+        open={ectnModalAcik}
+        onClose={() => setEctnModalAcik(false)}
+        onSaved={(payload: EctnOverrideDegerleri) => {
+          setEctnFobOverride(payload.ectn_fob_override);
+          setEctnFreightOverride(payload.ectn_freight_override);
+          setEctnCfrOverride(payload.ectn_cfr_override);
+        }}
+      />
 
       <ConfirmDialog
         open={yenidenTaslakConfirm !== null}

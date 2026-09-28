@@ -48,6 +48,12 @@ export type Dosya = {
   // Bu sevkiyat icin ECTN basvurusu yapilacak mi (talep: 28.09.2026). true ise
   // Commercial Invoice'a TOTAL FOB/FREIGHT/TOTAL CFR satirlari eklenir.
   ectn_basvurusu: boolean | null;
+  // ECTN satirlarinin manuel (kullanici tarafindan girilen) degerleri (talep:
+  // 28.09.2026). Her biri NULL ise ilgili satir otomatik hesaplanir - bkz.
+  // lib/invoice-builder.ts -> hesaplaEctnOtomatikDegerler / buildEctnSatirlari.
+  ectn_fob_override: number | null;
+  ectn_freight_override: number | null;
+  ectn_cfr_override: number | null;
   konsimento_dosya_url: string | null;
   konsimento_dosya_adi: string | null;
   konsimento_yukleme_tarihi: string | null;

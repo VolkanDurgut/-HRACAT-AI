@@ -279,36 +279,73 @@ function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
   return safe(raw);
 }
 
+export type EctnOtomatikDegerler = {
+  fob: number | null;
+  freight: number | null;
+  cfr: number | null;
+  limanAdi: string | null;
+};
+
+/**
+ * ECTN satirlari icin OTOMATIK hesaplanan degerleri dondurur (manuel override
+ * uygulanmadan ONCE). FREIGHT, Fatura Talimatindaki ile AYNI hesap mantigini
+ * kullanir: navlun_tutari (konteyner basina) * konteyner adedi. Hem "Duzenle"
+ * modalinda "Otomatik: ..." bilgisini gostermek hem de buildEctnSatirlari
+ * icinde kullanicinin bos biraktigi alanlari doldurmak icin kullanilir
+ * (talep: 28.09.2026).
+ */
+export function hesaplaEctnOtomatikDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnOtomatikDegerler {
+  const fob = dosya.toplam_tutar ?? null;
+  const rez = rezervasyonlar[0];
+  const navlunBirim = (dosya as any).navlun_tutari;
+  const konteynerAdedi = rez?.konteyner_adedi || 0;
+  const freight = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
+  const cfr = fob !== null && freight !== null ? fob + freight : null;
+  const limanAdi = limanAdiAyikla(dosya.varis_limani);
+  return { fob, freight, cfr, limanAdi };
+}
+
 /**
  * ECTN basvurusu isaretli dosyalarda (dosya.ectn_basvurusu) Commercial
  * Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR <liman> satirlari eklenir
  * (talep: 28.09.2026). Isaretli DEGILSE bos string doner - belge birebir
- * eskisi gibi kalir. FREIGHT, Fatura Talimatindaki ile AYNI hesap
- * mantigini kullanir: navlun_tutari (konteyner basina) * konteyner adedi.
- * CFR satiri, hem FOB hem FREIGHT bilinmeden gosterilmez - eksik/yaniltici
- * tutar gostermemek icin.
+ * eskisi gibi kalir.
+ *
+ * Her satir icin ONCELIK: kullanicinin manuel girdigi deger (ectn_*_override,
+ * doluysa) > otomatik hesaplanan deger. TOTAL CFR ozel durum: kullanici CFR'i
+ * AYRICA manuel girmediyse, (olasi override edilmis) FOB+FREIGHT'tan yeniden
+ * hesaplanir - boylece FOB veya FREIGHT'i duzelten kullanici CFR'i de elle
+ * guncellemek zorunda kalmaz. Hicbir deger bilinmiyorsa satir hic gosterilmez
+ * - eksik/yaniltici tutar riskini onlemek icin (talep: 28.09.2026).
  */
 function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
   if (!(dosya as any).ectn_basvurusu) return "";
 
-  const fobToplam = dosya.toplam_tutar;
-  const rez = rezervasyonlar[0];
-  const navlunBirim = (dosya as any).navlun_tutari;
-  const konteynerAdedi = rez?.konteyner_adedi || 0;
-  const navlunToplam = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
-  const limanAdi = limanAdiAyikla(dosya.varis_limani);
+  const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
+  const fobOverride = (dosya as any).ectn_fob_override;
+  const freightOverride = (dosya as any).ectn_freight_override;
+  const cfrOverride = (dosya as any).ectn_cfr_override;
+
+  const fob = fobOverride !== null && fobOverride !== undefined ? fobOverride : otomatik.fob;
+  const freight = freightOverride !== null && freightOverride !== undefined ? freightOverride : otomatik.freight;
+  const cfr =
+    cfrOverride !== null && cfrOverride !== undefined
+      ? cfrOverride
+      : fob !== null && freight !== null
+        ? fob + freight
+        : null;
+  const limanAdi = otomatik.limanAdi;
 
   const satirlar: string[] = [];
-  if (fobToplam !== null && fobToplam !== undefined) {
-    satirlar.push(`<tr><td class="label">TOTAL FOB</td><td class="value">${escapeHtml(formatCurrency(fobToplam, dosya.para_birimi))}</td></tr>`);
+  if (fob !== null && fob !== undefined) {
+    satirlar.push(`<tr><td class="label">TOTAL FOB</td><td class="value">${escapeHtml(formatCurrency(fob, dosya.para_birimi))}</td></tr>`);
   }
-  if (navlunToplam !== null) {
-    satirlar.push(`<tr><td class="label">FREIGHT</td><td class="value">${escapeHtml(formatCurrency(navlunToplam, dosya.para_birimi))}</td></tr>`);
+  if (freight !== null && freight !== undefined) {
+    satirlar.push(`<tr><td class="label">FREIGHT</td><td class="value">${escapeHtml(formatCurrency(freight, dosya.para_birimi))}</td></tr>`);
   }
-  if (fobToplam !== null && fobToplam !== undefined && navlunToplam !== null) {
-    const cfrToplam = fobToplam + navlunToplam;
+  if (cfr !== null && cfr !== undefined) {
     const cfrEtiket = limanAdi ? `TOTAL CFR ${escapeHtml(limanAdi)}` : "TOTAL CFR";
-    satirlar.push(`<tr><td class="label">${cfrEtiket}</td><td class="value">${escapeHtml(formatCurrency(cfrToplam, dosya.para_birimi))}</td></tr>`);
+    satirlar.push(`<tr><td class="label">${cfrEtiket}</td><td class="value">${escapeHtml(formatCurrency(cfr, dosya.para_birimi))}</td></tr>`);
   }
   return satirlar.join("\n");
 }

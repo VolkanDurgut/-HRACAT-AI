@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
 import { Loader2, Printer, Calendar } from "lucide-react";
 
 type BugunYuklenen = {
@@ -20,47 +21,11 @@ type MusteriGrubu = {
   bekleyenSayisi: number;
 };
 
-function bugunTarihStr() {
-  const d = new Date();
-  const yerelOfset = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - yerelOfset).toISOString().slice(0, 10);
-}
-
-/**
- * DBA belgesinden yapay zeka ile cikarilan "DD.MM.YYYY HH:MM:SS" formatindaki
- * GERCEK tartim tarihini { gun, saat } olarak ayristirir. Bu, konteynerin
- * SISTEME NE ZAMAN YUKLENDIGINDEN (dba_yukleme_tarihi) FARKLI bir bilgidir -
- * personel belgeyi ertesi gun/gec yukleyebilir, bu durumda konteyner yanlis
- * gune dusmemesi icin belgedeki gercek tarih esas alinir. Format tanınamazsa
- * (nadir AI cikarim hatasi) null doner ve cagiran kod yukleme tarihine
- * guvenli sekilde geri doner - hicbir konteyner raporda sessizce kaybolmaz.
- */
-function tartimTarihiAyristir(deger: string | null | undefined): { gun: string; saat: string } | null {
-  if (!deger) return null;
-  const eslesme = deger.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})[ ,T]+(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!eslesme) return null;
-  const [, gg, aa, yyyy, ss, dd, sn] = eslesme;
-  return { gun: `${yyyy}-${aa}-${gg}`, saat: `${ss}:${dd}:${sn || "00"}` };
-}
-
-/** Bir konteyner icin raporda kullanilacak "efektif gun/saat" bilgisini dondurur:
- *  once DBA belgesindeki gercek tartim tarihi denenir, o yoksa/bozuksa
- *  (Turkiye saatine cevrilmis) sistem yukleme tarihine guvenli sekilde doner. */
-function efektifTartimBilgisi(dbaKontrolSonucu: any, dbaYuklemeTarihi: string | null): { gun: string; saat: string } | null {
-  const aiTarihi = tartimTarihiAyristir(dbaKontrolSonucu?.tartim_tarih_saat);
-  if (aiTarihi) return aiTarihi;
-  if (!dbaYuklemeTarihi) return null;
-  const yuklemeDate = new Date(dbaYuklemeTarihi);
-  const gun = yuklemeDate.toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
-  const saat = yuklemeDate.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour12: false });
-  return { gun, saat };
-}
-
 export default function GunlukRaporSayfasi() {
   const { user, loading: authLoading, companyId } = useAuth();
   const router = useRouter();
 
-  const [tarih, setTarih] = useState(bugunTarihStr());
+  const [tarih, setTarih] = useState(bugunTarihIstanbul());
   const [yukleniyor, setYukleniyor] = useState(true);
   const [companyName, setCompanyName] = useState("");
   const [bugunYuklenenler, setBugunYuklenenler] = useState<BugunYuklenen[]>([]);
@@ -194,7 +159,7 @@ export default function GunlukRaporSayfasi() {
             className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm text-slate-700"
           />
           <button
-            onClick={() => setTarih(bugunTarihStr())}
+            onClick={() => setTarih(bugunTarihIstanbul())}
             className="text-sm px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
           >
             Bugün

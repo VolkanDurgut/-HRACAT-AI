@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
-import { formatDateTR } from "@/lib/cutoff-utils";
+import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
@@ -121,13 +121,17 @@ export default function DashboardPage() {
 
   const bekleyenRez = aciklar.filter(d => d.rezervasyonlar.length === 0).length;
 
-  // Bugun DBA'si yuklenen (sevk edilen) konteyner sayisi - yerel gun sinirlari ile
-  const bugunBaslangic = new Date(); bugunBaslangic.setHours(0, 0, 0, 0);
-  const bugunBitis = new Date(bugunBaslangic); bugunBitis.setDate(bugunBitis.getDate() + 1);
+  // Bugun GERCEKTEN tartilan (sevk edilen) konteyner sayisi. DBA belgesinden
+  // AI ile cikarilan gercek tartim tarihi esas alinir (efektifTartimBilgisi),
+  // sisteme yukleme zamani (dba_yukleme_tarihi) DEGIL - Gunluk Ihracat Kantar
+  // Raporu ile AYNI TEK DOGRU KAYNAK (talep: 29.09.2026). Boylece personel bir
+  // DBA belgesini ertesi gun yuklerse, Dashboard ve rapor artik farkli sayilar
+  // gostermez (kok neden: SEGU1669290 - 28 Eylul'de tartilmis, DBA'si 29
+  // Eylul sabahi yuklenmis, eskiden Dashboard bunu "bugun" sayiyordu).
+  const bugunStr = bugunTarihIstanbul();
   const bugunYuklenenSayisi = durumlar.reduce((toplam, d) => toplam + d.konteynerler.filter(k => {
-    if (!k.dba_yukleme_tarihi) return false;
-    const t = new Date(k.dba_yukleme_tarihi).getTime();
-    return t >= bugunBaslangic.getTime() && t < bugunBitis.getTime();
+    const efektif = efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi);
+    return efektif?.gun === bugunStr;
   }).length, 0);
 
   if (loading) {

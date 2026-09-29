@@ -48,7 +48,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       para_birimi: dosya.para_birimi,
       proforma_no: dosya.proforma_no,
       gemi_adi: rez?.gemi_adi,
-      yukleme_limani: dosya.yuklenme_limani || rez?.yuklenme_limani,
+      yukleme_limani: rez?.yuklenme_limani || dosya.yuklenme_limani,
       varis_limani: dosya.varis_limani,
       diib_no: dosya.diib_no,
       diib_tarihi: dosya.diib_tarihi,

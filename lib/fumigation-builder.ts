@@ -287,7 +287,7 @@ export function buildFumigationHtml(
     CONTAINER_NOS:         buildContainerNos(konteynerler),
     VESSEL_NAME:           safe(rez?.gemi_adi),
     VOYAGE_NUMBER:         safe(rez?.sefer_no),
-    PORT_OF_LOADING:       safe(dosya.yuklenme_limani || rez?.yuklenme_limani),
+    PORT_OF_LOADING:       safe(rez?.yuklenme_limani || dosya.yuklenme_limani),
     PORT_OF_DISCHARGE:     safe(dosya.varis_limani),
     DESCRIPTION_OF_GOODS:  safe(dosya.urun_tanimi || dosya.ambalaj),
     NET_WEIGHT:            buildNetAgirlikToplam(konteynerler),

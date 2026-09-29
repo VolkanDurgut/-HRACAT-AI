@@ -169,7 +169,7 @@ export function buildPhytosanitaryCertificateHtml(
   konteynerler: Konteyner[]
 ): string {
   const rez = rezervasyonlar[0];
-  const limanAdi = dosya.yuklenme_limani || rez?.yuklenme_limani;
+  const limanAdi = rez?.yuklenme_limani || dosya.yuklenme_limani;
 
   const replacements: Record<string, string> = {
     EXPORTER:        escapeHtml(`${COMPANY_NAME}\n${COMPANY_ADDRESS}`),

@@ -43,7 +43,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       satici_firma: dosya.satici_firma,
       proforma_no: dosya.proforma_no,
       consignee: (dosya as any).consignee,
-      yukleme_limani: dosya.yuklenme_limani || rez?.yuklenme_limani,
+      yukleme_limani: rez?.yuklenme_limani || dosya.yuklenme_limani,
       varis_limani: dosya.varis_limani,
       teslim_sekli: dosya.teslim_sekli,
       gemi_adi: rez?.gemi_adi,

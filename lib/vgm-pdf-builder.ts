@@ -42,7 +42,7 @@ export function indirVgmPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteyn
   };
   bilgiSatiri("Booking No", rez?.booking_no || "-");
   bilgiSatiri("Gemi Adı", rez?.gemi_adi || "-");
-  bilgiSatiri("Yükleme Limanı", dosya.yuklenme_limani || rez?.yuklenme_limani || "-");
+  bilgiSatiri("Yükleme Limanı", rez?.yuklenme_limani || dosya.yuklenme_limani || "-");
   bilgiSatiri("Varış Limanı", dosya.varis_limani || "-");
   doc.setTextColor(0, 0, 0);
 

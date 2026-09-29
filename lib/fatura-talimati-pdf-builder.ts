@@ -112,7 +112,7 @@ function ciz(
     ? `${formatDateTimeTR(rez.beyanname_cutoff)} ${formatCutoffSaat(rez.beyanname_cutoff)}`
     : null;
   bolumTablosu("LOJISTIK BILGILERI", [
-    ["Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani],
+    ["Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani],
     ["Varis Limani", dosya.varis_limani],
     ["Ulke", ulkeAyikla(dosya.varis_limani)],
     ["Teslim Sekli", dosya.teslim_sekli],

@@ -257,7 +257,7 @@ export function buildPackingListHtml(
     ALICI_ADRES: safe((dosya as any).alici_adresi),
     CONSIGNEE: safe((dosya as any).consignee),
     VESSEL_VOYAGE: vesselVoyage,
-    YUKLEME_LIMANI: safe(dosya.yuklenme_limani || rez?.yuklenme_limani),
+    YUKLEME_LIMANI: safe(rez?.yuklenme_limani || dosya.yuklenme_limani),
     VARIS_LIMANI: safe(dosya.varis_limani),
     URETIM_TARIHI: dosya.uretim_tarihi ? escapeHtml(formatDateTR(dosya.uretim_tarihi)) : safe(null),
     SON_KULLANIM_TARIHI: dosya.son_kullanim_tarihi ? escapeHtml(formatDateTR(dosya.son_kullanim_tarihi)) : safe(null),

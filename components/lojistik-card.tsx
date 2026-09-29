@@ -24,7 +24,7 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
   const { showToast } = useToast();
 
   const buildEmptyForm = () => ({
-    yuklenme_limani: dosya.yuklenme_limani || rezervasyonlar[0]?.yuklenme_limani || "",
+    yuklenme_limani: rezervasyonlar[0]?.yuklenme_limani || dosya.yuklenme_limani || "",
     varis_limani: dosya.varis_limani || "",
     teslim_sekli: dosya.teslim_sekli || "",
     sevkiyat_suresi: (dosya.ham_veri as any)?.sevkiyat_suresi || "",
@@ -84,7 +84,7 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <CopyableField dark label="Yukleme Limani" value={dosya.yuklenme_limani || rezervasyonlar[0]?.yuklenme_limani} />
+        <CopyableField dark label="Yukleme Limani" value={rezervasyonlar[0]?.yuklenme_limani || dosya.yuklenme_limani} />
         <CopyableField dark label="Varis Limani" value={dosya.varis_limani} />
         <CopyableField dark label="Teslim Sekli" value={dosya.teslim_sekli} />
         <CopyableField dark label="Sevkiyat Suresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />

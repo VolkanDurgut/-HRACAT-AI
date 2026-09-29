@@ -50,7 +50,7 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
       `${ayrac}\n` +
       `Booking No     : ${rez?.booking_no || "-"}\n` +
       `Gemi Adı       : ${rez?.gemi_adi || "-"}\n` +
-      `Yükleme Limanı : ${dosya.yuklenme_limani || rez?.yuklenme_limani || "-"}\n` +
+      `Yükleme Limanı : ${rez?.yuklenme_limani || dosya.yuklenme_limani || "-"}\n` +
       `Varış Limanı   : ${dosya.varis_limani || "-"}\n\n` +
       `${ayrac}\n` +
       `VGM SONUÇLARI (${konteynerler.length} Konteyner)\n` +

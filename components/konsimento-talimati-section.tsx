@@ -54,7 +54,7 @@ export default function KonsimentoTalimatiSection({
     return {
       dosya_no: dosya.dosya_no, lot_no: dosya.lot_no, alici_firma: dosya.alici_firma,
       satici_firma: dosya.satici_firma, proforma_no: dosya.proforma_no,
-      yukleme_limani: dosya.yuklenme_limani || rez?.yuklenme_limani,
+      yukleme_limani: rez?.yuklenme_limani || dosya.yuklenme_limani,
       varis_limani: dosya.varis_limani, teslim_sekli: dosya.teslim_sekli,
       gemi_adi: rez?.gemi_adi, acente_ismi: rez?.acente_ismi,
       booking_no: rez?.booking_no, gemi_kalkis_tarihi: rez?.gemi_kalkis_tarihi,

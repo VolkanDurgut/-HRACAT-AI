@@ -110,7 +110,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       : null;
 
     const lojistikBilgileri = [
-      satir("Yukleme Limani", dosya.yuklenme_limani || rez?.yuklenme_limani),
+      satir("Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani),
       satir("Varis Limani", dosya.varis_limani),
       satir("Ulke", ulkeAyikla(dosya.varis_limani)),
       satir("Teslim Sekli", dosya.teslim_sekli),

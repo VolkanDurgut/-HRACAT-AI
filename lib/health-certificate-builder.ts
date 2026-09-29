@@ -318,7 +318,7 @@ export function buildHealthCertificateHtml(
   konteynerler: Konteyner[]
 ): string {
   const rez = rezervasyonlar[0];
-  const limanAdi = dosya.yuklenme_limani || rez?.yuklenme_limani;
+  const limanAdi = rez?.yuklenme_limani || dosya.yuklenme_limani;
   // buildToplamKapAdedi konteyner verisinden toplam kap adedini bulamazsa
   // (ör. konteyner hic girilmemis), eski detayli ambalaj metnine geri duser.
   const disAmbalajYedek = (dosya as any).detayli_ambalaj || dosya.ambalaj;

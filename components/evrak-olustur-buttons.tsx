@@ -92,14 +92,19 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const dosyaEctnFobOverride = (dosya as any).ectn_fob_override ?? null;
   const dosyaEctnFreightOverride = (dosya as any).ectn_freight_override ?? null;
   const dosyaEctnCfrOverride = (dosya as any).ectn_cfr_override ?? null;
+  // INSURANCE'in otomatik hesaplamasi YOK (talep: 29.09.2026) - sadece elle
+  // girilen deger var, digerleriyle ayni "yerel state" mantigiyla tutulur.
+  const dosyaEctnInsuranceOverride = (dosya as any).ectn_insurance_override ?? null;
   const [ectnFobOverride, setEctnFobOverride] = useState<number | null>(dosyaEctnFobOverride);
   const [ectnFreightOverride, setEctnFreightOverride] = useState<number | null>(dosyaEctnFreightOverride);
   const [ectnCfrOverride, setEctnCfrOverride] = useState<number | null>(dosyaEctnCfrOverride);
+  const [ectnInsuranceOverride, setEctnInsuranceOverride] = useState<number | null>(dosyaEctnInsuranceOverride);
   useEffect(() => {
     setEctnFobOverride(dosyaEctnFobOverride);
     setEctnFreightOverride(dosyaEctnFreightOverride);
     setEctnCfrOverride(dosyaEctnCfrOverride);
-  }, [dosya.id, dosyaEctnFobOverride, dosyaEctnFreightOverride, dosyaEctnCfrOverride]);
+    setEctnInsuranceOverride(dosyaEctnInsuranceOverride);
+  }, [dosya.id, dosyaEctnFobOverride, dosyaEctnFreightOverride, dosyaEctnCfrOverride, dosyaEctnInsuranceOverride]);
   const [ectnModalAcik, setEctnModalAcik] = useState(false);
   // "ci-taslak" | "ci-orijinal" | "pl-taslak" ... formatinda - hangi butonun yuklendigini gosterir
   const [yukleniyor, setYukleniyor] = useState<string | null>(null);
@@ -238,6 +243,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         ectn_fob_override: ectnFobOverride,
         ectn_freight_override: ectnFreightOverride,
         ectn_cfr_override: ectnCfrOverride,
+        ectn_insurance_override: ectnInsuranceOverride,
       } as Dosya, rezervasyonlar, konteynerler);
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
@@ -428,6 +434,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           ectn_fob_override: ectnFobOverride,
           ectn_freight_override: ectnFreightOverride,
           ectn_cfr_override: ectnCfrOverride,
+          ectn_insurance_override: ectnInsuranceOverride,
         } as Dosya}
         rezervasyonlar={rezervasyonlar}
         open={ectnModalAcik}
@@ -436,6 +443,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           setEctnFobOverride(payload.ectn_fob_override);
           setEctnFreightOverride(payload.ectn_freight_override);
           setEctnCfrOverride(payload.ectn_cfr_override);
+          setEctnInsuranceOverride(payload.ectn_insurance_override);
         }}
       />
 

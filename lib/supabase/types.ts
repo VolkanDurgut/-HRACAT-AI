@@ -54,6 +54,9 @@ export type Dosya = {
   ectn_fob_override: number | null;
   ectn_freight_override: number | null;
   ectn_cfr_override: number | null;
+  // INSURANCE satiri icin elle girilen tutar (talep: 29.09.2026) - otomatik
+  // hesaplamasi YOK, NULL ise satir hic gosterilmez.
+  ectn_insurance_override: number | null;
   konsimento_dosya_url: string | null;
   konsimento_dosya_adi: string | null;
   konsimento_yukleme_tarihi: string | null;

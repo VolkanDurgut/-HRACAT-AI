@@ -12,6 +12,7 @@ export type EctnOverrideDegerleri = {
   ectn_fob_override: number | null;
   ectn_freight_override: number | null;
   ectn_cfr_override: number | null;
+  ectn_insurance_override: number | null;
 };
 
 type Props = {
@@ -36,6 +37,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
   const [fob, setFob] = useState<string>("");
   const [freight, setFreight] = useState<string>("");
   const [cfr, setCfr] = useState<string>("");
+  const [insurance, setInsurance] = useState<string>("");
 
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
 
@@ -46,6 +48,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
     setFob(d.ectn_fob_override !== null && d.ectn_fob_override !== undefined ? String(d.ectn_fob_override) : "");
     setFreight(d.ectn_freight_override !== null && d.ectn_freight_override !== undefined ? String(d.ectn_freight_override) : "");
     setCfr(d.ectn_cfr_override !== null && d.ectn_cfr_override !== undefined ? String(d.ectn_cfr_override) : "");
+    setInsurance(d.ectn_insurance_override !== null && d.ectn_insurance_override !== undefined ? String(d.ectn_insurance_override) : "");
   }, [open, dosya]);
 
   const parse = (v: string): number | null => {
@@ -66,6 +69,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
         ectn_fob_override: parse(fob),
         ectn_freight_override: parse(freight),
         ectn_cfr_override: parse(cfr),
+        ectn_insurance_override: parse(insurance),
       };
       const { error } = await supabase
         .from("ihracat_dosyalari")
@@ -151,6 +155,20 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
+              INSURANCE
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              className={inputClass}
+              style={inputStyle}
+              value={insurance}
+              onChange={(e) => setInsurance(e.target.value)}
+              placeholder="Boş = satır gösterilmez"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
               {cfrEtiket}
               {otomatik.cfr !== null && (
                 <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatik.cfr, dosya.para_birimi)}</span>
@@ -172,7 +190,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
         <div className="px-6 py-4 border-t flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
           <button
             type="button"
-            onClick={() => { setFob(""); setFreight(""); setCfr(""); }}
+            onClick={() => { setFob(""); setFreight(""); setCfr(""); setInsurance(""); }}
             className="text-xs font-medium hover:underline"
             style={{ color: TEXT_MUTED }}
           >

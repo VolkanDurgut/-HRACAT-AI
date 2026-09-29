@@ -332,6 +332,10 @@ function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string
   const fobOverride = (dosya as any).ectn_fob_override;
   const freightOverride = (dosya as any).ectn_freight_override;
   const cfrOverride = (dosya as any).ectn_cfr_override;
+  // INSURANCE'in otomatik hesaplama mantigi YOK (talep: 29.09.2026) - sadece
+  // kullanicinin elle girdigi deger var, digerlerinde oldugu gibi bir
+  // "otomatik" karsiligi yok.
+  const insurance = (dosya as any).ectn_insurance_override;
 
   const fob = fobOverride !== null && fobOverride !== undefined ? fobOverride : otomatik.fob;
   const freight = freightOverride !== null && freightOverride !== undefined ? freightOverride : otomatik.freight;
@@ -349,6 +353,9 @@ function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string
   }
   if (freight !== null && freight !== undefined) {
     satirlar.push(`<tr><td class="label">FREIGHT</td><td class="value">${escapeHtml(formatCurrency(freight, dosya.para_birimi))}</td></tr>`);
+  }
+  if (insurance !== null && insurance !== undefined) {
+    satirlar.push(`<tr><td class="label">INSURANCE</td><td class="value">${escapeHtml(formatCurrency(insurance, dosya.para_birimi))}</td></tr>`);
   }
   if (cfr !== null && cfr !== undefined) {
     const cfrEtiket = limanAdi ? `TOTAL CFR ${escapeHtml(limanAdi)}` : "TOTAL CFR";

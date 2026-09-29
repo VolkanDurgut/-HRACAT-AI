@@ -320,30 +320,39 @@ export function hesaplaEctnOtomatikDegerler(dosya: Dosya, rezervasyonlar: Rezerv
   return { fob, freight, cfr, limanAdi };
 }
 
+export type EctnGosterilenDegerler = {
+  fob: number | null;
+  freight: number | null;
+  insurance: number | null;
+  cfr: number | null;
+  limanAdi: string | null;
+};
+
 /**
- * ECTN basvurusu isaretli dosyalarda (dosya.ectn_basvurusu) Commercial
- * Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR <liman> satirlari eklenir
- * (talep: 28.09.2026). Isaretli DEGILSE bos string doner - belge birebir
- * eskisi gibi kalir.
+ * ECTN basvurusu isaretli dosyalarda Commercial Invoice'a eklenen TOTAL FOB /
+ * FREIGHT / INSURANCE / TOTAL CFR satirlarinin GERCEKTEN GOSTERILECEK
+ * degerlerini hesaplar (override'lar uygulandiktan sonra). buildEctnSatirlari
+ * (HTML satirlari) VE buildCommercialInvoiceHtml (en alttaki TOTAL / "Total
+ * Amount Payable" kutusu) AYNI bu fonksiyonu kullanir - boylece TOTAL CFR
+ * satirinda gorunen deger ile altindaki TOTAL/odenecek tutar bir daha
+ * BIRBIRINDEN SAPAMAZ (kok neden: 29.09.2026, IHR-2026-0085 - TOTAL satiri
+ * eskiden CFR'den bagimsiz, dosyanin ham CIF tutarindan hesaplaniyordu).
  *
  * Her satir icin ONCELIK: kullanicinin manuel girdigi deger (ectn_*_override,
  * doluysa) > otomatik hesaplanan deger. TOTAL CFR ozel durum: kullanici CFR'i
- * AYRICA manuel girmediyse, (olasi override edilmis) FOB+FREIGHT'tan yeniden
- * hesaplanir - boylece FOB veya FREIGHT'i duzelten kullanici CFR'i de elle
- * guncellemek zorunda kalmaz. Hicbir deger bilinmiyorsa satir hic gosterilmez
- * - eksik/yaniltici tutar riskini onlemek icin (talep: 28.09.2026).
+ * AYRICA manuel girmediyse, (olasi override edilmis) FOB + FREIGHT +
+ * INSURANCE (varsa) toplamindan yeniden hesaplanir (talep: 29.09.2026 -
+ * INSURANCE girildiginde TOTAL CFR'e otomatik eklensin; INSURANCE'in kendi
+ * "otomatik" karsiligi yok, tamamen elle girilir). Boylece FOB veya
+ * FREIGHT'i duzelten kullanici CFR'i de elle guncellemek zorunda kalmaz.
  */
-function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
-  if (!(dosya as any).ectn_basvurusu) return "";
-
+export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnGosterilenDegerler {
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
   const fobOverride = (dosya as any).ectn_fob_override;
   const freightOverride = (dosya as any).ectn_freight_override;
   const cfrOverride = (dosya as any).ectn_cfr_override;
-  // INSURANCE'in otomatik hesaplama mantigi YOK (talep: 29.09.2026) - sadece
-  // kullanicinin elle girdigi deger var, digerlerinde oldugu gibi bir
-  // "otomatik" karsiligi yok.
-  const insurance = (dosya as any).ectn_insurance_override;
+  const insuranceRaw = (dosya as any).ectn_insurance_override;
+  const insurance = insuranceRaw !== null && insuranceRaw !== undefined ? insuranceRaw : null;
 
   const fob = fobOverride !== null && fobOverride !== undefined ? fobOverride : otomatik.fob;
   const freight = freightOverride !== null && freightOverride !== undefined ? freightOverride : otomatik.freight;
@@ -351,9 +360,23 @@ function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string
     cfrOverride !== null && cfrOverride !== undefined
       ? cfrOverride
       : fob !== null && freight !== null
-        ? fob + freight
+        ? fob + freight + (insurance !== null ? insurance : 0)
         : null;
-  const limanAdi = otomatik.limanAdi;
+
+  return { fob, freight, insurance, cfr, limanAdi: otomatik.limanAdi };
+}
+
+/**
+ * ECTN basvurusu isaretli dosyalarda (dosya.ectn_basvurusu) Commercial
+ * Invoice'a TOTAL FOB / FREIGHT / TOTAL CFR <liman> satirlari eklenir
+ * (talep: 28.09.2026). Isaretli DEGILSE bos string doner - belge birebir
+ * eskisi gibi kalir. Hicbir deger bilinmiyorsa satir hic gosterilmez -
+ * eksik/yaniltici tutar riskini onlemek icin (talep: 28.09.2026).
+ */
+function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
+  if (!(dosya as any).ectn_basvurusu) return "";
+
+  const { fob, freight, insurance, cfr, limanAdi } = hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar);
 
   const satirlar: string[] = [];
   if (fob !== null && fob !== undefined) {
@@ -385,7 +408,16 @@ export function buildCommercialInvoiceHtml(
   const rez = rezervasyonlar[0];
   const toplamTutar = dosya.toplam_tutar;
   const avansTutari = (dosya.ham_veri as any)?.avans_tutari || 0;
-  const odenecekTutar = toplamTutar ? toplamTutar - avansTutari : null;
+  // ECTN isaretliyse ve TOTAL CFR satiri hesaplanabiliyorsa, belgenin en
+  // altindaki TOTAL / "Total Amount Payable" kutusu artik o CFR degerinden
+  // (INSURANCE dahil, override'lar uygulanmis haliyle) avansi dusuyor - dosyanin
+  // ham CIF tutarindan degil. Boylece yukarida gorunen TOTAL CFR ile en alttaki
+  // TOTAL bir daha birbirinden sapmaz (kok neden: 29.09.2026, IHR-2026-0085).
+  // ECTN isaretli DEGILSE veya CFR hesaplanamiyorsa (ornegin FOB/FREIGHT
+  // bilinmiyor), eskisi gibi ham CIF tutarindan hesaplanmaya devam eder.
+  const ectnCfr = (dosya as any).ectn_basvurusu ? hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar).cfr : null;
+  const odenecekTutarBazi = ectnCfr !== null ? ectnCfr : toplamTutar;
+  const odenecekTutar = odenecekTutarBazi ? odenecekTutarBazi - avansTutari : null;
 
   const replacements: Record<string, string> = {
     INVOICE_NO: safe(dosya.fatura_no),

@@ -179,3 +179,53 @@ export function autoSuggestContainers(totalMiktar: number | null): number | null
   if (!totalMiktar || totalMiktar <= 0) return null;
   return Math.ceil(totalMiktar / 25);
 }
+
+export type FobFreightCifToplamlari = {
+  toplamCif: number;
+  netNavlunToplam: number | null;
+  toplamFob: number | null;
+};
+
+/**
+ * CIF toplami, Net Navlun (navlun - lokal masraf) ve bunlardan turetilen FOB
+ * toplamini hesaplar. TEK DOGRU KAYNAK: hem Fatura Talimati
+ * (fatura-talimati-pdf-builder.ts) hem Commercial Invoice'taki ECTN
+ * satirlari (invoice-builder.ts -> hesaplaEctnOtomatikDegerler) bu
+ * fonksiyonu kullanir.
+ *
+ * Kok neden incelemesi (29.09.2026, IHR-2026-0084): daha once invoice-builder.ts
+ * kendi (yanlis) hesabini yapiyordu - TOTAL FOB alaninda CIF toplamini
+ * (navlun dahil, $46.000), FREIGHT alaninda lokal masraf dusulmemis HAM
+ * navlunu ($7.200) gosteriyordu. Dogrusu (Fatura Talimatinda zaten
+ * dogrulanmis): FOB = CIF - Net Navlun ($40.500), FREIGHT = Net Navlun
+ * ($5.500). Iki belge farkli formul kullandigi icin sessizce birbirinden
+ * sapmisti - bu fonksiyon o sapmayi bir daha mumkun olmayacak sekilde
+ * ortadan kaldirir.
+ *
+ * konteynerAdedi CAGIRAN TARAFTAN parametre olarak alinir - bu fonksiyon
+ * hangi rezervasyon(lar)in konteyner adedinin sayilacagina KARISMAZ (Fatura
+ * Talimati TUM rezervasyonlari toplar, Commercial Invoice'taki ECTN ise
+ * sadece ilk rezervasyonu kullanir - bu, her rezervasyonun ayri bir evrak
+ * seti anlamina geldigi ve mevcut ECTN davranisinin degistirilmesi
+ * istenmedigi icin BILEREK boyle birakilmistir, talep: 29.09.2026).
+ */
+export function hesaplaFobFreightCifToplamlari(
+  dosya: { urun_detaylari: unknown; navlun_tutari: number | null; lokal_masraf_tutari?: number | null },
+  konteynerAdedi: number
+): FobFreightCifToplamlari {
+  const urunler = (dosya.urun_detaylari as any[]) || [];
+  const toplamCif = urunler.reduce((s, u) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
+
+  const navlunBirim = dosya.navlun_tutari;
+  const lokalMasrafBirim = (dosya as any).lokal_masraf_tutari as number | null;
+  const navlunToplam = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
+  const lokalMasrafToplam = lokalMasrafBirim != null && konteynerAdedi > 0 ? lokalMasrafBirim * konteynerAdedi : null;
+
+  const netNavlunToplam = navlunToplam !== null ? navlunToplam - (lokalMasrafToplam ?? 0) : null;
+  const toplamDusulecek =
+    navlunToplam !== null && lokalMasrafToplam !== null ? navlunToplam - lokalMasrafToplam : navlunToplam !== null ? navlunToplam : 0;
+  const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
+  const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+
+  return { toplamCif, netNavlunToplam, toplamFob };
+}

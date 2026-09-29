@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
-import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatDateTimeTR, formatCutoffSaat, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
@@ -123,12 +123,16 @@ function ciz(
     ["Beyanname Teslim Suresi", beyannameSuresi],
   ]);
 
-  // Navlun/Lokal Masraf birim-toplam ve "All in Navlun Fiyati" (konteyner basina toplam) hesaplari.
+  // Navlun/Lokal Masraf birim-toplam ve CIF/FOB toplamlari - TEK DOGRU KAYNAK:
+  // hesaplaFobFreightCifToplamlari (bkz. lib/cutoff-utils.ts). Commercial
+  // Invoice'taki ECTN satirlari da AYNI fonksiyonu kullanir - iki belgenin
+  // sessizce birbirinden sapmasini (kok neden incelemesi: 29.09.2026,
+  // IHR-2026-0084) bir daha yasanmayacak sekilde onler.
   const navlunBirim = dosya.navlun_tutari;
   const lokalMasrafBirim = (dosya as any).lokal_masraf_tutari as number | null;
   const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
   const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
-  const netNavlunToplam = navlunToplam !== null ? navlunToplam - (lokalMasrafToplam ?? 0) : null;
+  const { toplamCif, netNavlunToplam, toplamFob } = hesaplaFobFreightCifToplamlari(dosya, rezervasyonKonteynerAdedi);
   bolumTablosu("MALIYET VE BANKA BILGILERI", [
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
     ["Toplam Navlun Fiyati", netNavlunToplam !== null ? formatCurrency(netNavlunToplam, dosya.para_birimi) : null],
@@ -141,12 +145,14 @@ function ciz(
 
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---
   const urunler = (dosya.urun_detaylari as any[]) || [];
-  const toplamCif = urunler.reduce((s, u) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
-      const toplamMiktar = urunler.reduce((s, u) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+  const toplamMiktar = urunler.reduce((s, u) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+  // toplamCif/toplamFob yukarida hesaplaFobFreightCifToplamlari'ndan geldi -
+  // burada sadece TABLODAKI HER SATIRIN kendi FOB birim fiyatini bulmak icin
+  // ayni "dusulecek" mantigi tekrar kuruluyor (bu kisim urun bazli oldugu
+  // icin paylasilan fonksiyonun kapsami disinda kalir).
   const toplamDusulecek =
     navlunToplam !== null && lokalMasrafToplam !== null ? navlunToplam - lokalMasrafToplam : navlunToplam !== null ? navlunToplam : 0;
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
-  const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
       const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
 
   const urunRows = urunler.map((u) => {

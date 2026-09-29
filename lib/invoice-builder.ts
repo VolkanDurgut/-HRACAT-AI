@@ -1,5 +1,5 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, limanAdiAyikla, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, limanAdiAyikla, detayliAmbalajCokluSegmentli, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 
 /**
@@ -302,11 +302,19 @@ export type EctnOtomatikDegerler = {
  * (talep: 28.09.2026).
  */
 export function hesaplaEctnOtomatikDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnOtomatikDegerler {
-  const fob = dosya.toplam_tutar ?? null;
+  // Kok neden (29.09.2026, IHR-2026-0084): burada eskiden dosya.toplam_tutar
+  // (CIF toplami, navlun dahil) dogrudan "FOB" olarak, ve navlun (lokal
+  // masraf dusulmeden HAM haliyle) "FREIGHT" olarak kullaniliyordu. Dogru
+  // FOB = CIF - Net Navlun'dur (Net Navlun = navlun - lokal masraf). Bu artik
+  // Fatura Talimati ile AYNI tek dogru kaynaktan (hesaplaFobFreightCifToplamlari)
+  // hesaplaniyor. Rezervasyon sayimi BILEREK degistirilmedi: burada hala
+  // sadece ilk rezervasyonun konteyner adedi kullanilir - her rezervasyon
+  // ayri bir evrak seti anlamina geldigi icin (kullanici onayi: 29.09.2026).
   const rez = rezervasyonlar[0];
-  const navlunBirim = (dosya as any).navlun_tutari;
   const konteynerAdedi = rez?.konteyner_adedi || 0;
-  const freight = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
+  const { toplamFob, netNavlunToplam } = hesaplaFobFreightCifToplamlari(dosya, konteynerAdedi);
+  const fob = toplamFob;
+  const freight = netNavlunToplam;
   const cfr = fob !== null && freight !== null ? fob + freight : null;
   const limanAdi = limanAdiAyikla(dosya.varis_limani);
   return { fob, freight, cfr, limanAdi };

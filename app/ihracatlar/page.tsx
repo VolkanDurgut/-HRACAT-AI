@@ -183,19 +183,69 @@ export default function IhracatlarPage() {
     }
   }, [yetkiler, router]);
 
+  // Ana siparisin urun kalemlerinden (urun_detaylari_master), o ana siparise
+  // ZATEN BAGLI dosyalarda sevk edilmis miktarlar dusulerek KALAN urun
+  // kalemlerini hesaplar. Kok neden (29.09.2026, UNEXCCS270826/IHR-2026-0088):
+  // "Siparise devam et" butonu yeni dosyayi urun_detaylari/toplam_tutar/miktar
+  // alanlari BOS birakarak olusturuyordu - bu fonksiyon o bosluğu, master
+  // kalemlerdeki her urun icin ayri ayri (urun adina gore eslestirip) kalan
+  // miktari hesaplayarak doldurur. Bir urun tamamen sevk edilmisse satira hic
+  // dahil edilmez.
+  const hesaplaKalanUrunKalemleri = (
+    master: { description?: string; urun_adi?: string; quantity?: number | string; miktar_mts?: number | string; unit_price?: number | string; birim_fiyat_usd?: number | string; packaging_size?: string; ambalaj_boyutu?: string }[],
+    bagliDosyalar: { urun_detaylari: unknown }[]
+  ) => {
+    const sevkEdilmis = new Map<string, number>();
+    for (const d of bagliDosyalar) {
+      const urunler = (d.urun_detaylari as any[]) || [];
+      for (const u of urunler) {
+        const ad = String(u.urun_adi || u.description || "").trim();
+        if (!ad) continue;
+        const miktar = parseFloat(String(u.miktar_mts || u.quantity || 0)) || 0;
+        sevkEdilmis.set(ad, (sevkEdilmis.get(ad) || 0) + miktar);
+      }
+    }
+
+    const kalanKalemler: { urun_adi: string; ambalaj_boyutu: string; miktar_mts: string; birim_fiyat_usd: string; toplam_tutar_usd: string }[] = [];
+    for (const m of master) {
+      const ad = String(m.urun_adi || m.description || "").trim();
+      if (!ad) continue;
+      const masterMiktar = parseFloat(String(m.miktar_mts || m.quantity || 0)) || 0;
+      const zatenSevkEdilmis = sevkEdilmis.get(ad) || 0;
+      const kalanMiktar = masterMiktar - zatenSevkEdilmis;
+      if (kalanMiktar <= 0.01) continue; // Bu urun tamamen sevk edilmis, satira dahil etme
+
+      const birimFiyat = parseFloat(String(m.birim_fiyat_usd || m.unit_price || 0)) || 0;
+      kalanKalemler.push({
+        urun_adi: ad,
+        ambalaj_boyutu: String(m.ambalaj_boyutu || m.packaging_size || ""),
+        miktar_mts: kalanMiktar.toFixed(2),
+        birim_fiyat_usd: String(birimFiyat),
+        toplam_tutar_usd: (kalanMiktar * birimFiyat).toFixed(2),
+      });
+    }
+    return kalanKalemler;
+  };
+
   const handleSipariseDevamEt = async (siparis: AnaSiparisWithProgress) => {
     if (!user || !companyId) return;
     setDevamEdiyor(siparis.id);
     try {
-      // Ayni ana siparise bagli ilk dosyanin tam proforma bilgilerini al (kopyalamak icin)
-      const { data: ornekDosya } = await supabase
+      // Ayni ana siparise bagli TUM dosyalari cek: hem kopyalanacak proforma
+      // bilgileri icin ilk dosya, hem de "kalan urun kalemi" hesabi icin
+      // hepsinin urun_detaylari'na ihtiyac var.
+      const { data: bagliDosyalar } = await supabase
         .from("ihracat_dosyalari")
         .select("*")
         .eq("company_id", companyId)
         .eq("ana_siparis_id", siparis.id)
-        .order("olusturma_tarihi", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order("olusturma_tarihi", { ascending: true });
+
+      const ornekDosya = (bagliDosyalar || [])[0] || null;
+      const master = (siparis.urun_detaylari_master as any[]) || [];
+      const kalanKalemler = hesaplaKalanUrunKalemleri(master, bagliDosyalar || []);
+      const kalanToplamTutar = kalanKalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
+      const kalanToplamMiktar = kalanKalemler.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
 
       const { data: yeniDosya, error: dbError } = await supabase
         .from("ihracat_dosyalari")
@@ -224,6 +274,10 @@ export default function IhracatlarPage() {
           swift: ornekDosya?.swift || null,
           hesap_numarasi: ornekDosya?.hesap_numarasi || null,
           iban: ornekDosya?.iban || null,
+          urun_detaylari: kalanKalemler.length > 0 ? kalanKalemler : null,
+          toplam_tutar: kalanKalemler.length > 0 ? kalanToplamTutar : null,
+          miktar: kalanKalemler.length > 0 ? String(kalanToplamMiktar) : null,
+          miktar_birimi: kalanKalemler.length > 0 ? "MTS" : null,
           durum: "Açık",
           created_by: user.id,
           ana_siparis_id: siparis.id,

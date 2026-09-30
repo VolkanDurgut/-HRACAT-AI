@@ -95,10 +95,15 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // INSURANCE'in otomatik hesaplamasi YOK (talep: 29.09.2026) - sadece elle
   // girilen deger var, digerleriyle ayni "yerel state" mantigiyla tutulur.
   const dosyaEctnInsuranceOverride = (dosya as any).ectn_insurance_override ?? null;
+  // TOTAL CFR/CIF satirinin etiketi icin manuel override (talep: 30.09.2026)
+  // - NULL ise otomatik secilir: sigorta girilmisse "TOTAL CIF", girilmemisse
+  // "TOTAL CFR" - bkz. lib/invoice-builder.ts -> hesaplaEctnGosterilenDegerler.
+  const dosyaEctnCfrEtiketOverride = (dosya as any).ectn_cfr_etiket_override ?? null;
   const [ectnFobOverride, setEctnFobOverride] = useState<number | null>(dosyaEctnFobOverride);
   const [ectnFreightOverride, setEctnFreightOverride] = useState<number | null>(dosyaEctnFreightOverride);
   const [ectnCfrOverride, setEctnCfrOverride] = useState<number | null>(dosyaEctnCfrOverride);
   const [ectnInsuranceOverride, setEctnInsuranceOverride] = useState<number | null>(dosyaEctnInsuranceOverride);
+  const [ectnCfrEtiketOverride, setEctnCfrEtiketOverride] = useState<string | null>(dosyaEctnCfrEtiketOverride);
   useEffect(() => {
     setEctnFobOverride(dosyaEctnFobOverride);
     setEctnFreightOverride(dosyaEctnFreightOverride);
@@ -244,6 +249,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         ectn_freight_override: ectnFreightOverride,
         ectn_cfr_override: ectnCfrOverride,
         ectn_insurance_override: ectnInsuranceOverride,
+        ectn_cfr_etiket_override: ectnCfrEtiketOverride,
       } as Dosya, rezervasyonlar, konteynerler);
       else if (tip === "pl") htmlHam = buildPackingListHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
@@ -435,6 +441,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           ectn_freight_override: ectnFreightOverride,
           ectn_cfr_override: ectnCfrOverride,
           ectn_insurance_override: ectnInsuranceOverride,
+          ectn_cfr_etiket_override: ectnCfrEtiketOverride,
         } as Dosya}
         rezervasyonlar={rezervasyonlar}
         open={ectnModalAcik}
@@ -444,6 +451,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           setEctnFreightOverride(payload.ectn_freight_override);
           setEctnCfrOverride(payload.ectn_cfr_override);
           setEctnInsuranceOverride(payload.ectn_insurance_override);
+          setEctnCfrEtiketOverride(payload.ectn_cfr_etiket_override);
         }}
       />
 

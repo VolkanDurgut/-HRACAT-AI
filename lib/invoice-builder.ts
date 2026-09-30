@@ -332,6 +332,7 @@ export type EctnGosterilenDegerler = {
   insurance: number | null;
   cfr: number | null;
   limanAdi: string | null;
+  cfrEtiket: string | null;
 };
 
 /**
@@ -363,6 +364,14 @@ export type EctnGosterilenDegerler = {
  * da dusulur - boylece TOTAL CFR her zaman orijinal CIF toplamina esit
  * kalir. Kullanici FOB'u elle girdiyse (fobOverride doluysa) bu otomatik
  * duzeltme UYGULANMAZ - kullanicinin girdigi deger aynen kullanilir.
+ *
+ * Etiket (TOTAL CFR/CIF) mantigi (talep: 30.09.2026, ornek: CULVIST2601427/
+ * UNEXBFB090926): Incoterm kurallarina gore INSURANCE toplama dahil
+ * edildiginde bu artik CFR (Cost+Freight) degil CIF'tir (Cost+Insurance+
+ * Freight). Bu yuzden etiket OTOMATIK olarak secilir: insurance doluysa
+ * "TOTAL CIF <liman>", degilse "TOTAL CFR <liman>". Kullanici
+ * ectn_cfr_etiket_override alanini doldurduysa bu otomatik secim ATLANIR ve
+ * kullanicinin yazdigi metin AYNEN (liman adi dahil) kullanilir.
  */
 export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnGosterilenDegerler {
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
@@ -371,6 +380,7 @@ export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Reze
   const cfrOverride = (dosya as any).ectn_cfr_override;
   const insuranceRaw = (dosya as any).ectn_insurance_override;
   const insurance = insuranceRaw !== null && insuranceRaw !== undefined ? insuranceRaw : null;
+  const cfrEtiketOverrideRaw = (dosya as any).ectn_cfr_etiket_override as string | null | undefined;
 
   const fobOtomatikSigortaDahil =
     otomatik.fob !== null && insurance !== null ? otomatik.fob - insurance : otomatik.fob;
@@ -384,7 +394,12 @@ export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Reze
         ? fob + freight + (insurance !== null ? insurance : 0)
         : null;
 
-  return { fob, freight, insurance, cfr, limanAdi: otomatik.limanAdi };
+  const cfrEtiketOtomatik = otomatik.limanAdi
+    ? `TOTAL ${insurance !== null ? "CIF" : "CFR"} ${otomatik.limanAdi}`
+    : `TOTAL ${insurance !== null ? "CIF" : "CFR"}`;
+  const cfrEtiket = cfrEtiketOverrideRaw && cfrEtiketOverrideRaw.trim() !== "" ? cfrEtiketOverrideRaw.trim() : cfrEtiketOtomatik;
+
+  return { fob, freight, insurance, cfr, limanAdi: otomatik.limanAdi, cfrEtiket };
 }
 
 /**
@@ -397,7 +412,7 @@ export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Reze
 function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
   if (!(dosya as any).ectn_basvurusu) return "";
 
-  const { fob, freight, insurance, cfr, limanAdi } = hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar);
+  const { fob, freight, insurance, cfr, cfrEtiket } = hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar);
 
   const satirlar: string[] = [];
   if (fob !== null && fob !== undefined) {
@@ -410,8 +425,7 @@ function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string
     satirlar.push(`<tr><td class="label">INSURANCE</td><td class="value">${escapeHtml(formatCurrency(insurance, dosya.para_birimi))}</td></tr>`);
   }
   if (cfr !== null && cfr !== undefined) {
-    const cfrEtiket = limanAdi ? `TOTAL CFR ${escapeHtml(limanAdi)}` : "TOTAL CFR";
-    satirlar.push(`<tr><td class="label">${cfrEtiket}</td><td class="value">${escapeHtml(formatCurrency(cfr, dosya.para_birimi))}</td></tr>`);
+    satirlar.push(`<tr><td class="label">${escapeHtml(cfrEtiket || "TOTAL CFR")}</td><td class="value">${escapeHtml(formatCurrency(cfr, dosya.para_birimi))}</td></tr>`);
   }
   return satirlar.join("\n");
 }

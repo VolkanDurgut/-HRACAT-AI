@@ -13,6 +13,7 @@ export type EctnOverrideDegerleri = {
   ectn_freight_override: number | null;
   ectn_cfr_override: number | null;
   ectn_insurance_override: number | null;
+  ectn_cfr_etiket_override: string | null;
 };
 
 type Props = {
@@ -38,6 +39,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
   const [freight, setFreight] = useState<string>("");
   const [cfr, setCfr] = useState<string>("");
   const [insurance, setInsurance] = useState<string>("");
+  const [cfrEtiketOverride, setCfrEtiketOverride] = useState<string>("");
 
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
 
@@ -49,6 +51,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
     setFreight(d.ectn_freight_override !== null && d.ectn_freight_override !== undefined ? String(d.ectn_freight_override) : "");
     setCfr(d.ectn_cfr_override !== null && d.ectn_cfr_override !== undefined ? String(d.ectn_cfr_override) : "");
     setInsurance(d.ectn_insurance_override !== null && d.ectn_insurance_override !== undefined ? String(d.ectn_insurance_override) : "");
+    setCfrEtiketOverride(d.ectn_cfr_etiket_override || "");
   }, [open, dosya]);
 
   const parse = (v: string): number | null => {
@@ -70,6 +73,13 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
     otomatikFobGosterim !== null && otomatik.freight !== null
       ? otomatikFobGosterim + otomatik.freight + (insuranceGirilen ?? 0)
       : otomatik.cfr;
+  // Etiket de ayni sekilde canli hesaplanir: sigorta girilmisse "CIF",
+  // girilmemisse "CFR" (Incoterm kurallarina uygun, bkz. lib/invoice-builder.ts
+  // -> hesaplaEctnGosterilenDegerler). Kullanici asagidaki etiket kutusuna
+  // kendi metnini yazarsa (cfrEtiketOverride), o AYNEN kullanilir.
+  const cfrEtiketOtomatikGosterim = otomatik.limanAdi
+    ? `TOTAL ${insuranceGirilen !== null ? "CIF" : "CFR"} ${otomatik.limanAdi}`
+    : `TOTAL ${insuranceGirilen !== null ? "CIF" : "CFR"}`;
 
   const handleSave = async () => {
     if (!companyId) {
@@ -83,6 +93,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
         ectn_freight_override: parse(freight),
         ectn_cfr_override: parse(cfr),
         ectn_insurance_override: parse(insurance),
+        ectn_cfr_etiket_override: cfrEtiketOverride.trim() === "" ? null : cfrEtiketOverride.trim(),
       };
       const { error } = await supabase
         .from("ihracat_dosyalari")
@@ -108,7 +119,6 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
 
   const inputClass = "w-full border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-400";
   const inputStyle = { borderColor: CARD_BORDER, backgroundColor: CARD_BG };
-  const cfrEtiket = otomatik.limanAdi ? `TOTAL CFR ${otomatik.limanAdi}` : "TOTAL CFR";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -182,7 +192,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
-              {cfrEtiket}
+              {cfrEtiketOverride.trim() !== "" ? cfrEtiketOverride : cfrEtiketOtomatikGosterim}
               {otomatikCfrGosterim !== null && (
                 <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatikCfrGosterim, dosya.para_birimi)}</span>
               )}
@@ -194,7 +204,21 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
               style={inputStyle}
               value={cfr}
               onChange={(e) => setCfr(e.target.value)}
-              placeholder="Boş = FOB + FREIGHT'tan hesaplanır"
+              placeholder="Boş = FOB + FREIGHT + INSURANCE'tan hesaplanır"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
+              Satır Etiketi
+              <span className="font-normal opacity-70"> — Otomatik: {cfrEtiketOtomatikGosterim}</span>
+            </label>
+            <input
+              type="text"
+              className={inputClass}
+              style={inputStyle}
+              value={cfrEtiketOverride}
+              onChange={(e) => setCfrEtiketOverride(e.target.value)}
+              placeholder="Boş = sigorta girilmişse CIF, girilmemişse CFR yazılır"
             />
           </div>
         </div>
@@ -203,7 +227,7 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
         <div className="px-6 py-4 border-t flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
           <button
             type="button"
-            onClick={() => { setFob(""); setFreight(""); setCfr(""); setInsurance(""); }}
+            onClick={() => { setFob(""); setFreight(""); setCfr(""); setInsurance(""); setCfrEtiketOverride(""); }}
             className="text-xs font-medium hover:underline"
             style={{ color: TEXT_MUTED }}
           >

@@ -11,6 +11,18 @@ import html2canvas from "html2canvas";
  *
  * Icerik tek A4 sayfaya sigmiyorsa (ornegin cok satirli urun listesi),
  * otomatik olarak birden fazla sayfaya bolunur - hicbir icerik kirpilmaz.
+ *
+ * Kalite notu (talep: 01.10.2026 - "yazilar bulanik, kayma var"): bu
+ * yontem HTML'i bir RESIM olarak PDF'e gomdugu icin (Fatura Talimati gibi
+ * jsPDF ile dogrudan metin cizen belgelerin aksine) hicbir zaman gercek
+ * vektor metin kadar keskin olmaz - ama asagidaki iki onlemle bulanikligin
+ * ve hizalama kaymasinin buyuk kismi giderilir:
+ *   1) scale 2 -> 3 (daha yuksek cozunurluklu "fotograf")
+ *   2) JPEG -> PNG (JPEG'in metin kenarlarinda yarattigi bulanik sikistirma
+ *      artifaktlari yok olur; boyut buyur ama okunabilirlik onceliklidir)
+ *   3) sabit 350ms bekleme yerine, tum <img> etiketlerinin (logo/imza)
+ *      fiilen decode olmasi beklenir - resim tam yuklenmeden alinan
+ *      "fotografta" satirlarin kaymasi/bos kalmasi ihtimali ortadan kalkar.
  */
 export async function htmlToPdfBlob(html: string): Promise<Blob> {
   const iframe = document.createElement("iframe");
@@ -29,7 +41,24 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     idoc.write(html);
     idoc.close();
 
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    // Once DOM'un yerlesmesi icin kisa bir bekleme, sonra TUM gorsellerin
+    // (logo, imza) fiilen decode olmasini bekle. decode() bazi eski
+    // tarayicilarda olmayabilir - o durumda onload/onerror'a duser.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const gorseller = Array.from(idoc.querySelectorAll("img"));
+    await Promise.all(
+      gorseller.map((img) => {
+        if (img.complete) {
+          return typeof img.decode === "function" ? img.decode().catch(() => undefined) : Promise.resolve();
+        }
+        return new Promise<void>((resolve) => {
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+        });
+      })
+    );
+    // Gorseller yerlestikten sonra layout'un oturmasi icin son bir kare payi.
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const hedefEl = (idoc.querySelector(".sheet") as HTMLElement | null) || idoc.body;
 
@@ -42,20 +71,20 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     if (ipucuKutusu) ipucuKutusu.style.display = "none";
 
     const canvas = await html2canvas(hedefEl, {
-      scale: 2,
+      scale: 3,
       useCORS: true,
       backgroundColor: "#ffffff",
       windowWidth: 820,
     });
 
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
+    const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
     const sayfaGenislikMm = 210;
     const sayfaYukseklikMm = 297;
     const goruntuYukseklikMm = (canvas.height * sayfaGenislikMm) / canvas.width;
 
     if (goruntuYukseklikMm <= sayfaYukseklikMm) {
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      pdf.addImage(imgData, "JPEG", 0, 0, sayfaGenislikMm, goruntuYukseklikMm);
+      const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", 0, 0, sayfaGenislikMm, goruntuYukseklikMm);
     } else {
       const pikselBasinaMm = canvas.width / sayfaGenislikMm;
       const dilimYukseklikPx = Math.floor(sayfaYukseklikMm * pikselBasinaMm);
@@ -74,7 +103,7 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
 
         if (!ilkSayfa) pdf.addPage();
         const dilimYukseklikMm = (buSeferkiYukseklik * sayfaGenislikMm) / canvas.width;
-        pdf.addImage(dilimCanvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, sayfaGenislikMm, dilimYukseklikMm);
+        pdf.addImage(dilimCanvas.toDataURL("image/png"), "PNG", 0, 0, sayfaGenislikMm, dilimYukseklikMm);
 
         offset += buSeferkiYukseklik;
         kalanYukseklik -= buSeferkiYukseklik;

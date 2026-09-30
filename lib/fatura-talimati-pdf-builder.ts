@@ -75,6 +75,14 @@ function ciz(
   let y = 39;
   const fontBoyu = 8 * olcek;
   const hucreDolgu = 1.3 * olcek;
+  // Tablolar arasi bosluk ve autoTable'in "sayfa sonuna yaklasti" esigi
+  // (margin.bottom) - "olcek" ile birlikte KUCULMEDIKLERI icin cok
+  // konteynerli dosyalarda bosa giden alan biriktirip PDF'i sessizce ikinci
+  // sayfaya tasiriyordu (kok neden: sadece yazi tipi/hucre dolgusu
+  // kuculuyordu, bu iki bosluk sabit kaliyordu). Artik ikisi de olcekle
+  // birlikte kuculuyor.
+  const tablolarArasiBosluk = Math.max(1.2, 3 * olcek);
+  const tabloAltMargin = Math.max(3, 10 * olcek);
 
   // --- Etiket:Deger bolumu (2 kolonlu, basligi renkli bir kart) ---
   const bolumTablosu = (baslik: string, satirlar: Satir[]) => {
@@ -90,9 +98,9 @@ function ciz(
       styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu, textColor: [30, 30, 30], lineColor: [210, 210, 210], lineWidth: 0.15 },
       headStyles: { fillColor: LACIVERT, textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
       columnStyles: { 0: { cellWidth: 48, fontStyle: "bold", textColor: [70, 70, 70] }, 1: { cellWidth: contentWidth - 48 } },
-      margin: { left: marginX, right: marginX, bottom: 10 },
+      margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
     });
-    y = (doc as any).lastAutoTable.finalY + 3;
+    y = (doc as any).lastAutoTable.finalY + tablolarArasiBosluk;
   };
 
   bolumTablosu("DOSYA BILGILERI", [
@@ -191,9 +199,9 @@ function ciz(
         ],
       ],
       footStyles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "bold", fontSize: fontBoyu },
-      margin: { left: marginX, right: marginX, bottom: 10 },
+      margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
     });
-    y = (doc as any).lastAutoTable.finalY + 3;
+    y = (doc as any).lastAutoTable.finalY + tablolarArasiBosluk;
   }
 
   // --- Konteyner tablosu (gercek sutunlu tablo + TOPLAM satiri) ---
@@ -234,16 +242,16 @@ function ciz(
         "",
       ]],
       theme: "grid",
-      styles: { font: "Roboto", fontSize: fontBoyu - 0.5, cellPadding: hucreDolgu - 0.2, halign: "center" },
+      styles: { font: "Roboto", fontSize: fontBoyu - 0.5, cellPadding: Math.max(0.3, hucreDolgu - 0.2), halign: "center", minCellHeight: 0 },
       headStyles: { fillColor: LACIVERT, textColor: 255, fontStyle: "bold", fontSize: fontBoyu },
       footStyles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "bold", fontSize: fontBoyu - 0.5 },
       columnStyles: {
         0: { cellWidth: 7 }, 1: { cellWidth: 26 }, 2: { cellWidth: 17 }, 3: { cellWidth: 11 },
         4: { cellWidth: 33, halign: "left" }, 5: { cellWidth: 12 }, 6: { cellWidth: 16 }, 7: { cellWidth: 16 }, 8: { cellWidth: 16 }, 9: { cellWidth: 28 },
       },
-      margin: { left: marginX, right: marginX, bottom: 10 },
+      margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
     });
-    y = (doc as any).lastAutoTable.finalY + 3;
+    y = (doc as any).lastAutoTable.finalY + tablolarArasiBosluk;
   }
 
   bolumTablosu("EVRAK VE TARIH BILGILERI", [
@@ -261,15 +269,28 @@ function ciz(
  * Fatura Talimatini, sistemdeki guncel dosya/rezervasyon/konteyner verisinden
  * dogrudan, logo ve bolumlere ayrilmis bir "kart" tasarimiyla tek sayfalik
  * gercek bir PDF olarak uretir ve tarayicida indirir. Icerik uzunsa (cok
- * konteyner/urun veya uzun metinler varsa) yazi boyutu, tek sayfaya sigana
- * kadar kademeli olarak kucultulur - asla ikinci sayfaya tasmaz.
- * Turkce karakterler icin Roboto fontu, basliga da UNEX logosu gomulur.
+ * konteyner/urun veya uzun metinler varsa) yazi boyutu VE tablolar arasi
+ * bosluklar, tek sayfaya sigana kadar kademeli olarak kucultulur.
+ *
+ * Kok neden duzeltmesi (30.09.2026): eskiden sadece yazi tipi/hucre dolgusu
+ * kucultuluyordu, tablolar arasi bosluk ve autoTable'in "sayfa sonuna
+ * yaklasti" esigi (margin.bottom) SABIT kaliyordu - bu da coklu konteynerli
+ * (~50+) dosyalarda PDF'in, adim %55'e (eski taban) ulasir ulasmaz henuz
+ * sigmamisken sessizce 2. sayfaya (genelde sadece EVRAK VE TARIH BILGILERI
+ * bolumunu tek basina tasiyarak) tasmasina yol aciyordu. Artik hem yazi tipi
+ * hem bu iki bosluk birlikte, daha ince adimlarla kucultuluyor - boylece
+ * ayni okunabilirlik seviyesinde cok daha fazla konteyner tek sayfaya sigiyor.
+ * Gercekci is hacimlerinin (birkaç yuz konteynere kadar) neredeyse tamami tek
+ * sayfada kalir; olagandisi derecede buyuk bir dosyada en dusuk olcekte bile
+ * sigmazsa, PDF okunmaz hale gelmemesi icin kucultmeyi tabanda durdurur ve
+ * autoTable geri kalanini (basligi tekrarlayarak) 2. sayfaya tasar - bu,
+ * kucultmenin durdugu NADIR bir emniyet supabidir, olagan davranis degildir.
  */
 export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[]): void {
   let olcek = 1.0;
   let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek);
-  while (sonuc.sayfaSayisi > 1 && olcek > 0.55) {
-    olcek -= 0.05;
+  while (sonuc.sayfaSayisi > 1 && olcek > 0.5) {
+    olcek = Math.round((olcek - 0.02) * 100) / 100;
     sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek);
   }
   sonuc.doc.save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}.pdf`);

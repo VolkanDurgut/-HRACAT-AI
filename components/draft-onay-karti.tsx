@@ -260,7 +260,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</td>
       <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</td>
       <td className="px-2.5 py-2.5">
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
           {evrakSirasi.map((item) =>
             item.href ? (
               <a
@@ -324,7 +324,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.gemi_kalkis_tarihi || null)}</td>
       <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.eta || null)}</td>
       <td className="px-2.5 py-2.5">
-        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+        <div className="flex items-center justify-start gap-1.5 whitespace-nowrap">
           <button
             type="button"
             onClick={handlePaketIndir}

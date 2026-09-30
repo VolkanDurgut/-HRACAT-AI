@@ -238,3 +238,22 @@ export type FumigationAyari = {
   aeration_period: string | null;
   updated_at: string | null;
 };
+
+/** Quality / Condition Certificate'teki PARAMETER/SPECIFICATION/RESULTS/METHODS
+ * tablosunun tek bir satiri. */
+export type KaliteParametresi = {
+  parametre: string;
+  spesifikasyon: string;
+  sonuc: string;
+  metod: string;
+};
+
+/** Quality / Condition Certificate - musteri (alici_firma) bazli kayitli
+ * parametre tablosu. fumigation_ayarlari ile ayni desen (bkz.
+ * kalite_sertifikasi_ayarlari migration'i). */
+export type KaliteSertifikasiAyari = {
+  id: string;
+  alici_firma: string;
+  parametreler: KaliteParametresi[] | null;
+  updated_at: string | null;
+};

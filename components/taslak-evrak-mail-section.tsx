@@ -8,6 +8,7 @@ const EVRAK_ADLARI: Record<string, string> = {
   commercial_invoice: "Commercial Invoice",
   packing_list: "Packing List",
   fumigation: "Fumigation Certificate",
+  quality_certificate: "Quality Certificate",
 };
 
 type Props = {
@@ -37,7 +38,7 @@ export default function TaslakEvrakMailSection({ dosya, companyId }: Props) {
       .eq("dosya_id", dosya.id)
       .eq("company_id", companyId)
       .eq("durum", "taslak")
-      .in("evrak_tipi", ["commercial_invoice", "packing_list", "fumigation"]);
+      .in("evrak_tipi", ["commercial_invoice", "packing_list", "fumigation", "quality_certificate"]);
     setTaslaklar(data || []);
   }, [dosya.id, companyId]);
 

@@ -192,3 +192,40 @@ export function checkFumigationReadiness(
 
   return { hazir: eksikler.length === 0, eksikler };
 }
+/**
+ * Quality / Condition Certificate icin gerekli tum alanlarin dolu olup
+ * olmadigini kontrol eder.
+ * Not: PARAMETER/SPECIFICATION/RESULTS/METHODS tablosu (musteri bazli
+ * kalite_sertifikasi_ayarlari) isteğe bagli kabul edilir - kayit yoksa
+ * builder ornek belgedeki varsayilan degerleri kullanir (bkz.
+ * lib/kalite-sertifikasi-builder.ts -> VARSAYILAN_KALITE_PARAMETRELERI).
+ */
+export function checkKaliteSertifikasiReadiness(
+  dosya: Dosya,
+  rezervasyonlar: Rezervasyon[],
+  konteynerler: Konteyner[]
+): ReadinessResult {
+  const eksikler: string[] = [];
+
+  if (!dosya.fatura_tarihi)     eksikler.push("Fatura Tarihi");
+  if (!dosya.consignee)         eksikler.push("Consignee");
+  if (!dosya.urun_tanimi)       eksikler.push("Ürün Tanımı");
+  if (!dosya.bl_no)             eksikler.push("B/L No");
+  if (!dosya.yuklenme_limani && !rezervasyonlar[0]?.yuklenme_limani) eksikler.push("Yükleme Limanı");
+  if (!dosya.varis_limani)      eksikler.push("Varış Limanı");
+  if (!dosya.uretim_tarihi)     eksikler.push("Üretim Tarihi");
+  if (!dosya.son_kullanim_tarihi) eksikler.push("Son Kullanım Tarihi");
+
+  const rez = rezervasyonlar[0];
+  if (!rez?.gemi_adi) eksikler.push("Gemi Adı");
+  if (!rez?.sefer_no) eksikler.push("Sefer No");
+
+  if (konteynerler.length === 0) {
+    eksikler.push("Konteyner Bilgileri");
+  } else {
+    const eksikBrut = konteynerler.some((k) => !k.brut_agirlik_kg);
+    if (eksikBrut) eksikler.push("Brüt Ağırlık (bir veya daha fazla konteynerde eksik)");
+  }
+
+  return { hazir: eksikler.length === 0, eksikler };
+}

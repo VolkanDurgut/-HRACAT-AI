@@ -41,7 +41,7 @@ type FaturaKontrolSonucu = {
   fatura_tarihi: string;
 };
 
-type EvrakTuru = "ci" | "pl" | "coo" | "phyto" | "health" | "fc";
+type EvrakTuru = "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc";
 
 const EVRAK_SIRASI: { anahtar: string; baslik: string; evrakTuru?: EvrakTuru }[] = [
   { anahtar: "Commercial Invoice", baslik: "Commercial Invoice", evrakTuru: "ci" },
@@ -50,7 +50,7 @@ const EVRAK_SIRASI: { anahtar: string; baslik: string; evrakTuru?: EvrakTuru }[]
   { anahtar: "Certificate of Origin", baslik: "Certificate of Origin", evrakTuru: "coo" },
   { anahtar: "Phytosanitary", baslik: "Phytosanitary Certificate", evrakTuru: "phyto" },
   { anahtar: "Health Certificate", baslik: "Health Certificate", evrakTuru: "health" },
-  { anahtar: "Quality And Weight", baslik: "Quality Certificate" },
+  { anahtar: "Quality", baslik: "Quality Certificate", evrakTuru: "qc" },
   { anahtar: "Fumigation", baslik: "Fumigation Certificate", evrakTuru: "fc" },
   { anahtar: "Photographic Loading", baslik: "Final Loading Report" },
   { anahtar: "Insurance", baslik: "Insurance Policy" },

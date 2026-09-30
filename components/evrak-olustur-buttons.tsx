@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
-import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
+import { Dosya, Rezervasyon, Konteyner, FumigationAyari, KaliteSertifikasiAyari } from "@/lib/supabase";
 import { supabase, getGuvenliDosyaUrl } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,7 @@ import InfoTooltip from "@/components/info-tooltip";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
+import { buildKaliteSertifikasiHtml } from "@/lib/kalite-sertifikasi-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
 import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
 import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
@@ -20,8 +21,10 @@ import {
   checkCertificateOfOriginReadiness,
   checkPhytosanitaryCertificateReadiness,
   checkHealthCertificateReadiness,
+  checkKaliteSertifikasiReadiness,
 } from "@/lib/document-readiness";
 import FumigationAyarModal from "@/components/fumigation-ayar-modal";
+import KaliteSertifikasiAyarModal from "@/components/kalite-sertifikasi-ayar-modal";
 import EctnDegerleriModal, { EctnOverrideDegerleri } from "@/components/ectn-degerleri-modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -54,12 +57,13 @@ function storageDosyaAdi(siraNo: number, evrakKisa: string, dosya: Dosya, rezerv
 
 // Uc evrak turunun sabit meta bilgisi - hem ilk uretimde hem "Orijinali Olustur"
 // akisinda AYNI storage yolunu/adini yeniden turetmek icin kullanilir.
-const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
+const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
   ci:  { evrakTipi: "commercial_invoice",     siraNo: 1, evrakKisa: "commercial_invoice",     evrakAdi: "COMMERCIAL INVOICE" },
   pl:  { evrakTipi: "packing_list",           siraNo: 2, evrakKisa: "packing_list",           evrakAdi: "PACKING LIST" },
   coo:   { evrakTipi: "certificate_of_origin",  siraNo: 4, evrakKisa: "certificate_of_origin",  evrakAdi: "CERTIFICATE OF ORIGIN" },
   phyto:  { evrakTipi: "phytosanitary",          siraNo: 5, evrakKisa: "phytosanitary",          evrakAdi: "PHYTOSANITARY CERTIFICATE" },
   health: { evrakTipi: "health_certificate",     siraNo: 6, evrakKisa: "health_certificate",     evrakAdi: "HEALTH CERTIFICATE" },
+  qc:    { evrakTipi: "quality_certificate",    siraNo: 7, evrakKisa: "quality_certificate",    evrakAdi: "QUALITY CERTIFICATE" },
   fc:    { evrakTipi: "fumigation",             siraNo: 8, evrakKisa: "fumigation",             evrakAdi: "FUMIGATION" },
 };
 
@@ -69,7 +73,7 @@ type Props = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
   konteynerler: Konteyner[];
-  show?: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "both";
+  show?: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc" | "both";
 };
 
 export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerler, show = "both" }: Props) {
@@ -77,6 +81,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const { companyId } = useAuth(); // SaaS: şirket bazlı izolasyon için company_id kaynağı
   const [fumigationAyar, setFumigationAyar] = useState<FumigationAyari | null>(null);
   const [ayarModalAcik, setAyarModalAcik] = useState(false);
+  const [kaliteAyar, setKaliteAyar] = useState<KaliteSertifikasiAyari | null>(null);
+  const [kaliteAyarModalAcik, setKaliteAyarModalAcik] = useState(false);
   // ECTN basvurusu isaretlendiyse Commercial Invoice'a TOTAL FOB/FREIGHT/
   // TOTAL CFR satirlari eklenir (talep: 28.09.2026). Yerel state - dosya
   // prop'u disaridan (parent) yenilenmeden ONCE bile bir sonraki Draft/
@@ -117,7 +123,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const [durumlar, setDurumlar] = useState<Record<string, EvrakDurumu>>({});
   // ORIJINAL onaylanmis bir evragi yanlislikla tekrar taslaga cevirmeyi
   // onlemek icin: bu durumda once onay istenir.
-  const [yenidenTaslakConfirm, setYenidenTaslakConfirm] = useState<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | null>(null);
+  const [yenidenTaslakConfirm, setYenidenTaslakConfirm] = useState<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc" | null>(null);
 
   const ciHazirlik  = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
   const plHazirlik  = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);
@@ -125,6 +131,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   const phytoHazirlik  = checkPhytosanitaryCertificateReadiness(dosya, rezervasyonlar, konteynerler);
   const healthHazirlik = checkHealthCertificateReadiness(dosya, rezervasyonlar, konteynerler);
   const fcHazirlik    = checkFumigationReadiness(dosya, rezervasyonlar, konteynerler);
+  const qcHazirlik    = checkKaliteSertifikasiReadiness(dosya, rezervasyonlar, konteynerler);
 
   // Musteri bazli fumigation ayarlarini yukle
   useEffect(() => {
@@ -142,6 +149,22 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     fetchAyar();
   }, [dosya.alici_firma, companyId]);
 
+  // Musteri bazli kalite sertifikasi ayarlarini yukle (fumigation_ayarlari ile ayni desen)
+  useEffect(() => {
+    if (!dosya.alici_firma) return;
+    const fetchAyar = async () => {
+      if (!companyId) return;
+      const { data } = await supabase
+        .from("kalite_sertifikasi_ayarlari")
+        .select("*")
+        .eq("alici_firma", dosya.alici_firma)
+        .eq("company_id", companyId)
+        .maybeSingle();
+      if (data) setKaliteAyar(data);
+    };
+    fetchAyar();
+  }, [dosya.alici_firma, companyId]);
+
   // Mevcut evrak durumlarini (taslak/orijinal) yukle - hem ilk acilista hem
   // bir islemden sonra tazelemek icin.
   const durumlariYukle = useCallback(async () => {
@@ -151,7 +174,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       .select("evrak_tipi, durum, dosya_url, dosya_adi")
       .eq("dosya_id", dosya.id)
       .eq("company_id", companyId)
-      .in("evrak_tipi", ["commercial_invoice", "packing_list", "certificate_of_origin", "phytosanitary", "health_certificate", "fumigation"]);
+      .in("evrak_tipi", ["commercial_invoice", "packing_list", "certificate_of_origin", "phytosanitary", "health_certificate", "fumigation", "quality_certificate"]);
 
     const map: Record<string, EvrakDurumu> = {};
     (data || []).forEach((kayit: any) => {
@@ -236,7 +259,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // Draft VE Orijinal, HER ZAMAN ayni kaynaktan (dosya/rezervasyon/konteyner
   // verisinden) taze olarak uretilir - tek fark filigran eklenip eklenmemesi.
   // Boylece iki ayri, birbirinden bagimsiz ve her zaman guvenilir buton olur.
-  const uretVeKaydet = async (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc", durum: "taslak" | "orijinal") => {
+  const uretVeKaydet = async (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", durum: "taslak" | "orijinal") => {
     if (yukleniyor) return; // Cift tiklama koruması
     setYukleniyor(`${tip}-${durum}`);
     try {
@@ -255,9 +278,10 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       else if (tip === "coo") htmlHam = buildCertificateOfOriginHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "phyto") htmlHam = buildPhytosanitaryCertificateHtml(dosya, rezervasyonlar, konteynerler);
       else if (tip === "health") htmlHam = buildHealthCertificateHtml(dosya, rezervasyonlar, konteynerler);
+      else if (tip === "qc") htmlHam = buildKaliteSertifikasiHtml(dosya, rezervasyonlar, konteynerler, kaliteAyar);
       else htmlHam = buildFumigationHtml(dosya, rezervasyonlar, konteynerler, fumigationAyar);
 
-      const filigranliTurler: Array<typeof tip> = ["ci", "pl", "fc"];
+      const filigranliTurler: Array<typeof tip> = ["ci", "pl", "fc", "qc"];
       const html = durum === "taslak" && filigranliTurler.includes(tip) ? draftFiligranEkle(htmlHam) : htmlHam;
       await kaydetVeAc(html, meta.evrakTipi,
         storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
@@ -288,7 +312,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     }
   };
 
-  const handleTiklandi = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc", durum: "taslak" | "orijinal") => {
+  const handleTiklandi = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", durum: "taslak" | "orijinal") => {
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
     if (durum === "taslak" && kayit?.durum === "orijinal") {
@@ -303,7 +327,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
   /** Uc evrak turu icin ortak render mantigi: hazir degilse uyari, hazirsa
    * durum rozeti + Draft + Orijinal butonlari. */
-  const renderEvrakButonlari = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
+  const renderEvrakButonlari = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
     if (!hazirlik.hazir) {
       return (
         <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
@@ -392,6 +416,15 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             {renderEvrakButonlari("health", healthHazirlik, "Health Certificate")}
           </div>
           <div className="flex items-center gap-3">
+            <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Quality Cert.</span>
+            <div className="flex items-center gap-1.5">
+              {renderEvrakButonlari("qc", qcHazirlik, "Quality Cert.")}
+              <button onClick={() => setKaliteAyarModalAcik(true)} className={iconBtnClass} title="Kalite sertifikası ayarlarını düzenle">
+                <Pencil size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
             <span className="text-xs font-medium w-[132px] shrink-0" style={{ color: "#94a3b8" }}>Fumigation Cert.</span>
             <div className="flex items-center gap-1.5">
               {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
@@ -408,6 +441,14 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           {show === "coo" && renderEvrakButonlari("coo", cooHazirlik, "Certificate of Origin")}
           {show === "phyto" && renderEvrakButonlari("phyto", phytoHazirlik, "Phytosanitary Certificate")}
           {show === "health" && renderEvrakButonlari("health", healthHazirlik, "Health Certificate")}
+          {show === "qc" && (
+            <div className="flex items-center gap-1.5">
+              {renderEvrakButonlari("qc", qcHazirlik, "Quality Cert.")}
+              <button onClick={() => setKaliteAyarModalAcik(true)} className={iconBtnClass} title="Kalite sertifikası ayarlarını düzenle">
+                <Pencil size={13} />
+              </button>
+            </div>
+          )}
           {show === "fc" && (
             <div className="flex items-center gap-1.5">
               {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
@@ -419,7 +460,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         </div>
       )}
 
-      {show === "both" && Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || cooHazirlik.hazir || phytoHazirlik.hazir || healthHazirlik.hazir || fcHazirlik.hazir) && (
+      {show === "both" && Object.keys(durumlar).length === 0 && (ciHazirlik.hazir || plHazirlik.hazir || cooHazirlik.hazir || phytoHazirlik.hazir || healthHazirlik.hazir || fcHazirlik.hazir || qcHazirlik.hazir) && (
         <p className="text-[11px] mt-1.5" style={{ color: "#94a3b8" }}>
           İşlem sırası: önce <strong>Draft</strong> ile filigranlı taslağı hazırlayın → müşteriye onaya gönderin → onay gelince <strong>Orijinal</strong> butonuna basın.
         </p>
@@ -431,6 +472,15 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           open={ayarModalAcik}
           onClose={() => setAyarModalAcik(false)}
           onSaved={(ayar) => setFumigationAyar(ayar)}
+        />
+      )}
+
+      {dosya.alici_firma && (
+        <KaliteSertifikasiAyarModal
+          aliciFirma={dosya.alici_firma}
+          open={kaliteAyarModalAcik}
+          onClose={() => setKaliteAyarModalAcik(false)}
+          onSaved={(ayar) => setKaliteAyar(ayar)}
         />
       )}
 

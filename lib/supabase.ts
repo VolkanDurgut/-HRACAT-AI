@@ -14,6 +14,8 @@ export type {
   DbaKontrolSonucu,
   KonsimentoKontrolSonucu,
   FumigationAyari,
+  KaliteParametresi,
+  KaliteSertifikasiAyari,
 } from './supabase/types';
 export {
   isDosyaAcik,

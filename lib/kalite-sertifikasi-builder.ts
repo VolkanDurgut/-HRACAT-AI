@@ -13,9 +13,10 @@
  * Weight as per B/L = konteynerler tablosundan brut agirlik toplami
  * Description of goods = dosya.urun_tanimi
  * Production/Expiry Date = dosya.uretim_tarihi / dosya.son_kullanim_tarihi
- * Date of inspection = dosya.uretim_tarihi (ayri bir alan yok, uretim
- *   tarihiyle ayni kabul edilir - orneklerde bu iki tarih 1 gun farkli,
- *   ancak sistemde muayene tarihi icin ayri bir alan bulunmuyor)
+ * Date of inspection = dosya.uretim_tarihi + 1 GUN (talep: 30.09.2026 -
+ *   kullanicinin acik talimati: "Date of inspection her zaman Production
+ *   Date'in 1 gun fazlasi olacak". Sistemde ayri bir muayene tarihi alani
+ *   yok, bu kuralla otomatik hesaplanir.)
  * PARAMETER/SPECIFICATION/RESULTS/METHODS tablosu = KaliteSertifikasiAyari
  *   (musteri bazli kayitli ayarlar - bkz. kalite-sertifikasi-ayar-modal.tsx)
  * Sabit bilgiler = UNEX firma bilgileri + GAFTA sertifikasyon metni
@@ -23,7 +24,7 @@
 
 import { Dosya, Rezervasyon, Konteyner, KaliteParametresi, KaliteSertifikasiAyari } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
-import { IMZA_HARUN, IMZA_CIGDEM, LOGO_UNEX } from "@/lib/imzalar";
+import { IMZA_HARUN, IMZA_CIGDEM_KALITE, LOGO_UNEX } from "@/lib/imzalar";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -222,7 +223,7 @@ __PARAMETRE_SATIRLARI__
     </div>
     <div class="signature-box">
       <div class="stamp-slot">
-        <img src="__IMZA_CIGDEM__" alt="Signature" onerror="this.style.display='none'">
+        <img src="__IMZA_CIGDEM_KALITE__" alt="Signature" onerror="this.style.display='none'">
       </div>
     </div>
   </div>
@@ -282,9 +283,12 @@ export function buildKaliteSertifikasiHtml(
     WEIGHT_AS_PER_BL:      buildBrutAgirlikToplam(konteynerler),
     PORT_OF_LOADING:       safe(rez?.yuklenme_limani || dosya.yuklenme_limani),
     DESTINATION:           safe(dosya.varis_limani),
-    INSPECTION_DATE:       dosya.uretim_tarihi
-                             ? escapeHtml(formatDateTR(dosya.uretim_tarihi))
-                             : safe(null),
+    INSPECTION_DATE:       (() => {
+                             if (!dosya.uretim_tarihi) return safe(null);
+                             const d = new Date(dosya.uretim_tarihi);
+                             d.setDate(d.getDate() + 1);
+                             return escapeHtml(formatDateTR(d.toISOString().split("T")[0]));
+                           })(),
     PRODUCTION_DATE:       dosya.uretim_tarihi
                              ? escapeHtml(formatDateTR(dosya.uretim_tarihi))
                              : safe(null),
@@ -303,7 +307,7 @@ export function buildKaliteSertifikasiHtml(
     FOOTER_LINE3:          escapeHtml(FOOTER_LINE3),
     FOOTER_LINE4:          escapeHtml(FOOTER_LINE4),
     IMZA_HARUN:            IMZA_HARUN,
-    IMZA_CIGDEM:           IMZA_CIGDEM,
+    IMZA_CIGDEM_KALITE:    IMZA_CIGDEM_KALITE,
     LOGO:                  LOGO_UNEX,
   };
 

@@ -64,48 +64,48 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
      yukseklikte akar - biri uzun biri kisa olsa da birbirini ITMEZ, cunku
      ikisi de ayni .header flex container'inin esit seviyedeki cocuklaridir.
      Negatif margin KULLANILMAZ - icerik miktarina bagli olarak kirilgan olur. */
-  .header { display: flex; justify-content: flex-start; align-items: flex-start; margin-bottom: 14px; }
+  .header { display: flex; justify-content: flex-start; align-items: flex-start; margin-bottom: 4px; }
   .header-left { flex: 1; }
-  .invoice-title { display: inline-block; background: #ECECEC; font-weight: bold; font-size: 16px; padding: 6px 16px; margin-bottom: 14px; }
+  .invoice-title { display: inline-block; background: #ECECEC; font-weight: bold; font-size: 16px; padding: 6px 16px; margin-bottom: 6px; }
   .meta-row { display: flex; margin-bottom: 2px; }
   .meta-label { width: 90px; font-weight: bold; }
   .meta-value { flex: 1; }
   .header-right { text-align: center; min-width: 260px; max-width: 420px; margin-right: 20px; }
   .logo-slot img { max-width: 200px; max-height: 100px; object-fit: contain; }
-  .logo-slot { margin-bottom: 8px; text-align: center; }
-  .buyer-box { text-align: center; margin-bottom: 14px; }
+  .logo-slot { margin-bottom: 5px; text-align: center; }
+  .buyer-box { text-align: center; margin-bottom: 6px; }
   .buyer-box .name { font-weight: bold; }
   .buyer-box div { white-space: pre-line; }
 
   /* TOTAL AMOUNT PAYABLE: artik header-right'in ICINDE, logo+firma blogunun
      hemen altinda - sabit, kararli konum, sol kolonun yuksekliginden bagimsiz. */
   .total-payable-row { display: flex; justify-content: center; }
-  .total-payable-box { background: #ECECEC; padding: 10px 14px; text-align: center; width: fit-content; }
+  .total-payable-box { background: #ECECEC; padding: 6px 14px; text-align: center; width: fit-content; }
   .total-payable-box .label { font-size: 10px; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
   .total-payable-box .value { font-size: 18px; font-weight: bold; }
 
-  .parties-block { margin-top: 12px; margin-bottom: 14px; }
-  .party-row { margin-bottom: 8px; }
+  .parties-block { margin-top: 4px; margin-bottom: 4px; }
+  .party-row { margin-bottom: 3px; }
   .party-label { font-weight: bold; margin-bottom: 2px; }
   .party-value { white-space: pre-line; }
-  .kv-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .kv-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
   .kv-table tr:nth-child(even) { background: #F7F7F7; }
-  .kv-table td { padding: 5px 10px; border: 1px solid #DADADA; vertical-align: top; }
+  .kv-table td { padding: 2.5px 10px; border: 1px solid #DADADA; vertical-align: top; }
   .kv-table td.k { background: #ECECEC; font-weight: bold; width: 180px; }
-  .items-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-  .items-table th { background: #ECECEC; font-weight: bold; text-align: center; padding: 6px 8px; border: 1px solid #DADADA; font-size: 10px; }
-  .items-table td { padding: 6px 8px; border: 1px solid #DADADA; }
+  .items-table { width: 100%; border-collapse: collapse; margin-bottom: 2px; }
+  .items-table th { background: #ECECEC; font-weight: bold; text-align: center; padding: 4px 8px; border: 1px solid #DADADA; font-size: 10px; }
+  .items-table td { padding: 4px 8px; border: 1px solid #DADADA; }
   .items-table td.num { text-align: right; }
-  .totals-block { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+  .totals-block { display: flex; justify-content: flex-end; margin-bottom: 6px; }
   .totals-block table { border-collapse: collapse; }
-  .totals-block td { padding: 6px 12px; font-size: 11px; border: 1px solid #DADADA; }
+  .totals-block td { padding: 4px 12px; font-size: 11px; border: 1px solid #DADADA; }
   .totals-block td.label { font-weight: bold; text-align: right; background: #ECECEC; min-width: 140px; }
   .totals-block td.value { text-align: right; min-width: 110px; background: #FFFFFF; }
   .totals-block tr.grand-total td { font-weight: bold; font-size: 12px; }
   .bank-table { margin-top: 0; }
-  .signature-block { display: flex; justify-content: flex-start; margin: 24px 0 14px 0; margin-top: auto; }
-  .stamp-slot img { max-width: 200px; max-height: 160px; object-fit: contain; }
-  .footer-note { text-align: center; font-size: 8.5px; font-weight: bold; line-height: 1.5; border-top: 1px solid #DADADA; padding-top: 8px; margin-top: 10px; }
+  .signature-block { display: flex; justify-content: flex-start; margin: 10px 0 6px 0; margin-top: auto; }
+  .stamp-slot img { max-width: 180px; max-height: 130px; object-fit: contain; }
+  .footer-note { text-align: center; font-size: 8.5px; font-weight: bold; line-height: 1.5; border-top: 1px solid #DADADA; padding-top: 4px; margin-top: 4px; }
   .print-hint { background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 10px 14px; font-size: 11px; margin-bottom: 16px; border-radius: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #FFFFFF; padding: 0; }
@@ -210,42 +210,6 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
       THE GOODS ARE OF TURKISH ORIGIN
     </div>
   </div>
-  <script>
-    // Kok neden duzeltmesi (30.09.2026): bu belge sabit A4 tek sayfaya gore
-    // tasarlanmisti ama ECTN basvurusu + INSURANCE satiri gibi eklemeler
-    // (28-29.09.2026) toplam icerigi bazen tek sayfanin biraz uzerine
-    // tasiriyordu - sonuc: "footer-note" (alt bilgi) tek basina, neredeyse
-    // bomboş bir 2. sayfaya dusuyordu. jsPDF ile uretilen Fatura Talimati'nda
-    // uygulanan "tek sayfaya sigana kadar kucult" mantiginin ayni - burada
-    // gercek tarayici print motoruyla, .sheet'i olceklendirerek (CSS zoom)
-    // yapiliyor. Icerik zaten sigıyorsa HICBIR GORSEL DEGISIKLIK olmaz.
-    (function () {
-      function olceklendir() {
-        var sheet = document.querySelector(".sheet");
-        if (!sheet) return;
-        sheet.style.zoom = "1";
-        var sonEleman = sheet.lastElementChild;
-        if (!sonEleman) return;
-        var stil = window.getComputedStyle(sheet);
-        // scrollHeight yerine son elemanin alt kenarini kullaniyoruz: min-height
-        // (ekran onizlemesinde "tam sayfa" gorunumu icin var) gercek icerik
-        // olcumunu saptirmasin diye.
-        var icerikYuksekligi = sonEleman.offsetTop + sonEleman.offsetHeight + parseFloat(stil.paddingBottom || "0");
-        // A4 yuksekligi (297mm) eksi @page ust+alt marj (10mm+10mm), 96dpi CSS px'e cevrilmis.
-        var basilabilirYukseklikPx = ((297 - 20) / 25.4) * 96;
-        if (icerikYuksekligi > basilabilirYukseklikPx) {
-          var olcek = basilabilirYukseklikPx / icerikYuksekligi;
-          // Okunabilirlik icin asiri kucultmeyi onleyen taban - normal
-          // dosyalarda buraya hemen hic inilmez, sadece cok asiri durumlarda.
-          olcek = Math.max(olcek, 0.72);
-          sheet.style.zoom = String(olcek);
-        }
-      }
-      if (document.readyState === "complete") olceklendir();
-      else window.addEventListener("load", olceklendir);
-      window.addEventListener("beforeprint", olceklendir);
-    })();
-  </script>
 </body>
 </html>`;
 

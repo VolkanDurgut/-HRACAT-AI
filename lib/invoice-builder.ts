@@ -109,7 +109,13 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
   .print-hint { background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 10px 14px; font-size: 11px; margin-bottom: 16px; border-radius: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #FFFFFF; padding: 0; }
-    .sheet { box-shadow: none; padding: 0; width: auto; }
+    /* min-height: 1000px eskiden burada da uygulanmaya devam ediyordu - ekranda
+       kisa belgeleri bile "tam sayfa" gostermek icin var, ama yazdirirken
+       gercek icerik zaten kisa sayfayi doldurmuyorsa bile bu sabit yukseklik
+       basilabilir alani gereksiz yere tuketip asagidaki oto-sigdirma script'inin
+       hesabini saptiriyordu. Yazdirirken tamamen kaldirilir; gercek yukseklik
+       neyse odur. */
+    .sheet { box-shadow: none; padding: 0; width: auto; min-height: 0; }
     .print-hint { display: none; }
   }
 </style>
@@ -204,6 +210,42 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
       THE GOODS ARE OF TURKISH ORIGIN
     </div>
   </div>
+  <script>
+    // Kok neden duzeltmesi (30.09.2026): bu belge sabit A4 tek sayfaya gore
+    // tasarlanmisti ama ECTN basvurusu + INSURANCE satiri gibi eklemeler
+    // (28-29.09.2026) toplam icerigi bazen tek sayfanin biraz uzerine
+    // tasiriyordu - sonuc: "footer-note" (alt bilgi) tek basina, neredeyse
+    // bomboş bir 2. sayfaya dusuyordu. jsPDF ile uretilen Fatura Talimati'nda
+    // uygulanan "tek sayfaya sigana kadar kucult" mantiginin ayni - burada
+    // gercek tarayici print motoruyla, .sheet'i olceklendirerek (CSS zoom)
+    // yapiliyor. Icerik zaten sigıyorsa HICBIR GORSEL DEGISIKLIK olmaz.
+    (function () {
+      function olceklendir() {
+        var sheet = document.querySelector(".sheet");
+        if (!sheet) return;
+        sheet.style.zoom = "1";
+        var sonEleman = sheet.lastElementChild;
+        if (!sonEleman) return;
+        var stil = window.getComputedStyle(sheet);
+        // scrollHeight yerine son elemanin alt kenarini kullaniyoruz: min-height
+        // (ekran onizlemesinde "tam sayfa" gorunumu icin var) gercek icerik
+        // olcumunu saptirmasin diye.
+        var icerikYuksekligi = sonEleman.offsetTop + sonEleman.offsetHeight + parseFloat(stil.paddingBottom || "0");
+        // A4 yuksekligi (297mm) eksi @page ust+alt marj (10mm+10mm), 96dpi CSS px'e cevrilmis.
+        var basilabilirYukseklikPx = ((297 - 20) / 25.4) * 96;
+        if (icerikYuksekligi > basilabilirYukseklikPx) {
+          var olcek = basilabilirYukseklikPx / icerikYuksekligi;
+          // Okunabilirlik icin asiri kucultmeyi onleyen taban - normal
+          // dosyalarda buraya hemen hic inilmez, sadece cok asiri durumlarda.
+          olcek = Math.max(olcek, 0.72);
+          sheet.style.zoom = String(olcek);
+        }
+      }
+      if (document.readyState === "complete") olceklendir();
+      else window.addEventListener("load", olceklendir);
+      window.addEventListener("beforeprint", olceklendir);
+    })();
+  </script>
 </body>
 </html>`;
 

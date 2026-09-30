@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { formatDateTimeTR, formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
-import { buildDraftOnayMailtoUrl, draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
+import { draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
@@ -44,6 +44,10 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const [onaylaniyor, setOnaylaniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
   const [musteriOnayiKaydediliyor, setMusteriOnayiKaydediliyor] = useState(false);
+  const [mailIsaretleniyor, setMailIsaretleniyor] = useState(false);
+  const [revizeModalAcik, setRevizeModalAcik] = useState(false);
+  const [revizeNotu, setRevizeNotu] = useState("");
+  const [revizeKaydediliyor, setRevizeKaydediliyor] = useState(false);
 
   const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
   const draftBlAdi = (dosya as any).draft_bl_dosya_adi as string | null;
@@ -91,12 +95,16 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
 
   const handleOnayla = async () => {
     setOnaylaniyor(true);
+    // Revize sonrasi yeniden onaylandiginda eski "Revize Istendi" rozeti
+    // kapanir - notu/tarihi/isaretleyeni SILINMEZ (gecmis kayit olarak
+    // kalir), sadece aktif uyari durumu (draft_revize_istendi) kapatilir.
     const { error } = await supabase
       .from("ihracat_dosyalari")
       .update({
         draft_onaylandi: true,
         draft_onaylayan: user?.email || null,
         draft_onay_tarihi: new Date().toISOString(),
+        draft_revize_istendi: false,
       })
       .eq("id", dosya.id)
       .eq("company_id", companyId);
@@ -105,26 +113,29 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       showToast(`Onay kaydedilemedi: ${error.message}`, "error");
       return;
     }
-    showToast("Draft onaylandı. Mail Gönder butonu artık aktif.", "success");
+    showToast("Draft onaylandı. \"Gönderildi İşaretle\" butonu artık aktif.", "success");
     onRefresh();
   };
 
-  const handleMailGonder = async () => {
-    if (!aliciEmail) {
-      showToast("Bu dosyada alıcı e-posta adresi tanımlı değil (Taraflar bölümünden ekleyin).", "error");
-      return;
-    }
-    window.open(buildDraftOnayMailtoUrl(dosya, rezervasyonlar));
+  // Talep (30.09.2026): mailto: ile mail penceresi acma adimi pratikte
+  // kullanilmiyor - ekip draft PDF paketini indirip kendi yolundan
+  // (kurumsal mail istemcisi ile) elle gonderiyor. Bu buton artik sadece
+  // "gonderdim" durumunu isaretler; "Musteri Onayladi" / "Revize Istendi"
+  // butonlarinin ortaya cikmasi ve 48 saatlik sure takibinin baslamasi
+  // buna baglidir.
+  const handleGonderildiIsaretle = async () => {
+    setMailIsaretleniyor(true);
     const { error } = await supabase
       .from("ihracat_dosyalari")
       .update({ draft_mail_gonderildi: true, draft_mail_gonderildi_tarihi: new Date().toISOString() })
       .eq("id", dosya.id)
       .eq("company_id", companyId);
+    setMailIsaretleniyor(false);
     if (error) {
       showToast(`Durum kaydedilemedi: ${error.message}`, "error");
       return;
     }
-    showToast("Mail uygulaması açıldı. Ekleri (Paketi İndir ile inen ZIP) sürükle-bırakla eklemeyi unutmayın.", "success");
+    showToast("Gönderildi olarak işaretlendi. 48 saatlik yanıt süresi başladı.", "success");
     onRefresh();
   };
 
@@ -152,15 +163,62 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     onRefresh();
   };
 
+  // Musteri "sunu degistirin" dediginde ekibin not dusup isaretledigi durum.
+  // Akis BILEREK basa sarilir (draft_onaylandi/draft_mail_gonderildi/
+  // draft_musteri_onayi_alindi false yapilir) - cunku evraklar degisecek,
+  // ekip duzelttikten sonra "Onayla" ile YENIDEN ic onaydan gecirmeli. Revize
+  // notu/tarihi/isaretleyen SILINMEZ - dosya yeniden onaylanana kadar (bkz.
+  // handleOnayla) gecmis bilgi olarak "Revize Istendi" rozetinde gorunur.
+  const handleRevizeIstendiKaydet = async () => {
+    setRevizeKaydediliyor(true);
+    const { error } = await supabase
+      .from("ihracat_dosyalari")
+      .update({
+        draft_revize_istendi: true,
+        draft_revize_notu: revizeNotu.trim() || null,
+        draft_revize_tarihi: new Date().toISOString(),
+        draft_revize_isaretleyen: user?.email || null,
+        draft_onaylandi: false,
+        draft_mail_gonderildi: false,
+        draft_musteri_onayi_alindi: false,
+      })
+      .eq("id", dosya.id)
+      .eq("company_id", companyId);
+    setRevizeKaydediliyor(false);
+    if (error) {
+      showToast(`Revize talebi kaydedilemedi: ${error.message}`, "error");
+      return;
+    }
+    showToast("Revize talebi kaydedildi. Dosya yeniden \"Onayla\" adımına döndü.", "success");
+    setRevizeModalAcik(false);
+    setRevizeNotu("");
+    onRefresh();
+  };
+
   const onaylandi = !!(dosya as any).draft_onaylandi;
   const mailGonderildi = !!(dosya as any).draft_mail_gonderildi;
   const musteriOnayiAlindi = !!(dosya as any).draft_musteri_onayi_alindi;
+  const revizeIstendi = !!(dosya as any).draft_revize_istendi;
   const onaylayan = (dosya as any).draft_onaylayan as string | null;
   const onayTarihi = (dosya as any).draft_onay_tarihi as string | null;
   const musteriOnayiIsaretleyen = (dosya as any).draft_musteri_onayi_isaretleyen as string | null;
   const musteriOnayiTarihi = (dosya as any).draft_musteri_onayi_tarihi as string | null;
+  const revizeNotuKayitli = (dosya as any).draft_revize_notu as string | null;
+  const revizeTarihi = (dosya as any).draft_revize_tarihi as string | null;
+  const revizeIsaretleyen = (dosya as any).draft_revize_isaretleyen as string | null;
+  const mailGonderildiTarihi = (dosya as any).draft_mail_gonderildi_tarihi as string | null;
+
+  // 48 saatlik yanit suresi: sadece "gonderildi isaretlendi, musteri onayi da
+  // gelmedi, revize de istenmedi" durumunda (yani hala aktif bekleme
+  // suredeyken) anlamli - digerlerinde zaten baska bir aksiyon alinmis demektir.
+  const sureDoldu =
+    mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && !!mailGonderildiTarihi &&
+    Date.now() - new Date(mailGonderildiTarihi).getTime() > 48 * 60 * 60 * 1000;
+
   const durumTitle = musteriOnayiAlindi
     ? `Müşteri onayını işaretleyen: ${musteriOnayiIsaretleyen || "-"}${musteriOnayiTarihi ? " · " + formatDateTimeTR(musteriOnayiTarihi) : ""}`
+    : revizeIstendi
+    ? `Revizeyi işaretleyen: ${revizeIsaretleyen || "-"}${revizeTarihi ? " · " + formatDateTimeTR(revizeTarihi) : ""}${revizeNotuKayitli ? " · Not: " + revizeNotuKayitli : ""}`
     : onaylandi
     ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}`
     : undefined;
@@ -182,7 +240,11 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 
   return (
-    <tr className="border-b last:border-0 hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
+    <>
+    <tr
+      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${sureDoldu ? "bg-red-500/[0.06]" : ""}`}
+      style={{ borderColor: CARD_BORDER }}
+    >
       <td className="px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap">
         <button
           type="button"
@@ -237,6 +299,14 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
             <CheckCircle2 size={11} /> Onay Geldi
           </span>
+        ) : revizeIstendi ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-400 bg-orange-500/10 px-2 py-1 rounded-full">
+            <MessageSquareWarning size={11} /> Revize İstendi
+          </span>
+        ) : sureDoldu ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
+            <Clock size={11} /> Süre Doldu (48s)
+          </span>
         ) : mailGonderildi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
             <AlertTriangle size={11} /> Yanıt Bekleniyor
@@ -277,27 +347,90 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           </button>
           <button
             type="button"
-            onClick={handleMailGonder}
-            disabled={!onaylandi}
-            title={!onaylandi ? "Önce evrakları onaylayın" : "Mail uygulamasını TO/CC/Konu/Metin dolu şekilde açar"}
+            onClick={handleGonderildiIsaretle}
+            disabled={!onaylandi || mailGonderildi || mailIsaretleniyor}
+            title={!onaylandi ? "Önce evrakları onaylayın" : mailGonderildi ? "Gönderildi olarak işaretlendi" : "Draftı kendi mail yolunuzdan gönderdiyseniz burada işaretleyin"}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5 transition-colors"
             style={{ borderColor: CARD_BORDER, color: "white" }}
           >
-            <Mail size={12} /> Mail
+            {mailIsaretleniyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} {mailGonderildi ? "Gönderildi" : "Gönderildi İşaretle"}
           </button>
-          {mailGonderildi && !musteriOnayiAlindi && (
-            <button
-              type="button"
-              onClick={handleMusteriOnayiGeldi}
-              disabled={musteriOnayiKaydediliyor}
-              title="Müşteriden onay maili/cevabı geldiğinde işaretleyin"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-500 disabled:opacity-50 transition-colors"
-            >
-              {musteriOnayiKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Müşteri Onayladı
-            </button>
+          {mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && (
+            <>
+              <button
+                type="button"
+                onClick={handleMusteriOnayiGeldi}
+                disabled={musteriOnayiKaydediliyor}
+                title="Müşteriden onay maili/cevabı geldiğinde işaretleyin"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-500 disabled:opacity-50 transition-colors"
+              >
+                {musteriOnayiKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Müşteri Onayladı
+              </button>
+              <button
+                type="button"
+                onClick={() => { setRevizeNotu(""); setRevizeModalAcik(true); }}
+                title="Müşteri revize istediğinde işaretleyip not düşün"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 transition-colors"
+              >
+                <MessageSquareWarning size={12} /> Revize İstendi
+              </button>
+            </>
           )}
         </div>
       </td>
     </tr>
+    {revizeModalAcik && (
+      <tr>
+        <td colSpan={9} className="p-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setRevizeModalAcik(false)}>
+            <div
+              className="w-full max-w-md rounded-xl border p-4 shadow-lg"
+              style={{ backgroundColor: "#1A1A1E", borderColor: CARD_BORDER }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <MessageSquareWarning size={14} className="text-orange-400" /> Revize Talebi — {dosya.dosya_no}
+                </h3>
+                <button type="button" onClick={() => setRevizeModalAcik(false)} className="text-slate-400 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>
+                Müşterinin talep ettiği değişikliği kısaca not düşün. Bu işlem dosyayı &quot;Bekliyor&quot; durumuna geri döndürür — evrakları düzelttikten sonra tekrar Onayla → Gönderildi İşaretle adımlarından geçirmeniz gerekir.
+              </p>
+              <textarea
+                value={revizeNotu}
+                onChange={(e) => setRevizeNotu(e.target.value)}
+                rows={3}
+                placeholder="Örn: Alıcı adresi güncellensin, konteyner sayısı 9 olarak düzeltilsin..."
+                className="w-full rounded-lg border px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                style={{ borderColor: CARD_BORDER, backgroundColor: "#0F0F12" }}
+                autoFocus
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setRevizeModalAcik(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}
+                >
+                  İptal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRevizeIstendiKaydet}
+                  disabled={revizeKaydediliyor}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 disabled:opacity-50 transition-colors"
+                >
+                  {revizeKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <MessageSquareWarning size={12} />} Revize Olarak Kaydet
+                </button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }

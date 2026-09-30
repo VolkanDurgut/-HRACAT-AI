@@ -37,13 +37,23 @@ function tamEvrakSetiHazirMi(dosya: Dosya, rezervasyonlar: Rezervasyon[], kontey
 }
 
 /**
- * Bekleyenler once, gonderime hazir olanlar sonra, musteri yanitini
- * bekleyenler (sari) daha sonra, musteri onayi gelmis olanlar (yesil)
- * en sonda gosterilir - boylece aktif takip gerektiren dosyalar ustte kalir.
+ * En acil aksiyon gerektiren dosyalar EN USTTE: once suresi dolmus (48s+
+ * yanitsiz) ve revize istenmis dosyalar, sonra bekleyenler, sonra gonderime
+ * hazir olanlar, sonra musteri yanitini bekleyenler (sari), musteri onayi
+ * gelmis olanlar (yesil) en sonda - onlarda artik aktif takip gerekmiyor.
  */
 function siraDegeri(d: DosyaWithRelations): number {
-  if ((d as any).draft_musteri_onayi_alindi) return 3;
-  if ((d as any).draft_mail_gonderildi) return 2;
+  const mailGonderildiTarihi = (d as any).draft_mail_gonderildi_tarihi as string | null;
+  const musteriOnayiAlindi = !!(d as any).draft_musteri_onayi_alindi;
+  const revizeIstendi = !!(d as any).draft_revize_istendi;
+  const mailGonderildi = !!(d as any).draft_mail_gonderildi;
+  const sureDoldu =
+    mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && !!mailGonderildiTarihi &&
+    Date.now() - new Date(mailGonderildiTarihi).getTime() > 48 * 60 * 60 * 1000;
+
+  if (musteriOnayiAlindi) return 5;
+  if (mailGonderildi) return sureDoldu ? 0 : 4;
+  if (revizeIstendi) return 0;
   if ((d as any).draft_onaylandi) return 1;
   return 0;
 }

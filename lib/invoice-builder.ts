@@ -351,6 +351,18 @@ export type EctnGosterilenDegerler = {
  * INSURANCE girildiginde TOTAL CFR'e otomatik eklensin; INSURANCE'in kendi
  * "otomatik" karsiligi yok, tamamen elle girilir). Boylece FOB veya
  * FREIGHT'i duzelten kullanici CFR'i de elle guncellemek zorunda kalmaz.
+ *
+ * Kok neden duzeltmesi (30.09.2026, IHR-2026-0086): dosya.toplam_tutar
+ * (hesaplaEctnOtomatikDegerler'in temel aldigi CIF toplami) sigortayi DA
+ * icerir - kullanici onayi: "93.600 CIF TOPLAM TUTAR". Otomatik FOB eskiden
+ * sadece navlunu dusuyordu, sigortayi dusmuyordu; bu da INSURANCE
+ * girildiginde TOTAL CFR'in orijinal CIF toplamini (dosya.toplam_tutar)
+ * sigorta tutari kadar ASMASINA yol aciyordu (83.000+10.600+200=93.800,
+ * oysa faturanin ust kismindaki kalem toplami hala 93.600). Bu yuzden FOB
+ * kullanici tarafindan elle override EDILMEDIYSE, otomatik FOB'dan sigorta
+ * da dusulur - boylece TOTAL CFR her zaman orijinal CIF toplamina esit
+ * kalir. Kullanici FOB'u elle girdiyse (fobOverride doluysa) bu otomatik
+ * duzeltme UYGULANMAZ - kullanicinin girdigi deger aynen kullanilir.
  */
 export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnGosterilenDegerler {
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
@@ -360,7 +372,10 @@ export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Reze
   const insuranceRaw = (dosya as any).ectn_insurance_override;
   const insurance = insuranceRaw !== null && insuranceRaw !== undefined ? insuranceRaw : null;
 
-  const fob = fobOverride !== null && fobOverride !== undefined ? fobOverride : otomatik.fob;
+  const fobOtomatikSigortaDahil =
+    otomatik.fob !== null && insurance !== null ? otomatik.fob - insurance : otomatik.fob;
+
+  const fob = fobOverride !== null && fobOverride !== undefined ? fobOverride : fobOtomatikSigortaDahil;
   const freight = freightOverride !== null && freightOverride !== undefined ? freightOverride : otomatik.freight;
   const cfr =
     cfrOverride !== null && cfrOverride !== undefined

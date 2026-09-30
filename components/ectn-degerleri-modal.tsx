@@ -58,6 +58,19 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
     return isNaN(n) ? null : n;
   };
 
+  // Otomatik FOB/CFR ipuclarini, kullanicinin O AN yazdigi INSURANCE
+  // degeriyle canli hesaplar (lib/invoice-builder.ts -> hesaplaEctnGosterilenDegerler
+  // ile AYNI mantik: toplam_tutar CIF oldugu icin, FOB elle girilmediyse
+  // sigorta da FOB'dan dusulur - boylece FOB + FREIGHT + INSURANCE her zaman
+  // orijinal CIF toplamina esit kalir). Kok neden: 30.09.2026, IHR-2026-0086.
+  const insuranceGirilen = parse(insurance);
+  const otomatikFobGosterim =
+    otomatik.fob !== null && insuranceGirilen !== null ? otomatik.fob - insuranceGirilen : otomatik.fob;
+  const otomatikCfrGosterim =
+    otomatikFobGosterim !== null && otomatik.freight !== null
+      ? otomatikFobGosterim + otomatik.freight + (insuranceGirilen ?? 0)
+      : otomatik.cfr;
+
   const handleSave = async () => {
     if (!companyId) {
       showToast("Şirket bilgisi henüz yüklenmedi. Lütfen birkaç saniye sonra tekrar deneyin.", "error");
@@ -122,8 +135,8 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
               TOTAL FOB
-              {otomatik.fob !== null && (
-                <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatik.fob, dosya.para_birimi)}</span>
+              {otomatikFobGosterim !== null && (
+                <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatikFobGosterim, dosya.para_birimi)}</span>
               )}
             </label>
             <input
@@ -170,8 +183,8 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
               {cfrEtiket}
-              {otomatik.cfr !== null && (
-                <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatik.cfr, dosya.para_birimi)}</span>
+              {otomatikCfrGosterim !== null && (
+                <span className="font-normal opacity-70"> — Otomatik: {formatCurrency(otomatikCfrGosterim, dosya.para_birimi)}</span>
               )}
             </label>
             <input

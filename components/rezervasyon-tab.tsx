@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER } from "@/lib/supabase";
-import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCurrency } from "@/lib/cutoff-utils";
+import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil } from "@/lib/supabase";
+import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCutoffTarih, formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -17,6 +17,15 @@ type Props = {
   onRefresh: () => void;
   onNavigateTab: (tab: TabKey) => void;
   companyId: string; // Şirket bazlı izolasyon için eklendi
+};
+
+/** Silme onay penceresinde gosterilen hedef + bagli konteyner ozeti. */
+type SilmeHedefi = {
+  id: string;
+  bookingNo: string;
+  konteynerSayisi: number;
+  dbaSayisi: number;
+  irsaliyeSayisi: number;
 };
 
 const emptyForm = {
@@ -373,13 +382,13 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
           <div>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</p>
             {rez.talimat_cutoff ? (
-              <p className="font-medium text-white">{formatDateTR(rez.talimat_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span></p>
+              <p className="font-medium text-white">{formatCutoffTarih(rez.talimat_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span></p>
             ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</p>
             {rez.beyanname_cutoff ? (
-              <p className="font-medium text-white">{formatDateTR(rez.beyanname_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span></p>
+              <p className="font-medium text-white">{formatCutoffTarih(rez.beyanname_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span></p>
             ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
@@ -410,7 +419,8 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
   const [savingNew, setSavingNew] = useState(false);
   const [newForm, setNewForm] = useState(emptyForm);
   const [newErrors, setNewErrors] = useState<Record<string, string>>({});
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; bookingNo: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SilmeHedefi | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
   const { showToast } = useToast();
 
   const updateNew = (field: string, value: string | number) => {
@@ -448,29 +458,103 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
     onRefresh();
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    await supabase.from("rezervasyonlar").delete().eq("id", deleteTarget.id).eq("company_id", companyId);
-    showToast(`${deleteTarget.bookingNo} silindi.`, "success");
-    setDeleteTarget(null);
-    onRefresh();
+  // Cop kutusuna basildiginda: once bu rezervasyona bagli konteynerler sayilir,
+  // onay penceresi neyin silinecegini ACIKCA soyler (talep: 01.10.2026).
+  // Neden: konteynerler.rezervasyon_id FK'si ON DELETE CASCADE - rezervasyon
+  // silinince bagli TUM konteynerler (DBA/irsaliye/kantar verisi dahil)
+  // veritabani tarafindan otomatik silinir. Eskiden pencere bundan hic
+  // bahsetmiyordu.
+  const handleDeleteRequest = async (hedef: { id: string; bookingNo: string }) => {
+    const { data, error } = await supabase
+      .from("konteynerler")
+      .select("dba_dosya_url, irsaliye_dosya_url")
+      .eq("rezervasyon_id", hedef.id)
+      .eq("company_id", companyId);
+    if (error) {
+      showToast(`Rezervasyon bilgisi okunamadı: ${error.message}`, "error");
+      return;
+    }
+    const liste = data || [];
+    setDeleteTarget({
+      ...hedef,
+      konteynerSayisi: liste.length,
+      dbaSayisi: liste.filter((k) => !!k.dba_dosya_url).length,
+      irsaliyeSayisi: liste.filter((k) => !!k.irsaliye_dosya_url).length,
+    });
   };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || siliniyor) return;
+    const hedef = deleteTarget;
+    setSiliniyor(true);
+    try {
+      // Silmeden HEMEN once bagli konteynerlerin storage dosyalarini TAZE oku
+      // (pencere acikken baska biri konteyner/DBA eklemis olabilir).
+      const { data: bagliKonteynerler } = await supabase
+        .from("konteynerler")
+        .select("dba_dosya_url, irsaliye_dosya_url")
+        .eq("rezervasyon_id", hedef.id)
+        .eq("company_id", companyId);
+
+      const { error } = await supabase.from("rezervasyonlar").delete().eq("id", hedef.id).eq("company_id", companyId);
+      if (error) {
+        // Silme basarisizsa HICBIR dosyaya dokunulmaz.
+        showToast(`Rezervasyon silinemedi: ${error.message}`, "error");
+        return;
+      }
+
+      // Veritabani silmesi BASARILI olduktan sonra: CASCADE ile silinen
+      // konteynerlerin DBA/irsaliye PDF'leri storage'da yetim kalmasin
+      // (best-effort, bkz. lib/supabase/storage.ts).
+      const urls = (bagliKonteynerler || []).flatMap((k: any) => [k.dba_dosya_url, k.irsaliye_dosya_url]);
+      await depoDosyalariniTopluSil(urls);
+
+      // Siparis takipli dosyalarda urun tutarlari kalan rezervasyonlara gore
+      // yeniden olceklenir - kaydet/ekle akisiyla ayni kural.
+      await syncDevamEdenDosyaTutari(dosyaId, companyId);
+
+      const kontSayisi = (bagliKonteynerler || []).length;
+      showToast(
+        kontSayisi > 0
+          ? `${hedef.bookingNo} ve bağlı ${kontSayisi} konteyner silindi.`
+          : `${hedef.bookingNo} silindi.`,
+        "success"
+      );
+      onRefresh();
+    } finally {
+      setSiliniyor(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const silmeAciklamasi = (() => {
+    if (!deleteTarget) return "";
+    const temel = `${deleteTarget.bookingNo} rezervasyonunu silmek istediğinize emin misiniz?`;
+    if (deleteTarget.konteynerSayisi === 0) return temel;
+    const belgeler: string[] = [];
+    if (deleteTarget.dbaSayisi > 0) belgeler.push(`${deleteTarget.dbaSayisi} DBA`);
+    if (deleteTarget.irsaliyeSayisi > 0) belgeler.push(`${deleteTarget.irsaliyeSayisi} irsaliye`);
+    const belgeMetni = belgeler.length > 0 ? ` (${belgeler.join(", ")} belgesi dahil)` : "";
+    return `${temel} DİKKAT: Bu rezervasyona bağlı ${deleteTarget.konteynerSayisi} konteyner${belgeMetni} de kantar ve ağırlık bilgileriyle birlikte KALICI OLARAK silinecek. Bu işlem geri alınamaz.`;
+  })();
 
   return (
     <div className="space-y-4">
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        title="Emin misiniz?"
-        description={`${deleteTarget?.bookingNo || ""} rezervasyonunu silmek istediginize emin misiniz?`}
-        confirmLabel="Evet, Sil"
+        title={deleteTarget && deleteTarget.konteynerSayisi > 0 ? "Rezervasyon ve konteynerleri silinecek" : "Emin misiniz?"}
+        description={silmeAciklamasi}
+        confirmLabel={deleteTarget && deleteTarget.konteynerSayisi > 0 ? "Evet, Hepsini Sil" : "Evet, Sil"}
         cancelLabel="Hayir"
         onConfirm={handleDelete}
         destructive
+        loading={siliniyor}
+        loadingLabel="Siliniyor..."
       />
 
       {rezervasyonlar.map((rez) => (
-        <RezervasyonCard key={rez.id} rez={rez} dosya={dosya} onRefresh={onRefresh} onDeleteRequest={setDeleteTarget} companyId={companyId} />
+        <RezervasyonCard key={rez.id} rez={rez} dosya={dosya} onRefresh={onRefresh} onDeleteRequest={handleDeleteRequest} companyId={companyId} />
       ))}
 
       {!showNewForm ? (

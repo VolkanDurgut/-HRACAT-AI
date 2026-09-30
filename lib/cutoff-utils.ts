@@ -31,6 +31,42 @@ export function formatCutoffSaat(dateStr: string | null): string {
   return `${m[1]}:${m[2]}`;
 }
 
+/**
+ * talimat_cutoff / beyanname_cutoff icin TARIH kismini "05.10.2026" biciminde
+ * gosterir - formatCutoffSaat'in tarih karsiligi.
+ *
+ * Neden ayri fonksiyon (kok neden incelemesi: 01.10.2026): formatDateTR /
+ * formatDateTimeTR new Date(...) ile ayristirir ve "yanlislikla UTC etiketli
+ * ama aslinda yerel" cutoff degerini Turkiye saatine (+3) CEVIRIR. 21:00 ve
+ * sonrasi girilen bir cut-off (ör. 05.10 22:00) bu yuzden ekranda ve Fatura
+ * Talimati PDF'inde bir sonraki gun (06.10) olarak gorunuyordu; saat ise
+ * dogru (22:00) cikiyordu. Bu fonksiyon takvim tarihini metinden HAM okur,
+ * hicbir saat dilimi donusumu yapmaz. Bicim formatDateTR ile birebir aynidir.
+ * Metin taninmazsa (beklenmedik bicim) eski davranisa guvenli sekilde doner.
+ */
+export function formatCutoffTarih(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  const p = ayristirHamTarih(dateStr);
+  if (!p) return formatDateTR(dateStr);
+  return new Date(p.yil, p.ay - 1, p.gun).toLocaleDateString("tr-TR");
+}
+
+/**
+ * formatCutoffTarih'in uzun bicimi ("5 Ekim 2026") - formatDateTimeTR ile
+ * birebir ayni gorunum, ama saat dilimi kaymasi olmadan (bkz. yukaridaki not).
+ * Panel ve Fatura Talimati (ekran + PDF) bunu kullanir.
+ */
+export function formatCutoffTarihUzun(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  const p = ayristirHamTarih(dateStr);
+  if (!p) return formatDateTimeTR(dateStr);
+  return new Date(p.yil, p.ay - 1, p.gun).toLocaleDateString("tr-TR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export function getCutOffDays(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const p = ayristirHamTarih(dateStr);

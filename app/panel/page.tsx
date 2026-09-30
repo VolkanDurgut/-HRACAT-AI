@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
-import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
+import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatCutoffTarihUzun } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -222,7 +222,7 @@ function PanelContent() {
                           <td className="px-3 py-3 align-top">
                             {tCutoff ? (
                               <div>
-                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.talimat_cutoff!)}</p>
+                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatCutoffTarihUzun(latestRez!.talimat_cutoff!)}</p>
                                 <StatusBadge label={tCutoff.text} color={tCutoff.color} />
                               </div>
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
@@ -230,7 +230,7 @@ function PanelContent() {
                           <td className="px-3 py-3 align-top">
                             {bCutoff ? (
                               <div>
-                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(latestRez!.beyanname_cutoff!)}</p>
+                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatCutoffTarihUzun(latestRez!.beyanname_cutoff!)}</p>
                                 <StatusBadge label={bCutoff.text} color={bCutoff.color} />
                               </div>
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}

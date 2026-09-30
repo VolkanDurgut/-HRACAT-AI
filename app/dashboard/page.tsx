@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
-import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
+import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi, getCutOffDays } from "@/lib/cutoff-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
@@ -24,10 +24,12 @@ type DosyaDurum = {
   konteynerler: Konteyner[];
 };
 
+// Cut-off'a kalan gun: Panel ve Rezervasyon karti ile AYNI hesap (takvim gunu
+// farki, saat dilimi donusumu olmadan - bkz. lib/cutoff-utils.ts getCutOffDays).
+// Daha once burada saat farkiyla hesaplaniyordu; cut-off gununun sabahinda
+// Panel "Bugun!" derken Dashboard "1g" gosteriyordu (duzeltme: 01.10.2026).
 function getDaysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const diff = new Date(dateStr).getTime() - new Date().getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return getCutOffDays(dateStr);
 }
 
 function CutoffBadge({ days, label }: { days: number | null; label: string }) {

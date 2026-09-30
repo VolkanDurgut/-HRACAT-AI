@@ -103,6 +103,27 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kullan (tablo zaten `overflow-x-auto` sarmalayıcıya sahipse yatay kaydırma
   devreye girer).
 
+## Cut-off tarihleri (talimat_cutoff / beyanname_cutoff) — ÖNEMLİ
+
+- Bu alanlar `timestamptz` ama kullanıcının girdiği YEREL saat (ör. 22:30)
+  saat dilimi belirtilmeden kaydediliyor; DB saat dilimi UTC olduğu için
+  değer "22:30+00" olarak duruyor. Veri bu haliyle doğru kabul ediliyor,
+  migration ile dönüştürülmedi.
+- Bu yüzden ekranda/PDF'te ASLA `formatDateTR` / `formatDateTimeTR` /
+  `new Date(...)` ile gösterilmez (21:00+ girilen cut-off bir sonraki güne
+  kayar). Her zaman `lib/cutoff-utils.ts` içindeki ham okuyan fonksiyonlar:
+  tarih → `formatCutoffTarih` (05.10.2026) / `formatCutoffTarihUzun`
+  (5 Ekim 2026), saat → `formatCutoffSaat`, kalan gün → `getCutOffDays` /
+  `getCutOffLabel`.
+
+## Rezervasyon silme
+
+- `konteynerler.rezervasyon_id` FK'si `ON DELETE CASCADE`: rezervasyon
+  silinince bağlı konteynerler de silinir. `components/rezervasyon-tab.tsx`
+  onay penceresinde bağlı konteyner/DBA/irsaliye sayısını gösterir, DB silmesi
+  başarılı olursa konteyner PDF'lerini storage'dan temizler ve
+  `syncDevamEdenDosyaTutari`'yı çalıştırır.
+
 ## Draft Onay akışı (özet)
 
 - Sayfa: `app/draft-onay/page.tsx`, satır bileşeni:

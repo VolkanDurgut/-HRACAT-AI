@@ -1,0 +1,28 @@
+-- ============================================================================
+-- Yeni sirketlerin AI belge kotasi varsayilan olarak 0 (01.10.2026)
+-- ============================================================================
+-- Uygulamayi sadece Unex Gida kullaniyor; kullanicilar Supabase Dashboard'dan
+-- MANUEL ekleniyor, arayuzde kayit formu yok (app/page.tsx).
+--
+-- Risk: Supabase Auth'ta "Allow new users to sign up" acik kalirsa, public
+-- anon key ile /auth/v1/signup cagirip hesap acan biri handle_new_user
+-- tetikleyicisi sayesinde KENDI bos/izole sirketinde admin olur. Bu sirket
+-- RLS ile Unex verisinden tamamen ayri kalir (bu yuzden tetikleyiciye
+-- dokunulmadi - yabancinin Unex sirketine degil izole bir sirkete dusmesi
+-- daha guvenli olan hata bicimidir), ama eski varsayilan kota (50) ile
+-- Gemini belge okuma maliyeti uretebilirdi.
+--
+-- Cozum (derinlemesine savunma): companies.ai_document_limit varsayilani
+-- 50 -> 0. Artik otomatik acilan bir sirket hicbir AI belge okuma cagrisi
+-- yapamaz (bkz. supabase/functions/_shared/kota-kontrol.ts: kullanim >= limit
+-- ise reddedilir). MEVCUT satirlar DEGISMEZ - Unex'in kotasi (100000) aynen
+-- kalir. Yeni ve gercek bir sirket eklenirse kotasi elle verilmelidir.
+--
+-- Asil kilit: Dashboard -> Authentication -> Sign In / Providers ->
+-- "Allow new users to sign up" KAPALI olmali.
+--
+-- Canliya 01.10.2026'da Supabase MCP ile uygulandi (bu dosya repo
+-- senkronu icindir). Idempotent: tekrar calistirmak zararsizdir.
+-- ============================================================================
+
+alter table public.companies alter column ai_document_limit set default 0;

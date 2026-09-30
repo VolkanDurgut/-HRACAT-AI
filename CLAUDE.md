@@ -122,6 +122,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   evrakları tamamlanmış olsa bile burada görünmez (kullanıcı kararı,
   30.09.2026).
 
+## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
+
+- Uygulamayı **sadece Unex Gıda** kullanıyor. Kayıt formu YOK; kullanıcılar
+  Supabase Dashboard'dan manuel ekleniyor. Giriş ekranında (`app/page.tsx`)
+  sadece "Giriş Yap" + "Şifremi unuttum" var. `/checkout` ve `/api/checkout`
+  (iyzico deneme çekimi) kaldırıldı — geri eklenmemeli.
+- Şifre sıfırlama linki `/sifre-yenile` sayfasına gelir
+  (`app/sifre-yenile/page.tsx`). Supabase → Authentication → URL Configuration
+  → Redirect URLs listesinde bu adres olmalı.
+- `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;
+  bilerek değiştirilmedi (yabancı biri Unex şirketine değil boş bir şirkete
+  düşer). Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in
+  kotası 100000.
+- Veritabanındaki `depositors` ve `contact_messages` tabloları (ve
+  `atomic_upsert_pending_depositor` fonksiyonu) kullanıcının BAŞKA bir
+  projesine ait — **dokunma, silme, raporlarda sorun olarak işaretleme.**
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

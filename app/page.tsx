@@ -12,28 +12,22 @@ import {
 } from "lucide-react";
 
 // ==========================================
-// 1. KISIM: GİRİŞ VE KAYIT EKRANI BİLEŞENİ
+// 1. KISIM: GİRİŞ EKRANI BİLEŞENİ
 // ==========================================
-const AuthScreen = ({ 
-  initialMode, 
-  onBack 
-}: { 
-  initialMode: "login" | "register", 
-  onBack: () => void 
-}) => {
+// Kayit formu BILEREK YOK (talep: 01.10.2026): uygulamayi sadece Unex Gida
+// kullaniyor, kullanicilar Supabase Dashboard'dan MANUEL ekleniyor. Bu ekran
+// sadece giris + "Sifremi unuttum" akisini sunar. Sifre sifirlama baglantisi
+// kullaniciyi /sifre-yenile sayfasina getirir (bkz. app/sifre-yenile/page.tsx).
+const AuthScreen = ({ onBack }: { onBack: () => void }) => {
   const { signIn } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [kurumsalAd, setKurumsalAd] = useState("");
-  const [kurumsalFirma, setKurumsalFirma] = useState("");
-  
+
   const [authError, setAuthError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [loginMode, setLoginMode] = useState<"personel" | "kurumsal">("personel");
-  const [authType, setAuthType] = useState<"login" | "register">(initialMode);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -47,22 +41,6 @@ const AuthScreen = ({
     } else {
       router.push("/dashboard");
     }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Tip hatasını çözmek için "info" parametresi "success" olarak güncellendi.
-    showToast("Kayıt ve 14 Günlük Deneme için Ödeme altyapısına yönlendiriliyorsunuz...", "success");
-  };
-
-  const handleKurumsalRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      showToast("Talebiniz alındı! Ekibimiz yerel kurulum ve detaylar için en kısa sürede sizinle iletişime geçecektir.", "success");
-      setKurumsalAd(""); setKurumsalFirma(""); setEmail("");
-    }, 1500);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -102,20 +80,9 @@ const AuthScreen = ({
 
       {/* Auth - Sağ Taraf (Form) */}
       <div className="w-full md:w-[500px] bg-white flex flex-col justify-center px-8 md:px-14 py-12 shadow-2xl z-20 overflow-y-auto">
-        {!isForgotPassword && (
-          <div className="flex p-1 bg-slate-100 rounded-lg mb-8">
-            <button type="button" onClick={() => { setLoginMode("personel"); setAuthType("login"); setAuthError(null); }} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${loginMode === "personel" ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700"}`}>
-              Bireysel
-            </button>
-            <button type="button" onClick={() => { setLoginMode("kurumsal"); setAuthError(null); }} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${loginMode === "kurumsal" ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-700"}`}>
-              Kurumsal (Lokal Kurulum)
-            </button>
-          </div>
-        )}
-
         {isForgotPassword ? (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <button type="button" onClick={() => setIsForgotPassword(false)} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 mb-6"><ArrowLeft size={16} /> Geri Dön</button>
+            <button type="button" onClick={() => { setIsForgotPassword(false); setAuthError(null); }} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 mb-6"><ArrowLeft size={16} /> Geri Dön</button>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Şifremi Unuttum</h2>
             <p className="text-sm text-slate-500 mb-6">Kayıtlı e-posta adresinize sıfırlama bağlantısı gönderelim.</p>
             {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
@@ -129,71 +96,32 @@ const AuthScreen = ({
               </button>
             </form>
           </div>
-        ) : loginMode === "kurumsal" ? (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Kurumsal & Özel Altyapı</h2>
-            <p className="text-sm text-slate-500 mb-6">Kendi sunucularınızda lokal kurulum ve API entegrasyonu çözümleri için bizimle iletişime geçin.</p>
-            <form onSubmit={handleKurumsalRequest} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Ad Soyad</label>
-                <input type="text" value={kurumsalAd} onChange={(e) => setKurumsalAd(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Firma Adı</label>
-                <input type="text" value={kurumsalFirma} onChange={(e) => setKurumsalFirma(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">İş E-postası</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <button type="submit" disabled={isProcessing} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-slate-800 bg-slate-900 flex justify-center">
-                {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Bizimle İletişime Geçin"}
-              </button>
-            </form>
-          </div>
         ) : (
           <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
-              {authType === "login" ? "Tekrar Hoş Geldiniz" : "Ücretsiz Başlayın"}
-            </h2>
-            <p className="text-sm text-slate-500 mb-6">
-              {authType === "login" ? "Hesabınıza erişmek için giriş yapın." : "Şu anda yeni kayıtlar davetle açılıyor."}
-            </p>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Tekrar Hoş Geldiniz</h2>
+            <p className="text-sm text-slate-500 mb-6">Hesabınıza erişmek için giriş yapın.</p>
             {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
 
-            {authType === "login" ? (
-              <>
-                <form onSubmit={handleEmailLogin} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-sm font-medium text-slate-700">Şifre</label>
-                      <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Şifremi unuttum?</button>
-                    </div>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-                  </div>
-                  <button type="submit" disabled={isProcessing || !email || !password} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center disabled:opacity-60">
-                    {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
-                  </button>
-                </form>
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700">Şifre</label>
+                  <button type="button" onClick={() => { setIsForgotPassword(true); setAuthError(null); }} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Şifremi unuttum?</button>
+                </div>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
+              </div>
+              <button type="submit" disabled={isProcessing || !email || !password} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center disabled:opacity-60">
+                {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
+              </button>
+            </form>
 
-                <div className="mt-6 text-center text-sm text-slate-600">
-                  Hesabınız yok mu? <button type="button" onClick={() => { setAuthType("register"); setAuthError(null); }} className="font-medium text-emerald-600 hover:underline">Kayıt Olun</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="p-4 rounded-md bg-slate-50 border border-slate-200 text-sm text-slate-600 leading-relaxed">
-                  Şu anda yeni kayıtlar yalnızca davetle açılıyor. Erişim talebiniz için lütfen bizimle iletişime geçin.
-                </div>
-                <div className="mt-4 text-center text-sm text-slate-600">
-                  Zaten hesabınız var mı? <button type="button" onClick={() => { setAuthType("login"); setAuthError(null); }} className="font-medium text-emerald-600 hover:underline">Giriş Yapın</button>
-                </div>
-              </>
-            )}
+            <p className="mt-6 text-center text-xs text-slate-500">
+              Hesaplar yönetici tarafından oluşturulur. Erişim için yöneticinizle iletişime geçin.
+            </p>
           </div>
         )}
       </div>
@@ -210,7 +138,6 @@ export default function Home() {
   const router = useRouter();
 
   const [currentView, setCurrentView] = useState<"landing" | "auth">("landing");
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
@@ -224,13 +151,12 @@ export default function Home() {
     );
   }
 
-  const goToAuth = (mode: "login" | "register") => {
-    setAuthMode(mode);
+  const goToAuth = () => {
     setCurrentView("auth");
   };
 
   if (currentView === "auth") {
-    return <AuthScreen initialMode={authMode} onBack={() => setCurrentView("landing")} />;
+    return <AuthScreen onBack={() => setCurrentView("landing")} />;
   }
 
   return (
@@ -253,14 +179,10 @@ export default function Home() {
         </div>
         <div className="flex items-center gap-5">
           {/* Supabase tarzı hayalet (ghost) Sign In butonu */}
-          <button onClick={() => goToAuth("login")} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
+          <button onClick={() => goToAuth()} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
             Sign in
           </button>
-          
-          {/* Supabase tarzı ana (primary) Start your project butonu */}
-          <button onClick={() => goToAuth("register")} className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
-            Start your project
-          </button>
+
         </div>
       </nav>
 
@@ -275,14 +197,10 @@ export default function Home() {
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
           {/* Supabase tarzı ana aksiyon butonu */}
-          <button onClick={() => goToAuth("login")} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
+          <button onClick={() => goToAuth()} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
             Start your project
           </button>
-          
-          {/* Supabase tarzı ikincil aksiyon butonu */}
-          <button onClick={() => goToAuth("register")} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium transition-all bg-white border rounded-md shadow-sm text-slate-700 border-slate-300 hover:bg-slate-50">
-            Request a demo
-          </button>
+
         </div>
       </section>
 
@@ -410,7 +328,7 @@ export default function Home() {
             Kullanıcı verileriniz şifrelenmiş sunucularda barınır. Sadece yetkili personelleriniz verilere erişebilir. Daima kontroldesiniz.
           </p>
           <div className="flex items-center justify-center">
-            <button onClick={() => goToAuth("login")} className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
+            <button onClick={() => goToAuth()} className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
               Start your project
             </button>
           </div>

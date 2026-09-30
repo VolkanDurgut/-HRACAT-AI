@@ -36,3 +36,6 @@ yarn-error.log*
 next-env.d.ts
 
 supabase/.temp/
+
+# Claude tarafindan teslim edilen git bundle dosyalari (repoya commit edilmez)
+*.bundle

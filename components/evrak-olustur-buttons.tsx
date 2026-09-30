@@ -14,6 +14,8 @@ import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builde
 import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
 import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
 import { draftFiligranEkle } from "@/lib/watermark";
+import { htmlToPdfBlob } from "@/lib/html-to-pdf";
+import { buildEvrakPdfDosyaAdi, EVRAK_KISA_KODLARI } from "@/lib/evrak-dosya-adi";
 import {
   checkCommercialInvoiceReadiness,
   checkPackingListReadiness,
@@ -37,34 +39,19 @@ function turkceSadelestir(metin: string): string {
   return metin.split("").map((ch) => map[ch] ?? ch).join("");
 }
 
-/** Kullaniciya gosterilen okunakli ad: bosluklu, Turkce sadelestirilmis.
- * Ornek: "1- COMMERCIAL INVOICE- FIRMA- BOOKING.html" */
-function gosterilecekDosyaAdi(siraNo: number, evrakAdi: string, dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
-  const firma = turkceSadelestir(dosya.alici_firma || dosya.dosya_no || "FIRMA");
-  const bookingNo = rezervasyonlar[0]?.booking_no || "";
-  const parcalar = [`${siraNo}- ${evrakAdi}`, firma];
-  if (bookingNo) parcalar.push(turkceSadelestir(bookingNo));
-  return parcalar.join("- ").replace(/[\/\\:*?"<>|]/g, "").replace(/\s+/g, " ").trim() + ".html";
-}
-
-/** Storage yolu icin sade ad: boslukluk yok, sadece alfanumerik + _ + -. */
-function storageDosyaAdi(siraNo: number, evrakKisa: string, dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
-  const firma = turkceSadelestir(dosya.alici_firma || dosya.dosya_no || "firma");
-  const bookingNo = rezervasyonlar[0]?.booking_no || "";
-  const ham = [`${siraNo}`, evrakKisa, firma, bookingNo].filter(Boolean).join("_");
-  return turkceSadelestir(ham).replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") + ".html";
-}
-
 // Uc evrak turunun sabit meta bilgisi - hem ilk uretimde hem "Orijinali Olustur"
-// akisinda AYNI storage yolunu/adini yeniden turetmek icin kullanilir.
-const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", { evrakTipi: string; siraNo: number; evrakKisa: string; evrakAdi: string }> = {
-  ci:  { evrakTipi: "commercial_invoice",     siraNo: 1, evrakKisa: "commercial_invoice",     evrakAdi: "COMMERCIAL INVOICE" },
-  pl:  { evrakTipi: "packing_list",           siraNo: 2, evrakKisa: "packing_list",           evrakAdi: "PACKING LIST" },
-  coo:   { evrakTipi: "certificate_of_origin",  siraNo: 4, evrakKisa: "certificate_of_origin",  evrakAdi: "CERTIFICATE OF ORIGIN" },
-  phyto:  { evrakTipi: "phytosanitary",          siraNo: 5, evrakKisa: "phytosanitary",          evrakAdi: "PHYTOSANITARY CERTIFICATE" },
-  health: { evrakTipi: "health_certificate",     siraNo: 6, evrakKisa: "health_certificate",     evrakAdi: "HEALTH CERTIFICATE" },
-  qc:    { evrakTipi: "quality_certificate",    siraNo: 7, evrakKisa: "quality_certificate",    evrakAdi: "QUALITY CERTIFICATE" },
-  fc:    { evrakTipi: "fumigation",             siraNo: 8, evrakKisa: "fumigation",             evrakAdi: "FUMIGATION" },
+// akisinda AYNI dosya adini/storage yolunu yeniden turetmek icin kullanilir.
+// evrakAdi sadece hazirlik uyarisi (InfoTooltip) basliginda kullanilir; PDF
+// dosya adi artik lib/evrak-dosya-adi.ts -> buildEvrakPdfDosyaAdi ile uretilir
+// (Taslak Onay Paketi'yle BIREBIR AYNI kural - talep: 01.10.2026).
+const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", { evrakTipi: string; siraNo: number; evrakAdi: string }> = {
+  ci:  { evrakTipi: "commercial_invoice",     siraNo: 1, evrakAdi: "COMMERCIAL INVOICE" },
+  pl:  { evrakTipi: "packing_list",           siraNo: 2, evrakAdi: "PACKING LIST" },
+  coo:   { evrakTipi: "certificate_of_origin",  siraNo: 4, evrakAdi: "CERTIFICATE OF ORIGIN" },
+  phyto:  { evrakTipi: "phytosanitary",          siraNo: 5, evrakAdi: "PHYTOSANITARY CERTIFICATE" },
+  health: { evrakTipi: "health_certificate",     siraNo: 6, evrakAdi: "HEALTH CERTIFICATE" },
+  qc:    { evrakTipi: "quality_certificate",    siraNo: 7, evrakAdi: "QUALITY CERTIFICATE" },
+  fc:    { evrakTipi: "fumigation",             siraNo: 8, evrakAdi: "FUMIGATION" },
 };
 
 type EvrakDurumu = { durum: "taslak" | "orijinal"; dosya_url: string; dosya_adi: string } | null;
@@ -187,36 +174,50 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     durumlariYukle();
   }, [durumlariYukle]);
 
-  const kaydetVeAc = async (html: string, evrakTipi: string, storageAdi: string, gosterilenAd: string, durum: "taslak" | "orijinal") => {
-    const temizIsim = gosterilenAd.replace(".html", "");
-    const guncelHtml = html.replace(/<title>.*?<\/title>/i, `<title>${temizIsim}</title>`);
+  // Butona basildigi an gercek bir PDF olarak INDIRILIR (talep: 01.10.2026 -
+  // "konteynerler sekmesindeki Fatura Talimatı gibi hizli indirme yapsin").
+  // Dosya adi, Taslak Onay Paketi'yle (lib/taslak-onay-paketi.ts) BIREBIR
+  // AYNI kuralla uretilir: "DRAFT- <no>- <KISA>- <booking>- <proforma>.pdf".
+  const kaydetVeAc = async (htmlHam: string, evrakTipi: string, pdfDosyaAdi: string, durum: "taslak" | "orijinal") => {
+    let pdfBlob: Blob;
+    try {
+      pdfBlob = await htmlToPdfBlob(htmlHam);
+    } catch (err) {
+      console.error("PDF olusturma hatasi:", err);
+      showToast("PDF oluşturulamadı. Lütfen tekrar deneyin.", "error");
+      return;
+    }
 
-    const acBlobIle = () => {
-      const blob = new Blob([guncelHtml], { type: "text/html;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank");
-      if (!win) {
-        showToast("Açılır pencere engellendi. Lütfen tarayıcı ayarlarından izin verin.", "error");
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const indir = () => {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = pdfDosyaAdi;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     };
 
     try {
       if (!companyId) {
-        console.warn("companyId yok, evrak arşive kaydedilmedi ama açılıyor.");
-        acBlobIle();
+        console.warn("companyId yok, evrak arşive kaydedilmedi ama indiriliyor.");
+        indir();
         return;
       }
-      const blob = new Blob([guncelHtml], { type: "text/html; charset=utf-8" });
+      // Storage anahtari icin bosluk/Turkce karakter icermeyen guvenli bir
+      // slug kullanilir - kullaniciya gosterilen/indirilen ad (pdfDosyaAdi)
+      // degismez, sadece storage'daki dosya YOLU sadelestirilir.
+      const storageAdi = turkceSadelestir(pdfDosyaAdi).replace(/[^a-zA-Z0-9_.-]/g, "_").replace(/_+/g, "_");
       const storagePath = `${dosya.id}/${storageAdi}`;
 
       const { error: uploadError } = await supabase.storage
         .from("evraklar")
-        .upload(storagePath, blob, { contentType: "text/html; charset=utf-8", upsert: true, cacheControl: "0" });
+        .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: true, cacheControl: "0" });
 
       if (uploadError) {
         console.error("Storage yukleme hatasi:", uploadError);
-        showToast("Evrak arşive kaydedilemedi ama açılıyor.", "error");
+        showToast("Evrak arşive kaydedilemedi ama indiriliyor.", "error");
       } else {
         const dosyaUrl = await getGuvenliDosyaUrl("evraklar", storagePath);
 
@@ -231,7 +232,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         if (mevcutKayit) {
           await supabase.from("dosya_evraklari").update({
             dosya_url: dosyaUrl,
-            dosya_adi: gosterilenAd,
+            dosya_adi: pdfDosyaAdi,
             yukleme_tarihi: new Date().toISOString(),
             durum,
           }).eq("id", mevcutKayit.id).eq("company_id", companyId);
@@ -240,7 +241,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
             dosya_id: dosya.id,
             evrak_tipi: evrakTipi,
             dosya_url: dosyaUrl,
-            dosya_adi: gosterilenAd,
+            dosya_adi: pdfDosyaAdi,
             yukleme_tarihi: new Date().toISOString(),
             durum,
             company_id: companyId,
@@ -249,11 +250,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         await durumlariYukle();
       }
     } catch (err) {
-      console.error("Evrak kaydetme hatasi:", err);      showToast("Evrak arşive kaydedilemedi ama açılıyor. Lütfen tekrar deneyin.", "error");
+      console.error("Evrak kaydetme hatasi:", err);
+      showToast("Evrak arşive kaydedilemedi ama indiriliyor. Lütfen tekrar deneyin.", "error");
     }
 
-    // Arsivleme sonucu ne olursa olsun evrak her zaman acilir.
-    acBlobIle();
+    // Arsivleme sonucu ne olursa olsun PDF her zaman indirilir.
+    indir();
   };
 
   // Draft VE Orijinal, HER ZAMAN ayni kaynaktan (dosya/rezervasyon/konteyner
@@ -283,11 +285,9 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
       const filigranliTurler: Array<typeof tip> = ["ci", "pl", "fc", "qc"];
       const html = durum === "taslak" && filigranliTurler.includes(tip) ? draftFiligranEkle(htmlHam) : htmlHam;
-      await kaydetVeAc(html, meta.evrakTipi,
-        storageDosyaAdi(meta.siraNo, meta.evrakKisa, dosya, rezervasyonlar),
-        gosterilecekDosyaAdi(meta.siraNo, meta.evrakAdi, dosya, rezervasyonlar),
-        durum);
-      showToast(`${meta.evrakAdi} ${durum === "taslak" ? "taslak (filigranlı)" : "orijinal (filigransız)"} olarak oluşturuldu.`, "success");
+      const pdfDosyaAdi = buildEvrakPdfDosyaAdi(durum, meta.siraNo, EVRAK_KISA_KODLARI[tip], dosya, rezervasyonlar);
+      await kaydetVeAc(html, meta.evrakTipi, pdfDosyaAdi, durum);
+      showToast(`${meta.evrakAdi} ${durum === "taslak" ? "taslak (filigranlı)" : "orijinal (filigransız)"} PDF olarak indirildi.`, "success");
     } catch (err) {
       console.error("Evrak olusturma hatasi:", err);
       showToast("Evrak oluşturulamadı.", "error");
@@ -343,7 +343,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         <button
           onClick={() => handleTiklandi(tip, "taslak")}
           disabled={yukleniyor !== null}
-          title={kayit?.durum === "orijinal" ? "Dikkat: Onaylanmış orijinali tekrar taslağa (filigranlı) çevirir" : "Filigranlı taslak oluşturur"}
+          title={kayit?.durum === "orijinal" ? "Dikkat: Onaylanmış orijinali tekrar taslağa (filigranlı) çevirir" : "Filigranlı taslağı PDF olarak indirir"}
           className={btnClass + " disabled:opacity-60 disabled:cursor-not-allowed"}
         >
           {yukleniyor === `${tip}-taslak` ? (
@@ -355,7 +355,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         <button
           onClick={() => handleTiklandi(tip, "orijinal")}
           disabled={yukleniyor !== null}
-          title="Filigransız orijinal evrağı oluşturur"
+          title="Filigransız orijinal evrağı PDF olarak indirir"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {yukleniyor === `${tip}-orijinal` ? (

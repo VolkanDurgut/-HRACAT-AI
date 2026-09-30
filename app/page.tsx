@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/lib/toast-context";
 import { 
   Anchor, BrainCircuit, FileText, Clock, 
   Loader2, Mail, Lock, ShieldCheck,
@@ -16,19 +14,16 @@ import {
 // ==========================================
 // Kayit formu BILEREK YOK (talep: 01.10.2026): uygulamayi sadece Unex Gida
 // kullaniyor, kullanicilar Supabase Dashboard'dan MANUEL ekleniyor. Bu ekran
-// sadece giris + "Sifremi unuttum" akisini sunar. Sifre sifirlama baglantisi
-// kullaniciyi /sifre-yenile sayfasina getirir (bkz. app/sifre-yenile/page.tsx).
+// SADECE giris sunar. "Sifremi unuttum" akisi da BILEREK YOK (talep:
+// 01.10.2026) - sifre sifirlama yonetici tarafindan yapilir.
 const AuthScreen = ({ onBack }: { onBack: () => void }) => {
   const { signIn } = useAuth();
   const router = useRouter();
-  const { showToast } = useToast();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [authError, setAuthError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,18 +36,6 @@ const AuthScreen = ({ onBack }: { onBack: () => void }) => {
     } else {
       router.push("/dashboard");
     }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) { setAuthError("Lütfen kayıtlı e-posta adresinizi girin."); return; }
-    setAuthError(null); setIsProcessing(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/sifre-yenile`,
-    });
-    setIsProcessing(false);
-    if (error) { setAuthError(error.message); } 
-    else { showToast("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.", "success"); setIsForgotPassword(false); }
   };
 
   return (
@@ -80,50 +63,29 @@ const AuthScreen = ({ onBack }: { onBack: () => void }) => {
 
       {/* Auth - Sağ Taraf (Form) */}
       <div className="w-full md:w-[500px] bg-white flex flex-col justify-center px-8 md:px-14 py-12 shadow-2xl z-20 overflow-y-auto">
-        {isForgotPassword ? (
-          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <button type="button" onClick={() => { setIsForgotPassword(false); setAuthError(null); }} className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 mb-6"><ArrowLeft size={16} /> Geri Dön</button>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Şifremi Unuttum</h2>
-            <p className="text-sm text-slate-500 mb-6">Kayıtlı e-posta adresinize sıfırlama bağlantısı gönderelim.</p>
-            {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
-            <form onSubmit={handleResetPassword} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta Adresi</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <button type="submit" disabled={isProcessing || !email} className="w-full py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center">
-                {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Bağlantı Gönder"}
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Tekrar Hoş Geldiniz</h2>
-            <p className="text-sm text-slate-500 mb-6">Hesabınıza erişmek için giriş yapın.</p>
-            {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
+        <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Tekrar Hoş Geldiniz</h2>
+          <p className="text-sm text-slate-500 mb-6">Hesabınıza erişmek için giriş yapın.</p>
+          {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
 
-            <form onSubmit={handleEmailLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-sm font-medium text-slate-700">Şifre</label>
-                  <button type="button" onClick={() => { setIsForgotPassword(true); setAuthError(null); }} className="text-xs text-slate-500 hover:text-emerald-600 transition-colors">Şifremi unuttum?</button>
-                </div>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-              </div>
-              <button type="submit" disabled={isProcessing || !email || !password} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center disabled:opacity-60">
-                {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
-              </button>
-            </form>
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Şifre</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
+            </div>
+            <button type="submit" disabled={isProcessing || !email || !password} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center disabled:opacity-60">
+              {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
+            </button>
+          </form>
 
-            <p className="mt-6 text-center text-xs text-slate-500">
-              Hesaplar yönetici tarafından oluşturulur. Erişim için yöneticinizle iletişime geçin.
-            </p>
-          </div>
-        )}
+          <p className="mt-6 text-center text-xs text-slate-500">
+            Hesaplar yönetici tarafından oluşturulur. Erişim veya şifre sıfırlama için yöneticinizle iletişime geçin.
+          </p>
+        </div>
       </div>
     </div>
   );

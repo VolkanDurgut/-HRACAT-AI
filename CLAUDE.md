@@ -126,11 +126,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 
 - Uygulamayı **sadece Unex Gıda** kullanıyor. Kayıt formu YOK; kullanıcılar
   Supabase Dashboard'dan manuel ekleniyor. Giriş ekranında (`app/page.tsx`)
-  sadece "Giriş Yap" + "Şifremi unuttum" var. `/checkout` ve `/api/checkout`
-  (iyzico deneme çekimi) kaldırıldı — geri eklenmemeli.
-- Şifre sıfırlama linki `/sifre-yenile` sayfasına gelir
-  (`app/sifre-yenile/page.tsx`). Supabase → Authentication → URL Configuration
-  → Redirect URLs listesinde bu adres olmalı.
+  SADECE e-posta + şifre ile giriş var; "Şifremi unuttum" akışı ve
+  `/sifre-yenile` sayfası da kullanıcı kararıyla kaldırıldı (şifre sıfırlama
+  yönetici işi). `/checkout` ve `/api/checkout` (iyzico deneme çekimi) de
+  kaldırıldı — bunların hiçbiri geri eklenmemeli.
+- Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
+  01.10.2026).
 - `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;
   bilerek değiştirilmedi (yabancı biri Unex şirketine değil boş bir şirkete
   düşer). Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in

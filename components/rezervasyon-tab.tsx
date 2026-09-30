@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER } from "@/lib/supabase";
-import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat } from "@/lib/cutoff-utils";
+import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -329,9 +329,13 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
   const talimatLabel = getCutOffLabel(rez.talimat_cutoff);
   const beyanLabel = getCutOffLabel(rez.beyanname_cutoff);
 
+  const paraBirimi = dosya.para_birimi || "USD";
+  const navlunTutari = (dosya as any).navlun_tutari;
+  const lokalMasrafTutari = (dosya as any).lokal_masraf_tutari;
+
   return (
-    <div className="rounded-xl border shadow-sm p-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <div className="flex items-start justify-between mb-3">
+    <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <div className="flex items-start justify-between mb-3 pb-3 border-b" style={{ borderColor: CARD_BORDER }}>
         <div>
           <h4 className="font-semibold text-sm" style={{ color: "white" }}>
             Booking: <span className="font-mono">{rez.booking_no}</span>
@@ -345,7 +349,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
             )}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20">
             Duzenle
           </button>
@@ -355,44 +359,43 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+      <div className="space-y-2.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2.5 text-sm">
           <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yukleme Limani</p><p className="font-medium text-white">{rez.yuklenme_limani || "-"}</p></div>
           <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Konteyner Adedi</p><p className="font-medium text-white">{rez.konteyner_adedi}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Navlun (Kont. Basi)</p><p className="font-medium text-white">{navlunTutari ? formatCurrency(navlunTutari, paraBirimi) : "-"}</p></div>
+          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Lokal Masraf (Kont. Basi)</p><p className="font-medium text-white">{lokalMasrafTutari ? formatCurrency(lokalMasrafTutari, paraBirimi) : "-"}</p></div>
         </div>
 
         <div className="border-t" style={{ borderColor: CARD_BORDER }} />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5 text-sm">
           <div>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</p>
             {rez.talimat_cutoff ? (
-              <div>
-                <p className="font-medium text-white">{formatDateTR(rez.talimat_cutoff)}</p>
-                <p style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</p>
-              </div>
+              <p className="font-medium text-white">{formatDateTR(rez.talimat_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span></p>
             ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</p>
             {rez.beyanname_cutoff ? (
-              <div>
-                <p className="font-medium text-white">{formatDateTR(rez.beyanname_cutoff)}</p>
-                <p style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</p>
-              </div>
+              <p className="font-medium text-white">{formatDateTR(rez.beyanname_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span></p>
             ) : <p className="font-medium text-white">-</p>}
           </div>
           <div>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Gemi Kalkis</p>
-            <p className={`font-medium ${getCutOffLabel(rez.gemi_kalkis_tarihi).color}`}>
-              {rez.gemi_kalkis_tarihi ? `${formatDateTR(rez.gemi_kalkis_tarihi)} ${getCutOffLabel(rez.gemi_kalkis_tarihi).text}` : "-"}
+            <p className="font-medium text-white">
+              {rez.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}
+              {rez.gemi_kalkis_tarihi && (
+                <span className={`ml-1 font-medium ${getCutOffLabel(rez.gemi_kalkis_tarihi).color}`}>{getCutOffLabel(rez.gemi_kalkis_tarihi).text}</span>
+              )}
             </p>
           </div>
         </div>
 
         <div className="border-t" style={{ borderColor: CARD_BORDER }} />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5 text-sm">
           <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi</p><p className="font-medium text-white">{rez.ekipman_alim_tarihi ? formatDateTR(rez.ekipman_alim_tarihi) : "-"}</p></div>
           <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi</p><p className="font-medium text-white">{(rez as any).ardiyesiz_giris ? formatDateTR((rez as any).ardiyesiz_giris) : "-"}</p></div>
           <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri</p><p className="font-medium text-white">{rez.ekipman_alim_yeri || "-"}</p></div>

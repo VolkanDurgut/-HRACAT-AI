@@ -45,13 +45,17 @@ export function getCutOffDays(dateStr: string | null): number | null {
 export type CutOffStyle = { text: string; color: string; icon: string };
 
 export function getCutOffLabel(dateStr: string | null): CutOffStyle {
+  // Renkler koyu tema icin (600 degil 400 tonu) secilmistir - bkz. lib/theme.ts
+  // CARD_BG (#12161F). "600" tonlari (orn. text-blue-600) acik arka planlar
+  // icin tasarlanmistir ve bu koyu kartlarda neredeyse gorunmez/soluk kalir
+  // (talep: 01.10.2026 - "Gemi Kalkis" tarihi rezervasyon kartinda gozukmuyordu).
   if (!dateStr) return { text: "-", color: "text-slate-400", icon: "" };
   const days = getCutOffDays(dateStr);
   if (days === null) return { text: "-", color: "text-slate-400", icon: "" };
-  if (days < 0) return { text: "Gecti", color: "text-red-600 font-semibold", icon: "" };
-  if (days === 0) return { text: "Bugun!", color: "text-red-600 font-semibold", icon: "" };
-  if (days <= 2) return { text: `${days} Gün`, color: "text-orange-600 font-semibold", icon: "" };
-  return { text: `${days} Gün`, color: "text-blue-600", icon: "" };
+  if (days < 0) return { text: "Gecti", color: "text-red-400 font-semibold", icon: "" };
+  if (days === 0) return { text: "Bugun!", color: "text-red-400 font-semibold", icon: "" };
+  if (days <= 2) return { text: `${days} Gün`, color: "text-orange-400 font-semibold", icon: "" };
+  return { text: `${days} Gün`, color: "text-blue-400", icon: "" };
 }
 
 export function isCutoffApproaching(talimatCutoff: string | null, beyannameCutoff: string | null): boolean {

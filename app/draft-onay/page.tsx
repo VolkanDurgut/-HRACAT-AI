@@ -14,6 +14,7 @@ import {
   checkHealthCertificateReadiness,
 } from "@/lib/document-readiness";
 import { Loader2, FileCheck2 } from "lucide-react";
+import { MusteriEvrakAyarlari, BOS_MUSTERI_EVRAK_AYARLARI, musteriEvrakAyarlariniTopluGetir } from "@/lib/musteri-evrak-ayarlari";
 import { TEXT_MUTED, CARD_BG, CARD_BORDER, ROW_HEADER_BG } from "@/lib/theme";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
@@ -61,6 +62,9 @@ function siraDegeri(d: DosyaWithRelations): number {
 export default function DraftOnayPage() {
   const { user, companyId } = useAuth();
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
+  // Quality / Fumigation belgeleri musteriye ozel ayarlarla uretilir (bkz.
+  // lib/musteri-evrak-ayarlari.ts) - tum listedeki musteriler icin tek seferde.
+  const [ayarlar, setAyarlar] = useState<Record<string, MusteriEvrakAyarlari>>({});
   const [loading, setLoading] = useState(true);
 
   const fetchDosyalar = useCallback(async () => {
@@ -114,6 +118,11 @@ export default function DraftOnayPage() {
     );
     hazirOlanlar.sort((a, b) => siraDegeri(a) - siraDegeri(b));
 
+    const musteriAyarlari = await musteriEvrakAyarlariniTopluGetir(
+      companyId,
+      hazirOlanlar.map((d) => d.alici_firma || "")
+    );
+    setAyarlar(musteriAyarlari);
     setDosyalar(hazirOlanlar);
     setLoading(false);
   }, [user?.id, companyId]);
@@ -131,7 +140,8 @@ export default function DraftOnayPage() {
           </h1>
           <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
             Sevkiyat evrakları (Commercial Invoice, Packing List, Draft BL, Certificate of Origin,
-            Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir.
+            Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir. Müşteri
+            istediyse Quality ve Fumigation sertifikaları da evrak listesinde gösterilir.
           </p>
         </div>
 
@@ -170,6 +180,7 @@ export default function DraftOnayPage() {
                       rezervasyonlar={d.rezervasyonlar}
                       konteynerler={d.konteynerler}
                       companyId={companyId!}
+                      ayarlar={(d.alici_firma && ayarlar[d.alici_firma]) || BOS_MUSTERI_EVRAK_AYARLARI}
                       onRefresh={fetchDosyalar}
                     />
                   ))}

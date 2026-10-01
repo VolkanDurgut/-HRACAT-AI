@@ -185,6 +185,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `draft_musteri_onayi_alindi` bayrakları sıfırlanır (dosya baştan Onayla
   adımına döner), ama `draft_revize_notu/tarihi/isaretleyen` geçmiş kayıt
   olarak silinmez.
+- Evrak ikonları (sıra = Taslak Onay Paketi ZIP sırası): 1 CI, 2 PL, 3 Draft BL,
+  4 CoO, 5 Phyto, 6 Health, 7 Quality, 8 Fumigation. Quality/Fumigation sadece
+  müşterinin `sevkiyat_evraklari` listesinde isteniyorsa görünür/pakete girer,
+  müşteriye özel ayarlarla (`lib/musteri-evrak-ayarlari.ts`) ve DRAFT
+  filigranıyla üretilir; bilgisi eksikse sarı uyarı ikonu çıkar, pakete
+  eklenmez, dosya listeden DÜŞMEZ (01.10.2026). Listeye giriş kriteri
+  (`tamEvrakSetiHazirMi`) bilerek değiştirilmedi.
 - Sadece **Açık** dosyalar listelenir (`isDosyaAcik`), kapalı dosyalar draft
   evrakları tamamlanmış olsa bile burada görünmez (kullanıcı kararı,
   30.09.2026).

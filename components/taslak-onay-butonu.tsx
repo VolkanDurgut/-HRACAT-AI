@@ -12,6 +12,8 @@ import {
   checkHealthCertificateReadiness,
 } from "@/lib/document-readiness";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
+import { musteriEvrakAyarlariniGetir, dosyaEvrakIstiyorMu } from "@/lib/musteri-evrak-ayarlari";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   dosya: Dosya;
@@ -21,6 +23,7 @@ type Props = {
 
 export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }: Props) {
   const { showToast } = useToast();
+  const { companyId } = useAuth();
   const [indiriliyor, setIndiriliyor] = useState(false);
 
   const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
@@ -45,8 +48,15 @@ export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }
     if (!hazir || indiriliyor || !draftBlUrl) return;
     setIndiriliyor(true);
     try {
-      await indirTaslakOnayPaketi(dosya, rezervasyonlar, konteynerler, draftBlUrl);
-      showToast("Taslak onay paketi indirildi.", "success");
+      // Quality / Fumigation musteriye ozel ayarlarla uretilir - dosya
+      // detayindaki Draft butonuyla ayni icerik (bkz. lib/musteri-evrak-ayarlari.ts).
+      const ayarlar = await musteriEvrakAyarlariniGetir(companyId || "", dosya.alici_firma);
+      const { eklenmeyenler } = await indirTaslakOnayPaketi(dosya, rezervasyonlar, konteynerler, draftBlUrl, ayarlar);
+      if (eklenmeyenler.length > 0) {
+        showToast(`Paket indirildi, ancak eklenemeyen evrak var: ${eklenmeyenler.join("; ")}`, "error");
+      } else {
+        showToast("Taslak onay paketi indirildi.", "success");
+      }
     } catch (err) {
       console.error("Taslak onay paketi olusturma hatasi:", err);
       showToast("Paket oluşturulamadı. Lütfen tekrar deneyin.", "error");
@@ -59,7 +69,7 @@ export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }
     <button
       onClick={handleTiklandi}
       disabled={!hazir || indiriliyor}
-      title={!hazir ? `Eksik: ${eksikler.join(", ")}` : "Commercial Invoice + Packing List + Draft BL + Certificate of Origin + Phytosanitary + Health Certificate'i tek ZIP olarak indir"}
+      title={!hazir ? `Eksik: ${eksikler.join(", ")}` : `Commercial Invoice + Packing List + Draft BL + Certificate of Origin + Phytosanitary + Health Certificate${dosyaEvrakIstiyorMu(dosya, "Quality") ? " + Quality Certificate" : ""}${dosyaEvrakIstiyorMu(dosya, "Fumigation") ? " + Fumigation Certificate" : ""}'i tek ZIP olarak indir`}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5"
       style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
     >

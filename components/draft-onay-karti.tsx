@@ -14,6 +14,10 @@ import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
 import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
 import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
+import { buildKaliteSertifikasiHtml } from "@/lib/kalite-sertifikasi-builder";
+import { buildFumigationHtml } from "@/lib/fumigation-builder";
+import { checkKaliteSertifikasiReadiness, checkFumigationReadiness } from "@/lib/document-readiness";
+import { MusteriEvrakAyarlari, dosyaEvrakIstiyorMu } from "@/lib/musteri-evrak-ayarlari";
 import { draftFiligranEkle } from "@/lib/watermark";
 
 const EVRAK_ADLARI: Record<string, string> = {
@@ -22,6 +26,8 @@ const EVRAK_ADLARI: Record<string, string> = {
   certificate_of_origin: "Certificate of Origin",
   phytosanitary: "Phytosanitary Certificate",
   health_certificate: "Health Certificate",
+  quality_certificate: "Quality Certificate",
+  fumigation: "Fumigation Certificate",
 };
 
 type Props = {
@@ -29,6 +35,8 @@ type Props = {
   rezervasyonlar: Rezervasyon[];
   konteynerler: Konteyner[];
   companyId: string;
+  /** Musteriye ozel Quality / Fumigation ayarlari (sayfa tek seferde getirir). */
+  ayarlar: MusteriEvrakAyarlari;
   onRefresh: () => void;
 };
 
@@ -37,7 +45,7 @@ type Props = {
  * yatay tablo deseniyle aynı sınıflar/renkler kullanılır - amaç kullanıcının
  * zaten alışık olduğu görünümü korumak.
  */
-export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, onRefresh }: Props) {
+export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, ayarlar, onRefresh }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -83,8 +91,12 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     if (!draftBlUrl) return;
     setIndiriliyor(true);
     try {
-      await indirTaslakOnayPaketi(dosya, rezervasyonlar, konteynerler, draftBlUrl);
-      showToast("Taslak onay paketi indirildi.", "success");
+      const { eklenmeyenler } = await indirTaslakOnayPaketi(dosya, rezervasyonlar, konteynerler, draftBlUrl, ayarlar);
+      if (eklenmeyenler.length > 0) {
+        showToast(`Paket indirildi, ancak eklenemeyen evrak var: ${eklenmeyenler.join("; ")}`, "error");
+      } else {
+        showToast("Taslak onay paketi indirildi.", "success");
+      }
     } catch (err) {
       console.error("Taslak onay paketi olusturma hatasi:", err);
       showToast("Paket oluşturulamadı. Lütfen tekrar deneyin.", "error");
@@ -225,10 +237,21 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
 
   // İlgili Evraklar sabit sırada gösterilir: 1) Commercial Invoice,
   // 2) Packing List, 3) Draft BL, 4) Certificate of Origin, 5) Phytosanitary,
-  // 6) Health Certificate. Bu satır zaten tamEvrakSetiHazirMi testini geçmiş
-  // dosyalar için render edildiğinden (bkz. app/draft-onay/page.tsx), Draft
-  // BL harici 5 evrak her zaman üretilebilir durumdadır ve koşulsuz gösterilir.
-  type EvrakGosterim = { key: string; title: string; href?: string; onClick?: () => void };
+  // 6) Health Certificate, 7) Quality Certificate, 8) Fumigation Certificate.
+  // Bu satır zaten tamEvrakSetiHazirMi testini geçmiş dosyalar için render
+  // edildiğinden (bkz. app/draft-onay/page.tsx), Draft BL harici ilk 5 evrak
+  // her zaman üretilebilir durumdadır ve koşulsuz gösterilir.
+  //
+  // 7 ve 8 (talep: 01.10.2026): sadece müşterinin evrak listesinde
+  // isteniyorsa gösterilir (dosya detayındaki liste ile aynı kural);
+  // müşteriye özel ayarlarla ve DRAFT filigranıyla üretilir (dosya
+  // detayındaki Draft butonuyla birebir aynı). Bilgisi eksikse dosya listeden
+  // DÜŞMEZ - ikon sarı uyarıya döner ve eksikleri söyler.
+  type EvrakGosterim = { key: string; title: string; href?: string; onClick?: () => void; eksikler?: string[] };
+  const qcIsteniyor = dosyaEvrakIstiyorMu(dosya, "Quality");
+  const fcIsteniyor = dosyaEvrakIstiyorMu(dosya, "Fumigation");
+  const qcHazirlik = checkKaliteSertifikasiReadiness(dosya, rezervasyonlar, konteynerler);
+  const fcHazirlik = checkFumigationReadiness(dosya, rezervasyonlar, konteynerler);
   const evrakListesiHam: (EvrakGosterim | null)[] = [
     { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntuleUret(buildCommercialInvoiceHtml) },
     { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntuleUret(buildPackingListHtml) },
@@ -236,6 +259,16 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml, false) },
     { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml, false) },
     { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml, false) },
+    qcIsteniyor
+      ? qcHazirlik.hazir
+        ? { key: "qc", title: EVRAK_ADLARI.quality_certificate, onClick: () => evrakGoruntuleUret((d, r, k) => buildKaliteSertifikasiHtml(d, r, k, ayarlar.kaliteAyar)) }
+        : { key: "qc", title: EVRAK_ADLARI.quality_certificate, eksikler: qcHazirlik.eksikler }
+      : null,
+    fcIsteniyor
+      ? fcHazirlik.hazir
+        ? { key: "fc", title: EVRAK_ADLARI.fumigation, onClick: () => evrakGoruntuleUret((d, r, k) => buildFumigationHtml(d, r, k, ayarlar.fumigationAyar)) }
+        : { key: "fc", title: EVRAK_ADLARI.fumigation, eksikler: fcHazirlik.eksikler }
+      : null,
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 
@@ -262,7 +295,17 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       <td className="px-2.5 py-2.5">
         <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
           {evrakSirasi.map((item) =>
-            item.href ? (
+            item.eksikler ? (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => showToast(`${item.title} üretilemiyor. Eksik: ${item.eksikler!.join(", ")}`, "error")}
+                title={`${item.title} — eksik bilgi: ${item.eksikler.join(", ")}`}
+                className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/10 transition-colors text-amber-400"
+              >
+                <AlertTriangle size={14} />
+              </button>
+            ) : item.href ? (
               <a
                 key={item.key}
                 href={item.href}

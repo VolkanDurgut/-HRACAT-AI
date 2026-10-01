@@ -159,6 +159,24 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   evrakları tamamlanmış olsa bile burada görünmez (kullanıcı kararı,
   30.09.2026).
 
+## Günlük yedek (`supabase/functions/yedekleme-gonder`)
+
+- pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon
+  anahtarla çağırır; fonksiyon veritabanı JSON yedeğini Resend ile
+  `GERI_BILDIRIM_ALICI` adresine mail eki olarak gönderir.
+- Canlıdaki sürüm repodaki koddur (v2, 01.10.2026). Fonksiyonu değiştirince
+  ayrıca DEPLOY edilmesi gerekir (Supabase MCP `deploy_edge_function` veya CLI)
+  — commit/push tek başına canlıyı değiştirmez.
+- Yeni bir iş tablosu eklenirse `YEDEKLENECEK_TABLOLAR` listesine de eklenmeli.
+  `denetim_kayitlari` sadece son 7 günüyle girer; `depositors` ve
+  `contact_messages` bilerek hariç.
+- Tablolar 1000'erlik sayfalarla çekilir; okunamayan tablo mail konusunda
+  `[UYARI]` olarak raporlanır. PDF dosyalarının kendisi yedekte YOK, sadece
+  dosya listesi (`_storage_dosya_listesi`) var.
+- Her gerçek çalışma `yedek_kayitlari` tablosuna yazılır (RLS açık, politika
+  yok → sadece service_role). Son 20 saatte başarılı yedek varsa yeni mail
+  gönderilmez. Test için gövde `{"deneme": true}`: mail/kayıt yok, sadece özet.
+
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 
 - Uygulamayı **sadece Unex Gıda** kullanıyor. Kayıt formu YOK; kullanıcılar

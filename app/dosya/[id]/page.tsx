@@ -137,7 +137,22 @@ function DosyaDetailContent() {
     { key: "konteynerler", label: "Konteynerler" },
   ];
 
-  const canAccessTab = (key: TabKey): boolean => yetkiler.sekme_yetkileri[key];
+  const canAccessTab = (key: TabKey): boolean => !!yetkiler.sekme_yetkileri[key];
+
+  // SEKME YETKISI (duzeltme: 01.10.2026): eskiden varsayilan sekme her zaman
+  // "proforma"ydi ve ?tab= parametresi kontrol edilmiyordu - proforma (veya
+  // hic) sekme yetkisi olmayan kullanici bile proforma icerigini goruyordu.
+  // Artik EKRANDA GOSTERILEN sekme her zaman yetkili bir sekmedir: istenen
+  // sekme (URL ya da tiklama) yetkisizse/gecersizse kullanicinin yetkili
+  // oldugu ilk sekme gosterilir; hic sekme yetkisi yoksa icerik yerine
+  // aciklayici bir mesaj cikar.
+  const SEKME_SIRASI: TabKey[] = ["proforma", "evraklar", "rezervasyon", "konteynerler"];
+  const ilkYetkiliSekme: TabKey | null = SEKME_SIRASI.find((k) => canAccessTab(k)) ?? null;
+  const gorunenSekme: TabKey | null =
+    SEKME_SIRASI.includes(activeTab) && canAccessTab(activeTab) ? activeTab : ilkYetkiliSekme;
+  const sekmeyeGit = (key: TabKey) => {
+    if (canAccessTab(key)) setActiveTab(key);
+  };
 
   if (loading) return <AppShell><DetailSkeleton /></AppShell>;
 
@@ -188,7 +203,7 @@ function DosyaDetailContent() {
                 {(dosya.durum === "Açık" || dosya.durum === "Acik") ? "Dosyayı Kapat" : "Dosyayı Yeniden Aç"}
               </button>
             )}
-            {activeTab === "konteynerler" && (() => {
+            {gorunenSekme === "konteynerler" && (() => {
               const vgmHazir = konteynerler.length > 0 && konteynerler.every((k) => !!k.vgm_kg);
               const rezKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
               const faturaHazir = rezKontAdedi > 0 && konteynerler.length === rezKontAdedi;
@@ -247,16 +262,16 @@ function DosyaDetailContent() {
         {tabs.map((tab) => (
           <div key={tab.key} className="relative flex items-center">
             <button
-              onClick={() => canAccessTab(tab.key) ? setActiveTab(tab.key) : undefined}
+              onClick={() => sekmeyeGit(tab.key)}
               disabled={!canAccessTab(tab.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px inline-flex items-center gap-1.5 ${
                 !canAccessTab(tab.key)
                   ? "border-transparent cursor-not-allowed opacity-40"
-                  : activeTab === tab.key
+                  : gorunenSekme === tab.key
                   ? "border-emerald-500 text-emerald-400"
                   : "border-transparent hover:text-white"
               }`}
-              style={!canAccessTab(tab.key) || activeTab !== tab.key ? { color: TEXT_MUTED } : undefined}
+              style={!canAccessTab(tab.key) || gorunenSekme !== tab.key ? { color: TEXT_MUTED } : undefined}
             >
               {tab.label}
             </button>
@@ -271,8 +286,16 @@ function DosyaDetailContent() {
         ))}
       </div>
 
-      <div key={activeTab} className="animate-fade-up">
-      {activeTab === "proforma" && (
+      <div key={gorunenSekme || "yok"} className="animate-fade-up">
+      {gorunenSekme === null && (
+        <EmptyState
+          icon={<Package size={36} />}
+          title="Görüntüleme yetkiniz yok"
+          description="Bu dosyanın sekmelerini görüntülemek için yetkiniz bulunmuyor. Erişim için yöneticinizle iletişime geçin."
+        />
+      )}
+
+      {gorunenSekme === "proforma" && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
             <div className="space-y-4 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             <div className="rounded-xl border shadow-sm p-6 space-y-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
@@ -323,7 +346,7 @@ function DosyaDetailContent() {
         </div>
       )}
 
-      {activeTab === "evraklar" && (
+      {gorunenSekme === "evraklar" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
@@ -394,18 +417,18 @@ function DosyaDetailContent() {
         </div>
       )}
 
-      {activeTab === "rezervasyon" && (
+      {gorunenSekme === "rezervasyon" && (
         <RezervasyonTab 
           dosyaId={dosya.id} 
           dosya={dosya}
           rezervasyonlar={rezervasyonlar} 
           onRefresh={fetchData} 
-          onNavigateTab={setActiveTab}
+          onNavigateTab={sekmeyeGit}
           companyId={companyId} // Şirket bazlı izolasyon alt sekmeye aktarıldı
         />
       )}
 
-      {activeTab === "konteynerler" && (
+      {gorunenSekme === "konteynerler" && (
         <KonteynerTab 
           ref={konteynerTabRef}
           dosyaId={dosya.id} 
@@ -413,7 +436,7 @@ function DosyaDetailContent() {
           konteynerler={konteynerler} 
           rezervasyonlar={rezervasyonlar} 
           onRefresh={fetchData} 
-          onNavigateTab={setActiveTab}
+          onNavigateTab={sekmeyeGit}
           companyId={companyId} // Şirket bazlı izolasyon alt sekmeye aktarıldı
         />
       )}

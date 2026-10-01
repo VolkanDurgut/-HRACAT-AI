@@ -37,7 +37,7 @@ function kalanGun(eta: string): number {
 }
 
 export default function EtdEtaPage() {
-  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [satirlar, setSatirlar] = useState<SevkiyatSatir[]>([]);
@@ -94,10 +94,17 @@ export default function EtdEtaPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.etd_eta) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   const handleEtaKaydet = async (rezervasyonId: string, etaValue: string) => {
     setSaving(rezervasyonId);

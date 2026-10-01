@@ -46,7 +46,7 @@ function maskeleMusteri(isim: string | null | undefined): string {
 }
 
 export default function KantarPage() {
-  const { user, companyId, yetkiler } = useAuth();
+  const { user, companyId, yetkiler, loading: authLoading } = useAuth();
   const router = useRouter();
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,10 +118,17 @@ export default function KantarPage() {
   }, [fetchKonteynerler, user?.id, companyId]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.kantar) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   useEffect(() => {
     if (!user?.id || !companyId) return;

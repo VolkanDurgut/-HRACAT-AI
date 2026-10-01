@@ -6,6 +6,7 @@ import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "
 import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi, getCutOffDays } from "@/lib/cutoff-utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import AppShell from "@/components/app-shell";
 import {
   Ship, FileText, CheckCircle2, AlertTriangle, Clock,
@@ -78,7 +79,7 @@ function AkisConnector({ tamamlandi }: { tamamlandi: boolean }) {
 }
 
 export default function DashboardPage() {
-  const { user, yetkiler, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, yetkiler, companyId, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const [durumlar, setDurumlar] = useState<DosyaDurum[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,10 +114,17 @@ export default function DashboardPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.dashboard) {
-      router.replace("/panel");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   const aciklar = durumlar.filter(d => d.dosya.durum !== "Kapalı" && d.dosya.durum !== "Kapali");
   const kapalilar = durumlar.filter(d => d.dosya.durum === "Kapalı" || d.dosya.durum === "Kapali");

@@ -103,6 +103,22 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kullan (tablo zaten `overflow-x-auto` sarmalayıcıya sahipse yatay kaydırma
   devreye girer).
 
+## Sayfa / sekme yetkileri (düzeltme: 01.10.2026)
+
+- Yetkiler `useAuth()` ile gelir ve veritabanından YÜKLENENE kadar hepsi
+  geçici olarak `false`'tur. Yetkiye göre yönlendirme yapan her kod önce
+  `loading` bitmesini beklemeli (sayfaların `authLoading` kontrolü); aksi halde
+  tam yetkili kullanıcı sayfayı yenileyince başka sayfaya atılır.
+- Yetkisiz sayfadan gidilecek yer her zaman
+  `lib/yetki-utils.ts → ilkErisilebilirSayfa`. Bu `null` dönerse (hiç sayfa
+  yetkisi yok) YÖNLENDİRME YAPILMAZ — `components/app-shell.tsx` "Erişim
+  yetkiniz yok" ekranını + Çıkış Yap'ı gösterir ("/" ↔ sayfa döngüsü olmasın).
+- Dosya detayında (`app/dosya/[id]/page.tsx`) ekranda gösterilen sekme
+  `gorunenSekme`dir: istenen sekme (URL `?tab=` veya tıklama) yetkisizse
+  kullanıcının yetkili olduğu ilk sekme gösterilir, hiç yoksa mesaj çıkar.
+  Sekme değiştirmek için `sekmeyeGit` kullanılır, `setActiveTab` doğrudan
+  alt bileşenlere verilmez.
+
 ## Cut-off tarihleri (talimat_cutoff / beyanname_cutoff) — ÖNEMLİ
 
 - Bu alanlar `timestamptz` ama kullanıcının girdiği YEREL saat (ör. 22:30)

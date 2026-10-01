@@ -15,16 +15,23 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
 
 export default function YeniDosyaPage() {
-  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>("upload");
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.yeni_dosya) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

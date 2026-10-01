@@ -30,7 +30,7 @@ function HBar({ value, max, color = NAVY }: { value: number; max: number; color?
 }
 
 export default function AnalizPage() {
-  const { user, companyId, yetkiler } = useAuth(); // Global context'ten companyId alındı
+  const { user, companyId, yetkiler, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const [dosyalar, setDosyalar] = useState<DosyaFull[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,10 +64,17 @@ export default function AnalizPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.analiz) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   const filtrelenmis = useMemo(() => {
     let liste = dosyalar;

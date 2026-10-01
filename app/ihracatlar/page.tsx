@@ -19,7 +19,7 @@ type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler:
 type AnaSiparisWithProgress = AnaSiparis & { gonderilmisMts: number; dosyaSayisi: number };
 
 export default function IhracatlarPage() {
-  const { user, yetkiler, companyId } = useAuth();
+  const { user, yetkiler, companyId, loading: authLoading } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
@@ -178,10 +178,17 @@ export default function IhracatlarPage() {
   useEffect(() => { fetchDosyalar(); fetchAcikSiparisler(); }, [fetchDosyalar, fetchAcikSiparisler]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.ihracatlar) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   // Ana siparisin urun kalemlerinden (urun_detaylari_master), o ana siparise
   // ZATEN BAGLI dosyalarda sevk edilmis miktarlar dusulerek KALAN urun

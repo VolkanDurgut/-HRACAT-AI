@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { 
   Anchor, BrainCircuit, FileText, Clock, 
   Loader2, Mail, Lock, ShieldCheck,
@@ -96,14 +97,17 @@ const AuthScreen = ({ onBack }: { onBack: () => void }) => {
 // 2. KISIM: ANA AÇILIŞ SAYFASI (LANDING PAGE)
 // ==========================================
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user, loading, yetkiler } = useAuth();
   const router = useRouter();
 
   const [currentView, setCurrentView] = useState<"landing" | "auth">("landing");
 
   useEffect(() => {
-    if (!loading && user) router.replace("/dashboard");
-  }, [user, loading, router]);
+    // Girisli kullanici, erisebildigi ILK sayfaya gider (ör. sadece kantar
+    // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /dashboard'a gider ve
+    // orada AppShell "Erisim yetkiniz yok" ekranini gosterir - dongu olusmaz.
+    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/dashboard");
+  }, [user, loading, yetkiler, router]);
 
   if (loading || user) {
     return (

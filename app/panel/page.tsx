@@ -21,7 +21,7 @@ function StatusBadge({ label, color }: { label: string; color: string }) {
 }
 
 function PanelContent() {
-  const { user, yetkiler, companyId } = useAuth(); // Global context'ten companyId alındı
+  const { user, yetkiler, companyId, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
@@ -72,10 +72,17 @@ function PanelContent() {
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
 
   useEffect(() => {
+    // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
+    // gecici olarak kapali gorunur ve tam yetkili kullanici bile sayfayi
+    // yenileyince baska sayfaya atiliyordu (duzeltme: 01.10.2026). Hic sayfa
+    // yetkisi yoksa yonlendirme yapilmaz - AppShell "Erisim yetkiniz yok"
+    // ekranini gosterir (bkz. lib/yetki-utils.ts).
+    if (authLoading) return;
     if (!yetkiler.sayfa_yetkileri.panel) {
-      router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/");
+      const hedef = ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri);
+      if (hedef) router.replace(hedef);
     }
-  }, [yetkiler, router]);
+  }, [authLoading, yetkiler, router]);
 
   const handleDelete = async () => {
     if (!deleteTarget || !companyId) return;

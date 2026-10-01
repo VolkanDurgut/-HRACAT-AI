@@ -9,10 +9,11 @@ import { isCutoffApproaching, formatDateTR } from "@/lib/cutoff-utils";
 import { CutoffSayac } from "@/components/cutoff-sayac";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, Loader2, FileText } from "lucide-react";
+import { Trash2, ExternalLink, FolderX, Loader2, FileText, FolderOpen } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
@@ -124,12 +125,11 @@ function PanelContent() {
 
   return (
     <AppShell>
-      <div className="mb-4 flex items-center justify-between flex-wrap gap-y-2 gap-x-3">
-        <div>
-          <h1 className="text-base font-semibold text-white">Ana Panel</h1>
-          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filteredDosyalar.length} açık dosya</p>
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
+      <SayfaBasligi
+        ikon={<FolderOpen size={20} />}
+        baslik="Ana Panel"
+        aciklama={`${filteredDosyalar.length} açık dosya`}
+        sag={<>
           <BildirimIzniButonu />
           {filters.map((f) => (
             <button
@@ -143,8 +143,8 @@ function PanelContent() {
               {f.label}
             </button>
           ))}
-        </div>
-      </div>
+        </>}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -171,7 +171,7 @@ function PanelContent() {
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Kalkış</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Talimat C/O</th>

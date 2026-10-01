@@ -7,17 +7,13 @@ import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi, getCutOffDays }
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
-import {
-  Ship, FileText, CheckCircle2, AlertTriangle, Clock,
-  Package, Mail, TrendingUp, ChevronRight, Anchor, ExternalLink, Loader2
-} from "lucide-react";
+import { Ship, FileText, CheckCircle2, AlertTriangle, Clock, Package, TrendingUp, ChevronRight, ExternalLink, Loader2, LayoutDashboard } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
+import { EmptyState } from "@/components/empty-state";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
-const CARD_BG = "#12161F";
-const CARD_BORDER = "#1E2530";
-const TEXT_MUTED = "#8B95A5";
-const ACCENT = "#10B981";
 
 type DosyaDurum = {
   dosya: Dosya;
@@ -35,7 +31,7 @@ function getDaysUntil(dateStr: string | null): number | null {
 
 function CutoffBadge({ days, label }: { days: number | null; label: string }) {
   if (days === null) return null;
-  const color = days < 0 ? "bg-red-100 text-red-700" : days <= 1 ? "bg-red-100 text-red-700 animate-pulse" : days <= 3 ? "bg-amber-100 text-amber-700 animate-pulse" : "bg-slate-100 text-slate-600";
+  const color = days < 0 ? "bg-red-500/10 text-red-400" : days <= 1 ? "bg-red-500/10 text-red-400 animate-pulse" : days <= 3 ? "bg-amber-500/10 text-amber-400 animate-pulse" : "bg-white/5 text-slate-300";
   const text = days < 0 ? "Geçti" : days === 0 ? "Bugün!" : `${days}g`;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${color}`}>
@@ -62,8 +58,8 @@ function AkisAdimi({ tamamlandi, bekliyor, label, sublabel, tooltip }: { tamamla
       {sublabel && <p className="text-[8px] text-center" style={{ color: "#5A6272" }}>{sublabel}</p>}
       {tooltip && hover && (
         <div className="absolute top-full left-0 pt-1.5 z-30" style={{ width: "max-content", maxWidth: "320px" }}>
-          <div className="p-3 rounded-lg shadow-lg border bg-white animate-fade-in overflow-y-auto"
-            style={{ borderColor: "#E2E8F0", maxHeight: "min(60vh, 400px)" }}>
+          <div className="p-3 rounded-lg shadow-xl border animate-fade-in overflow-y-auto"
+            style={{ backgroundColor: "#1A1F2B", borderColor: CARD_BORDER, maxHeight: "min(60vh, 400px)" }}>
             {tooltip}
           </div>
         </div>
@@ -160,13 +156,12 @@ export default function DashboardPage() {
   return (
     <AppShell>
       {/* Baslik */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-1">
-          <Anchor size={24} style={{ color: ACCENT }} />
-          <h1 className="text-2xl font-bold text-white">Kontrol Merkezi</h1>
-        </div>
-        <p className="text-sm ml-9" style={{ color: TEXT_MUTED }}>Tüm ihracat operasyonlarının anlık durumu</p>
-      </div>
+      <SayfaBasligi
+        ikon={<LayoutDashboard size={20} />}
+        baslik="Kontrol Merkezi"
+        aciklama="Tüm ihracat operasyonlarının anlık durumu"
+        className="mb-6"
+      />
 
       {/* Ozet kartlar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -187,14 +182,14 @@ export default function DashboardPage() {
             <p className="text-xs font-medium flex-1 truncate" style={{ color: TEXT_MUTED }}>{m.label}</p>
             {m.key === "rezervasyon" && bekleyenRez > 0 && (
               <InfoTooltip variant="warning" position="bottom" align="right" width="w-72">
-                <span className="font-semibold text-amber-600">Rezervasyon bekleyen dosyalar:</span>
+                <span className="font-semibold text-amber-400">Rezervasyon bekleyen dosyalar:</span>
                 <ul className="mt-1.5 space-y-1.5">
                   {aciklar.filter(d => d.rezervasyonlar.length === 0).map(({ dosya }) => {
                     const urunler = (dosya.urun_detaylari as any[]) || [];
                     const toplamMts = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
                     return (
-                      <li key={dosya.id} className="text-slate-600">
-                        <span className="font-medium text-slate-800">{dosya.alici_firma || "Firma belirtilmemiş"}</span>
+                      <li key={dosya.id} className="text-slate-300">
+                        <span className="font-medium text-white">{dosya.alici_firma || "Firma belirtilmemiş"}</span>
                         {" — "}{dosya.varis_limani || "Varış limanı belirtilmemiş"}
                         {toplamMts > 0 && ` — ${toplamMts.toLocaleString("tr-TR")} MTS`}
                       </li>
@@ -205,7 +200,7 @@ export default function DashboardPage() {
             )}
             {m.key === "aktif" && aciklar.length > 0 && (
               <InfoTooltip variant="info" position="bottom" align="right" width="w-80">
-                <span className="font-semibold text-slate-700">Aktif dosyalar:</span>
+                <span className="font-semibold text-slate-200">Aktif dosyalar:</span>
                 <div className="mt-2 space-y-3 max-h-80 overflow-y-auto">
                   {aciklar.map(({ dosya, rezervasyonlar }) => {
                     const rez = rezervasyonlar[0];
@@ -215,9 +210,9 @@ export default function DashboardPage() {
                       <div key={dosya.id} className="pb-2 border-b last:border-0" style={{ borderColor: "#F1F5F9" }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">Açık</span>
-                          <span className="font-semibold text-slate-800">{dosya.dosya_no}</span>
+                          <span className="font-semibold text-white">{dosya.dosya_no}</span>
                         </div>
-                        <p className="text-slate-500">{dosya.alici_firma || "-"} {rez?.konteyner_adedi ? `— ${rez.konteyner_adedi}x` : ""} {dosya.varis_limani ? `— ${dosya.varis_limani}` : ""}</p>
+                        <p className="text-slate-400">{dosya.alici_firma || "-"} {rez?.konteyner_adedi ? `— ${rez.konteyner_adedi}x` : ""} {dosya.varis_limani ? `— ${dosya.varis_limani}` : ""}</p>
                         {dosya.proforma_no && <p className="text-slate-400">Proforma: {dosya.proforma_no}</p>}
                         {rez?.booking_no && <p className="text-slate-400">Booking: {rez.booking_no}{rez?.gemi_adi ? ` — ${rez.gemi_adi}` : ""}</p>}
                         {rez?.gemi_kalkis_tarihi && <p className="text-slate-400">Kalkış: {formatDateTR(rez.gemi_kalkis_tarihi)}</p>}
@@ -280,7 +275,7 @@ export default function DashboardPage() {
             return (
               <div key={dosya.id} className={`rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 {/* Dosya baslik */}
-                <div className="px-4 py-2.5 border-b flex items-center justify-between gap-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                <div className="px-4 py-2.5 border-b flex items-center justify-between gap-3" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{ backgroundColor: "#22c55e" }} />
                     <div className="min-w-0">
@@ -318,13 +313,13 @@ export default function DashboardPage() {
                       label="Rezervasyon"
                       sublabel={rez?.booking_no || undefined}
                       tooltip={rezVar ? (
-                        <div className="space-y-1.5 text-xs text-slate-700">
-                          <p><span className="font-semibold text-slate-500">Booking No:</span> {rez?.booking_no || "-"}</p>
-                          <p><span className="font-semibold text-slate-500">Gemi Adı:</span> {rez?.gemi_adi || "-"}</p>
-                          <p><span className="font-semibold text-slate-500">Acente:</span> {rez?.acente_ismi || "-"}</p>
-                          <p><span className="font-semibold text-slate-500">Yükleme Limanı:</span> {rez?.yuklenme_limani || "-"}</p>
-                          <p><span className="font-semibold text-slate-500">Konteyner Adedi:</span> {rez?.konteyner_adedi || "-"}</p>
-                          <p><span className="font-semibold text-slate-500">Gemi Kalkış:</span> {rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</p>
+                        <div className="space-y-1.5 text-xs text-slate-200">
+                          <p><span className="font-semibold text-slate-400">Booking No:</span> {rez?.booking_no || "-"}</p>
+                          <p><span className="font-semibold text-slate-400">Gemi Adı:</span> {rez?.gemi_adi || "-"}</p>
+                          <p><span className="font-semibold text-slate-400">Acente:</span> {rez?.acente_ismi || "-"}</p>
+                          <p><span className="font-semibold text-slate-400">Yükleme Limanı:</span> {rez?.yuklenme_limani || "-"}</p>
+                          <p><span className="font-semibold text-slate-400">Konteyner Adedi:</span> {rez?.konteyner_adedi || "-"}</p>
+                          <p><span className="font-semibold text-slate-400">Gemi Kalkış:</span> {rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</p>
                         </div>
                       ) : undefined}
                     />
@@ -338,19 +333,19 @@ export default function DashboardPage() {
                         <table className="text-xs w-full" style={{ minWidth: "280px" }}>
                           <thead>
                             <tr className="border-b" style={{ borderColor: "#F1F5F9" }}>
-                              <th className="text-left font-semibold text-slate-500 pb-1.5 pr-2">Konteyner</th>
-                              <th className="text-right font-semibold text-slate-500 pb-1.5 pr-2">Net</th>
-                              <th className="text-right font-semibold text-slate-500 pb-1.5 pr-2">Brüt</th>
-                              <th className="text-right font-semibold text-slate-500 pb-1.5">Kap</th>
+                              <th className="text-left font-semibold text-slate-400 pb-1.5 pr-2">Konteyner</th>
+                              <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Net</th>
+                              <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Brüt</th>
+                              <th className="text-right font-semibold text-slate-400 pb-1.5">Kap</th>
                             </tr>
                           </thead>
                           <tbody>
                             {konteynerler.map((k) => (
                               <tr key={k.id} className="border-b last:border-0" style={{ borderColor: "#F8FAFC" }}>
-                                <td className="font-mono text-slate-800 py-1 pr-2">{k.konteyner_no}</td>
-                                <td className="text-right text-slate-600 py-1 pr-2">{k.net_agirlik_kg || "-"}</td>
-                                <td className="text-right text-slate-600 py-1 pr-2">{(k as any).brut_agirlik_kg || "-"}</td>
-                                <td className="text-right text-slate-600 py-1">{(k as any).pieces || "-"}</td>
+                                <td className="font-mono text-white py-1 pr-2">{k.konteyner_no}</td>
+                                <td className="text-right text-slate-300 py-1 pr-2">{k.net_agirlik_kg || "-"}</td>
+                                <td className="text-right text-slate-300 py-1 pr-2">{(k as any).brut_agirlik_kg || "-"}</td>
+                                <td className="text-right text-slate-300 py-1">{(k as any).pieces || "-"}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -408,13 +403,13 @@ export default function DashboardPage() {
             <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
-                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya No</th>
-                  <th className="text-left px-2 py-2.5 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Alıcı</th>
-                  <th className="text-right px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
-                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
-                  <th className="text-left px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kalkış</th>
-                  <th className="text-right px-2 py-2.5 text-xs font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}></th>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya No</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Alıcı</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                  <th lang="en" className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kalkış</th>
+                  <th className="text-right px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -444,11 +439,16 @@ export default function DashboardPage() {
       )}
 
       {durumlar.length === 0 && (
-        <div className="text-center py-20">
-          <Ship size={48} className="text-slate-200 mx-auto mb-4" />
-          <p className="text-slate-400 text-sm">Henüz hiç dosya yok.</p>
-          <Link href="/yeni-dosya" className="text-amber-600 text-sm mt-2 inline-block hover:underline">+ Yeni Dosya Aç</Link>
-        </div>
+        <EmptyState
+          icon={<Ship size={40} />}
+          title="Henüz hiç dosya yok"
+          description="İlk ihracat dosyanızı proforma yükleyerek oluşturun."
+          action={
+            <Link href="/yeni-dosya" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90" style={{ backgroundColor: ACCENT }}>
+              Yeni Dosya Aç
+            </Link>
+          }
+        />
       )}
     </AppShell>
   );

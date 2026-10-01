@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Loader2, Save } from "lucide-react";
@@ -122,10 +123,11 @@ export default function YetkilendirmePage() {
 
   return (
     <AppShell>
-      <div className="mb-5 flex items-center gap-2">
-        <ShieldCheck size={20} style={{ color: ACCENT }} />
-        <h1 className="text-xl font-bold text-white">Yetkilendirme</h1>
-      </div>
+      <SayfaBasligi
+        ikon={<ShieldCheck size={20} />}
+        baslik="Yetkilendirme"
+        aciklama="Kullanıcıların görebileceği sayfa ve dosya sekmeleri"
+      />
 
       <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="overflow-x-auto">

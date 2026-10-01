@@ -7,6 +7,7 @@ import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
@@ -376,13 +377,12 @@ export default function IhracatlarPage() {
         destructive
       />
 
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Archive size={22} style={{ color: ACCENT }} />
-          <h1 className="text-2xl font-bold text-white">İhracatlar Arşivi</h1>
-        </div>
-        <p className="text-sm ml-7" style={{ color: TEXT_MUTED }}>Tamamlanmış dosyalar ve devam eden siparişleriniz</p>
-      </div>
+      <SayfaBasligi
+        ikon={<Archive size={20} />}
+        baslik="İhracatlar Arşivi"
+        aciklama="Tamamlanmış dosyalar ve devam eden siparişleriniz"
+        className="mb-6"
+      />
 
       {!siparisLoading && acikSiparisler.length > 0 && (
         <div className="mb-8 space-y-3">
@@ -474,17 +474,17 @@ export default function IhracatlarPage() {
             <table className="min-w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Teslim</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ürün</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>MTS</th>
-                  <th className="text-right px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tutar</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>BL No</th>
-                  <th className="text-left px-2.5 py-2.5 text-[11px] font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Marka</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Teslim</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ürün</th>
+                  <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                  <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>MTS</th>
+                  <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tutar</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>BL No</th>
+                  <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Marka</th>
                   <th className="w-16"></th>
                 </tr>
               </thead>
@@ -652,10 +652,10 @@ export default function IhracatlarPage() {
                     <table className="min-w-full">
                       <thead>
                         <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner No</th>
-                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Mühür</th>
-                          <th className="text-left px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Tip</th>
-                          <th className="text-right px-2 py-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>VGM</th>
+                          <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner No</th>
+                          <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür</th>
+                          <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tip</th>
+                          <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>VGM</th>
                         </tr>
                       </thead>
                       <tbody>

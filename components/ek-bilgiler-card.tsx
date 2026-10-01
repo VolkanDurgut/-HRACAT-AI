@@ -173,7 +173,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
               <p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam FOB</p>
               {navlunBekleniyor && (
                 <InfoTooltip variant="warning">
-                  <span className="font-semibold text-amber-600">Konteyner adedi gerekli.</span> Navlun tutarı kaydedildi, FOB hesaplanması için Rezervasyon sekmesinden konteyner adedini girin.
+                  <span className="font-semibold text-amber-400">Konteyner adedi gerekli.</span> Navlun tutarı kaydedildi, FOB hesaplanması için Rezervasyon sekmesinden konteyner adedini girin.
                 </InfoTooltip>
               )}
             </div>

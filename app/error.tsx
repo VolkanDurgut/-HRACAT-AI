@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-const BG = '#0B0E14';
+const BG = '#0B0F14';
 const CARD_BG = '#12161F';
 const CARD_BORDER = '#1E2530';
 const TEXT_MUTED = '#8B95A5';

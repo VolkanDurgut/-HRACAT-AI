@@ -24,9 +24,9 @@ type Props = {
 };
 
 const variantStyles: Record<Variant, { icon: React.ElementType; color: string; badgeBg: string }> = {
-  warning: { icon: AlertCircle, color: "text-amber-500 hover:text-amber-600", badgeBg: "bg-amber-50 text-amber-600" },
-  danger: { icon: AlertTriangle, color: "text-red-500 hover:text-red-600", badgeBg: "bg-red-50 text-red-600" },
-  info: { icon: Info, color: "text-slate-400 hover:text-slate-500", badgeBg: "bg-slate-100 text-slate-500" },
+  warning: { icon: AlertCircle, color: "text-amber-400 hover:text-amber-300", badgeBg: "bg-amber-500/10 text-amber-400" },
+  danger: { icon: AlertTriangle, color: "text-red-400 hover:text-red-300", badgeBg: "bg-red-500/10 text-red-400" },
+  info: { icon: Info, color: "text-slate-400 hover:text-slate-300", badgeBg: "bg-white/5 text-slate-400" },
 };
 
 /**
@@ -78,10 +78,10 @@ export default function InfoTooltip({
       </button>
       {open && (
         <div
-          className={`absolute ${alignClasses} ${positionClasses} ${width} max-w-[calc(100vw-2rem)] p-2.5 rounded-lg shadow-lg border bg-white z-20 animate-fade-in`}
-          style={{ borderColor: "#E2E8F0" }}
+          className={`absolute ${alignClasses} ${positionClasses} ${width} max-w-[calc(100vw-2rem)] p-2.5 rounded-lg shadow-xl border z-20 animate-fade-in`}
+          style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }}
         >
-          <p className="text-xs text-slate-700 leading-relaxed">{children}</p>
+          <p className="text-xs text-slate-300 leading-relaxed">{children}</p>
         </div>
       )}
     </div>

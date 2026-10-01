@@ -332,13 +332,13 @@ export default function KantarPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Mühür / Plaka</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Çuval / Dosya</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Rez No</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center" style={{ color: TEXT_MUTED }}>İrsaliye</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center w-24" style={{ color: TEXT_MUTED }}>İşlem</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür / Plaka</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Çuval / Dosya</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Rez No</th>
+                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
+                      <th className="px-4 py-2.5 text-center w-24 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,12 +438,12 @@ export default function KantarPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-right" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center" style={{ color: TEXT_MUTED }}>İrsaliye</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase text-center w-16" style={{ color: TEXT_MUTED }}>Durum</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
+                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                      <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
+                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
+                      <th className="px-4 py-2.5 text-center w-16 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
                     </tr>
                   </thead>
                   <tbody>

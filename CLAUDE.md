@@ -109,6 +109,27 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kullan (tablo zaten `overflow-x-auto` sarmalayıcıya sahipse yatay kaydırma
   devreye girer).
 
+## Görsel düzen standardı (01.10.2026)
+
+- Sayfa başlığı her sayfada `components/sayfa-basligi.tsx` (`SayfaBasligi`):
+  ACCENT renkli 20px ikon (sidebar'daki ikonun aynısı) + `text-xl font-bold`
+  başlık + `text-sm` soluk açıklama, sağda opsiyonel aksiyonlar. Elle h1 yazma.
+- Tablo başlığı (`<th>`): `text-[10px] font-semibold uppercase tracking-wide
+  whitespace-nowrap`, renk `TEXT_MUTED`, satır zemini `ROW_HEADER_BG`.
+  İngilizce ve içinde küçük "i" olan başlıklara (ör. "Booking No") `lang="en"`
+  verilir, yoksa Türkçe büyük harf kuralıyla "BOOKİNG" görünür. Metni elle
+  BÜYÜK HARF yazma; CSS büyütür.
+- Koyu tema dışı sınıf kullanılmaz (`bg-white`, `bg-*-50`, `text-*-700`
+  vb.). İpucu/popover zemini `#1A1F2B`, kenar `#2A3141`. Boş durumlar
+  `EmptyState`, onay pencereleri `ConfirmDialog` (tarayıcı `confirm()` yok).
+- Kullanıcıya görünen metinler Türkçe karakterle yazılır. İSTİSNA: müşteriye /
+  acenteye giden mailto gövdeleri ve panoya kopyalanan düz metin (bilerek
+  ASCII), PDF evrak içerikleri (İngilizce).
+- Giriş sayfası (`app/page.tsx`) sade kurumsal giriş ekranıdır; pazarlama
+  sayfası kullanıcı kararıyla kaldırıldı (01.10.2026), geri eklenmez.
+- Kantar Paneli bilerek kenar çubuksuz (terminal ekranı); AppShell kullanmadığı
+  için oturum/yetki kapısı sayfanın içinde ayrıca uygulanır.
+
 ## Veritabanına yazma ve dosya silme kuralları (düzeltme: 01.10.2026)
 
 - supabase-js hata FIRLATMAZ; `{ data, error }` döner. RLS bir
@@ -117,6 +138,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `.select("id")` eklenir ve sonuç `yazmaHatasi(error, data)`
   (`lib/supabase/yazma-kontrol.ts`) ile kontrol edilir; hata varsa kırmızı
   toast gösterilir ve form/pencere AÇIK bırakılır.
+- Dosya yükleyip ardından DB'ye bağlayan akışlarda (fatura, Draft BL,
+  konşimento, DBA, irsaliye, proforma) DB yazması başarısız olursa az önce
+  yüklenen dosya depodan geri silinir (sahipsiz dosya kalmasın).
 - Storage dosyası silmenin DOĞRU SIRASI: (1) silinecek URL'leri topla,
   (2) DB kaydını sil/güncelle ve sonucu kontrol et, (3) SADECE başarılıysa
   `depoDosyalariniTopluSil(urls)`. Dosya silerken `dosyaninStorageUrlleriniTopla`

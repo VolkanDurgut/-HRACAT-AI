@@ -116,28 +116,28 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
           <table className="min-w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ürün Adı</th>
-                <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ambalaj</th>
-                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
-                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
-                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Toplam</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Ürün Adı</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Ambalaj</th>
+                <th className="text-right px-3 py-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
+                <th className="text-right px-3 py-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                <th className="text-right px-3 py-3 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Toplam</th>
               </tr>
             </thead>
             <tbody>
               {gosterilecekSatirlar.map((item: any, i: number) => (
                 <tr key={i} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
-                  <td className="px-4 py-3 text-sm text-white">{item.urun_adi || item.description || "-"}</td>
-                  <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{item.ambalaj_boyutu || item.packaging_size || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{item.miktar_mts || item.quantity || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{formatCurrency(item.birim_fiyat_usd || item.unit_price, dosya.para_birimi)}</td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-white">{formatCurrency(item.toplam_tutar_usd || item.total_amount, dosya.para_birimi)}</td>
+                  <td className="px-3 py-3 text-sm text-white">{item.urun_adi || item.description || "-"}</td>
+                  <td className="px-3 py-3 text-sm" style={{ color: TEXT_MUTED }}>{item.ambalaj_boyutu || item.packaging_size || "-"}</td>
+                  <td className="px-3 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{item.miktar_mts || item.quantity || "-"}</td>
+                  <td className="px-3 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{formatCurrency(item.birim_fiyat_usd || item.unit_price, dosya.para_birimi)}</td>
+                  <td className="px-3 py-3 text-sm text-right font-medium text-white">{formatCurrency(item.toplam_tutar_usd || item.total_amount, dosya.para_birimi)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                <td colSpan={4} className="px-4 py-3 text-sm font-semibold text-right" style={{ color: "white" }}>TOPLAM</td>
-                <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: ACCENT }}>
+                <td colSpan={4} className="px-3 py-3 text-sm font-semibold text-right" style={{ color: "white" }}>TOPLAM</td>
+                <td className="px-3 py-3 text-sm font-bold text-right" style={{ color: ACCENT }}>
                   {formatCurrency(gosterilecekSatirlar.reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0), dosya.para_birimi)}
                 </td>
               </tr>

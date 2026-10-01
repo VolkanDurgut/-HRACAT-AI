@@ -333,8 +333,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     }
   };
 
-  const btnClass = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 transition-colors";
-  const iconBtnClass = "inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors";
+  const btnClass = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-colors";
+  const iconBtnClass = "inline-flex items-center justify-center w-7 h-7 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/5 transition-colors";
 
   /** Uc evrak turu icin ortak render mantigi: hazir degilse uyari, hazirsa
    * durum rozeti + Draft + Orijinal butonlari. */
@@ -342,7 +342,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     if (!hazirlik.hazir) {
       return (
         <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-          <span className="font-semibold text-amber-600">{etiket} eksik bilgiler:</span> {hazirlik.eksikler.join(", ")}
+          <span className="font-semibold text-amber-400">{etiket} eksik bilgiler:</span> {hazirlik.eksikler.join(", ")}
         </InfoTooltip>
       );
     }
@@ -367,7 +367,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           onClick={() => handleTiklandi(tip, "orijinal")}
           disabled={yukleniyor !== null}
           title="Filigransız orijinal evrağı PDF olarak indirir"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:border-sky-500/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {yukleniyor === `${tip}-orijinal` ? (
             <><Loader2 size={12} className="animate-spin" /> Hazırlanıyor...</>
@@ -392,7 +392,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         <button
           type="button"
           onClick={() => setEctnModalAcik(true)}
-          className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+          className="inline-flex items-center justify-center w-5 h-5 rounded text-slate-400 hover:text-emerald-400 hover:bg-white/5 transition-colors"
           title="ECTN tutarlarını (TOTAL FOB / FREIGHT / TOTAL CFR) elle düzenle"
         >
           <Pencil size={11} />

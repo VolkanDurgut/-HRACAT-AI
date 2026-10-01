@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
 import { FileCog, Loader2, Save } from "lucide-react";
@@ -71,10 +72,11 @@ export default function IhracatAyarlariPage() {
 
   return (
     <AppShell>
-      <div className="mb-5 flex items-center gap-2">
-        <FileCog size={20} style={{ color: ACCENT }} />
-        <h1 className="text-xl font-bold text-white">İhracat Ayarları</h1>
-      </div>
+      <SayfaBasligi
+        ikon={<FileCog size={20} />}
+        baslik="İhracat Ayarları"
+        aciklama="Yeni dosyalarda kullanılacak şirket geneli varsayılanlar"
+      />
 
       <div className="rounded-xl border shadow-sm p-5 max-w-xl animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <label className="block text-sm font-semibold mb-1 text-white">Varsayılan DİİB No</label>

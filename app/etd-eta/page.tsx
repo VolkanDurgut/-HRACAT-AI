@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils"; 
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { Ship, Search, Loader2, AlertCircle, Bell } from "lucide-react";
 import { formatDateTR } from "@/lib/cutoff-utils";
@@ -155,13 +156,11 @@ export default function EtdEtaPage() {
 
   return (
     <AppShell>
-      <div className="mb-5">
-        <div className="flex items-center gap-2 mb-1">
-          <Ship size={20} style={{ color: ACCENT }} />
-          <h1 className="text-xl font-bold text-white">ETD / ETA</h1>
-        </div>
-        <p className="text-sm ml-7" style={{ color: TEXT_MUTED }}>Sevkiyat kalkış ve varış tarihleri</p>
-      </div>
+      <SayfaBasligi
+        ikon={<Ship size={20} />}
+        baslik="ETD / ETA"
+        aciklama="Sevkiyat kalkış ve varış tarihleri"
+      />
 
       {/* ETA'sı Yaklaşan Sevkiyatlar */}
       {yaklasanlar.length > 0 && (
@@ -259,15 +258,15 @@ export default function EtdEtaPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Firma Adı</th>
-                  <th className="text-center px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>B/L No</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
-                  <th className="text-left px-3 py-2.5 font-semibold whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Firma Adı</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
+                  <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>B/L No</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
                 </tr>
               </thead>
               <tbody>

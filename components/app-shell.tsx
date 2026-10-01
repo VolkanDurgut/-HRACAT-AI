@@ -78,7 +78,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // gerçekleşene kadar nötr bir yükleniyor ekranı gösteriliyor.
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0B0F14" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
         <Loader2 size={32} className="animate-spin text-emerald-500" />
       </div>
     );
@@ -114,14 +114,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0B0F14" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
         <Loader2 size={32} className="animate-spin text-emerald-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#0B0F14" }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: PAGE_BG }}>
       <Sidebar />
       <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">

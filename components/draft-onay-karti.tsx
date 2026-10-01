@@ -5,7 +5,7 @@ import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supa
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
-import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 import { draftOnayAliciEmailAl, buildDraftHatirlatmaMailtoUrl } from "@/lib/draft-onay-mail";
@@ -525,7 +525,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setRevizeModalAcik(false)}>
             <div
               className="w-full max-w-md rounded-xl border p-4 shadow-lg"
-              style={{ backgroundColor: "#1A1A1E", borderColor: CARD_BORDER }}
+              style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-3">
@@ -545,7 +545,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 rows={3}
                 placeholder="Örn: Alıcı adresi güncellensin, konteyner sayısı 9 olarak düzeltilsin..."
                 className="w-full rounded-lg border px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                style={{ borderColor: CARD_BORDER, backgroundColor: "#0F0F12" }}
+                style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}
                 autoFocus
               />
               <div className="flex justify-end gap-2 mt-3">

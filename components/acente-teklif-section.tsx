@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { supabase, MTS_PER_KONTEYNER, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Plus, Mail, Pencil, Trash2, Check, RefreshCw, Loader2 } from "lucide-react";
+import { Plus, Mail, Pencil, Trash2, Check, RefreshCw, Loader2, UserCog } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type Acente = {
@@ -338,6 +338,12 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
                         <Pencil size={14} />
                       </button>
                     )}
+                    {/* handleEdit vardi ama hicbir butona bagli degildi - acente
+                        bilgileri (e-posta, CC, telefon) duzenlenemiyordu (01.10.2026) */}
+                    <button onClick={() => handleEdit(acente)}
+                      className="p-1.5 rounded-md hover:bg-white/10" style={{ color: TEXT_MUTED }} title="Acente bilgilerini düzenle">
+                      <UserCog size={14} />
+                    </button>
                     <button onClick={() => setSilinecek(acente)} className="p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Acenteyi sil">
                       <Trash2 size={14} />
                     </button>

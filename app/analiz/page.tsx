@@ -6,8 +6,9 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck } from "lucide-react";
+import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck, BarChart3 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type DosyaFull = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
@@ -259,13 +260,13 @@ export default function AnalizPage() {
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Dosya</th>
-                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Liman</th>
-                      <th className="text-center px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Kont.</th>
-                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>ETD</th>
-                      <th className="text-left px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>ETA</th>
-                      <th className="text-right px-4 py-2.5 font-semibold uppercase text-[10px]" style={{ color: TEXT_MUTED }}>Tutar</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Liman</th>
+                      <th className="text-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tutar</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -289,12 +290,11 @@ export default function AnalizPage() {
       )}
 
       {/* Başlık */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-base font-semibold text-white">Analiz</h1>
-          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filtrelenmis.length} dosya üzerinden hesaplanıyor</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SayfaBasligi
+        ikon={<BarChart3 size={20} />}
+        baslik="Analiz"
+        aciklama={`${filtrelenmis.length} dosya üzerinden hesaplanıyor`}
+        sag={<>
           <div className="flex rounded border text-xs overflow-hidden" style={{ borderColor: CARD_BORDER }}>
             {(["tumu", "tamamlanan"] as const).map(f => (
               <button key={f} onClick={() => setDurumFiltre(f)}
@@ -313,8 +313,8 @@ export default function AnalizPage() {
               </button>
             ))}
           </div>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* KPI Kartlar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -533,10 +533,10 @@ export default function AnalizPage() {
               <table className="min-w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>#</th>
-                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
-                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
-                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>#</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
+                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
+                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -569,11 +569,11 @@ export default function AnalizPage() {
               <table className="min-w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Dosya</th>
-                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Liman</th>
-                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Kont.</th>
-                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>Tutar</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                    <th className="text-left px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Liman</th>
+                    <th className="text-center px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                    <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tutar</th>
                   </tr>
                 </thead>
                 <tbody>

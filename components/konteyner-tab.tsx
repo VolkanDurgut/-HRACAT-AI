@@ -205,19 +205,19 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
             <table className="min-w-full">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                  <th className="text-left px-4 py-3 text-xs font-semibold w-8" style={{ color: TEXT_MUTED }}>No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Mühür No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Tip</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Çuval</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Plaka</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Dara</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Net</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Brüt</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Kap Adeti</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>VGM</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>DBA</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>İrsaliye</th>
+                  <th className="text-left px-4 py-3 w-8 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>No</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner No</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür No</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tip</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Çuval</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Plaka</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dara</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Net</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Brüt</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kap Adeti</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>VGM</th>
+                  <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>DBA</th>
+                  <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>

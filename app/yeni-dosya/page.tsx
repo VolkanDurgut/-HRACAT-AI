@@ -7,9 +7,10 @@ import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import AcenteTeklifSection from "@/components/acente-teklif-section";
-import { Upload, FileText, Check, Loader2, Package, AlertCircle } from "lucide-react";
+import { Upload, FileText, Check, Loader2, Package, AlertCircle, FolderPlus } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -317,12 +318,12 @@ export default function YeniDosyaPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Yeni İhracat Dosyası Aç</h1>
-        <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-          Proforma faturayı yükleyin, sistem otomatik olarak ihracat dosyasını oluştursun.
-        </p>
-      </div>
+      <SayfaBasligi
+        ikon={<FolderPlus size={20} />}
+        baslik="Yeni İhracat Dosyası Aç"
+        aciklama="Proforma faturayı yükleyin, sistem otomatik olarak ihracat dosyasını oluştursun."
+        className="mb-6"
+      />
 
       <div className="max-w-4xl">
         {error && (
@@ -564,11 +565,11 @@ export default function YeniDosyaPage() {
                   <table className="min-w-full">
                     <thead>
                       <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>ÜRÜN ADI</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>AMBALAJ</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>MİKTAR (MTS)</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>BİRİM FİYAT</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>TOPLAM</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ürün Adı</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ambalaj</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                        <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Toplam</th>
                       </tr>
                     </thead>
                     <tbody>

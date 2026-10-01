@@ -20,7 +20,7 @@ import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, Copy, ExternalLink, FileText } from "lucide-react";
+import { Loader2, Package, FileCheck, Copy, ExternalLink, FileText, FolderOpen } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -174,12 +174,20 @@ function DosyaDetailContent() {
   if (!dosya || !companyId) {
     return (
       <AppShell>
-        <div className="text-center py-20">
-          <p className="text-slate-400">Dosya bulunamadı</p>
-          <button onClick={() => router.push("/panel")} className="text-emerald-600 text-sm mt-2 hover:underline">
-            Ana Panele Dön
-          </button>
-        </div>
+        <EmptyState
+          icon={<FolderOpen size={40} />}
+          title="Dosya bulunamadı"
+          description="Dosya silinmiş olabilir ya da bu dosyaya erişim yetkiniz bulunmuyor."
+          action={
+            <button
+              onClick={() => router.push("/panel")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90"
+              style={{ backgroundColor: ACCENT }}
+            >
+              Ana Panele Dön
+            </button>
+          }
+        />
       </AppShell>
     );
   }
@@ -203,9 +211,15 @@ function DosyaDetailContent() {
 
       <div className="mb-6">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">📁 {dosya.dosya_no}</h1>
-            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Oluşturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
+          {/* Sayfa basligi standardi (components/sayfa-basligi.tsx) ile ayni gorunum */}
+          <div className="flex items-start gap-3 min-w-0">
+            <FolderOpen size={20} className="mt-[3px] shrink-0" style={{ color: ACCENT }} />
+            <div>
+              <h1 className="text-xl font-bold text-white leading-tight">{dosya.dosya_no}</h1>
+              <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
+                {dosya.alici_firma ? `${dosya.alici_firma} · ` : ""}Oluşturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}
+              </p>
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2">
             {yetkiler.sayfa_yetkileri.yeni_dosya && (
@@ -293,7 +307,7 @@ function DosyaDetailContent() {
             {tab.key === "konteynerler" && konsimentoBekliyor && (
               <div className="-ml-1 mr-2 -mb-px">
                 <InfoTooltip variant="danger" position="bottom" width="w-64" size={14} badge="1">
-                  <span className="font-semibold text-slate-800">Konşimento talimatı bekleniyor.</span> Fatura talimatı gönderildi, şimdi konşimento talimatını hazırlayıp Konteynerler sekmesinden yükleyebilirsiniz.
+                  <span className="font-semibold text-white">Konşimento talimatı bekleniyor.</span> Fatura talimatı gönderildi, şimdi konşimento talimatını hazırlayıp Konteynerler sekmesinden yükleyebilirsiniz.
                 </InfoTooltip>
               </div>
             )}
@@ -404,7 +418,7 @@ function DosyaDetailContent() {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:border-sky-500/50 transition-colors"
                               title="Draft BL'yi yeni sekmede aç"
                             >
                               <ExternalLink size={12} /> Görüntüle

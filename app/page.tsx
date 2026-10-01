@@ -4,27 +4,33 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { 
-  Anchor, BrainCircuit, FileText, Clock, 
-  Loader2, Mail, Lock, ShieldCheck,
-  Building2, ArrowLeft, Github, Twitter, Quote
-} from "lucide-react";
+import { Loader2, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
+import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
-// ==========================================
-// 1. KISIM: GİRİŞ EKRANI BİLEŞENİ
-// ==========================================
-// Kayit formu BILEREK YOK (talep: 01.10.2026): uygulamayi sadece Unex Gida
-// kullaniyor, kullanicilar Supabase Dashboard'dan MANUEL ekleniyor. Bu ekran
-// SADECE giris sunar. "Sifremi unuttum" akisi da BILEREK YOK (talep:
-// 01.10.2026) - sifre sifirlama yonetici tarafindan yapilir.
-const AuthScreen = ({ onBack }: { onBack: () => void }) => {
-  const { signIn } = useAuth();
+/**
+ * Giris ekrani (kullanici karari 01.10.2026): Uygulamayi SADECE Unex Gida
+ * kullaniyor, kayit KAPALI. Eskiden burada herkese acik bir pazarlama sayfasi
+ * vardi ("Start your project" butonlari, Fiyatlandirma/Kariyer menuleri, 20
+ * olu link, ornek musteri yorumu). Artik dogrudan uygulamanin koyu temasinda,
+ * sade kurumsal bir giris ekrani acilir.
+ *
+ * Kayit formu ve "Sifremi unuttum" akisi BILEREK YOK (01.10.2026): kullanicilar
+ * Supabase Dashboard'dan manuel eklenir, sifre sifirlama yonetici isidir.
+ */
+export default function GirisSayfasi() {
+  const { user, loading, yetkiler, signIn } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [authError, setAuthError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    // Girisli kullanici, erisebildigi ILK sayfaya gider (ör. sadece kantar
+    // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /dashboard'a gider ve
+    // orada AppShell "Erisim yetkiniz yok" ekranini gosterir - dongu olusmaz.
+    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/dashboard");
+  }, [user, loading, yetkiler, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,332 +45,96 @@ const AuthScreen = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col md:flex-row w-full bg-slate-50 font-sans animate-in fade-in duration-500">
-      <button type="button" onClick={onBack} className="absolute top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg text-white text-sm font-medium hover:bg-white/20 transition-colors">
-        <ArrowLeft size={16} /> Ana Sayfaya Dön
-      </button>
-
-      {/* Auth - Sol Taraf (Dark) */}
-      <div className="relative hidden md:flex flex-1 bg-[#1C1C1C] overflow-hidden flex-col justify-between p-12 lg:p-20 text-white">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem]" />
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-500 text-white shadow-xl"><Anchor size={20} /></div>
-          <span className="text-xl font-bold tracking-tight">İhracat AI</span>
-        </div>
-        <div className="relative z-10 max-w-lg my-auto">
-          <h2 className="text-4xl font-extrabold leading-[1.2] mb-6 tracking-tight">
-            Operasyonlarınızı <span className="text-emerald-400">Yapay Zeka</span> ile Ölçeklendirin.
-          </h2>
-          <p className="text-slate-400 text-lg leading-relaxed">
-            Binlerce ihracatçı manuel veri girişini bıraktı. Siz de aramıza katılın ve zamanınızı büyümeye ayırın.
-          </p>
-        </div>
-      </div>
-
-      {/* Auth - Sağ Taraf (Form) */}
-      <div className="w-full md:w-[500px] bg-white flex flex-col justify-center px-8 md:px-14 py-12 shadow-2xl z-20 overflow-y-auto">
-        <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">Tekrar Hoş Geldiniz</h2>
-          <p className="text-sm text-slate-500 mb-6">Hesabınıza erişmek için giriş yapın.</p>
-          {authError && <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-100 text-sm text-red-600 font-medium">{authError}</div>}
-
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">E-posta</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Şifre</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-3 py-2.5 border border-slate-300 rounded-md text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none" />
-            </div>
-            <button type="submit" disabled={isProcessing || !email || !password} className="w-full mt-2 py-2.5 rounded-md text-white font-medium text-sm transition-colors hover:bg-emerald-600 bg-emerald-500 flex justify-center disabled:opacity-60">
-              {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-xs text-slate-500">
-            Hesaplar yönetici tarafından oluşturulur. Erişim veya şifre sıfırlama için yöneticinizle iletişime geçin.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-// ==========================================
-// 2. KISIM: ANA AÇILIŞ SAYFASI (LANDING PAGE)
-// ==========================================
-export default function Home() {
-  const { user, loading, yetkiler } = useAuth();
-  const router = useRouter();
-
-  const [currentView, setCurrentView] = useState<"landing" | "auth">("landing");
-
-  useEffect(() => {
-    // Girisli kullanici, erisebildigi ILK sayfaya gider (ör. sadece kantar
-    // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /dashboard'a gider ve
-    // orada AppShell "Erisim yetkiniz yok" ekranini gosterir - dongu olusmaz.
-    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/dashboard");
-  }, [user, loading, yetkiler, router]);
-
   if (loading || user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <Loader2 size={32} className="animate-spin text-emerald-500" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
       </div>
     );
   }
 
-  const goToAuth = () => {
-    setCurrentView("auth");
-  };
-
-  if (currentView === "auth") {
-    return <AuthScreen onBack={() => setCurrentView("landing")} />;
-  }
+  const inputClass =
+    "w-full pl-9 pr-3 py-2.5 rounded-lg border text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60";
 
   return (
-    <div className="min-h-screen flex flex-col w-full bg-white font-sans text-slate-900 selection:bg-emerald-200">
-      
-      {/* ÜST NAVBAR */}
-      <nav className="fixed top-0 w-full h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50 flex items-center justify-between px-6 lg:px-12">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 cursor-pointer">
-            <div className="w-8 h-8 rounded-md bg-emerald-500 flex items-center justify-center text-white shadow-sm">
-              <Anchor size={16} />
-            </div>
-            <span className="font-bold text-lg tracking-tight">İhracat AI</span>
-          </div>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-500">
-            <a href="#" className="hover:text-slate-900 transition-colors">Özellikler</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">Çözümler</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">Fiyatlandırma</a>
+    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-10" style={{ backgroundColor: PAGE_BG }}>
+      <div className="w-full max-w-[400px]">
+        {/* Marka */}
+        <div className="flex items-center justify-center gap-3 mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.png" alt="Unex" className="w-11 h-11 object-contain" />
+          <div>
+            <p className="text-lg font-semibold leading-tight text-white">İhracat AI</p>
+            <p className="text-xs" style={{ color: TEXT_MUTED }}>Unex Gıda · İhracat Operasyon Paneli</p>
           </div>
         </div>
-        <div className="flex items-center gap-5">
-          {/* Supabase tarzı hayalet (ghost) Sign In butonu */}
-          <button onClick={() => goToAuth()} className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">
-            Sign in
-          </button>
 
-        </div>
-      </nav>
+        {/* Giris karti */}
+        <div className="rounded-xl border p-6 sm:p-8 shadow-2xl" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <h1 className="text-xl font-bold text-white">Giriş Yap</h1>
+          <p className="text-sm mt-1 mb-6" style={{ color: TEXT_MUTED }}>Kurumsal e-posta adresiniz ve şifrenizle oturum açın.</p>
 
-      {/* HERO BÖLÜMÜ */}
-      <section className="pt-32 pb-20 px-6 text-center max-w-5xl mx-auto flex flex-col items-center">
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 mb-6 leading-[1.1]">
-          Bugün dijitalleşin.<br />
-          <span className="text-emerald-500">Global ölçekte büyüyün.</span>
-        </h1>
-        <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-          İhracat operasyonlarınıza yapay zeka ile başlayın. AI destekli belge okuma, %100 uyumlu evrak üretimi, akıllı cut-off takibi ve navlun yönetimi ekleyin.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
-          {/* Supabase tarzı ana aksiyon butonu */}
-          <button onClick={() => goToAuth()} className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
-            Start your project
-          </button>
-
-        </div>
-      </section>
-
-      {/* ÖZELLİKLER (SUPABASE TARZI BENTO GRID) */}
-      <section className="py-16 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            
-            {/* Kart 1: Veritabanı / Evrak Üretimi */}
-            <div className="col-span-1 p-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText size={18} className="text-slate-700" />
-                <h3 className="font-bold text-slate-900">Sıfır Hata Evraklar</h3>
-              </div>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Her projeye tam entegre evrak üreticisi. Commercial Invoice, Packing List ve sertifikalarınızı saniyeler içinde PDF&apos;e dönüştürün.
-              </p>
+          {authError && (
+            <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm text-red-300" style={{ backgroundColor: "rgba(239,68,68,0.08)", borderColor: "rgba(239,68,68,0.3)" }}>
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <span>{authError}</span>
             </div>
+          )}
 
-            {/* Kart 2: Auth / AI Analiz */}
-            <div className="col-span-1 p-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
-              <div className="flex items-center gap-2 mb-4">
-                <BrainCircuit size={18} className="text-slate-700" />
-                <h3 className="font-bold text-slate-900">Yapay Zeka Analizi</h3>
-              </div>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Manuel veri girişini bırakın. Gemi evrakları, proforma ve talimatlarınızı yapay zeka entegrasyonu ile otomatik okutun.
-              </p>
-            </div>
-
-            {/* Kart 3: Realtime / Cut-off */}
-            <div className="col-span-1 p-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
-              <div className="flex items-center gap-2 mb-4">
-                <Clock size={18} className="text-slate-700" />
-                <h3 className="font-bold text-slate-900">Gerçek Zamanlı Takip</h3>
-              </div>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Gemi kalkış, ETA, ETD ve beyanname sürelerini gerçek zamanlı takip edin. Gecikmeleri anında fark edin.
-              </p>
-            </div>
-
-            {/* Kart 4: API / Kurumsal Ağ */}
-            <div className="col-span-1 p-6 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 size={18} className="text-slate-700" />
-                <h3 className="font-bold text-slate-900">Acente API&apos;leri</h3>
-              </div>
-              <p className="text-sm text-slate-500 leading-relaxed">
-                Farklı acentelerden navlun tekliflerini tek merkezde toplayın. Anında kullanıma hazır operasyonel paneller.
-              </p>
-            </div>
-
-          </div>
-
-          <div className="mt-16 text-center">
-            <p className="text-lg text-slate-600 font-medium">
-              Birini veya hepsini kullanın. İhracat operasyonlarında sınıfının en iyisi.<br/>
-              <span className="text-slate-900 font-bold">Tek platform olarak entegre.</span>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* DASHBOARD MOCKUP / ÜRETKEN KALIN BÖLÜMÜ */}
-      <section className="py-24 bg-slate-50 border-y border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">Üretken kalın ve tüm süreci yönetin</h2>
-          <p className="text-slate-500 mb-12">tek bir ekrandan ayrılmadan.</p>
-          
-          <div className="w-full aspect-[16/9] md:aspect-[21/9] rounded-xl bg-white border border-slate-200 shadow-xl overflow-hidden flex flex-col text-left">
-            <div className="h-10 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-300"></div>
-              <div className="ml-4 px-3 py-1 bg-white rounded border border-slate-200 text-xs text-slate-400 font-mono shadow-sm">app.ihracat-ai.com/dashboard</div>
-            </div>
-            <div className="flex-1 p-8 flex gap-6">
-              <div className="w-48 h-full bg-slate-50 rounded border border-slate-100 hidden md:block"></div>
-              <div className="flex-1 flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <div className="h-20 flex-1 bg-slate-50 border border-slate-100 rounded"></div>
-                  <div className="h-20 flex-1 bg-emerald-50 border border-emerald-100 rounded"></div>
-                  <div className="h-20 flex-1 bg-slate-50 border border-slate-100 rounded"></div>
-                </div>
-                <div className="flex-1 bg-slate-50 border border-slate-100 rounded p-6">
-                  <div className="w-1/4 h-3 bg-slate-200 rounded mb-6"></div>
-                  <div className="w-full h-8 bg-white border border-slate-100 rounded mb-2"></div>
-                  <div className="w-full h-8 bg-white border border-slate-100 rounded mb-2"></div>
-                </div>
+          <form onSubmit={handleEmailLogin} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-xs font-medium mb-1.5" style={{ color: TEXT_MUTED }}>E-posta</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="ad.soyad@unex.com.tr"
+                  className={inputClass}
+                  style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}
+                />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* MÜŞTERİ HİKAYELERİ */}
-      <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center tracking-tight">
-            Sektör liderleri İhracat AI ile nasıl büyüyor?
-          </h2>
-          <div className="p-8 md:p-12 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-emerald-500/30 transition-colors">
-            <Quote className="text-slate-200 w-10 h-10 mb-6" />
-            <p className="text-xl md:text-2xl font-medium text-slate-800 leading-relaxed mb-8">
-              &quot;Alternatiflere baktık ve İhracat AI&apos;ı seçtik çünkü inanılmaz basit ve tüm sevkiyat sürecimizi kapsıyor. Operasyon süremizi %80 kısalttı ve sıfır hata ile çalışmamızı sağladı.&quot;
-            </p>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-sm">
-                VD
-              </div>
-              <div>
-                <div className="font-bold text-slate-900">Volkan Durgut</div>
-                <div className="text-sm text-slate-500">İhracat Operasyon</div>
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium mb-1.5" style={{ color: TEXT_MUTED }}>Şifre</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className={inputClass}
+                  style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}
+                />
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ALT CTA BÖLÜMÜ */}
-      <section className="py-24 bg-[#1C1C1C] text-center px-6">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">İlk günden itibaren endüstri standardıDoc güvenlik.</h2>
-          <p className="text-slate-400 text-lg mb-10">
-            Kullanıcı verileriniz şifrelenmiş sunucularda barınır. Sadece yetkili personelleriniz verilere erişebilir. Daima kontroldesiniz.
-          </p>
-          <div className="flex items-center justify-center">
-            <button onClick={() => goToAuth()} className="inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white transition-all bg-[#24b47e] border border-[#24b47e] rounded-md shadow-sm hover:bg-[#1e9d6d] hover:border-[#1e9d6d]">
-              Start your project
+            <button
+              type="submit"
+              disabled={isProcessing || !email || !password}
+              className="w-full h-10 mt-2 inline-flex items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: ACCENT }}
+            >
+              {isProcessing ? <Loader2 size={18} className="animate-spin" /> : "Giriş Yap"}
             </button>
+          </form>
+
+          <div className="mt-6 flex items-start gap-2 rounded-lg border px-3 py-2.5" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+            <ShieldCheck size={15} className="shrink-0 mt-0.5" style={{ color: ACCENT }} />
+            <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
+              Hesaplar yönetici tarafından oluşturulur. Erişim veya şifre sıfırlama için yöneticinizle iletişime geçin.
+            </p>
           </div>
         </div>
-      </section>
 
-      {/* DEVASE SUPABASE TARZI FOOTER */}
-      <footer className="bg-white border-t border-slate-200 pt-16 pb-8 px-6 lg:px-12">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 mb-16">
-          
-          <div className="col-span-2 lg:col-span-2">
-            <div className="flex items-center gap-2 mb-6">
-              <Anchor size={20} className="text-emerald-500" />
-              <span className="font-bold text-xl text-slate-900 tracking-tight">İhracat AI</span>
-            </div>
-            <div className="flex gap-4 text-slate-400 mb-8">
-              <Github className="w-5 h-5 hover:text-slate-900 cursor-pointer transition-colors" />
-              <Twitter className="w-5 h-5 hover:text-slate-900 cursor-pointer transition-colors" />
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-4">Ürün</h4>
-            <ul className="space-y-3 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Fiyatlandırma</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Yapay Zeka Analizi</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Evrak Üretici</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Cut-Off Takibi</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Acente & Navlun</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-4">Çözümler</h4>
-            <ul className="space-y-3 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">KOBİ&apos;ler</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Kurumsal İhracatçılar</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Lojistik Acenteleri</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Gümrük Müşavirleri</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-4">Kaynaklar</h4>
-            <ul className="space-y-3 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Dokümantasyon</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Müşteri Hikayeleri</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Sistem Durumu</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-bold text-slate-900 mb-4">Şirket</h4>
-            <ul className="space-y-3 text-sm text-slate-500">
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Hakkımızda</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Kariyer</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Gizlilik Politikası</a></li>
-              <li><a href="#" className="hover:text-emerald-600 transition-colors">Kullanım Şartları</a></li>
-              <li><a href="mailto:export@unex.com.tr" className="hover:text-emerald-600 transition-colors">Bize Ulaşın</a></li>
-            </ul>
-          </div>
-
-        </div>
-
-        <div className="max-w-7xl mx-auto pt-8 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-slate-500">© 2026 İhracat AI Inc.</p>
-        </div>
-      </footer>
-
-    </div>
+        <p className="mt-6 text-center text-[11px]" style={{ color: "#4A5262" }}>© {new Date().getFullYear()} Unex Gıda · İhracat AI</p>
+      </div>
+    </main>
   );
 }

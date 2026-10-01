@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, isDosyaAcik } from "@/lib/supabase";
+import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import DraftOnayKarti from "@/components/draft-onay-karti";
@@ -138,16 +139,12 @@ export default function DraftOnayPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        <div>
-          <h1 className="text-lg font-bold text-white flex items-center gap-2">
-            <FileCheck2 size={20} /> Draft Onay Gönderim
-          </h1>
-          <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-            Sevkiyat evrakları (Commercial Invoice, Packing List, Draft BL, Certificate of Origin,
-            Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir. Müşteri
-            istediyse Quality ve Fumigation sertifikaları da evrak listesinde gösterilir.
-          </p>
-        </div>
+        <SayfaBasligi
+          ikon={<FileCheck2 size={20} />}
+          baslik="Draft Onay Gönderim"
+          aciklama="Sevkiyat evrakları (Commercial Invoice, Packing List, Draft BL, Certificate of Origin, Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir. Müşteri istediyse Quality ve Fumigation sertifikaları da evrak listesinde gösterilir."
+          className="mb-0"
+        />
 
         {loading ? (
           <div className="flex items-center gap-2 py-10 justify-center" style={{ color: TEXT_MUTED }}>

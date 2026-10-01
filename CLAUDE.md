@@ -214,6 +214,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   mail şablonunda "Unless we receive any feedback within 48 hours, it will be
   deemed approved." cümlesi var; süre dolunca satırda "onaylanmış sayılır"
   notu çıkar ama durum otomatik değiştirilmez (01.10.2026).
+- Tablo düzeni (revize 01.10.2026): 6 sütun — Dosya/Müşteri, Proforma/Booking,
+  İlgili Evraklar, Kalkış/ETA, Durum, Aksiyonlar. Her hücre 2 satır, tüm
+  satırlar eşit yükseklikte; 1366 ve 1536 px ekranda yatay kaydırma YOK
+  (yeni sütun/buton eklerken bunu ölçerek koru). Durum = rozet + tek satır
+  bilgi (yanıt beklenirken 48s sayaç). Aksiyonlarda sadece SIRADAKİ adım
+  görünür (Onayla → Gönderildi İşaretle → Müşteri Onayladı/Revize/Hatırlat);
+  tamamlanan adımlar Durum hücresinin tooltip'inde adım geçmişi olarak.
 - Revize istenirse `draft_onaylandi` / `draft_mail_gonderildi` /
   `draft_musteri_onayi_alindi` bayrakları sıfırlanır (dosya baştan Onayla
   adımına döner), ama `draft_revize_notu/tarihi/isaretleyen` geçmiş kayıt

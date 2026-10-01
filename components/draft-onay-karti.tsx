@@ -6,10 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
-import { formatDateTimeTR, formatDateTR } from "@/lib/cutoff-utils";
+import { formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
 import { draftOnayAliciEmailAl, buildDraftHatirlatmaMailtoUrl } from "@/lib/draft-onay-mail";
-import { draftYanitSonuMs, draftSuresiDoldu } from "@/lib/draft-onay-sure";
+import { draftYanitSonuMs, draftSuresiDoldu, formatIstanbulTarihSaat } from "@/lib/draft-onay-sure";
 import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
 import { useSimdi } from "@/lib/use-simdi";
 import { DraftYanitSayaci } from "@/components/draft-yanit-sayaci";
@@ -245,13 +245,23 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         })
       : null;
 
-  const durumTitle = musteriOnayiAlindi
-    ? `Müşteri onayını işaretleyen: ${musteriOnayiIsaretleyen || "-"}${musteriOnayiTarihi ? " · " + formatDateTimeTR(musteriOnayiTarihi) : ""}`
-    : revizeIstendi
-    ? `Revizeyi işaretleyen: ${revizeIsaretleyen || "-"}${revizeTarihi ? " · " + formatDateTimeTR(revizeTarihi) : ""}${revizeNotuKayitli ? " · Not: " + revizeNotuKayitli : ""}`
-    : onaylandi
-    ? `Onaylayan: ${onaylayan || "-"}${onayTarihi ? " · " + formatDateTimeTR(onayTarihi) : ""}`
-    : undefined;
+  // Tamamlanan adimlar artik ayri (soluk) butonlar olarak degil, durum
+  // rozetinin uzerine gelince adim gecmisi olarak gosterilir (01.10.2026).
+  const tamZaman = (iso: string | null) => {
+    if (!iso) return "";
+    const ms = new Date(iso).getTime();
+    return isNaN(ms) ? "" : formatIstanbulTarihSaat(ms);
+  };
+  const mailGonderildiTarihi = dosya.draft_mail_gonderildi_tarihi as string | null;
+  const durumTitle =
+    [
+      onaylandi ? `✓ İç onay: ${onaylayan || "-"} ${tamZaman(onayTarihi)}` : null,
+      mailGonderildi ? `✓ Müşteriye gönderildi: ${tamZaman(mailGonderildiTarihi)}` : null,
+      musteriOnayiAlindi ? `✓ Müşteri onayı: ${musteriOnayiIsaretleyen || "-"} ${tamZaman(musteriOnayiTarihi)}` : null,
+      revizeIstendi ? `Revize: ${revizeIsaretleyen || "-"} ${tamZaman(revizeTarihi)}${revizeNotuKayitli ? "\nNot: " + revizeNotuKayitli : ""}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n") || undefined;
 
   // İlgili Evraklar sabit sırada gösterilir: 1) Commercial Invoice,
   // 2) Packing List, 3) Draft BL, 4) Certificate of Origin, 5) Phytosanitary,
@@ -290,28 +300,69 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
 
+  // Durum rozetinin altindaki TEK satirlik bilgi - her satir ayni yukseklikte
+  // kalsin diye her durumda bir ikinci satir vardir (duzen revizesi 01.10.2026).
+  const kisaZaman = (iso: string | null) => {
+    if (!iso) return null;
+    const ms = new Date(iso).getTime();
+    if (isNaN(ms)) return null;
+    const [t, sa] = formatIstanbulTarihSaat(ms).split(" ");
+    return `${t.slice(0, 5)} ${sa}`;
+  };
+  const durumAltSatir: React.ReactNode = musteriOnayiAlindi
+    ? (kisaZaman(musteriOnayiTarihi) ? `Müşteri onayı: ${kisaZaman(musteriOnayiTarihi)}` : "Müşteri onayı alındı")
+    : revizeIstendi
+    ? revizeNotuKayitli || `Revize: ${kisaZaman(revizeTarihi) || "—"}`
+    : (sureDoldu || mailGonderildi) && yanitSonuMs !== null
+    ? <DraftYanitSayaci sonMs={yanitSonuMs} />
+    : mailGonderildi
+    ? "Müşteri yanıtı bekleniyor"
+    : onaylandi
+    ? "Müşteriye gönderilmedi"
+    : "İç onay bekleniyor";
+
+  const ROZET = "inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap";
+  const BUTON = "inline-flex items-center justify-center gap-1 h-7 px-2 rounded-lg text-[11px] font-medium whitespace-nowrap transition-colors disabled:opacity-50";
+
   return (
     <>
     <tr
-      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${sureDoldu ? "bg-red-500/[0.06]" : ""}`}
+      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${sureDoldu ? "bg-red-500/[0.05]" : hatirlatmaKritik ? "bg-red-500/[0.03]" : ""}`}
       style={{ borderColor: CARD_BORDER }}
     >
-      <td className="px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap">
-        <button
-          type="button"
-          onClick={() => router.push(`/dosya/${dosya.id}`)}
-          title="İlgili ihracat dosyasını aç"
-          className="hover:underline transition-colors"
-          style={{ color: ACCENT }}
-        >
-          {dosya.dosya_no}
-        </button>
+      {/* Dosya + Musteri (e-posta uyarisi ayni satirda - satir yuksekligi sabit kalsin) */}
+      <td className="px-2.5 py-2.5 align-middle max-w-[160px]">
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => router.push(`/dosya/${dosya.id}`)}
+            title="İlgili ihracat dosyasını aç"
+            className="text-xs font-semibold hover:underline"
+            style={{ color: ACCENT }}
+          >
+            {dosya.dosya_no}
+          </button>
+          {!aliciEmail && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-400"
+              title="Müşterinin e-postası dosyada kayıtlı değil; maillerde alıcıyı elle girmeniz gerekir"
+            >
+              <AlertTriangle size={10} /> E-posta yok
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] truncate text-slate-300" title={dosya.alici_firma || undefined}>{dosya.alici_firma || "—"}</p>
       </td>
-      <td className="px-2.5 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "—"}</td>
-      <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</td>
-      <td className="px-2.5 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</td>
-      <td className="px-2.5 py-2.5">
-        <div className="flex items-center gap-1 flex-nowrap whitespace-nowrap">
+
+      {/* Proforma + Booking */}
+      <td className="px-2.5 py-2.5 align-middle whitespace-nowrap">
+        <p className="text-[11px] font-mono" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</p>
+        <p className="text-[11px] font-mono" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</p>
+      </td>
+
+      {/* Evraklar */}
+      <td className="px-2.5 py-2.5 align-middle">
+        <div className="flex items-center flex-nowrap whitespace-nowrap">
           {evrakSirasi.map((item) =>
             item.eksikler ? (
               <button
@@ -319,7 +370,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 type="button"
                 onClick={() => showToast(`${item.title} üretilemiyor. Eksik: ${item.eksikler!.join(", ")}`, "error")}
                 title={`${item.title} — eksik bilgi: ${item.eksikler.join(", ")}`}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/10 transition-colors text-amber-400"
+                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors text-amber-400"
               >
                 <AlertTriangle size={14} />
               </button>
@@ -330,7 +381,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 target="_blank"
                 rel="noopener noreferrer"
                 title={item.title}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors"
                 style={{ color: ACCENT }}
               >
                 <Ship size={14} />
@@ -341,7 +392,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 type="button"
                 onClick={item.onClick}
                 title={item.title}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-white/10 transition-colors"
+                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors"
                 style={{ color: ACCENT }}
               >
                 <FileType2 size={14} />
@@ -349,79 +400,79 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             )
           )}
         </div>
-        {!aliciEmail && (
-          <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-1 whitespace-nowrap">
-            <AlertTriangle size={10} /> Alıcı e-postası yok
-          </p>
-        )}
       </td>
-      <td className="px-2.5 py-2.5 whitespace-nowrap" title={durumTitle}>
-        {musteriOnayiAlindi ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-            <CheckCircle2 size={11} /> Onay Geldi
-          </span>
-        ) : revizeIstendi ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-400 bg-orange-500/10 px-2 py-1 rounded-full">
-            <MessageSquareWarning size={11} /> Revize İstendi
-          </span>
-        ) : sureDoldu ? (
-          <div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
-              <Clock size={11} /> Süre Doldu (48s)
-            </span>
-            {yanitSonuMs !== null && <DraftYanitSayaci sonMs={yanitSonuMs} />}
-          </div>
-        ) : mailGonderildi ? (
-          <div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-              <AlertTriangle size={11} /> Yanıt Bekleniyor
-            </span>
-            {yanitSonuMs !== null && <DraftYanitSayaci sonMs={yanitSonuMs} />}
-          </div>
-        ) : onaylandi ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: ACCENT, backgroundColor: `${ACCENT}1A` }}>
-            <ThumbsUp size={11} /> Gönderime Hazır
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}>
-            Bekliyor
-          </span>
-        )}
+
+      {/* Kalkis + ETA */}
+      <td className="px-2.5 py-2.5 align-middle whitespace-nowrap">
+        <p className="text-[11px] text-slate-300 tabular-nums">{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "—"}</p>
+        <p className="text-[10px] tabular-nums" style={{ color: TEXT_MUTED }}>ETA {rez?.eta ? formatDateTR(rez.eta) : "—"}</p>
       </td>
-      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.gemi_kalkis_tarihi || null)}</td>
-      <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatDateTR(rez?.eta || null)}</td>
-      <td className="px-2.5 py-2.5">
+
+      {/* Durum: rozet + tek satir bilgi */}
+      <td className="px-2.5 py-2.5 align-middle" title={durumTitle}>
+        <div className="flex flex-col items-start gap-1 min-w-[140px]">
+          {musteriOnayiAlindi ? (
+            <span className={`${ROZET} text-green-400 bg-green-500/10`}><CheckCircle2 size={11} /> Onay Geldi</span>
+          ) : revizeIstendi ? (
+            <span className={`${ROZET} text-orange-400 bg-orange-500/10`}><MessageSquareWarning size={11} /> Revize İstendi</span>
+          ) : sureDoldu ? (
+            <span className={`${ROZET} text-red-400 bg-red-500/10`}><Clock size={11} /> Süre Doldu (48s)</span>
+          ) : mailGonderildi ? (
+            <span className={`${ROZET} text-amber-400 bg-amber-500/10`}><Clock size={11} /> Yanıt Bekleniyor</span>
+          ) : onaylandi ? (
+            <span className={ROZET} style={{ color: ACCENT, backgroundColor: `${ACCENT}1A` }}><ThumbsUp size={11} /> Gönderime Hazır</span>
+          ) : (
+            <span className={ROZET} style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}>Bekliyor</span>
+          )}
+          {typeof durumAltSatir === "string" ? (
+            <p className="text-[10px] whitespace-nowrap max-w-[190px] truncate" style={{ color: TEXT_MUTED }}>{durumAltSatir}</p>
+          ) : (
+            durumAltSatir
+          )}
+        </div>
+      </td>
+
+      {/* Aksiyonlar: sadece SIRADAKI adim (tamamlanan adimlar durum rozetinin
+          tooltip'inde). Paket butonu her zaman ilk sirada - sabit x konumu. */}
+      <td className="px-2.5 py-2.5 align-middle">
         <div className="flex items-center justify-start gap-1.5 whitespace-nowrap">
           <button
             type="button"
             onClick={handlePaketIndir}
             disabled={indiriliyor}
             title="Taslak Onay Paketi İndir (ZIP)"
-            className="inline-flex items-center justify-center w-7 h-7 rounded-md border hover:bg-white/5 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg border hover:bg-white/5 disabled:opacity-50 transition-colors shrink-0"
             style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
           >
             {indiriliyor ? <Loader2 size={13} className="animate-spin" /> : <FileArchive size={13} />}
           </button>
-          <button
-            type="button"
-            onClick={handleOnayla}
-            disabled={onaylandi || onaylaniyor}
-            title={onaylandi ? "Onaylandı" : "Onayla"}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-opacity"
-            style={{ backgroundColor: ACCENT }}
-          >
-            <ThumbsUp size={12} /> {onaylandi ? "Onaylandı" : "Onayla"}
-          </button>
-          <button
-            type="button"
-            onClick={handleGonderildiIsaretle}
-            disabled={!onaylandi || mailGonderildi || mailIsaretleniyor}
-            title={!onaylandi ? "Önce evrakları onaylayın" : mailGonderildi ? "Gönderildi olarak işaretlendi" : "Draftı kendi mail yolunuzdan gönderdiyseniz burada işaretleyin"}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5 transition-colors"
-            style={{ borderColor: CARD_BORDER, color: "white" }}
-          >
-            {mailIsaretleniyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} {mailGonderildi ? "Gönderildi" : "Gönderildi İşaretle"}
-          </button>
+
+          {!onaylandi && (
+            <button
+              type="button"
+              onClick={handleOnayla}
+              disabled={onaylaniyor}
+              title="Evrakları kontrol ettiyseniz iç onay verin"
+              className={`${BUTON} text-white hover:opacity-90`}
+              style={{ backgroundColor: ACCENT }}
+            >
+              {onaylaniyor ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />} Onayla
+            </button>
+          )}
+
+          {onaylandi && !mailGonderildi && (
+            <button
+              type="button"
+              onClick={handleGonderildiIsaretle}
+              disabled={mailIsaretleniyor}
+              title="Draftı kendi mail yolunuzdan gönderdiyseniz işaretleyin - 48 saatlik yanıt süresi başlar"
+              className={`${BUTON} text-white hover:opacity-90`}
+              style={{ backgroundColor: ACCENT }}
+            >
+              {mailIsaretleniyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Gönderildi İşaretle
+            </button>
+          )}
+
           {mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && (
             <>
               <button
@@ -429,7 +480,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 onClick={handleMusteriOnayiGeldi}
                 disabled={musteriOnayiKaydediliyor}
                 title="Müşteriden onay maili/cevabı geldiğinde işaretleyin"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-500 disabled:opacity-50 transition-colors"
+                className={`${BUTON} text-white bg-green-600 hover:bg-green-500`}
               >
                 {musteriOnayiKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Müşteri Onayladı
               </button>
@@ -437,21 +488,22 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
                 type="button"
                 onClick={() => { setRevizeNotu(""); setRevizeModalAcik(true); }}
                 title="Müşteri revize istediğinde işaretleyip not düşün"
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-orange-600 hover:bg-orange-500 transition-colors"
+                className={`${BUTON} border text-orange-300 hover:bg-orange-500/10`}
+                style={{ borderColor: "rgba(251,146,60,0.45)" }}
               >
-                <MessageSquareWarning size={12} /> Revize İstendi
+                <MessageSquareWarning size={12} /> Revize
               </button>
               {/* 48 saat dolmadan musteriye hatirlatma (talep: 01.10.2026).
-                  Son 10 saatte kirmizi vurgulanir; ayni anda uygulama geneli
-                  bildirim de gelir (components/cutoff-uyarilari.tsx). */}
+                  Son 10 saatte kirmizi; ayni anda uygulama geneli bildirim
+                  de gelir (components/cutoff-uyarilari.tsx). */}
               {hatirlatmaMailto && (
                 <a
                   href={hatirlatmaMailto}
                   title={aliciEmail ? `Müşteriye hatırlatma maili: ${aliciEmail}` : "Alıcı e-postası dosyada kayıtlı değil - alıcıyı mailde elle girin"}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${hatirlatmaKritik ? "text-red-300 hover:bg-red-500/10" : "text-white hover:bg-white/5"}`}
-                  style={{ borderColor: hatirlatmaKritik ? "rgba(248,113,113,0.45)" : CARD_BORDER }}
+                  className={`${BUTON} border ${hatirlatmaKritik ? "text-red-300 hover:bg-red-500/10" : "text-slate-200 hover:bg-white/5"}`}
+                  style={{ borderColor: hatirlatmaKritik ? "rgba(248,113,113,0.5)" : CARD_BORDER }}
                 >
-                  <Mail size={12} /> Hatırlatma
+                  <Mail size={12} /> Hatırlat
                 </a>
               )}
             </>
@@ -461,7 +513,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     </tr>
     {revizeModalAcik && (
       <tr>
-        <td colSpan={9} className="p-0">
+        <td colSpan={6} className="p-0">
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setRevizeModalAcik(false)}>
             <div
               className="w-full max-w-md rounded-xl border p-4 shadow-lg"

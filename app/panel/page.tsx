@@ -7,6 +7,7 @@ import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyani
 import { useSearchParams, useRouter } from "next/navigation";
 import { isCutoffApproaching, formatDateTR } from "@/lib/cutoff-utils";
 import { CutoffSayac } from "@/components/cutoff-sayac";
+import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
 import { useToast } from "@/lib/toast-context";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -203,7 +204,7 @@ function PanelContent() {
                     {/* Ana satır */}
                     <tr className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
                       <td className="px-3 py-3 align-top">
-                        <span className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{dosya.proforma_no || dosya.dosya_no}</span>
+                        <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }} />
                       </td>
                       <td className="px-3 py-3 align-top max-w-[220px]">
                         <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>

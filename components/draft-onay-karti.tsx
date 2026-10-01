@@ -13,6 +13,7 @@ import { draftYanitSonuMs, draftSuresiDoldu, formatIstanbulTarihSaat } from "@/l
 import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
 import { useSimdi } from "@/lib/use-simdi";
 import { DraftYanitSayaci } from "@/components/draft-yanit-sayaci";
+import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
@@ -364,7 +365,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
 
       {/* Proforma + Booking */}
       <td className="px-2.5 py-2.5 align-middle whitespace-nowrap">
-        <p className="text-[11px] font-mono" style={{ color: ACCENT }}>{dosya.proforma_no || "—"}</p>
+        <p className="text-[11px] font-mono"><CokluNoKisa deger={dosya.proforma_no} style={{ color: ACCENT }} /></p>
         <p className="text-[11px] font-mono" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</p>
       </td>
 

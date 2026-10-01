@@ -8,6 +8,7 @@ import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/lib/toast-context";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
+import { CokluNoKisa, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
@@ -499,7 +500,7 @@ export default function IhracatlarPage() {
                       style={{ borderColor: CARD_BORDER }}
                       onClick={() => setSelectedDosya(d)}
                     >
-                      <td className="px-2.5 py-2.5 text-xs font-medium whitespace-nowrap" style={{ color: ACCENT }}>{d.proforma_no || "—"}</td>
+                      <td className="px-2.5 py-2.5 text-xs font-medium whitespace-nowrap"><CokluNoKisa deger={d.proforma_no} style={{ color: ACCENT }} /></td>
                       <td className="px-2.5 py-2.5 text-xs text-white max-w-[140px] truncate">{d.alici_firma || "—"}</td>
                       <td className="px-2.5 py-2.5 text-xs max-w-[140px] truncate" style={{ color: TEXT_MUTED }}>{d.varis_limani || "—"}</td>
                       <td className="px-2.5 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{d.teslim_sekli || "—"}</td>
@@ -588,7 +589,7 @@ export default function IhracatlarPage() {
               <div>
                 <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>Proforma Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <CopyableField dark label="Proforma No" value={selectedDosya.proforma_no} />
+                  <CopyableField dark label="Proforma No" value={selectedDosya.proforma_no} gosterim={cokluNoSatirlari(selectedDosya.proforma_no)} />
                   <CopyableField dark label="Proforma Tarihi" value={formatDateTR(selectedDosya.proforma_tarihi)} />
                   <CopyableField dark label="Alıcı Firma" value={selectedDosya.alici_firma} />
                   <CopyableField dark label="Satıcı Firma" value={selectedDosya.satici_firma} />

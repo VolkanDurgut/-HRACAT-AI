@@ -28,6 +28,7 @@
  *   alani - biz hic dokunmuyoruz.
  */
 
+import { noParcala } from "@/lib/coklu-no";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { HEALTH_BACKGROUND_BASE64 } from "@/lib/images/health-background-base64";
 
@@ -303,7 +304,7 @@ const HEALTH_TEMPLATE = `<!DOCTYPE html>
     <div class="veri" id="f-bolge">__BOLGE__</div>
     <div class="veri" id="f-consignee">__CONSIGNEE__</div>
     <div class="veri" id="f-urun">WHEAT FLOUR</div>
-    <div class="veri" id="f-lot">__LOT_NR__</div>
+    <div class="veri" id="f-lot" style="__LOT_STIL__">__LOT_NR__</div>
     <div class="veri" id="f-skt">__SKT__</div>
     <div class="veri" id="f-birim-net">__BIRIM_NET__</div>
     <div class="veri" id="f-dis-ambalaj">__DIS_AMBALAJ__</div>
@@ -335,6 +336,10 @@ export function buildHealthCertificateHtml(
     CONSIGNEE:    consigneeSatirlari ? escapeHtml(consigneeSatirlari) : safe(null),
     CONSIGNEE_FONT: String(consigneeFont),
     LOT_NR:       safe(dosya.lot_no),
+    // Iki lot ("A / B", bkz. lib/coklu-no.ts) kutuya iki satir olarak sigar;
+    // ikinci satirin basili "Lot No" etiketine binmemesi icin biraz yukari
+    // alinir ve punto kuculur. Tek lotta gorunum degismez (01.10.2026).
+    LOT_STIL:     noParcala(dosya.lot_no).length > 1 ? "top: 38.65%; font-size: 9px; line-height: 1.15;" : "",
     SKT:          dosya.son_kullanim_tarihi ? safe(new Date(dosya.son_kullanim_tarihi).toLocaleDateString("tr-TR")) : safe(null),
     BIRIM_NET:    buildBirimNetAgirlik(dosya),
     DIS_AMBALAJ:  buildToplamKapAdedi(konteynerler, disAmbalajYedek),

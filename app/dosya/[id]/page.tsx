@@ -3,10 +3,9 @@
 import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, SurecTakibi, yazmaHatasi } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, formatDateTimeTR, autoSuggestContainers } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTimeTR, autoSuggestContainers } from "@/lib/cutoff-utils";
 import { MTS_PER_KONTEYNER } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
-import { CopyableField } from "@/components/copyable-field";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { DetailSkeleton } from "@/components/skeleton-loaders";
@@ -15,12 +14,13 @@ import RezervasyonTab from "@/components/rezervasyon-tab";
 import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
 import BankaBilgileriCard from "@/components/banka-bilgileri-card";
+import ProformaCard from "@/components/proforma-card";
 import TaraflarCard from "@/components/taraflar-card";
 import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, Copy, ExternalLink, FileText, FolderOpen } from "lucide-react";
+import { Loader2, Package, FileCheck, Copy, ExternalLink, FolderOpen } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -332,30 +332,7 @@ function DosyaDetailContent() {
                 <TaraflarCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Proforma</h3>
-                  {/* Talep (26.09.2026): orijinal proforma PDF'ini goruntuleme. Sadece
-                      PDF'i storage'a kaydedilmis dosyalarda gorunur (26.09.2026 sonrasi
-                      acilanlar - oncesindeki dosyalarda PDF geriye donuk eklenemez). */}
-                  {dosya.proforma_dosya_url && (
-                    <a
-                      href={dosya.proforma_dosya_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors hover:text-white"
-                      style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
-                      title="Orijinal proforma PDF'ini yeni sekmede aç"
-                    >
-                      <FileText size={12} /> Proformayı Görüntüle
-                    </a>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <CopyableField dark label="Proforma No" value={dosya.proforma_no} />
-                  <CopyableField dark label="Proforma Tarihi" value={formatDateTR(dosya.proforma_tarihi)} />
-                  <CopyableField dark label="Geçerlilik Tarihi" value={formatDateTR(dosya.gecerlilik_tarihi)} />
-                  <CopyableField dark label="Lot No" value={dosya.lot_no} />
-                </div>
+                <ProformaCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
               </div>
             </div>
           <UrunDetaylariCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />

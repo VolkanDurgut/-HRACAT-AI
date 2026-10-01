@@ -209,6 +209,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Müşteri onayı alınmamışsa "Hatırlatma maili": `buildDraftHatirlatmaMailtoUrl`
   (`lib/draft-onay-mail.ts`), Draft Onay maili ile aynı alıcı + CC.
 
+## Birden fazla Proforma No / Lot No (01.10.2026)
+
+- Ayrı kolon YOK: ikinci numara mevcut `proforma_no` / `lot_no` alanına
+  `" / "` ayırıcıyla yazılır ("UNEXCCS270826 / UNEXBFB090926"). Parçala /
+  birleştir yalnızca `lib/coklu-no.ts` (`noParcala`, `noBirlestir`) ile; en
+  fazla 2 numara (`AZAMI_NO_SAYISI`). Bu sayede fatura talimatı, tüm evraklar,
+  mailler ve arama ek kod olmadan ikisini birlikte gösterir.
+- Düzenleme: Proforma kartı (`components/proforma-card.tsx`) ve Ek Bilgiler'deki
+  Lot No → `CokluNoGirisi`. Kartlarda her numara ayrı satır
+  (`cokluNoSatirlari` + `CopyableField gosterim`), dar tablo hücrelerinde
+  `CokluNoKisa` ("A +1", tamamı tooltip'te). Dosya adlarında "A-B".
+- Health Certificate'te iki lot kutuya iki satır sığsın diye `LOT_STIL` ile
+  biraz yukarı alınıp küçültülür; diğer evraklarda yer zaten yeterli.
+- `ana_siparisler.proforma_no` (sipariş kimliği) tek numara kalır, değişmez.
+
 ## Rezervasyon silme
 
 - `konteynerler.rezervasyon_id` FK'si `ON DELETE CASCADE`: rezervasyon

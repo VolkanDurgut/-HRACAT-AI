@@ -13,7 +13,8 @@ import { draftFiligranEkle } from "@/lib/watermark";
 import { htmlToPdfBlob } from "@/lib/html-to-pdf";
 
 function guvenliParca(ham: string | null | undefined, yedek: string): string {
-  return (ham || yedek).trim().replace(/[\/\\:*?"<>|]/g, "");
+  // Iki proforma "A / B" bicimindeyse (lib/coklu-no.ts) dosya adinda "A-B" olur
+  return (ham || yedek).trim().replace(/\s*\/\s*/g, "-").replace(/[\/\\:*?"<>|]/g, "");
 }
 
 function guvenliDosyaAdi(ham: string | null | undefined, yedek: string): string {

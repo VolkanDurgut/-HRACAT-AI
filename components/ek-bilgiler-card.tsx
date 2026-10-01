@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { supabase, Dosya, Rezervasyon, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
+import { CokluNoGirisi, cokluNoSatirlari } from "@/components/coklu-no-girisi";
+import { noParcala, noBirlestir } from "@/lib/coklu-no";
 import { formatDateTR, formatCurrency } from "@/lib/cutoff-utils";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
@@ -73,7 +75,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     notify: notifyText,
     consignee: consigneeText,
     marka_listesi: markaListesiText,
-    lot_no: dosya.lot_no || "",
+    // Birden fazla lot "A / B" olarak tek alanda tutulur (lib/coklu-no.ts)
+    lot_nolari: noParcala(dosya.lot_no),
     marka: dosya.marka || "",
     beyanname_no: dosya.beyanname_no || "",
     bl_no: dosya.bl_no || rezervasyonlar[0]?.booking_no || "",
@@ -111,7 +114,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
     const payload = {
       consignee: form.consignee || null,
-      lot_no: form.lot_no || null,
+      lot_no: noBirlestir(form.lot_nolari),
       marka: form.marka || null,
       beyanname_no: form.beyanname_no || null,
       bl_no: form.bl_no || null,
@@ -245,7 +248,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <CopyableField dark label="Lot No" value={dosya.lot_no} />
+          <CopyableField dark label="Lot No" value={dosya.lot_no} gosterim={cokluNoSatirlari(dosya.lot_no)} />
           <CopyableField dark label="Marka" value={dosya.marka} />
           {mevcutMarkaListesi.length > 1 && (
             <CopyableField dark label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
@@ -281,8 +284,12 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lot No</label>
-          <input value={form.lot_no} onChange={(e) => update("lot_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          <CokluNoGirisi
+            etiket="Lot No"
+            ekEtiket="ikinci lot"
+            degerler={form.lot_nolari}
+            onChange={(v) => setForm((prev) => ({ ...prev, lot_nolari: v }))}
+          />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Marka</label>

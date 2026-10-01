@@ -16,7 +16,8 @@
  * karakterleri temizler) - lib/taslak-onay-paketi.ts -> guvenliParca ile
  * ayni mantik. */
 function guvenliParca(ham: string | null | undefined, yedek: string): string {
-  return (ham || yedek).trim().replace(/[\/\\:*?"<>|]/g, "");
+  // Iki proforma "A / B" bicimindeyse (lib/coklu-no.ts) dosya adinda "A-B" olur
+  return (ham || yedek).trim().replace(/\s*\/\s*/g, "-").replace(/[\/\\:*?"<>|]/g, "");
 }
 
 /** Her evrak turu icin Taslak Onay Paketi'nde kullanilan kisa kod. */

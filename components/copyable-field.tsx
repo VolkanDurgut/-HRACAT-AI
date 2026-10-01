@@ -8,11 +8,14 @@ export function CopyableField({
   value,
   monospace = false,
   dark = false,
+  gosterim,
 }: {
   label: string;
   value: string | null | undefined;
   monospace?: boolean;
   dark?: boolean;
+  /** Ekranda value yerine gosterilecek icerik (kopyalanan yine value'dur). */
+  gosterim?: React.ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -44,7 +47,7 @@ export function CopyableField({
         onClick={handleCopy}
       >
         <p className={`text-sm font-medium break-all ${monospace ? "font-mono tracking-tight" : ""} ${dark ? "text-white" : "text-slate-700"}`}>
-          {value || "—"}
+          {value ? (gosterim ?? value) : "—"}
         </p>
         {value && (
           <span className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

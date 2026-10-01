@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils"; 
-import { supabase } from "@/lib/supabase";
+import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { Ship, Search, Loader2, AlertCircle, Bell } from "lucide-react";
@@ -108,14 +108,16 @@ export default function EtdEtaPage() {
 
   const handleEtaKaydet = async (rezervasyonId: string, etaValue: string) => {
     setSaving(rezervasyonId);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("rezervasyonlar")
       .update({ eta: etaValue || null, eta_guncelleme_tarihi: etaValue ? new Date().toISOString() : null })
       .eq("id", rezervasyonId)
-      .eq("company_id", companyId); // Güncelleme işlemi şirket doğrulamasına kilitlendi
+      .eq("company_id", companyId) // Güncelleme işlemi şirket doğrulamasına kilitlendi
+      .select("id");
 
-    if (error) {
-      showToast("ETA kaydedilemedi.", "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`ETA kaydedilemedi: ${hata}`, "error");
     } else {
       setSatirlar(prev => prev.map(s =>
         s.rezervasyon_id === rezervasyonId ? { ...s, eta: etaValue || null, eta_guncelleme_tarihi: etaValue ? new Date().toISOString() : null } : s

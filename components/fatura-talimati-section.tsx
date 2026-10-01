@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
-import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
+import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
@@ -185,12 +185,13 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   const handleMailGonder = async () => {
     const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : "";
     window.open(`mailto:${to}?subject=${encodeURIComponent(konu)}${ccPart}&body=${encodeURIComponent(metin)}`);
-    const { error } = await supabase.from("ihracat_dosyalari").update({
+    const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({
       fatura_talimati_gonderildi: true,
       fatura_talimati_metni: metin,
-    }).eq("id", dosyaId).eq("company_id", companyId);
-    if (error) {
-      showToast(`Fatura talimati durumu kaydedilemedi: ${error.message}`, "error");
+    }).eq("id", dosyaId).eq("company_id", companyId).select("id");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Fatura talimati durumu kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     setShowFaturaTalimati(false);

@@ -1,6 +1,6 @@
 "use client";
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
-import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase } from "@/lib/supabase";
+import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase, yazmaHatasi } from "@/lib/supabase";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { useIrsaliyeUpload } from "@/lib/hooks/use-irsaliye-upload";
 import { useKonteynerForm } from "@/lib/hooks/use-konteyner-form";
@@ -517,16 +517,21 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
   const [duzenle, setDuzenle] = React.useState(false);
   const [taslak, setTaslak] = React.useState(deger || "");
   const [kaydediyor, setKaydediyor] = React.useState(false);
+  const { showToast } = useToast();
 
+  // Sonuc dogrulanir (01.10.2026): eskiden hata/0 satir durumunda da hucre
+  // "kaydedildi" gibi kapaniyordu.
   const kaydet = async (yeniDeger: string) => {
     setKaydediyor(true);
-    try {
-      await supabase.from("konteynerler").update({ marka: yeniDeger || null }).eq("id", konteynerId).eq("company_id", companyId);
-      onKaydedildi();
-    } finally {
-      setKaydediyor(false);
-      setDuzenle(false);
+    const { data, error } = await supabase.from("konteynerler").update({ marka: yeniDeger || null }).eq("id", konteynerId).eq("company_id", companyId).select("id");
+    setKaydediyor(false);
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Çuval markası kaydedilemedi: ${hata}`, "error");
+      return;
     }
+    setDuzenle(false);
+    onKaydedildi();
   };
 
   // Cuval marka listesinde tek bir secenek varsa ve konteynere henuz marka atanmamissa,

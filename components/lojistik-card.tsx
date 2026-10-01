@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
 import { Pencil, Check, X } from "lucide-react";
@@ -63,10 +63,11 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
       detayli_ambalaj: form.detayli_ambalaj || null,
       ham_veri: guncelHamVeri,
     };
-    const { error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId);
+    const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId).select("id");
     setSaving(false);
-    if (error) {
-      showToast(`Lojistik bilgileri kaydedilemedi: ${error.message}`, "error");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Lojistik bilgileri kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     showToast("Lojistik bilgileri güncellendi.", "success");

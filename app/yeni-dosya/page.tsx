@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl } from "@/lib/supabase";
+import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -235,6 +235,7 @@ export default function YeniDosyaPage() {
       // Goruntule/Incele" butonu icin). BEST-EFFORT: basarisiz olsa bile dosya
       // olusturma akisini DURDURMAZ, sadece o dosya icin goruntuleme butonu
       // gorunmez kalir - ana islem (dosya kaydi) her zaman onceliklidir.
+      let proformaSaklanamadi = false;
       if (pdfFile) {
         try {
           const guvenliAd = pdfFile.name
@@ -244,15 +245,29 @@ export default function YeniDosyaPage() {
             .replace(/[^a-zA-Z0-9._-]/g, "_");
           const path = `${data.id}/proforma/${Date.now()}_${guvenliAd}`;
           const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, pdfFile);
-          if (!uploadError) {
+          if (uploadError) {
+            proformaSaklanamadi = true;
+          } else {
             const proformaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
-            await supabase.from("ihracat_dosyalari")
+            const { data: yazilan, error: yazmaError } = await supabase.from("ihracat_dosyalari")
               .update({ proforma_dosya_url: proformaUrl, proforma_dosya_adi: pdfFile.name })
-              .eq("id", data.id).eq("company_id", companyId);
+              .eq("id", data.id).eq("company_id", companyId)
+              .select("id");
+            if (yazmaHatasi(yazmaError, yazilan)) {
+              proformaSaklanamadi = true;
+              // Kayda baglanamayan PDF depoda sahipsiz kalmasin
+              await supabase.storage.from("konsimento-talimatlari").remove([path]);
+            }
           }
         } catch {
-          // Sessizce yut - proforma PDF yedeklemesi ikincil bir islem.
+          proformaSaklanamadi = true;
         }
+      }
+      // Ikincil islem: dosya olusturma akisini durdurmaz ama artik sessiz
+      // gecilmez - kullanici "Proformayi Goruntule" butonunun neden
+      // olmadigini bilir (01.10.2026).
+      if (proformaSaklanamadi) {
+        showToast("Dosya oluşturuldu ancak proforma PDF'i arşive kaydedilemedi.", "error");
       }
 
       setStep("success");

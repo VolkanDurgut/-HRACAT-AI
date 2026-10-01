@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { supabase, Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
@@ -116,7 +116,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     // Revize sonrasi yeniden onaylandiginda eski "Revize Istendi" rozeti
     // kapanir - notu/tarihi/isaretleyeni SILINMEZ (gecmis kayit olarak
     // kalir), sadece aktif uyari durumu (draft_revize_istendi) kapatilir.
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("ihracat_dosyalari")
       .update({
         draft_onaylandi: true,
@@ -125,10 +125,12 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         draft_revize_istendi: false,
       })
       .eq("id", dosya.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .select("id");
     setOnaylaniyor(false);
-    if (error) {
-      showToast(`Onay kaydedilemedi: ${error.message}`, "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Onay kaydedilemedi: ${hata}`, "error");
       return;
     }
     showToast("Draft onaylandı. \"Gönderildi İşaretle\" butonu artık aktif.", "success");
@@ -143,14 +145,16 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   // buna baglidir.
   const handleGonderildiIsaretle = async () => {
     setMailIsaretleniyor(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("ihracat_dosyalari")
       .update({ draft_mail_gonderildi: true, draft_mail_gonderildi_tarihi: new Date().toISOString() })
       .eq("id", dosya.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .select("id");
     setMailIsaretleniyor(false);
-    if (error) {
-      showToast(`Durum kaydedilemedi: ${error.message}`, "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Durum kaydedilemedi: ${hata}`, "error");
       return;
     }
     showToast("Gönderildi olarak işaretlendi. 48 saatlik yanıt süresi başladı.", "success");
@@ -163,7 +167,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   // gercekten onayladigini gosterir. Ikisi karistirilmamalidir.
   const handleMusteriOnayiGeldi = async () => {
     setMusteriOnayiKaydediliyor(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("ihracat_dosyalari")
       .update({
         draft_musteri_onayi_alindi: true,
@@ -171,10 +175,12 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         draft_musteri_onayi_isaretleyen: user?.email || null,
       })
       .eq("id", dosya.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .select("id");
     setMusteriOnayiKaydediliyor(false);
-    if (error) {
-      showToast(`Müşteri onayı kaydedilemedi: ${error.message}`, "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Müşteri onayı kaydedilemedi: ${hata}`, "error");
       return;
     }
     showToast("Müşteri onayı kaydedildi.", "success");
@@ -189,7 +195,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   // handleOnayla) gecmis bilgi olarak "Revize Istendi" rozetinde gorunur.
   const handleRevizeIstendiKaydet = async () => {
     setRevizeKaydediliyor(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("ihracat_dosyalari")
       .update({
         draft_revize_istendi: true,
@@ -201,10 +207,12 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         draft_musteri_onayi_alindi: false,
       })
       .eq("id", dosya.id)
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .select("id");
     setRevizeKaydediliyor(false);
-    if (error) {
-      showToast(`Revize talebi kaydedilemedi: ${error.message}`, "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Revize talebi kaydedilemedi: ${hata}`, "error");
       return;
     }
     showToast("Revize talebi kaydedildi. Dosya yeniden \"Onayla\" adımına döndü.", "success");

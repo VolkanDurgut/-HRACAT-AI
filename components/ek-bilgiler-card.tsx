@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
 import { formatDateTR, formatCurrency } from "@/lib/cutoff-utils";
@@ -128,12 +128,13 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       }
     };
 
-    const { error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId); // Şirket kilidi enjekte edildi
+    const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId).select("id"); // Şirket kilidi enjekte edildi
     setSaving(false);
     // Onceki fatura talimati hatasindan ogrenildi: hata kontrolu yapilmadan
     // basari mesaji gosterilirse, kayit sessizce basarisiz olabilir.
-    if (error) {
-      showToast(`Ek bilgiler kaydedilemedi: ${error.message}`, "error");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Ek bilgiler kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     showToast("Ek bilgiler guncellendi.", "success");

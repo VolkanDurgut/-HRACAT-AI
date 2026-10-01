@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { supabase, MTS_PER_KONTEYNER } from "@/lib/supabase";
+import { supabase, MTS_PER_KONTEYNER, yazmaHatasi } from "@/lib/supabase";
+import { useToast } from "@/lib/toast-context";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Plus, Mail, Pencil, Trash2, Check, RefreshCw, Loader2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
@@ -41,6 +43,9 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
   const [editTarget, setEditTarget] = useState<Acente | null>(null);
   const [form, setForm] = useState({ isim: "", email: "", telefon: "", cc_emails: "", notlar: "" });
   const [saving, setSaving] = useState(false);
+  const { showToast } = useToast();
+  const [silinecek, setSilinecek] = useState<Acente | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
 
   const [activePanel, setActivePanel] = useState<{ id: string; type: "mail" | "teklif" } | null>(null);
   const [mailMetin, setMailMetin] = useState("");
@@ -130,8 +135,10 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
     }
   };
 
-  // dosya_id + acente_id icin teklif kaydini upsert eder
-  const upsertTeklif = async (acenteId: string, payload: Partial<Teklif>) => {
+  // dosya_id + acente_id icin teklif kaydini upsert eder. Hata varsa
+  // kullaniciya gosterilecek mesaji, basariliysa null dondurur (01.10.2026:
+  // eskiden sonuc hic kontrol edilmiyordu, basarisiz kayit sessizce kayboluyordu).
+  const upsertTeklif = async (acenteId: string, payload: Partial<Teklif>): Promise<string | null> => {
     const { data: existing } = await supabase
       .from("acente_teklifleri")
       .select("id")
@@ -140,26 +147,31 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("acente_teklifleri").update(payload).eq("id", existing.id).eq("company_id", companyId);
-    } else {
-      await supabase.from("acente_teklifleri").insert({ 
-        dosya_id: dosyaId, 
-        acente_id: acenteId, 
-        company_id: companyId, // Şirket mührü eklendi
-        ...payload 
-      });
+      const { data, error } = await supabase.from("acente_teklifleri").update(payload).eq("id", existing.id).eq("company_id", companyId).select("id");
+      return yazmaHatasi(error, data);
     }
+    const { data, error } = await supabase.from("acente_teklifleri").insert({
+      dosya_id: dosyaId,
+      acente_id: acenteId,
+      company_id: companyId, // Şirket mührü eklendi
+      ...payload,
+    }).select("id");
+    return yazmaHatasi(error, data);
   };
 
   const handleMailGonder = async (acente: AcenteWithTeklif) => {
     const ccList = acente.cc_emails ? acente.cc_emails.split(",").map((e: string) => e.trim()).join(",") : "";
     const cc = ccList ? `&cc=${encodeURIComponent(ccList)}` : "";
     window.open(`mailto:${acente.email}?subject=${encodeURIComponent(mailKonusu)}${cc}&body=${encodeURIComponent(mailMetin)}`);
-    await upsertTeklif(acente.id, {
+    const hata = await upsertTeklif(acente.id, {
       mail_metni: isReminder ? acente.teklif?.mail_metni : mailMetin,
       mail_konusu: isReminder ? acente.teklif?.mail_konusu : mailKonusu,
       son_gonderim_tarihi: new Date().toISOString(),
     });
+    if (hata) {
+      showToast(`Mail açıldı ancak gönderim kaydı tutulamadı: ${hata}`, "error");
+      return;
+    }
     setActivePanel(null);
     fetchAcenteler();
   };
@@ -179,12 +191,17 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
 
   const handleTeklifKaydet = async (acenteId: string) => {
     const fiyatStr = teklifForm.teklif_fiyat ? `${teklifForm.teklif_para_birimi} ${teklifForm.teklif_fiyat}` : "";
-    await upsertTeklif(acenteId, {
+    const hata = await upsertTeklif(acenteId, {
       teklif_fiyat: fiyatStr,
       teklif_gecerlilik: teklifForm.teklif_gecerlilik || undefined,
       teklif_notu: teklifForm.teklif_notu || undefined,
       teklif_tarihi: new Date().toISOString(),
     });
+    if (hata) {
+      showToast(`Teklif kaydedilemedi: ${hata}`, "error");
+      return; // panel acik kalir, girilen bilgi kaybolmaz
+    }
+    showToast("Teklif kaydedildi.", "success");
     setActivePanel(null);
     fetchAcenteler();
   };
@@ -192,21 +209,26 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
   const handleSave = async () => {
     if (!form.isim || !form.email) return;
     setSaving(true);
-    if (editTarget) {
-      await supabase.from("acenteler").update({
-        isim: form.isim, email: form.email, telefon: form.telefon, cc_emails: form.cc_emails, notlar: form.notlar,
-      }).eq("id", editTarget.id).eq("company_id", companyId);
-    } else {
-      await supabase.from("acenteler").insert({
-        isim: form.isim, 
-        email: form.email, 
-        telefon: form.telefon, 
-        cc_emails: form.cc_emails, 
-        notlar: form.notlar, 
-        created_by: userId,
-        company_id: companyId, // Şirket mührü eklendi
-      });
+    const sonuc = editTarget
+      ? await supabase.from("acenteler").update({
+          isim: form.isim, email: form.email, telefon: form.telefon, cc_emails: form.cc_emails, notlar: form.notlar,
+        }).eq("id", editTarget.id).eq("company_id", companyId).select("id")
+      : await supabase.from("acenteler").insert({
+          isim: form.isim,
+          email: form.email,
+          telefon: form.telefon,
+          cc_emails: form.cc_emails,
+          notlar: form.notlar,
+          created_by: userId,
+          company_id: companyId, // Şirket mührü eklendi
+        }).select("id");
+    const hata = yazmaHatasi(sonuc.error, sonuc.data);
+    if (hata) {
+      setSaving(false);
+      showToast(`Acente kaydedilemedi: ${hata}`, "error");
+      return; // form acik kalir, girilen bilgi kaybolmaz
     }
+    showToast(editTarget ? "Acente güncellendi." : "Acente eklendi.", "success");
     setForm({ isim: "", email: "", telefon: "", cc_emails: "", notlar: "" });
     setShowForm(false);
     setEditTarget(null);
@@ -221,14 +243,39 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
     setActivePanel(null);
   };
 
-  const handleDelete = async (id: string) => {
-    await supabase.from("acenteler").delete().eq("id", id).eq("company_id", companyId);
+  // Silme artik onay penceresinden geciyor (01.10.2026: eskiden tek tikla,
+  // onaysiz ve sonucu kontrol edilmeden siliniyordu).
+  const handleDelete = async () => {
+    if (!silinecek) return;
+    const id = silinecek.id;
+    setSiliniyor(true);
+    const { data, error } = await supabase.from("acenteler").delete().eq("id", id).eq("company_id", companyId).select("id");
+    setSiliniyor(false);
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Acente silinemedi: ${hata}`, "error");
+      return;
+    }
+    showToast(`${silinecek.isim} silindi.`, "success");
+    setSilinecek(null);
     if (activePanel?.id === id) setActivePanel(null);
     fetchAcenteler();
   };
 
   return (
     <div className="space-y-3">
+      <ConfirmDialog
+        open={silinecek !== null}
+        onOpenChange={(acik) => { if (!acik) setSilinecek(null); }}
+        title="Acente silinsin mi?"
+        description={`${silinecek?.isim || ""} acentesi ve bu acenteye ait teklif kayıtları silinecek.`}
+        confirmLabel="Evet, Sil"
+        cancelLabel="Vazgeç"
+        onConfirm={handleDelete}
+        destructive
+        loading={siliniyor}
+        loadingLabel="Siliniyor..."
+      />
       {acenteler.length === 0 && !showForm ? (
         <p className="text-sm" style={{ color: TEXT_MUTED }}>Henüz acente eklenmemiş.</p>
       ) : (
@@ -291,7 +338,7 @@ export default function AcenteTeklifSection({ dosyaId, proformData, userId, comp
                         <Pencil size={14} />
                       </button>
                     )}
-                    <button onClick={() => handleDelete(acente.id)} className="p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Acenteyi sil">
+                    <button onClick={() => setSilinecek(acente)} className="p-1.5 rounded-md text-red-400 hover:bg-red-500/10" title="Acenteyi sil">
                       <Trash2 size={14} />
                     </button>
                   </div>

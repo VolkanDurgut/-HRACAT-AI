@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
@@ -44,13 +44,15 @@ export default function IhracatAyarlariPage() {
   const handleSave = async () => {
     if (!companyId) return;
     setSaving(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("companies")
       .update({ varsayilan_diib_no: varsayilanDiibNo || null })
-      .eq("id", companyId);
+      .eq("id", companyId)
+      .select("id");
     setSaving(false);
-    if (error) {
-      showToast(`Kaydedilemedi: ${error.message}`, "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Kaydedilemedi: ${hata}`, "error");
       return;
     }
     setKayitliDeger(varsayilanDiibNo);

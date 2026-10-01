@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
@@ -96,15 +96,18 @@ export default function YetkilendirmePage() {
 
   const handleSave = async (userId: string) => {
     if (!companyId) return;
-    setSaving(userId);
     const k = kullanicilar.find(k => k.user_id === userId);
     if (!k) return;
-    const { error } = await supabase
+    setSaving(userId);
+    const { data, error } = await supabase
       .from("kullanici_yetkileri")
       .update({ sayfa_yetkileri: k.sayfa_yetkileri, sekme_yetkileri: k.sekme_yetkileri, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
-      .eq("company_id", companyId); // Güncelleme yetkisi şirket doğrulamasına kilitlendi
-    if (error) showToast("Kayıt sırasında hata oluştu.", "error");
+      .eq("company_id", companyId) // Güncelleme yetkisi şirket doğrulamasına kilitlendi
+      .select("id");
+    // 0 satir guncellendiyse de (RLS) "kaydedildi" denmez (01.10.2026)
+    const hata = yazmaHatasi(error, data);
+    if (hata) showToast(`Yetkiler kaydedilemedi: ${hata}`, "error");
     else showToast("Yetkiler kaydedildi.", "success");
     setSaving(null);
   };

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari, KaliteSertifikasiAyari } from "@/lib/supabase";
-import { supabase, getGuvenliDosyaUrl } from "@/lib/supabase";
+import { supabase, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { FileText, Pencil, Loader2, CheckCircle2 } from "lucide-react";
@@ -178,14 +178,18 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // "konteynerler sekmesindeki Fatura Talimatı gibi hizli indirme yapsin").
   // Dosya adi, Taslak Onay Paketi'yle (lib/taslak-onay-paketi.ts) BIREBIR
   // AYNI kuralla uretilir: "DRAFT- <no>- <KISA>- <booking>- <proforma>.pdf".
-  const kaydetVeAc = async (htmlHam: string, evrakTipi: string, pdfDosyaAdi: string, durum: "taslak" | "orijinal") => {
+  // Sonuc (01.10.2026): "arsivlendi" = indirildi + arsiv kaydi dogrulandi;
+  // "sadece_indirildi" = PDF indi ama arsiv/durum kaydi tutulamadi (kirmizi
+  // uyari zaten gosterildi); "basarisiz" = PDF hic uretilemedi. Eskiden her
+  // durumda yesil "indirildi" mesaji da gosteriliyordu.
+  const kaydetVeAc = async (htmlHam: string, evrakTipi: string, pdfDosyaAdi: string, durum: "taslak" | "orijinal"): Promise<"arsivlendi" | "sadece_indirildi" | "basarisiz"> => {
     let pdfBlob: Blob;
     try {
       pdfBlob = await htmlToPdfBlob(htmlHam);
     } catch (err) {
       console.error("PDF olusturma hatasi:", err);
       showToast("PDF oluşturulamadı. Lütfen tekrar deneyin.", "error");
-      return;
+      return "basarisiz";
     }
 
     const indir = () => {
@@ -199,11 +203,12 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     };
 
+    let arsivlendi = false;
     try {
       if (!companyId) {
-        console.warn("companyId yok, evrak arşive kaydedilmedi ama indiriliyor.");
+        showToast("Oturum bilgisi eksik: evrak arşive kaydedilmedi ama indiriliyor.", "error");
         indir();
-        return;
+        return "sadece_indirildi";
       }
       // Storage anahtari icin bosluk/Turkce karakter icermeyen guvenli bir
       // slug kullanilir - kullaniciya gosterilen/indirilen ad (pdfDosyaAdi)
@@ -229,23 +234,27 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           .eq("company_id", companyId)
           .maybeSingle();
 
-        if (mevcutKayit) {
-          await supabase.from("dosya_evraklari").update({
-            dosya_url: dosyaUrl,
-            dosya_adi: pdfDosyaAdi,
-            yukleme_tarihi: new Date().toISOString(),
-            durum,
-          }).eq("id", mevcutKayit.id).eq("company_id", companyId);
+        const kayit = mevcutKayit
+          ? await supabase.from("dosya_evraklari").update({
+              dosya_url: dosyaUrl,
+              dosya_adi: pdfDosyaAdi,
+              yukleme_tarihi: new Date().toISOString(),
+              durum,
+            }).eq("id", mevcutKayit.id).eq("company_id", companyId).select("id")
+          : await supabase.from("dosya_evraklari").insert({
+              dosya_id: dosya.id,
+              evrak_tipi: evrakTipi,
+              dosya_url: dosyaUrl,
+              dosya_adi: pdfDosyaAdi,
+              yukleme_tarihi: new Date().toISOString(),
+              durum,
+              company_id: companyId,
+            }).select("id");
+        const kayitHatasi = yazmaHatasi(kayit.error, kayit.data);
+        if (kayitHatasi) {
+          showToast(`Evrak indiriliyor ancak arşiv/durum kaydı tutulamadı: ${kayitHatasi}`, "error");
         } else {
-          await supabase.from("dosya_evraklari").insert({
-            dosya_id: dosya.id,
-            evrak_tipi: evrakTipi,
-            dosya_url: dosyaUrl,
-            dosya_adi: pdfDosyaAdi,
-            yukleme_tarihi: new Date().toISOString(),
-            durum,
-            company_id: companyId,
-          });
+          arsivlendi = true;
         }
         await durumlariYukle();
       }
@@ -256,6 +265,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
     // Arsivleme sonucu ne olursa olsun PDF her zaman indirilir.
     indir();
+    return arsivlendi ? "arsivlendi" : "sadece_indirildi";
   };
 
   // Draft VE Orijinal, HER ZAMAN ayni kaynaktan (dosya/rezervasyon/konteyner
@@ -286,8 +296,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
       const filigranliTurler: Array<typeof tip> = ["ci", "pl", "fc", "qc"];
       const html = durum === "taslak" && filigranliTurler.includes(tip) ? draftFiligranEkle(htmlHam) : htmlHam;
       const pdfDosyaAdi = buildEvrakPdfDosyaAdi(durum, meta.siraNo, EVRAK_KISA_KODLARI[tip], dosya, rezervasyonlar);
-      await kaydetVeAc(html, meta.evrakTipi, pdfDosyaAdi, durum);
-      showToast(`${meta.evrakAdi} ${durum === "taslak" ? "taslak (filigranlı)" : "orijinal (filigransız)"} PDF olarak indirildi.`, "success");
+      const sonuc = await kaydetVeAc(html, meta.evrakTipi, pdfDosyaAdi, durum);
+      if (sonuc === "arsivlendi") showToast(`${meta.evrakAdi} ${durum === "taslak" ? "taslak (filigranlı)" : "orijinal (filigransız)"} PDF olarak indirildi.`, "success");
     } catch (err) {
       console.error("Evrak olusturma hatasi:", err);
       showToast("Evrak oluşturulamadı.", "error");
@@ -305,10 +315,11 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     const onceki = ectnBasvurusu;
     setEctnBasvurusu(value); // aninda yansit - butonlar hep guncel degeri kullanir
     if (!companyId) return;
-    const { error } = await supabase.from("ihracat_dosyalari").update({ ectn_basvurusu: value }).eq("id", dosya.id).eq("company_id", companyId);
-    if (error) {
+    const { data, error } = await supabase.from("ihracat_dosyalari").update({ ectn_basvurusu: value }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
       setEctnBasvurusu(onceki); // basarisizsa geri al
-      showToast(`ECTN ayarı kaydedilemedi: ${error.message}`, "error");
+      showToast(`ECTN ayarı kaydedilemedi: ${hata}`, "error");
     }
   };
 

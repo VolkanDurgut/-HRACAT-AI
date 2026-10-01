@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Dosya, Rezervasyon, supabase } from "@/lib/supabase";
+import { Dosya, Rezervasyon, supabase, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { Loader2, X, Calculator } from "lucide-react";
@@ -95,14 +95,15 @@ export default function EctnDegerleriModal({ dosya, rezervasyonlar, open, onClos
         ectn_insurance_override: parse(insurance),
         ectn_cfr_etiket_override: cfrEtiketOverride.trim() === "" ? null : cfrEtiketOverride.trim(),
       };
-      const { error } = await supabase
+      const { data: yazilan, error } = await supabase
         .from("ihracat_dosyalari")
         .update(payload)
         .eq("id", dosya.id)
-        .eq("company_id", companyId);
+        .eq("company_id", companyId).select("id");
 
-      if (error) {
-        showToast(`ECTN tutarları kaydedilemedi: ${error.message}`, "error");
+      const yazmaSorunu = yazmaHatasi(error, yazilan);
+      if (yazmaSorunu) {
+        showToast(`ECTN tutarları kaydedilemedi: ${yazmaSorunu}`, "error");
       } else {
         showToast("ECTN tutarları kaydedildi.", "success");
         onSaved(payload);

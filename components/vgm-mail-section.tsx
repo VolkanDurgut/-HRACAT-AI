@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
-import { supabase, Rezervasyon, Konteyner, Dosya } from "@/lib/supabase";
+import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -66,9 +66,10 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
     const vgmKonu = `VGM Sonuclari - ${dosya.dosya_no}`;
     const ccPart = vgmCc ? `&cc=${encodeURIComponent(vgmCc)}` : "";
     window.open(`mailto:${vgmTo}?subject=${encodeURIComponent(vgmKonu)}${ccPart}&body=${encodeURIComponent(buildVgmMailMetni())}`);
-    const { error } = await supabase.from("ihracat_dosyalari").update({ vgm_gonderildi: true }).eq("id", dosyaId).eq("company_id", companyId);
-    if (error) {
-      showToast(`VGM durumu kaydedilemedi: ${error.message}`, "error");
+    const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({ vgm_gonderildi: true }).eq("id", dosyaId).eq("company_id", companyId).select("id");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`VGM durumu kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     showToast("VGM maili gonderildi.", "success");

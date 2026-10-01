@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, UrunDetay } from "@/lib/supabase";
+import { supabase, Dosya, UrunDetay, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { Pencil, Check, X, Plus, Trash2 } from "lucide-react";
@@ -81,18 +81,19 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
     const toplamMiktar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.miktar_mts).replace(",", ".")) || 0), 0);
     const toplamTutar = temizSatirlar.reduce((s, u) => s + (parseFloat(String(u.toplam_tutar_usd).replace(",", ".")) || 0), 0);
 
-    const { error } = await supabase.from("ihracat_dosyalari").update({
+    const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({
       urun_detaylari: temizSatirlar,
       miktar: temizSatirlar.length > 0 ? String(parseFloat(toplamMiktar.toFixed(3))) : null,
       toplam_tutar: temizSatirlar.length > 0 ? parseFloat(toplamTutar.toFixed(2)) : null,
-    }).eq("id", dosya.id).eq("company_id", companyId);
+    }).eq("id", dosya.id).eq("company_id", companyId).select("id");
     setSaving(false);
     // KRITIK: hata kontrolu yapilmadan basari mesaji gosterilirse, kayit
     // basarisiz olsa bile (RLS, ag kesintisi vb.) kullanici degisikligin
     // islendigini sanir ve modal kapanir - eski veri sessizce kalmaya devam
     // eder. Hata varsa modali ACIK birak, kullanici tekrar deneyebilsin.
-    if (error) {
-      showToast(`Urun detaylari kaydedilemedi: ${error.message}`, "error");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Urun detaylari kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     showToast("Urun detaylari güncellendi.", "success");
@@ -118,7 +119,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
                 <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Urun Adi</th>
                 <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ambalaj</th>
                 <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
-                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
+                <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
                 <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Toplam</th>
               </tr>
             </thead>

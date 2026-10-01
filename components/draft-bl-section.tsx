@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
@@ -70,6 +70,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
   const handleYukle = async (file: File) => {
     setYukleniyor(true);
     setHata(null);
+    let yuklenenYol: string | null = null;
     try {
       const guvenliAd = file.name
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -80,6 +81,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       const path = `${dosya.id}/draft-bl/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
+      yuklenenYol = path;
       const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
 
       const formData = new FormData();
@@ -133,7 +135,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         guncelHamVeri.bl_no_kaynak = "draft_bl";
       }
 
-      await supabase.from("ihracat_dosyalari").update({
+      const { data: yazilan, error: yazmaError } = await supabase.from("ihracat_dosyalari").update({
         draft_bl_dosya_url: dosyaUrl,
         draft_bl_dosya_adi: file.name,
         draft_bl_yukleme_tarihi: new Date().toISOString(),
@@ -142,10 +144,15 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         bl_no: data.bl_no || dosya.bl_no,
         consignee: data.consignee || dosya.consignee,
         ham_veri: guncelHamVeri,
-      }).eq("id", dosya.id).eq("company_id", companyId);
+      }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+      const yazmaSorunu = yazmaHatasi(yazmaError, yazilan);
+      if (yazmaSorunu) throw new Error(`Draft BL bilgileri kaydedilemedi: ${yazmaSorunu}`);
+      yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
 
       onRefresh();
     } catch (err: any) {
+      // Kayda baglanamayan yeni PDF depoda sahipsiz kalmasin (01.10.2026)
+      if (yuklenenYol) await supabase.storage.from("konsimento-talimatlari").remove([yuklenenYol]);
       setHata(err.message || "Kontrol sırasında hata oluştu.");
     } finally {
       setYukleniyor(false);
@@ -160,12 +167,17 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
 
   const handleYenidenYukle = async () => {
     setHata(null);
-    await supabase.from("ihracat_dosyalari").update({
+    const { data, error } = await supabase.from("ihracat_dosyalari").update({
       draft_bl_dosya_url: null,
       draft_bl_dosya_adi: null,
       draft_bl_yukleme_tarihi: null,
       draft_bl_kontrol_sonucu: null,
-    }).eq("id", dosya.id).eq("company_id", companyId);
+    }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const yazmaSorunu = yazmaHatasi(error, data);
+    if (yazmaSorunu) {
+      setHata(`Draft BL sıfırlanamadı: ${yazmaSorunu}`);
+      return;
+    }
     onRefresh();
   };
 

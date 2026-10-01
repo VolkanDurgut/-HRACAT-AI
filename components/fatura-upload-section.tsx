@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote, FileType2, ExternalLink
@@ -67,6 +67,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   const handleFaturaYukle = async (file: File) => {
     setFaturaYukleniyor(true);
     setFaturaHata(null);
+    let yuklenenYol: string | null = null;
     try {
       const guvenliAd = file.name
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -76,6 +77,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const path = `fatura/${dosya.id}/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
+      yuklenenYol = path;
       const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
 
       const formData = new FormData();
@@ -91,7 +93,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const data: FaturaKontrolSonucu & { error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
 
-      await supabase.from("ihracat_dosyalari").update({
+      const { data: yazilan, error: yazmaError } = await supabase.from("ihracat_dosyalari").update({
         fatura_dosya_url: dosyaUrl,
         fatura_dosya_adi: file.name,
         fatura_yukleme_tarihi: new Date().toISOString(),
@@ -100,10 +102,15 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         fatura_tarihi: data.fatura_tarihi || dosya.fatura_tarihi,
         diib_no: data.diib_no || dosya.diib_no,
         diib_tarihi: data.diib_tarihi || dosya.diib_tarihi,
-      }).eq("id", dosya.id).eq("company_id", companyId);
+      }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+      const hata = yazmaHatasi(yazmaError, yazilan);
+      if (hata) throw new Error(`Fatura bilgileri kaydedilemedi: ${hata}`);
+      yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
 
       onRefresh();
     } catch (err: any) {
+      // Kayda baglanamayan yeni PDF depoda sahipsiz kalmasin (01.10.2026)
+      if (yuklenenYol) await supabase.storage.from("konsimento-talimatlari").remove([yuklenenYol]);
       setFaturaHata(err.message || "Kontrol sırasında hata oluştu.");
     } finally {
       setFaturaYukleniyor(false);
@@ -119,12 +126,17 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
   const handleFaturaYenidenYukle = async () => {
     setFaturaHata(null);
-    await supabase.from("ihracat_dosyalari").update({
+    const { data, error } = await supabase.from("ihracat_dosyalari").update({
       fatura_dosya_url: null,
       fatura_dosya_adi: null,
       fatura_yukleme_tarihi: null,
       fatura_kontrol_sonucu: null,
-    }).eq("id", dosya.id).eq("company_id", companyId);
+    }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      setFaturaHata(`Fatura sıfırlanamadı: ${hata}`);
+      return;
+    }
     onRefresh();
   };
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pencil, Check, X, Banknote, Plus, Loader2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
@@ -79,6 +80,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
   const [yeniKartFormuAcik, setYeniKartFormuAcik] = useState(false);
   const [kartKaydediliyor, setKartKaydediliyor] = useState(false);
   const [silinenPresetId, setSilinenPresetId] = useState<string | null>(null);
+  const [silinecekPreset, setSilinecekPreset] = useState<OzelPreset | null>(null);
 
   // Yeni kart EKLEME formu, dosyanin kendi banka bilgilerini gosteren `form`
   // state'inden TAMAMEN AYRI ve bagimsizdir - biri digerini etkilemez.
@@ -184,15 +186,20 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
     ozelPresetleriYukle();
   };
 
-  const handleOzelPresetSil = async (preset: OzelPreset) => {
-    if (!window.confirm(`"${preset.goruntulenen_ad}" kartını silmek istediğinize emin misiniz?`)) return;
+  // Tarayicinin kendi confirm() penceresi yerine uygulamanin onay penceresi;
+  // silme sonucu dogrulanir (01.10.2026).
+  const handleOzelPresetSil = async () => {
+    const preset = silinecekPreset;
+    if (!preset) return;
     setSilinenPresetId(preset.id);
-    const { error } = await supabase.from("banka_presetleri").delete().eq("id", preset.id).eq("company_id", companyId);
+    const { data, error } = await supabase.from("banka_presetleri").delete().eq("id", preset.id).eq("company_id", companyId).select("id");
     setSilinenPresetId(null);
-    if (error) {
-      showToast("Kart silinemedi.", "error");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Kart silinemedi: ${hata}`, "error");
       return;
     }
+    setSilinecekPreset(null);
     showToast("Kart silindi.", "success");
     setOzelPresetler((prev) => prev.filter((p) => p.id !== preset.id));
   };
@@ -223,6 +230,18 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
 
   return (
     <div>
+      <ConfirmDialog
+        open={silinecekPreset !== null}
+        onOpenChange={(acik) => { if (!acik) setSilinecekPreset(null); }}
+        title="Banka kartı silinsin mi?"
+        description={`"${silinecekPreset?.goruntulenen_ad || ""}" kartı silinecek. Dosyalara daha önce işlenmiş banka bilgileri değişmez.`}
+        confirmLabel="Evet, Sil"
+        cancelLabel="Vazgeç"
+        onConfirm={handleOzelPresetSil}
+        destructive
+        loading={silinenPresetId !== null}
+        loadingLabel="Siliniyor..."
+      />
       <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Banka Bilgileri</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
@@ -273,7 +292,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleOzelPresetSil(preset)}
+                      onClick={() => setSilinecekPreset(preset)}
                       disabled={silinenPresetId === preset.id}
                       title="Bu kartı sil"
                       className="p-0.5 rounded hover:bg-red-500/20 hover:text-red-400 transition-colors disabled:opacity-50"

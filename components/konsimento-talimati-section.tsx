@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl } from "@/lib/supabase";
+import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
@@ -123,14 +123,15 @@ export default function KonsimentoTalimatiSection({
         notify: data.notify || []
       };
 
-      const { error: updateError } = await supabase.from("ihracat_dosyalari").update({
+      const { data: guncellenen, error: updateError } = await supabase.from("ihracat_dosyalari").update({
         konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
         consignee: data.consignee || null,
         bl_no: draftBlYetkiliMi ? dosya.bl_no : (data.bl_no || dosya.bl_no),
         ham_veri: guncelHamVeri,
-      }).eq("id", dosyaId).eq("company_id", companyId);
-      if (updateError) throw new Error(`Sonuc kaydedilemedi: ${updateError.message}`);
+      }).eq("id", dosyaId).eq("company_id", companyId).select("id");
+      const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
+      if (guncellemeHatasi) throw new Error(`Sonuç kaydedilemedi: ${guncellemeHatasi}`);
       onRefresh();
     } catch (err: any) {
       setKontrolHata(err.message || "Kontrol hatasi.");
@@ -152,12 +153,13 @@ export default function KonsimentoTalimatiSection({
 
   const handleYenidenYukle = async () => {
     setKontrolHata(null);
-    const { error } = await supabase.from("ihracat_dosyalari").update({
+    const { data, error } = await supabase.from("ihracat_dosyalari").update({
       konsimento_dosya_url: null, konsimento_dosya_adi: null,
       konsimento_yukleme_tarihi: null, konsimento_kontrol_sonucu: null,
-    }).eq("id", dosyaId).eq("company_id", companyId);
-    if (error) {
-      showToast(`Islem basarisiz: ${error.message}`, "error");
+    }).eq("id", dosyaId).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`İşlem başarısız: ${hata}`, "error");
       return;
     }
     if (fileInputRef.current) fileInputRef.current.value = "";

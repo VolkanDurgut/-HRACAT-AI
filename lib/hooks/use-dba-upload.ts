@@ -50,6 +50,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
     setYukleniyor((prev) => ({ ...prev, [konteyner.id]: true }));
     setHatalar((prev) => ({ ...prev, [konteyner.id]: '' }));
 
+    let yuklenenYol: string | null = null; // kayda baglanamazsa depodan geri silinir
     try {
       // 1. Storage'a yukle
       const timestamp = Date.now();
@@ -58,6 +59,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
         .from('konsimento-talimatlari')
         .upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
+      yuklenenYol = path;
 
       const dosyaUrl = await getGuvenliDosyaUrl('konsimento-talimatlari', path);
 
@@ -106,7 +108,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
       }
 
       // 6. Veritabanini guncelle (Net, Brut, Kap Adeti DBA'dan etkilenmez - idari personel tarafindan elle girilir)
-      const { error: updateError } = await supabase
+      const { data: guncellenen, error: updateError } = await supabase
         .from('konteynerler')
         .update({
           plaka: dbaData.arac_plaka || null,
@@ -119,11 +121,16 @@ export function useDbaUpload(): UseDbaUploadReturn {
           dba_kontrol_sonucu: { ...dbaData, uyusmazliklar: [] },
         })
         .eq('company_id', companyId)
-        .eq('id', konteyner.id);
-      if (updateError) throw new Error(`DBA bilgileri kaydedilemedi: ${updateError.message}`);
+        .eq('id', konteyner.id)
+        .select('id');
+      // 0 satir guncellendiyse (RLS) de basarili sayilmaz (01.10.2026)
+      const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
+      if (guncellemeHatasi) throw new Error(`DBA bilgileri kaydedilemedi: ${guncellemeHatasi}`);
+      yuklenenYol = null; // kayit basarili
 
       return { success: true, uyusmazliklar: [] };
     } catch (err) {
+      if (yuklenenYol) await supabase.storage.from('konsimento-talimatlari').remove([yuklenenYol]);
       const message = err instanceof Error ? err.message : 'Hata oluştu.';
       setHatalar((prev) => ({ ...prev, [konteyner.id]: message }));
       return { success: false, uyusmazliklar: [], error: message };

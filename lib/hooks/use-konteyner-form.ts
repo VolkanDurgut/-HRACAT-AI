@@ -114,13 +114,14 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
 
   const handleManuelAlanKaydet = useCallback(async (konteynerId: string, alan: "net_agirlik_kg" | "brut_agirlik_kg" | "pieces", deger: number | null) => {
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("konteynerler").update({
+    const { data: yazilan, error } = await supabase.from("konteynerler").update({
       [alan]: deger,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
-    }).eq("id", konteynerId).eq("company_id", companyId); // Şirket kilidi eklendi
-    if (error) {
-      showToast(`Değer kaydedilemedi: ${error.message}`, "error");
+    }).eq("id", konteynerId).eq("company_id", companyId).select("id"); // Şirket kilidi eklendi
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Değer kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     onRefresh();
@@ -174,19 +175,20 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
   const handleHepsineUygula = useCallback(async (kaynak: Konteyner, hedefIds: string[]): Promise<boolean> => {
     if (hedefIds.length === 0) return false;
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("konteynerler").update({
+    const { data: yazilan, error } = await supabase.from("konteynerler").update({
       net_agirlik_kg: (kaynak as any).net_agirlik_kg ?? null,
       brut_agirlik_kg: (kaynak as any).brut_agirlik_kg ?? null,
       pieces: (kaynak as any).pieces ?? null,
       marka: (kaynak as any).marka ?? null,
       updated_by: user?.id || null,
       updated_at: new Date().toISOString(),
-    }).in("id", hedefIds).eq("company_id", companyId); // Şirket kilidi eklendi
-    if (error) {
-      showToast(`Değerler uygulanamadı: ${error.message}`, "error");
+    }).in("id", hedefIds).eq("company_id", companyId).select("id"); // Şirket kilidi eklendi
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) {
+      showToast(`Değerler uygulanamadı: ${yazmaSorunu}`, "error");
       return false;
     }
-    showToast(`${hedefIds.length} konteynere uygulandı.`, "success");
+    showToast(`${yazilan?.length ?? 0} konteynere uygulandı.`, "success");
     onRefresh();
     return true;
   }, [companyId, showToast, onRefresh]);

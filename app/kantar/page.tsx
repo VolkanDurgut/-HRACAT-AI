@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
-import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search } from "lucide-react";
+import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type KonteynerRow = {
@@ -46,7 +46,7 @@ function maskeleMusteri(isim: string | null | undefined): string {
 }
 
 export default function KantarPage() {
-  const { user, companyId, yetkiler, loading: authLoading } = useAuth();
+  const { user, companyId, yetkiler, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +200,49 @@ export default function KantarPage() {
 
   const tamamlananlarFiltreli = gunFiltre(aramaFiltre(tamamlananlar));
 
+  // Bu sayfa kantar terminali icin BILEREK kenar cubugu (AppShell) olmadan
+  // calisir; bu yuzden AppShell'in yaptigi oturum/yetki kapisi burada
+  // ayrica uygulanir (01.10.2026). Eskiden oturum kapaliyken sonsuz
+  // "Yukleniyor" ekrani kaliyor, hic yetkisi olmayan kullanici da icerigi
+  // gorebiliyordu.
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/");
+  }, [authLoading, user, router]);
+
+  const kantarYetkisiVar = !!yetkiler.sayfa_yetkileri.kantar;
+  // Kantar disinda erisebildigi bir sayfa varsa oraya donus baglantisi
+  const digerSayfa = ilkErisilebilirSayfa({ ...yetkiler.sayfa_yetkileri, kantar: false });
+
+  if (authLoading || !user) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
+        <Loader2 size={28} className="animate-spin" style={{ color: ACCENT }} />
+      </div>
+    );
+  }
+
+  if (!kantarYetkisiVar) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: PAGE_BG }}>
+        <div className="w-full max-w-md rounded-xl border p-8 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <ShieldAlert size={36} className="mx-auto mb-4 text-amber-400" />
+          <h1 className="text-lg font-bold text-white mb-2">Erişim yetkiniz yok</h1>
+          <p className="text-sm leading-relaxed mb-6" style={{ color: TEXT_MUTED }}>
+            Kantar Paneli için yetkiniz bulunmuyor. Erişim için yöneticinizle iletişime geçin.
+          </p>
+          <button
+            type="button"
+            onClick={signOut}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-colors text-white"
+            style={{ borderColor: CARD_BORDER }}
+          >
+            <LogOut size={14} /> Çıkış Yap
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
@@ -226,11 +269,27 @@ export default function KantarPage() {
               <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>DBA belgelerini yükleyin</p>
             </div>
           </div>
-          <button onClick={fetchKonteynerler}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
-            style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}>
-            <RefreshCw size={14} /> Yenile
-          </button>
+          <div className="flex items-center gap-2">
+            {digerSayfa && (
+              <button onClick={() => router.push(digerSayfa)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
+                style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
+                title="Uygulamanın diğer sayfalarına dön">
+                <LayoutGrid size={14} /> Ana Menü
+              </button>
+            )}
+            <button onClick={fetchKonteynerler}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}>
+              <RefreshCw size={14} /> Yenile
+            </button>
+            <button onClick={signOut}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
+              title="Oturumu kapat">
+              <LogOut size={14} /> Çıkış
+            </button>
+          </div>
         </div>
 
         {/* Arama */}

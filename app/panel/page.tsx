@@ -97,8 +97,9 @@ function PanelContent() {
     if (silmeHatasi) { showToast(`Dosya silinemedi: ${silmeHatasi}`, "error"); setDeleteTarget(null); return; }
     await depoDosyalariniTopluSil(storageUrlleri);
     if (anaSiparisId) {
-      const { count } = await supabase.from("ihracat_dosyalari").select("id", { count: "exact", head: true }).eq("ana_siparis_id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
-      if (!count || count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
+      const { count, error: sayimHatasi } = await supabase.from("ihracat_dosyalari").select("id", { count: "exact", head: true }).eq("ana_siparis_id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
+      // Sayim okunamadiysa (count=null) bos sanilip silinmez (01.10.2026)
+      if (!sayimHatasi && count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
     }
     showToast(`${deleteTarget.dosyaNo} basariyla silindi.`, "success");
     fetchDosyalar();

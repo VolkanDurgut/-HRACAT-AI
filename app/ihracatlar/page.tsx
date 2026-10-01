@@ -333,12 +333,13 @@ export default function IhracatlarPage() {
 
     // Eger dosya bir ana siparise bagliysa, o ana siparise baska dosya kalip kalmadigini kontrol et
     if (anaSiparisId) {
-      const { count } = await supabase
+      const { count, error: sayimHatasi } = await supabase
         .from("ihracat_dosyalari")
         .select("id", { count: "exact", head: true })
         .eq("company_id", companyId)
         .eq("ana_siparis_id", anaSiparisId);
-      if (!count || count === 0) {
+      // Sayim okunamadiysa (count=null) bos sanilip silinmez (01.10.2026)
+      if (!sayimHatasi && count === 0) {
         await supabase.from("ana_siparisler").delete().eq("company_id", companyId).eq("id", anaSiparisId);
       }
     }

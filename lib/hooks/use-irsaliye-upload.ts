@@ -46,6 +46,7 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
     setYukleniyor((prev) => ({ ...prev, [konteyner.id]: true }));
     setHatalar((prev) => ({ ...prev, [konteyner.id]: '' }));
 
+    let yuklenenYol: string | null = null; // kayda baglanamazsa depodan geri silinir
     try {
       const timestamp = Date.now();
       const uzanti = file.name.split('.').pop() || 'pdf';
@@ -54,10 +55,11 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
         .from('konsimento-talimatlari')
         .upload(path, file);
       if (uploadError) throw new Error(`Dosya yüklenemedi: ${uploadError.message}`);
+      yuklenenYol = path;
 
       const dosyaUrl = await getGuvenliDosyaUrl('konsimento-talimatlari', path);
 
-      const { error: updateError } = await supabase
+      const { data: guncellenen, error: updateError } = await supabase
         .from('konteynerler')
         .update({
           irsaliye_dosya_url: dosyaUrl,
@@ -65,11 +67,16 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
           irsaliye_yukleme_tarihi: new Date().toISOString(),
         })
         .eq('company_id', companyId)
-        .eq('id', konteyner.id);
-      if (updateError) throw new Error(`İrsaliye kaydedilemedi: ${updateError.message}`);
+        .eq('id', konteyner.id)
+        .select('id');
+      // 0 satir guncellendiyse (RLS) de basarili sayilmaz (01.10.2026)
+      const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
+      if (guncellemeHatasi) throw new Error(`İrsaliye kaydedilemedi: ${guncellemeHatasi}`);
+      yuklenenYol = null; // kayit basarili
 
       return { success: true };
     } catch (err) {
+      if (yuklenenYol) await supabase.storage.from('konsimento-talimatlari').remove([yuklenenYol]);
       const message = err instanceof Error ? err.message : 'Hata oluştu.';
       setHatalar((prev) => ({ ...prev, [konteyner.id]: message }));
       return { success: false, error: message };

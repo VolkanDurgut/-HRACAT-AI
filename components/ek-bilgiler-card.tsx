@@ -137,7 +137,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       showToast(`Ek bilgiler kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
-    showToast("Ek bilgiler guncellendi.", "success");
+    showToast("Ek bilgiler güncellendi.", "success");
     setEditing(false);
     onRefresh();
   };
@@ -146,10 +146,10 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     if (urunler.length === 0) return null;
     return (
       <div className={forEdit ? "p-3 rounded-lg border" : ""} style={forEdit ? { borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG } : undefined}>
-        {forEdit && <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>Proformadan otomatik hesaplanir, buradan duzenlenemez</p>}
+        {forEdit && <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>Proformadan otomatik hesaplanır, buradan düzenlenemez</p>}
         <div className="space-y-2">
           {urunler.map((u: any, i: number) => {
-            const ad = u.urun_adi || u.description || "Urun";
+            const ad = u.urun_adi || u.description || "Ürün";
             const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
             const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
             return (
@@ -215,7 +215,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: CARD_BORDER }}>
           <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Ek Bilgiler</h3>
           <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
-            <Pencil size={12} /> Duzenle
+            <Pencil size={12} /> Düzenle
           </button>
         </div>
 
@@ -253,8 +253,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           
           <CopyableField dark label="Beyanname No" value={dosya.beyanname_no} />
           <CopyableField dark label="BL No" value={dosya.bl_no} />
-          <CopyableField dark label="Uretim Tarihi" value={formatDateTR(dosya.uretim_tarihi)} />
-          <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR(dosya.son_kullanim_tarihi)} />
+          <CopyableField dark label="Üretim Tarihi" value={formatDateTR(dosya.uretim_tarihi)} />
+          <CopyableField dark label="Son Kullanım Tarihi" value={formatDateTR(dosya.son_kullanim_tarihi)} />
           <CopyableField dark label="DİİB No" value={dosya.diib_no} />
           <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={dosya.gumruk_odeme_sekli} />
         </div>
@@ -301,11 +301,11 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <input value={form.bl_no} onChange={(e) => update("bl_no", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Uretim Tarihi</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Üretim Tarihi</label>
           <input type="date" value={form.uretim_tarihi} onChange={(e) => update("uretim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanim Tarihi</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanım Tarihi</label>
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
         <div>
@@ -340,7 +340,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
         </button>
         <button onClick={() => setEditing(false)} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all inline-flex items-center gap-1" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-          <X size={14} /> Iptal
+          <X size={14} /> İptal
         </button>
       </div>
     </div>

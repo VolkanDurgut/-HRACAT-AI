@@ -132,8 +132,8 @@ export function getCutOffLabel(dateStr: string | null): CutOffStyle {
   if (!dateStr) return { text: "-", color: "text-slate-400", icon: "" };
   const days = getCutOffDays(dateStr);
   if (days === null) return { text: "-", color: "text-slate-400", icon: "" };
-  if (days < 0) return { text: "Gecti", color: "text-red-400 font-semibold", icon: "" };
-  if (days === 0) return { text: "Bugun!", color: "text-red-400 font-semibold", icon: "" };
+  if (days < 0) return { text: "Geçti", color: "text-red-400 font-semibold", icon: "" };
+  if (days === 0) return { text: "Bugün!", color: "text-red-400 font-semibold", icon: "" };
   if (days <= 2) return { text: `${days} Gün`, color: "text-orange-400 font-semibold", icon: "" };
   return { text: `${days} Gün`, color: "text-blue-400", icon: "" };
 }

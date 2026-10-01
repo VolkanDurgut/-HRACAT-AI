@@ -81,7 +81,7 @@ export default function KonsimentoTalimatiSection({
         .replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${dosyaId}/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
-      if (uploadError) throw new Error(`Yukleme hatasi: ${uploadError.message}`);
+      if (uploadError) throw new Error(`Yükleme hatası: ${uploadError.message}`);
       const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -94,7 +94,7 @@ export default function KonsimentoTalimatiSection({
         body: formData,
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Kontrol hatasi.");
+      if (!response.ok) throw new Error(data.error || "Kontrol hatası.");
 
       const normalize = (s: string) => s.toUpperCase().replace(/[^A-ZÇĞİÖŞÜ0-9]/g, "");
       const gercekUyusmazliklar = (data.uyusmazliklar || []).filter((u: any) => {
@@ -134,7 +134,7 @@ export default function KonsimentoTalimatiSection({
       if (guncellemeHatasi) throw new Error(`Sonuç kaydedilemedi: ${guncellemeHatasi}`);
       onRefresh();
     } catch (err: any) {
-      setKontrolHata(err.message || "Kontrol hatasi.");
+      setKontrolHata(err.message || "Kontrol hatası.");
     } finally { setKontrolEdiliyor(false); }
   };
 
@@ -178,7 +178,7 @@ export default function KonsimentoTalimatiSection({
           type="file"
           accept="application/pdf"
           className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lutfen PDF yukleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (f.type !== "application/pdf") { showToast("Lütfen PDF yükleyin.", "error"); return; } handleYukleVeKontrolEt(f); } }}
         />
 
         {!kontrolEdiliyor && kontrolHata && (

@@ -93,10 +93,10 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
     // eder. Hata varsa modali ACIK birak, kullanici tekrar deneyebilsin.
     const yazmaSorunu = yazmaHatasi(error, yazilan);
     if (yazmaSorunu) {
-      showToast(`Urun detaylari kaydedilemedi: ${yazmaSorunu}`, "error");
+      showToast(`Ürün detayları kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
-    showToast("Urun detaylari güncellendi.", "success");
+    showToast("Ürün detayları güncellendi.", "success");
     setEditing(false);
     onRefresh();
   };
@@ -106,9 +106,9 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
   return (
     <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div className="px-6 py-4 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Urun Detaylari</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Ürün Detayları</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
-          <Pencil size={12} /> Duzenle
+          <Pencil size={12} /> Düzenle
         </button>
       </div>
       {gosterilecekSatirlar.length > 0 ? (
@@ -116,7 +116,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
           <table className="min-w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Urun Adi</th>
+                <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ürün Adı</th>
                 <th className="text-left px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Ambalaj</th>
                 <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Miktar (MTS)</th>
                 <th className="text-right px-4 py-3 text-xs font-bold" style={{ color: TEXT_MUTED }}>Birim Fiyat</th>
@@ -145,14 +145,14 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
           </table>
         </div>
       ) : (
-        <p className="px-6 py-6 text-sm italic" style={{ color: TEXT_MUTED }}>Henuz urun detayi eklenmemis.</p>
+        <p className="px-6 py-6 text-sm italic" style={{ color: TEXT_MUTED }}>Henüz ürün detayı eklenmemiş.</p>
       )}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Urun Detaylarini Duzenle</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Ürün Detaylarını Düzenle</h3>
               <button onClick={() => setEditing(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
 
@@ -160,13 +160,13 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
               {satirlar.map((satir, i) => (
                 <div key={i} className="p-3 rounded-lg border relative" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   {satirlar.length > 1 && (
-                    <button onClick={() => satirSil(i)} className="absolute top-2 right-2 text-red-400 hover:text-red-300" title="Satiri sil">
+                    <button onClick={() => satirSil(i)} className="absolute top-2 right-2 text-red-400 hover:text-red-300" title="Satırı sil">
                       <Trash2 size={14} />
                     </button>
                   )}
                   <div className="grid grid-cols-2 gap-2 pr-6">
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Urun Adi</label>
+                      <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Ürün Adı</label>
                       <input value={satir.urun_adi} onChange={(e) => satirGuncelle(i, "urun_adi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     </div>
                     <div>
@@ -182,7 +182,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
                       <input value={satir.birim_fiyat_usd} onChange={(e) => satirGuncelle(i, "birim_fiyat_usd", e.target.value)} inputMode="decimal" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Toplam <span className="normal-case font-normal">(otomatik, elle degistirilebilir)</span></label>
+                      <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Toplam <span className="normal-case font-normal">(otomatik, elle değiştirilebilir)</span></label>
                       <input value={satir.toplam_tutar_usd} onChange={(e) => satirGuncelle(i, "toplam_tutar_usd", e.target.value)} inputMode="decimal" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     </div>
                   </div>
@@ -191,7 +191,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
             </div>
 
             <button onClick={satirEkle} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-              <Plus size={13} /> Satir Ekle
+              <Plus size={13} /> Satır Ekle
             </button>
 
             <div className="flex items-center justify-between mt-4 pt-3 border-t" style={{ borderColor: CARD_BORDER }}>
@@ -204,7 +204,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
                 <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                Iptal
+                İptal
               </button>
             </div>
           </div>

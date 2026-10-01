@@ -222,7 +222,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
       setSaving(false);
       return;
     }
-    showToast("Banka bilgileri guncellendi.", "success");
+    showToast("Banka bilgileri güncellendi.", "success");
     setSaving(false);
     handleModalKapat();
     onRefresh();
@@ -245,12 +245,12 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
       <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Banka Bilgileri</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
-          <Pencil size={12} /> Duzenle
+          <Pencil size={12} /> Düzenle
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <CopyableField dark label="Hesap Adi" value={dosya.hesap_adi} />
+        <CopyableField dark label="Hesap Adı" value={dosya.hesap_adi} />
         <CopyableField dark label="Banka" value={dosya.banka} />
         <CopyableField dark label="SWIFT" value={dosya.swift} monospace />
         <CopyableField dark label="Hesap Numarası" value={dosya.hesap_numarasi} monospace />
@@ -261,7 +261,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={handleModalKapat}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Banka Bilgilerini Duzenle</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Banka Bilgilerini Düzenle</h3>
               <button onClick={handleModalKapat} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
 
@@ -361,7 +361,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Hesap Adi</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Hesap Adı</label>
                 <input value={form.hesap_adi} onChange={(e) => update("hesap_adi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
@@ -386,7 +386,7 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
                 <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={handleModalKapat} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                Iptal
+                İptal
               </button>
             </div>
           </div>

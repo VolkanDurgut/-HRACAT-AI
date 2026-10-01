@@ -53,7 +53,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     const pattern = /^[A-Z]{4}[0-9]{7}$/;
     const cleaned = form.konteyner_no.toUpperCase().replace(/\s/g, "");
     if (!cleaned) e.konteyner_no = "Konteyner no zorunlu";
-    else if (!pattern.test(cleaned)) e.konteyner_no = "Format: 4 harf + 7 rakam (orn: ABCU1234567)";
+    else if (!pattern.test(cleaned)) e.konteyner_no = "Format: 4 harf + 7 rakam (örn: ABCU1234567)";
     setErrors(e);
     return Object.keys(e).length === 0;
   }, [form.konteyner_no]);
@@ -163,7 +163,7 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
         // etmeyebilir.
         return {
           basarili: 0,
-          hatali: [...hatalilar, ...basarililar.map((b) => `${b.konteyner_no} (veritabani hatasi: ${error.message})`)],
+          hatali: [...hatalilar, ...basarililar.map((b) => `${b.konteyner_no} (veritabanı hatası: ${error.message})`)],
         };
       }
       onRefresh();

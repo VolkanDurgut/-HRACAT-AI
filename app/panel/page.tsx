@@ -101,7 +101,7 @@ function PanelContent() {
       // Sayim okunamadiysa (count=null) bos sanilip silinmez (01.10.2026)
       if (!sayimHatasi && count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
     }
-    showToast(`${deleteTarget.dosyaNo} basariyla silindi.`, "success");
+    showToast(`${deleteTarget.dosyaNo} başarıyla silindi.`, "success");
     fetchDosyalar();
     setDeleteTarget(null);
   };

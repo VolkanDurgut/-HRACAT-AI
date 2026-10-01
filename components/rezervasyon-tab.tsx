@@ -213,22 +213,22 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("booking_no")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Adi *</label>
-        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: NAVIOS AZURE" />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Adı *</label>
+        <input value={form.gemi_adi} onChange={(e) => update("gemi_adi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="örn: NAVIOS AZURE" />
         {hataGoster("gemi_adi")}
       </div>
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sefer No (Voyage No) *</label>
-        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: 1BM21S1MA" />
+        <input value={form.sefer_no} onChange={(e) => update("sefer_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="örn: 1BM21S1MA" />
         {hataGoster("sefer_no")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Acente Ismi *</label>
-        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="orn: MSC, CMA CGM" />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Acente İsmi *</label>
+        <input value={form.acente_ismi} onChange={(e) => update("acente_ismi", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="örn: MSC, CMA CGM" />
         {hataGoster("acente_ismi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yukleme Limani *</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yükleme Limanı *</label>
         <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("yuklenme_limani")}
       </div>
@@ -238,7 +238,7 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("konteyner_adedi")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Kalkis Tarihi *</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Gemi Kalkış Tarihi *</label>
         <input type="date" value={form.gemi_kalkis_tarihi} onChange={(e) => update("gemi_kalkis_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         {hataGoster("gemi_kalkis_tarihi")}
       </div>
@@ -248,7 +248,7 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("talimat_cutoff")}
         {form.talimat_cutoff && (
           <>
-            <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            <input type="text" value={form.talimat_cutoff_saat} onChange={(e) => updateSaat("talimat_cutoff_saat", e.target.value)} placeholder="Saat (örn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
             {hataGoster("talimat_cutoff_saat")}
           </>
         )}
@@ -259,7 +259,7 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("beyanname_cutoff")}
         {form.beyanname_cutoff && (
           <>
-            <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (orn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+            <input type="text" value={form.beyanname_cutoff_saat} onChange={(e) => updateSaat("beyanname_cutoff_saat", e.target.value)} placeholder="Saat (örn: 1200)" maxLength={5} className="w-full px-3 py-2 border rounded-lg text-sm mt-1.5 text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
             {hataGoster("beyanname_cutoff_saat")}
           </>
         )}
@@ -280,13 +280,13 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("ekipman_alim_yeri")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutari (Konteyner Basi, {dosya.para_birimi || "USD"}) *</label>
-        <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="orn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutarı (Konteyner Başı, {dosya.para_birimi || "USD"}) *</label>
+        <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="örn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("navlun_tutari")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Basi, {dosya.para_birimi || "USD"}) *</label>
-        <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="orn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Başı, {dosya.para_birimi || "USD"}) *</label>
+        <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="örn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("lokal_masraf_tutari")}
       </div>
     </div>
@@ -339,7 +339,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
     const { data: dosyaData, error: dosyaError } = await supabase
       .from("ihracat_dosyalari").update(buildDosyaPayload(form)).eq("id", rez.dosya_id).eq("company_id", companyId).select("id");
     const tutarBasarili = await syncDevamEdenDosyaTutari(rez.dosya_id, companyId);
-    const sonuc = ikincilAdimMesaji(yazmaHatasi(dosyaError, dosyaData), tutarBasarili, "Rezervasyon guncellendi.");
+    const sonuc = ikincilAdimMesaji(yazmaHatasi(dosyaError, dosyaData), tutarBasarili, "Rezervasyon güncellendi.");
     showToast(sonuc.mesaj, sonuc.tur);
     setSaving(false);
     setEditing(false);
@@ -351,13 +351,13 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
         <div className="rounded-2xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-sm" style={{ color: "white" }}>Rezervasyonu Duzenle</h4>
+            <h4 className="font-semibold text-sm" style={{ color: "white" }}>Rezervasyonu Düzenle</h4>
             <div className="flex gap-2">
               <button onClick={handleSave} disabled={saving} className="text-green-400 hover:text-green-300 text-xs font-medium inline-flex items-center gap-1 disabled:opacity-50">
                 <Check size={12} /> {saving ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={() => setEditing(false)} className="hover:text-white text-xs font-medium inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
-                <X size={12} /> Iptal
+                <X size={12} /> İptal
               </button>
             </div>
           </div>
@@ -641,7 +641,7 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
       {!showNewForm ? (
         <div>
           {rezervasyonlar.length === 0 && (
-            <EmptyState icon={<Package size={36} />} title="Henuz rezervasyon yok" description="Bu dosyaya bir rezervasyon ekleyin" />
+            <EmptyState icon={<Package size={36} />} title="Henüz rezervasyon yok" description="Bu dosyaya bir rezervasyon ekleyin" />
           )}
           <button onClick={handleAcNewForm}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors mt-2">
@@ -658,7 +658,7 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
                 {savingNew ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={() => { setShowNewForm(false); setNewForm(emptyForm); }} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 transition-all" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                Iptal
+                İptal
               </button>
             </div>
           </div>

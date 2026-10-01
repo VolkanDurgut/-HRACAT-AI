@@ -36,7 +36,7 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
 
   try {
     const idoc = iframe.contentDocument;
-    if (!idoc) throw new Error("Gecici render alani olusturulamadi.");
+    if (!idoc) throw new Error("Geçici render alanı oluşturulamadı.");
     idoc.open();
     idoc.write(html);
     idoc.close();
@@ -98,7 +98,7 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
         dilimCanvas.width = canvas.width;
         dilimCanvas.height = buSeferkiYukseklik;
         const ctx = dilimCanvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas baglami olusturulamadi.");
+        if (!ctx) throw new Error("Canvas bağlamı oluşturulamadı.");
         ctx.drawImage(canvas, 0, offset, canvas.width, buSeferkiYukseklik, 0, 0, canvas.width, buSeferkiYukseklik);
 
         if (!ilkSayfa) pdf.addPage();

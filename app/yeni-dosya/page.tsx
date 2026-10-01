@@ -60,7 +60,7 @@ export default function YeniDosyaPage() {
       setPdfFile(file);
       setError(null);
     } else {
-      setError("Lutfen 20MB'den kucuk bir PDF dosyasi yukleyin.");
+      setError("Lütfen 20MB'den küçük bir PDF dosyası yükleyin.");
     }
   }, []);
 
@@ -70,7 +70,7 @@ export default function YeniDosyaPage() {
       setPdfFile(file);
       setError(null);
     } else {
-      setError("Lutfen 20MB'den kucuk bir PDF dosyasi yukleyin.");
+      setError("Lütfen 20MB'den küçük bir PDF dosyası yükleyin.");
     }
   }, []);
 
@@ -110,7 +110,7 @@ export default function YeniDosyaPage() {
       }
 
       if (!extracted) {
-        throw new Error("PDF okunamadi.");
+        throw new Error("PDF okunamadı.");
       }
 
       setProformData(extracted);
@@ -175,8 +175,8 @@ export default function YeniDosyaPage() {
       // proforma_no yoksa direkt dosya olustur (ana siparis baglanmadan)
       await createDosya(extracted, null);
     } catch {
-      setError("Dosya olusturulurken hata olustu. Lutfen tekrar deneyin.");
-      showToast("Dosya olusturulurken hata olustu.", "error");
+      setError("Dosya oluşturulurken hata oluştu. Lütfen tekrar deneyin.");
+      showToast("Dosya oluşturulurken hata oluştu.", "error");
       setStep("upload");
       setLoading(false);
     }
@@ -271,11 +271,11 @@ export default function YeniDosyaPage() {
       }
 
       setStep("success");
-      showToast("Dosya olusturuldu!", "success");
+      showToast("Dosya oluşturuldu!", "success");
       setTimeout(() => setStep("reservation_choice"), 1500);
     } catch {
-      setError("Dosya olusturulurken hata olustu. Lutfen tekrar deneyin.");
-      showToast("Dosya olusturulurken hata olustu.", "error");
+      setError("Dosya oluşturulurken hata oluştu. Lütfen tekrar deneyin.");
+      showToast("Dosya oluşturulurken hata oluştu.", "error");
       setStep("upload");
     } finally {
       setLoading(false);
@@ -310,7 +310,7 @@ export default function YeniDosyaPage() {
       if (anaSiparisError) throw anaSiparisError;
       await createDosya(proformData, yeniAnaSiparis.id);
     } catch {
-      showToast("Ana siparis olusturulurken hata olustu.", "error");
+      showToast("Ana sipariş oluşturulurken hata oluştu.", "error");
       setLoading(false);
     }
   };
@@ -318,9 +318,9 @@ export default function YeniDosyaPage() {
   return (
     <AppShell>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Yeni Ihracat Dosyasi Ac</h1>
+        <h1 className="text-2xl font-bold text-white">Yeni İhracat Dosyası Aç</h1>
         <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-          Proforma faturayi yukleyin, sistem otomatik olarak ihracat dosyasini oluştursun.
+          Proforma faturayı yükleyin, sistem otomatik olarak ihracat dosyasını oluştursun.
         </p>
       </div>
 
@@ -361,7 +361,7 @@ export default function YeniDosyaPage() {
               className="mt-6 w-full py-3 rounded-lg text-white font-medium text-sm transition-all duration-200 hover:opacity-90 disabled:opacity-40"
               style={{ backgroundColor: ACCENT }}
             >
-              Dosyayi Olustur
+              Dosyayı Oluştur
             </button>
           </div>
         )}
@@ -484,7 +484,7 @@ export default function YeniDosyaPage() {
         {step === "success" && (
           <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <Check size={40} className="mx-auto text-green-400 mb-4" />
-            <p className="text-white font-medium">Tamamlandi!</p>
+            <p className="text-white font-medium">Tamamlandı!</p>
           </div>
         )}
 
@@ -493,7 +493,7 @@ export default function YeniDosyaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-white mb-1">Rezervasyon Ekle</h3>
-                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Booking no, cut-off tarihleri ve yukleme bilgilerini girin.</p>
+                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Booking no, cut-off tarihleri ve yükleme bilgilerini girin.</p>
                 <button
                   onClick={() => router.push(`/dosya/${dosyaId}?tab=rezervasyon&action=new`)}
                   className="w-full py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
@@ -505,7 +505,7 @@ export default function YeniDosyaPage() {
 
               <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-white mb-1">Acentelerden Teklif Al</h3>
-                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Kayitli acentelerinize freight teklifi isteyin.</p>
+                <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Kayıtlı acentelerinize freight teklifi isteyin.</p>
                 <AcenteTeklifSection dosyaId={dosyaId!} proformData={proformData} userId={user!.id} companyId={companyId!} />
               </div>
             </div>
@@ -516,16 +516,16 @@ export default function YeniDosyaPage() {
           <div className="space-y-6 animate-fade-up">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-                <h3 className="font-semibold text-sm" style={{ color: "white" }}>Satici & Alici Bilgileri</h3>
+                <h3 className="font-semibold text-sm" style={{ color: "white" }}>Satıcı & Alıcı Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Satici Firma</p><p className="font-medium text-white">{proformData.satici_firma}</p></div>
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Alici Firma</p><p className="font-medium text-white">{proformData.alici_firma}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Satıcı Firma</p><p className="font-medium text-white">{proformData.satici_firma}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Alıcı Firma</p><p className="font-medium text-white">{proformData.alici_firma}</p></div>
                 </div>
                 <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Proforma Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Proforma No</p><p className="font-medium text-white">{proformData.proforma_no}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Proforma Tarihi</p><p className="font-medium text-white">{proformData.proforma_tarihi}</p></div>
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Gecerlilik Tarihi</p><p className="font-medium text-white">{proformData.gecerlilik_tarihi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Geçerlilik Tarihi</p><p className="font-medium text-white">{proformData.gecerlilik_tarihi}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Lot No</p><p className="font-medium text-white">{proformData.lot_no}</p></div>
                 </div>
                 <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Finansal</h3>
@@ -539,14 +539,14 @@ export default function YeniDosyaPage() {
               <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-sm" style={{ color: "white" }}>Lojistik</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Varis Limani</p><p className="font-medium text-white">{proformData.varis_limani}</p></div>
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yukleme Limani</p><p className="font-medium text-white">{proformData.yuklenme_limani || proformData.yukleme_limani}</p></div>
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Teslim Sekli</p><p className="font-medium text-white">{proformData.teslim_sekli}</p></div>
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Odeme Sekli</p><p className="font-medium text-white">{proformData.odeme_sekli}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Varış Limanı</p><p className="font-medium text-white">{proformData.varis_limani}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yükleme Limanı</p><p className="font-medium text-white">{proformData.yuklenme_limani || proformData.yukleme_limani}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Teslim Şekli</p><p className="font-medium text-white">{proformData.teslim_sekli}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ödeme Şekli</p><p className="font-medium text-white">{proformData.odeme_sekli}</p></div>
                 </div>
                 <h3 className="font-semibold text-sm pt-2" style={{ color: "white" }}>Banka Bilgileri</h3>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Adi</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_adi || proformData.hesap_adi}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Adı</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_adi || proformData.hesap_adi}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Banka</p><p className="font-medium text-white">{proformData.banka_bilgileri?.banka_adi || proformData.banka}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>SWIFT</p><p className="font-medium text-white">{proformData.banka_bilgileri?.swift || proformData.swift}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Hesap Numarası</p><p className="font-medium text-white">{proformData.banka_bilgileri?.hesap_numarasi || proformData.hesap_numarasi}</p></div>
@@ -558,16 +558,16 @@ export default function YeniDosyaPage() {
             {proformData.urun_detaylari && proformData.urun_detaylari.length > 0 && (
               <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <div className="px-6 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
-                  <h3 className="font-semibold text-sm" style={{ color: "white" }}>Urun Detaylari</h3>
+                  <h3 className="font-semibold text-sm" style={{ color: "white" }}>Ürün Detayları</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full">
                     <thead>
                       <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>URUN ADI</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>ÜRÜN ADI</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>AMBALAJ</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>MIKTAR (MTS)</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>BIRIM FIYAT</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>MİKTAR (MTS)</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>BİRİM FİYAT</th>
                         <th className="text-right px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>TOPLAM</th>
                       </tr>
                     </thead>
@@ -601,14 +601,14 @@ export default function YeniDosyaPage() {
                 className="px-6 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
                 style={{ backgroundColor: ACCENT }}
               >
-                Dosyayi Goruntule
+                Dosyayı Görüntüle
               </button>
               <button
                 onClick={() => router.push("/panel")}
                 className="px-6 py-2.5 rounded-lg font-medium text-sm border hover:bg-white/5 transition-all"
                 style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
               >
-                Ana Panele Don
+                Ana Panele Dön
               </button>
             </div>
           </div>

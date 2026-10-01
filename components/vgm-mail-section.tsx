@@ -72,7 +72,7 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
       showToast(`VGM durumu kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
-    showToast("VGM maili gonderildi.", "success");
+    showToast("VGM maili gönderildi.", "success");
     setShowVgmMail(false);
     onRefresh();
   };
@@ -87,7 +87,7 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
           <button onClick={() => setShowVgmMail(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
         </div>
         <div>
-          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Acente / Armator)</p>
+          <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Acente / Armatör)</p>
           <input value={vgmTo} onChange={(e) => setVgmTo(e.target.value)} placeholder="acente@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>
@@ -98,9 +98,9 @@ const VgmMailSection = forwardRef<VgmMailSectionHandle, Props>(function VgmMailS
         <div className="flex gap-2">
           <button onClick={handleVgmMailGonder} disabled={!vgmTo}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-            <Mail size={14} /> Mail Uygulamasini Ac
+            <Mail size={14} /> Mail Uygulamasını Aç
           </button>
-          <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+          <button onClick={() => setShowVgmMail(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>İptal</button>
         </div>
       </div>
     </div>

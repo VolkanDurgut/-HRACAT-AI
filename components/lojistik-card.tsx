@@ -80,15 +80,15 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
       <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Lojistik</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
-          <Pencil size={12} /> Duzenle
+          <Pencil size={12} /> Düzenle
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <CopyableField dark label="Yukleme Limani" value={rezervasyonlar[0]?.yuklenme_limani || dosya.yuklenme_limani} />
-        <CopyableField dark label="Varis Limani" value={dosya.varis_limani} />
-        <CopyableField dark label="Teslim Sekli" value={dosya.teslim_sekli} />
-        <CopyableField dark label="Sevkiyat Suresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />
+        <CopyableField dark label="Yükleme Limanı" value={rezervasyonlar[0]?.yuklenme_limani || dosya.yuklenme_limani} />
+        <CopyableField dark label="Varış Limanı" value={dosya.varis_limani} />
+        <CopyableField dark label="Teslim Şekli" value={dosya.teslim_sekli} />
+        <CopyableField dark label="Sevkiyat Süresi" value={(dosya.ham_veri as any)?.sevkiyat_suresi} />
         <CopyableField dark label="Toplam Miktar" value={dosya.miktar ? `${dosya.miktar} ${dosya.miktar_birimi || "MTS"}` : null} />
         <CopyableField dark label="Ambalaj" value={dosya.ambalaj} />
         <div className="col-span-2">
@@ -100,24 +100,24 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Lojistigi Duzenle</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Lojistiği Düzenle</h3>
               <button onClick={() => setEditing(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yukleme Limani</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yükleme Limanı</label>
                 <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Varis Limani</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Varış Limanı</label>
                 <input value={form.varis_limani} onChange={(e) => update("varis_limani", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Teslim Sekli</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Teslim Şekli</label>
                 <input value={form.teslim_sekli} onChange={(e) => update("teslim_sekli", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sevkiyat Suresi</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Sevkiyat Süresi</label>
                 <input value={form.sevkiyat_suresi} onChange={(e) => update("sevkiyat_suresi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
@@ -144,7 +144,7 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
                 <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                Iptal
+                İptal
               </button>
             </div>
           </div>

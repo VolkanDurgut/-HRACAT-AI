@@ -69,39 +69,39 @@ export default function TaraflarCard({ dosya, onRefresh, companyId }: Props) {
       <div className="flex items-center justify-between mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: ACCENT }}>Taraflar</h3>
         <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium inline-flex items-center gap-1">
-          <Pencil size={12} /> Duzenle
+          <Pencil size={12} /> Düzenle
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <CopyableField dark label="Satici Firma" value={dosya.satici_firma} />
-        <CopyableField dark label="Alici Firma" value={dosya.alici_firma} />
-        <CopyableField dark label="Alici Tel" value={(dosya.ham_veri as any)?.alici_tel} />
-        <CopyableField dark label="Alici Email" value={(dosya.ham_veri as any)?.alici_email} />
+        <CopyableField dark label="Satıcı Firma" value={dosya.satici_firma} />
+        <CopyableField dark label="Alıcı Firma" value={dosya.alici_firma} />
+        <CopyableField dark label="Alıcı Tel" value={(dosya.ham_veri as any)?.alici_tel} />
+        <CopyableField dark label="Alıcı Email" value={(dosya.ham_veri as any)?.alici_email} />
       </div>
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Taraflari Duzenle</h3>
+              <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Tarafları Düzenle</h3>
               <button onClick={() => setEditing(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Satici Firma</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Satıcı Firma</label>
                 <input value={form.satici_firma} onChange={(e) => update("satici_firma", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alici Firma</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alıcı Firma</label>
                 <input value={form.alici_firma} onChange={(e) => update("alici_firma", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alici Tel</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alıcı Tel</label>
                 <input value={form.alici_tel} onChange={(e) => update("alici_tel", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alici Email</label>
+                <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Alıcı Email</label>
                 <input value={form.alici_email} onChange={(e) => update("alici_email", e.target.value)} type="email" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
               </div>
             </div>
@@ -110,7 +110,7 @@ export default function TaraflarCard({ dosya, onRefresh, companyId }: Props) {
                 <Check size={14} /> {saving ? "Kaydediliyor..." : "Kaydet"}
               </button>
               <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                Iptal
+                İptal
               </button>
             </div>
           </div>

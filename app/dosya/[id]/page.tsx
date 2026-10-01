@@ -142,12 +142,12 @@ function DosyaDetailContent() {
       return;
     }
     setDosya({ ...dosya, toplam_konteyner: val });
-    showToast("Toplam konteyner guncellendi.", "success");
+    showToast("Toplam konteyner güncellendi.", "success");
   };
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "proforma",     label: "Proforma Bilgileri" },
-    { key: "evraklar",     label: "Sevkiyat Evraklari" },
+    { key: "evraklar",     label: "Sevkiyat Evrakları" },
     { key: "rezervasyon",  label: "Rezervasyon" },
     { key: "konteynerler", label: "Konteynerler" },
   ];
@@ -175,9 +175,9 @@ function DosyaDetailContent() {
     return (
       <AppShell>
         <div className="text-center py-20">
-          <p className="text-slate-400">Dosya bulunamadi</p>
+          <p className="text-slate-400">Dosya bulunamadı</p>
           <button onClick={() => router.push("/panel")} className="text-emerald-600 text-sm mt-2 hover:underline">
-            Ana Panele Don
+            Ana Panele Dön
           </button>
         </div>
       </AppShell>
@@ -205,7 +205,7 @@ function DosyaDetailContent() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">📁 {dosya.dosya_no}</h1>
-            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Olusturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Oluşturulma: {formatDateTimeTR(dosya.olusturma_tarihi)}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
             {yetkiler.sayfa_yetkileri.yeni_dosya && (
@@ -339,7 +339,7 @@ function DosyaDetailContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <CopyableField dark label="Proforma No" value={dosya.proforma_no} />
                   <CopyableField dark label="Proforma Tarihi" value={formatDateTR(dosya.proforma_tarihi)} />
-                  <CopyableField dark label="Gecerlilik Tarihi" value={formatDateTR(dosya.gecerlilik_tarihi)} />
+                  <CopyableField dark label="Geçerlilik Tarihi" value={formatDateTR(dosya.gecerlilik_tarihi)} />
                   <CopyableField dark label="Lot No" value={dosya.lot_no} />
                 </div>
               </div>
@@ -425,7 +425,7 @@ function DosyaDetailContent() {
                   })}
                 </div>
               ) : (
-                <EmptyState icon={<Package size={36} />} title="Sevkiyat evraki bulunmuyor" description="Bu dosyaya henuz sevkiyat evraki eklenmemis" />
+                <EmptyState icon={<Package size={36} />} title="Sevkiyat evrakı bulunmuyor" description="Bu dosyaya henüz sevkiyat evrakı eklenmemiş" />
               )}
             </div>
           </div>

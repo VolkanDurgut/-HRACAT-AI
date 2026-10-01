@@ -191,11 +191,11 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     }).eq("id", dosyaId).eq("company_id", companyId).select("id");
     const yazmaSorunu = yazmaHatasi(error, yazilan);
     if (yazmaSorunu) {
-      showToast(`Fatura talimati durumu kaydedilemedi: ${yazmaSorunu}`, "error");
+      showToast(`Fatura talimatı durumu kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
     setShowFaturaTalimati(false);
-    showToast("Fatura talimati maili gonderildi.", "success");
+    showToast("Fatura talimatı maili gönderildi.", "success");
     onRefresh();
   };
 
@@ -210,11 +210,11 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowFaturaTalimati(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-5 space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Fatura Talimati Maili</p>
+              <p className="text-sm font-bold text-white">Fatura Talimatı Maili</p>
               <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
             <div>
-              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alici)</p>
+              <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alıcı)</p>
               <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
             </div>
             <div>
@@ -231,12 +231,12 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
             </div>
             <div className="flex gap-2">
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-                <Mail size={14} /> Mail Uygulamasini Ac
+                <Mail size={14} /> Mail Uygulamasını Aç
               </button>
-              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatini PDF olarak indir">
-                <Download size={14} /> Fatura Talimati Indir
+              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
+                <Download size={14} /> Fatura Talimatı İndir
               </button>
-              <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Iptal</button>
+              <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>İptal</button>
             </div>
           </div>
         </div>

@@ -105,7 +105,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
 
   const handleKopyala = async (deger: string, etiket: string) => {
     await navigator.clipboard.writeText(deger);
-    showToast(`${etiket} kopyalandi.`, "success");
+    showToast(`${etiket} kopyalandı.`, "success");
   };
   
   const scrollToBolum = (id: string) => {
@@ -128,7 +128,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
     ].join("\t"));
     const metin = [baslik, ...satirlar].join("\n");
     await navigator.clipboard.writeText(metin);
-    showToast("Tum konteyner bilgileri kopyalandi.", "success");
+    showToast("Tüm konteyner bilgileri kopyalandı.", "success");
   };
 
   const [uygulaConfirm, setUygulaConfirm] = React.useState(false);
@@ -195,7 +195,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                 <button onClick={handleTumunuKopyala}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-white/5"
                   style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                  <ClipboardList size={13} /> Tumunu Kopyala
+                  <ClipboardList size={13} /> Tümünü Kopyala
                 </button>
               </div>
             </div>
@@ -207,7 +207,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   <th className="text-left px-4 py-3 text-xs font-semibold w-8" style={{ color: TEXT_MUTED }}>No</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Konteyner No</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Muhur No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Mühür No</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Tip</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Çuval</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Plaka</th>
@@ -242,7 +242,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                       <td className="px-4 py-3 text-sm font-mono" style={{ color: TEXT_MUTED }}>
                         {k.muhur_no ? (
                           <span className="cursor-pointer hover:text-amber-400"
-                            onClick={() => handleKopyala(k.muhur_no!, "Muhur no")}>
+                            onClick={() => handleKopyala(k.muhur_no!, "Mühür no")}>
                             {k.muhur_no}
                           </span>
                         ) : "-"}
@@ -288,7 +288,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                         ) : k.dba_dosya_url ? (
                           <div className="flex items-center justify-center gap-1.5">
                             {uyusmazlik ? (
-                              <AlertTriangle size={14} className="text-amber-400" aria-label="Uyusmazlik var" />
+                              <AlertTriangle size={14} className="text-amber-400" aria-label="Uyuşmazlık var" />
                             ) : (
                               <CheckCircle2 size={14} className="text-green-400" />
                             )}
@@ -368,7 +368,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Emin misiniz?"
-        description={`${deleteTarget?.konteynerNo || ""} konteynerini silmek istediginize emin misiniz?`}
+        description={`${deleteTarget?.konteynerNo || ""} konteynerini silmek istediğinize emin misiniz?`}
         confirmLabel="Evet, Sil" cancelLabel="Hayir"
         onConfirm={handleDelete} destructive
       />
@@ -416,7 +416,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
               {errors.konteyner_no && <p className="text-xs text-red-400 mt-0.5">{errors.konteyner_no}</p>}
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Muhur No</label>
+              <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Mühür No</label>
               <input value={form.muhur_no} onChange={(e) => update("muhur_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm uppercase text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
             </div>
             <div>
@@ -438,7 +438,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
               {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
             <button onClick={() => setShowForm(false)} className="px-5 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-              Iptal
+              İptal
             </button>
           </div>
         </div>

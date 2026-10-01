@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
+import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil, yazmaHatasi, isDosyaAcik } from "@/lib/supabase";
 import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCutoffTarih, formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -367,81 +367,116 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
     );
   }
 
-  const talimatLabel = getCutOffLabel(rez.talimat_cutoff);
-  const beyanLabel = getCutOffLabel(rez.beyanname_cutoff);
-
+  // ---- KART GORUNUMU (yeniden duzenlendi: 01.10.2026) ----
+  // Talep: "rezervasyon eklerken girdigimiz BUTUN bilgiler kartta gorunmeli;
+  // kart cok buyuk, duzensiz ve bicimsiz". Formdaki her alan (bkz.
+  // RezervasyonFormFields) kartta KENDI satirinda gosterilir; ayni bilgiler
+  // uc mantiksal bolumde, etiket-deger satirlari halinde toplanir. Tarihler
+  // olus sirasina gore dizilir. Kart genisligi sinirlidir (genis ekranda
+  // 1600 px'e yayilmaz).
   const paraBirimi = dosya.para_birimi || "USD";
   const navlunTutari = dosya.navlun_tutari;
   const lokalMasrafTutari = dosya.lokal_masraf_tutari;
+  const kontAdedi = rez.konteyner_adedi || 0;
+  // Kalan gun rozetleri sadece ACIK dosyada anlamlidir; kapali dosyada
+  // her tarih "Gecti" diye kirmizi yanip gurultu yaratir.
+  const dosyaAcik = isDosyaAcik(dosya);
+
+  const parasal = (tutar: number | null) => {
+    if (tutar === null || tutar === undefined) return null;
+    return (
+      <span className="text-right">
+        <span className="font-medium text-white">{formatCurrency(tutar, paraBirimi)}</span>
+        <span className="text-[11px]" style={{ color: TEXT_MUTED }}> / kont.</span>
+        {kontAdedi > 0 && (
+          <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>
+            Toplam ({kontAdedi} kont.): <span className="text-slate-300">{formatCurrency(Number(tutar) * kontAdedi, paraBirimi)}</span>
+          </span>
+        )}
+      </span>
+    );
+  };
+
+  const kalanGun = (deger: string | null) => {
+    if (!deger || !dosyaAcik) return null;
+    const etiket = getCutOffLabel(deger);
+    return <span className={`ml-1.5 text-[11px] ${etiket.color}`}>{etiket.text}</span>;
+  };
 
   return (
-    <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <div className="flex items-start justify-between mb-3 pb-3 border-b" style={{ borderColor: CARD_BORDER }}>
-        <div>
-          <h4 className="font-semibold text-sm" style={{ color: "white" }}>
-            Booking: <span className="font-mono">{rez.booking_no}</span>
-          </h4>
-          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-            {(rez as any).gemi_adi && (
-              <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi: <span className="font-medium text-white">{(rez as any).gemi_adi}{(rez as any).sefer_no ? ` / ${(rez as any).sefer_no}` : ""}</span></p>
-            )}
-            {(rez as any).acente_ismi && (
-              <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente: <span className="font-medium text-white">{(rez as any).acente_ismi}</span></p>
-            )}
-          </div>
+    <div className="max-w-5xl rounded-xl border shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      {/* Baslik: Booking No + islemler */}
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
+        <div className="min-w-0">
+          <p lang="en" className="text-[11px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Booking No</p>
+          <h4 className="font-mono font-semibold text-sm text-white truncate">{rez.booking_no || "-"}</h4>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20">
-            Duzenle
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={handleEditStart} className="text-amber-400 hover:text-amber-300 text-xs font-medium px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20">
+            Düzenle
           </button>
-          <button onClick={() => onDeleteRequest({ id: rez.id, bookingNo: rez.booking_no })} className="text-red-400 hover:text-red-300">
+          <button onClick={() => onDeleteRequest({ id: rez.id, bookingNo: rez.booking_no })} className="p-1 text-red-400 hover:text-red-300" title="Rezervasyonu sil">
             <Trash2 size={16} />
           </button>
         </div>
       </div>
 
-      <div className="space-y-2.5">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2.5 text-sm">
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yukleme Limani</p><p className="font-medium text-white">{rez.yuklenme_limani || "-"}</p></div>
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Konteyner Adedi</p><p className="font-medium text-white">{rez.konteyner_adedi}</p></div>
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Navlun (Kont. Basi)</p><p className="font-medium text-white">{navlunTutari ? formatCurrency(navlunTutari, paraBirimi) : "-"}</p></div>
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Lokal Masraf (Kont. Basi)</p><p className="font-medium text-white">{lokalMasrafTutari ? formatCurrency(lokalMasrafTutari, paraBirimi) : "-"}</p></div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x" style={{ borderColor: CARD_BORDER }}>
+        <KartBolumu baslik="Gemi & Sevkiyat">
+          <KartSatiri etiket="Gemi Adı" deger={rez.gemi_adi} />
+          <KartSatiri etiket="Sefer No" deger={rez.sefer_no} mono />
+          <KartSatiri etiket="Acente" deger={rez.acente_ismi} />
+          <KartSatiri etiket="Yükleme Limanı" deger={rez.yuklenme_limani} />
+          <KartSatiri etiket="Konteyner Adedi" deger={kontAdedi > 0 ? String(kontAdedi) : null} />
+        </KartBolumu>
 
-        <div className="border-t" style={{ borderColor: CARD_BORDER }} />
+        <KartBolumu baslik="Tarihler">
+          <KartSatiri etiket="Ekipman Alım" deger={rez.ekipman_alim_tarihi ? formatDateTR(rez.ekipman_alim_tarihi) : null} />
+          <KartSatiri etiket="Ardiyesiz Giriş" deger={rez.ardiyesiz_giris ? formatDateTR(rez.ardiyesiz_giris) : null} />
+          <KartSatiri
+            etiket="Talimat Cut-Off"
+            deger={rez.talimat_cutoff ? <>{formatCutoffTarih(rez.talimat_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span>{kalanGun(rez.talimat_cutoff)}</> : null}
+          />
+          <KartSatiri
+            etiket="Beyanname Cut-Off"
+            deger={rez.beyanname_cutoff ? <>{formatCutoffTarih(rez.beyanname_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span>{kalanGun(rez.beyanname_cutoff)}</> : null}
+          />
+          <KartSatiri
+            etiket="Gemi Kalkış"
+            deger={rez.gemi_kalkis_tarihi ? <>{formatDateTR(rez.gemi_kalkis_tarihi)}{kalanGun(rez.gemi_kalkis_tarihi)}</> : null}
+          />
+          {rez.eta && <KartSatiri etiket="ETA (Varış)" deger={formatDateTR(rez.eta)} />}
+        </KartBolumu>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5 text-sm">
-          <div>
-            <p className="text-xs" style={{ color: TEXT_MUTED }}>Talimat Cut-Off</p>
-            {rez.talimat_cutoff ? (
-              <p className="font-medium text-white">{formatCutoffTarih(rez.talimat_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span></p>
-            ) : <p className="font-medium text-white">-</p>}
-          </div>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_MUTED }}>Beyanname Cut-Off</p>
-            {rez.beyanname_cutoff ? (
-              <p className="font-medium text-white">{formatCutoffTarih(rez.beyanname_cutoff)} <span className="font-normal" style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span></p>
-            ) : <p className="font-medium text-white">-</p>}
-          </div>
-          <div>
-            <p className="text-xs" style={{ color: TEXT_MUTED }}>Gemi Kalkis</p>
-            <p className="font-medium text-white">
-              {rez.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}
-              {rez.gemi_kalkis_tarihi && (
-                <span className={`ml-1 font-medium ${getCutOffLabel(rez.gemi_kalkis_tarihi).color}`}>{getCutOffLabel(rez.gemi_kalkis_tarihi).text}</span>
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t" style={{ borderColor: CARD_BORDER }} />
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2.5 text-sm">
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Tarihi</p><p className="font-medium text-white">{rez.ekipman_alim_tarihi ? formatDateTR(rez.ekipman_alim_tarihi) : "-"}</p></div>
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ardiyesiz Giris Tarihi</p><p className="font-medium text-white">{(rez as any).ardiyesiz_giris ? formatDateTR((rez as any).ardiyesiz_giris) : "-"}</p></div>
-          <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ekipman Alim Yeri</p><p className="font-medium text-white">{rez.ekipman_alim_yeri || "-"}</p></div>
-        </div>
+        <KartBolumu baslik="Ekipman & Maliyet">
+          <KartSatiri etiket="Ekipman Alım Yeri" deger={rez.ekipman_alim_yeri} />
+          <KartSatiri etiket="Navlun" deger={parasal(navlunTutari)} />
+          <KartSatiri etiket="Lokal Masraf" deger={parasal(lokalMasrafTutari)} />
+        </KartBolumu>
       </div>
+    </div>
+  );
+}
+
+/** Rezervasyon kartinda bir bolum (baslik + etiket-deger satirlari). */
+function KartBolumu({ baslik, children }: { baslik: string; children: React.ReactNode }) {
+  return (
+    <div className="px-4 py-3 border-t md:border-t-0 first:border-t-0" style={{ borderColor: CARD_BORDER }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: ACCENT }}>{baslik}</p>
+      <dl className="space-y-1.5">{children}</dl>
+    </div>
+  );
+}
+
+/** Tek satir: solda etiket, sagda deger. Deger bossa soluk "—" gosterilir. */
+function KartSatiri({ etiket, deger, mono = false }: { etiket: string; deger: React.ReactNode; mono?: boolean }) {
+  const bos = deger === null || deger === undefined || deger === "";
+  return (
+    <div className="flex items-start justify-between gap-3 text-sm">
+      <dt className="text-xs pt-0.5 shrink-0" style={{ color: TEXT_MUTED }}>{etiket}</dt>
+      <dd className={`text-right min-w-0 break-words ${mono && !bos ? "font-mono" : ""} ${bos ? "" : "font-medium text-white"}`} style={bos ? { color: TEXT_MUTED } : undefined}>
+        {bos ? "—" : deger}
+      </dd>
     </div>
   );
 }

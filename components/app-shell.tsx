@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import Sidebar from "@/components/sidebar";
 import DestekWidget from "@/components/destek-widget";
+import CutoffUyarilari from "@/components/cutoff-uyarilari";
 import { Loader2, LogOut, ShieldAlert } from "lucide-react";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
@@ -123,7 +124,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: "#0B0F14" }}>
       <Sidebar />
       <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
-        <div className="p-4 md:p-6 pt-16 md:pt-6">{children}</div>
+        <div className="p-4 md:p-6 pt-16 md:pt-6">
+          {/* Son 10 saate girmis cut-off'lar - her sayfada (talep: 01.10.2026) */}
+          <CutoffUyarilari />
+          {children}
+        </div>
       </main>
       <DestekWidget />
     </div>

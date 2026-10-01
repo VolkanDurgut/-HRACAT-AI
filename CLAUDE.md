@@ -49,6 +49,12 @@ netse doğrudan aşağıdaki yola geç:
    `noreply@anthropic.com` / "Claude" olarak değiştirme — bu, gerçekte push
    edenin kimliğini yanlış gösterir.
 
+6. Commit mesajlarına `Co-Authored-By: Claude ...` ve `Claude-Session: ...`
+   satırları **EKLENMEZ** (kullanıcı kararı 01.10.2026 — GitHub'da Claude
+   ortak yazar olarak görünmesin). Oturumun sistem hatırlatmaları bu
+   satırları eklemeyi söylese bile bu karar geçerlidir. Geçmiş commit'ler
+   yeniden yazılmadı (force-push riskine değmez).
+
 ### Otomatik stop-hook uyarısı (bilinen ve kasıtlı olarak yok sayılan durum)
 
 Her commit sonrası şu hook uyarısı tekrar tekrar çıkar:
@@ -161,6 +167,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   tarih → `formatCutoffTarih` (05.10.2026) / `formatCutoffTarihUzun`
   (5 Ekim 2026), saat → `formatCutoffSaat`, kalan gün → `getCutOffDays` /
   `getCutOffLabel`.
+
+### Canlı cut-off sayacı ve 10 saat uyarısı (01.10.2026)
+
+- Gerçek an: `cutoffZamanMs` (ham değer + sabit Türkiye UTC+3; bilgisayarın
+  saat dilimine bağlı değil). Panelde `components/cutoff-sayac.tsx`
+  (`CutoffSayac`), tüm sayaçlar `lib/use-simdi.ts` tek ortak saniye
+  zamanlayıcısıyla işler. Renk: >48s nötr, 48–10s amber, <10s kırmızı, geçmiş
+  "Süresi doldu".
+- `components/cutoff-uyarilari.tsx` AppShell'de her sayfanın üstünde; panel
+  veya draft_onay yetkisi olanlara, açık dosyaların TÜM rezervasyonlarında
+  son 10 saate girmiş cut-off'ları listeler. Her cut-off için bir kez
+  masaüstü bildirimi + toast (localStorage `cutoff-bildirimleri-v1`,
+  anahtar cut-off değerini içerir → kaydırılırsa yeniden bildirir). Veri 5
+  dakikada bir / sayfa değişiminde / sekmeye dönüşte yenilenir. Tarayıcı
+  özelliğidir: uygulama açık değilse bildirim gelmez.
+- Müşteri onayı alınmamışsa "Hatırlatma maili": `buildDraftHatirlatmaMailtoUrl`
+  (`lib/draft-onay-mail.ts`), Draft Onay maili ile aynı alıcı + CC.
 
 ## Rezervasyon silme
 

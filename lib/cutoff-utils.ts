@@ -67,6 +67,50 @@ export function formatCutoffTarihUzun(dateStr: string | null): string {
   });
 }
 
+/**
+ * Cut-off anini GERCEK zaman damgasi (epoch ms) olarak dondurur - canli geri
+ * sayim ve "son 10 saat" bildirimi icin (talep: 01.10.2026).
+ *
+ * Deger metinden HAM okunur ve TURKIYE yerel saati kabul edilir (bkz. dosya
+ * basindaki not: "+00" etiketi yanlistir, deger aslinda yereldir). Turkiye
+ * 2016'dan beri sabit UTC+3 (yaz saati yok), bu yuzden donusum sabit 3 saattir
+ * ve kullanicinin bilgisayar saat dilimine BAGLI DEGILDIR. Saat kismi yoksa
+ * gun sonu (23:59) kabul edilir. Taninmayan bicimde null doner.
+ */
+export const TURKIYE_UTC_OFSET_MS = 3 * 60 * 60 * 1000;
+
+export function cutoffZamanMs(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const p = ayristirHamTarih(dateStr);
+  if (!p) return null;
+  const s = dateStr.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  const saat = s ? parseInt(s[1], 10) : 23;
+  const dakika = s ? parseInt(s[2], 10) : 59;
+  const saniye = s && s[3] ? parseInt(s[3], 10) : 0;
+  return Date.UTC(p.yil, p.ay - 1, p.gun, saat, dakika, saniye) - TURKIYE_UTC_OFSET_MS;
+}
+
+/** Cut-off'a kalan sure (ms). Gecmisse negatif, deger yoksa null. */
+export function cutoffKalanMs(dateStr: string | null, simdi: number = Date.now()): number | null {
+  const hedef = cutoffZamanMs(dateStr);
+  return hedef === null ? null : hedef - simdi;
+}
+
+/** Bildirim esigi: cut-off'a bu kadar (ve daha az) kala uyari verilir. */
+export const CUTOFF_UYARI_ESIGI_MS = 10 * 60 * 60 * 1000;
+
+/** Kalan sureyi "4g 01:36:12" / "09:59:59" bicimine cevirir (negatifse mutlak deger). */
+export function formatKalanSure(ms: number): string {
+  const toplamSn = Math.floor(Math.abs(ms) / 1000);
+  const gun = Math.floor(toplamSn / 86400);
+  const saat = Math.floor((toplamSn % 86400) / 3600);
+  const dk = Math.floor((toplamSn % 3600) / 60);
+  const sn = toplamSn % 60;
+  const iki = (n: number) => String(n).padStart(2, "0");
+  const hms = `${iki(saat)}:${iki(dk)}:${iki(sn)}`;
+  return gun > 0 ? `${gun}g ${hms}` : hms;
+}
+
 export function getCutOffDays(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const p = ayristirHamTarih(dateStr);

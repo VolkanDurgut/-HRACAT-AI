@@ -5,7 +5,9 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
-import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatCutoffTarihUzun } from "@/lib/cutoff-utils";
+import { isCutoffApproaching, formatDateTR } from "@/lib/cutoff-utils";
+import { CutoffSayac } from "@/components/cutoff-sayac";
+import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
@@ -16,9 +18,6 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
-function StatusBadge({ label, color }: { label: string; color: string }) {
-  return <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${color}`}>{label}</span>;
-}
 
 function PanelContent() {
   const { user, yetkiler, companyId, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
@@ -130,6 +129,7 @@ function PanelContent() {
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{filteredDosyalar.length} açık dosya</p>
         </div>
         <div className="flex gap-1.5 flex-wrap">
+          <BildirimIzniButonu />
           {filters.map((f) => (
             <button
               key={f.key}
@@ -183,8 +183,6 @@ function PanelContent() {
                 const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
                 const latestRez = dosya.rezervasyonlar[0] || null;
                 const hasRez = !!latestRez;
-                const tCutoff = latestRez?.talimat_cutoff ? getCutOffLabel(latestRez.talimat_cutoff) : null;
-                const bCutoff = latestRez?.beyanname_cutoff ? getCutOffLabel(latestRez.beyanname_cutoff) : null;
                 const konteynerAdedi = dosya.rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
                 const eklenenKont = dosya.konteynerler.length;
                 const dbaTamamlanan = dosya.konteynerler.filter((k) => !!k.dba_dosya_url).length;
@@ -232,19 +230,13 @@ function PanelContent() {
                             ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
                           </td>
                           <td className="px-3 py-3 align-top">
-                            {tCutoff ? (
-                              <div>
-                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatCutoffTarihUzun(latestRez!.talimat_cutoff!)}</p>
-                                <StatusBadge label={tCutoff.text} color={tCutoff.color} />
-                              </div>
+                            {latestRez!.talimat_cutoff ? (
+                              <CutoffSayac deger={latestRez!.talimat_cutoff} />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                           </td>
                           <td className="px-3 py-3 align-top">
-                            {bCutoff ? (
-                              <div>
-                                <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{formatCutoffTarihUzun(latestRez!.beyanname_cutoff!)}</p>
-                                <StatusBadge label={bCutoff.text} color={bCutoff.color} />
-                              </div>
+                            {latestRez!.beyanname_cutoff ? (
+                              <CutoffSayac deger={latestRez!.beyanname_cutoff} />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                           </td>
                         </>

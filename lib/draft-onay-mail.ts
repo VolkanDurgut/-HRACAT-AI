@@ -1,4 +1,5 @@
 import { Dosya, Rezervasyon } from "@/lib/supabase";
+import { formatCutoffTarih, formatCutoffSaat } from "@/lib/cutoff-utils";
 
 /**
  * Draft Onay Gönderim akışında CC'ye eklenecek sabit iç ekip adresleri.
@@ -50,6 +51,54 @@ export function buildDraftOnayMetni(dosya: Dosya, rezervasyonlar: Rezervasyon[])
  */
 export function draftOnayAliciEmailAl(dosya: Dosya): string {
   return ((dosya.ham_veri as any)?.alici_email as string) || "";
+}
+
+/**
+ * Cut-off yaklasirken musteriye gonderilen DRAFT ONAY HATIRLATMA maili
+ * (talep: 01.10.2026). Ayni alici (ham_veri.alici_email) ve ayni CC listesi;
+ * konu, orijinal draft mailinin konusuna "REMINDER" eklenmis halidir ki
+ * musterinin mail istemcisinde ayni konuya yakin dursun. Cut-off saatleri
+ * Turkiye saatiyle (GMT+3) ham okunarak yazilir (bkz. lib/cutoff-utils.ts).
+ */
+export type DraftHatirlatmaBilgisi = {
+  proformaNo: string | null;
+  bookingNo: string | null;
+  aliciEmail: string | null;
+  talimatCutoff: string | null;
+  beyannameCutoff: string | null;
+};
+
+function cutoffMetni(deger: string | null): string | null {
+  if (!deger) return null;
+  const tarih = formatCutoffTarih(deger);
+  const saat = formatCutoffSaat(deger);
+  return saat === "-" ? tarih : `${tarih} ${saat} (Turkey time, GMT+3)`;
+}
+
+export function buildDraftHatirlatmaKonu(b: DraftHatirlatmaBilgisi): string {
+  return `UNEX // REMINDER: DRAFT APPROVAL OF LOADING DOCUMENTS // ${b.proformaNo?.trim() || "-"}// ${b.bookingNo?.trim() || "-"}`;
+}
+
+export function buildDraftHatirlatmaMetni(b: DraftHatirlatmaBilgisi): string {
+  const satirlar = [
+    `• Booking Number: ${b.bookingNo?.trim() || "-"}`,
+    `• Proforma Number: ${b.proformaNo?.trim() || "-"}`,
+  ];
+  const talimat = cutoffMetni(b.talimatCutoff);
+  const beyan = cutoffMetni(b.beyannameCutoff);
+  if (talimat) satirlar.push(`• Shipping Instruction Cut-off: ${talimat}`);
+  if (beyan) satirlar.push(`• Customs Declaration Cut-off: ${beyan}`);
+  return (
+    `Dear Valuable Partners,\n\n` +
+    `This is a kind reminder regarding the draft shipment documents we have sent for your approval.\n\n` +
+    satirlar.join("\n") +
+    `\n\n- As the cut-off is approaching, kindly send us your approval or amendment request at your earliest convenience so that we can prepare the original documents on time and avoid any delay in the shipment.`
+  );
+}
+
+export function buildDraftHatirlatmaMailtoUrl(b: DraftHatirlatmaBilgisi): string {
+  const cc = DRAFT_ONAY_CC_LISTESI.join(",");
+  return `mailto:${encodeURIComponent(b.aliciEmail || "")}?cc=${encodeURIComponent(cc)}&subject=${encodeURIComponent(buildDraftHatirlatmaKonu(b))}&body=${encodeURIComponent(buildDraftHatirlatmaMetni(b))}`;
 }
 
 /**

@@ -204,6 +204,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Durum akışı: Bekliyor → Onayla (ekip) → Gönderildi İşaretle (ekip, mail dışarıdan
   gönderiliyor, sadece işaretleniyor) → [Müşteri Onayladı | Revize İstendi]
   (48 saat yanıtsız kalırsa "Süre Doldu" kırmızı rozeti).
+- 48 saat kuralı TEK yerde: `lib/draft-onay-sure.ts` (`draftYanitSonuMs`,
+  `draftSuresiDoldu`); süre "Gönderildi İşaretle" anında
+  (`draft_mail_gonderildi_tarihi`, gerçek UTC) başlar. Satırda canlı sayaç
+  (`components/draft-yanit-sayaci.tsx`) + "Hatırlatma" mailto butonu (süre
+  dolana kadar; son 10 saatte kırmızı). Son 10 saate girenler uygulama geneli
+  uyarı kartında "Draft Onay 48s" olarak çıkar ve bir kez bildirilir
+  (`components/cutoff-uyarilari.tsx`, anahtar gönderim anını içerir). Müşteri
+  mail şablonunda "Unless we receive any feedback within 48 hours, it will be
+  deemed approved." cümlesi var; süre dolunca satırda "onaylanmış sayılır"
+  notu çıkar ama durum otomatik değiştirilmez (01.10.2026).
 - Revize istenirse `draft_onaylandi` / `draft_mail_gonderildi` /
   `draft_musteri_onayi_alindi` bayrakları sıfırlanır (dosya baştan Onayla
   adımına döner), ama `draft_revize_notu/tarihi/isaretleyen` geçmiş kayıt

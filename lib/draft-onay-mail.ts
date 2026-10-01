@@ -1,5 +1,6 @@
 import { Dosya, Rezervasyon } from "@/lib/supabase";
 import { formatCutoffTarih, formatCutoffSaat } from "@/lib/cutoff-utils";
+import { formatIstanbulTarihSaat } from "@/lib/draft-onay-sure";
 
 /**
  * Draft Onay Gönderim akışında CC'ye eklenecek sabit iç ekip adresleri.
@@ -40,7 +41,7 @@ export function buildDraftOnayMetni(dosya: Dosya, rezervasyonlar: Rezervasyon[])
     `Dear Valuable Partners,\n\n` +
     `• Booking Number: ${bookingNo}\n` +
     `• Proforma Number: ${proformaNo}\n\n` +
-    `- Please find draft shipment documents as attachment , kindly waiting your approval or amendment request within 48 hours in order to prepare the originals.`
+    `- Please find draft shipment documents as attachment , kindly waiting your approval or amendment request within 48 hours in order to prepare the originals. Unless we receive any feedback within 48 hours, it will be deemed approved.`
   );
 }
 
@@ -66,6 +67,9 @@ export type DraftHatirlatmaBilgisi = {
   aliciEmail: string | null;
   talimatCutoff: string | null;
   beyannameCutoff: string | null;
+  /** 48 saatlik yanit suresinin bittigi an (lib/draft-onay-sure.ts). Verilirse
+   *  mail bu sureyi ve "deemed approved" kuralini hatirlatir. */
+  yanitSonuMs?: number | null;
 };
 
 function cutoffMetni(deger: string | null): string | null {
@@ -88,6 +92,15 @@ export function buildDraftHatirlatmaMetni(b: DraftHatirlatmaBilgisi): string {
   const beyan = cutoffMetni(b.beyannameCutoff);
   if (talimat) satirlar.push(`• Shipping Instruction Cut-off: ${talimat}`);
   if (beyan) satirlar.push(`• Customs Declaration Cut-off: ${beyan}`);
+  if (b.yanitSonuMs) {
+    satirlar.push(`• Approval Period Ends: ${formatIstanbulTarihSaat(b.yanitSonuMs)} (Turkey time, GMT+3)`);
+    return (
+      `Dear Valuable Partners,\n\n` +
+      `This is a kind reminder regarding the draft shipment documents we have sent for your approval.\n\n` +
+      satirlar.join("\n") +
+      `\n\n- Kindly send us your approval or amendment request before the 48-hour approval period ends. Unless we receive any feedback within this period, the documents will be deemed approved and the originals will be prepared accordingly.`
+    );
+  }
   return (
     `Dear Valuable Partners,\n\n` +
     `This is a kind reminder regarding the draft shipment documents we have sent for your approval.\n\n` +

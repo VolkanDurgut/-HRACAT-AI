@@ -9,10 +9,12 @@ import { useToast } from "@/lib/toast-context";
 import { useSimdi } from "@/lib/use-simdi";
 import { cutoffZamanMs, formatCutoffTarih, formatCutoffSaat, formatKalanSure, CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
 import { buildDraftHatirlatmaMailtoUrl } from "@/lib/draft-onay-mail";
+import { draftYanitSonuMs, formatIstanbulTarihSaat } from "@/lib/draft-onay-sure";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 /**
- * Uygulama geneli CUT-OFF UYARISI (talep: 01.10.2026).
+ * Uygulama geneli SURE UYARISI (talep: 01.10.2026): cut-off'lar + Draft Onay
+ * 48 saatlik musteri yanit suresi (ayni 10 saat esigi, ayni bildirim yolu).
  *
  * Acik dosyalarin TUM rezervasyonlarindaki Talimat / Beyanname cut-off'larindan
  * son 10 saate girmis (ve henuz gecmemis) olanlari her sayfanin ustunde
@@ -36,7 +38,9 @@ type DosyaOzet = {
   alici_firma: string | null;
   alici_email: string | null;
   draft_mail_gonderildi: boolean | null;
+  draft_mail_gonderildi_tarihi: string | null;
   draft_musteri_onayi_alindi: boolean | null;
+  draft_revize_istendi: boolean | null;
 };
 
 type RezOzet = {
@@ -47,14 +51,31 @@ type RezOzet = {
   beyanname_cutoff: string | null;
 };
 
+/**
+ * Talimat / Beyanname: rezervasyondaki cut-off (deger = ham cut-off metni).
+ * Draft: 48 saatlik musteri draft onay suresi (talep: 01.10.2026) - deger yok,
+ * bitis ani lib/draft-onay-sure.ts'den gelir; rez booking no icin ilk
+ * rezervasyondur (olmayabilir).
+ */
 type CutoffKalemi = {
   anahtar: string;
-  tur: "Talimat" | "Beyanname";
-  deger: string;
+  tur: "Talimat" | "Beyanname" | "Draft";
+  deger: string | null;
   hedefMs: number;
   dosya: DosyaOzet;
-  rez: RezOzet;
+  rez: RezOzet | null;
 };
+
+function kalemEtiketi(k: CutoffKalemi): string {
+  return k.tur === "Draft" ? "Draft Onay 48s" : `${k.tur} C/O`;
+}
+
+/** Kalemin bitis ani, Turkiye saatiyle { tarih, saat }. */
+function kalemZamani(k: CutoffKalemi): { tarih: string; saat: string } {
+  if (k.tur !== "Draft" && k.deger) return { tarih: formatCutoffTarih(k.deger), saat: formatCutoffSaat(k.deger) };
+  const [tarih, saat] = formatIstanbulTarihSaat(k.hedefMs).split(" ");
+  return { tarih, saat };
+}
 
 const YENILEME_MS = 5 * 60 * 1000;
 const BILDIRIM_DEPO_ANAHTARI = "cutoff-bildirimleri-v1";
@@ -135,7 +156,7 @@ export default function CutoffUyarilari() {
     const no = ++istekNo.current;
     const { data: dData, error: dHata } = await supabase
       .from("ihracat_dosyalari")
-      .select("id, dosya_no, proforma_no, alici_firma, alici_email:ham_veri->>alici_email, draft_mail_gonderildi, draft_musteri_onayi_alindi")
+      .select("id, dosya_no, proforma_no, alici_firma, alici_email:ham_veri->>alici_email, draft_mail_gonderildi, draft_mail_gonderildi_tarihi, draft_musteri_onayi_alindi, draft_revize_istendi")
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik")
       .returns<DosyaOzet[]>();
@@ -166,7 +187,7 @@ export default function CutoffUyarilari() {
     return () => { clearInterval(zamanlayici); document.removeEventListener("visibilitychange", gorunurluk); };
   }, [verileriGetir]);
 
-  // Son 10 saate girmis, henuz gecmemis cut-off'lar (en yakin once)
+  // Son 10 saate girmis, henuz gecmemis cut-off'lar ve draft onay sureleri (en yakin once)
   const kalemler = useMemo<CutoffKalemi[]>(() => {
     const dosyaMap = new Map(dosyalar.map((d) => [d.id, d]));
     const liste: CutoffKalemi[] = [];
@@ -183,6 +204,18 @@ export default function CutoffUyarilari() {
         }
       });
     });
+    // Draft onay: musteriye gonderildi, onay/revize yok, 48 saatin son 10 saati.
+    // Anahtar gonderim anini icerir: revize sonrasi yeniden gonderilirse yeni
+    // sure icin tekrar bildirilir.
+    dosyalar.forEach((dosya) => {
+      const hedefMs = draftYanitSonuMs(dosya);
+      if (hedefMs === null) return;
+      const kalan = hedefMs - simdi;
+      if (kalan > 0 && kalan <= CUTOFF_UYARI_ESIGI_MS) {
+        const rez = rezler.find((r) => r.dosya_id === dosya.id) || null;
+        liste.push({ anahtar: `draft:${dosya.id}:${dosya.draft_mail_gonderildi_tarihi}`, tur: "Draft", deger: null, hedefMs, dosya, rez });
+      }
+    });
     return liste.sort((a, b) => a.hedefMs - b.hedefMs);
   }, [dosyalar, rezler, simdi]);
 
@@ -195,26 +228,36 @@ export default function CutoffUyarilari() {
     if (yeniler.length === 0) return;
     yeniler.forEach((k) => {
       gosterilenler[k.anahtar] = Date.now();
-      const baslik = `${k.tur} cut-off yaklaşıyor`;
-      const govde = `${k.dosya.proforma_no || k.dosya.dosya_no} · ${k.dosya.alici_firma || ""}\nCut-off: ${formatCutoffTarih(k.deger)} ${formatCutoffSaat(k.deger)} · kalan ${formatKalanSure(k.hedefMs - Date.now())}`;
+      const z = kalemZamani(k);
+      const draft = k.tur === "Draft";
+      const baslik = draft ? "Draft onay süresi doluyor" : `${k.tur} cut-off yaklaşıyor`;
+      const govde =
+        `${k.dosya.proforma_no || k.dosya.dosya_no} · ${k.dosya.alici_firma || ""}\n` +
+        (draft
+          ? `Müşteri onayı gelmedi · 48s süre ${z.tarih} ${z.saat} · kalan ${formatKalanSure(k.hedefMs - Date.now())}`
+          : `Cut-off: ${z.tarih} ${z.saat} · kalan ${formatKalanSure(k.hedefMs - Date.now())}`);
+      const hedefSayfa = draft ? "/draft-onay" : `/dosya/${k.dosya.id}`;
       if (bildirimDestekleniyor() && Notification.permission === "granted") {
         try {
           const n = new Notification(baslik, { body: govde, tag: k.anahtar });
-          n.onclick = () => { window.focus(); router.push(`/dosya/${k.dosya.id}`); n.close(); };
+          n.onclick = () => { window.focus(); router.push(hedefSayfa); n.close(); };
         } catch { /* bazi tarayicilar (mobil) yapici ile bildirime izin vermez */ }
       }
     });
     gosterilenleriYaz(gosterilenler);
     showToast(
       yeniler.length === 1
-        ? `${yeniler[0].tur} cut-off'a 10 saatten az kaldı: ${yeniler[0].dosya.proforma_no || yeniler[0].dosya.dosya_no}`
-        : `${yeniler.length} cut-off'a 10 saatten az kaldı`,
+        ? `${yeniler[0].tur === "Draft" ? "Draft onay süresine" : `${yeniler[0].tur} cut-off'a`} 10 saatten az kaldı: ${yeniler[0].dosya.proforma_no || yeniler[0].dosya.dosya_no}`
+        : `${yeniler.length} süre uyarısı: 10 saatten az kaldı`,
       "error"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anahtarDizisi]);
 
   if (!yetkili || kalemler.length === 0) return null;
+
+  const draftSayisi = kalemler.filter((k) => k.tur === "Draft").length;
+  const cutoffSayisi = kalemler.length - draftSayisi;
 
   const daraltDegistir = () => {
     const yeni = !daraltildi;
@@ -226,7 +269,7 @@ export default function CutoffUyarilari() {
     <section
       className="mb-4 rounded-xl border overflow-hidden animate-fade-in"
       style={{ backgroundColor: CARD_BG, borderColor: "rgba(248,113,113,0.35)" }}
-      aria-label="Cut-off uyarıları"
+      aria-label="Süre uyarıları"
       data-testid="cutoff-uyarilari"
     >
       <div className="flex items-center gap-3 px-4 py-2.5 border-b" style={{ borderColor: CARD_BORDER, background: "linear-gradient(90deg, rgba(248,113,113,0.10), transparent 60%)" }}>
@@ -235,9 +278,9 @@ export default function CutoffUyarilari() {
           <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-400 animate-ping" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-white">Cut-off uyarısı</p>
+          <p className="text-xs font-semibold text-white">{draftSayisi > 0 && cutoffSayisi === 0 ? "Draft onay uyarısı" : draftSayisi > 0 ? "Süre uyarısı" : "Cut-off uyarısı"}</p>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            {kalemler.length} cut-off için 10 saatten az kaldı
+            {[cutoffSayisi > 0 ? `${cutoffSayisi} cut-off` : null, draftSayisi > 0 ? `${draftSayisi} draft onayı` : null].filter(Boolean).join(" · ")} için 10 saatten az kaldı
           </p>
         </div>
         <button
@@ -255,22 +298,26 @@ export default function CutoffUyarilari() {
         <ul className="divide-y" style={{ borderColor: CARD_BORDER }}>
           {kalemler.map((k) => {
             const kalan = k.hedefMs - simdi;
+            const draft = k.tur === "Draft";
             const onayAlindi = !!k.dosya.draft_musteri_onayi_alindi;
+            const z = kalemZamani(k);
             const mailto = buildDraftHatirlatmaMailtoUrl({
               proformaNo: k.dosya.proforma_no,
-              bookingNo: k.rez.booking_no,
+              bookingNo: k.rez?.booking_no || null,
               aliciEmail: k.dosya.alici_email,
-              talimatCutoff: k.rez.talimat_cutoff,
-              beyannameCutoff: k.rez.beyanname_cutoff,
+              talimatCutoff: k.rez?.talimat_cutoff || null,
+              beyannameCutoff: k.rez?.beyanname_cutoff || null,
+              // Draft kaleminde mail 48 saat suresini ve "deemed approved" kuralini hatirlatir
+              yanitSonuMs: draft ? k.hedefMs : null,
             });
             return (
               <li key={k.anahtar} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5" style={{ borderColor: CARD_BORDER }}>
                 <div className="flex items-center gap-2 min-w-[150px]">
                   <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border whitespace-nowrap" style={{ color: "#F87171", borderColor: "rgba(248,113,113,0.35)" }}>
-                    {k.tur} C/O
+                    {kalemEtiketi(k)}
                   </span>
                   <span className="text-[11px] tabular-nums whitespace-nowrap" style={{ color: TEXT_MUTED }}>
-                    {formatCutoffTarih(k.deger)} · <span className="text-slate-300 font-medium">{formatCutoffSaat(k.deger)}</span>
+                    {z.tarih} · <span className="text-slate-300 font-medium">{z.saat}</span>
                   </span>
                 </div>
 
@@ -279,7 +326,7 @@ export default function CutoffUyarilari() {
                     {k.dosya.proforma_no || k.dosya.dosya_no}
                     <span className="font-normal text-white"> · {k.dosya.alici_firma || "—"}</span>
                   </p>
-                  <p className="text-[10px] font-mono truncate" style={{ color: TEXT_MUTED }}>{k.rez.booking_no || "Booking no yok"}</p>
+                  <p className="text-[10px] font-mono truncate" style={{ color: TEXT_MUTED }}>{k.rez?.booking_no || "Booking no yok"}</p>
                 </div>
 
                 <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums whitespace-nowrap" style={{ color: "#F87171", backgroundColor: "rgba(248,113,113,0.10)", borderColor: "rgba(248,113,113,0.40)" }}>
@@ -308,11 +355,11 @@ export default function CutoffUyarilari() {
                   )}
                   <button
                     type="button"
-                    onClick={() => router.push(`/dosya/${k.dosya.id}`)}
+                    onClick={() => router.push(draft ? "/draft-onay" : `/dosya/${k.dosya.id}`)}
                     className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                     style={{ backgroundColor: ACCENT }}
                   >
-                    Dosya <ArrowRight size={12} />
+                    {draft ? "Draft Onay" : "Dosya"} <ArrowRight size={12} />
                   </button>
                 </div>
               </li>

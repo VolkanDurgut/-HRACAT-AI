@@ -16,6 +16,8 @@ import {
 import { Loader2, FileCheck2 } from "lucide-react";
 import { MusteriEvrakAyarlari, BOS_MUSTERI_EVRAK_AYARLARI, musteriEvrakAyarlariniTopluGetir } from "@/lib/musteri-evrak-ayarlari";
 import { TEXT_MUTED, CARD_BG, CARD_BORDER, ROW_HEADER_BG } from "@/lib/theme";
+import { draftSuresiDoldu, draftYanitSonuMs } from "@/lib/draft-onay-sure";
+import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
@@ -39,23 +41,25 @@ function tamEvrakSetiHazirMi(dosya: Dosya, rezervasyonlar: Rezervasyon[], kontey
 
 /**
  * En acil aksiyon gerektiren dosyalar EN USTTE: once suresi dolmus (48s+
- * yanitsiz) ve revize istenmis dosyalar, sonra bekleyenler, sonra gonderime
+ * yanitsiz) veya son 10 saatine girmis ve revize istenmis dosyalar, sonra bekleyenler, sonra gonderime
  * hazir olanlar, sonra musteri yanitini bekleyenler (sari), musteri onayi
  * gelmis olanlar (yesil) en sonda - onlarda artik aktif takip gerekmiyor.
  */
 function siraDegeri(d: DosyaWithRelations): number {
-  const mailGonderildiTarihi = (d as any).draft_mail_gonderildi_tarihi as string | null;
-  const musteriOnayiAlindi = !!(d as any).draft_musteri_onayi_alindi;
-  const revizeIstendi = !!(d as any).draft_revize_istendi;
-  const mailGonderildi = !!(d as any).draft_mail_gonderildi;
-  const sureDoldu =
-    mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && !!mailGonderildiTarihi &&
-    Date.now() - new Date(mailGonderildiTarihi).getTime() > 48 * 60 * 60 * 1000;
+  const musteriOnayiAlindi = !!d.draft_musteri_onayi_alindi;
+  const revizeIstendi = !!d.draft_revize_istendi;
+  const mailGonderildi = !!d.draft_mail_gonderildi;
+  const sureDoldu = draftSuresiDoldu(d);
 
   if (musteriOnayiAlindi) return 5;
-  if (mailGonderildi) return sureDoldu ? 0 : 4;
+  if (mailGonderildi) {
+    // Son 10 saate girmis (hatirlatma maili gerekebilir) bekleyenler de en uste
+    const son = draftYanitSonuMs(d);
+    const kritik = son !== null && son - Date.now() <= CUTOFF_UYARI_ESIGI_MS;
+    return sureDoldu || kritik ? 0 : 4;
+  }
   if (revizeIstendi) return 0;
-  if ((d as any).draft_onaylandi) return 1;
+  if (d.draft_onaylandi) return 1;
   return 0;
 }
 

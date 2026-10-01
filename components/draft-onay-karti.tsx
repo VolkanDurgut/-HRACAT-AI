@@ -8,7 +8,11 @@ import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchi
 import { CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { formatDateTimeTR, formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
-import { draftOnayAliciEmailAl } from "@/lib/draft-onay-mail";
+import { draftOnayAliciEmailAl, buildDraftHatirlatmaMailtoUrl } from "@/lib/draft-onay-mail";
+import { draftYanitSonuMs, draftSuresiDoldu } from "@/lib/draft-onay-sure";
+import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
+import { useSimdi } from "@/lib/use-simdi";
+import { DraftYanitSayaci } from "@/components/draft-yanit-sayaci";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
@@ -56,6 +60,8 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const [revizeModalAcik, setRevizeModalAcik] = useState(false);
   const [revizeNotu, setRevizeNotu] = useState("");
   const [revizeKaydediliyor, setRevizeKaydediliyor] = useState(false);
+  // Canli saat: 48 saat dolunca rozet sayfa yenilenmeden "Süre Doldu"ya doner.
+  const simdi = useSimdi();
 
   const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
   const draftBlAdi = dosya.draft_bl_dosya_adi as string | null;
@@ -218,14 +224,26 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const revizeNotuKayitli = dosya.draft_revize_notu as string | null;
   const revizeTarihi = dosya.draft_revize_tarihi as string | null;
   const revizeIsaretleyen = dosya.draft_revize_isaretleyen as string | null;
-  const mailGonderildiTarihi = dosya.draft_mail_gonderildi_tarihi as string | null;
 
   // 48 saatlik yanit suresi: sadece "gonderildi isaretlendi, musteri onayi da
   // gelmedi, revize de istenmedi" durumunda (yani hala aktif bekleme
   // suredeyken) anlamli - digerlerinde zaten baska bir aksiyon alinmis demektir.
-  const sureDoldu =
-    mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && !!mailGonderildiTarihi &&
-    Date.now() - new Date(mailGonderildiTarihi).getTime() > 48 * 60 * 60 * 1000;
+  // Hesap tek yerde: lib/draft-onay-sure.ts
+  const yanitSonuMs = draftYanitSonuMs(dosya);
+  const sureDoldu = draftSuresiDoldu(dosya, simdi);
+  const yanitKalanMs = yanitSonuMs !== null ? yanitSonuMs - simdi : null;
+  const hatirlatmaKritik = yanitKalanMs !== null && yanitKalanMs > 0 && yanitKalanMs <= CUTOFF_UYARI_ESIGI_MS;
+  const hatirlatmaMailto =
+    yanitKalanMs !== null && yanitKalanMs > 0
+      ? buildDraftHatirlatmaMailtoUrl({
+          proformaNo: dosya.proforma_no,
+          bookingNo: rez?.booking_no || null,
+          aliciEmail,
+          talimatCutoff: rez?.talimat_cutoff || null,
+          beyannameCutoff: rez?.beyanname_cutoff || null,
+          yanitSonuMs,
+        })
+      : null;
 
   const durumTitle = musteriOnayiAlindi
     ? `Müşteri onayını işaretleyen: ${musteriOnayiIsaretleyen || "-"}${musteriOnayiTarihi ? " · " + formatDateTimeTR(musteriOnayiTarihi) : ""}`
@@ -347,13 +365,19 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             <MessageSquareWarning size={11} /> Revize İstendi
           </span>
         ) : sureDoldu ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
-            <Clock size={11} /> Süre Doldu (48s)
-          </span>
+          <div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-500/10 px-2 py-1 rounded-full">
+              <Clock size={11} /> Süre Doldu (48s)
+            </span>
+            {yanitSonuMs !== null && <DraftYanitSayaci sonMs={yanitSonuMs} />}
+          </div>
         ) : mailGonderildi ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
-            <AlertTriangle size={11} /> Yanıt Bekleniyor
-          </span>
+          <div>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 bg-amber-500/10 px-2 py-1 rounded-full">
+              <AlertTriangle size={11} /> Yanıt Bekleniyor
+            </span>
+            {yanitSonuMs !== null && <DraftYanitSayaci sonMs={yanitSonuMs} />}
+          </div>
         ) : onaylandi ? (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full" style={{ color: ACCENT, backgroundColor: `${ACCENT}1A` }}>
             <ThumbsUp size={11} /> Gönderime Hazır
@@ -417,6 +441,19 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
               >
                 <MessageSquareWarning size={12} /> Revize İstendi
               </button>
+              {/* 48 saat dolmadan musteriye hatirlatma (talep: 01.10.2026).
+                  Son 10 saatte kirmizi vurgulanir; ayni anda uygulama geneli
+                  bildirim de gelir (components/cutoff-uyarilari.tsx). */}
+              {hatirlatmaMailto && (
+                <a
+                  href={hatirlatmaMailto}
+                  title={aliciEmail ? `Müşteriye hatırlatma maili: ${aliciEmail}` : "Alıcı e-postası dosyada kayıtlı değil - alıcıyı mailde elle girin"}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${hatirlatmaKritik ? "text-red-300 hover:bg-red-500/10" : "text-white hover:bg-white/5"}`}
+                  style={{ borderColor: hatirlatmaKritik ? "rgba(248,113,113,0.45)" : CARD_BORDER }}
+                >
+                  <Mail size={12} /> Hatırlatma
+                </a>
+              )}
             </>
           )}
         </div>

@@ -74,7 +74,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // TOTAL CFR satirlari eklenir (talep: 28.09.2026). Yerel state - dosya
   // prop'u disaridan (parent) yenilenmeden ONCE bile bir sonraki Draft/
   // Orijinal tiklamasinda hemen yeni degeri kullanabilmek icin.
-  const dosyaEctnBasvurusu = !!(dosya as any).ectn_basvurusu;
+  const dosyaEctnBasvurusu = !!dosya.ectn_basvurusu;
   const [ectnBasvurusu, setEctnBasvurusu] = useState<boolean>(dosyaEctnBasvurusu);
   useEffect(() => { setEctnBasvurusu(dosyaEctnBasvurusu); }, [dosya.id, dosyaEctnBasvurusu]);
   // ECTN satirlarinin manuel girilmis degerleri (talep: 28.09.2026). NULL ise
@@ -82,16 +82,16 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
   // kaydedilince buradaki yerel state de aninda guncellenir, boylece dosya
   // prop'u disaridan yenilenmeden once bile bir sonraki Draft/Orijinal
   // tiklamasi guncel degerleri kullanir.
-  const dosyaEctnFobOverride = (dosya as any).ectn_fob_override ?? null;
-  const dosyaEctnFreightOverride = (dosya as any).ectn_freight_override ?? null;
-  const dosyaEctnCfrOverride = (dosya as any).ectn_cfr_override ?? null;
+  const dosyaEctnFobOverride = dosya.ectn_fob_override ?? null;
+  const dosyaEctnFreightOverride = dosya.ectn_freight_override ?? null;
+  const dosyaEctnCfrOverride = dosya.ectn_cfr_override ?? null;
   // INSURANCE'in otomatik hesaplamasi YOK (talep: 29.09.2026) - sadece elle
   // girilen deger var, digerleriyle ayni "yerel state" mantigiyla tutulur.
-  const dosyaEctnInsuranceOverride = (dosya as any).ectn_insurance_override ?? null;
+  const dosyaEctnInsuranceOverride = dosya.ectn_insurance_override ?? null;
   // TOTAL CFR/CIF satirinin etiketi icin manuel override (talep: 30.09.2026)
   // - NULL ise otomatik secilir: sigorta girilmisse "TOTAL CIF", girilmemisse
   // "TOTAL CFR" - bkz. lib/invoice-builder.ts -> hesaplaEctnGosterilenDegerler.
-  const dosyaEctnCfrEtiketOverride = (dosya as any).ectn_cfr_etiket_override ?? null;
+  const dosyaEctnCfrEtiketOverride = dosya.ectn_cfr_etiket_override ?? null;
   const [ectnFobOverride, setEctnFobOverride] = useState<number | null>(dosyaEctnFobOverride);
   const [ectnFreightOverride, setEctnFreightOverride] = useState<number | null>(dosyaEctnFreightOverride);
   const [ectnCfrOverride, setEctnCfrOverride] = useState<number | null>(dosyaEctnCfrOverride);

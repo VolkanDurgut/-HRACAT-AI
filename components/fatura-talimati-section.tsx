@@ -43,7 +43,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const rez = rezervasyonlar[0];
     const toplamCif = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
     const navlunBirim = dosya.navlun_tutari;
-    const lokalMasrafBirim = (dosya as any).lokal_masraf_tutari;
+    const lokalMasrafBirim = dosya.lokal_masraf_tutari;
     const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
     const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
     const toplamDusulecek = navlunToplam !== null && lokalMasrafToplam !== null
@@ -114,7 +114,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Varis Limani", dosya.varis_limani),
       satir("Ulke", ulkeAyikla(dosya.varis_limani)),
       satir("Teslim Sekli", dosya.teslim_sekli),
-      satir("Odeme Sekli", (dosya as any).gumruk_odeme_sekli),
+      satir("Odeme Sekli", dosya.gumruk_odeme_sekli),
       satir("Gemi Adi", rez?.gemi_adi),
       satir("Acente", rez?.acente_ismi),
       satir("Booking No", rez?.booking_no),
@@ -168,7 +168,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   const handleFaturaTalimatiAc = () => {
     if (!faturaTalimatiHazir) return;
     setKonu(buildKonu());
-    setMetin((dosya as any).fatura_talimati_metni || buildMetin());
+    setMetin(dosya.fatura_talimati_metni || buildMetin());
     setTo(""); setCc("");
     setShowFaturaTalimati(true);
   };

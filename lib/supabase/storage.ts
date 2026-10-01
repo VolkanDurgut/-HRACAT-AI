@@ -80,10 +80,10 @@ export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: 
   ]);
 
   return [
-    (dosya as any)?.fatura_dosya_url,
-    (dosya as any)?.konsimento_dosya_url,
-    (dosya as any)?.draft_bl_dosya_url,
-    (dosya as any)?.proforma_dosya_url,
+    dosya?.fatura_dosya_url,
+    dosya?.konsimento_dosya_url,
+    dosya?.draft_bl_dosya_url,
+    dosya?.proforma_dosya_url,
     ...((evraklar as any[]) || []).map((e) => e.dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.dba_dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.irsaliye_dosya_url),

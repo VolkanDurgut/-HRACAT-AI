@@ -57,8 +57,8 @@ const buildFormFromRez = (rez: Rezervasyon, dosya: Dosya) => ({
   yuklenme_limani: rez.yuklenme_limani || "",
   konteyner_adedi: rez.konteyner_adedi || 0,
   ardiyesiz_giris: (rez as any).ardiyesiz_giris ? (rez as any).ardiyesiz_giris.split("T")[0] : "",
-  navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
-  lokal_masraf_tutari: (dosya as any).lokal_masraf_tutari?.toString() || "",
+  navlun_tutari: dosya.navlun_tutari?.toString() || "",
+  lokal_masraf_tutari: dosya.lokal_masraf_tutari?.toString() || "",
 });
 
 function buildPayload(form: typeof emptyForm) {
@@ -371,8 +371,8 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
   const beyanLabel = getCutOffLabel(rez.beyanname_cutoff);
 
   const paraBirimi = dosya.para_birimi || "USD";
-  const navlunTutari = (dosya as any).navlun_tutari;
-  const lokalMasrafTutari = (dosya as any).lokal_masraf_tutari;
+  const navlunTutari = dosya.navlun_tutari;
+  const lokalMasrafTutari = dosya.lokal_masraf_tutari;
 
   return (
     <div className="rounded-xl border shadow-sm p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
@@ -467,8 +467,8 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
   const handleAcNewForm = () => {
     setNewForm({
       ...emptyForm,
-      navlun_tutari: (dosya as any).navlun_tutari?.toString() || "",
-      lokal_masraf_tutari: (dosya as any).lokal_masraf_tutari?.toString() || "",
+      navlun_tutari: dosya.navlun_tutari?.toString() || "",
+      lokal_masraf_tutari: dosya.lokal_masraf_tutari?.toString() || "",
     });
     setNewErrors({});
     setShowNewForm(true);

@@ -83,6 +83,29 @@ export type Dosya = {
   draft_musteri_onayi_alindi: boolean | null;
   draft_musteri_onayi_tarihi: string | null;
   draft_musteri_onayi_isaretleyen: string | null;
+  // --- 01.10.2026: canli tablodaki ama tipte EKSIK olan alanlar eklendi. ---
+  // Eskiden bu alanlara kodda "(dosya as any).x" ile erisiliyordu; tip
+  // kontrolu yazim hatalarini yakalayamiyordu. Kolon listesi canli
+  // ihracat_dosyalari tablosuyla birebir karsilastirildi.
+  // Konteyner basi lokal masraf (rezervasyonda girilir, Fatura Talimati ve
+  // ECTN FOB/FREIGHT hesabinda kullanilir).
+  lokal_masraf_tutari: number | null;
+  // Draft konsimento (BL) PDF'i ve AI kontrol sonucu (Draft Onay akisi).
+  draft_bl_dosya_url: string | null;
+  draft_bl_dosya_adi: string | null;
+  draft_bl_yukleme_tarihi: string | null;
+  draft_bl_kontrol_sonucu: Record<string, unknown> | null;
+  // Musteri draft icin revize istediyse (bkz. migration 20260930140000).
+  draft_revize_istendi: boolean | null;
+  draft_revize_notu: string | null;
+  draft_revize_tarihi: string | null;
+  draft_revize_isaretleyen: string | null;
+  // ECTN "TOTAL CFR" satir etiketinin elle girilen hali (NULL -> otomatik).
+  ectn_cfr_etiket_override: string | null;
+  fatura_talimati_metni: string | null;
+  company_id: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
 };
 
 export type UrunDetay = {

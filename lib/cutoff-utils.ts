@@ -257,7 +257,7 @@ export function hesaplaFobFreightCifToplamlari(
   const toplamCif = urunler.reduce((s, u) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
 
   const navlunBirim = dosya.navlun_tutari;
-  const lokalMasrafBirim = (dosya as any).lokal_masraf_tutari as number | null;
+  const lokalMasrafBirim = dosya.lokal_masraf_tutari as number | null;
   const navlunToplam = navlunBirim != null && konteynerAdedi > 0 ? navlunBirim * konteynerAdedi : null;
   const lokalMasrafToplam = lokalMasrafBirim != null && konteynerAdedi > 0 ? lokalMasrafBirim * konteynerAdedi : null;
 

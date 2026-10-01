@@ -29,9 +29,9 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
   const [hata, setHata] = useState<string | null>(null);
 
   const kontrolSonucu = (dosya as any).draft_bl_kontrol_sonucu as DraftBlKontrolSonucu | null;
-  const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
-  const draftBlAdi = (dosya as any).draft_bl_dosya_adi as string | null;
-  const draftBlTarihi = (dosya as any).draft_bl_yukleme_tarihi as string | null;
+  const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
+  const draftBlAdi = dosya.draft_bl_dosya_adi as string | null;
+  const draftBlTarihi = dosya.draft_bl_yukleme_tarihi as string | null;
 
   // Draft BL, konsimento talimatiyla ayni sistem verisini kullanir (ayni Edge Function).
   const buildSistemVerisi = () => {
@@ -42,7 +42,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       alici_firma: dosya.alici_firma,
       satici_firma: dosya.satici_firma,
       proforma_no: dosya.proforma_no,
-      consignee: (dosya as any).consignee,
+      consignee: dosya.consignee,
       yukleme_limani: rez?.yuklenme_limani || dosya.yuklenme_limani,
       varis_limani: dosya.varis_limani,
       teslim_sekli: dosya.teslim_sekli,
@@ -140,7 +140,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         draft_bl_kontrol_sonucu: filtrelenmisData,
         // Draft BL'den okunan bilgiler otomatik doldurulur; mevcut deger varsa korunur.
         bl_no: data.bl_no || dosya.bl_no,
-        consignee: data.consignee || (dosya as any).consignee,
+        consignee: data.consignee || dosya.consignee,
         ham_veri: guncelHamVeri,
       }).eq("id", dosya.id).eq("company_id", companyId);
 

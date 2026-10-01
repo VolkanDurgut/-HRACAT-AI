@@ -21,6 +21,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const { showToast } = useToast();
 
   const urunler = (dosya.urun_detaylari as any[]) || [];
+  // Not: numeric kolonlar PostgREST'ten sayi olarak gelir; asagidaki
+  // parseFloat(sayi) degeri aynen geri verir. Derlenen kod degismesin diye
+  // bu iki satirda "as any" bilerek korundu (01.10.2026).
   const navlunBirimFiyati = (dosya as any).navlun_tutari; // konteyner basi
   const lokalMasrafBirimFiyati = (dosya as any).lokal_masraf_tutari; // konteyner basi
   const konteynerAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
@@ -59,7 +62,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const notifyText = Array.isArray(mevcutNotify) ? mevcutNotify.join("\n\n") : "";
 
   // Consignee: DB'de text kolonu. Kaynak bilgisi ham_veri icinde metadata olarak tutulur.
-  const consigneeText = (dosya as any).consignee || "";
+  const consigneeText = dosya.consignee || "";
   const consigneeKaynak = (dosya.ham_veri as any)?.consignee_kaynak || null;
 
   // Cuval marka listesi: ham_veri icinde dizi olarak tutulur. Konteyner tablosundaki secim listesini besler.
@@ -70,12 +73,12 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     notify: notifyText,
     consignee: consigneeText,
     marka_listesi: markaListesiText,
-    lot_no: (dosya as any).lot_no || "",
-    marka: (dosya as any).marka || "",
-    beyanname_no: (dosya as any).beyanname_no || "",
-    bl_no: (dosya as any).bl_no || rezervasyonlar[0]?.booking_no || "",
-    uretim_tarihi: (dosya as any).uretim_tarihi || "",
-    son_kullanim_tarihi: (dosya as any).son_kullanim_tarihi || "",
+    lot_no: dosya.lot_no || "",
+    marka: dosya.marka || "",
+    beyanname_no: dosya.beyanname_no || "",
+    bl_no: dosya.bl_no || rezervasyonlar[0]?.booking_no || "",
+    uretim_tarihi: dosya.uretim_tarihi || "",
+    son_kullanim_tarihi: dosya.son_kullanim_tarihi || "",
     // DIIB No normalde sadece fatura yuklenip AI ile okundugunda dolar (bkz.
     // fatura-upload-section.tsx) - ama Fatura Talimati faturadan ONCE
     // gonderildigi icin o an henuz bilinmeyebilir. Yeni dosyalarda Ayarlar >
@@ -83,10 +86,10 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     // app/yeni-dosya/page.tsx); DIIB limiti dolup degistiginde burada elle de
     // guncellenebilir olmasi gerekiyor. Tarih artik ayri bir alan degil - bu
     // kutuya elle, DIIB No ile birlikte yaziliyor (26.09.2026 talebi).
-    diib_no: (dosya as any).diib_no || "",
+    diib_no: dosya.diib_no || "",
     // Gumruk/dis ticaret odeme sekli siniflandirmasi (Mal Mukabili vb.) -
     // "odeme_sekli" alanindan AYRI, bkz. migration 20260925130000.
-    gumruk_odeme_sekli: (dosya as any).gumruk_odeme_sekli || "",
+    gumruk_odeme_sekli: dosya.gumruk_odeme_sekli || "",
     });
 
   const [form, setForm] = useState(buildEmptyForm);
@@ -241,18 +244,18 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <CopyableField dark label="Lot No" value={(dosya as any).lot_no} />
-          <CopyableField dark label="Marka" value={(dosya as any).marka} />
+          <CopyableField dark label="Lot No" value={dosya.lot_no} />
+          <CopyableField dark label="Marka" value={dosya.marka} />
           {mevcutMarkaListesi.length > 1 && (
             <CopyableField dark label="Çuval Markaları" value={mevcutMarkaListesi.join(", ")} />
           )}
           
-          <CopyableField dark label="Beyanname No" value={(dosya as any).beyanname_no} />
-          <CopyableField dark label="BL No" value={(dosya as any).bl_no} />
-          <CopyableField dark label="Uretim Tarihi" value={formatDateTR((dosya as any).uretim_tarihi)} />
-          <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR((dosya as any).son_kullanim_tarihi)} />
-          <CopyableField dark label="DİİB No" value={(dosya as any).diib_no} />
-          <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={(dosya as any).gumruk_odeme_sekli} />
+          <CopyableField dark label="Beyanname No" value={dosya.beyanname_no} />
+          <CopyableField dark label="BL No" value={dosya.bl_no} />
+          <CopyableField dark label="Uretim Tarihi" value={formatDateTR(dosya.uretim_tarihi)} />
+          <CopyableField dark label="Son Kullanim Tarihi" value={formatDateTR(dosya.son_kullanim_tarihi)} />
+          <CopyableField dark label="DİİB No" value={dosya.diib_no} />
+          <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={dosya.gumruk_odeme_sekli} />
         </div>
 
         {odenecekTutar !== null && (

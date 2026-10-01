@@ -25,7 +25,7 @@ type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler:
  * Tutarlılık icin aynı readiness fonksiyonları kullanılır.
  */
 function tamEvrakSetiHazirMi(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[]): boolean {
-  const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
+  const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
   if (!draftBlUrl) return false;
   return (
     checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler).hazir &&

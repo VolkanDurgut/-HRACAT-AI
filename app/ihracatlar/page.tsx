@@ -558,9 +558,9 @@ export default function IhracatlarPage() {
                 {/* Talep (26.09.2026): orijinal proforma PDF'ini goruntuleme - sadece
                     PDF'i storage'a kaydedilmis dosyalarda gorunur (26.09.2026 sonrasi
                     acilanlar). */}
-                {(selectedDosya as any).proforma_dosya_url && (
+                {selectedDosya.proforma_dosya_url && (
                   <a
-                    href={(selectedDosya as any).proforma_dosya_url}
+                    href={selectedDosya.proforma_dosya_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:text-white"

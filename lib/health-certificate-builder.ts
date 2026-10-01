@@ -177,7 +177,9 @@ function buildNetAgirlikToplam(konteynerler: Konteyner[]): string {
  * 0 ise, eski davranisa (detayli ambalaj / ambalaj metni) geri duser -
  * veri kaybi olmaz.
  */
-function buildToplamKapAdedi(konteynerler: Konteyner[], yedekMetin: string): string {
+// yedekMetin null olabilir (detayli_ambalaj ve ambalaj ikisi de bos) - safe()
+// bunu "-" olarak basar; tip 01.10.2026'da gercegi yansitacak sekilde duzeltildi.
+function buildToplamKapAdedi(konteynerler: Konteyner[], yedekMetin: string | null): string {
   if (!konteynerler || konteynerler.length === 0) return safe(yedekMetin);
   const toplamKap = konteynerler.reduce((acc, k) => acc + ((k as any).pieces || 0), 0);
   if (toplamKap === 0) return safe(yedekMetin);
@@ -321,7 +323,7 @@ export function buildHealthCertificateHtml(
   const limanAdi = rez?.yuklenme_limani || dosya.yuklenme_limani;
   // buildToplamKapAdedi konteyner verisinden toplam kap adedini bulamazsa
   // (ör. konteyner hic girilmemis), eski detayli ambalaj metnine geri duser.
-  const disAmbalajYedek = (dosya as any).detayli_ambalaj || dosya.ambalaj;
+  const disAmbalajYedek = dosya.detayli_ambalaj || dosya.ambalaj;
 
   const consigneeSatirlari = dosya.consignee ? buildKisaAliciAdresi(dosya.consignee) : "";
   const consigneeFont = consigneeSatirlari ? hesaplaConsigneeFontBoyutu(consigneeSatirlari) : 10;

@@ -192,7 +192,7 @@ function PanelContent() {
                 const akisAdimlari = [
                   { label: "Rezervasyon", done: dosya.rezervasyonlar.length > 0 },
                   { label: "Konteynerler", done: konteynerAdedi > 0 && eklenenKont >= konteynerAdedi },
-                  { label: "Fatura Kesildi", done: !!(dosya as any).fatura_no },
+                  { label: "Fatura Kesildi", done: !!dosya.fatura_no },
                   // DBA rozeti artik sayisal - kac konteynerin doldugunu ("dolu")
                   // eklenen konteyner sayisina oranla gosterir (talep: 26.09.2026).
                   { label: eklenenKont > 0 ? `DBA ${dbaTamamlanan}/${eklenenKont}` : "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
@@ -254,9 +254,9 @@ function PanelContent() {
                           {/* Talep (26.09.2026): orijinal proforma PDF'ini hizli goruntuleme.
                               Sadece PDF storage'a kaydedilmis dosyalarda gorunur - bu ozellik
                               26.09.2026'da eklendi, oncesindeki dosyalarda PDF yok. */}
-                          {(dosya as any).proforma_dosya_url && (
+                          {dosya.proforma_dosya_url && (
                             <a
-                              href={(dosya as any).proforma_dosya_url}
+                              href={dosya.proforma_dosya_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Proformayı Görüntüle"

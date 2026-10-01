@@ -117,6 +117,22 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kayıt silinmeden ÖNCE çağrılır (CASCADE alt satırları siler). Asla önce
   storage silinmez — kayıt silinemezse var olmayan PDF'leri gösterir.
 
+## Supabase güvenlik tarayıcısı — bilinçli kararlar (01.10.2026)
+
+- `pg_net` public şemada kalıyor (WARN `extension_in_public`): public'te bu
+  eklentiye ait HİÇBİR nesne yok (fonksiyonları `net` şemasında), eklenti
+  taşınamıyor (relocatable=false); düzeltmek için sil-yeniden-kur gerekir ki
+  bu, istek geçmişini siler ve gece yedeğini tetikleyen cron'u riske atar.
+  Risk > fayda → dokunma.
+- Sızdırılmış şifre koruması (HaveIBeenPwned) Supabase Free planda
+  açılamıyor; organizasyon Free plandadır.
+- Fonksiyonlarda `search_path` her zaman sabitlenir (`SET search_path =
+  public`); bkz. migration 20261001005150.
+- `Dosya` tipi (`lib/supabase/types.ts`) canlı `ihracat_dosyalari`
+  kolonlarıyla birebir tutulur. Tabloya kolon eklenirse tipe de eklenmeli;
+  `(dosya as any).alan` yazılmaz. Sadece JSON alanlarında (`ham_veri`,
+  `urun_detaylari` vb.) iç yapıya erişim için cast kabul edilir.
+
 ## Sayfa / sekme yetkileri (düzeltme: 01.10.2026)
 
 - Yetkiler `useAuth()` ile gelir ve veritabanından YÜKLENENE kadar hepsi

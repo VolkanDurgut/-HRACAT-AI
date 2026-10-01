@@ -275,7 +275,7 @@ function buildMarkaListesi(dosya: Dosya, konteynerler: Konteyner[]): string {
 }
 
 function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
-  const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
+  const raw = dosya.detayli_ambalaj || dosya.ambalaj;
   if (!raw) return safe(null);
   // Coklu ambalaj/urun segmenti iceren metinlerde (ör. "2.000 PIECES 25 KG...,
   // 1.000 PIECES OF 50 KG...") konteynerlerin TOPLAM kap adedini metnin
@@ -375,12 +375,12 @@ export type EctnGosterilenDegerler = {
  */
 export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Rezervasyon[]): EctnGosterilenDegerler {
   const otomatik = hesaplaEctnOtomatikDegerler(dosya, rezervasyonlar);
-  const fobOverride = (dosya as any).ectn_fob_override;
-  const freightOverride = (dosya as any).ectn_freight_override;
-  const cfrOverride = (dosya as any).ectn_cfr_override;
-  const insuranceRaw = (dosya as any).ectn_insurance_override;
+  const fobOverride = dosya.ectn_fob_override;
+  const freightOverride = dosya.ectn_freight_override;
+  const cfrOverride = dosya.ectn_cfr_override;
+  const insuranceRaw = dosya.ectn_insurance_override;
   const insurance = insuranceRaw !== null && insuranceRaw !== undefined ? insuranceRaw : null;
-  const cfrEtiketOverrideRaw = (dosya as any).ectn_cfr_etiket_override as string | null | undefined;
+  const cfrEtiketOverrideRaw = dosya.ectn_cfr_etiket_override as string | null | undefined;
 
   const fobOtomatikSigortaDahil =
     otomatik.fob !== null && insurance !== null ? otomatik.fob - insurance : otomatik.fob;
@@ -410,7 +410,7 @@ export function hesaplaEctnGosterilenDegerler(dosya: Dosya, rezervasyonlar: Reze
  * eksik/yaniltici tutar riskini onlemek icin (talep: 28.09.2026).
  */
 function buildEctnSatirlari(dosya: Dosya, rezervasyonlar: Rezervasyon[]): string {
-  if (!(dosya as any).ectn_basvurusu) return "";
+  if (!dosya.ectn_basvurusu) return "";
 
   const { fob, freight, insurance, cfr, cfrEtiket } = hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar);
 
@@ -450,7 +450,7 @@ export function buildCommercialInvoiceHtml(
   // TOTAL bir daha birbirinden sapmaz (kok neden: 29.09.2026, IHR-2026-0085).
   // ECTN isaretli DEGILSE veya CFR hesaplanamiyorsa (ornegin FOB/FREIGHT
   // bilinmiyor), eskisi gibi ham CIF tutarindan hesaplanmaya devam eder.
-  const ectnCfr = (dosya as any).ectn_basvurusu ? hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar).cfr : null;
+  const ectnCfr = dosya.ectn_basvurusu ? hesaplaEctnGosterilenDegerler(dosya, rezervasyonlar).cfr : null;
   const odenecekTutarBazi = ectnCfr !== null ? ectnCfr : toplamTutar;
   const odenecekTutar = odenecekTutarBazi ? odenecekTutarBazi - avansTutari : null;
 
@@ -463,8 +463,8 @@ export function buildCommercialInvoiceHtml(
     SATICI_EMAIL: escapeHtml(SATICI_SABIT_EMAIL),
     ODENECEK_TUTAR: odenecekTutar !== null ? escapeHtml(formatCurrency(odenecekTutar, dosya.para_birimi)) : safe(null),
     ALICI_FIRMA: safe(dosya.alici_firma),
-    ALICI_ADRES: safe((dosya as any).alici_adresi),
-    CONSIGNEE: safe((dosya as any).consignee),
+    ALICI_ADRES: safe(dosya.alici_adresi),
+    CONSIGNEE: safe(dosya.consignee),
     BL_NO: safe(dosya.bl_no),
     MARKA: buildMarkaListesi(dosya, konteynerler),
     DETAYLI_AMBALAJ: buildDetayliAmbalaj(dosya, konteynerler),
@@ -476,11 +476,11 @@ export function buildCommercialInvoiceHtml(
     KONTEYNER_NUMARALARI: buildKonteynerNumaralari(konteynerler),
     AVANS_TUTARI: escapeHtml(formatCurrency(avansTutari, dosya.para_birimi)),
     TOPLAM_TUTAR: odenecekTutar !== null ? escapeHtml(formatCurrency(odenecekTutar, dosya.para_birimi)) : escapeHtml(formatCurrency(toplamTutar, dosya.para_birimi)),
-    HESAP_ADI: safe((dosya as any).hesap_adi),
-    BANKA: safe((dosya as any).banka),
-    SWIFT: safe((dosya as any).swift),
-    HESAP_NUMARASI: safe((dosya as any).hesap_numarasi),
-    IBAN: safe((dosya as any).iban),
+    HESAP_ADI: safe(dosya.hesap_adi),
+    BANKA: safe(dosya.banka),
+    SWIFT: safe(dosya.swift),
+    HESAP_NUMARASI: safe(dosya.hesap_numarasi),
+    IBAN: safe(dosya.iban),
     IMZA_HARUN: IMZA_HARUN,
     LOGO: LOGO_UNEX,
   };

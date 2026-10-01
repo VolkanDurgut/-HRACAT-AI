@@ -124,7 +124,7 @@ function ciz(
     ["Varis Limani", dosya.varis_limani],
     ["Ulke", ulkeAyikla(dosya.varis_limani)],
     ["Teslim Sekli", dosya.teslim_sekli],
-    ["Odeme Sekli", (dosya as any).gumruk_odeme_sekli],
+    ["Odeme Sekli", dosya.gumruk_odeme_sekli],
     ["Gemi Adi", rez?.gemi_adi],
     ["Acente", rez?.acente_ismi],
     ["Booking No", rez?.booking_no ? rez.booking_no.trim() : null],
@@ -137,7 +137,7 @@ function ciz(
   // sessizce birbirinden sapmasini (kok neden incelemesi: 29.09.2026,
   // IHR-2026-0084) bir daha yasanmayacak sekilde onler.
   const navlunBirim = dosya.navlun_tutari;
-  const lokalMasrafBirim = (dosya as any).lokal_masraf_tutari as number | null;
+  const lokalMasrafBirim = dosya.lokal_masraf_tutari as number | null;
   const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
   const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
   const { toplamCif, netNavlunToplam, toplamFob } = hesaplaFobFreightCifToplamlari(dosya, rezervasyonKonteynerAdedi);

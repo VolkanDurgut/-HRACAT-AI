@@ -103,11 +103,11 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
   }, [ozelPresetleriYukle]);
 
   const buildEmptyForm = () => ({
-    hesap_adi: (dosya as any).hesap_adi || "",
-    banka: (dosya as any).banka || "",
-    swift: (dosya as any).swift || "",
-    hesap_numarasi: (dosya as any).hesap_numarasi || "",
-    iban: (dosya as any).iban || "",
+    hesap_adi: dosya.hesap_adi || "",
+    banka: dosya.banka || "",
+    swift: dosya.swift || "",
+    hesap_numarasi: dosya.hesap_numarasi || "",
+    iban: dosya.iban || "",
   });
   const [form, setForm] = useState(buildEmptyForm);
 
@@ -231,11 +231,11 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <CopyableField dark label="Hesap Adi" value={(dosya as any).hesap_adi} />
-        <CopyableField dark label="Banka" value={(dosya as any).banka} />
-        <CopyableField dark label="SWIFT" value={(dosya as any).swift} monospace />
-        <CopyableField dark label="Hesap Numarası" value={(dosya as any).hesap_numarasi} monospace />
-        <CopyableField dark label="IBAN" value={(dosya as any).iban} monospace />
+        <CopyableField dark label="Hesap Adi" value={dosya.hesap_adi} />
+        <CopyableField dark label="Banka" value={dosya.banka} />
+        <CopyableField dark label="SWIFT" value={dosya.swift} monospace />
+        <CopyableField dark label="Hesap Numarası" value={dosya.hesap_numarasi} monospace />
+        <CopyableField dark label="IBAN" value={dosya.iban} monospace />
       </div>
 
       {editing && (

@@ -254,15 +254,15 @@ export function buildPackingListHtml(
     SATICI_TEL: escapeHtml(SATICI_SABIT_TEL),
     SATICI_EMAIL: escapeHtml(SATICI_SABIT_EMAIL),
     ALICI_FIRMA: safe(dosya.alici_firma),
-    ALICI_ADRES: safe((dosya as any).alici_adresi),
-    CONSIGNEE: safe((dosya as any).consignee),
+    ALICI_ADRES: safe(dosya.alici_adresi),
+    CONSIGNEE: safe(dosya.consignee),
     VESSEL_VOYAGE: vesselVoyage,
     YUKLEME_LIMANI: safe(rez?.yuklenme_limani || dosya.yuklenme_limani),
     VARIS_LIMANI: safe(dosya.varis_limani),
     URETIM_TARIHI: dosya.uretim_tarihi ? escapeHtml(formatDateTR(dosya.uretim_tarihi)) : safe(null),
     SON_KULLANIM_TARIHI: dosya.son_kullanim_tarihi ? escapeHtml(formatDateTR(dosya.son_kullanim_tarihi)) : safe(null),
     DETAYLI_AMBALAJ: (() => {
-      const raw = (dosya as any).detayli_ambalaj || dosya.ambalaj;
+      const raw = dosya.detayli_ambalaj || dosya.ambalaj;
       if (!raw) return safe(null);
       // Coklu ambalaj/urun segmenti iceren metinlerde toplam kap adedini
       // metnin basina yapistirmak YANLIS sonuc uretir - bkz.

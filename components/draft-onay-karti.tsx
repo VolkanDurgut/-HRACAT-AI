@@ -49,8 +49,8 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const [revizeNotu, setRevizeNotu] = useState("");
   const [revizeKaydediliyor, setRevizeKaydediliyor] = useState(false);
 
-  const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
-  const draftBlAdi = (dosya as any).draft_bl_dosya_adi as string | null;
+  const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
+  const draftBlAdi = dosya.draft_bl_dosya_adi as string | null;
   const rez = rezervasyonlar[0];
   const aliciEmail = draftOnayAliciEmailAl(dosya);
 
@@ -195,18 +195,18 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
     onRefresh();
   };
 
-  const onaylandi = !!(dosya as any).draft_onaylandi;
-  const mailGonderildi = !!(dosya as any).draft_mail_gonderildi;
-  const musteriOnayiAlindi = !!(dosya as any).draft_musteri_onayi_alindi;
-  const revizeIstendi = !!(dosya as any).draft_revize_istendi;
-  const onaylayan = (dosya as any).draft_onaylayan as string | null;
-  const onayTarihi = (dosya as any).draft_onay_tarihi as string | null;
-  const musteriOnayiIsaretleyen = (dosya as any).draft_musteri_onayi_isaretleyen as string | null;
-  const musteriOnayiTarihi = (dosya as any).draft_musteri_onayi_tarihi as string | null;
-  const revizeNotuKayitli = (dosya as any).draft_revize_notu as string | null;
-  const revizeTarihi = (dosya as any).draft_revize_tarihi as string | null;
-  const revizeIsaretleyen = (dosya as any).draft_revize_isaretleyen as string | null;
-  const mailGonderildiTarihi = (dosya as any).draft_mail_gonderildi_tarihi as string | null;
+  const onaylandi = !!dosya.draft_onaylandi;
+  const mailGonderildi = !!dosya.draft_mail_gonderildi;
+  const musteriOnayiAlindi = !!dosya.draft_musteri_onayi_alindi;
+  const revizeIstendi = !!dosya.draft_revize_istendi;
+  const onaylayan = dosya.draft_onaylayan as string | null;
+  const onayTarihi = dosya.draft_onay_tarihi as string | null;
+  const musteriOnayiIsaretleyen = dosya.draft_musteri_onayi_isaretleyen as string | null;
+  const musteriOnayiTarihi = dosya.draft_musteri_onayi_tarihi as string | null;
+  const revizeNotuKayitli = dosya.draft_revize_notu as string | null;
+  const revizeTarihi = dosya.draft_revize_tarihi as string | null;
+  const revizeIsaretleyen = dosya.draft_revize_isaretleyen as string | null;
+  const mailGonderildiTarihi = dosya.draft_mail_gonderildi_tarihi as string | null;
 
   // 48 saatlik yanit suresi: sadece "gonderildi isaretlendi, musteri onayi da
   // gelmedi, revize de istenmedi" durumunda (yani hala aktif bekleme

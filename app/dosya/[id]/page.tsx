@@ -323,9 +323,9 @@ function DosyaDetailContent() {
                   {/* Talep (26.09.2026): orijinal proforma PDF'ini goruntuleme. Sadece
                       PDF'i storage'a kaydedilmis dosyalarda gorunur (26.09.2026 sonrasi
                       acilanlar - oncesindeki dosyalarda PDF geriye donuk eklenemez). */}
-                  {(dosya as any).proforma_dosya_url && (
+                  {dosya.proforma_dosya_url && (
                     <a
-                      href={(dosya as any).proforma_dosya_url}
+                      href={dosya.proforma_dosya_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors hover:text-white"
@@ -398,9 +398,9 @@ function DosyaDetailContent() {
                         <div className="flex items-center gap-2 shrink-0">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
-                          ) : tanim.anahtar === "Bill of Lading" && (dosya as any).draft_bl_dosya_url ? (
+                          ) : tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url ? (
                             <a
-                              href={(dosya as any).draft_bl_dosya_url}
+                              href={dosya.draft_bl_dosya_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}

@@ -23,7 +23,7 @@ export default function TaslakOnayButonu({ dosya, rezervasyonlar, konteynerler }
   const { showToast } = useToast();
   const [indiriliyor, setIndiriliyor] = useState(false);
 
-  const draftBlUrl = (dosya as any).draft_bl_dosya_url as string | null;
+  const draftBlUrl = dosya.draft_bl_dosya_url as string | null;
 
   const ciHazir    = checkCommercialInvoiceReadiness(dosya, rezervasyonlar, konteynerler);
   const plHazir    = checkPackingListReadiness(dosya, rezervasyonlar, konteynerler);

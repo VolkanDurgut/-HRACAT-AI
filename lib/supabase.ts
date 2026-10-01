@@ -2,7 +2,8 @@
 // Ornek: import { supabase, Dosya, KONTEYNER_TIPLERI } from "@/lib/supabase"
 
 export { supabase } from './supabase/client';
-export { getGuvenliDosyaUrl, depoDosyalariniTopluSil, dosyaninStorageDosyalariniSil } from './supabase/storage';
+export { getGuvenliDosyaUrl, depoDosyalariniTopluSil, dosyaninStorageUrlleriniTopla } from './supabase/storage';
+export { yazmaHatasi } from './supabase/yazma-kontrol';
 export type {
   Dosya,
   UrunDetay,

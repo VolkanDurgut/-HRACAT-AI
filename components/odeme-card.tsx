@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya } from "@/lib/supabase";
+import { supabase, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
 import { formatCurrency } from "@/lib/cutoff-utils";
@@ -48,7 +48,15 @@ export default function OdemeCard({ dosya, onRefresh, companyId }: Props) {
       odeme_sekli: form.odeme_sekli || null,
       ham_veri: guncelHamVeri,
     };
-    await supabase.from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId);
+    const { data, error } = await supabase
+      .from("ihracat_dosyalari").update(payload).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      // Kayit basarisiz: form ACIK kalir, girilen bilgiler kaybolmaz.
+      showToast(`Ödeme bilgileri kaydedilemedi: ${hata}`, "error");
+      setSaving(false);
+      return;
+    }
     showToast("Odeme bilgileri güncellendi.", "success");
     setSaving(false);
     setEditing(false);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, Dosya, Rezervasyon, Konteyner, SurecTakibi } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, SurecTakibi, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatDateTimeTR, autoSuggestContainers } from "@/lib/cutoff-utils";
 import { MTS_PER_KONTEYNER } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
@@ -112,7 +112,16 @@ function DosyaDetailContent() {
     setDurumSaving(true);
     const isAcik = dosya.durum === "Açık" || dosya.durum === "Acik";
     const newDurum = isAcik ? "Kapalı" : "Açık";
-    await supabase.from("ihracat_dosyalari").update({ durum: newDurum }).eq("id", dosya.id).eq("company_id", companyId);
+    const { data, error } = await supabase
+      .from("ihracat_dosyalari").update({ durum: newDurum }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      // Basarisizsa dosya durumu degismemistir: Panel'e YONLENDIRILMEZ.
+      showToast(`Dosya durumu değiştirilemedi: ${hata}`, "error");
+      setDurumSaving(false);
+      setShowDurumConfirm(false);
+      return;
+    }
     showToast(newDurum === "Kapalı" ? "Dosya kapatıldı." : "Dosya yeniden açıldı.", "success");
     setDurumSaving(false);
     setShowDurumConfirm(false);
@@ -125,7 +134,13 @@ function DosyaDetailContent() {
 
   const updateToplamKonteyner = async (val: number) => {
     if (!dosya || !companyId) return;
-    await supabase.from("ihracat_dosyalari").update({ toplam_konteyner: val }).eq("id", dosya.id).eq("company_id", companyId);
+    const { data, error } = await supabase
+      .from("ihracat_dosyalari").update({ toplam_konteyner: val }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Toplam konteyner kaydedilemedi: ${hata}`, "error");
+      return;
+    }
     setDosya({ ...dosya, toplam_konteyner: val });
     showToast("Toplam konteyner guncellendi.", "success");
   };

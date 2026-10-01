@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageDosyalariniSil } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { isCutoffApproaching, getCutOffLabel, getCutOffDays, formatDateTR, formatCutoffTarihUzun } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
@@ -89,9 +89,14 @@ function PanelContent() {
     const { data: dosyaData } = await supabase
       .from("ihracat_dosyalari").select("ana_siparis_id").eq("id", deleteTarget.id).eq("company_id", companyId).maybeSingle(); // Şirket filtresi eklendi
     const anaSiparisId = dosyaData?.ana_siparis_id;
-    await dosyaninStorageDosyalariniSil(deleteTarget.id, companyId); // Silinmeden once storage'daki gercek dosyalar (PDF vb.) temizlenir
-    const { error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id).eq("company_id", companyId); // Şirket filtresi eklendi
-    if (error) { showToast("Dosya silinirken hata olustu.", "error"); setDeleteTarget(null); return; }
+    // SIRA ONEMLI (01.10.2026): once dosya URL'leri toplanir (kayit silinince
+    // bagli konteyner/evrak satirlari CASCADE ile gider), sonra kayit silinir;
+    // PDF'ler ancak kayit GERCEKTEN silindiyse storage'dan temizlenir.
+    const storageUrlleri = await dosyaninStorageUrlleriniTopla(deleteTarget.id, companyId);
+    const { data: silinen, error } = await supabase.from("ihracat_dosyalari").delete().eq("id", deleteTarget.id).eq("company_id", companyId).select("id"); // Şirket filtresi eklendi
+    const silmeHatasi = yazmaHatasi(error, silinen);
+    if (silmeHatasi) { showToast(`Dosya silinemedi: ${silmeHatasi}`, "error"); setDeleteTarget(null); return; }
+    await depoDosyalariniTopluSil(storageUrlleri);
     if (anaSiparisId) {
       const { count } = await supabase.from("ihracat_dosyalari").select("id", { count: "exact", head: true }).eq("ana_siparis_id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi
       if (!count || count === 0) await supabase.from("ana_siparisler").delete().eq("id", anaSiparisId).eq("company_id", companyId); // Şirket filtresi eklendi

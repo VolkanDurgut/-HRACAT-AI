@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type IrsaliyeYukleResult = {
@@ -11,7 +11,8 @@ type UseIrsaliyeUploadReturn = {
   yukleniyor: Record<string, boolean>;
   hatalar: Record<string, string>;
   yukleIrsaliye: (konteyner: { id: string; dosya_id: string; konteyner_no: string }, file: File) => Promise<IrsaliyeYukleResult>;
-  kaldirIrsaliye: (konteynerId: string, irsaliyeDosyaUrl?: string | null) => Promise<void>;
+  /** Hata yoksa null, varsa kullaniciya gosterilecek mesaj dondurur. */
+  kaldirIrsaliye: (konteynerId: string, irsaliyeDosyaUrl?: string | null) => Promise<string | null>;
   inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
 };
 
@@ -77,10 +78,12 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
     }
   }, [companyId]);
 
-  const kaldirIrsaliye = useCallback(async (konteynerId: string, irsaliyeDosyaUrl?: string | null) => {
-    if (!companyId) return;
-    if (irsaliyeDosyaUrl) await depoDosyalariniTopluSil([irsaliyeDosyaUrl]); // storage'daki gercek dosya da temizlenir
-    await supabase
+  /** Donus: hata yoksa null, varsa kullaniciya gosterilecek mesaj. */
+  const kaldirIrsaliye = useCallback(async (konteynerId: string, irsaliyeDosyaUrl?: string | null): Promise<string | null> => {
+    if (!companyId) return 'Şirket bilgisi bulunamadı.';
+    // SIRA ONEMLI (01.10.2026): once kayit guncellenir, PDF ancak bu
+    // BASARILI olursa storage'dan silinir.
+    const { data, error } = await supabase
       .from('konteynerler')
       .update({
         irsaliye_dosya_url: null,
@@ -88,7 +91,12 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
         irsaliye_yukleme_tarihi: null,
       })
       .eq('company_id', companyId)
-      .eq('id', konteynerId);
+      .eq('id', konteynerId)
+      .select('id');
+    const hata = yazmaHatasi(error, data);
+    if (hata) return hata;
+    if (irsaliyeDosyaUrl) await depoDosyalariniTopluSil([irsaliyeDosyaUrl]); // storage'daki gercek dosya da temizlenir
+    return null;
   }, [companyId]);
 
   return { yukleniyor, hatalar, yukleIrsaliye, kaldirIrsaliye, inputRefs };

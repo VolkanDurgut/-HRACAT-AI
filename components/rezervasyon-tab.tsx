@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil } from "@/lib/supabase";
+import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCutoffTarih, formatCurrency } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -118,16 +118,19 @@ function validateForm(form: typeof emptyForm): Record<string, string> {
  * kuculur. Boylece Commercial Invoice, siparisin tamami yerine o partide
  * gonderilen MTS uzerinden dogru tutari gosterir.
  * ana_siparis_id olmayan (tek seferlik) dosyalara hic dokunulmaz.
+ *
+ * Donus: guncelleme gerekmiyorsa veya basariliysa true; tutar guncellemesi
+ * BASARISIZ olursa false (cagiran taraf kullaniciyi uyarir - 01.10.2026).
  */
-async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) {
-  if (!companyId) return;
+async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Promise<boolean> {
+  if (!companyId) return true;
   const { data: dosya } = await supabase
     .from("ihracat_dosyalari")
     .select("ana_siparis_id")
     .eq("id", dosyaId)
     .eq("company_id", companyId)
     .maybeSingle();
-  if (!dosya?.ana_siparis_id) return;
+  if (!dosya?.ana_siparis_id) return true;
 
   const { data: anaSiparis } = await supabase
     .from("ana_siparisler")
@@ -137,7 +140,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) {
     .maybeSingle();
   const masterUrunler = (anaSiparis?.urun_detaylari_master as any[]) || [];
   const toplamSiparisMts = anaSiparis?.toplam_mts || 0;
-  if (masterUrunler.length === 0 || toplamSiparisMts <= 0) return;
+  if (masterUrunler.length === 0 || toplamSiparisMts <= 0) return true;
 
   const { data: tumRezervasyonlar } = await supabase
     .from("rezervasyonlar")
@@ -145,7 +148,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) {
     .eq("dosya_id", dosyaId)
     .eq("company_id", companyId);
   const toplamKonteynerAdedi = (tumRezervasyonlar || []).reduce((s, r: any) => s + (r.konteyner_adedi || 0), 0);
-  if (toplamKonteynerAdedi <= 0) return;
+  if (toplamKonteynerAdedi <= 0) return true;
 
   const buPartininMts = toplamKonteynerAdedi * MTS_PER_KONTEYNER;
   const oran = buPartininMts / toplamSiparisMts;
@@ -168,11 +171,30 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string) {
 
   const toplamTutar = urunDetaylari.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
 
-  await supabase
+  const { data, error } = await supabase
     .from("ihracat_dosyalari")
     .update({ urun_detaylari: urunDetaylari, toplam_tutar: toplamTutar })
     .eq("id", dosyaId)
-    .eq("company_id", companyId);
+    .eq("company_id", companyId)
+    .select("id");
+  const hata = yazmaHatasi(error, data);
+  if (hata) {
+    console.error("Urun tutarlari guncellenemedi:", hata);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Rezervasyon kaydedildikten SONRA calisan ikincil adimlarin (navlun/lokal
+ * masraf ve siparis tutari) sonucuna gore dogru mesaji gosterir. Ana kayit
+ * zaten basarili oldugu icin bu adimlarin hatasi "kaydedildi ANCAK ..." diye
+ * acikca soylenir, sessizce yutulmaz (01.10.2026).
+ */
+function ikincilAdimMesaji(navlunHatasi: string | null, tutarBasarili: boolean, basariMesaji: string): { mesaj: string; tur: "success" | "error" } {
+  if (navlunHatasi) return { mesaj: `Rezervasyon kaydedildi ancak navlun / lokal masraf kaydedilemedi: ${navlunHatasi}`, tur: "error" };
+  if (!tutarBasarili) return { mesaj: "Rezervasyon kaydedildi ancak ürün tutarları güncellenemedi. Lütfen rezervasyonu tekrar kaydedin.", tur: "error" };
+  return { mesaj: basariMesaji, tur: "success" };
 }
 
 function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
@@ -305,10 +327,20 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
     if (Object.keys(e).length > 0) return;
 
     setSaving(true);
-    await supabase.from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id).eq("company_id", companyId);
-    await supabase.from("ihracat_dosyalari").update(buildDosyaPayload(form)).eq("id", rez.dosya_id).eq("company_id", companyId);
-    await syncDevamEdenDosyaTutari(rez.dosya_id, companyId);
-    showToast("Rezervasyon guncellendi.", "success");
+    const { data: rezData, error: rezError } = await supabase
+      .from("rezervasyonlar").update(buildPayload(form)).eq("id", rez.id).eq("company_id", companyId).select("id");
+    const rezHata = yazmaHatasi(rezError, rezData);
+    if (rezHata) {
+      // Kayit basarisiz: pencere ACIK kalir, girilen bilgiler kaybolmaz.
+      showToast(`Rezervasyon kaydedilemedi: ${rezHata}`, "error");
+      setSaving(false);
+      return;
+    }
+    const { data: dosyaData, error: dosyaError } = await supabase
+      .from("ihracat_dosyalari").update(buildDosyaPayload(form)).eq("id", rez.dosya_id).eq("company_id", companyId).select("id");
+    const tutarBasarili = await syncDevamEdenDosyaTutari(rez.dosya_id, companyId);
+    const sonuc = ikincilAdimMesaji(yazmaHatasi(dosyaError, dosyaData), tutarBasarili, "Rezervasyon guncellendi.");
+    showToast(sonuc.mesaj, sonuc.tur);
     setSaving(false);
     setEditing(false);
     onRefresh();
@@ -448,10 +480,20 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
     if (Object.keys(e).length > 0) return;
 
     setSavingNew(true);
-    await supabase.from("rezervasyonlar").insert({ company_id: companyId, dosya_id: dosyaId, ...buildPayload(newForm) });
-    await supabase.from("ihracat_dosyalari").update(buildDosyaPayload(newForm)).eq("id", dosyaId).eq("company_id", companyId);
-    await syncDevamEdenDosyaTutari(dosyaId, companyId);
-    showToast("Rezervasyon eklendi.", "success");
+    const { data: rezData, error: rezError } = await supabase
+      .from("rezervasyonlar").insert({ company_id: companyId, dosya_id: dosyaId, ...buildPayload(newForm) }).select("id");
+    const rezHata = yazmaHatasi(rezError, rezData);
+    if (rezHata) {
+      // Kayit basarisiz: form ACIK kalir, girilen bilgiler kaybolmaz.
+      showToast(`Rezervasyon eklenemedi: ${rezHata}`, "error");
+      setSavingNew(false);
+      return;
+    }
+    const { data: dosyaData, error: dosyaError } = await supabase
+      .from("ihracat_dosyalari").update(buildDosyaPayload(newForm)).eq("id", dosyaId).eq("company_id", companyId).select("id");
+    const tutarBasarili = await syncDevamEdenDosyaTutari(dosyaId, companyId);
+    const sonuc = ikincilAdimMesaji(yazmaHatasi(dosyaError, dosyaData), tutarBasarili, "Rezervasyon eklendi.");
+    showToast(sonuc.mesaj, sonuc.tur);
     setShowNewForm(false);
     setNewForm(emptyForm);
     setSavingNew(false);
@@ -496,10 +538,12 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
         .eq("rezervasyon_id", hedef.id)
         .eq("company_id", companyId);
 
-      const { error } = await supabase.from("rezervasyonlar").delete().eq("id", hedef.id).eq("company_id", companyId);
-      if (error) {
+      const { data: silinen, error } = await supabase
+        .from("rezervasyonlar").delete().eq("id", hedef.id).eq("company_id", companyId).select("id");
+      const silmeHatasi = yazmaHatasi(error, silinen);
+      if (silmeHatasi) {
         // Silme basarisizsa HICBIR dosyaya dokunulmaz.
-        showToast(`Rezervasyon silinemedi: ${error.message}`, "error");
+        showToast(`Rezervasyon silinemedi: ${silmeHatasi}`, "error");
         return;
       }
 
@@ -511,15 +555,17 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
 
       // Siparis takipli dosyalarda urun tutarlari kalan rezervasyonlara gore
       // yeniden olceklenir - kaydet/ekle akisiyla ayni kural.
-      await syncDevamEdenDosyaTutari(dosyaId, companyId);
+      const tutarBasarili = await syncDevamEdenDosyaTutari(dosyaId, companyId);
 
       const kontSayisi = (bagliKonteynerler || []).length;
-      showToast(
-        kontSayisi > 0
-          ? `${hedef.bookingNo} ve bağlı ${kontSayisi} konteyner silindi.`
-          : `${hedef.bookingNo} silindi.`,
-        "success"
-      );
+      const silindiMesaji = kontSayisi > 0
+        ? `${hedef.bookingNo} ve bağlı ${kontSayisi} konteyner silindi.`
+        : `${hedef.bookingNo} silindi.`;
+      if (tutarBasarili) {
+        showToast(silindiMesaji, "success");
+      } else {
+        showToast(`${silindiMesaji} Ancak ürün tutarları güncellenemedi; kalan rezervasyonlardan birini tekrar kaydedin.`, "error");
+      }
       onRefresh();
     } finally {
       setSiliniyor(false);

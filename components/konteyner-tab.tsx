@@ -98,7 +98,8 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   };
 
   const handleIrsaliyeKaldir = async (konteyner: Konteyner) => {
-    await kaldirIrsaliye(konteyner.id, konteyner.irsaliye_dosya_url);
+    const hata = await kaldirIrsaliye(konteyner.id, konteyner.irsaliye_dosya_url);
+    if (hata) showToast(`İrsaliye kaldırılamadı: ${hata}`, "error");
     onRefresh();
   };
 

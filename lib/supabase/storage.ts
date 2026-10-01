@@ -58,20 +58,28 @@ export async function depoDosyalariniTopluSil(urls: (string | null | undefined)[
 }
 
 /**
- * Bir ihracat dosyası silinmeden ÖNCE çağrılır: o dosyaya ve bağlı
- * konteynerlere/evraklara ait TÜM storage dosyalarını toplayıp siler.
- * Veritabanı satırlarının silinmesi ayrıdır (CASCADE zaten hallediyor) —
- * bu fonksiyon sadece gerçek dosyaların (PDF/resim) storage'da yetim
- * kalmasını engeller.
+ * Bir ihracat dosyasına ve bağlı konteynerlere/evraklara ait TÜM storage
+ * dosyalarının URL'lerini TOPLAR (silmez).
+ *
+ * DOĞRU SIRA (düzeltme: 01.10.2026):
+ *   1) const urls = await dosyaninStorageUrlleriniTopla(id, companyId)
+ *      -> kayıt silinmeden ÖNCE çağrılmalı: ihracat_dosyalari silinince
+ *         konteynerler / dosya_evraklari satırları CASCADE ile silinir ve
+ *         URL'ler bir daha okunamaz.
+ *   2) ihracat_dosyalari kaydını sil ve sonucunu kontrol et.
+ *   3) SADECE silme başarılıysa: await depoDosyalariniTopluSil(urls)
+ *
+ * Eskiden (dosyaninStorageDosyalariniSil) dosyalar kayıttan ÖNCE siliniyordu;
+ * kayıt silinemezse dosya kayıtta duruyor ama PDF'leri kaybolmuş oluyordu.
  */
-export async function dosyaninStorageDosyalariniSil(dosyaId: string, companyId: string): Promise<void> {
+export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: string): Promise<(string | null | undefined)[]> {
   const [{ data: dosya }, { data: evraklar }, { data: konteynerler }] = await Promise.all([
     supabase.from('ihracat_dosyalari').select('fatura_dosya_url, konsimento_dosya_url, draft_bl_dosya_url, proforma_dosya_url').eq('id', dosyaId).eq('company_id', companyId).maybeSingle(),
     supabase.from('dosya_evraklari').select('dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
     supabase.from('konteynerler').select('dba_dosya_url, irsaliye_dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
   ]);
 
-  const urls: (string | null | undefined)[] = [
+  return [
     (dosya as any)?.fatura_dosya_url,
     (dosya as any)?.konsimento_dosya_url,
     (dosya as any)?.draft_bl_dosya_url,
@@ -80,6 +88,4 @@ export async function dosyaninStorageDosyalariniSil(dosyaId: string, companyId: 
     ...((konteynerler as any[]) || []).map((k) => k.dba_dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.irsaliye_dosya_url),
   ];
-
-  await depoDosyalariniTopluSil(urls);
 }

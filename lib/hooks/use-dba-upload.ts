@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -134,8 +134,9 @@ export function useDbaUpload(): UseDbaUploadReturn {
 
   const kaldirDba = useCallback(async (konteynerId: string, dbaDosyaUrl?: string | null) => {
     if (!companyId) return;
-    if (dbaDosyaUrl) await depoDosyalariniTopluSil([dbaDosyaUrl]); // storage'daki gercek dosya da temizlenir
-    const { error } = await supabase
+    // SIRA ONEMLI (01.10.2026): once kayit guncellenir, PDF ancak bu
+    // BASARILI olursa storage'dan silinir.
+    const { data, error } = await supabase
       .from('konteynerler')
       .update({
         plaka: null,
@@ -148,10 +149,14 @@ export function useDbaUpload(): UseDbaUploadReturn {
         dba_kontrol_sonucu: null,
       })
       .eq('company_id', companyId)
-      .eq('id', konteynerId);
-    if (error) {
-      showToast(`DBA kaldırılamadı: ${error.message}`, 'error');
+      .eq('id', konteynerId)
+      .select('id');
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`DBA kaldırılamadı: ${hata}`, 'error');
+      return;
     }
+    if (dbaDosyaUrl) await depoDosyalariniTopluSil([dbaDosyaUrl]); // storage'daki gercek dosya da temizlenir
   }, [showToast, companyId]);
 
   return { yukleniyor, hatalar, yukleDba, kaldirDba, inputRefs };

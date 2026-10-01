@@ -103,6 +103,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kullan (tablo zaten `overflow-x-auto` sarmalayıcıya sahipse yatay kaydırma
   devreye girer).
 
+## Veritabanına yazma ve dosya silme kuralları (düzeltme: 01.10.2026)
+
+- supabase-js hata FIRLATMAZ; `{ data, error }` döner. RLS bir
+  güncellemeyi/silmeyi engellediğinde hata bile dönmez, 0 satır etkilenir.
+  Kullanıcıya "başarılı" diyen her yazma işleminde sorgu sonuna
+  `.select("id")` eklenir ve sonuç `yazmaHatasi(error, data)`
+  (`lib/supabase/yazma-kontrol.ts`) ile kontrol edilir; hata varsa kırmızı
+  toast gösterilir ve form/pencere AÇIK bırakılır.
+- Storage dosyası silmenin DOĞRU SIRASI: (1) silinecek URL'leri topla,
+  (2) DB kaydını sil/güncelle ve sonucu kontrol et, (3) SADECE başarılıysa
+  `depoDosyalariniTopluSil(urls)`. Dosya silerken `dosyaninStorageUrlleriniTopla`
+  kayıt silinmeden ÖNCE çağrılır (CASCADE alt satırları siler). Asla önce
+  storage silinmez — kayıt silinemezse var olmayan PDF'leri gösterir.
+
 ## Sayfa / sekme yetkileri (düzeltme: 01.10.2026)
 
 - Yetkiler `useAuth()` ile gelir ve veritabanından YÜKLENENE kadar hepsi

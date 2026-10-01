@@ -208,6 +208,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   özelliğidir: uygulama açık değilse bildirim gelmez.
 - Müşteri onayı alınmamışsa "Hatırlatma maili": `buildDraftHatirlatmaMailtoUrl`
   (`lib/draft-onay-mail.ts`), Draft Onay maili ile aynı alıcı + CC.
+- 48 saat (draft) hatırlatması: metin kullanıcının verdiği şablon (01.10.2026),
+  kalan saat dinamik (`kalanSaatMetni`, en yakın tam saat). Konu ilk draft
+  mailinin birebir "RE:" li hali ki istemci aynı konuşmada gruplasın. mailto
+  var olan maili YANITLAYAMAZ (hep yeni ileti) ve Outlook, gövdesi dolu
+  mailto iletisine varsayılan imzayı EKLEMEZ (protokol sınırı) — imza elle
+  (İleti > İmza) eklenir. Cut-off hatırlatması ayrı metin/konu ile kalır.
 
 ## Birden fazla Proforma No / Lot No (01.10.2026)
 

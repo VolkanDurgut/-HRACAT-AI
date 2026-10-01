@@ -1,6 +1,5 @@
 import { Dosya, Rezervasyon } from "@/lib/supabase";
 import { formatCutoffTarih, formatCutoffSaat } from "@/lib/cutoff-utils";
-import { formatIstanbulTarihSaat } from "@/lib/draft-onay-sure";
 
 /**
  * Draft Onay Gönderim akışında CC'ye eklenecek sabit iç ekip adresleri.
@@ -80,10 +79,28 @@ function cutoffMetni(deger: string | null): string | null {
 }
 
 export function buildDraftHatirlatmaKonu(b: DraftHatirlatmaBilgisi): string {
-  return `UNEX // REMINDER: DRAFT APPROVAL OF LOADING DOCUMENTS // ${b.proformaNo?.trim() || "-"}// ${b.bookingNo?.trim() || "-"}`;
+  const proforma = b.proformaNo?.trim() || "-";
+  const booking = b.bookingNo?.trim() || "-";
+  // 48 saat hatirlatmasi (talep: 01.10.2026): konu, musteriye giden ilk draft
+  // mailinin konusunun (buildDraftOnayKonu) birebir "RE:" li halidir. mailto
+  // var olan bir maili YANITLAYAMAZ, hep yeni ileti acar; ama Outlook / Gmail
+  // gibi istemciler konusu ayni (RE: haric) iletileri ayni konusmada gruplar.
+  if (b.yanitSonuMs) return `RE: UNEX // DRAFT APPROVAL OF LOADING DOCUMENTS // ${proforma}// ${booking}`;
+  return `UNEX // REMINDER: DRAFT APPROVAL OF LOADING DOCUMENTS // ${proforma}// ${booking}`;
 }
 
-export function buildDraftHatirlatmaMetni(b: DraftHatirlatmaBilgisi): string {
+/**
+ * 48 saatlik onay suresinden kalan saat, mail metni icin (en yakin tam saat,
+ * en az 1). Uygulama geneli bildirim son 10 saatte geldigi icin bildirimden
+ * hemen sonra basilirsa metin "10 hours" der; daha erken basilirsa gercek
+ * kalan sureyi yazar - musteriye asla yanlis bir sure soylenmez.
+ */
+function kalanSaatMetni(yanitSonuMs: number, simdi: number): { sayi: number; birim: string } {
+  const sayi = Math.max(1, Math.round((yanitSonuMs - simdi) / (60 * 60 * 1000)));
+  return { sayi, birim: sayi === 1 ? "hour" : "hours" };
+}
+
+export function buildDraftHatirlatmaMetni(b: DraftHatirlatmaBilgisi, simdi: number = Date.now()): string {
   const satirlar = [
     `• Booking Number: ${b.bookingNo?.trim() || "-"}`,
     `• Proforma Number: ${b.proformaNo?.trim() || "-"}`,
@@ -93,12 +110,18 @@ export function buildDraftHatirlatmaMetni(b: DraftHatirlatmaBilgisi): string {
   if (talimat) satirlar.push(`• Shipping Instruction Cut-off: ${talimat}`);
   if (beyan) satirlar.push(`• Customs Declaration Cut-off: ${beyan}`);
   if (b.yanitSonuMs) {
-    satirlar.push(`• Approval Period Ends: ${formatIstanbulTarihSaat(b.yanitSonuMs)} (Turkey time, GMT+3)`);
+    // Kullanicinin verdigi metin (talep: 01.10.2026), kalan sure dinamik.
+    // Sondaki bos satirlar: mailto ile acilan iletiye Outlook varsayilan
+    // imzayi EKLEMEZ (mailto'da imza parametresi yok); kullanici imzayi
+    // Ileti > Imza ile buraya ekler.
+    const { sayi, birim } = kalanSaatMetni(b.yanitSonuMs, simdi);
+    const kalanFiil = sayi === 1 ? "remains" : "remain";
     return (
-      `Dear Valuable Partners,\n\n` +
-      `This is a kind reminder regarding the draft shipment documents we have sent for your approval.\n\n` +
-      satirlar.join("\n") +
-      `\n\n- Kindly send us your approval or amendment request before the 48-hour approval period ends. Unless we receive any feedback within this period, the documents will be deemed approved and the originals will be prepared accordingly.`
+      `Dear Valued Partners,\n\n` +
+      `This is a kind reminder regarding the draft shipment documents we sent for your approval.\n\n` +
+      `Please note that ${sayi} ${birim} ${kalanFiil} until the 48-hour approval period expires. Kindly send us your approval or any amendment requests within this period.\n\n` +
+      `If we do not receive any feedback within the remaining ${sayi} ${birim}, the documents will be deemed approved, and the originals will be prepared accordingly.\n\n` +
+      `Thank you for your prompt attention.\n\n`
     );
   }
   return (

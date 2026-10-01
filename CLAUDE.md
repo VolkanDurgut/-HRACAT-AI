@@ -198,7 +198,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   SADECE e-posta + şifre ile giriş var; "Şifremi unuttum" akışı ve
   `/sifre-yenile` sayfası da kullanıcı kararıyla kaldırıldı (şifre sıfırlama
   yönetici işi). `/checkout` ve `/api/checkout` (iyzico deneme çekimi) de
-  kaldırıldı — bunların hiçbiri geri eklenmemeli.
+  kaldırıldı — bunların hiçbiri geri eklenmemeli. `iyzipay` /
+  `@types/iyzipay` npm paketleri ve `next.config.js`'teki ilgili ayar da
+  kaldırıldı; build artık hiçbir IYZICO_* ortam değişkenine ihtiyaç duymaz.
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).
 - `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;

@@ -281,6 +281,43 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   evrakları tamamlanmış olsa bile burada görünmez (kullanıcı kararı,
   30.09.2026).
 
+### Müşteriye otomatik mail gönderimi — ASKIDA (karar: 01.10.2026)
+
+- Draft onay / hatırlatma mailleri hâlâ `mailto:` ile kullanıcının kendi
+  Outlook'undan gönderiliyor. `mailto` var olan bir maili YANITLAYAMAZ (hep yeni
+  ileti açar; konu aynı tutularak istemcide aynı konuşmada gruplanır) ve
+  gövdeli mailto'ya Outlook varsayılan imzayı EKLEMEZ.
+- Sistemden otomatik gönderim konuşuldu ve kullanıcı kararıyla **askıya
+  alındı**. Kural: "mailin spama düşme ihtimali varsa kullanılmaz."
+  - Seçenek A (Resend, `bildirim@ihracatasistanim.com`): müşteriye yabancı
+    alan adından gittiği için spam riski → REDDEDİLDİ.
+  - Seçenek B (Promail SMTP ile `execution@unex.com.tr` adına sistemden
+    gönderim): ancak unex.com.tr SPF hatası düzeltilip test gönderimi
+    yapıldıktan sonra konuşulabilir.
+- Tespit: unex.com.tr maili Promail'de (mx1/mx2.promail.com.tr) ve alan adında
+  İKİ ayrı SPF TXT kaydı var (`v=spf1 redirect=_spf.yandex.net` ve
+  `v=spf1 +a include:_spf.promail.com.tr -all`) → SPF PermError. Kullanıcıya
+  tek kayda indirilmesi (Yandex kaydının silinmesi) söylendi.
+
+## Analiz sayfası hesap kuralları (`app/analiz/page.tsx`, 01.10.2026)
+
+- Konteyner sayısı her kartta tek kaynaktan: dosyanın rezervasyonlarındaki
+  `konteyner_adedi` toplamı; rezervasyon yoksa eklenmiş konteyner sayısı
+  (`konteynerSayisi`). Eklenen konteyner sayısı rezervasyondakinden farklı
+  olabiliyor (örn. IHR-2026-0089: rez 4, eklenen 2) — analiz rezervasyonu esas alır.
+- Tarih esası "sevkiyat tarihi" = en erken ETD, yoksa `olusturma_tarihi`
+  (`sevkiyatTarihi`). Yıl filtresi (veriden üretilir), aylık grafik ve "Son
+  Tamamlanan Sevkiyatlar" sırası buna göre.
+- Varış limanı serbest metin; `lib/liman-anahtari.ts` farklı yazımları tek
+  İngilizce büyük harf ada indirger (DJIBOUTI, SINGAPORE…) — SADECE gruplama
+  için, kayıt ve evraklar değişmez. Yeni bir Türkçe yazım çıkarsa
+  `TURKCE_ADLAR`'a eklenir. Gemi adları da "M/V", "MV" öneki ve boşluk farkı
+  yok sayılarak birleştirilir.
+- Yüzdeler "toplamdaki pay"; çubuk uzunluğu listedeki en büyüğe göre. Birim
+  fiyat ve transit süresinde yüzde yok. Tüm çubuklar tek renk (`ACCENT`); çift
+  ölçekli grafik kullanılmaz (aylık grafik sadece hacim, konteyner alt yazıda).
+- Birden fazla para birimi varsa kur çevrimi yapılmadığı için sayfada uyarı çıkar.
+
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon

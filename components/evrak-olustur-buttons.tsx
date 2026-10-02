@@ -29,6 +29,7 @@ import FumigationAyarModal from "@/components/fumigation-ayar-modal";
 import KaliteSertifikasiAyarModal from "@/components/kalite-sertifikasi-ayar-modal";
 import EctnDegerleriModal, { EctnOverrideDegerleri } from "@/components/ectn-degerleri-modal";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { EvrakIkonYuvasi, EVRAK_IKON_BUTON_SINIFI } from "@/components/evrak-ikon-yuvasi";
 
 /** Turkce karakterleri Latin karsiliklariyla degistirir. */
 function turkceSadelestir(metin: string): string {
@@ -52,6 +53,12 @@ const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc",
   health: { evrakTipi: "health_certificate",     siraNo: 6, evrakAdi: "HEALTH CERTIFICATE" },
   qc:    { evrakTipi: "quality_certificate",    siraNo: 7, evrakAdi: "QUALITY CERTIFICATE" },
   fc:    { evrakTipi: "fumigation",             siraNo: 8, evrakAdi: "FUMIGATION" },
+};
+
+/** Hazirlik uyarisi basliginda kullanilan kisa adlar (tek satir modu). */
+const TEK_SATIR_ETIKETLERI: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", string> = {
+  ci: "Commercial Invoice", pl: "Packing List", coo: "Certificate of Origin", phyto: "Phytosanitary Certificate",
+  health: "Health Certificate", qc: "Quality Cert.", fc: "Fumigation Cert.",
 };
 
 type EvrakDurumu = { durum: "taslak" | "orijinal"; dosya_url: string; dosya_adi: string } | null;
@@ -401,6 +408,9 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     </div>
   );
 
+  // Tek evrak satiri modunda hangi hazirlik sonucunun kullanilacagi.
+  const tekSatirHazirlik = { ci: ciHazirlik, pl: plHazirlik, coo: cooHazirlik, phyto: phytoHazirlik, health: healthHazirlik, qc: qcHazirlik, fc: fcHazirlik };
+
   return (
     <>
       {show === "both" ? (
@@ -446,28 +456,30 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 flex-wrap">
-          {show === "ci" && (<>{renderEvrakButonlari("ci", ciHazirlik, "Commercial Invoice")}{ectnCheckbox}</>)}
-          {show === "pl" && renderEvrakButonlari("pl", plHazirlik, "Packing List")}
-          {show === "coo" && renderEvrakButonlari("coo", cooHazirlik, "Certificate of Origin")}
-          {show === "phyto" && renderEvrakButonlari("phyto", phytoHazirlik, "Phytosanitary Certificate")}
-          {show === "health" && renderEvrakButonlari("health", healthHazirlik, "Health Certificate")}
-          {show === "qc" && (
-            <div className="flex items-center gap-1.5">
-              {renderEvrakButonlari("qc", qcHazirlik, "Quality Cert.")}
-              <button onClick={() => setKaliteAyarModalAcik(true)} className={iconBtnClass} title="Kalite sertifikası ayarlarını düzenle">
-                <Pencil size={13} />
-              </button>
-            </div>
-          )}
-          {show === "fc" && (
-            <div className="flex items-center gap-1.5">
-              {renderEvrakButonlari("fc", fcHazirlik, "Fumigation Cert.")}
-              <button onClick={() => setAyarModalAcik(true)} className={iconBtnClass} title="Fumigasyon ayarlarını düzenle">
-                <Pencil size={13} />
-              </button>
-            </div>
-          )}
+        // Tek evrak satiri (Evraklar listesi, duzen: 02.10.2026): ust satir SABIT
+        // [Draft] [Orijinal] [kalem yuvasi]. Kalem yuvasi bos olsa da ayni
+        // genislikte durur - Draft/Orijinal tum satirlarda ayni hizada kalsin
+        // (bkz. components/evrak-ikon-yuvasi.tsx). CI'daki ECTN kutusu butonlarin
+        // ALTINA, Orijinal'in sag kenarina hizali konur: yana konunca dar kartta
+        // "Commercial Invoice" basligini kesiyor ve hizayi bozuyordu.
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1.5">
+            {renderEvrakButonlari(show, tekSatirHazirlik[show], TEK_SATIR_ETIKETLERI[show])}
+            <EvrakIkonYuvasi>
+              {show === "qc" && (
+                <button onClick={() => setKaliteAyarModalAcik(true)} className={EVRAK_IKON_BUTON_SINIFI} title="Kalite sertifikası ayarlarını düzenle">
+                  <Pencil size={13} />
+                </button>
+              )}
+              {show === "fc" && (
+                <button onClick={() => setAyarModalAcik(true)} className={EVRAK_IKON_BUTON_SINIFI} title="Fumigasyon ayarlarını düzenle">
+                  <Pencil size={13} />
+                </button>
+              )}
+            </EvrakIkonYuvasi>
+          </div>
+          {/* mr-[34px] = kalem yuvasi (28px) + aradaki bosluk (6px) */}
+          {show === "ci" && <div className="mr-[34px]">{ectnCheckbox}</div>}
         </div>
       )}
 

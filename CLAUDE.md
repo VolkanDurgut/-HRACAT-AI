@@ -318,15 +318,24 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   ölçekli grafik kullanılmaz (aylık grafik sadece hacim, konteyner alt yazıda).
 - Birden fazla para birimi varsa kur çevrimi yapılmadığı için sayfada uyarı çıkar.
 
+## Evraklar listesi satır düzeni (02.10.2026)
+
+- "İhracat Evrakları" satırlarının sağı SABİT düzende: [aksiyon butonları]
+  [kalem yuvası] [kopyala yuvası] (`components/evrak-ikon-yuvasi.tsx`).
+  İkonu olmayan satırda yuva boş ama aynı genişlikte durur; Draft/Orijinal
+  butonları tüm satırlarda aynı hizadadır. CI satırındaki ECTN kutusu
+  butonların ALTINDA (yanda başlığı kesiyordu). Yeni ikon/buton eklerken bu yuvaları kullan, butonların
+  yanına doğrudan ikon ekleme (hizayı kaydırır). İhracatlar sayfasındaki
+  `show="both"` görünümü ayrı, bu kurala dahil değil.
+
 ## Yük Sigortası Talimatı — 10. evrak (02.10.2026)
 
 - Evraklar listesindeki 10. satır ("Insurance Policy", sadece müşterinin
   `sevkiyat_evraklari` listesinde sigorta varsa görünür):
-  `components/sigorta-talimati-section.tsx`. Fatura Talimatı gibi çalışır:
-  "İndir" PDF'i doğrudan indirir (boş alan varken kapalı), "Talimat"
-  penceresinde otomatik alanlar düzeltilip PDF indirilir / mailto açılır.
-  Veritabanına HİÇBİR şey yazılmaz; son kullanılan Kime/CC sadece tarayıcıda
-  (`localStorage` `sigorta-talimati-alicilari-v1`).
+  `components/sigorta-talimati-section.tsx`. "İndir" PDF'i doğrudan indirir
+  (boş alan varken kapalı); kalem ikonu otomatik alanların düzeltildiği
+  pencereyi açar, oradan PDF indirilir. Mail bölümü kullanıcı isteğiyle
+  KALDIRILDI (02.10.2026) — geri eklenmez. Veritabanına hiçbir şey yazılmaz.
 - Alan kuralları tek yerde: `lib/sigorta-talimati.ts` (şablon, kullanıcının
   verdiği Word dosyası; IHR-2026-0071 ile birebir doğrulandı). Tarih HER ZAMAN
   bugün (Türkiye saati); Gönderici "UNEX GIDA SAN VE TİC LTD ŞTİ", Malın Cinsi

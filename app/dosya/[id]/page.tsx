@@ -30,6 +30,7 @@ import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
 import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
 import SigortaTalimatiSection from "@/components/sigorta-talimati-section";
+import { EvrakIkonYuvasi, EVRAK_IKON_BUTON_SINIFI } from "@/components/evrak-ikon-yuvasi";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
@@ -387,33 +388,43 @@ function DosyaDetailContent() {
                           <FileCheck size={15} className="shrink-0" style={{ color: TEXT_MUTED }} />
                           <span className="text-sm font-medium text-white truncate">{tanim.baslik}</span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        {/* Sag taraf duzeni SABIT (02.10.2026): [aksiyon butonlari]
+                            [kalem yuvasi] [kopyala yuvasi]. Yuvalar bos olsa da ayni
+                            genislikte durur; Draft/Orijinal tum satirlarda ayni hizada. */}
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
                           ) : tanim.anahtar === "Insurance" ? (
-                            // 10. evrak: Yuk Sigortasi Talimati (talep: 02.10.2026)
-                            <SigortaTalimatiSection dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} sartMetni={orijinalMetin} />
-                          ) : tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url ? (
-                            <a
-                              href={dosya.draft_bl_dosya_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:border-sky-500/50 transition-colors"
-                              title="Draft BL'yi yeni sekmede aç"
-                            >
-                              <ExternalLink size={12} /> Görüntüle
-                            </a>
+                            // 10. evrak: Yuk Sigortasi Talimati (talep: 02.10.2026) - [Indir] [kalem]
+                            <SigortaTalimatiSection dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} />
                           ) : (
-                            <button
-                              onClick={async () => { await navigator.clipboard.writeText(orijinalMetin); }}
-                              title="Metni kopyala"
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg hover:bg-white/10 hover:text-white transition-colors"
-                              style={{ color: TEXT_MUTED }}
-                            >
-                              <Copy size={13} />
-                            </button>
+                            <>
+                              {tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url && (
+                                <a
+                                  href={dosya.draft_bl_dosya_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 hover:border-sky-500/50 transition-colors"
+                                  title="Draft BL'yi yeni sekmede aç"
+                                >
+                                  <ExternalLink size={12} /> Görüntüle
+                                </a>
+                              )}
+                              <EvrakIkonYuvasi />
+                            </>
                           )}
+                          <EvrakIkonYuvasi>
+                            {!tanim.evrakTuru && !(tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url) && (
+                              <button
+                                onClick={async () => { try { await navigator.clipboard.writeText(orijinalMetin); } catch { /* pano izni yok */ } }}
+                                title="Müşterinin evrak şartı metnini kopyala"
+                                className={EVRAK_IKON_BUTON_SINIFI}
+                              >
+                                <Copy size={13} />
+                              </button>
+                            )}
+                          </EvrakIkonYuvasi>
                         </div>
                       </div>
                     );

@@ -46,7 +46,7 @@ export function buildDraftOnayMetni(dosya: Dosya, rezervasyonlar: Rezervasyon[])
 
 /**
  * Musterinin dosyada kayitli e-posta adresini dondurur (ham_veri.alici_email).
- * Diger mail ozelliklerinde (taraflar-card, taslak-evrak-mail-section) de
+ * Diger mail ozelliklerinde (taraflar-card) de
  * ayni kaynak kullanilir.
  */
 export function draftOnayAliciEmailAl(dosya: Dosya): string {

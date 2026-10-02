@@ -329,6 +329,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   yanına doğrudan ikon ekleme (hizayı kaydırır). İhracatlar sayfasındaki
   `show="both"` görünümü ayrı, bu kurala dahil değil.
 
+- Evraklar sekmesindeki "N taslak evrak müşteri onayı bekliyor / Taslakları
+  Müşteriye Gönder" kutusu (`taslak-evrak-mail-section.tsx`) kullanıcı
+  kararıyla KALDIRILDI (02.10.2026): taslaklar müşteriye Draft Onay
+  akışından gidiyor; kutu sadece 4 evrak türünü sayıyor ve CC/paket/48s
+  takibi olmayan ikinci bir yol açıyordu. Geri eklenmez. Sadece okuma
+  yapıyordu; `dosya_evraklari` kayıtları etkilenmedi.
+
 ## Yük Sigortası Talimatı — 10. evrak (02.10.2026)
 
 - Evraklar listesindeki 10. satır ("Insurance Policy", sadece müşterinin

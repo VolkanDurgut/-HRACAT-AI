@@ -25,7 +25,6 @@ import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { indirVgmPdf } from "@/lib/vgm-pdf-builder";
-import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
 import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
 import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
@@ -370,7 +369,6 @@ function DosyaDetailContent() {
               <TaslakOnayButonu dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} />
             </div>
             <div className="p-4 space-y-3">
-              <TaslakEvrakMailSection dosya={dosya} companyId={companyId} />
               {(dosya.sevkiyat_evraklari || []).length > 0 ? (
                 <div className="space-y-2">
                   {EVRAK_SIRASI.map((tanim, i) => {

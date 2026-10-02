@@ -321,7 +321,8 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 ## Evraklar listesi satır düzeni (02.10.2026)
 
 - "İhracat Evrakları" satırlarının sağı SABİT düzende: [aksiyon butonları]
-  [kalem yuvası] [kopyala yuvası] (`components/evrak-ikon-yuvasi.tsx`).
+  [kalem yuvası] (`components/evrak-ikon-yuvasi.tsx`). Kopyala ikonları
+  kullanıcı isteğiyle KALDIRILDI (02.10.2026) — geri eklenmez.
   İkonu olmayan satırda yuva boş ama aynı genişlikte durur; Draft/Orijinal
   butonları tüm satırlarda aynı hizadadır. CI satırındaki ECTN kutusu
   butonların ALTINDA (yanda başlığı kesiyordu). Yeni ikon/buton eklerken bu yuvaları kullan, butonların

@@ -25,7 +25,6 @@ import { buildSigortaTalimatiDosyaAdi } from "@/lib/evrak-dosya-adi";
  * evraklardaki ayar kalemiyle ayni yuvada) otomatik doldurulan alanlarin
  * duzeltildigi pencereyi acar, oradan PDF indirilir. Mail bolumu kullanici
  * istegiyle kaldirildi (02.10.2026). Hicbir sey veritabanina yazilmaz.
- * Satirin kopyala ikonu sayfada (app/dosya/[id]/page.tsx) cizilir.
  */
 
 type Props = {

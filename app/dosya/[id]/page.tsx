@@ -20,7 +20,7 @@ import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, Copy, ExternalLink, FolderOpen } from "lucide-react";
+import { Loader2, Package, FileCheck, ExternalLink, FolderOpen } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -30,7 +30,7 @@ import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
 import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
 import SigortaTalimatiSection from "@/components/sigorta-talimati-section";
-import { EvrakIkonYuvasi, EVRAK_IKON_BUTON_SINIFI } from "@/components/evrak-ikon-yuvasi";
+import { EvrakIkonYuvasi } from "@/components/evrak-ikon-yuvasi";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
@@ -389,8 +389,10 @@ function DosyaDetailContent() {
                           <span className="text-sm font-medium text-white truncate">{tanim.baslik}</span>
                         </div>
                         {/* Sag taraf duzeni SABIT (02.10.2026): [aksiyon butonlari]
-                            [kalem yuvasi] [kopyala yuvasi]. Yuvalar bos olsa da ayni
-                            genislikte durur; Draft/Orijinal tum satirlarda ayni hizada. */}
+                            [kalem yuvasi]. Yuva bos olsa da ayni genislikte durur;
+                            Draft/Orijinal tum satirlarda ayni hizada. Kopyala ikonlari
+                            kullanici istegiyle kaldirildi - geri eklenmez; musterinin
+                            evrak sarti metni satirin title'inda (uzerine gelince). */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
@@ -414,17 +416,6 @@ function DosyaDetailContent() {
                               <EvrakIkonYuvasi />
                             </>
                           )}
-                          <EvrakIkonYuvasi>
-                            {!tanim.evrakTuru && !(tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url) && (
-                              <button
-                                onClick={async () => { try { await navigator.clipboard.writeText(orijinalMetin); } catch { /* pano izni yok */ } }}
-                                title="Müşterinin evrak şartı metnini kopyala"
-                                className={EVRAK_IKON_BUTON_SINIFI}
-                              >
-                                <Copy size={13} />
-                              </button>
-                            )}
-                          </EvrakIkonYuvasi>
                         </div>
                       </div>
                     );

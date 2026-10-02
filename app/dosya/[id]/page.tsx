@@ -29,6 +29,7 @@ import TaslakEvrakMailSection from "@/components/taslak-evrak-mail-section";
 import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
 import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
+import SigortaTalimatiSection from "@/components/sigorta-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
@@ -389,6 +390,9 @@ function DosyaDetailContent() {
                         <div className="flex items-center gap-2 shrink-0">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
+                          ) : tanim.anahtar === "Insurance" ? (
+                            // 10. evrak: Yuk Sigortasi Talimati (talep: 02.10.2026)
+                            <SigortaTalimatiSection dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} sartMetni={orijinalMetin} />
                           ) : tanim.anahtar === "Bill of Lading" && dosya.draft_bl_dosya_url ? (
                             <a
                               href={dosya.draft_bl_dosya_url}

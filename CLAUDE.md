@@ -318,6 +318,28 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   ölçekli grafik kullanılmaz (aylık grafik sadece hacim, konteyner alt yazıda).
 - Birden fazla para birimi varsa kur çevrimi yapılmadığı için sayfada uyarı çıkar.
 
+## Yük Sigortası Talimatı — 10. evrak (02.10.2026)
+
+- Evraklar listesindeki 10. satır ("Insurance Policy", sadece müşterinin
+  `sevkiyat_evraklari` listesinde sigorta varsa görünür):
+  `components/sigorta-talimati-section.tsx`. Fatura Talimatı gibi çalışır:
+  "İndir" PDF'i doğrudan indirir (boş alan varken kapalı), "Talimat"
+  penceresinde otomatik alanlar düzeltilip PDF indirilir / mailto açılır.
+  Veritabanına HİÇBİR şey yazılmaz; son kullanılan Kime/CC sadece tarayıcıda
+  (`localStorage` `sigorta-talimati-alicilari-v1`).
+- Alan kuralları tek yerde: `lib/sigorta-talimati.ts` (şablon, kullanıcının
+  verdiği Word dosyası; IHR-2026-0071 ile birebir doğrulandı). Tarih HER ZAMAN
+  bugün (Türkiye saati); Gönderici "UNEX GIDA SAN VE TİC LTD ŞTİ", Malın Cinsi
+  "BUĞDAY UNU", Taşıma Şekli "KONTEYNER / GEMİ" SABİT. Acente "DRAFT/HAPAG"
+  gibi ise hat kısmı alınır (HAPAG → HAPAG-LLOYD, CMA → CMA CGM). Ambalaj
+  satırı detaylı ambalajın Türkçesi ("PIECES OF … PP BAGS+KRAFT" → "ADET …
+  PP+KRAFT ÇUVAL").
+- Butonlar Fatura Talimatı ile aynı koşulda açılır: rezervasyon var ve
+  konteynerler tamamlanmış.
+- PDF `lib/sigorta-talimati-pdf-builder.ts` (jsPDF, vektör, Roboto TR) —
+  TÜRKÇE içerikli tek PDF; "PDF içerikleri İngilizce" kuralının bilinçli
+  istisnası. Dosya adı `10- SIGORTA TALIMATI- <booking>- <proforma>.pdf`.
+
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon

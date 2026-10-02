@@ -43,3 +43,18 @@ export function buildEvrakPdfDosyaAdi(
   const proformaNo = guvenliParca(dosya.proforma_no, "PROFORMA");
   return `${durumOneki}- ${siraNo}- ${kisaKod}- ${bookingNo}- ${proformaNo}.pdf`;
 }
+
+/**
+ * Yuk Sigortasi Talimati (Evraklar listesinde 10. evrak, talep: 02.10.2026)
+ * PDF dosya adi - ayni "<siraNo>- <KOD>- <booking>- <proforma>" duzeni,
+ * taslak/orijinal ayrimi olmadigi icin durum oneki yok.
+ * Ornek: "10- SIGORTA TALIMATI- BOOKING123- PRO456.pdf"
+ */
+export function buildSigortaTalimatiDosyaAdi(
+  dosya: { proforma_no: string | null },
+  rezervasyonlar: { booking_no: string | null }[]
+): string {
+  const bookingNo = guvenliParca(rezervasyonlar[0]?.booking_no, "BOOKING");
+  const proformaNo = guvenliParca(dosya.proforma_no, "PROFORMA");
+  return `10- SIGORTA TALIMATI- ${bookingNo}- ${proformaNo}.pdf`;
+}

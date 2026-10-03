@@ -19,7 +19,7 @@ const TURKCE_ADLAR: Record<string, string> = {
   CIBUTI: "DJIBOUTI",
 };
 
-function sadelestir(metin: string): string {
+export function sadelestir(metin: string): string {
   return metin
     .toLocaleUpperCase("tr-TR")
     .replace(/İ/g, "I")

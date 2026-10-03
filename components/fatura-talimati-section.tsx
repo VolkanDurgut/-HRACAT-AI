@@ -7,6 +7,7 @@ import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 type Props = {
   dosyaId: string;
@@ -53,7 +54,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       : 0;
     const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
     const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
-    const toplamMiktar = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+    const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
     const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
     const urunSatirlari = urunler.map((u: any) => {
       const ad = u.urun_adi || u.description || "Urun";

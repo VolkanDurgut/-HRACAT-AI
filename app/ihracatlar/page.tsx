@@ -12,10 +12,11 @@ import { CokluNoKisa, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
-import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2, FileText } from "lucide-react";
+import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2, FileText, CheckCircle2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 type AnaSiparisWithProgress = AnaSiparis & { gonderilmisMts: number; dosyaSayisi: number };
@@ -32,6 +33,8 @@ export default function IhracatlarPage() {
   const [search, setSearch] = useState("");
   const [selectedDosya, setSelectedDosya] = useState<DosyaWithRelations | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
+  const [tamamlanacak, setTamamlanacak] = useState<AnaSiparisWithProgress | null>(null);
+  const [tamamlaniyor, setTamamlaniyor] = useState(false);
 
   const SAYFA_BOYUTU = 50;
   const [dahaFazlaVar, setDahaFazlaVar] = useState(true);
@@ -153,7 +156,7 @@ export default function IhracatlarPage() {
       const dosyalariBuSiparise = (bagliDosyalar || []).filter((d: any) => d.ana_siparis_id === s.id);
       const gonderilmisMts = dosyalariBuSiparise.reduce((sum: number, d: any) => {
         const urunler = d.urun_detaylari || [];
-        const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+        const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + kalemMiktari(u), 0);
 
         // Dosya kapatilmissa, o partinin tamami gonderilmis sayilir - DBA
         // belgesi yuklenmis olsun ya da olmasin. "Kapali" durumu, sevkiyatin
@@ -172,7 +175,8 @@ export default function IhracatlarPage() {
       return { ...s, gonderilmisMts, dosyaSayisi: dosyalariBuSiparise.length };
     });
 
-    const acikOlanlar = withProgress.filter((s) => (s.toplam_mts || 0) - s.gonderilmisMts > 0.01);
+    // Elle tamamlanan siparis (03.10.2026) kalan miktardan bagimsiz listeden duser.
+    const acikOlanlar = withProgress.filter((s) => !s.tamamlandi && (s.toplam_mts || 0) - s.gonderilmisMts > 0.01);
     setAcikSiparisler(acikOlanlar);
     setSiparisLoading(false);
   }, [user?.id, companyId]);
@@ -210,7 +214,7 @@ export default function IhracatlarPage() {
       for (const u of urunler) {
         const ad = String(u.urun_adi || u.description || "").trim();
         if (!ad) continue;
-        const miktar = parseFloat(String(u.miktar_mts || u.quantity || 0)) || 0;
+        const miktar = kalemMiktari(u) || 0;
         sevkEdilmis.set(ad, (sevkEdilmis.get(ad) || 0) + miktar);
       }
     }
@@ -219,7 +223,7 @@ export default function IhracatlarPage() {
     for (const m of master) {
       const ad = String(m.urun_adi || m.description || "").trim();
       if (!ad) continue;
-      const masterMiktar = parseFloat(String(m.miktar_mts || m.quantity || 0)) || 0;
+      const masterMiktar = kalemMiktari(m) || 0;
       const zatenSevkEdilmis = sevkEdilmis.get(ad) || 0;
       const kalanMiktar = masterMiktar - zatenSevkEdilmis;
       if (kalanMiktar <= 0.01) continue; // Bu urun tamamen sevk edilmis, satira dahil etme
@@ -305,6 +309,29 @@ export default function IhracatlarPage() {
     }
   };
 
+  // "Siparisi Tamamla" (talep: 03.10.2026): kucuk sevk farklari yuzunden bitmis
+  // siparisler listede kaliyordu. Kayit SILINMEZ; sadece tamamlandi isaretlenir.
+  const handleSiparisiTamamla = async () => {
+    const siparis = tamamlanacak;
+    if (!siparis || !companyId) return;
+    setTamamlaniyor(true);
+    const { data, error } = await supabase
+      .from("ana_siparisler")
+      .update({ tamamlandi: true, tamamlanma_tarihi: new Date().toISOString(), tamamlayan: user?.email || null })
+      .eq("id", siparis.id)
+      .eq("company_id", companyId)
+      .select("id");
+    setTamamlaniyor(false);
+    setTamamlanacak(null);
+    const hata = yazmaHatasi(error, data);
+    if (hata) {
+      showToast(`Sipariş tamamlanamadı: ${hata}`, "error");
+      return;
+    }
+    showToast(`${siparis.proforma_no} siparişi tamamlandı.`, "success");
+    fetchAcikSiparisler();
+  };
+
   const filteredDosyalar = useMemo(() => {
     return aramaSonuclari !== null ? aramaSonuclari : dosyalar;
   }, [dosyalar, aramaSonuclari]);
@@ -359,7 +386,7 @@ export default function IhracatlarPage() {
       return urunler.map((u) => u.urun_adi || u.description || "-").join(", ");
     }
     if (alan === "miktar_mts") {
-      const toplam = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+      const toplam = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
       return toplam > 0 ? `${toplam.toLocaleString("tr-TR")} MTS` : "—";
     }
     return urunler.map((u) => formatCurrency(parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0)), dosya.para_birimi)).join(", ");
@@ -376,6 +403,20 @@ export default function IhracatlarPage() {
         cancelLabel="Hayır"
         onConfirm={handleDelete}
         destructive
+      />
+
+      <ConfirmDialog
+        open={tamamlanacak !== null}
+        onOpenChange={(open) => { if (!open && !tamamlaniyor) setTamamlanacak(null); }}
+        title="Sipariş tamamlansın mı?"
+        description={tamamlanacak
+          ? `${tamamlanacak.proforma_no} (${tamamlanacak.alici_firma || "—"}) siparişi tamamlandı olarak işaretlenecek ve Devam Eden Siparişler listesinden kalkacak. Kalan ${Math.max(0, (tamamlanacak.toplam_mts || 0) - tamamlanacak.gonderilmisMts).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS sevk edilmemiş sayılacak. Dosyalar ve sipariş kaydı silinmez.`
+          : ""}
+        confirmLabel="Evet, Tamamla"
+        cancelLabel="Vazgeç"
+        onConfirm={handleSiparisiTamamla}
+        loading={tamamlaniyor}
+        loadingLabel="Kaydediliyor..."
       />
 
       <SayfaBasligi
@@ -403,15 +444,25 @@ export default function IhracatlarPage() {
                     <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.alici_firma}</p>
                     <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.urun_tanimi}</p>
                   </div>
-                  <button
-                    onClick={() => handleSipariseDevamEt(s)}
-                    disabled={devamEdiyor === s.id}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap transition-all hover:opacity-90 disabled:opacity-50"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    {devamEdiyor === s.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
-                    Siparişe Devam Et
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setTamamlanacak(s)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border whitespace-nowrap transition-colors hover:bg-white/5 hover:text-white"
+                      style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                      title="Kalan miktar sevk edilmeyecekse siparişi kapatır (kayıt silinmez)"
+                    >
+                      <CheckCircle2 size={13} /> Siparişi Tamamla
+                    </button>
+                    <button
+                      onClick={() => handleSipariseDevamEt(s)}
+                      disabled={devamEdiyor === s.id}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap transition-all hover:opacity-90 disabled:opacity-50"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      {devamEdiyor === s.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                      Siparişe Devam Et
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-2">
                   <div>
@@ -420,11 +471,11 @@ export default function IhracatlarPage() {
                   </div>
                   <div>
                     <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Gönderilmiş</p>
-                    <p className="text-sm font-bold text-green-400">{s.gonderilmisMts.toLocaleString("tr-TR")} MTS</p>
+                    <p className="text-sm font-bold text-green-400">{s.gonderilmisMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-amber-500">Kalan</p>
-                    <p className="text-sm font-bold text-amber-400">{kalan.toLocaleString("tr-TR")} MTS</p>
+                    <p className="text-sm font-bold text-amber-400">{kalan.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS</p>
                   </div>
                 </div>
                 <div className="w-full rounded-full h-1.5" style={{ backgroundColor: CARD_BORDER }}>

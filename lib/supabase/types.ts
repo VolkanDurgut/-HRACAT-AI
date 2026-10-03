@@ -183,6 +183,11 @@ export type AnaSiparis = {
   urun_detaylari_master: UrunDetay[] | null;
   olusturma_tarihi: string | null;
   created_by: string | null;
+  // "Siparisi Tamamla" (03.10.2026, migration 20261003130000): true ise
+  // siparis Devam Eden Siparisler listesinden duser; kayit silinmez.
+  tamamlandi: boolean | null;
+  tamamlanma_tarihi: string | null;
+  tamamlayan: string | null;
 };
 
 export type SurecTakibi = {

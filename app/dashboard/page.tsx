@@ -13,6 +13,7 @@ import { Ship, FileText, CheckCircle2, AlertTriangle, Clock, Package, TrendingUp
 import InfoTooltip from "@/components/info-tooltip";
 import { EmptyState } from "@/components/empty-state";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 
 type DosyaDurum = {
@@ -186,7 +187,7 @@ export default function DashboardPage() {
                 <ul className="mt-1.5 space-y-1.5">
                   {aciklar.filter(d => d.rezervasyonlar.length === 0).map(({ dosya }) => {
                     const urunler = (dosya.urun_detaylari as any[]) || [];
-                    const toplamMts = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+                    const toplamMts = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
                     return (
                       <li key={dosya.id} className="text-slate-300">
                         <span className="font-medium text-white">{dosya.alici_firma || "Firma belirtilmemiş"}</span>

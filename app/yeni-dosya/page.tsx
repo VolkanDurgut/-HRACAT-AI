@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
@@ -12,6 +12,8 @@ import AppShell from "@/components/app-shell";
 import AcenteTeklifSection from "@/components/acente-teklif-section";
 import { Upload, FileText, Check, Loader2, Package, AlertCircle, FolderPlus } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
+import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
 
@@ -38,6 +40,11 @@ export default function YeniDosyaPage() {
   const [loading, setLoading] = useState(false);
   const [dosyaId, setDosyaId] = useState<string | null>(null);
   const [proformData, setProformData] = useState<any | null>(null);
+  // Varis limani duzeltme notu (03.10.2026, bkz. varisLimaniniDogrula)
+  const [varisLimaniNotu, setVarisLimaniNotuState] = useState<string | null>(null);
+  // Ayni tik icinde createDosya cagrildiginda guncel notu okuyabilmek icin ref
+  const varisLimaniNotuRef = useRef<string | null>(null);
+  const setVarisLimaniNotu = (not: string | null) => { varisLimaniNotuRef.current = not; setVarisLimaniNotuState(not); };
 
   // Ana siparis state'leri
   const [mevcutAnaSiparis, setMevcutAnaSiparis] = useState<AnaSiparis | null>(null);
@@ -77,7 +84,7 @@ export default function YeniDosyaPage() {
 
   const getProformaMts = (extracted: any): number => {
     if (extracted.urun_detaylari && extracted.urun_detaylari.length > 0) {
-      return extracted.urun_detaylari.reduce((s: number, u: any) => s + parseFloat(String(u.quantity || u.miktar_mts || 0)), 0);
+      return extracted.urun_detaylari.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
     }
     return parseFloat(String(extracted.toplam_miktar || extracted.miktar || 0));
   };
@@ -114,6 +121,7 @@ export default function YeniDosyaPage() {
         throw new Error("PDF okunamadı.");
       }
 
+      extracted = await varisLimaniniDogrula(extracted);
       setProformData(extracted);
 
       // Ayni proforma_no'ya sahip ve AYNI ŞİRKETE ait bir ana siparis var mi kontrol et
@@ -142,7 +150,7 @@ export default function YeniDosyaPage() {
 
           const toplamGonderilmis = (bagliDosyalar || []).reduce((s: number, d: any) => {
             const urunler = d.urun_detaylari || [];
-            const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+            const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + kalemMiktari(u), 0);
 
             // Dosya kapatilmissa, o partinin tamami gonderilmis sayilir - DBA
             // belgesi yuklenmis olsun ya da olmasin. "Kapali" durumu, sevkiyatin
@@ -181,6 +189,47 @@ export default function YeniDosyaPage() {
       setStep("upload");
       setLoading(false);
     }
+  };
+
+  /**
+   * Varis limani dogrulamasi (kural: 03.10.2026 - "Varis limani yukleme limani
+   * ile ayni olamaz"). FOB proformada "FOB Ambarli Port" gibi yazan liman
+   * YUKLEME limanidir; okuma bunu varis limanina yazabiliyor (IHR-2026-0076).
+   * Varis limani bos / yukleme limaniyla ayni / bir Turkiye limaniysa:
+   *  - Turkiye limani ve yukleme limani bossa, o deger yukleme limanina tasinir
+   *  - ayni musterinin (alici_firma) en son GECERLI varis limani kullanilir
+   *  - bulunamazsa bos birakilir; her durumda kullaniciya uyari gosterilir
+   */
+  const varisLimaniniDogrula = async (extracted: any) => {
+    setVarisLimaniNotu(null);
+    const yukleme = extracted.yuklenme_limani || extracted.yukleme_limani || "";
+    const sorun = varisLimaniSorunu(extracted.varis_limani, [yukleme]);
+    if (!sorun) return extracted;
+    const duzeltilmis = { ...extracted };
+    const okunan = (extracted.varis_limani || "").trim();
+    if (okunan && !yukleme && turkiyeLimaniMi(okunan)) duzeltilmis.yuklenme_limani = okunan;
+    let onceki: { varis_limani: string | null; yuklenme_limani: string | null; dosya_no: string } | undefined;
+    if (extracted.alici_firma && companyId) {
+      const { data } = await supabase
+        .from("ihracat_dosyalari")
+        .select("dosya_no, varis_limani, yuklenme_limani")
+        .eq("company_id", companyId)
+        .ilike("alici_firma", String(extracted.alici_firma).trim())
+        .order("olusturma_tarihi", { ascending: false })
+        .limit(20);
+      onceki = (data || []).find((d: any) => !varisLimaniSorunu(d.varis_limani, [d.yuklenme_limani, duzeltilmis.yuklenme_limani]));
+    }
+    const sebep = VARIS_LIMANI_SORUN_METNI[sorun];
+    // Denetim izi: proformadan okunan ham deger ham_veri'de saklanir
+    duzeltilmis.varis_limani_duzeltme = { okunan: okunan || null, sorun, kaynak_dosya: onceki?.dosya_no || null };
+    if (onceki?.varis_limani) {
+      duzeltilmis.varis_limani = onceki.varis_limani;
+      setVarisLimaniNotu(`${sebep} Proformadan okunan "${okunan || "—"}" yerine müşterinin önceki dosyasındaki (${onceki.dosya_no}) varış limanı "${onceki.varis_limani}" yazıldı. Lütfen Lojistik kartından kontrol edin.`);
+    } else {
+      duzeltilmis.varis_limani = null;
+      setVarisLimaniNotu(`${sebep} Proformadan okunan "${okunan || "—"}" kullanılmadı ve müşterinin önceki dosyası bulunamadı. Varış limanını dosyadaki Lojistik kartından girin.`);
+    }
+    return duzeltilmis;
   };
 
   const createDosya = async (extracted: any, anaSiparisId: string | null) => {
@@ -273,6 +322,7 @@ export default function YeniDosyaPage() {
 
       setStep("success");
       showToast("Dosya oluşturuldu!", "success");
+      if (varisLimaniNotuRef.current) showToast(varisLimaniNotuRef.current, "error");
       setTimeout(() => setStep("reservation_choice"), 1500);
     } catch {
       setError("Dosya oluşturulurken hata oluştu. Lütfen tekrar deneyin.");
@@ -539,8 +589,11 @@ export default function YeniDosyaPage() {
 
               <div className="rounded-xl border shadow-sm p-6 space-y-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-sm" style={{ color: "white" }}>Lojistik</h3>
+                {varisLimaniNotu && (
+                  <p className="text-xs rounded-lg border px-3 py-2" style={{ color: "#FCD34D", borderColor: "rgba(245,158,11,0.3)", backgroundColor: "rgba(245,158,11,0.08)" }}>{varisLimaniNotu}</p>
+                )}
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Varış Limanı</p><p className="font-medium text-white">{proformData.varis_limani}</p></div>
+                  <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Varış Limanı</p><p className="font-medium text-white">{proformData.varis_limani || "—"}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Yükleme Limanı</p><p className="font-medium text-white">{proformData.yuklenme_limani || proformData.yukleme_limani}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Teslim Şekli</p><p className="font-medium text-white">{proformData.teslim_sekli}</p></div>
                   <div><p className="text-xs" style={{ color: TEXT_MUTED }}>Ödeme Şekli</p><p className="font-medium text-white">{proformData.odeme_sekli}</p></div>

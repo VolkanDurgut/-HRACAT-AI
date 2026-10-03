@@ -9,6 +9,7 @@ import { formatDateTR, formatCurrency } from "@/lib/cutoff-utils";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 type Props = {
   dosya: Dosya;
@@ -34,7 +35,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const navlunBekleniyor = !!(navlunBirimFiyati || lokalMasrafBirimFiyati) && konteynerAdedi === 0;
 
   // Toplam miktar ve toplam CIF hesapla
-  const toplamMiktar = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+  const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
   const toplamCif = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
 
   // Navlun + Lokal Masraf payi (MTS basina)

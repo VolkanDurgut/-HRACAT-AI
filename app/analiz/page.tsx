@@ -7,11 +7,13 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { limanAnahtari } from "@/lib/liman-anahtari";
+import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
 import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck, BarChart3, Anchor, AlertTriangle } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -60,6 +62,18 @@ function konteynerSayisi(d: DosyaFull): number {
   return d.konteynerler.length;
 }
 
+/**
+ * Liman listeleri icin varis limani anahtari. Varis limani yukleme limaniyla
+ * ayni ya da bir Turkiye limaniysa (FOB proformada yukleme limaninin varis
+ * limanina okunmasi - IHR-2026-0076 "AMBARLI") liman bazli listelere GIRMEZ
+ * (kural: 03.10.2026, bkz. lib/varis-limani-kontrol.ts).
+ */
+function analizLimani(d: DosyaFull): string | null {
+  const sorun = varisLimaniSorunu(d.varis_limani, [d.yuklenme_limani, ...d.rezervasyonlar.map((r) => r.yuklenme_limani)]);
+  if (sorun) return null;
+  return limanAnahtari(d.varis_limani);
+}
+
 function sevkiyatTarihi(d: DosyaFull): string | null {
   const etdler = d.rezervasyonlar.map((r) => r.gemi_kalkis_tarihi).filter((t): t is string => !!t).sort();
   return etdler[0] || d.olusturma_tarihi || null;
@@ -67,7 +81,7 @@ function sevkiyatTarihi(d: DosyaFull): string | null {
 
 function dosyaMts(d: Dosya): number {
   const urunler = (d.urun_detaylari as any[]) || [];
-  return urunler.reduce((t: number, u: any) => t + (parseFloat(String(u.miktar_mts || u.quantity || 0)) || 0), 0);
+  return urunler.reduce((t: number, u: any) => t + (kalemMiktari(u) || 0), 0);
 }
 
 /** "M/V TOR", "MV TOR ", "m/v tor" -> "TOR" (sadece gruplama icin). */
@@ -291,7 +305,7 @@ export default function AnalizPage() {
   const limanlar = useMemo(() => {
     const s: Record<string, { tutar: number; konteyner: number; adet: number; mts: number; yazimlar: Set<string>; teslim: Set<string> }> = {};
     filtrelenmis.forEach((d) => {
-      const anahtar = limanAnahtari(d.varis_limani); if (!anahtar) return;
+      const anahtar = analizLimani(d); if (!anahtar) return;
       if (!s[anahtar]) s[anahtar] = { tutar: 0, konteyner: 0, adet: 0, mts: 0, yazimlar: new Set(), teslim: new Set() };
       s[anahtar].tutar += d.toplam_tutar || 0;
       s[anahtar].konteyner += konteynerSayisi(d);
@@ -359,7 +373,7 @@ export default function AnalizPage() {
   const transitSatirlari = useMemo<ListeSatiri[]>(() => {
     const s: Record<string, { toplam: number; adet: number; enAz: number; enCok: number }> = {};
     filtrelenmis.forEach((d) => {
-      const liman = limanAnahtari(d.varis_limani); if (!liman) return;
+      const liman = analizLimani(d); if (!liman) return;
       d.rezervasyonlar.forEach((r) => {
         if (!r.gemi_kalkis_tarihi || !r.eta) return;
         const gun = Math.round((new Date(r.eta).getTime() - new Date(r.gemi_kalkis_tarihi).getTime()) / GUN_MS);

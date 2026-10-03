@@ -5,6 +5,7 @@ import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -153,7 +154,7 @@ function ciz(
 
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---
   const urunler = (dosya.urun_detaylari as any[]) || [];
-  const toplamMiktar = urunler.reduce((s, u) => s + parseFloat(String(u.miktar_mts || u.quantity || 0)), 0);
+  const toplamMiktar = urunler.reduce((s, u) => s + kalemMiktari(u), 0);
   // toplamCif/toplamFob yukarida hesaplaFobFreightCifToplamlari'ndan geldi -
   // burada sadece TABLODAKI HER SATIRIN kendi FOB birim fiyatini bulmak icin
   // ayni "dusulecek" mantigi tekrar kuruluyor (bu kisim urun bazli oldugu

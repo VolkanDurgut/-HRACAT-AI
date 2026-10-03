@@ -365,6 +365,30 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   TÜRKÇE içerikli tek PDF; "PDF içerikleri İngilizce" kuralının bilinçli
   istisnası. Dosya adı `10- SIGORTA TALIMATI- <booking>- <proforma>.pdf`.
 
+## Sayılar ve varış limanı kuralları (03.10.2026)
+
+- Ürün kalemi miktarları `lib/sayi-oku.ts` (`sayiOku`, `kalemMiktari`) ile
+  okunur. `parseFloat("252,45")` 252 verdiği için ESFIRA siparişinde
+  "Kalan 3,35 MTS" görünüyordu (doğrusu 2,90). Yeni kodda miktar okurken
+  `parseFloat(String(u.miktar_mts ...))` YAZMA, bu fonksiyonları kullan.
+- Devam Eden Siparişler'de "Siparişi Tamamla" butonu (onay penceresiyle):
+  `ana_siparisler.tamamlandi / tamamlanma_tarihi / tamamlayan` (migration
+  `20261003130000_ana_siparis_tamamlama.sql`, canlıya UYGULANDI 03.10.2026).
+  Kayıt ve dosyalar silinmez; sadece listeden düşer.
+- Varış limanı kuralı (kullanıcı: "varış limanı yükleme limanı ile aynı
+  olamaz"): `lib/varis-limani-kontrol.ts`. Boş / yükleme limanıyla aynı /
+  Türkiye limanı ise geçersiz.
+  - Yeni dosya: geçersizse aynı müşterinin son GEÇERLİ varış limanı yazılır,
+    yoksa boş bırakılır; kullanıcıya sarı uyarı + toast. Okunan ham değer
+    `ham_veri.varis_limani_duzeltme` içinde saklanır.
+  - Lojistik kartı: geçersiz varış limanı KAYDEDİLMEZ (boş bırakmaya izin var).
+  - Analiz: geçersiz kayıt liman listelerine girmez.
+- Veri düzeltmesi: IHR-2026-0076 (ESMAAGRIC, FOB) varış limanı "Ambarlı
+  Port" → "Mariel Port, Cuba" (kullanıcı onayı, 03.10.2026). Proforma
+  "FOB Ambarlı" yazdığı için yükleme limanı varışa okunmuştu.
+- Proforma okuma (edge function `proforma-oku`) talimatı DEĞİŞTİRİLMEDİ;
+  koruma uygulama tarafında.
+
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon

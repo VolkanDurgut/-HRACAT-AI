@@ -5,6 +5,7 @@ import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
 import { Pencil, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { varisLimaniSorunu, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 
 type Props = {
   dosya: Dosya;
@@ -51,6 +52,15 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
   };
 
   const handleSave = async () => {
+    // Varis limani yukleme limaniyla ayni / bir Turkiye limani olamaz
+    // (kural: 03.10.2026, bkz. lib/varis-limani-kontrol.ts). Bos birakmaya izin var.
+    if (form.varis_limani.trim()) {
+      const sorun = varisLimaniSorunu(form.varis_limani, [form.yuklenme_limani, dosya.yuklenme_limani, rezervasyonlar[0]?.yuklenme_limani]);
+      if (sorun) {
+        showToast(`${VARIS_LIMANI_SORUN_METNI[sorun]} Lütfen müşterinin varış limanını girin.`, "error");
+        return;
+      }
+    }
     setSaving(true);
     const guncelHamVeri = { ...(dosya.ham_veri as any || {}), sevkiyat_suresi: form.sevkiyat_suresi || null };
     const payload = {

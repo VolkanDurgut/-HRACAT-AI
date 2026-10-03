@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Trash2, Plus, Package, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -156,7 +157,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
   const urunDetaylari = masterUrunler.map((u: any) => {
     const urunAdi = u.urun_adi || u.description || "";
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "";
-    const urunToplamMts = parseFloat(String(u.miktar_mts || u.quantity || 0));
+    const urunToplamMts = kalemMiktari(u);
     const birimFiyat = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
     const buPartiMts = urunToplamMts * oran;
     const buPartiTutar = buPartiMts * birimFiyat;

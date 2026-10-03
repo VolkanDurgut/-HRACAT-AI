@@ -6,6 +6,7 @@ import { CopyableField } from "@/components/copyable-field";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { Pencil, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { sayiOku } from "@/lib/sayi-oku";
 
 type Props = {
   dosya: Dosya;
@@ -41,10 +42,10 @@ export default function OdemeCard({ dosya, onRefresh, companyId }: Props) {
 
   const handleSave = async () => {
     setSaving(true);
-    const avansSayi = form.avans_tutari.trim() === "" ? null : parseFloat(form.avans_tutari.replace(",", "."));
+    const avansSayi = form.avans_tutari.trim() === "" ? null : sayiOku(form.avans_tutari);
     const guncelHamVeri = { ...(dosya.ham_veri as any || {}), avans_tutari: avansSayi };
     const payload = {
-      toplam_tutar: form.toplam_tutar.trim() === "" ? null : parseFloat(form.toplam_tutar.replace(",", ".")),
+      toplam_tutar: form.toplam_tutar.trim() === "" ? null : sayiOku(form.toplam_tutar),
       odeme_sekli: form.odeme_sekli || null,
       ham_veri: guncelHamVeri,
     };

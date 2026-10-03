@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Trash2, Plus, Package, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
-import { kalemMiktari } from "@/lib/sayi-oku";
+import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -62,18 +62,22 @@ const buildFormFromRez = (rez: Rezervasyon, dosya: Dosya) => ({
   lokal_masraf_tutari: dosya.lokal_masraf_tutari?.toString() || "",
 });
 
+// Bas/son bosluklar kirpilir (03.10.2026): " YM WREATH", "KUMPORT " gibi
+// degerler evraklara aynen basiliyor ve analizde ayri kayit gibi sayiliyordu.
+const kirp = (v: string | null | undefined) => (v || "").trim();
+
 function buildPayload(form: typeof emptyForm) {
   return {
-    booking_no: form.booking_no,
-    gemi_adi: form.gemi_adi || null,
-    sefer_no: form.sefer_no || null,
-    acente_ismi: form.acente_ismi || null,
+    booking_no: kirp(form.booking_no),
+    gemi_adi: kirp(form.gemi_adi) || null,
+    sefer_no: kirp(form.sefer_no) || null,
+    acente_ismi: kirp(form.acente_ismi) || null,
     gemi_kalkis_tarihi: form.gemi_kalkis_tarihi || null,
     talimat_cutoff: form.talimat_cutoff ? `${form.talimat_cutoff}T${form.talimat_cutoff_saat || "00:00"}:00` : null,
     beyanname_cutoff: form.beyanname_cutoff ? `${form.beyanname_cutoff}T${form.beyanname_cutoff_saat || "00:00"}:00` : null,
     ekipman_alim_yeri: form.ekipman_alim_yeri || null,
     ekipman_alim_tarihi: form.ekipman_alim_tarihi || null,
-    yuklenme_limani: form.yuklenme_limani || null,
+    yuklenme_limani: kirp(form.yuklenme_limani) || null,
     konteyner_adedi: form.konteyner_adedi,
     ardiyesiz_giris: form.ardiyesiz_giris || null,
   };
@@ -81,8 +85,9 @@ function buildPayload(form: typeof emptyForm) {
 
 function buildDosyaPayload(form: typeof emptyForm) {
   return {
-    navlun_tutari: form.navlun_tutari ? parseFloat(form.navlun_tutari) : null,
-    lokal_masraf_tutari: form.lokal_masraf_tutari ? parseFloat(form.lokal_masraf_tutari) : null,
+    // "1250,50" eskiden 1250 kaydediliyordu (parseFloat virgulde durur) - 03.10.2026
+    navlun_tutari: form.navlun_tutari.trim() ? sayiOku(form.navlun_tutari) : null,
+    lokal_masraf_tutari: form.lokal_masraf_tutari.trim() ? sayiOku(form.lokal_masraf_tutari) : null,
   };
 }
 
@@ -90,12 +95,12 @@ function buildDosyaPayload(form: typeof emptyForm) {
 function validateForm(form: typeof emptyForm): Record<string, string> {
   const e: Record<string, string> = {};
   const zorunlu = "Zorunlu alan";
-  if (!form.booking_no) e.booking_no = zorunlu;
+  if (!form.booking_no.trim()) e.booking_no = zorunlu;
   else if (form.booking_no.length > 50) e.booking_no = "Maksimum 50 karakter";
-  if (!form.gemi_adi) e.gemi_adi = zorunlu;
-  if (!form.sefer_no) e.sefer_no = zorunlu;
-  if (!form.acente_ismi) e.acente_ismi = zorunlu;
-  if (!form.yuklenme_limani) e.yuklenme_limani = zorunlu;
+  if (!form.gemi_adi.trim()) e.gemi_adi = zorunlu;
+  if (!form.sefer_no.trim()) e.sefer_no = zorunlu;
+  if (!form.acente_ismi.trim()) e.acente_ismi = zorunlu;
+  if (!form.yuklenme_limani.trim()) e.yuklenme_limani = zorunlu;
   if (!form.konteyner_adedi || form.konteyner_adedi <= 0) e.konteyner_adedi = zorunlu;
   if (!form.gemi_kalkis_tarihi) e.gemi_kalkis_tarihi = zorunlu;
   if (!form.talimat_cutoff) e.talimat_cutoff = zorunlu;

@@ -392,6 +392,25 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Proforma okuma (edge function `proforma-oku`) talimatı DEĞİŞTİRİLMEDİ;
   koruma uygulama tarafında.
 
+## Veritabanı genel kontrolü (03.10.2026)
+
+- `public.nextval(text)` sarmalayıcısı anon anahtarıyla RPC'den çağrılabiliyordu
+  → anon/authenticated/public EXECUTE kaldırıldı, anon'un `ihracat_dosya_sira`
+  USAGE yetkisi kaldırıldı. ÖNEMLİ DERS: `auto_dosya_no` tetikleyicisindeki
+  `nextval('ihracat_dosya_sira')` bu sarmalayıcıya çözümleniyordu (bilinmeyen
+  tipli literal → text tercih edilir; `EXPLAIN VERBOSE` ile görüldü). Tetikleyici
+  artık `pg_catalog.nextval('public.ihracat_dosya_sira'::regclass)` kullanır.
+  Bir fonksiyonun yetkisini kaldırmadan ÖNCE aynı adlı çağrıların hangi
+  fonksiyona çözümlendiğini `EXPLAIN VERBOSE` ile kontrol et.
+  (Migration `20261003150000`; canlıda ilk denemede ~1 dk dosya oluşturma
+  kapalı kaldı, o sürede dosya açılmadı; authenticated ile geri alınan test
+  insert'i doğrulandı, sıra 89'a geri alındı.)
+- Rezervasyonlarda baş/son boşluklu 5 kayıt temizlendi; rezervasyon kaydı
+  artık metin alanlarını kırpar. Navlun/lokal masraf ve ödeme kartındaki
+  tutarlar `sayiOku` ile okunur ("1250,50" artık 1250 değil).
+- Bilerek bırakılanlar: performans uyarıları (19 dosyada etkisiz), depoda
+  hiçbir kayda bağlı olmayan ~35 MB PDF (silme kullanıcı kararı bekliyor).
+
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon

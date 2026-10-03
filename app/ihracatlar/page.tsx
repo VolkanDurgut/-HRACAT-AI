@@ -276,7 +276,8 @@ export default function IhracatlarPage() {
           varis_limani: ornekDosya?.varis_limani || null,
           teslim_sekli: ornekDosya?.teslim_sekli || null,
           ambalaj: ornekDosya?.ambalaj || null,
-          ham_veri: ornekDosya?.ham_veri || null,
+          // Ilk dosyanin varis limani duzeltme notu yeni dosyaya tasinmaz (03.10.2026)
+          ham_veri: ornekDosya?.ham_veri ? (({ varis_limani_duzeltme: _atla, ...kalan }) => kalan)(ornekDosya.ham_veri as Record<string, unknown>) : null,
           marka: ornekDosya?.marka || null,
           sevkiyat_evraklari: ornekDosya?.sevkiyat_evraklari || SEVKIYAT_EVRAKLARI,
           alici_adresi: ornekDosya?.alici_adresi || null,

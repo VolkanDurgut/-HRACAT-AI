@@ -13,11 +13,12 @@
  */
 import { limanAnahtari, sadelestir } from "@/lib/liman-anahtari";
 
-/** Turkiye limanlari / terminalleri (sadelestirilmis, buyuk harf). */
+/** Turkiye limanlari / terminalleri (sadelestirilmis, buyuk harf). YILPORT
+ * bilerek YOK: yurt disinda da terminalleri var (Leixoes, Gavle, Taranto...). */
 const TURKIYE_LIMANLARI = [
   "AMBARLI", "MARPORT", "KUMPORT", "MARDAS", "HAYDARPASA", "ISTANBUL",
   "MERSIN", "IZMIR", "ALIAGA", "NEMPORT", "GEMLIK", "BORUSAN", "TEKIRDAG",
-  "ASYAPORT", "ASYA PORT", "MARTAS", "AKPORT", "DERINCE", "EVYAP", "YILPORT",
+  "ASYAPORT", "ASYA PORT", "MARTAS", "AKPORT", "DERINCE", "EVYAP",
   "KOCAELI", "DILISKELESI", "ISKENDERUN", "ISDEMIR", "SAMSUN", "TRABZON",
   "BANDIRMA", "GEBZE", "ANTALYA", "TURKIYE", "TURKEY",
 ];

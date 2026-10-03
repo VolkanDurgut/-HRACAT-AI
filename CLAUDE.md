@@ -382,6 +382,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     yoksa boş bırakılır; kullanıcıya sarı uyarı + toast. Okunan ham değer
     `ham_veri.varis_limani_duzeltme` içinde saklanır.
   - Lojistik kartı: geçersiz varış limanı KAYDEDİLMEZ (boş bırakmaya izin var).
+    Sadece varış limanı değiştirildiyse ve sadece formdaki yükleme limanıyla
+    karşılaştırılır (eski kayıtta diğer alanların kaydı engellenmez).
+  - YILPORT listede bilerek yok (yurt dışı terminalleri var).
   - Analiz: geçersiz kayıt liman listelerine girmez.
 - Veri düzeltmesi: IHR-2026-0076 (ESMAAGRIC, FOB) varış limanı "Ambarlı
   Port" → "Mariel Port, Cuba" (kullanıcı onayı, 03.10.2026). Proforma

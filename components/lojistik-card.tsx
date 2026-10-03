@@ -54,8 +54,12 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
   const handleSave = async () => {
     // Varis limani yukleme limaniyla ayni / bir Turkiye limani olamaz
     // (kural: 03.10.2026, bkz. lib/varis-limani-kontrol.ts). Bos birakmaya izin var.
-    if (form.varis_limani.trim()) {
-      const sorun = varisLimaniSorunu(form.varis_limani, [form.yuklenme_limani, dosya.yuklenme_limani, rezervasyonlar[0]?.yuklenme_limani]);
+    // Sadece varis limani DEGISTIRILDIYSE kontrol edilir (eski kayitlarda diger
+    // alanlarin kaydi engellenmesin) ve SADECE formdaki yukleme limaniyla
+    // karsilastirilir (kayit o degeri yazar; yer degistirmis cift duzeltilebilsin).
+    const varisDegisti = form.varis_limani.trim() !== (dosya.varis_limani || "").trim();
+    if (varisDegisti && form.varis_limani.trim()) {
+      const sorun = varisLimaniSorunu(form.varis_limani, [form.yuklenme_limani]);
       if (sorun) {
         showToast(`${VARIS_LIMANI_SORUN_METNI[sorun]} Lütfen müşterinin varış limanını girin.`, "error");
         return;

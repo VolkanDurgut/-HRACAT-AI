@@ -93,6 +93,7 @@ export default function YeniDosyaPage() {
     if (!pdfFile || !user) return;
     setLoading(true);
     setError(null);
+    setVarisLimaniNotu(null);
     setStep("reading");
 
     try {

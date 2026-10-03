@@ -277,6 +277,14 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   filigranıyla üretilir; bilgisi eksikse sarı uyarı ikonu çıkar, pakete
   eklenmez, dosya listeden DÜŞMEZ (01.10.2026). Listeye giriş kriteri
   (`tamEvrakSetiHazirMi`) bilerek değiştirilmedi.
+- İlgili Evraklar iki satır (03.10.2026): üst satır DRAFT (yeşil, mevcut
+  davranış), hemen altında aynı sırayla ORİJİNAL (mavi, `FileCheck2`). İkisi
+  de belgeyi HTML olarak yeni sekmede açar (Evraklar sekmesindeki PDF
+  butonlarından daha keskin); orijinal satırı filigransızdır, aynı
+  builder'ları kullanır (ECTN dahil) ve veritabanına YAZMAZ. Orijinal BL
+  dosyası sistemde olmadığı için BL'nin altı boş bırakılır (sütunlar hizalı).
+  Satır etiketi ("Draft/Orijinal") bilerek yok: 1366 px'te tabloyu taşırıyor;
+  açıklama sayfa başlığında.
 - Sadece **Açık** dosyalar listelenir (`isDosyaAcik`), kapalı dosyalar draft
   evrakları tamamlanmış olsa bile burada görünmez (kullanıcı kararı,
   30.09.2026).

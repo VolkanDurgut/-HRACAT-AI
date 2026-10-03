@@ -142,7 +142,7 @@ export default function DraftOnayPage() {
         <SayfaBasligi
           ikon={<FileCheck2 size={20} />}
           baslik="Draft Onay Gönderim"
-          aciklama="Sevkiyat evrakları (Commercial Invoice, Packing List, Draft BL, Certificate of Origin, Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir. Müşteri istediyse Quality ve Fumigation sertifikaları da evrak listesinde gösterilir."
+          aciklama="Sevkiyat evrakları (Commercial Invoice, Packing List, Draft BL, Certificate of Origin, Phytosanitary, Health Certificate) tam ve hazır olan dosyalar burada listelenir. Müşteri istediyse Quality ve Fumigation sertifikaları da evrak listesinde gösterilir. İlgili Evraklar'da üst satır taslak (yeşil), alt satır orijinal (mavi) belgelerdir."
           className="mb-0"
         />
 

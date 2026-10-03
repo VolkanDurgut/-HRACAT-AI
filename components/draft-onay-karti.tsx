@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, FileCheck2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
@@ -284,30 +284,79 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   // müşteriye özel ayarlarla ve DRAFT filigranıyla üretilir (dosya
   // detayındaki Draft butonuyla birebir aynı). Bilgisi eksikse dosya listeden
   // DÜŞMEZ - ikon sarı uyarıya döner ve eksikleri söyler.
-  type EvrakGosterim = { key: string; title: string; href?: string; onClick?: () => void; eksikler?: string[] };
+  //
+  // ORİJİNAL satiri (talep: 03.10.2026): Draft ikonlarinin hemen altinda ayni
+  // sirayla, AYNI yontemle (HTML yeni sekmede - Evraklar sekmesindeki PDF
+  // butonlarindan daha keskin) ama FILIGRANSIZ acilir. Icerik Evraklar
+  // sekmesindeki "Orijinal" butonuyla ayni builder'lardan gelir (ECTN dahil;
+  // dosya "*" ile okunuyor). Sistemde orijinal BL dosyasi olmadigi icin BL'nin
+  // altindaki yer bos kalir (sutunlar hizali kalsin). Veritabanina YAZMAZ.
+  type HtmlBuilder = (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => string;
+  type EvrakGosterim = { key: string; title: string; href?: string; builder?: HtmlBuilder; draftFiligranli?: boolean; eksikler?: string[] };
   const qcIsteniyor = dosyaEvrakIstiyorMu(dosya, "Quality");
   const fcIsteniyor = dosyaEvrakIstiyorMu(dosya, "Fumigation");
   const qcHazirlik = checkKaliteSertifikasiReadiness(dosya, rezervasyonlar, konteynerler);
   const fcHazirlik = checkFumigationReadiness(dosya, rezervasyonlar, konteynerler);
   const evrakListesiHam: (EvrakGosterim | null)[] = [
-    { key: "ci", title: EVRAK_ADLARI.commercial_invoice, onClick: () => evrakGoruntuleUret(buildCommercialInvoiceHtml) },
-    { key: "pl", title: EVRAK_ADLARI.packing_list, onClick: () => evrakGoruntuleUret(buildPackingListHtml) },
+    { key: "ci", title: EVRAK_ADLARI.commercial_invoice, builder: buildCommercialInvoiceHtml, draftFiligranli: true },
+    { key: "pl", title: EVRAK_ADLARI.packing_list, builder: buildPackingListHtml, draftFiligranli: true },
     draftBlUrl ? { key: "draftbl", title: draftBlAdi || "Draft BL", href: draftBlUrl } : null,
-    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, onClick: () => evrakGoruntuleUret(buildCertificateOfOriginHtml, false) },
-    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, onClick: () => evrakGoruntuleUret(buildPhytosanitaryCertificateHtml, false) },
-    { key: "health", title: EVRAK_ADLARI.health_certificate, onClick: () => evrakGoruntuleUret(buildHealthCertificateHtml, false) },
+    { key: "coo", title: EVRAK_ADLARI.certificate_of_origin, builder: buildCertificateOfOriginHtml, draftFiligranli: false },
+    { key: "phyto", title: EVRAK_ADLARI.phytosanitary, builder: buildPhytosanitaryCertificateHtml, draftFiligranli: false },
+    { key: "health", title: EVRAK_ADLARI.health_certificate, builder: buildHealthCertificateHtml, draftFiligranli: false },
     qcIsteniyor
       ? qcHazirlik.hazir
-        ? { key: "qc", title: EVRAK_ADLARI.quality_certificate, onClick: () => evrakGoruntuleUret((d, r, k) => buildKaliteSertifikasiHtml(d, r, k, ayarlar.kaliteAyar)) }
+        ? { key: "qc", title: EVRAK_ADLARI.quality_certificate, builder: (d, r, k) => buildKaliteSertifikasiHtml(d, r, k, ayarlar.kaliteAyar), draftFiligranli: true }
         : { key: "qc", title: EVRAK_ADLARI.quality_certificate, eksikler: qcHazirlik.eksikler }
       : null,
     fcIsteniyor
       ? fcHazirlik.hazir
-        ? { key: "fc", title: EVRAK_ADLARI.fumigation, onClick: () => evrakGoruntuleUret((d, r, k) => buildFumigationHtml(d, r, k, ayarlar.fumigationAyar)) }
+        ? { key: "fc", title: EVRAK_ADLARI.fumigation, builder: (d, r, k) => buildFumigationHtml(d, r, k, ayarlar.fumigationAyar), draftFiligranli: true }
         : { key: "fc", title: EVRAK_ADLARI.fumigation, eksikler: fcHazirlik.eksikler }
       : null,
   ];
   const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
+
+  const IKON_SINIFI = "inline-flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/10 transition-colors";
+  const ORIJINAL_RENK = "#7DD3FC"; // Evraklar sekmesindeki "Orijinal" butonuyla ayni (sky-300)
+  const evrakIkonu = (item: EvrakGosterim, tur: "draft" | "orijinal") => {
+    const turAdi = tur === "draft" ? "Draft" : "Orijinal";
+    if (item.eksikler) {
+      return (
+        <button
+          key={`${tur}-${item.key}`}
+          type="button"
+          onClick={() => showToast(`${item.title} üretilemiyor. Eksik: ${item.eksikler!.join(", ")}`, "error")}
+          title={`${item.title} (${turAdi}) — eksik bilgi: ${item.eksikler.join(", ")}`}
+          className={`${IKON_SINIFI} text-amber-400`}
+        >
+          <AlertTriangle size={14} />
+        </button>
+      );
+    }
+    if (item.href) {
+      // Draft BL: sadece Draft satirinda; Orijinal satirinda ayni genislikte bos yer
+      if (tur === "orijinal") return <span key={`${tur}-${item.key}`} className="inline-block w-6 h-6" aria-hidden="true" />;
+      return (
+        <a key={`${tur}-${item.key}`} href={item.href} target="_blank" rel="noopener noreferrer" title={item.title} className={IKON_SINIFI} style={{ color: ACCENT }}>
+          <Ship size={14} />
+        </a>
+      );
+    }
+    const builder = item.builder!;
+    return (
+      <button
+        key={`${tur}-${item.key}`}
+        type="button"
+        onClick={() => evrakGoruntuleUret(builder, tur === "draft" ? !!item.draftFiligranli : false)}
+        title={`${item.title} — ${turAdi}`}
+        className={IKON_SINIFI}
+        style={{ color: tur === "draft" ? ACCENT : ORIJINAL_RENK }}
+      >
+        {tur === "draft" ? <FileType2 size={14} /> : <FileCheck2 size={14} />}
+      </button>
+    );
+  };
 
   // Durum rozetinin altindaki TEK satirlik bilgi - her satir ayni yukseklikte
   // kalsin diye her durumda bir ikinci satir vardir (duzen revizesi 01.10.2026).
@@ -369,45 +418,16 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         <p className="text-[11px] font-mono" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "—"}</p>
       </td>
 
-      {/* Evraklar */}
-      <td className="px-2.5 py-2.5 align-middle">
-        <div className="flex items-center flex-nowrap whitespace-nowrap">
-          {evrakSirasi.map((item) =>
-            item.eksikler ? (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => showToast(`${item.title} üretilemiyor. Eksik: ${item.eksikler!.join(", ")}`, "error")}
-                title={`${item.title} — eksik bilgi: ${item.eksikler.join(", ")}`}
-                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors text-amber-400"
-              >
-                <AlertTriangle size={14} />
-              </button>
-            ) : item.href ? (
-              <a
-                key={item.key}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={item.title}
-                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors"
-                style={{ color: ACCENT }}
-              >
-                <Ship size={14} />
-              </a>
-            ) : (
-              <button
-                key={item.key}
-                type="button"
-                onClick={item.onClick}
-                title={item.title}
-                className="inline-flex items-center justify-center w-6 h-7 rounded-md hover:bg-white/10 transition-colors"
-                style={{ color: ACCENT }}
-              >
-                <FileType2 size={14} />
-              </button>
-            )
-          )}
+      {/* Evraklar: ust satir Draft, alt satir Orijinal (ayni sira, hizali sutunlar) */}
+      <td className="px-2.5 py-2 align-middle">
+        <div className="flex flex-col gap-0.5">
+          {(["draft", "orijinal"] as const).map((tur) => (
+            // Satir etiketi bilerek YOK: 1366 px'te tabloyu tasiriyordu (olculdu).
+            // Ayrim: renk (yesil/mavi) + ikon + ipucu + sayfa aciklamasi.
+            <div key={tur} className="flex items-center flex-nowrap whitespace-nowrap" aria-label={tur === "draft" ? "Draft evraklar" : "Orijinal evraklar"}>
+              {evrakSirasi.map((item) => evrakIkonu(item, tur))}
+            </div>
+          ))}
         </div>
       </td>
 

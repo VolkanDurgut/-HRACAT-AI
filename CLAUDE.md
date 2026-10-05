@@ -560,6 +560,17 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   uyarısı ancak Next 15'e geçişle kapanır (ayrı, kapsamlı test gerektiren
   iş). Kalan "high" uyarıların hepsi derleme araçları (tailwind/eslint
   zinciri), sunucuda çalışmaz.
+- Dependabot (`.github/dependabot.yml`, 05.10.2026): ana sürüm (major)
+  yükseltmeleri ÖNERİLMEZ (Next 13→16 PR'ı build'i kırıyordu; Netlify
+  önizlemesi "Failed" görünür, canlıyı ETKİLEMEZ). `next`, `@next/*`,
+  `eslint-config-next` tek grupta gelir (sürümleri aynı olmalı; #3'te
+  yardımcı paket tek başına 16'ya çıkıyordu). Diğer minor/patch tek haftalık
+  PR. Ana sürüm geçişleri planlı iş olarak elle yapılır.
+- Önizleme (Deploy Preview) PR'ına aittir; canlı = Netlify'de "Production"
+  satırı ve `main` commit'i. Kontrol: get-project → currentDeploy → commit_ref.
+- `dependency-audit.yml` CI'ı `npm audit --audit-level=high` ile Next 13 ve
+  derleme araçlarındaki bilinen uyarılar yüzünden KIRMIZI kalır (Next 15
+  geçişine kadar beklenen durum; deploy'u engellemez).
 
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 

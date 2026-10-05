@@ -9,3 +9,23 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(deps)"
+    # Ana surum (major) gecisleri (orn. Next 13 -> 16, Tailwind 3 -> 4) kod
+    # degisikligi ister; Dependabot bunlari otomatik ONERMEZ, planli ve test
+    # edilerek ayri is olarak yapilir (05.10.2026, bkz. CLAUDE.md).
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # next ile yardimci paketleri AYNI surumde olmali; tek PR'da birlikte gelir.
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+          - "eslint-config-next"
+      # Diger kucuk (minor/patch) guncellemeler haftada tek PR.
+      kucuk-guncellemeler:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

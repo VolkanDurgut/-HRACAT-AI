@@ -5,7 +5,15 @@
 -- yaziliyordu ve fonksiyonun gercek cevabi kayboluyordu (bir gece gercekten
 -- hata olursa veritabanindan gorulemezdi). Sadece bekleme suresi 60 sn yapildi;
 -- url, baslik ve govde AYNI. Anahtar anon anahtaridir (zaten herkese acik).
-select cron.alter_job(
+--
+-- Geri yukleme provasi (05.10.2026): yeni / bos bir projede bu is henuz yoktur;
+-- o durumda alter_job(NULL) kurulumu durdurmasin diye sadece IS VARSA
+-- guncellenir. Yeni projede is docs/felaket-kurtarma.md adim 6 ile, YENI
+-- projenin adresi ve anahtariyla kurulur. Canlida davranis ayni.
+do $guard$
+begin
+  if exists (select 1 from cron.job where jobname = 'gunluk-yedek-maili') then
+perform cron.alter_job(
   (select jobid from cron.job where jobname = 'gunluk-yedek-maili'),
   command := $cmd$
   SELECT net.http_post(
@@ -19,6 +27,9 @@ select cron.alter_job(
   );
   $cmd$
 );
+  end if;
+end
+$guard$;
 
 -- Hic istatistigi toplanmamis / eski kucuk tablolar (veriye dokunmaz).
 analyze public.kullanici_yetkileri;

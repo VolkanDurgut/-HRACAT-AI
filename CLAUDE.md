@@ -449,7 +449,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   gelmiyordu. Son gecenin sonucu: `select status_code, content from
   net._http_response order by id desc limit 1` (pg_net ~6 saat saklar) veya
   `yedek_kayitlari`.
-- Canlıdaki sürüm repodaki koddur (Supabase v4, 05.10.2026). Fonksiyonu değiştirince
+- Canlıdaki sürüm repodaki koddur (Supabase v5, 05.10.2026). Fonksiyonu değiştirince
   ayrıca DEPLOY edilmesi gerekir (Supabase MCP `deploy_edge_function` veya CLI)
   — commit/push tek başına canlıyı değiştirmez.
 - Yeni bir iş tablosu eklenirse `YEDEKLENECEK_TABLOLAR` listesine de eklenmeli.
@@ -491,6 +491,33 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   eklendi). Eski ve yeni aynı yolsa (upsert) hiçbir şey silinmez. Hiçbir depo
   dosyası iki kayıtta paylaşılmıyor (05.10.2026 doğrulandı; "Siparişe Devam
   Et" dosya URL'si kopyalamaz) — paylaşım eklenirse bu kural yeniden düşünülmeli.
+
+## Felaket kurtarma / geri yükleme testi (05.10.2026)
+
+- Kılavuz: `docs/felaket-kurtarma.md` (RPO/RTO, adım adım kurulum). Veri
+  geri yükleme aracı: `scripts/yedekten-geri-yukle.mjs` (canlı projeyi ve dolu
+  veritabanını REDDEDER; `--onayla` olmadan yazmaz). Yerel uçtan uca prova ile
+  test edildi (Postgres 17 + PostgREST, gerçek yedek formatı: 19/19 tablo,
+  kullanıcı kimlikleri, roller birebir; silme CASCADE ve dosya no sayacı çalışıyor).
+- Repo canlıdan SAPMIŞTI (temiz veritabanında 2 migration hata veriyordu;
+  denetim sistemi, `kantar_dosya_listesi`, 9 FK'nin ON DELETE CASCADE'i, rol
+  bazlı ihracat politikaları, bucket ayarları yoktu). Kapatıldı:
+  `20261001005100_nextval_sarmalayici.sql` + `20261005130000_canli_sema_senkronu.sql`
+  (canlıdan birebir, idempotent, canlıya uygulanması GEREKMEZ). Prova:
+  24/24 migration hatasız, canlıyla 518/519 nesne birebir (fark: projeye özel
+  cron işi, kılavuz adım 6). `20261005090000` cron güncellemesi "iş varsa"
+  korumasına alındı (boş projede alter_job(NULL) kurulumu durdurmasın).
+- KURAL: canlıya SQL ile yapılan HER şema değişikliği repoya migration olarak
+  da eklenir; şema değişince prova tekrarlanır (kılavuz son bölüm).
+- Gece yedeği (v5) her gece paketi `public.yedek_geri_yukleme_testi(jsonb)`
+  ile canlıyla aynı yapıdaki GEÇİCİ tablolara gerçekten yükler, satırları
+  DEĞER olarak (jsonb eşitliği; JS sondaki sıfırları düşürdüğü için md5 değil)
+  karşılaştırır, bağları kontrol eder → mailde "Geri yükleme testi: x/y".
+  Pakete `_kullanicilar` (kimlik + e-posta, ŞİFRE YOK) eklendi:
+  `public.yedek_kullanici_listesi()`. İkisi de sadece service_role (migration
+  `20261005140000`, `20261005150000`, canlıya UYGULANDI).
+- RPO: veri ≤24 saat, denetim 7 gün, PDF'ler YEDEKSİZ (karar bekliyor). RTO ≈1–2 saat.
+  Kayıtlardaki dosya URL'leri eski projeye imzalı; proje değişirse yeniden imzalanmalı.
 
 ## Depo temizliği — KARANTİNA (05.10.2026)
 

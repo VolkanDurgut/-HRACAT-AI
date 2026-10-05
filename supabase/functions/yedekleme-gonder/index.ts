@@ -35,6 +35,14 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 //    Sinirlar Free plan kotasidir; plan degisirse asagidaki sabitler guncellenir.
 //  - GECICI HATA TEKRARI (05.10.2026): okuma isteklerinde 5xx / ag hatasi
 //    olursa 2 kez daha denenir (geciciHatadaTekrarla).
+//  - GERI YUKLEME TESTI (05.10.2026): uretilen paket her gece
+//    public.yedek_geri_yukleme_testi() ile canliyla ayni yapidaki GECICI
+//    tablolara gercekten yuklenir; satirlar canliyla md5 karsilastirilir ve
+//    tablolar arasi baglar kontrol edilir. Sonuc mailde yazar; sorun varsa
+//    konu "[UYARI]". Canliya hicbir sey yazilmaz.
+//  - KULLANICI LISTESI (05.10.2026): pakete "_kullanicilar" eklenir (kimlik,
+//    e-posta, tarihler; SIFRE YOK) - yeni projede ayni kimlikle yeniden
+//    olusturmak icin (docs/felaket-kurtarma.md).
 //
 // depositors ve contact_messages tablolari BASKA bir projeye ait - bilerek
 // yedege dahil edilmez (bkz. CLAUDE.md).
@@ -216,6 +224,27 @@ async function veritabaniBoyutu(): Promise<number> {
   return deger;
 }
 
+/** Service-role RPC cagrisi (gecici hatada tekrar dener). */
+async function rpc(ad: string, govde: unknown): Promise<unknown> {
+  const res = await geciciHatadaTekrarla(() =>
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/${ad}`, {
+      method: "POST",
+      headers: { ...servisBasliklari, "Content-Type": "application/json" },
+      body: JSON.stringify(govde),
+    })
+  );
+  if (!res.ok) throw new Error(`${ad} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return await res.json();
+}
+
+type GeriYuklemeSonucu = {
+  tablo_sayisi: number;
+  yuklenemeyen: number;
+  birebir: number;
+  bag_sorunlari: { bag: string; kirik: number }[];
+  tablolar: { tablo: string; durum: string; satir?: number; farkli?: number; canlida_yok?: number; hata?: string }[];
+};
+
 type KapasiteSatiri = { kaynak: string; bayt: number | null; kota: number; oran: number | null };
 
 function kapasiteDurumu(oran: number | null): "normal" | "uyari" | "kritik" | "olculemedi" {
@@ -326,18 +355,49 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ---- Giris kullanicilari (sifresiz liste) ----
+    let kullanicilar: unknown = null;
+    try {
+      kullanicilar = await rpc("yedek_kullanici_listesi", {});
+    } catch (e) {
+      uyarilar.push(`Kullanıcı listesi alınamadı: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
     const simdi = new Date();
     const tarih = simdi.toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
     const paket = {
       _bilgi: {
         olusturulma: simdi.toISOString(),
-        surum: 2,
-        not: `Tablolar tam yedektir; ${DENETIM_TABLOSU} sadece son ${DENETIM_GUN} günü içerir. _storage_dosya_listesi sadece DOSYA LİSTESİDİR - PDF dosyalarının kendisi bu yedekte YOKTUR, Supabase Storage'da durur.`,
+        surum: 3,
+        not: `Tablolar tam yedektir; ${DENETIM_TABLOSU} sadece son ${DENETIM_GUN} günü içerir. _storage_dosya_listesi sadece DOSYA LİSTESİDİR - PDF dosyalarının kendisi bu yedekte YOKTUR, Supabase Storage'da durur. _kullanicilar giriş kullanıcılarının kimlik ve e-postalarıdır (şifre YOK); geri yükleme adımları: repodaki docs/felaket-kurtarma.md.`,
         uyarilar,
       },
       ...yedek,
+      _kullanicilar: kullanicilar,
       _storage_dosya_listesi: storageDosyalari,
     };
+
+    // ---- Geri yukleme testi: paket GERCEKTEN yuklenebiliyor mu? ----
+    let geriYukleme: GeriYuklemeSonucu | null = null;
+    try {
+      geriYukleme = (await rpc("yedek_geri_yukleme_testi", { paket })) as GeriYuklemeSonucu;
+      if (geriYukleme.yuklenemeyen > 0) {
+        const adlar = geriYukleme.tablolar.filter((t) => t.durum === "YUKLENEMEDI").map((t) => `${t.tablo} (${t.hata})`);
+        uyarilar.push(`Geri yükleme testi: ${geriYukleme.yuklenemeyen} tablo yüklenemedi: ${adlar.join("; ")}`);
+      }
+      const farkli = geriYukleme.tablolar.filter((t) => t.durum === "fark_var");
+      if (farkli.length > 0) {
+        uyarilar.push(
+          `Geri yükleme testi: ${farkli.map((t) => `${t.tablo} (${(t.farkli || 0) + (t.canlida_yok || 0)} satır)`).join(", ")} canlıdan farklı. ` +
+            "Yedek alınırken o kayıtlar değiştirildiyse normaldir; tekrarlarsa incelenmeli."
+        );
+      }
+      if (geriYukleme.bag_sorunlari.length > 0) {
+        uyarilar.push(`Geri yükleme testi: kırık bağ: ${geriYukleme.bag_sorunlari.map((b) => `${b.bag} (${b.kirik})`).join(", ")}`);
+      }
+    } catch (e) {
+      uyarilar.push(`Geri yükleme testi çalıştırılamadı: ${e instanceof Error ? e.message : String(e)}`);
+    }
     const jsonIcerik = JSON.stringify(paket, null, 2);
     const jsonBayt = new TextEncoder().encode(jsonIcerik).length;
     const ekSigiyor = jsonBayt <= MAKS_EK_BAYT;
@@ -359,6 +419,8 @@ Deno.serve(async (req: Request) => {
       tablolar: tabloSayilari,
       bucketlar: bucketOzeti,
       kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
+      kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,
+      geriYukleme: geriYukleme ? { tablo_sayisi: geriYukleme.tablo_sayisi, birebir: geriYukleme.birebir, yuklenemeyen: geriYukleme.yuklenemeyen, bag_sorunlari: geriYukleme.bag_sorunlari } : null,
       uyarilar,
     };
 
@@ -382,11 +444,15 @@ Deno.serve(async (req: Request) => {
         return `<tr><td style="padding:2px 12px 2px 0;">${escapeHtml(k.kaynak)}</td><td style="padding:2px 0;text-align:right;color:${kapasiteRenk[d]};font-weight:${d === "normal" ? "400" : "700"};">${deger}</td></tr>`;
       })
       .join("");
+    const geriYuklemeSatiri = geriYukleme
+      ? `<p style="margin-top:14px;"><b>Geri yükleme testi:</b> ${geriYukleme.birebir}/${geriYukleme.tablo_sayisi} tablo birebir geri yüklendi${geriYukleme.bag_sorunlari.length === 0 ? ", tablolar arası bağlar tutarlı" : ""}. ${geriYukleme.birebir === geriYukleme.tablo_sayisi && geriYukleme.bag_sorunlari.length === 0 ? "✅" : "⚠️"}</p>`
+      : `<p style="margin-top:14px;"><b>Geri yükleme testi:</b> <b style="color:#b91c1c">çalıştırılamadı</b> (uyarılara bakın).</p>`;
     const html = `
 <p>İhracat AI veritabanınızın ${tarih} tarihli otomatik yedeği ${ekSigiyor ? "ektedir" : "<b>bu sefer eke sığmadı</b>"}.</p>
 ${uyariBlogu}
 <p><b>Toplam ${toplamKayit} kayıt, ${tabloSayilari.length} tablo.</b></p>
 <table style="border-collapse:collapse;font-size:13px;">${tabloSatirlari}</table>
+${geriYuklemeSatiri}
 <p style="margin-top:14px;"><b>Kapasite (Free plan kotası):</b> %85'te uyarı, %90'da kritik.</p>
 <table style="border-collapse:collapse;font-size:13px;">${kapasiteSatirlari}</table>
 <p style="margin-top:14px;"><b>Dosyalar (PDF vb.):</b> Yedekte sadece dosya <i>listesi</i> vardır; dosyaların kendisi mail ekine sığmadığı için yedekte değildir ve Supabase Storage'da durur.</p>

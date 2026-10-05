@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari, KaliteSertifikasiAyari } from "@/lib/supabase";
-import { supabase, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
+import { supabase, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { FileText, Pencil, Loader2, CheckCircle2 } from "lucide-react";
@@ -235,7 +235,7 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
 
         const { data: mevcutKayit } = await supabase
           .from("dosya_evraklari")
-          .select("id")
+          .select("id, dosya_url")
           .eq("dosya_id", dosya.id)
           .eq("evrak_tipi", evrakTipi)
           .eq("company_id", companyId)
@@ -262,6 +262,10 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           showToast(`Evrak indiriliyor ancak arşiv/durum kaydı tutulamadı: ${kayitHatasi}`, "error");
         } else {
           arsivlendi = true;
+          // Dosya adi degistiyse (DRAFT -> ORIJINAL, booking/proforma degisti)
+          // ayni evrak turunun eski arsiv PDF'i sahipsiz kalmasin (05.10.2026).
+          // Ayni yola upsert edildiyse hicbir sey silinmez.
+          if (mevcutKayit) await eskiDepoDosyasiniSil(mevcutKayit.dosya_url, dosyaUrl);
         }
         await durumlariYukle();
       }

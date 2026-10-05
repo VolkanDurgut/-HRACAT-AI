@@ -58,6 +58,27 @@ export async function depoDosyalariniTopluSil(urls: (string | null | undefined)[
 }
 
 /**
+ * Bir kayıt YENİ dosyaya bağlandıktan (veya dosyası kaldırıldıktan) SONRA,
+ * artık hiçbir kaydın göstermediği ESKİ dosyayı depodan siler (05.10.2026).
+ *
+ * Kök neden: DBA / irsaliye / Draft BL / fatura / konşimento yeniden
+ * yüklenince eski PDF depoda sahipsiz kalıyordu (05.10.2026 tespiti: 52
+ * dosya, ~24 MB). Kullanım sırası CLAUDE.md kuralıdır:
+ *   1) eski URL'yi kayıttan TAZE oku,
+ *   2) yeni dosyayı yükle ve kaydı güncelle, sonucu kontrol et,
+ *   3) SADECE başarılıysa: await eskiDepoDosyasiniSil(eskiUrl, yeniUrl)
+ * Eski ve yeni aynı depo yolunu gösteriyorsa (upsert ile üzerine yazılan
+ * evraklar) HİÇBİR ŞEY silinmez. Best-effort: silinemezse ana işlem bozulmaz.
+ */
+export async function eskiDepoDosyasiniSil(eskiUrl: string | null | undefined, yeniUrl?: string | null): Promise<void> {
+  const eski = depoYoluCikar(eskiUrl);
+  if (!eski) return;
+  const yeni = depoYoluCikar(yeniUrl);
+  if (yeni && yeni.bucket === eski.bucket && yeni.path === eski.path) return;
+  await depoDosyalariniTopluSil([eskiUrl]);
+}
+
+/**
  * Bir ihracat dosyasına ve bağlı konteynerlere/evraklara ait TÜM storage
  * dosyalarının URL'lerini TOPLAR (silmez).
  *

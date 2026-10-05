@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
@@ -135,6 +135,11 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         guncelHamVeri.bl_no_kaynak = "draft_bl";
       }
 
+      // Yeniden yuklemede eski Draft BL'nin adresi: kayit basariyla guncellenince
+      // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
+      const { data: onceki } = await supabase.from("ihracat_dosyalari")
+        .select("draft_bl_dosya_url").eq("id", dosya.id).eq("company_id", companyId).maybeSingle();
+
       const { data: yazilan, error: yazmaError } = await supabase.from("ihracat_dosyalari").update({
         draft_bl_dosya_url: dosyaUrl,
         draft_bl_dosya_adi: file.name,
@@ -148,6 +153,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       const yazmaSorunu = yazmaHatasi(yazmaError, yazilan);
       if (yazmaSorunu) throw new Error(`Draft BL bilgileri kaydedilemedi: ${yazmaSorunu}`);
       yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
+      await eskiDepoDosyasiniSil(onceki?.draft_bl_dosya_url, dosyaUrl);
 
       onRefresh();
     } catch (err: any) {
@@ -167,6 +173,9 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
 
   const handleYenidenYukle = async () => {
     setHata(null);
+    // Kaldirilan PDF, kayit BASARIYLA temizlendikten sonra depodan da silinir
+    // (05.10.2026 - DBA/irsaliye "kaldir" ile ayni kural).
+    const kaldirilanUrl = draftBlUrl;
     const { data, error } = await supabase.from("ihracat_dosyalari").update({
       draft_bl_dosya_url: null,
       draft_bl_dosya_adi: null,
@@ -178,6 +187,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       setHata(`Draft BL sıfırlanamadı: ${yazmaSorunu}`);
       return;
     }
+    await eskiDepoDosyasiniSil(kaldirilanUrl);
     onRefresh();
   };
 

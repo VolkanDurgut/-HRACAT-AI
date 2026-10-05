@@ -481,10 +481,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Yedek fonksiyonu okuma isteklerinde 5xx / ağ hatasında 2 kez yeniden dener
   (`geciciHatadaTekrarla`): 05.10.2026 deneme çalışmasında 19 satırlık
   `ihracat_dosyalari` PostgREST'ten tek seferlik HTTP 555 döndü.
-- AÇIK KONU (kullanıcı kararı bekliyor): DBA / Draft BL / fatura / konşimento /
-  irsaliye yeniden yüklenince ESKİ dosya depodan silinmiyor (28 sahipsiz DBA
-  ≈17 MB). Düzeltme yapılırsa sıra CLAUDE.md kuralına uyar: yeni dosya yükle →
-  DB güncelle ve kontrol et → SADECE başarılıysa eski dosyayı sil.
+- DÜZELTİLDİ (05.10.2026): DBA / irsaliye / Draft BL / fatura / konşimento
+  yeniden yüklenince ve "kaldır"da, ayrıca sistem evrak arşivinin adı
+  değişince (DRAFT → ORİJİNAL) ESKİ dosya depodan silinir. Tek yardımcı:
+  `lib/supabase/storage.ts → eskiDepoDosyasiniSil(eskiUrl, yeniUrl)`. Sıra:
+  eski URL kayıttan TAZE okunur → yeni dosya yüklenir → kayıt güncellenir ve
+  kontrol edilir → SADECE başarılıysa eski silinir. Kayıt başarısızsa eskiye
+  dokunulmaz, yeni yüklenen geri silinir (konşimentoda bu geri alma eksikti,
+  eklendi). Eski ve yeni aynı yolsa (upsert) hiçbir şey silinmez. Hiçbir depo
+  dosyası iki kayıtta paylaşılmıyor (05.10.2026 doğrulandı; "Siparişe Devam
+  Et" dosya URL'si kopyalamaz) — paylaşım eklenirse bu kural yeniden düşünülmeli.
 
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 

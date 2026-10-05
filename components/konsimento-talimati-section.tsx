@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
+import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTimeTR } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
@@ -73,6 +73,9 @@ export default function KonsimentoTalimatiSection({
 
   const handleYukleVeKontrolEt = async (file: File) => {
     setKontrolEdiliyor(true); setKontrolHata(null);
+    // Kayda baglanamayan yeni PDF depoda sahipsiz kalmasin (05.10.2026 -
+    // diger yukleme akislariyla ayni kural; burada eksikti).
+    let yuklenenYol: string | null = null;
     try {
       const guvenliAd = file.name
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -82,6 +85,7 @@ export default function KonsimentoTalimatiSection({
       const path = `${dosyaId}/${Date.now()}_${guvenliAd}`;
       const { error: uploadError } = await supabase.storage.from("konsimento-talimatlari").upload(path, file);
       if (uploadError) throw new Error(`Yükleme hatası: ${uploadError.message}`);
+      yuklenenYol = path;
       const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
@@ -123,6 +127,11 @@ export default function KonsimentoTalimatiSection({
         notify: data.notify || []
       };
 
+      // Yeniden yuklemede eski talimatin adresi: kayit basariyla guncellenince
+      // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
+      const { data: onceki } = await supabase.from("ihracat_dosyalari")
+        .select("konsimento_dosya_url").eq("id", dosyaId).eq("company_id", companyId).maybeSingle();
+
       const { data: guncellenen, error: updateError } = await supabase.from("ihracat_dosyalari").update({
         konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
         konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: filtrelenmisData,
@@ -132,8 +141,11 @@ export default function KonsimentoTalimatiSection({
       }).eq("id", dosyaId).eq("company_id", companyId).select("id");
       const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
       if (guncellemeHatasi) throw new Error(`Sonuç kaydedilemedi: ${guncellemeHatasi}`);
+      yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
+      await eskiDepoDosyasiniSil(onceki?.konsimento_dosya_url, dosyaUrl);
       onRefresh();
     } catch (err: any) {
+      if (yuklenenYol) await supabase.storage.from("konsimento-talimatlari").remove([yuklenenYol]);
       setKontrolHata(err.message || "Kontrol hatası.");
     } finally { setKontrolEdiliyor(false); }
   };
@@ -153,6 +165,8 @@ export default function KonsimentoTalimatiSection({
 
   const handleYenidenYukle = async () => {
     setKontrolHata(null);
+    // Kaldirilan PDF, kayit BASARIYLA temizlendikten sonra depodan da silinir (05.10.2026).
+    const kaldirilanUrl = konsimentoDosyaUrl;
     const { data, error } = await supabase.from("ihracat_dosyalari").update({
       konsimento_dosya_url: null, konsimento_dosya_adi: null,
       konsimento_yukleme_tarihi: null, konsimento_kontrol_sonucu: null,
@@ -162,6 +176,7 @@ export default function KonsimentoTalimatiSection({
       showToast(`İşlem başarısız: ${hata}`, "error");
       return;
     }
+    await eskiDepoDosyasiniSil(kaldirilanUrl);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onRefresh();
   };

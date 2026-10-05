@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
   Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote, FileType2, ExternalLink
@@ -93,6 +93,11 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const data: FaturaKontrolSonucu & { error?: string } = await response.json();
       if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
 
+      // Yeniden yuklemede eski faturanin adresi: kayit basariyla guncellenince
+      // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
+      const { data: onceki } = await supabase.from("ihracat_dosyalari")
+        .select("fatura_dosya_url").eq("id", dosya.id).eq("company_id", companyId).maybeSingle();
+
       const { data: yazilan, error: yazmaError } = await supabase.from("ihracat_dosyalari").update({
         fatura_dosya_url: dosyaUrl,
         fatura_dosya_adi: file.name,
@@ -106,6 +111,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const hata = yazmaHatasi(yazmaError, yazilan);
       if (hata) throw new Error(`Fatura bilgileri kaydedilemedi: ${hata}`);
       yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
+      await eskiDepoDosyasiniSil(onceki?.fatura_dosya_url, dosyaUrl);
 
       onRefresh();
     } catch (err: any) {
@@ -126,6 +132,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
   const handleFaturaYenidenYukle = async () => {
     setFaturaHata(null);
+    // Kaldirilan PDF, kayit BASARIYLA temizlendikten sonra depodan da silinir (05.10.2026).
+    const kaldirilanUrl = dosya.fatura_dosya_url;
     const { data, error } = await supabase.from("ihracat_dosyalari").update({
       fatura_dosya_url: null,
       fatura_dosya_adi: null,
@@ -137,6 +145,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       setFaturaHata(`Fatura sıfırlanamadı: ${hata}`);
       return;
     }
+    await eskiDepoDosyasiniSil(kaldirilanUrl);
     onRefresh();
   };
 

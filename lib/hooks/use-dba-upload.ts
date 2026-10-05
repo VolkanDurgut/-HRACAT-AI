@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, eskiDepoDosyasiniSil, yazmaHatasi } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -107,6 +107,16 @@ export function useDbaUpload(): UseDbaUploadReturn {
         );
       }
 
+      // 6a. Yeniden yuklemede eski DBA'nin adresi (kayit basariyla guncellenince
+      // depodan silinir - sahipsiz PDF kalmasin, 05.10.2026). Taze okunur;
+      // okunamazsa hicbir sey silinmez.
+      const { data: onceki } = await supabase
+        .from('konteynerler')
+        .select('dba_dosya_url')
+        .eq('company_id', companyId)
+        .eq('id', konteyner.id)
+        .maybeSingle();
+
       // 6. Veritabanini guncelle (Net, Brut, Kap Adeti DBA'dan etkilenmez - idari personel tarafindan elle girilir)
       const { data: guncellenen, error: updateError } = await supabase
         .from('konteynerler')
@@ -127,6 +137,7 @@ export function useDbaUpload(): UseDbaUploadReturn {
       const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
       if (guncellemeHatasi) throw new Error(`DBA bilgileri kaydedilemedi: ${guncellemeHatasi}`);
       yuklenenYol = null; // kayit basarili
+      await eskiDepoDosyasiniSil(onceki?.dba_dosya_url, dosyaUrl);
 
       return { success: true, uyusmazliklar: [] };
     } catch (err) {

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, eskiDepoDosyasiniSil, yazmaHatasi } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 type IrsaliyeYukleResult = {
@@ -59,6 +59,15 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
 
       const dosyaUrl = await getGuvenliDosyaUrl('konsimento-talimatlari', path);
 
+      // Yeniden yuklemede eski irsaliyenin adresi (kayit basariyla guncellenince
+      // depodan silinir, 05.10.2026). Okunamazsa hicbir sey silinmez.
+      const { data: onceki } = await supabase
+        .from('konteynerler')
+        .select('irsaliye_dosya_url')
+        .eq('company_id', companyId)
+        .eq('id', konteyner.id)
+        .maybeSingle();
+
       const { data: guncellenen, error: updateError } = await supabase
         .from('konteynerler')
         .update({
@@ -73,6 +82,7 @@ export function useIrsaliyeUpload(): UseIrsaliyeUploadReturn {
       const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
       if (guncellemeHatasi) throw new Error(`İrsaliye kaydedilemedi: ${guncellemeHatasi}`);
       yuklenenYol = null; // kayit basarili
+      await eskiDepoDosyasiniSil(onceki?.irsaliye_dosya_url, dosyaUrl);
 
       return { success: true };
     } catch (err) {

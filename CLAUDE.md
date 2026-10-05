@@ -541,6 +541,26 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   dosyaları gösteriyor (kayda bağlı, dokunulmadı; evrak yeniden üretilince
   ad düzelir ve eski arşiv otomatik silinir).
 
+## Yazılım / sürüm uyumluluğu (05.10.2026)
+
+- Veritabanı: Postgres 17.6 (Supabase imajı 17.6.1.155). PG17 üretici
+  desteği 08.11.2029'a kadar. Güvenlik yamaları (17.10, 17.11) Supabase
+  imaj güncellemesiyle gelir; güncellemeyi kullanıcı panelden yapar
+  (Project Settings → Infrastructure, kısa kesinti → mesai dışı). Claude
+  bunu kendisi tetiklemez.
+- Geçersiz nesne kontrolü: Postgres'te Oracle'daki gibi "INVALID" durumu
+  YOK. Bakılacaklar: `pg_index.indisvalid/indisready`,
+  `pg_constraint.convalidated`, `pg_trigger.tgenabled`, cron işleri ve
+  hataları; fonksiyon gövdeleri bağımlılık takibine girmediği için
+  ÇALIŞTIRILARAK sınanır. 05.10.2026: hepsi temiz.
+- Next.js 13.5.1 → 13.5.11 (aynı ana sürümün son yaması; `next`,
+  `eslint-config-next`, `@next/swc-wasm-nodejs` sabit sürüm). `@next/swc-*`
+  ikilileri 13.5.9 görünür: next 13.5.11 bunları böyle ister, normaldir.
+  Next 13 artık güvenlik desteği almıyor; `npm audit` kalan "critical"
+  uyarısı ancak Next 15'e geçişle kapanır (ayrı, kapsamlı test gerektiren
+  iş). Kalan "high" uyarıların hepsi derleme araçları (tailwind/eslint
+  zinciri), sunucuda çalışmaz.
+
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 
 - Uygulamayı **sadece Unex Gıda** kullanıyor. Kayıt formu YOK; kullanıcılar

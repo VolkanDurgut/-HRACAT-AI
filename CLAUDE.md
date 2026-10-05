@@ -244,6 +244,14 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   ekleniyordu ("FOB Mariel Port, Cuba" – IHR-2026-0076). Canlı 20 dosyada
   kontrol: sadece 2 FOB dosyası değişti. Arşivlenmiş eski PDF'ler değişmez,
   evrak yeniden üretilince düzelir.
+- Fatura Talimatı (PDF + mail metni) FOB grubunda: proforma fiyatı FOB
+  sütununa yazılır, CIF "-", navlun girilmiş olsa bile DÜŞÜLMEZ (eskiden
+  fiyat "CIF Birim Fiyat" altında çıkıyordu; IHR-2026-0076'da navlun düşülüp
+  FOB 106.250 yerine 81.250 çıkıyordu). Kural tek yerde:
+  `hesaplaFobFreightCifToplamlari(...).fiyatlarFob` (`lib/cutoff-utils.ts`);
+  mail metni aynı kuralı `navlunAliciyaAitMi` ile uygular. Canlı 21 dosya
+  eski/yeni PDF karşılaştırması: 18 CIF/CFR birebir, sadece 3 FOB değişti;
+  Commercial Invoice HTML'i 21'inde de birebir aynı.
 - Birden fazla proforma TEK evrak seti (05.10.2026, BIRRAKA 5 FCL: UNEXBIS170626-1
   100 MTS @410 + UNEXBIS120526 25 MTS @413): büyük proforma yüklenir, sipariş
   takibi "Tek Seferlik Dosya", ikinci no Proforma kartından eklenir, ikinci

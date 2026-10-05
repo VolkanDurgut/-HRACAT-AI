@@ -141,7 +141,7 @@ function ciz(
   const lokalMasrafBirim = dosya.lokal_masraf_tutari as number | null;
   const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
   const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
-  const { toplamCif, netNavlunToplam, toplamFob } = hesaplaFobFreightCifToplamlari(dosya, rezervasyonKonteynerAdedi);
+  const { toplamCif, netNavlunToplam, toplamFob, fiyatlarFob } = hesaplaFobFreightCifToplamlari(dosya, rezervasyonKonteynerAdedi);
   bolumTablosu("MALIYET VE BANKA BILGILERI", [
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
     ["Toplam Navlun Fiyati", netNavlunToplam !== null ? formatCurrency(netNavlunToplam, dosya.para_birimi) : null],
@@ -167,8 +167,11 @@ function ciz(
   const urunRows = urunler.map((u) => {
     const ad = u.urun_adi || u.description || "Urun";
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "-";
-    const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-        const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
+    const proformaBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
+    // FOB teslimde proforma fiyati FOB'dur: FOB sutununa yazilir, CIF bos kalir.
+    if (fiyatlarFob) return [ad, ambalajBoyutu, "-", formatBirimFiyatKg(proformaBirim)];
+    const cifBirim = proformaBirim;
+    const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
     // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu 3 ondalikli
     // ve para birimi sembolsuz gosterilir (orn. "0,460") - sistemde TON (MT)
     // basina tutulan deger degismez, sadece bu tablodaki goruntuleme boyle.
@@ -195,7 +198,7 @@ function ciz(
         [
           "Toplam",
           "",
-          `${formatCurrency(toplamCif, dosya.para_birimi)} ${dosya.para_birimi || "USD"}`,
+          fiyatlarFob ? "-" : `${formatCurrency(toplamCif, dosya.para_birimi)} ${dosya.para_birimi || "USD"}`,
           toplamFob !== null ? `${formatCurrency(toplamFob, dosya.para_birimi)} ${dosya.para_birimi || "USD"}` : "-",
         ],
       ],

@@ -1,3 +1,5 @@
+import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
+
 /**
  * Tarih/saat metninden (hem duz "YYYY-MM-DD" tarih hem "YYYY-MM-DDTHH:MM:SS+TZ"
  * bicimini destekler) sadece takvim tarihini HAM olarak cikartir - herhangi bir
@@ -265,9 +267,16 @@ export function autoSuggestContainers(totalMiktar: number | null): number | null
 }
 
 export type FobFreightCifToplamlari = {
+  /** Kalem toplami. fiyatlarFob=true ise bu bir CIF degeri DEGILDIR (gosterme). */
   toplamCif: number;
   netNavlunToplam: number | null;
   toplamFob: number | null;
+  /**
+   * Teslim sekli FOB / FCA / FAS / EXW: proformadaki fiyatlar ZATEN FOB'dur
+   * (navlunu alici oder). Bu durumda FOB = kalem toplami, navlun DUSULMEZ,
+   * CIF sutunu bos ("-") gosterilir (05.10.2026, IHR-2026-0090).
+   */
+  fiyatlarFob: boolean;
 };
 
 /**
@@ -294,7 +303,7 @@ export type FobFreightCifToplamlari = {
  * istenmedigi icin BILEREK boyle birakilmistir, talep: 29.09.2026).
  */
 export function hesaplaFobFreightCifToplamlari(
-  dosya: { urun_detaylari: unknown; navlun_tutari: number | null; lokal_masraf_tutari?: number | null },
+  dosya: { urun_detaylari: unknown; navlun_tutari: number | null; lokal_masraf_tutari?: number | null; teslim_sekli?: string | null },
   konteynerAdedi: number
 ): FobFreightCifToplamlari {
   const urunler = (dosya.urun_detaylari as any[]) || [];
@@ -309,9 +318,12 @@ export function hesaplaFobFreightCifToplamlari(
   const toplamDusulecek =
     navlunToplam !== null && lokalMasrafToplam !== null ? navlunToplam - lokalMasrafToplam : navlunToplam !== null ? navlunToplam : 0;
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
-  const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+  const fiyatlarFob = navlunAliciyaAitMi(dosya.teslim_sekli);
+  // FOB teslimde proforma fiyati FOB fiyatidir: navlun girilmis olsa bile
+  // dusulmez (eskiden IHR-2026-0076'da 106.250 yerine 81.250 FOB cikiyordu).
+  const toplamFob = fiyatlarFob ? toplamCif : dusulecekVarMi ? toplamCif - toplamDusulecek : null;
 
-  return { toplamCif, netNavlunToplam, toplamFob };
+  return { toplamCif, netNavlunToplam, toplamFob, fiyatlarFob };
 }
 
 /**

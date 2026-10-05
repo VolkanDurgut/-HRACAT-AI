@@ -8,6 +8,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 
 type Props = {
   dosyaId: string;
@@ -53,7 +54,10 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       ? navlunToplam
       : 0;
     const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
-    const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+    // FOB / FCA / FAS / EXW: proforma fiyati ZATEN FOB'dur - navlun dusulmez,
+    // CIF yazilmaz (PDF ile ayni kural: hesaplaFobFreightCifToplamlari).
+    const fiyatlarFob = navlunAliciyaAitMi(dosya.teslim_sekli);
+    const toplamFob = fiyatlarFob ? toplamCif : dusulecekVarMi ? toplamCif - toplamDusulecek : null;
     const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
     const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
     const urunSatirlari = urunler.map((u: any) => {
@@ -66,6 +70,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       // Muhasebe talebi: birim fiyatlar KG basina, virgullu 3 ondalikli, para
       // birimi sembolsuz (orn. "0,460") - PDF versiyonuyla tutarli.
       const birim = dosya.para_birimi || "USD";
+      if (fiyatlarFob) return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: FOB ${formatBirimFiyatKg(cifBirim)} ${birim}/KG`;
       return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
     }).join("\n");
     const konteynerSatirlari = konteynerler.map((k, i) => {
@@ -138,7 +143,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const toplamFobStr = toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : null;
     const urunFiyatBilgileri = [
       urunSatirlari || null,
-      satir("Toplam CIF", formatCurrency(toplamCif, dosya.para_birimi)),
+      fiyatlarFob ? null : satir("Toplam CIF", formatCurrency(toplamCif, dosya.para_birimi)),
       satir("Toplam FOB", toplamFobStr),
     ].filter(Boolean).join("\n");
 

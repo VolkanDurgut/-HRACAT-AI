@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Trash2, Plus, Package, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
+import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -91,8 +92,12 @@ function buildDosyaPayload(form: typeof emptyForm) {
   };
 }
 
-/** Tum alanlar doldurulmadan kayit yapilamaz. */
-function validateForm(form: typeof emptyForm): Record<string, string> {
+/**
+ * Tum alanlar doldurulmadan kayit yapilamaz. ISTISNA (05.10.2026): FOB / FCA /
+ * FAS / EXW teslimde navlunu alici oder -> Navlun ve Lokal Masraf opsiyonel
+ * (bkz. lib/teslim-sekli.ts).
+ */
+function validateForm(form: typeof emptyForm, navlunOpsiyonel: boolean): Record<string, string> {
   const e: Record<string, string> = {};
   const zorunlu = "Zorunlu alan";
   if (!form.booking_no.trim()) e.booking_no = zorunlu;
@@ -110,8 +115,10 @@ function validateForm(form: typeof emptyForm): Record<string, string> {
   if (!form.ekipman_alim_tarihi) e.ekipman_alim_tarihi = zorunlu;
   if (!form.ardiyesiz_giris) e.ardiyesiz_giris = zorunlu;
   if (!form.ekipman_alim_yeri) e.ekipman_alim_yeri = zorunlu;
-  if (!form.navlun_tutari) e.navlun_tutari = zorunlu;
-  if (!form.lokal_masraf_tutari) e.lokal_masraf_tutari = zorunlu;
+  if (!navlunOpsiyonel) {
+    if (!form.navlun_tutari) e.navlun_tutari = zorunlu;
+    if (!form.lokal_masraf_tutari) e.lokal_masraf_tutari = zorunlu;
+  }
   return e;
 }
 
@@ -211,6 +218,8 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
   dosya: Dosya;
 }) {
   const hataGoster = (alan: string) => errors[alan] && <p className="text-xs text-red-400 mt-0.5">{errors[alan]}</p>;
+  const navlunOpsiyonel = navlunAliciyaAitMi(dosya.teslim_sekli);
+  const maliyetEtiketSoneki = navlunOpsiyonel ? "" : " *";
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div>
@@ -286,15 +295,20 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         {hataGoster("ekipman_alim_yeri")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutarı (Konteyner Başı, {dosya.para_birimi || "USD"}) *</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Navlun Tutarı (Konteyner Başı, {dosya.para_birimi || "USD"}){maliyetEtiketSoneki}</label>
         <input type="number" step="0.01" value={form.navlun_tutari} onChange={(e) => update("navlun_tutari", e.target.value)} placeholder="örn: 400" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("navlun_tutari")}
       </div>
       <div>
-        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Başı, {dosya.para_birimi || "USD"}) *</label>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Lokal Masraf (Konteyner Başı, {dosya.para_birimi || "USD"}){maliyetEtiketSoneki}</label>
         <input type="number" step="0.01" value={form.lokal_masraf_tutari} onChange={(e) => update("lokal_masraf_tutari", e.target.value)} placeholder="örn: 150" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("lokal_masraf_tutari")}
       </div>
+      {navlunOpsiyonel && (
+        <p className="md:col-span-3 -mt-2 text-xs" style={{ color: TEXT_MUTED }}>
+          Teslim şekli {(dosya.teslim_sekli || "").trim().toUpperCase()}: navlunu alıcı öder, navlun ve lokal masraf boş bırakılabilir.
+        </p>
+      )}
     </div>
   );
 }
@@ -328,7 +342,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
   };
 
   const handleSave = async () => {
-    const e = validateForm(form);
+    const e = validateForm(form, navlunAliciyaAitMi(dosya.teslim_sekli));
     setErrors(e);
     if (Object.keys(e).length > 0) return;
 
@@ -521,7 +535,7 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
   };
 
   const handleSaveNew = async () => {
-    const e = validateForm(newForm);
+    const e = validateForm(newForm, navlunAliciyaAitMi(dosya.teslim_sekli));
     setNewErrors(e);
     if (Object.keys(e).length > 0) return;
 

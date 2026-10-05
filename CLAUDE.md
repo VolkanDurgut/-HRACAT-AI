@@ -230,6 +230,17 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   biraz yukarı alınıp küçültülür; diğer evraklarda yer zaten yeterli.
 - `ana_siparisler.proforma_no` (sipariş kimliği) tek numara kalır, değişmez.
 
+## Rezervasyon formu — FOB teslimde navlun opsiyonel (05.10.2026)
+
+- Rezervasyon formunda tüm alanlar zorunludur; İSTİSNA: teslim şekli FOB /
+  FCA / FAS / EXW ise (navlunu alıcı öder) Navlun ve Lokal Masraf boş
+  bırakılabilir, etikette "*" çıkmaz, formun altında açıklama görünür.
+  Karar tek yerde: `lib/teslim-sekli.ts → navlunAliciyaAitMi` (teslim_sekli
+  serbest metin, kelime olarak aranır: "FOB AMBARLI" da FOB sayılır).
+  Girilirse yine kaydedilir. Kullanıcı isteği: IHR-2026-0090 (FOB).
+- Boş navlun/lokal masraf evrakları bozmaz: Fatura Talimatı, ECTN satırları
+  ve Ek Bilgiler kartı null değeri "–" gösterir / FOB sütununu hesaplamaz.
+
 ## Rezervasyon silme
 
 - `konteynerler.rezervasyon_id` FK'si `ON DELETE CASCADE`: rezervasyon

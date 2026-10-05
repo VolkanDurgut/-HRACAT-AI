@@ -419,8 +419,8 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Rezervasyonlarda baş/son boşluklu 5 kayıt temizlendi; rezervasyon kaydı
   artık metin alanlarını kırpar. Navlun/lokal masraf ve ödeme kartındaki
   tutarlar `sayiOku` ile okunur ("1250,50" artık 1250 değil).
-- Bilerek bırakılanlar: performans uyarıları (19 dosyada etkisiz), depoda
-  hiçbir kayda bağlı olmayan ~35 MB PDF (silme kullanıcı kararı bekliyor).
+- Bilerek bırakılanlar: performans uyarıları (19 dosyada etkisiz). Kayda
+  bağlı olmayan ~36 MB PDF 05.10.2026'da karantinaya alındı (aşağıya bkz.).
 
 ## Log / kilitlenme kontrolü (05.10.2026)
 
@@ -491,6 +491,28 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   eklendi). Eski ve yeni aynı yolsa (upsert) hiçbir şey silinmez. Hiçbir depo
   dosyası iki kayıtta paylaşılmıyor (05.10.2026 doğrulandı; "Siparişe Devam
   Et" dosya URL'si kopyalamaz) — paylaşım eklenirse bu kural yeniden düşünülmeli.
+
+## Depo temizliği — KARANTİNA (05.10.2026)
+
+- Hiçbir kayda bağlı olmayan 68 dosya (36,7 MB) SİLİNMEDİ; aynı bucket'ta
+  `_karantina/2026-10-05/<eski yol>` altına TAŞINDI (geri alınabilir).
+  Kanıt: tüm tablolar (JSON dahil) tarandı; 47'si yeniden yüklemeyle eskimiş
+  kopya (aynı belgenin DAHA YENİ sürümü kayıtta), 5'i silinmiş dosyalara ait
+  (e0d1264e: IHR-2026-0072'nin mükerrer DBA'ları, ccb9d562: test konteyneri
+  ABCD1234567, 644ebc69: 26.08'de silinmiş dosyanın faturası), 16'sı
+  sistemin yeniden üretebildiği eski evrak arşivi (HTML / sonradan orijinali
+  basılmış taslak). Liste md5 `7991d1e970067a7955801bbb2fb1e9b0`.
+- Taşıma sonrası: 241 kayıt referansının 0'ı kırık, karantinada 68 dosya.
+- Araç: edge function `depo-karantina` (repoda `supabase/functions/depo-karantina`).
+  `{"islem":"rapor"}` değişiklik yapmaz; `"geri_al"` hepsini eski yerine
+  taşır; `{"kontrol":[bucket, yol]}` dedektörü sınar. KALICI SİLME İÇERMEZ.
+  Her taşımadan önce dosyanın kayıtlarda kullanılıp kullanılmadığı tekrar
+  kontrol edilir (kullanılıyorsa atlanır).
+- AÇIK: kullanıcı birkaç gün sorun görmezse onayıyla karantina kalıcı
+  silinir (yer ancak o zaman açılır), ardından fonksiyon devre dışı bırakılır.
+- Not: IHR-2026-0086'nın CI ve Phyto arşiv kayıtları "…-DENEME.pdf" adlı
+  dosyaları gösteriyor (kayda bağlı, dokunulmadı; evrak yeniden üretilince
+  ad düzelir ve eski arşiv otomatik silinir).
 
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 

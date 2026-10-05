@@ -438,7 +438,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   gelmiyordu. Son gecenin sonucu: `select status_code, content from
   net._http_response order by id desc limit 1` (pg_net ~6 saat saklar) veya
   `yedek_kayitlari`.
-- Canlıdaki sürüm repodaki koddur (v2, 01.10.2026). Fonksiyonu değiştirince
+- Canlıdaki sürüm repodaki koddur (Supabase v4, 05.10.2026). Fonksiyonu değiştirince
   ayrıca DEPLOY edilmesi gerekir (Supabase MCP `deploy_edge_function` veya CLI)
   — commit/push tek başına canlıyı değiştirmez.
 - Yeni bir iş tablosu eklenirse `YEDEKLENECEK_TABLOLAR` listesine de eklenmeli.
@@ -450,6 +450,30 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Her gerçek çalışma `yedek_kayitlari` tablosuna yazılır (RLS açık, politika
   yok → sadece service_role). Son 20 saatte başarılı yedek varsa yeni mail
   gönderilmez. Test için gövde `{"deneme": true}`: mail/kayıt yok, sadece özet.
+
+## Donanım / altyapı ve kapasite (05.10.2026)
+
+- SQL Server'daki .mdf/.ldf ayrımı ve auto-growth ayarının karşılığı yok:
+  veri ve WAL aynı yönetilen diskte (`/data/pgdata`), büyümeyi Supabase
+  yönetir. Bizim sınırımız plan kotası: Free → DB 500 MB, dosya deposu 1 GB,
+  50 MB tek dosya, yedek yok, 1 hafta hareketsizlikte proje durdurulur.
+- 05.10.2026: DB 20 MB (%4), depo ~159 MB (%15,5). Depo haftada 40–65 MB
+  büyüyor (DBA PDF'leri ~93 MB, Draft BL ~2 MB/adet, CoO/Phyto orijinal
+  ~3,7 MB/adet) → %85'e tahmini 11–18 hafta. Nano sınıfı ayarlar
+  (shared_buffers 224 MB, work_mem ~2 MB, max_connections 60), cache hit
+  %100, checkpoint'ler sağlıklı. CPU/RAM trendi MCP'den okunamaz →
+  Supabase panel → Reports → Database.
+- Kapasite izleme gece yedek mailinde: `public.veritabani_boyutu_bayt()`
+  (sadece service_role EXECUTE; migration `20261005110000`, canlıya
+  UYGULANDI) + storage envanteri toplamı. %85 → uyarı (konu `[UYARI]`),
+  %90 → "KRİTİK". Plan değişirse `DB_KOTA_BAYT` / `DEPO_KOTA_BAYT` güncellenir.
+- Yedek fonksiyonu okuma isteklerinde 5xx / ağ hatasında 2 kez yeniden dener
+  (`geciciHatadaTekrarla`): 05.10.2026 deneme çalışmasında 19 satırlık
+  `ihracat_dosyalari` PostgREST'ten tek seferlik HTTP 555 döndü.
+- AÇIK KONU (kullanıcı kararı bekliyor): DBA / Draft BL / fatura / konşimento /
+  irsaliye yeniden yüklenince ESKİ dosya depodan silinmiyor (28 sahipsiz DBA
+  ≈17 MB). Düzeltme yapılırsa sıra CLAUDE.md kuralına uyar: yeni dosya yükle →
+  DB güncelle ve kontrol et → SADECE başarılıysa eski dosyayı sil.
 
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 

@@ -28,6 +28,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 //  - DENEME MODU: govdede {"deneme": true} -> her sey hazirlanir ama mail
 //    GONDERILMEZ, kayit YAZILMAZ; yanitta SADECE ozet sayilar doner (veri
 //    donmez).
+//  - KAPASITE IZLEME (05.10.2026): mailde DB ve dosya deposu doluluk orani
+//    yazilir. %85'i gecen kaynak uyariya eklenir (konu "[UYARI]"), %90'da
+//    "KRITIK" yazar. DB boyutu public.veritabani_boyutu_bayt() (sadece
+//    service_role) ile, depo boyutu storage envanterinden hesaplanir.
+//    Sinirlar Free plan kotasidir; plan degisirse asagidaki sabitler guncellenir.
+//  - GECICI HATA TEKRARI (05.10.2026): okuma isteklerinde 5xx / ag hatasi
+//    olursa 2 kez daha denenir (geciciHatadaTekrarla).
 //
 // depositors ve contact_messages tablolari BASKA bir projeye ait - bilerek
 // yedege dahil edilmez (bkz. CLAUDE.md).
@@ -71,10 +78,34 @@ const MAKS_EK_BAYT = 25 * 1024 * 1024;
 // Ayni gun icinde ikinci bir yedek maili gonderilmez.
 const TEKRAR_BEKLEME_SAAT = 20;
 
+// Kapasite izleme (Free plan kotalari, supabase.com/pricing 05.10.2026).
+const DB_KOTA_BAYT = 500 * 1024 * 1024;
+const DEPO_KOTA_BAYT = 1024 * 1024 * 1024;
+const KAPASITE_UYARI_ORAN = 0.85;
+const KAPASITE_KRITIK_ORAN = 0.9;
+
 const servisBasliklari = {
   apikey: SERVICE_ROLE_KEY,
   Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
 };
+
+/** Gecici sunucu hatalarinda (5xx, ag hatasi) 2 kez daha dener (2 sn, 4 sn
+ * bekleyerek). 05.10.2026: PostgREST'in "Thread killed by timeout manager"
+ * aninda 19 satirlik ihracat_dosyalari tek seferlik HTTP 555 dondurdu; tek
+ * bir anlik kesinti gece yedeginde tabloyu eksik birakmasin. 4xx tekrar
+ * denenmez (kalici hata). */
+async function geciciHatadaTekrarla(istek: () => Promise<Response>): Promise<Response> {
+  for (let sira = 0; ; sira++) {
+    try {
+      const res = await istek();
+      if (res.status < 500 || sira >= 2) return res;
+      await res.body?.cancel();
+    } catch (e) {
+      if (sira >= 2) throw e;
+    }
+    await new Promise((r) => setTimeout(r, 2000 * (sira + 1)));
+  }
+}
 
 /** Bir tablonun TUM satirlarini 1000'erlik sayfalarla ceker. Hata olursa
  * firlatir (sessizce bos donmez). */
@@ -84,7 +115,7 @@ async function tabloyuSayfaliCek(tablo: string, ekFiltre = "", siralama = "id.as
     // limit/offset: son sayfadan sonrasi her zaman bos liste (200) doner;
     // Range basligi tam 1000'in katinda 416 hatasi verebiliyordu.
     const url = `${SUPABASE_URL}/rest/v1/${tablo}?select=*&order=${siralama}${ekFiltre}&limit=${SAYFA_BOYUTU}&offset=${baslangic}`;
-    const res = await fetch(url, { headers: servisBasliklari });
+    const res = await geciciHatadaTekrarla(() => fetch(url, { headers: servisBasliklari }));
     if (!res.ok) {
       throw new Error(`${tablo} okunamadı (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
     }
@@ -101,11 +132,13 @@ type StorageDosyasi = { bucket: string; yol: string; bayt: number | null; tur: s
 async function bucketDosyalariniListele(bucket: string, onEk = ""): Promise<StorageDosyasi[]> {
   const sonuc: StorageDosyasi[] = [];
   for (let offset = 0; ; offset += SAYFA_BOYUTU) {
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
-      method: "POST",
-      headers: { ...servisBasliklari, "Content-Type": "application/json" },
-      body: JSON.stringify({ prefix: onEk, limit: SAYFA_BOYUTU, offset, sortBy: { column: "name", order: "asc" } }),
-    });
+    const res = await geciciHatadaTekrarla(() =>
+      fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+        method: "POST",
+        headers: { ...servisBasliklari, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefix: onEk, limit: SAYFA_BOYUTU, offset, sortBy: { column: "name", order: "asc" } }),
+      })
+    );
     if (!res.ok) {
       throw new Error(`${bucket}/${onEk} listelenemedi (HTTP ${res.status})`);
     }
@@ -131,7 +164,7 @@ async function bucketDosyalariniListele(bucket: string, onEk = ""): Promise<Stor
 }
 
 async function storageEnvanteriCikar(): Promise<StorageDosyasi[]> {
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/bucket`, { headers: servisBasliklari });
+  const res = await geciciHatadaTekrarla(() => fetch(`${SUPABASE_URL}/storage/v1/bucket`, { headers: servisBasliklari }));
   if (!res.ok) throw new Error(`Bucket listesi alınamadı (HTTP ${res.status})`);
   // deno-lint-ignore no-explicit-any
   const bucketlar = (await res.json()) as any[];
@@ -166,6 +199,34 @@ async function calismayiKaydet(kayit: Record<string, unknown>): Promise<void> {
     body: JSON.stringify(kayit),
   });
   if (!res.ok) console.error("yedek_kayitlari yazilamadi:", res.status, await res.text());
+}
+
+/** Veritabani boyutu (bayt). Okunamazsa firlatir. */
+async function veritabaniBoyutu(): Promise<number> {
+  const res = await geciciHatadaTekrarla(() =>
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/veritabani_boyutu_bayt`, {
+      method: "POST",
+      headers: { ...servisBasliklari, "Content-Type": "application/json" },
+      body: "{}",
+    })
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const deger = Number(await res.json());
+  if (!Number.isFinite(deger) || deger <= 0) throw new Error("geçersiz değer");
+  return deger;
+}
+
+type KapasiteSatiri = { kaynak: string; bayt: number | null; kota: number; oran: number | null };
+
+function kapasiteDurumu(oran: number | null): "normal" | "uyari" | "kritik" | "olculemedi" {
+  if (oran === null) return "olculemedi";
+  if (oran >= KAPASITE_KRITIK_ORAN) return "kritik";
+  if (oran >= KAPASITE_UYARI_ORAN) return "uyari";
+  return "normal";
+}
+
+function yuzdeYaz(oran: number): string {
+  return `%${(oran * 100).toFixed(1).replace(".", ",")}`;
 }
 
 function escapeHtml(deger: string): string {
@@ -241,6 +302,30 @@ Deno.serve(async (req: Request) => {
       o.bayt += d.bayt || 0;
     }
 
+    // ---- Kapasite (DB + dosya deposu) ----
+    let dbBayt: number | null = null;
+    try {
+      dbBayt = await veritabaniBoyutu();
+    } catch (e) {
+      uyarilar.push(`Veritabanı boyutu ölçülemedi: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // Envanter cikarilamadiysa depo boyutu bilinmiyor (0 yazmak yaniltir).
+    const envanterVar = !uyarilar.some((u) => u.startsWith("Storage dosya listesi"));
+    const depoBayt = envanterVar ? storageDosyalari.reduce((s, d) => s + (d.bayt || 0), 0) : null;
+    const kapasite: KapasiteSatiri[] = [
+      { kaynak: "Veritabanı", bayt: dbBayt, kota: DB_KOTA_BAYT, oran: dbBayt === null ? null : dbBayt / DB_KOTA_BAYT },
+      { kaynak: "Dosya deposu (PDF vb.)", bayt: depoBayt, kota: DEPO_KOTA_BAYT, oran: depoBayt === null ? null : depoBayt / DEPO_KOTA_BAYT },
+    ];
+    for (const k of kapasite) {
+      const d = kapasiteDurumu(k.oran);
+      if (d === "kritik" || d === "uyari") {
+        uyarilar.push(
+          `${d === "kritik" ? "KRİTİK: " : ""}${k.kaynak} ${yuzdeYaz(k.oran!)} dolu (${mbYaz(k.bayt!)} / ${mbYaz(k.kota)}). ` +
+            "Yer açılmalı veya plan yükseltilmeli; kota dolunca yeni yükleme/kayıt yapılamaz."
+        );
+      }
+    }
+
     const simdi = new Date();
     const tarih = simdi.toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" });
     const paket = {
@@ -273,6 +358,7 @@ Deno.serve(async (req: Request) => {
       storageDosyaSayisi: storageDosyalari.length,
       tablolar: tabloSayilari,
       bucketlar: bucketOzeti,
+      kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
       uyarilar,
     };
 
@@ -288,11 +374,21 @@ Deno.serve(async (req: Request) => {
     const uyariBlogu = uyarilar.length
       ? `<div style="background:#fef2f2;border:1px solid #fecaca;padding:10px 14px;border-radius:8px;margin:12px 0;"><b>Uyarılar:</b><ul>${uyarilar.map((u) => `<li>${escapeHtml(u)}</li>`).join("")}</ul></div>`
       : "";
+    const kapasiteRenk = { normal: "#15803d", uyari: "#b45309", kritik: "#b91c1c", olculemedi: "#6b7280" };
+    const kapasiteSatirlari = kapasite
+      .map((k) => {
+        const d = kapasiteDurumu(k.oran);
+        const deger = k.oran === null ? "ölçülemedi" : `${mbYaz(k.bayt!)} / ${mbYaz(k.kota)} (${yuzdeYaz(k.oran)})`;
+        return `<tr><td style="padding:2px 12px 2px 0;">${escapeHtml(k.kaynak)}</td><td style="padding:2px 0;text-align:right;color:${kapasiteRenk[d]};font-weight:${d === "normal" ? "400" : "700"};">${deger}</td></tr>`;
+      })
+      .join("");
     const html = `
 <p>İhracat AI veritabanınızın ${tarih} tarihli otomatik yedeği ${ekSigiyor ? "ektedir" : "<b>bu sefer eke sığmadı</b>"}.</p>
 ${uyariBlogu}
 <p><b>Toplam ${toplamKayit} kayıt, ${tabloSayilari.length} tablo.</b></p>
 <table style="border-collapse:collapse;font-size:13px;">${tabloSatirlari}</table>
+<p style="margin-top:14px;"><b>Kapasite (Free plan kotası):</b> %85'te uyarı, %90'da kritik.</p>
+<table style="border-collapse:collapse;font-size:13px;">${kapasiteSatirlari}</table>
 <p style="margin-top:14px;"><b>Dosyalar (PDF vb.):</b> Yedekte sadece dosya <i>listesi</i> vardır; dosyaların kendisi mail ekine sığmadığı için yedekte değildir ve Supabase Storage'da durur.</p>
 <ul>${bucketSatirlari || "<li>-</li>"}</ul>
 <p>Bu dosyayı güvenli bir yerde (örn. bilgisayarınızda veya bulut depolamada) saklamanızı öneririz.</p>`;

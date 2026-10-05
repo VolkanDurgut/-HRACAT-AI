@@ -411,11 +411,33 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Bilerek bırakılanlar: performans uyarıları (19 dosyada etkisiz), depoda
   hiçbir kayda bağlı olmayan ~35 MB PDF (silme kullanıcı kararı bekliyor).
 
+## Log / kilitlenme kontrolü (05.10.2026)
+
+- Supabase yönetilen sunucu: işletim sistemi loglarına erişim yok. Bakılacak
+  yerler: `query_logs` (postgres_logs, postgrest_logs, edge_logs, auth_logs,
+  function_logs), `pg_stat_database` (deadlocks, conflicts, temp),
+  `pg_stat_activity` / `pg_locks` / `pg_blocking_pids`, `pg_stat_statements`,
+  `cron.job_run_details`, `net._http_response`, `pg_replication_slots`.
+- 05.10.2026 durumu: 56 günde 0 deadlock, 0 conflict, bekleyen kilit / açık
+  işlem yok, rollback %0,12, cache hit %100, Postgres'te ERROR/FATAL yok,
+  tüm API istekleri 2xx.
+- PostgREST'teki "Warp server error: Thread killed by timeout manager"
+  kayıtları HATA DEĞİL (boşta kalan keep-alive bağlantılarının kapatılması);
+  aynı anda 4xx/5xx yoksa yok say. `SELECT name FROM pg_timezone_names`
+  (authenticator, ~400 ms) PostgREST şema önbelleği sorgusudur, uygulamadan
+  gelmez.
+
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon
   anahtarla çağırır; fonksiyon veritabanı JSON yedeğini Resend ile
   `GERI_BILDIRIM_ALICI` adresine mail eki olarak gönderir.
+- Cron çağrısı `timeout_milliseconds := 60000` ile yapılır (05.10.2026,
+  migration `20261005090000`). Varsayılan 5 sn'de fonksiyon (~10 sn) bitmeden
+  zaman aşımı yazılıyordu; yedek alınsa da cevap `net._http_response`'a
+  gelmiyordu. Son gecenin sonucu: `select status_code, content from
+  net._http_response order by id desc limit 1` (pg_net ~6 saat saklar) veya
+  `yedek_kayitlari`.
 - Canlıdaki sürüm repodaki koddur (v2, 01.10.2026). Fonksiyonu değiştirince
   ayrıca DEPLOY edilmesi gerekir (Supabase MCP `deploy_edge_function` veya CLI)
   — commit/push tek başına canlıyı değiştirmez.

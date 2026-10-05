@@ -1,6 +1,7 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, limanAdiAyikla, detayliAmbalajCokluSegmentli, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
+import { teslimSekliLimani } from "@/lib/teslim-sekli";
 
 /**
  * HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi).
@@ -470,7 +471,8 @@ export function buildCommercialInvoiceHtml(
     DETAYLI_AMBALAJ: buildDetayliAmbalaj(dosya, konteynerler),
     SEVKIYAT_YONTEMI: buildSevkiyatYontemi(konteynerler),
     TESLIM_SEKLI: safe(dosya.teslim_sekli, ""),
-    VARIS_LIMANI: safe(dosya.varis_limani, ""),
+    // FOB grubunda yukleme limani, digerlerinde varis limani (bkz. teslimSekliLimani).
+    VARIS_LIMANI: safe(teslimSekliLimani(dosya.teslim_sekli, dosya.yuklenme_limani, dosya.varis_limani), ""),
     ODEME_SEKLI: safe(dosya.odeme_sekli),
     LOT_NO: safe(dosya.lot_no),
     KONTEYNER_NUMARALARI: buildKonteynerNumaralari(konteynerler),

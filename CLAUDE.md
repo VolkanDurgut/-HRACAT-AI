@@ -238,6 +238,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Karar tek yerde: `lib/teslim-sekli.ts → navlunAliciyaAitMi` (teslim_sekli
   serbest metin, kelime olarak aranır: "FOB AMBARLI" da FOB sayılır).
   Girilirse yine kaydedilir. Kullanıcı isteği: IHR-2026-0090 (FOB).
+- Commercial Invoice "SHIPMENT TERMS": FOB / FCA / FAS / EXW → teslim şekli +
+  YÜKLEME limanı ("FOB AMBARLI PORT"); diğerleri → + varış limanı (değişmedi).
+  Tek yer: `lib/teslim-sekli.ts → teslimSekliLimani`. Eskiden FOB'da da varış
+  ekleniyordu ("FOB Mariel Port, Cuba" – IHR-2026-0076). Canlı 20 dosyada
+  kontrol: sadece 2 FOB dosyası değişti. Arşivlenmiş eski PDF'ler değişmez,
+  evrak yeniden üretilince düzelir.
+- Birden fazla proforma TEK evrak seti (05.10.2026, BIRRAKA 5 FCL: UNEXBIS170626-1
+  100 MTS @410 + UNEXBIS120526 25 MTS @413): büyük proforma yüklenir, sipariş
+  takibi "Tek Seferlik Dosya", ikinci no Proforma kartından eklenir, ikinci
+  proformanın kalemi Ürün Detayları'na AYRI SATIR (farklı fiyat) eklenir →
+  miktar/toplam otomatik güncellenir; CI/PL/Fatura Talimatı/Sigorta tüm
+  satırları kullanır. Avans = alınan avansların toplamı (Ödeme kartı), CI'da
+  TEK banka çıkar (proformalardaki banka farklıysa kullanıcı seçer).
 - Boş navlun/lokal masraf evrakları bozmaz: Fatura Talimatı, ECTN satırları
   ve Ek Bilgiler kartı null değeri "–" gösterir / FOB sütununu hesaplamaz.
 

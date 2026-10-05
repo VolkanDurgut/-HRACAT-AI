@@ -572,6 +572,29 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   derleme araçlarındaki bilinen uyarılar yüzünden KIRMIZI kalır (Next 15
   geçişine kadar beklenen durum; deploy'u engellemez).
 
+## Yüksek erişilebilirlik / replikasyon (05.10.2026)
+
+- Free plan: TEK veritabanı sunucusu. Read replica, standby, otomatik
+  failover YOK (read replica Pro plan + Small compute ister; ayrıca HA
+  Supabase'in kendi altyapısında). `pg_stat_replication` boş, kalıcı
+  replikasyon slotu yok, `pg_is_in_recovery()=false`, `hot_standby=off` →
+  izlenecek lag yok. WAL arşivleme açık (`pg_stat_archiver`: 0 hata) ama
+  Free planda kullanıcıya geri yükleme (PITR) sunulmaz.
+- Tek "replikasyon": Supabase Realtime, Kantar Paneli için
+  `supabase_realtime` yayınındaki `konteynerler` tablosunu mantıksal
+  replikasyonla dinler. Slot (`supabase_realtime_messages_replication_slot_*`)
+  panel açıkken oluşur, kimse bağlı değilken kapanır; `max_slot_wal_keep_size
+  = 512MB` takılı slotun diski doldurmasını engeller. Kontrol:
+  `select slot_name, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) from pg_replication_slots`.
+- Kantar Paneli bağlantı dayanıklılığı (`app/kantar/page.tsx`): canlı kanal
+  (yeniden) bağlanınca, sekmeye dönülünce, internet gelince ve görünürken
+  dakikada bir liste yenilenir (kopukken kaçan değişiklikler telafi edilir).
+  Okuma başarısızsa liste BOŞALTILMAZ (eskiden kesinti anında "konteyner yok"
+  görünüyordu), başlıkta "Bağlantı yok · SS:DD" çıkar; telefonda Yenile
+  butonunda renkli nokta. Aynı anda biten yenilemelerde sadece en sonuncusu
+  ekrana yazılır (`istekSira`).
+- Felaket kurtarma (proje tamamen kaybolursa): `docs/felaket-kurtarma.md`.
+
 ## Kimlik doğrulama / kullanıcılar (karar: 01.10.2026)
 
 - Uygulamayı **sadece Unex Gıda** kullanıyor. Kayıt formu YOK; kullanıcılar

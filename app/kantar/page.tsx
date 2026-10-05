@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -52,22 +52,39 @@ export default function KantarPage() {
   const [loading, setLoading] = useState(true);
   const [arama, setArama] = useState("");
   const [secilenGun, setSecilenGun] = useState<string | null>(null);
+  // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
+  // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
+  // baslatmasi) aradaki degisiklikler kacirilmasin diye yeniden baglaninca,
+  // sekmeye donulunce, internet gelince ve dakikada bir liste yenilenir.
+  const [canliBagli, setCanliBagli] = useState(false);
+  const [okumaHatasi, setOkumaHatasi] = useState(false);
+  const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
+  const istekSira = useRef(0);
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
   const fetchKonteynerler = useCallback(async () => {
     if (!user?.id || !companyId) return;
+    // Ayni anda birden fazla yenileme olabilir (canli bildirim + periyodik):
+    // sadece EN SON baslayanin sonucu ekrana yazilir.
+    const sira = ++istekSira.current;
+    const eskiIstek = () => sira !== istekSira.current;
+    // Okuma basarisizsa (ag kesintisi) liste BOSALTILMAZ: eski liste kalir,
+    // ustte uyari gorunur. Eskiden kesinti aninda "konteyner yok" gorunuyordu.
+    const okumaBasarisiz = () => { setOkumaHatasi(true); setLoading(false); };
 
     // ONCE sadece ACIK dosyalar cekilir. Kantar panelinin ilgi alani zaten
     // yalnizca acik (henuz sevk edilmemis) dosyalarin konteynerleridir - bu
     // sayede konteynerler tablosunun tum tarihcesi degil, sadece guncel alt
     // kume cekilir. Sirket yillar boyunca veri biriktirdikce bu sayfa
     // yavaslamaz, cunku "acik dosya" sayisi dogasi geregi sinirlidir.
-    const { data: dosyaData } = await supabase
+    const { data: dosyaData, error: dosyaHata } = await supabase
       .rpc("kantar_dosya_listesi")
       .or("durum.eq.Açık,durum.eq.Acik");
 
-    if (!dosyaData || dosyaData.length === 0) { setKonteynerler([]); setLoading(false); return; }
+    if (eskiIstek()) return;
+    if (dosyaHata) { okumaBasarisiz(); return; }
+    if (!dosyaData || dosyaData.length === 0) { setKonteynerler([]); setOkumaHatasi(false); setSonGuncelleme(new Date()); setLoading(false); return; }
 
     const dosyaIds = dosyaData.map((d: any) => d.id);
     const dosyaMap: Record<string, { dosya_no: string; marka: string | null; alici_firma: string | null }> = {};
@@ -75,7 +92,7 @@ export default function KantarPage() {
 
     // REZERVASYON BULMA - İYİLEŞTİRİLDİ
     // Konteynerin rezervasyon_id'si boş olsa bile, dosya üzerinden booking no bulur.
-    const [{ data: kontData }, { data: rezData }] = await Promise.all([
+    const [{ data: kontData, error: kontHata }, { data: rezData, error: rezHata }] = await Promise.all([
       supabase
         .from("konteynerler")
         .select("id, konteyner_no, muhur_no, tip, dosya_id, rezervasyon_id, plaka, tare_kg, net_agirlik_kg, vgm_kg, dba_dosya_url, dba_dosya_adi, dba_yukleme_tarihi, dba_kontrol_sonucu, dba_belge_no, marka, irsaliye_dosya_url, irsaliye_dosya_adi, irsaliye_yukleme_tarihi")
@@ -88,7 +105,9 @@ export default function KantarPage() {
         .in("dosya_id", dosyaIds),
     ]);
 
-    if (!kontData || kontData.length === 0) { setKonteynerler([]); setLoading(false); return; }
+    if (eskiIstek()) return;
+    if (kontHata || rezHata) { okumaBasarisiz(); return; }
+    if (!kontData || kontData.length === 0) { setKonteynerler([]); setOkumaHatasi(false); setSonGuncelleme(new Date()); setLoading(false); return; }
 
     const rezDosyaMap: Record<string, string> = {};
     const rezIdMap: Record<string, string> = {};
@@ -110,6 +129,8 @@ export default function KantarPage() {
       })) as KonteynerRow[];
 
     setKonteynerler(enriched);
+    setOkumaHatasi(false);
+    setSonGuncelleme(new Date());
     setLoading(false);
   }, [user?.id, companyId]);
 
@@ -137,9 +158,38 @@ export default function KantarPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler", filter: `company_id=eq.${companyId}` }, () => {
         fetchKonteynerler();
       })
-      .subscribe();
+      .subscribe((durum) => {
+        if (durum === "SUBSCRIBED") {
+          setCanliBagli(true);
+          // (Yeniden) baglanildi: kopukken / abonelik kurulurken olan
+          // degisiklikler bildirim olarak GELMEZ, listeyi tazele.
+          fetchKonteynerler();
+        } else {
+          // CHANNEL_ERROR / TIMED_OUT / CLOSED: istemci kendisi yeniden dener.
+          setCanliBagli(false);
+        }
+      });
     return () => { supabase.removeChannel(channel); };
   }, [fetchKonteynerler, user?.id, companyId]);
+
+  useEffect(() => {
+    if (!user?.id || !companyId) return;
+    const gorunurseYenile = () => { if (document.visibilityState === "visible") fetchKonteynerler(); };
+    // Canli bildirim kacirilsa bile liste en fazla 1 dk eski kalir.
+    const zamanlayici = window.setInterval(gorunurseYenile, 60_000);
+    document.addEventListener("visibilitychange", gorunurseYenile);
+    window.addEventListener("online", gorunurseYenile);
+    return () => {
+      window.clearInterval(zamanlayici);
+      document.removeEventListener("visibilitychange", gorunurseYenile);
+      window.removeEventListener("online", gorunurseYenile);
+    };
+  }, [fetchKonteynerler, user?.id, companyId]);
+
+  const baglantiSorunu = okumaHatasi || !canliBagli;
+  const sonGuncellemeSaat = sonGuncelleme
+    ? sonGuncelleme.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+    : "–";
 
   const handleDbaYukle = async (konteyner: KonteynerRow, file: File) => {
     await yukleDba(konteyner, file);
@@ -270,6 +320,15 @@ export default function KantarPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <span
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium whitespace-nowrap ${baglantiSorunu ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400"}`}
+              title={baglantiSorunu
+                ? `Sunucuyla bağlantı kurulamadı; liste ${sonGuncellemeSaat} itibarıyla. Bağlantı gelince otomatik yenilenir.`
+                : `Değişiklikler anında yansıyor. Son güncelleme: ${sonGuncellemeSaat}`}
+              aria-live="polite">
+              <span className={`w-2 h-2 rounded-full ${baglantiSorunu ? "bg-amber-500" : "bg-emerald-500"}`} />
+              {baglantiSorunu ? <span>Bağlantı yok · {sonGuncellemeSaat}</span> : <span>Canlı</span>}
+            </span>
             {digerSayfa && (
               <button onClick={() => router.push(digerSayfa)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
@@ -279,9 +338,14 @@ export default function KantarPage() {
               </button>
             )}
             <button onClick={fetchKonteynerler}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
-              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}>
+              className="relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
+              title={baglantiSorunu ? `Bağlantı yok — liste ${sonGuncellemeSaat} itibarıyla` : "Canlı — değişiklikler anında yansıyor"}>
               <RefreshCw size={14} /> Yenile
+              {/* Dar ekranda baglanti durumu: butonun kosesinde nokta (baslik tasmasin). */}
+              <span aria-hidden="true"
+                className={`sm:hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ${baglantiSorunu ? "bg-amber-500" : "bg-emerald-500"}`}
+                style={{ boxShadow: `0 0 0 2px ${PAGE_BG}` }} />
             </button>
             <button onClick={signOut}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"

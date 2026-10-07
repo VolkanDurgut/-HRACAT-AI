@@ -12,11 +12,12 @@ import {
   RaporKonteyneri,
   RaporRezervasyonu,
   SevkiyatSatiri,
-  DURUM_METNI,
+  durumRozetMetni,
 } from "@/supabase/functions/_shared/gunluk-rapor";
 
 /**
- * Gunluk Sevkiyat ve Kantar Raporu (yenilendi: 07.10.2026).
+ * Guncel Ihracat Raporu (yenilendi: 07.10.2026; eski adi "Gunluk Sevkiyat ve
+ * Kantar Raporu").
  * Hesap TEK YERDE: supabase/functions/_shared/gunluk-rapor.ts - her sabah
  * 08:00 ve aksam 17:00 giden rapor maili (gunluk-rapor-gonder) ayni sayilari
  * kullanir. Sayfa yazdirmaya / PDF'e uygun beyaz belge olarak kalir.
@@ -27,11 +28,6 @@ const LACIVERT = "#1E293B";
 const YESIL = "#059669";
 const AMBER = "#D97706";
 const GRI = "#64748B";
-
-type DetayGrubu = {
-  musteri: string;
-  konteynerler: { konteyner_no: string; muhur_no: string | null; plaka: string | null; net: number | null; yuklendi: boolean }[];
-};
 
 const sayi = (n: number) => n.toLocaleString("tr-TR");
 
@@ -48,11 +44,29 @@ function tarihKisa(tarih: string | null): string {
 function DurumRozeti({ s }: { s: SevkiyatSatiri }) {
   const renk = s.durum === "tamamlandi" ? YESIL : s.durum === "yukleniyor" ? AMBER : GRI;
   const zemin = s.durum === "tamamlandi" ? "#D1FAE5" : s.durum === "yukleniyor" ? "#FEF3C7" : "#F1F5F9";
-  const metin = s.durum === "yukleniyor" ? `Yükleniyor ${s.yuklenen}/${s.konteynerAdedi}` : DURUM_METNI[s.durum];
+  const metin = durumRozetMetni(s);
   return (
     <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap" style={{ backgroundColor: zemin, color: renk }}>
       {metin}
     </span>
+  );
+}
+
+function FaturaRozeti({ s }: { s: SevkiyatSatiri }) {
+  if (!s.faturaKesildi) {
+    return <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>Kesilmedi</span>;
+  }
+  return (
+    <div>
+      <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap" style={{ backgroundColor: "#D1FAE5", color: YESIL }}>Kesildi</span>
+      {(s.faturaNo || s.faturaTarihi) && (
+        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+          {s.faturaNo}
+          {s.faturaNo && s.faturaTarihi ? <br /> : null}
+          {s.faturaTarihi ? tarihKisa(s.faturaTarihi) : null}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -74,7 +88,6 @@ export default function GunlukRaporSayfasi() {
   const [hata, setHata] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [rapor, setRapor] = useState<GunlukRapor | null>(null);
-  const [detay, setDetay] = useState<DetayGrubu[]>([]);
   // Tarih hizli degisirse (ornegin ?tarih= ile acilis) once baslayan ama gec
   // biten istek ekrani ezmesin: sadece EN SON istegin sonucu yazilir.
   const istekSira = useRef(0);
@@ -102,7 +115,7 @@ export default function GunlukRaporSayfasi() {
 
     const { data: acikDosyalar, error: e1 } = await supabase
       .from("ihracat_dosyalari")
-      .select("id, dosya_no, alici_firma, marka")
+      .select("id, dosya_no, alici_firma, marka, fatura_dosya_url, fatura_no, fatura_tarihi")
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik");
     const acikIdler = (acikDosyalar || []).map((d) => d.id);
@@ -149,24 +162,6 @@ export default function GunlukRaporSayfasi() {
       )
     );
 
-    // Ek: acik dosyalarin konteyner detayi (onceki rapordaki bolum, aynen)
-    const gruplar = new Map<string, DetayGrubu>();
-    for (const d of acikDosyalar || []) {
-      const liste = acikKont.filter((k) => k.dosya_id === d.id);
-      if (liste.length === 0) continue;
-      const ad = d.alici_firma || "Belirtilmemiş";
-      if (!gruplar.has(ad)) gruplar.set(ad, { musteri: ad, konteynerler: [] });
-      gruplar.get(ad)!.konteynerler.push(
-        ...liste.map((k) => ({
-          konteyner_no: k.konteyner_no,
-          muhur_no: k.muhur_no ?? null,
-          plaka: k.plaka ?? null,
-          net: k.vgm_kg != null && k.tare_kg != null ? k.vgm_kg - k.tare_kg : null,
-          yuklendi: !!k.dba_dosya_url,
-        }))
-      );
-    }
-    setDetay(Array.from(gruplar.values()).sort((a, b) => a.musteri.localeCompare(b.musteri, "tr")));
     setYukleniyor(false);
   }, [companyId, tarih]);
 
@@ -186,6 +181,9 @@ export default function GunlukRaporSayfasi() {
   const gunEtiketi = bugunMu ? "Bugün" : tarihKisa(tarih);
   const olusturmaZamani = new Date().toLocaleString("tr-TR");
   const o = rapor?.ozet;
+  const tamamlananlar = rapor ? rapor.sevkiyatlar.filter((s) => s.durum === "tamamlandi") : [];
+  // Ek: yuklemesi devam eden / baslamamis sevkiyatlarin sisteme eklenmis konteynerleri
+  const detay = rapor ? rapor.sevkiyatlar.filter((s) => s.durum !== "tamamlandi" && s.konteynerler.length > 0) : [];
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 print:py-0 print:bg-white">
@@ -225,7 +223,7 @@ export default function GunlukRaporSayfasi() {
               <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain shrink-0" />
               <div>
                 <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">{companyName || "İhracat"}</h1>
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Günlük Sevkiyat ve Kantar Raporu</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Güncel İhracat Raporu</p>
               </div>
             </div>
             <div className="text-right">
@@ -238,13 +236,13 @@ export default function GunlukRaporSayfasi() {
           <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-2 mb-6 sayfa-boleme">
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
-              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} yükleniyor · ${o.bekliyor} başlamadı`, r: YESIL },
+              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı\nFatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, r: YESIL },
               { e: "Yükleme Bekleyen Konteyner", d: `${o.bekleyenKonteyner}`, a: `DBA bekliyor · toplam ${o.toplamKonteyner}, yüklenen ${o.yuklenenKonteyner}`, r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>
                 <p className="text-xl font-bold leading-tight" style={{ color: k.r }}>{k.d}</p>
-                <p className="text-[10px] text-slate-500">{k.a}</p>
+                <p className="text-[10px] text-slate-500 whitespace-pre-line">{k.a}</p>
               </div>
             ))}
           </div>
@@ -259,7 +257,7 @@ export default function GunlukRaporSayfasi() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr style={{ backgroundColor: LACIVERT }}>
-                    {["Müşteri", "Adet", "Marka", "Durum", "Dosya / Booking", "ETD"].map((b, i) => (
+                    {["Müşteri", "Adet", "Marka", "Yükleme Durumu", "Fatura", "Dosya / Booking", "ETD"].map((b, i) => (
                       <th key={b} className={`py-2 ${i === 0 ? "pl-3" : ""} pr-2 font-semibold text-white text-[10px] uppercase tracking-wide ${i === 1 ? "text-center" : "text-left"}`}>{b}</th>
                     ))}
                   </tr>
@@ -272,15 +270,49 @@ export default function GunlukRaporSayfasi() {
                       <td className="py-1.5 pr-2 font-semibold text-slate-700 text-[12px]">{s.marka}</td>
                       <td className="py-1.5 pr-2">
                         <DurumRozeti s={s} />
-                        {s.gunTamamlandi && <span className="ml-1 text-[10px] font-semibold" style={{ color: YESIL }}>{bugunMu ? "bugün" : "o gün"}</span>}
-                        {s.durum !== "tamamlandi" && s.gunYuklenen > 0 && <span className="ml-1 text-[10px] text-slate-500">+{s.gunYuklenen} {bugunMu ? "bugün" : "o gün"}</span>}
+                        {s.gunTamamlandi ? (
+                          <p className="text-[10px] font-semibold mt-0.5" style={{ color: YESIL }}>{bugunMu ? "Bugün" : "Bu tarihte"} tamamlandı</p>
+                        ) : s.gunYuklenen > 0 ? (
+                          <p className="text-[10px] text-slate-500 mt-0.5">{bugunMu ? "Bugün" : "Bu tarihte"} {s.gunYuklenen} konteyner yüklendi</p>
+                        ) : null}
                       </td>
-                      <td className="py-1.5 pr-2 text-[11px] text-slate-500 whitespace-nowrap">{s.dosya_no}{s.booking ? ` · ${s.booking}` : ""}</td>
+                      <td className="py-1.5 pr-2"><FaturaRozeti s={s} /></td>
+                      <td className="py-1.5 pr-2 text-[11px] text-slate-500 whitespace-nowrap leading-tight">{s.dosya_no}{s.booking ? <><br />{s.booking}</> : null}</td>
                       <td className="py-1.5 pr-3 text-[11px] text-slate-500 whitespace-nowrap">{tarihKisa(s.etd)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
+            )}
+          </div>
+
+          {/* TAMAMLANANLAR: PLAKA VE TONAJ */}
+          <div className="mb-6">
+            <Baslik>Yüklemesi Tamamlanan Sevkiyatlar — Plaka ve Tonaj</Baslik>
+            {tamamlananlar.length === 0 ? (
+              <p className="text-sm text-slate-400 italic pl-3">Yüklemesi tamamlanan açık sevkiyat bulunmuyor.</p>
+            ) : (
+              <div className="border border-slate-200 rounded overflow-hidden">
+                {tamamlananlar.map((s, gi) => (
+                  <div key={s.dosya_id} className={`sayfa-boleme ${gi > 0 ? "border-t border-slate-200" : ""}`}>
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5" style={{ backgroundColor: "#F1F5F9" }}>
+                      <p className="text-xs text-slate-800">
+                        <span className="font-bold">{s.musteri}</span> · {s.marka} · {s.konteynerAdedi}x <span className="text-slate-500 text-[11px]">({s.dosya_no})</span>
+                      </p>
+                      <p className="text-xs font-bold text-slate-800 whitespace-nowrap">Toplam {s.yuklenenNetKg ? `${sayi(s.yuklenenNetKg)} kg` : "-"}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2">
+                      {s.konteynerler.filter((k) => k.yuklendi).map((k) => (
+                        <div key={k.konteyner_no} className="flex items-center gap-3 px-3 py-1 text-xs border-b border-slate-100">
+                          <span className="font-mono text-slate-600 w-28 shrink-0">{k.konteyner_no}</span>
+                          <span className="font-bold text-slate-800 flex-1">{k.plaka || "-"}</span>
+                          <span className="text-slate-700 whitespace-nowrap">{k.net != null ? `${sayi(k.net)} kg` : "-"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -326,21 +358,25 @@ export default function GunlukRaporSayfasi() {
 
           {/* EK: KONTEYNER DETAYI */}
           <div className="flex-1">
-            <Baslik>Ek — Açık Dosyalar Konteyner Detayı</Baslik>
+            <Baslik>Ek — Devam Eden Sevkiyatlar Konteyner Detayı</Baslik>
             {detay.length === 0 ? (
-              <p className="text-sm text-slate-400 italic pl-3">Açık dosyada henüz eklenmiş konteyner bulunmuyor.</p>
+              <p className="text-sm text-slate-400 italic pl-3">Yüklemesi devam eden sevkiyatta eklenmiş konteyner bulunmuyor.</p>
             ) : (
               <div className="border border-slate-200 rounded overflow-hidden">
                 {detay.map((g, gi) => {
                   const yuklenen = g.konteynerler.filter((k) => k.yuklendi).length;
                   return (
-                    <div key={g.musteri} className={gi > 0 ? "border-t border-slate-200" : ""}>
+                    <div key={g.dosya_id} className={gi > 0 ? "border-t border-slate-200" : ""}>
                       <div className="flex items-center justify-between px-3 py-1.5" style={{ backgroundColor: "#F1F5F9" }}>
-                        <p className="text-xs font-bold text-slate-800">{g.musteri}</p>
+                        <p className="text-xs text-slate-800"><span className="font-bold">{g.musteri}</span> · {g.marka} <span className="text-slate-500 text-[11px]">({g.dosya_no})</span></p>
                         <p className="text-[11px] font-semibold">
-                          <span style={{ color: YESIL }}>{yuklenen} yüklendi</span>
-                          <span className="text-slate-400"> · </span>
-                          <span style={{ color: AMBER }}>{g.konteynerler.length - yuklenen} bekliyor</span>
+                          <span style={{ color: YESIL }}>{yuklenen}/{g.konteynerAdedi} yüklendi</span>
+                          {g.konteynerAdedi > g.konteynerler.length && (
+                            <>
+                              <span className="text-slate-400"> · </span>
+                              <span style={{ color: AMBER }}>{g.konteynerAdedi - g.konteynerler.length} konteyner henüz eklenmedi</span>
+                            </>
+                          )}
                         </p>
                       </div>
                       <table className="w-full text-xs">

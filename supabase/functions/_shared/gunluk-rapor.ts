@@ -24,6 +24,20 @@ export type RaporDosyasi = {
   dosya_no: string | null;
   alici_firma: string | null;
   marka: string | null;
+  /** Fatura PDF'i yuklendiyse fatura kesilmis sayilir (getDosyaAkisDurumu ile ayni kural). */
+  fatura_dosya_url?: string | null;
+  fatura_no?: string | null;
+  fatura_tarihi?: string | null;
+};
+
+/** Sevkiyattaki tek konteyner (plaka / tonaj gosterimi icin). */
+export type SevkiyatKonteyneri = {
+  konteyner_no: string;
+  plaka: string | null;
+  muhur_no: string | null;
+  /** Gercek net = VGM - Dara; yoksa null. */
+  net: number | null;
+  yuklendi: boolean;
 };
 
 export type RaporRezervasyonu = {
@@ -66,6 +80,13 @@ export type SevkiyatSatiri = {
   booking: string | null;
   gemi: string | null;
   etd: string | null;
+  faturaKesildi: boolean;
+  faturaNo: string | null;
+  faturaTarihi: string | null;
+  /** Dosyaya eklenmis konteynerler (yuklenenler once, konteyner no sirasiyla). */
+  konteynerler: SevkiyatKonteyneri[];
+  /** Yuklenen (DBA'li) konteynerlerin gercek net toplami (kg). */
+  yuklenenNetKg: number;
 };
 
 export type YuklenenKonteyner = {
@@ -99,6 +120,9 @@ export type GunlukRapor = {
     yuklenenKonteyner: number;
     /** Rezervasyonu alinmis ama DBA'si henuz yuklenmemis konteyner = toplam - yuklenen. */
     bekleyenKonteyner: number;
+    /** Acik sevkiyatlardan faturasi kesilmis / kesilmemis olanlar. */
+    faturaKesilen: number;
+    faturaKesilmeyen: number;
   };
 };
 
@@ -196,6 +220,10 @@ export function gunlukRaporHesapla(
     const durum: SevkiyatDurumu =
       yuklenenler.length >= konteynerAdedi ? "tamamlandi" : yuklenenler.length > 0 ? "yukleniyor" : "bekliyor";
     const sonGun = yuklenenler.map((k) => efektif.get(k.id)?.gun || "").sort().pop() || "";
+    const netHesapla = (k: RaporKonteyneri) => (k.vgm_kg != null && k.tare_kg != null ? k.vgm_kg - k.tare_kg : null);
+    const sevkKonteynerleri: SevkiyatKonteyneri[] = kendi
+      .map((k) => ({ konteyner_no: k.konteyner_no, plaka: k.plaka ?? null, muhur_no: k.muhur_no ?? null, net: netHesapla(k), yuklendi: !!k.dba_dosya_url }))
+      .sort((a, b) => Number(b.yuklendi) - Number(a.yuklendi) || a.konteyner_no.localeCompare(b.konteyner_no));
     const ilkRez = [...rezler].sort((a, b) => String(a.gemi_kalkis_tarihi || "").localeCompare(String(b.gemi_kalkis_tarihi || "")))[0];
     sevkiyatlar.push({
       dosya_id: d.id,
@@ -211,6 +239,11 @@ export function gunlukRaporHesapla(
       booking: ilkRez?.booking_no?.trim() || null,
       gemi: ilkRez?.gemi_adi || null,
       etd: ilkRez?.gemi_kalkis_tarihi || null,
+      faturaKesildi: !!d.fatura_dosya_url,
+      faturaNo: d.fatura_no?.trim() || null,
+      faturaTarihi: d.fatura_tarihi || null,
+      konteynerler: sevkKonteynerleri,
+      yuklenenNetKg: sevkKonteynerleri.reduce((t, k) => t + (k.yuklendi && k.net ? k.net : 0), 0),
     });
   }
   sevkiyatlar.sort(
@@ -255,19 +288,29 @@ export function gunlukRaporHesapla(
       toplamKonteyner: sevkiyatlar.reduce((t, s) => t + s.konteynerAdedi, 0),
       yuklenenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.min(s.yuklenen, s.konteynerAdedi), 0),
       bekleyenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.max(0, s.konteynerAdedi - s.yuklenen), 0),
+      faturaKesilen: sevkiyatlar.filter((s) => s.faturaKesildi).length,
+      faturaKesilmeyen: sevkiyatlar.filter((s) => !s.faturaKesildi).length,
     },
   };
 }
 
 export const DURUM_METNI: Record<SevkiyatDurumu, string> = {
   tamamlandi: "Yükleme Tamamlandı ✔",
-  yukleniyor: "Yükleniyor",
+  yukleniyor: "Yükleme Devam Ediyor",
   // "Bekleyen konteyner" ozetiyle karismasin diye: hic konteyneri yuklenmemis sevkiyat
   bekliyor: "Yükleme Başlamadı",
 };
 
+/**
+ * Rozet metni. "Yukleniyor 2/5" yerine "2/5 Yüklendi": 5 konteynerin 2'si
+ * DOLDURULUP tartildi (DBA yuklendi). Bos ekipman alimi SAYILMAZ.
+ */
+export function durumRozetMetni(s: SevkiyatSatiri): string {
+  return s.durum === "yukleniyor" ? `${s.yuklenen}/${s.konteynerAdedi} Yüklendi` : DURUM_METNI[s.durum];
+}
+
 /** "VIADUC HOL HOL SARLU - 4x - LE SOLEIL - Yükleme Tamamlandı ✔" */
 export function sevkiyatSatiriMetni(s: SevkiyatSatiri): string {
-  const durum = s.durum === "yukleniyor" ? `Yükleniyor ${s.yuklenen}/${s.konteynerAdedi}` : DURUM_METNI[s.durum];
+  const durum = durumRozetMetni(s);
   return `${s.musteri} - ${s.konteynerAdedi}x - ${s.marka} - ${durum}`;
 }

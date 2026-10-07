@@ -553,7 +553,17 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Alıcı 07.10.2026: kullanıcının Google Workspace maili askıda olduğu için
   `GERI_BILDIRIM_ALICI` secret'i mesensei282@gmail.com yapıldı (yedek + rapor +
   geri bildirim aynı adrese). Mail açılınca secret geri değiştirilir.
-- Mail: edge function `gunluk-rapor-gonder` (canlıda v4). pg_cron
+- Revize 2 (07.10.2026): başlık "Güncel İhracat Raporu" (eski: Günlük
+  Sevkiyat ve Kantar Raporu; mail konusu da), mailde logo
+  (`https://ihracatasistanim.com/images/logo.png`). Rozet "Yükleniyor 2/5" →
+  "2/5 Yüklendi" = 5 konteynerin 2'si DOLDURULUP tartıldı (DBA); boş ekipman
+  alımı sayılmaz. "+1 bugün" → "Bugün 1 konteyner yüklendi". Fatura sütunu:
+  kural uygulamayla aynı (`fatura_dosya_url` dolu = kesildi; no + tarih
+  gösterilir). Yeni bölüm "Yüklemesi Tamamlanan Sevkiyatlar — Plaka ve Tonaj"
+  (konteyner no / plaka / net, satırda 2 konteyner, sevkiyat toplamı; canlıda
+  SQL ile birebir 1.128.420 kg). Sayfadaki Ek artık sadece devam eden
+  sevkiyatlar (+ "x konteyner henüz eklenmedi").
+- Mail: edge function `gunluk-rapor-gonder` (canlıda v5). pg_cron
   `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret

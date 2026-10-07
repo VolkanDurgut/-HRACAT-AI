@@ -24,7 +24,9 @@ import {
  * ?tarih=YYYY-MM-DD ile belirli gun acilabilir (maildeki baglanti).
  */
 
-const LACIVERT = "#1E293B";
+// Unex logosunun renkleri (public/images/logo.png): lacivert zemin + seftali/turuncu ekmek
+const LACIVERT = "#283474";
+const MARKA_TURUNCU = "#F4A07C";
 const YESIL = "#059669";
 const AMBER = "#D97706";
 const GRI = "#64748B";
@@ -73,8 +75,8 @@ function FaturaRozeti({ s }: { s: SevkiyatSatiri }) {
 function Baslik({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-2.5">
-      <div className="w-1 h-4" style={{ backgroundColor: LACIVERT }} />
-      <h2 className="text-xs font-bold uppercase tracking-widest text-slate-700">{children}</h2>
+      <div className="w-1 h-4 rounded-sm" style={{ backgroundColor: MARKA_TURUNCU }} />
+      <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: LACIVERT }}>{children}</h2>
     </div>
   );
 }
@@ -222,7 +224,7 @@ export default function GunlukRaporSayfasi() {
             <div className="flex items-center gap-3">
               <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain shrink-0" />
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">{companyName || "İhracat"}</h1>
+                <h1 className="text-lg font-bold tracking-tight leading-tight" style={{ color: LACIVERT }}>{companyName ? `${companyName} İhracat AI` : "İhracat AI"}</h1>
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Güncel İhracat Raporu</p>
               </div>
             </div>
@@ -237,7 +239,7 @@ export default function GunlukRaporSayfasi() {
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
               { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı\nFatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, r: YESIL },
-              { e: "Yükleme Bekleyen Konteyner", d: `${o.bekleyenKonteyner}`, a: `DBA bekliyor · toplam ${o.toplamKonteyner}, yüklenen ${o.yuklenenKonteyner}`, r: AMBER },
+              { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}`, r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>

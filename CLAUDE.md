@@ -563,7 +563,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (konteyner no / plaka / net, satırda 2 konteyner, sevkiyat toplamı; canlıda
   SQL ile birebir 1.128.420 kg). Sayfadaki Ek artık sadece devam eden
   sevkiyatlar (+ "x konteyner henüz eklenmedi").
-- Mail: edge function `gunluk-rapor-gonder` (canlıda v5). pg_cron
+- Revize 3 (07.10.2026): başlık "{şirket} İhracat AI" ("Unex Gıda İhracat AI").
+  Renkler LOGODAN: lacivert `#283474` (başlık yazıları, tablo başlıkları, üst
+  çizgi) + şeftali/turuncu `#F4A07C` (bölüm başlığı çubuğu). Durum renkleri
+  (yeşil/amber/kırmızı) anlam taşıdığı için değişmedi. 3. kutu "Yüklenecek
+  Konteyner" = rezerve (rezervasyondaki toplam) − yüklenen (DBA'lı); alt metin
+  "rezerve 61 · yüklenen 50".
+- Mail: edge function `gunluk-rapor-gonder` (canlıda v6). pg_cron
   `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret

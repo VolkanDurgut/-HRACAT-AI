@@ -46,6 +46,9 @@ const ALICILAR = (Deno.env.get("GUNLUK_RAPOR_ALICILARI") || Deno.env.get("GERI_B
   .map((a) => a.trim())
   .filter(Boolean);
 const UYGULAMA_URL = "https://ihracatasistanim.com";
+// Unex logosunun renkleri: lacivert + seftali/turuncu (sayfa ile ayni)
+const LACIVERT = "#283474";
+const MARKA_TURUNCU = "#F4A07C";
 const SAYFA_BOYUTU = 1000;
 
 const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
@@ -134,7 +137,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   const o = r.ozet;
   const gunEtiket = slot === "aksam" ? "Bugün" : "Dün";
   const baslikGun = slot === "aksam" ? "Bugün" : "Dün";
-  const th = (t: string, sag = false) => `<th style="background:#1E293B;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold">${t}</th>`;
+  const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold">${t}</th>`;
   const td = (t: string, ek = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;${ek}">${t}</td>`;
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
     `<td style="width:33%;padding:4px;vertical-align:top"><div style="border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:10px;color:#64748B">${alt}</div></div></td>`;
@@ -176,23 +179,23 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   </table>`
     : `<div style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">Yüklemesi tamamlanan açık sevkiyat bulunmuyor.</div>`;
 
-  const bolumBaslik = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#334155;border-left:4px solid #1E293B;padding-left:8px">${t}</div>`;
+  const bolumBaslik = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">${t}</div>`;
 
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
 <table role="presentation" width="760" cellpadding="0" cellspacing="0" style="max-width:760px;width:100%;background:#fff;border-radius:6px;padding:24px">
 <tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid #1E293B;padding-bottom:10px"><tr>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi || "Logo")}" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:#0F172A">${esc(sirketAdi || "İhracat AI")}</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:#1E293B">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${slot === "aksam" ? "Akşam raporu · 17:00" : "Sabah raporu · 08:00 (dünün özeti)"}</div></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi ? `${sirketAdi} İhracat AI` : "İhracat AI")}</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
+    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${slot === "aksam" ? "Akşam raporu · 17:00" : "Sabah raporu · 08:00 (dünün özeti)"}</div></td>
   </tr></table>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
-    ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", "#1E293B")}
+    ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", LACIVERT)}
     ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı<br>Fatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, "#047857")}
-    ${kutu("Yükleme Bekleyen Konteyner", String(o.bekleyenKonteyner), `DBA bekliyor · toplam ${o.toplamKonteyner}, yüklenen ${o.yuklenenKonteyner}`, "#B45309")}
+    ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}`, "#B45309")}
   </tr></table>
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}

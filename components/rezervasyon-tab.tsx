@@ -9,6 +9,7 @@ import { Trash2, Plus, Package, Check, X } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
+import { oransalYenidenYazilabilirMi } from "@/lib/siparis-takip";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -132,18 +133,26 @@ function validateForm(form: typeof emptyForm, navlunOpsiyonel: boolean): Record<
  * gonderilen MTS uzerinden dogru tutari gosterir.
  * ana_siparis_id olmayan (tek seferlik) dosyalara hic dokunulmaz.
  *
- * Donus: guncelleme gerekmiyorsa veya basariliysa true; tutar guncellemesi
- * BASARISIZ olursa false (cagiran taraf kullaniciyi uyarir - 01.10.2026).
+ * SINIR (07.10.2026): Kalemler SADECE hala "otomatik" haldeyse yeniden yazilir
+ * (oransalYenidenYazilabilirMi). Kullanici markaya ozel parti yaptiysa
+ * (0083: sadece SAAD), kalem ekleyip sildiyse, fiyat degistirdiyse veya kalemi
+ * bir siparise etiketlediyse DOKUNULMAZ - eskiden her rezervasyon kaydinda bu
+ * duzeltmeler sessizce siliniyor, faturadaki tutar degisiyordu. Bu durumda
+ * kalem tonaji konteyner adedini tutmuyorsa sadece uyari doner.
+ *
+ * Donus: basarili=false ise tutar guncellemesi BASARISIZ (cagiran kullaniciyi
+ * uyarir - 01.10.2026); uyari doluysa kayit basarili ama kullanici bilmeli.
  */
-async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Promise<boolean> {
-  if (!companyId) return true;
+async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Promise<{ basarili: boolean; uyari: string | null }> {
+  const TAMAM = { basarili: true, uyari: null };
+  if (!companyId) return TAMAM;
   const { data: dosya } = await supabase
     .from("ihracat_dosyalari")
-    .select("ana_siparis_id")
+    .select("ana_siparis_id, urun_detaylari")
     .eq("id", dosyaId)
     .eq("company_id", companyId)
     .maybeSingle();
-  if (!dosya?.ana_siparis_id) return true;
+  if (!dosya?.ana_siparis_id) return TAMAM;
 
   const { data: anaSiparis } = await supabase
     .from("ana_siparisler")
@@ -153,7 +162,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
     .maybeSingle();
   const masterUrunler = (anaSiparis?.urun_detaylari_master as any[]) || [];
   const toplamSiparisMts = anaSiparis?.toplam_mts || 0;
-  if (masterUrunler.length === 0 || toplamSiparisMts <= 0) return true;
+  if (masterUrunler.length === 0 || toplamSiparisMts <= 0) return TAMAM;
 
   const { data: tumRezervasyonlar } = await supabase
     .from("rezervasyonlar")
@@ -161,9 +170,17 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
     .eq("dosya_id", dosyaId)
     .eq("company_id", companyId);
   const toplamKonteynerAdedi = (tumRezervasyonlar || []).reduce((s, r: any) => s + (r.konteyner_adedi || 0), 0);
-  if (toplamKonteynerAdedi <= 0) return true;
+  if (toplamKonteynerAdedi <= 0) return TAMAM;
 
   const buPartininMts = toplamKonteynerAdedi * MTS_PER_KONTEYNER;
+
+  if (!oransalYenidenYazilabilirMi(dosya.urun_detaylari, masterUrunler)) {
+    const kalemMts = ((dosya.urun_detaylari as any[]) || []).reduce((s, u) => s + kalemMiktari(u), 0);
+    const uyari = Math.abs(kalemMts - buPartininMts) > 0.5
+      ? `Ürün Detayları'ndaki toplam (${kalemMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS) rezervasyondaki ${toplamKonteynerAdedi} konteynerle (${buPartininMts.toLocaleString("tr-TR")} MTS) uyuşmuyor. Elle düzenlenmiş kalemlere dokunulmadı; Ürün Detayları kartını kontrol edin.`
+      : null;
+    return { basarili: true, uyari };
+  }
   const oran = buPartininMts / toplamSiparisMts;
 
   const urunDetaylari = masterUrunler.map((u: any) => {
@@ -193,9 +210,9 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
   const hata = yazmaHatasi(error, data);
   if (hata) {
     console.error("Urun tutarlari guncellenemedi:", hata);
-    return false;
+    return { basarili: false, uyari: null };
   }
-  return true;
+  return TAMAM;
 }
 
 /**
@@ -204,9 +221,10 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
  * zaten basarili oldugu icin bu adimlarin hatasi "kaydedildi ANCAK ..." diye
  * acikca soylenir, sessizce yutulmaz (01.10.2026).
  */
-function ikincilAdimMesaji(navlunHatasi: string | null, tutarBasarili: boolean, basariMesaji: string): { mesaj: string; tur: "success" | "error" } {
+function ikincilAdimMesaji(navlunHatasi: string | null, tutar: { basarili: boolean; uyari: string | null }, basariMesaji: string): { mesaj: string; tur: "success" | "error" } {
   if (navlunHatasi) return { mesaj: `Rezervasyon kaydedildi ancak navlun / lokal masraf kaydedilemedi: ${navlunHatasi}`, tur: "error" };
-  if (!tutarBasarili) return { mesaj: "Rezervasyon kaydedildi ancak ürün tutarları güncellenemedi. Lütfen rezervasyonu tekrar kaydedin.", tur: "error" };
+  if (!tutar.basarili) return { mesaj: "Rezervasyon kaydedildi ancak ürün tutarları güncellenemedi. Lütfen rezervasyonu tekrar kaydedin.", tur: "error" };
+  if (tutar.uyari) return { mesaj: `${basariMesaji} ${tutar.uyari}`, tur: "error" };
   return { mesaj: basariMesaji, tur: "success" };
 }
 
@@ -621,7 +639,9 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
       const silindiMesaji = kontSayisi > 0
         ? `${hedef.bookingNo} ve bağlı ${kontSayisi} konteyner silindi.`
         : `${hedef.bookingNo} silindi.`;
-      if (tutarBasarili) {
+      if (tutarBasarili.basarili && tutarBasarili.uyari) {
+        showToast(`${silindiMesaji} ${tutarBasarili.uyari}`, "error");
+      } else if (tutarBasarili.basarili) {
         showToast(silindiMesaji, "success");
       } else {
         showToast(`${silindiMesaji} Ancak ürün tutarları güncellenemedi; kalan rezervasyonlardan birini tekrar kaydedin.`, "error");

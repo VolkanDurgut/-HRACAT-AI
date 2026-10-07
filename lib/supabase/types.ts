@@ -114,6 +114,10 @@ export type UrunDetay = {
   miktar_mts: string;
   birim_fiyat_usd: string;
   toplam_tutar_usd: string;
+  // Kalemin sayildigi siparis (07.10.2026, lib/siparis-takip.ts): bos = dosyanin
+  // ana_siparis_id'si, "yok" = hicbir siparise sayilmaz, id = o siparis
+  // (iki proformali dosya: 5 SAAD 270826 + 5 SAAD 160926).
+  siparis_id?: string;
 };
 
 export type Rezervasyon = {

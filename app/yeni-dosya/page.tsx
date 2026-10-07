@@ -13,6 +13,8 @@ import AcenteTeklifSection from "@/components/acente-teklif-section";
 import { Upload, FileText, Check, Loader2, Package, AlertCircle, FolderPlus } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
+import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -135,38 +137,13 @@ export default function YeniDosyaPage() {
           .maybeSingle();
 
         if (existingAnaSiparis) {
-          // Mevcut ana siparise bagli dosyalardaki gonderilmis MTS toplamini hesapla
-          const { data: bagliDosyalar } = await supabase
-            .from("ihracat_dosyalari")
-            .select("id, urun_detaylari, durum")
-            .eq("company_id", companyId)
-            .eq("ana_siparis_id", existingAnaSiparis.id);
-
-          const dosyaIdListesi = (bagliDosyalar || []).map((d: any) => d.id);
-          const { data: bagliKonteynerler } = await supabase
-            .from("konteynerler")
-            .select("dosya_id, dba_dosya_url")
-            .eq("company_id", companyId)
-            .in("dosya_id", dosyaIdListesi);
-
-          const toplamGonderilmis = (bagliDosyalar || []).reduce((s: number, d: any) => {
-            const urunler = d.urun_detaylari || [];
-            const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + kalemMiktari(u), 0);
-
-            // Dosya kapatilmissa, o partinin tamami gonderilmis sayilir - DBA
-            // belgesi yuklenmis olsun ya da olmasin. "Kapali" durumu, sevkiyatin
-            // gercekten tamamlandiginin en kesin sinyalidir.
-            const dosyaKapali = d.durum === "Kapalı" || d.durum === "Kapali";
-            if (dosyaKapali) return s + dosyaToplamMts;
-
-            // Dosya hala aciksa, konteyner bazli DBA tamamlanma oranina gore
-            // kismi ilerleme goster.
-            const dosyaKonteynerleri = (bagliKonteynerler || []).filter((k: any) => k.dosya_id === d.id);
-            if (dosyaKonteynerleri.length === 0) return s; // Konteyner yoksa henuz gonderilmemis sayilir
-            const dbaTamamlananSayisi = dosyaKonteynerleri.filter((k: any) => !!k.dba_dosya_url).length;
-            const mtsPerKonteyner = dosyaToplamMts / dosyaKonteynerleri.length;
-            return s + (mtsPerKonteyner * dbaTamamlananSayisi);
-          }, 0);
+          // Mevcut siparisin sevk edilen miktari - Devam Eden Siparisler ile
+          // AYNI hesap (marka/kalem bazli, etiketli kalemler dahil:
+          // lib/siparis-takip.ts). Okunamazsa 0 gosterilir.
+          const veri = await siparisTakipVerisiGetir(companyId!, [existingAnaSiparis]);
+          const toplamGonderilmis = veri
+            ? siparisIlerlemesiHesapla(existingAnaSiparis, veri.dosyalar, veri.konteynerler).toplamSevkMts
+            : 0;
 
           setMevcutAnaSiparis(existingAnaSiparis);
           setGonderilmisMts(toplamGonderilmis);

@@ -424,6 +424,34 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Proforma okuma (edge function `proforma-oku`) talimatı DEĞİŞTİRİLMEDİ;
   koruma uygulama tarafında.
 
+## Sipariş takibi — marka / kalem bazlı (07.10.2026)
+
+- Devam Eden Siparişler (İhracatlar sayfası) artık her sipariş KALEMİNİ
+  (ürün adı, genelde markayı içerir: "... (SAAD BRAND)") ayrı izler: Sipariş /
+  Sevk Edildi / Kalan / Dosyası Açılmamış — FCL (25 MTS) ve çuval
+  (MTS×1000/ambalaj kg) cinsinden. Bir kalemdeki fazla diğerinin eksiğini
+  KAPATMAZ (eskiden UNEXCCS270826'da 0088'in 10 FCL ASLI'si 5 FCL SAAD
+  eksiğini kapatıp siparişi "bitti" gösteriyordu). Fazla sayılan kalem "+x
+  FCL fazla", eşleşmeyen kalem uyarı olarak görünür.
+- Tek hesap yeri: `lib/siparis-takip.ts` (saf fonksiyonlar), veri:
+  `lib/siparis-takip-veri.ts`. Kullananlar: İhracatlar kartı
+  (`components/siparis-takip-karti.tsx`), "Siparişe Devam Et" ön dolumu
+  (`acikKalemler` = henüz hiçbir dosyada olmayan miktar), Yeni Dosya'daki
+  "Mevcut sipariş bulundu" ekranı. Tek kalemli siparişte "Toplam Taahhüt"
+  (toplam_mts) esas alınır. Sevk kuralı değişmedi: kapalı dosya = tamamı, açık
+  dosya = DBA'lı konteyner oranı.
+- Kalem → sipariş: `urun_detaylari[].siparis_id` (şema değişikliği YOK, JSON
+  alanı). Boş = dosyanın ana_siparis_id'si, "yok" = hiçbir siparişe
+  sayılmaz, id = o sipariş. Ürün Detayları kartında "Sayıldığı sipariş"
+  seçimi (aynı alıcının siparişleri). İki proformalı dosya: 0092 = 5 SAAD
+  (270826) + 5 SAAD (160926).
+- Rezervasyon kaydında kalemleri siparişe göre ORANSAL yeniden yazma
+  (`syncDevamEdenDosyaTutari`) artık SADECE kalemler hâlâ otomatik haldeyse
+  (`oransalYenidenYazilabilirMi`: boş ya da siparişin tüm kalemleri aynı fiyat
+  ve oranda). Markaya özel parti, elle eklenen/silinen kalem, değişen fiyat
+  veya etiketli kalem KORUNUR; tonaj konteyner adedini tutmuyorsa uyarı
+  çıkar. Eskiden her rezervasyon kaydında bu düzeltmeler sessizce siliniyordu.
+
 ## Veritabanı genel kontrolü (03.10.2026)
 
 - `public.nextval(text)` sarmalayıcısı anon anahtarıyla RPC'den çağrılabiliyordu

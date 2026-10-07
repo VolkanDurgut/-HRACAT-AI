@@ -1,9 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase, Dosya, UrunDetay, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { formatCurrency } from "@/lib/cutoff-utils";
-import { Pencil, Check, X, Plus, Trash2 } from "lucide-react";
+import { Pencil, Check, X, Plus, Trash2, Link2 } from "lucide-react";
+import { SIPARISE_SAYILMAZ } from "@/lib/siparis-takip";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG, ACCENT } from "@/lib/theme";
 
 type Props = {
@@ -43,9 +44,33 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
       miktar_mts: String(u.miktar_mts ?? u.quantity ?? ""),
       birim_fiyat_usd: String(u.birim_fiyat_usd ?? u.unit_price ?? ""),
       toplam_tutar_usd: String(u.toplam_tutar_usd ?? u.total_amount ?? ""),
+      // Kalemin sayildigi siparis korunur - duzenleyip kaydetmek etiketi silmemeli.
+      // (dosyanin kendi siparisine etiketli kalem = etiketsiz; ayni anlam)
+      ...(u.siparis_id && u.siparis_id !== dosya.ana_siparis_id ? { siparis_id: String(u.siparis_id) } : {}),
     }));
   };
   const [satirlar, setSatirlar] = useState<UrunDetay[]>(mevcutSatirlar);
+
+  // Ayni alicinin siparisleri (07.10.2026): iki proformadan olusan dosyada her
+  // kalemin HANGI siparise sayilacagi secilebilsin (Devam Eden Siparisler
+  // marka bazli takibi; lib/siparis-takip.ts).
+  const [siparisler, setSiparisler] = useState<{ id: string; proforma_no: string; tamamlandi: boolean | null }[]>([]);
+  useEffect(() => {
+    if (!dosya.alici_firma || !companyId) return;
+    let iptal = false;
+    supabase.from("ana_siparisler").select("id, proforma_no, tamamlandi")
+      .eq("company_id", companyId).eq("alici_firma", dosya.alici_firma)
+      .order("olusturma_tarihi", { ascending: true })
+      .then(({ data }) => { if (!iptal && data) setSiparisler(data); });
+    return () => { iptal = true; };
+  }, [dosya.alici_firma, companyId]);
+  const dosyaSiparisi = siparisler.find((s) => s.id === dosya.ana_siparis_id) || null;
+  const siparisSecimiVar = siparisler.length > 0;
+  const siparisAdi = (id: string | undefined) => {
+    if (!id) return null;
+    if (id === SIPARISE_SAYILMAZ) return "Hiçbir siparişe sayılmaz";
+    return siparisler.find((s) => s.id === id)?.proforma_no || "Bilinmeyen sipariş";
+  };
 
   const handleEditStart = () => {
     setSatirlar(mevcutSatirlar());
@@ -56,6 +81,7 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
     setSatirlar((prev) => {
       const yeni = [...prev];
       yeni[index] = { ...yeni[index], [alan]: deger };
+      if (alan === "siparis_id" && !deger) delete yeni[index].siparis_id;
       if (alan === "miktar_mts" || alan === "birim_fiyat_usd") {
         yeni[index].toplam_tutar_usd = otomatikToplamHesapla(yeni[index].miktar_mts, yeni[index].birim_fiyat_usd);
       }
@@ -126,7 +152,14 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
             <tbody>
               {gosterilecekSatirlar.map((item: any, i: number) => (
                 <tr key={i} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
-                  <td className="px-3 py-3 text-sm text-white">{item.urun_adi || item.description || "-"}</td>
+                  <td className="px-3 py-3 text-sm text-white">
+                    {item.urun_adi || item.description || "-"}
+                    {item.siparis_id && (
+                      <span className="mt-1 flex items-center gap-1 text-[11px]" style={{ color: TEXT_MUTED }} title="Bu kalem Devam Eden Siparişler'de bu siparişe sayılır">
+                        <Link2 size={11} /> {siparisAdi(item.siparis_id)}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-sm" style={{ color: TEXT_MUTED }}>{item.ambalaj_boyutu || item.packaging_size || "-"}</td>
                   <td className="px-3 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{item.miktar_mts || item.quantity || "-"}</td>
                   <td className="px-3 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{formatCurrency(item.birim_fiyat_usd || item.unit_price, dosya.para_birimi)}</td>
@@ -185,6 +218,23 @@ export default function UrunDetaylariCard({ dosya, onRefresh, companyId }: Props
                       <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Toplam <span className="normal-case font-normal">(otomatik, elle değiştirilebilir)</span></label>
                       <input value={satir.toplam_tutar_usd} onChange={(e) => satirGuncelle(i, "toplam_tutar_usd", e.target.value)} inputMode="decimal" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
                     </div>
+                    {siparisSecimiVar && (
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>
+                          Sayıldığı sipariş <span className="normal-case font-normal">(sipariş takibinde bu kalem hangi proformadan düşülsün)</span>
+                        </label>
+                        <select value={satir.siparis_id || ""} onChange={(e) => satirGuncelle(i, "siparis_id", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+                          <option value="">{dosyaSiparisi ? `${dosyaSiparisi.proforma_no} (dosyanın siparişi)` : "Siparişe bağlı değil"}</option>
+                          {siparisler.filter((s) => s.id !== dosya.ana_siparis_id).map((s) => (
+                            <option key={s.id} value={s.id}>{s.proforma_no}{s.tamamlandi ? " (tamamlandı)" : ""}</option>
+                          ))}
+                          {dosya.ana_siparis_id && <option value={SIPARISE_SAYILMAZ}>Hiçbir siparişe sayılmasın</option>}
+                          {satir.siparis_id && satir.siparis_id !== SIPARISE_SAYILMAZ && !siparisler.some((s) => s.id === satir.siparis_id) && (
+                            <option value={satir.siparis_id}>Bilinmeyen sipariş</option>
+                          )}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

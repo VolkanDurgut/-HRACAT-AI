@@ -12,14 +12,17 @@ import { CokluNoKisa, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
-import { Search, ExternalLink, Archive, X, Package, Loader2, ArrowRight, Trash2, FileText, CheckCircle2 } from "lucide-react";
+import { Search, ExternalLink, Archive, X, Package, Loader2, Trash2, FileText } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { siparisIlerlemesiHesapla, acikKalemler, SiparisIlerlemesi } from "@/lib/siparis-takip";
+import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
+import { SiparisTakipKarti } from "@/components/siparis-takip-karti";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
-type AnaSiparisWithProgress = AnaSiparis & { gonderilmisMts: number; dosyaSayisi: number };
+type AnaSiparisWithProgress = AnaSiparis & { ilerleme: SiparisIlerlemesi };
 
 export default function IhracatlarPage() {
   const { user, yetkiler, companyId, loading: authLoading } = useAuth();
@@ -138,45 +141,18 @@ export default function IhracatlarPage() {
 
     if (!siparisler || siparisler.length === 0) { setAcikSiparisler([]); setSiparisLoading(false); return; }
 
-    const siparisIds = siparisler.map((s: AnaSiparis) => s.id);
-    const { data: bagliDosyalar } = await supabase
-      .from("ihracat_dosyalari")
-      .select("id, ana_siparis_id, urun_detaylari, durum")
-      .eq("company_id", companyId)
-      .in("ana_siparis_id", siparisIds);
-
-    const dosyaIdListesi = (bagliDosyalar || []).map((d: any) => d.id);
-    const { data: bagliKonteynerler } = await supabase
-      .from("konteynerler")
-      .select("dosya_id, dba_dosya_url")
-      .eq("company_id", companyId)
-      .in("dosya_id", dosyaIdListesi);
-
-    const withProgress: AnaSiparisWithProgress[] = siparisler.map((s: AnaSiparis) => {
-      const dosyalariBuSiparise = (bagliDosyalar || []).filter((d: any) => d.ana_siparis_id === s.id);
-      const gonderilmisMts = dosyalariBuSiparise.reduce((sum: number, d: any) => {
-        const urunler = d.urun_detaylari || [];
-        const dosyaToplamMts = urunler.reduce((s2: number, u: any) => s2 + kalemMiktari(u), 0);
-
-        // Dosya kapatilmissa, o partinin tamami gonderilmis sayilir - DBA
-        // belgesi yuklenmis olsun ya da olmasin. "Kapali" durumu, sevkiyatin
-        // gercekten tamamlandiginin en kesin sinyalidir.
-        const dosyaKapali = d.durum === "Kapalı" || d.durum === "Kapali";
-        if (dosyaKapali) return sum + dosyaToplamMts;
-
-        // Dosya hala aciksa, konteyner bazli DBA tamamlanma oranina gore
-        // kismi ilerleme goster.
-        const dosyaKonteynerleri = (bagliKonteynerler || []).filter((k: any) => k.dosya_id === d.id);
-        if (dosyaKonteynerleri.length === 0) return sum;
-        const dbaTamamlananSayisi = dosyaKonteynerleri.filter((k: any) => !!k.dba_dosya_url).length;
-        const mtsPerKonteyner = dosyaToplamMts / dosyaKonteynerleri.length;
-        return sum + (mtsPerKonteyner * dbaTamamlananSayisi);
-      }, 0);
-      return { ...s, gonderilmisMts, dosyaSayisi: dosyalariBuSiparise.length };
-    });
+    // Marka/kalem bazli takip (07.10.2026, bkz. lib/siparis-takip.ts): bir
+    // kalemdeki fazla digerinin eksigini kapatmaz; dosya kalemi baska bir
+    // siparise etiketlenebilir. Okuma basarisizsa liste bos birakilmaz.
+    const veri = await siparisTakipVerisiGetir(companyId, siparisler as AnaSiparis[]);
+    if (!veri) { setSiparisLoading(false); return; }
+    const withProgress: AnaSiparisWithProgress[] = (siparisler as AnaSiparis[]).map((s) => ({
+      ...s,
+      ilerleme: siparisIlerlemesiHesapla(s, veri.dosyalar, veri.konteynerler),
+    }));
 
     // Elle tamamlanan siparis (03.10.2026) kalan miktardan bagimsiz listeden duser.
-    const acikOlanlar = withProgress.filter((s) => !s.tamamlandi && (s.toplam_mts || 0) - s.gonderilmisMts > 0.01);
+    const acikOlanlar = withProgress.filter((s) => !s.tamamlandi && s.ilerleme.devamEdiyor);
     setAcikSiparisler(acikOlanlar);
     setSiparisLoading(false);
   }, [user?.id, companyId]);
@@ -196,50 +172,6 @@ export default function IhracatlarPage() {
     }
   }, [authLoading, yetkiler, router]);
 
-  // Ana siparisin urun kalemlerinden (urun_detaylari_master), o ana siparise
-  // ZATEN BAGLI dosyalarda sevk edilmis miktarlar dusulerek KALAN urun
-  // kalemlerini hesaplar. Kok neden (29.09.2026, UNEXCCS270826/IHR-2026-0088):
-  // "Siparise devam et" butonu yeni dosyayi urun_detaylari/toplam_tutar/miktar
-  // alanlari BOS birakarak olusturuyordu - bu fonksiyon o bosluğu, master
-  // kalemlerdeki her urun icin ayri ayri (urun adina gore eslestirip) kalan
-  // miktari hesaplayarak doldurur. Bir urun tamamen sevk edilmisse satira hic
-  // dahil edilmez.
-  const hesaplaKalanUrunKalemleri = (
-    master: { description?: string; urun_adi?: string; quantity?: number | string; miktar_mts?: number | string; unit_price?: number | string; birim_fiyat_usd?: number | string; packaging_size?: string; ambalaj_boyutu?: string }[],
-    bagliDosyalar: { urun_detaylari: unknown }[]
-  ) => {
-    const sevkEdilmis = new Map<string, number>();
-    for (const d of bagliDosyalar) {
-      const urunler = (d.urun_detaylari as any[]) || [];
-      for (const u of urunler) {
-        const ad = String(u.urun_adi || u.description || "").trim();
-        if (!ad) continue;
-        const miktar = kalemMiktari(u) || 0;
-        sevkEdilmis.set(ad, (sevkEdilmis.get(ad) || 0) + miktar);
-      }
-    }
-
-    const kalanKalemler: { urun_adi: string; ambalaj_boyutu: string; miktar_mts: string; birim_fiyat_usd: string; toplam_tutar_usd: string }[] = [];
-    for (const m of master) {
-      const ad = String(m.urun_adi || m.description || "").trim();
-      if (!ad) continue;
-      const masterMiktar = kalemMiktari(m) || 0;
-      const zatenSevkEdilmis = sevkEdilmis.get(ad) || 0;
-      const kalanMiktar = masterMiktar - zatenSevkEdilmis;
-      if (kalanMiktar <= 0.01) continue; // Bu urun tamamen sevk edilmis, satira dahil etme
-
-      const birimFiyat = parseFloat(String(m.birim_fiyat_usd || m.unit_price || 0)) || 0;
-      kalanKalemler.push({
-        urun_adi: ad,
-        ambalaj_boyutu: String(m.ambalaj_boyutu || m.packaging_size || ""),
-        miktar_mts: kalanMiktar.toFixed(2),
-        birim_fiyat_usd: String(birimFiyat),
-        toplam_tutar_usd: (kalanMiktar * birimFiyat).toFixed(2),
-      });
-    }
-    return kalanKalemler;
-  };
-
   const handleSipariseDevamEt = async (siparis: AnaSiparisWithProgress) => {
     if (!user || !companyId) return;
     setDevamEdiyor(siparis.id);
@@ -255,8 +187,12 @@ export default function IhracatlarPage() {
         .order("olusturma_tarihi", { ascending: true });
 
       const ornekDosya = (bagliDosyalar || [])[0] || null;
-      const master = (siparis.urun_detaylari_master as any[]) || [];
-      const kalanKalemler = hesaplaKalanUrunKalemleri(master, bagliDosyalar || []);
+      // Yeni dosyanin kalemleri: siparisin HENUZ HICBIR DOSYADA OLMAYAN kismi,
+      // marka/kalem bazli (lib/siparis-takip.ts). Guncel veriyle yeniden
+      // hesaplanir; okunamazsa dosya acilmaz (yanlis miktarla dosya olusmasin).
+      const veri = await siparisTakipVerisiGetir(companyId, [siparis]);
+      if (!veri) throw new Error("Sipariş verisi okunamadı");
+      const kalanKalemler = acikKalemler(siparisIlerlemesiHesapla(siparis, veri.dosyalar, veri.konteynerler));
       const kalanToplamTutar = kalanKalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
       const kalanToplamMiktar = kalanKalemler.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
 
@@ -411,7 +347,7 @@ export default function IhracatlarPage() {
         onOpenChange={(open) => { if (!open && !tamamlaniyor) setTamamlanacak(null); }}
         title="Sipariş tamamlansın mı?"
         description={tamamlanacak
-          ? `${tamamlanacak.proforma_no} (${tamamlanacak.alici_firma || "—"}) siparişi tamamlandı olarak işaretlenecek ve Devam Eden Siparişler listesinden kalkacak. Kalan ${Math.max(0, (tamamlanacak.toplam_mts || 0) - tamamlanacak.gonderilmisMts).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS sevk edilmemiş sayılacak. Dosyalar ve sipariş kaydı silinmez.`
+          ? `${tamamlanacak.proforma_no} (${tamamlanacak.alici_firma || "—"}) siparişi tamamlandı olarak işaretlenecek ve Devam Eden Siparişler listesinden kalkacak. Kalan ${tamamlanacak.ilerleme.toplamKalanMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS sevk edilmemiş sayılacak. Dosyalar ve sipariş kaydı silinmez.`
           : ""}
         confirmLabel="Evet, Tamamla"
         cancelLabel="Vazgeç"
@@ -433,59 +369,17 @@ export default function IhracatlarPage() {
             <Package size={16} style={{ color: ACCENT }} />
             <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Devam Eden Siparişler</h2>
           </div>
-          {acikSiparisler.map((s, idx) => {
-            const kalan = Math.max(0, (s.toplam_mts || 0) - s.gonderilmisMts);
-            const yuzde = s.toplam_mts ? Math.min(100, (s.gonderilmisMts / s.toplam_mts) * 100) : 0;
-            const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
-            return (
-              <div key={s.id} className={`rounded-xl border shadow-sm p-4 animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <p className="text-sm font-bold text-white">{s.proforma_no}</p>
-                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.alici_firma}</p>
-                    <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{s.urun_tanimi}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setTamamlanacak(s)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border whitespace-nowrap transition-colors hover:bg-white/5 hover:text-white"
-                      style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
-                      title="Kalan miktar sevk edilmeyecekse siparişi kapatır (kayıt silinmez)"
-                    >
-                      <CheckCircle2 size={13} /> Siparişi Tamamla
-                    </button>
-                    <button
-                      onClick={() => handleSipariseDevamEt(s)}
-                      disabled={devamEdiyor === s.id}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white whitespace-nowrap transition-all hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      {devamEdiyor === s.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
-                      Siparişe Devam Et
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3 mb-2">
-                  <div>
-                    <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Toplam Taahhüt</p>
-                    <p className="text-sm font-bold text-white">{(s.toplam_mts || 0).toLocaleString("tr-TR")} MTS</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Gönderilmiş</p>
-                    <p className="text-sm font-bold text-green-400">{s.gonderilmisMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-amber-500">Kalan</p>
-                    <p className="text-sm font-bold text-amber-400">{kalan.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS</p>
-                  </div>
-                </div>
-                <div className="w-full rounded-full h-1.5" style={{ backgroundColor: CARD_BORDER }}>
-                  <div className="h-1.5 rounded-full bg-green-500 transition-all duration-500" style={{ width: `${yuzde}%` }} />
-                </div>
-                <p className="text-[11px] mt-1.5" style={{ color: TEXT_MUTED }}>{s.dosyaSayisi} sevkiyat dosyası oluşturuldu</p>
-              </div>
-            );
-          })}
+          {acikSiparisler.map((s, idx) => (
+            <SiparisTakipKarti
+              key={s.id}
+              siparis={s}
+              ilerleme={s.ilerleme}
+              sira={idx}
+              devamEdiyor={devamEdiyor === s.id}
+              onTamamla={() => setTamamlanacak(s)}
+              onDevamEt={() => handleSipariseDevamEt(s)}
+            />
+          ))}
         </div>
       )}
 

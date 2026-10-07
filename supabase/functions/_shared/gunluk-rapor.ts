@@ -15,7 +15,8 @@
  * rezervasyon yoksa / eklenen daha fazlaysa eklenen konteyner sayisi.
  * "Yuklendi" = konteynerin DBA belgesi yuklenmis (Kantar Paneli ile ayni).
  * Durum: tum planlanan konteynerlerin DBA'si yuklendiyse "tamamlandi",
- * en az biri yuklendiyse "yukleniyor", hic yoksa "bekliyor".
+ * en az biri yuklendiyse "yukleniyor", hic yoksa "bekliyor" (ekranda
+ * "Yukleme Baslamadi").
  */
 
 export type RaporDosyasi = {
@@ -92,6 +93,11 @@ export type GunlukRapor = {
     gunTamamlanan: number;
     yukleniyor: number;
     bekliyor: number;
+    /** Acik dosyalarin planlanan (rezervasyondaki) toplam konteyner sayisi. */
+    toplamKonteyner: number;
+    /** Bunlardan DBA'si yuklenmis olanlar (planlanandan fazlasi sayilmaz). */
+    yuklenenKonteyner: number;
+    /** Rezervasyonu alinmis ama DBA'si henuz yuklenmemis konteyner = toplam - yuklenen. */
     bekleyenKonteyner: number;
   };
 };
@@ -246,6 +252,8 @@ export function gunlukRaporHesapla(
       gunTamamlanan: sevkiyatlar.filter((s) => s.gunTamamlandi).length,
       yukleniyor: sevkiyatlar.filter((s) => s.durum === "yukleniyor").length,
       bekliyor: sevkiyatlar.filter((s) => s.durum === "bekliyor").length,
+      toplamKonteyner: sevkiyatlar.reduce((t, s) => t + s.konteynerAdedi, 0),
+      yuklenenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.min(s.yuklenen, s.konteynerAdedi), 0),
       bekleyenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.max(0, s.konteynerAdedi - s.yuklenen), 0),
     },
   };
@@ -254,7 +262,8 @@ export function gunlukRaporHesapla(
 export const DURUM_METNI: Record<SevkiyatDurumu, string> = {
   tamamlandi: "Yükleme Tamamlandı ✔",
   yukleniyor: "Yükleniyor",
-  bekliyor: "Yükleme Bekliyor",
+  // "Bekleyen konteyner" ozetiyle karismasin diye: hic konteyneri yuklenmemis sevkiyat
+  bekliyor: "Yükleme Başlamadı",
 };
 
 /** "VIADUC HOL HOL SARLU - 4x - LE SOLEIL - Yükleme Tamamlandı ✔" */

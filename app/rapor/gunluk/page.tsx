@@ -235,12 +235,11 @@ export default function GunlukRaporSayfasi() {
           </div>
 
           {/* OZET */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 print:grid-cols-4 gap-2 mb-6 sayfa-boleme">
+          <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-2 mb-6 sayfa-boleme">
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
-              { e: "Yükleme Tamamlanan", d: `${o.tamamlanan}`, a: o.gunTamamlanan ? `sevkiyat · ${o.gunTamamlanan} tanesi ${bugunMu ? "bugün" : "o gün"} bitti` : "sevkiyat", r: YESIL },
-              { e: "Yükleniyor", d: `${o.yukleniyor}`, a: "sevkiyat", r: AMBER },
-              { e: "Bekleyen Konteyner", d: `${o.bekleyenKonteyner}`, a: `${o.bekliyor} sevkiyat hiç başlamadı`, r: GRI },
+              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} yükleniyor · ${o.bekliyor} başlamadı`, r: YESIL },
+              { e: "Yükleme Bekleyen Konteyner", d: `${o.bekleyenKonteyner}`, a: `DBA bekliyor · toplam ${o.toplamKonteyner}, yüklenen ${o.yuklenenKonteyner}`, r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>
@@ -369,7 +368,7 @@ export default function GunlukRaporSayfasi() {
           </div>
 
           <div className="mt-8 pt-3 border-t border-slate-200 text-center">
-            <p className="text-[10px] text-slate-400">{companyName || "İhracat"} — Bu rapor sistem tarafından otomatik oluşturulmuştur. Her gün 08:00 ve 17:00&apos;de e-posta ile de gönderilir.</p>
+            <p className="text-[10px] text-slate-400">{companyName || "İhracat"} — Bu rapor sistem tarafından otomatik oluşturulmuştur.</p>
           </div>
         </div>
       )}

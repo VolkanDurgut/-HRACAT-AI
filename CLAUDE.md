@@ -542,7 +542,18 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Marka konteynerlerin markası ("BRAND" atılır, farklıysa "SAAD & ASLI"), yoksa
   dosyanın markası. Sadece AÇIK dosyalar; günün yüklenenleri efektif tartım
   gününe göre (DBA'daki tartım tarihi, yoksa yükleme anı TR).
-- Mail: edge function `gunluk-rapor-gonder` (canlıda v1). pg_cron
+- Özet kutuları (revize 07.10.2026, kullanıcı "Yükleme Tamamlanan 7 ne
+  alaka" dedi): 3 kutu — "{Gün} Yüklenen" (konteyner + kg), "Açık Sevkiyat"
+  (x yüklendi · y yükleniyor · z başlamadı), "Yükleme Bekleyen Konteyner"
+  (rezervasyonu var, DBA'sı yok; toplam = yüklenen + bekleyen). Hiç konteyneri
+  yüklenmemiş sevkiyatın rozeti "Yükleme Başlamadı" (eskiden "Yükleme
+  Bekliyor" idi, bekleyen konteyner ile karışıyordu). Mailden "Kısa Özet"
+  metin listesi ve "her gün 08:00/17:00 gönderilir" alt notu kullanıcı
+  isteğiyle KALDIRILDI — geri eklenmez.
+- Alıcı 07.10.2026: kullanıcının Google Workspace maili askıda olduğu için
+  `GERI_BILDIRIM_ALICI` secret'i mesensei282@gmail.com yapıldı (yedek + rapor +
+  geri bildirim aynı adrese). Mail açılınca secret geri değiştirilir.
+- Mail: edge function `gunluk-rapor-gonder` (canlıda v4). pg_cron
   `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
+  DURUM_METNI,
   gunlukRaporHesapla,
   istanbulBugun,
   gunEkle,
@@ -18,8 +19,9 @@ import {
 //   "gunluk-rapor-sabah" 05:00 UTC = 08:00 TR -> DUNUN raporu (gunu kapatir)
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
-// ozet + sevkiyat satirlari ("MUSTERI - 4x - MARKA - Yukleme Tamamlandi ✔") +
-// gun icinde yuklenen konteynerler. Musteriye GITMEZ; sirket ici alicilara.
+// ozet kutulari + sevkiyat tablosu ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔")
+// + gun icinde yuklenen konteynerler (07.10.2026 revize: "Kisa Ozet" metni ve
+// alt bilgi notu kullanici istegiyle kaldirildi). Musteriye GITMEZ; sirket ici alicilara.
 //
 // Alici: GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i varsa o,
 // yoksa gece yedeginin gittigi GERI_BILDIRIM_ALICI. Sirket adreslerine gecmek
@@ -108,10 +110,10 @@ const tarihTR = (t: string | null) => (t ? `${t.slice(8, 10)}.${t.slice(5, 7)}.$
 function durumHucresi(s: SevkiyatSatiri, gunEtiket: string): string {
   const [renk, zemin, metin] =
     s.durum === "tamamlandi"
-      ? ["#047857", "#D1FAE5", "Yükleme Tamamlandı ✔"]
+      ? ["#047857", "#D1FAE5", DURUM_METNI.tamamlandi]
       : s.durum === "yukleniyor"
       ? ["#B45309", "#FEF3C7", `Yükleniyor ${s.yuklenen}/${s.konteynerAdedi}`]
-      : ["#475569", "#F1F5F9", "Yükleme Bekliyor"];
+      : ["#475569", "#F1F5F9", DURUM_METNI.bekliyor];
   const ek = s.gunTamamlandi
     ? ` <span style="color:#047857;font-size:11px;font-weight:bold">${gunEtiket}</span>`
     : s.durum !== "tamamlandi" && s.gunYuklenen > 0
@@ -127,7 +129,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   const th = (t: string, sag = false) => `<th style="background:#1E293B;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold">${t}</th>`;
   const td = (t: string, ek = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;${ek}">${t}</td>`;
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
-    `<td style="width:25%;padding:4px"><div style="border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:10px;color:#64748B">${alt}</div></div></td>`;
+    `<td style="width:33%;padding:4px;vertical-align:top"><div style="border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:10px;color:#64748B">${alt}</div></div></td>`;
 
   const sevkiyatSatirlari = r.sevkiyatlar.length
     ? r.sevkiyatlar
@@ -142,7 +144,6 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
       `<tr><td colspan="6" style="padding:8px;font-size:11px;font-weight:bold;color:#475569;border-top:2px solid #CBD5E1">TOPLAM — ${r.gunYuklenenler.length} konteyner</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1">${o.gunYuklenenNetKg ? sayi(o.gunYuklenenNetKg) + " kg" : ""}</td></tr>`
     : `<tr><td colspan="7" style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">${baslikGun} yüklenen konteyner bulunmuyor.</td></tr>`;
 
-  const metinOzet = r.sevkiyatlar.map((s) => esc(sevkiyatSatiriMetni(s))).join("<br>");
   const bolumBaslik = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#334155;border-left:4px solid #1E293B;padding-left:8px">${t}</div>`;
 
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
@@ -157,9 +158,8 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
     ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", "#1E293B")}
-    ${kutu("Yükleme Tamamlanan", String(o.tamamlanan), o.gunTamamlanan ? `sevkiyat · ${o.gunTamamlanan} tanesi ${gunEtiket} bitti` : "sevkiyat", "#047857")}
-    ${kutu("Yükleniyor", String(o.yukleniyor), "sevkiyat", "#B45309")}
-    ${kutu("Bekleyen Konteyner", String(o.bekleyenKonteyner), `${o.bekliyor} sevkiyat hiç başlamadı`, "#475569")}
+    ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), `${o.tamamlanan} yüklendi · ${o.yukleniyor} yükleniyor · ${o.bekliyor} başlamadı`, "#047857")}
+    ${kutu("Yükleme Bekleyen Konteyner", String(o.bekleyenKonteyner), `DBA bekliyor · toplam ${o.toplamKonteyner}, yüklenen ${o.yuklenenKonteyner}`, "#B45309")}
   </tr></table>
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}
@@ -174,13 +174,8 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
     ${yuklenenSatirlari}
   </table>
 
-  ${r.sevkiyatlar.length ? `${bolumBaslik("Kısa Özet")}<div style="font-size:12px;line-height:1.7;color:#334155;font-family:Arial,Helvetica,sans-serif">${metinOzet}</div>` : ""}
-
   <div style="margin-top:24px;text-align:center">
     <a href="${UYGULAMA_URL}/rapor/gunluk?tarih=${r.tarih}" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">Raporu uygulamada aç</a>
-  </div>
-  <div style="margin-top:20px;padding-top:10px;border-top:1px solid #E2E8F0;text-align:center;font-size:10px;color:#94A3B8">
-    Bu rapor İhracat AI tarafından her gün 08:00 ve 17:00'de otomatik gönderilir. Yükleme durumu konteynerlerin DBA belgelerine göre hesaplanır.
   </div>
 </td></tr></table>
 </td></tr></table></body></html>`;
@@ -189,8 +184,8 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
 function mailKonusu(r: GunlukRapor, slot: "sabah" | "aksam"): string {
   const o = r.ozet;
   const parcalar = [`${o.gunYuklenenKonteyner} konteyner yüklendi`];
-  if (o.gunTamamlanan) parcalar.push(`${o.gunTamamlanan} sevkiyat tamamlandı`);
-  parcalar.push(`${o.yukleniyor} devam ediyor`);
+  if (o.gunTamamlanan) parcalar.push(`${o.gunTamamlanan} sevkiyatın yüklemesi bitti`);
+  parcalar.push(o.bekleyenKonteyner ? `${o.bekleyenKonteyner} konteyner yükleme bekliyor` : "bekleyen konteyner yok");
   return `Günlük Sevkiyat Raporu — ${tarihTR(r.tarih)} ${slot === "aksam" ? "Akşam" : "(Dün)"} | ${parcalar.join(" · ")}`;
 }
 

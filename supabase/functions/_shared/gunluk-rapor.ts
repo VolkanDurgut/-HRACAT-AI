@@ -28,6 +28,7 @@ export type RaporDosyasi = {
   fatura_dosya_url?: string | null;
   fatura_no?: string | null;
   fatura_tarihi?: string | null;
+  varis_limani?: string | null;
 };
 
 /** Sevkiyattaki tek konteyner (plaka / tonaj gosterimi icin). */
@@ -87,6 +88,18 @@ export type SevkiyatSatiri = {
   konteynerler: SevkiyatKonteyneri[];
   /** Yuklenen (DBA'li) konteynerlerin gercek net toplami (kg). */
   yuklenenNetKg: number;
+  /** Varis limani (gosterim icin buyuk harf; kayit degismez). */
+  varisLimani: string | null;
+  /**
+   * Ekipman dagilimi (07.10.2026). Bos ekipman alininca konteyner no sisteme
+   * eklenir, dolup tartilinca DBA yuklenir:
+   *   ekipmanAlinan  = sisteme eklenmis konteyner (eklenen)
+   *   dolu           = DBA'li (yuklenen)
+   *   dolumBekleyen  = ekipmani alinmis ama henuz dolmamis (eklenen - dolu)
+   *   ekipmanAlinmayan = rezervasyonda olup henuz eklenmemis (adet - eklenen)
+   */
+  dolumBekleyen: number;
+  ekipmanAlinmayan: number;
 };
 
 export type YuklenenKonteyner = {
@@ -120,6 +133,8 @@ export type GunlukRapor = {
     yuklenenKonteyner: number;
     /** Rezervasyonu alinmis ama DBA'si henuz yuklenmemis konteyner = toplam - yuklenen. */
     bekleyenKonteyner: number;
+    /** Ekipmani alinmis ama henuz dolmamis konteyner toplami. */
+    dolumBekleyen: number;
     /** Acik sevkiyatlardan faturasi kesilmis / kesilmemis olanlar. */
     faturaKesilen: number;
     faturaKesilmeyen: number;
@@ -244,6 +259,9 @@ export function gunlukRaporHesapla(
       faturaTarihi: d.fatura_tarihi || null,
       konteynerler: sevkKonteynerleri,
       yuklenenNetKg: sevkKonteynerleri.reduce((t, k) => t + (k.yuklendi && k.net ? k.net : 0), 0),
+      varisLimani: d.varis_limani?.trim() ? d.varis_limani.trim().toLocaleUpperCase("en-US") : null,
+      dolumBekleyen: Math.max(0, kendi.length - yuklenenler.length),
+      ekipmanAlinmayan: Math.max(0, konteynerAdedi - kendi.length),
     });
   }
   sevkiyatlar.sort(
@@ -288,6 +306,7 @@ export function gunlukRaporHesapla(
       toplamKonteyner: sevkiyatlar.reduce((t, s) => t + s.konteynerAdedi, 0),
       yuklenenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.min(s.yuklenen, s.konteynerAdedi), 0),
       bekleyenKonteyner: sevkiyatlar.reduce((t, s) => t + Math.max(0, s.konteynerAdedi - s.yuklenen), 0),
+      dolumBekleyen: sevkiyatlar.reduce((t, s) => t + s.dolumBekleyen, 0),
       faturaKesilen: sevkiyatlar.filter((s) => s.faturaKesildi).length,
       faturaKesilmeyen: sevkiyatlar.filter((s) => !s.faturaKesildi).length,
     },
@@ -307,6 +326,12 @@ export const DURUM_METNI: Record<SevkiyatDurumu, string> = {
  */
 export function durumRozetMetni(s: SevkiyatSatiri): string {
   return s.durum === "yukleniyor" ? `${s.yuklenen}/${s.konteynerAdedi} Yüklendi` : DURUM_METNI[s.durum];
+}
+
+/** "Ekipman 6/10 · Dolu 3 · Dolum bekleyen 3" (tamamlanan sevkiyatta null). */
+export function ekipmanOzetMetni(s: SevkiyatSatiri): string | null {
+  if (s.durum === "tamamlandi") return null;
+  return `Ekipman ${s.eklenen}/${s.konteynerAdedi} · Dolu ${s.yuklenen} · Dolum bekleyen ${s.dolumBekleyen}`;
 }
 
 /** "VIADUC HOL HOL SARLU - 4x - LE SOLEIL - Yükleme Tamamlandı ✔" */

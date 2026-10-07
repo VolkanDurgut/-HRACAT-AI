@@ -569,7 +569,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (yeşil/amber/kırmızı) anlam taşıdığı için değişmedi. 3. kutu "Yüklenecek
   Konteyner" = rezerve (rezervasyondaki toplam) − yüklenen (DBA'lı); alt metin
   "rezerve 61 · yüklenen 50".
-- Mail: edge function `gunluk-rapor-gonder` (canlıda v6). pg_cron
+- Revize 4 (07.10.2026): EKİPMAN durumu. Sistemde ayrı ekipman alanı YOK;
+  boş ekipman alınınca konteyner no (+mühür) eklenir, dolup tartılınca DBA
+  yüklenir. Buna göre devam eden / başlamamış sevkiyatta rozetin altında 3 renkli
+  çubuk (dolu yeşil · ekipmanı alınmış boş amber · alınmamış gri) + "Ekipman
+  6/10 · Dolu 3 · Dolum bekleyen 3" (`ekipmanOzetMetni`; alanlar `eklenen`,
+  `yuklenen`, `dolumBekleyen`, `ekipmanAlinmayan`). 3. kutuya "boş ekipman
+  (dolum bekleyen)" toplamı eklendi. Tamamlanan sevkiyat başlığında "Varış:"
+  (dosyanın `varis_limani`, gösterimde büyük harf; kayıt değişmez).
+- Mail: edge function `gunluk-rapor-gonder` (canlıda v7). pg_cron
   `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret

@@ -13,6 +13,7 @@ import {
   RaporRezervasyonu,
   SevkiyatSatiri,
   durumRozetMetni,
+  ekipmanOzetMetni,
 } from "@/supabase/functions/_shared/gunluk-rapor";
 
 /**
@@ -51,6 +52,23 @@ function DurumRozeti({ s }: { s: SevkiyatSatiri }) {
     <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap" style={{ backgroundColor: zemin, color: renk }}>
       {metin}
     </span>
+  );
+}
+
+/** Ekipman dagilimi: dolu (yesil) / ekipmani alinmis bos (amber) / alinmamis (gri). */
+function EkipmanCubugu({ s }: { s: SevkiyatSatiri }) {
+  const metin = ekipmanOzetMetni(s);
+  if (!metin || s.konteynerAdedi <= 0) return null;
+  const yuzde = (n: number) => `${(100 * n) / s.konteynerAdedi}%`;
+  return (
+    <div className="mt-1">
+      <div className="flex h-1.5 w-32 rounded-sm overflow-hidden" title={metin}>
+        {s.yuklenen > 0 && <div style={{ width: yuzde(s.yuklenen), backgroundColor: "#10B981" }} />}
+        {s.dolumBekleyen > 0 && <div style={{ width: yuzde(s.dolumBekleyen), backgroundColor: "#F59E0B" }} />}
+        {s.ekipmanAlinmayan > 0 && <div style={{ width: yuzde(s.ekipmanAlinmayan), backgroundColor: "#CBD5E1" }} />}
+      </div>
+      <p className="text-[10px] text-slate-600 mt-0.5 whitespace-nowrap">{metin}</p>
+    </div>
   );
 }
 
@@ -117,7 +135,7 @@ export default function GunlukRaporSayfasi() {
 
     const { data: acikDosyalar, error: e1 } = await supabase
       .from("ihracat_dosyalari")
-      .select("id, dosya_no, alici_firma, marka, fatura_dosya_url, fatura_no, fatura_tarihi")
+      .select("id, dosya_no, alici_firma, marka, fatura_dosya_url, fatura_no, fatura_tarihi, varis_limani")
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik");
     const acikIdler = (acikDosyalar || []).map((d) => d.id);
@@ -239,7 +257,7 @@ export default function GunlukRaporSayfasi() {
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
               { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı\nFatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, r: YESIL },
-              { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}`, r: AMBER },
+              { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}\nboş ekipman (dolum bekleyen): ${o.dolumBekleyen}`, r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>
@@ -277,6 +295,7 @@ export default function GunlukRaporSayfasi() {
                         ) : s.gunYuklenen > 0 ? (
                           <p className="text-[10px] text-slate-500 mt-0.5">{bugunMu ? "Bugün" : "Bu tarihte"} {s.gunYuklenen} konteyner yüklendi</p>
                         ) : null}
+                        <EkipmanCubugu s={s} />
                       </td>
                       <td className="py-1.5 pr-2"><FaturaRozeti s={s} /></td>
                       <td className="py-1.5 pr-2 text-[11px] text-slate-500 whitespace-nowrap leading-tight">{s.dosya_no}{s.booking ? <><br />{s.booking}</> : null}</td>
@@ -300,7 +319,11 @@ export default function GunlukRaporSayfasi() {
                   <div key={s.dosya_id} className={`sayfa-boleme ${gi > 0 ? "border-t border-slate-200" : ""}`}>
                     <div className="flex items-center justify-between gap-2 px-3 py-1.5" style={{ backgroundColor: "#F1F5F9" }}>
                       <p className="text-xs text-slate-800">
-                        <span className="font-bold">{s.musteri}</span> · {s.marka} · {s.konteynerAdedi}x <span className="text-slate-500 text-[11px]">({s.dosya_no})</span>
+                        <span className="font-bold">{s.musteri}</span> · {s.marka} · {s.konteynerAdedi}x
+                        {s.varisLimani && (
+                          <> · <span style={{ color: LACIVERT }}>Varış: <span className="font-bold">{s.varisLimani}</span></span></>
+                        )}{" "}
+                        <span className="text-slate-500 text-[11px]">({s.dosya_no})</span>
                       </p>
                       <p className="text-xs font-bold text-slate-800 whitespace-nowrap">Toplam {s.yuklenenNetKg ? `${sayi(s.yuklenenNetKg)} kg` : "-"}</p>
                     </div>

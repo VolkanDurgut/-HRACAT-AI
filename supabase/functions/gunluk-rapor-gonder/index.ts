@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   DURUM_METNI,
   durumRozetMetni,
+  ekipmanOzetMetni,
   gunlukRaporHesapla,
   istanbulBugun,
   gunEkle,
@@ -85,7 +86,7 @@ const inListe = (idler: string[]) => `(${idler.map((i) => `"${i}"`).join(",")})`
 
 async function sirketRaporu(companyId: string, tarih: string): Promise<GunlukRapor> {
   const acik = await hepsiniCek<RaporDosyasi>(
-    `ihracat_dosyalari?select=id,dosya_no,alici_firma,marka,fatura_dosya_url,fatura_no,fatura_tarihi&company_id=eq.${companyId}&durum=in.(${encodeURIComponent("Açık")},Acik)&order=id`
+    `ihracat_dosyalari?select=id,dosya_no,alici_firma,marka,fatura_dosya_url,fatura_no,fatura_tarihi,varis_limani&company_id=eq.${companyId}&durum=in.(${encodeURIComponent("Açık")},Acik)&order=id`
   );
   const acikIdler = acik.map((d) => d.id);
   const kolonlar = "id,dosya_id,konteyner_no,muhur_no,plaka,marka,tare_kg,vgm_kg,dba_dosya_url,dba_yukleme_tarihi,dba_kontrol_sonucu";
@@ -124,7 +125,23 @@ function durumHucresi(s: SevkiyatSatiri, gunEtiket: string): string {
     : s.gunYuklenen > 0
     ? `<div style="color:#64748B;font-size:10px;margin-top:2px">${gunEtiket} ${s.gunYuklenen} konteyner yüklendi</div>`
     : "";
-  return `<span style="display:inline-block;padding:2px 9px;border-radius:999px;background:${zemin};color:${renk};font-size:11px;font-weight:bold;white-space:nowrap">${metin}</span>${ek}`;
+  return `<span style="display:inline-block;padding:2px 9px;border-radius:999px;background:${zemin};color:${renk};font-size:11px;font-weight:bold;white-space:nowrap">${metin}</span>${ek}${ekipmanCubugu(s)}`;
+}
+
+/**
+ * Devam eden / baslamamis sevkiyatta ekipman dagilimi: 3 renkli cubuk
+ * (dolu = yesil, ekipmani alinmis bos = amber, ekipmani alinmamis = gri) +
+ * "Ekipman 6/10 · Dolu 3 · Dolum bekleyen 3". Tamamlananda gosterilmez.
+ */
+function ekipmanCubugu(s: SevkiyatSatiri): string {
+  const metin = ekipmanOzetMetni(s);
+  if (!metin || s.konteynerAdedi <= 0) return "";
+  const gen = 130;
+  const parca = (adet: number, renk: string) => {
+    const w = Math.round((gen * adet) / s.konteynerAdedi);
+    return adet > 0 && w > 0 ? `<td style="width:${w}px;height:6px;background:${renk};font-size:0;line-height:0">&nbsp;</td>` : "";
+  };
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:5px;width:${gen}px;border-collapse:collapse;border-radius:3px;overflow:hidden"><tr>${parca(s.yuklenen, "#10B981")}${parca(s.dolumBekleyen, "#F59E0B")}${parca(s.ekipmanAlinmayan, "#CBD5E1")}</tr></table><div style="color:#475569;font-size:10px;margin-top:3px;white-space:nowrap">${esc(metin)}</div>`;
 }
 
 function faturaHucresi(s: SevkiyatSatiri): string {
@@ -159,7 +176,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   const tamamlananlar = r.sevkiyatlar.filter((s) => s.durum === "tamamlandi");
   const tamamlananSatirlari = tamamlananlar
     .map((s) => {
-      const baslik = `<tr><td colspan="5" style="padding:7px 8px;background:#F1F5F9;border-top:1px solid #CBD5E1;font-size:12px;color:#0F172A"><b>${esc(s.musteri)}</b> · ${esc(s.marka)} · ${s.konteynerAdedi}x <span style="color:#64748B;font-size:11px">(${esc(s.dosya_no)})</span></td><td colspan="2" style="padding:7px 8px;background:#F1F5F9;border-top:1px solid #CBD5E1;font-size:12px;font-weight:bold;text-align:right;white-space:nowrap">Toplam ${s.yuklenenNetKg ? sayi(s.yuklenenNetKg) + " kg" : "-"}</td></tr>`;
+      const baslik = `<tr><td colspan="5" style="padding:7px 8px;background:#F1F5F9;border-top:1px solid #CBD5E1;font-size:12px;color:#0F172A"><b>${esc(s.musteri)}</b> · ${esc(s.marka)} · ${s.konteynerAdedi}x${s.varisLimani ? ` · <span style="color:${LACIVERT}">Varış: <b>${esc(s.varisLimani)}</b></span>` : ""} <span style="color:#64748B;font-size:11px">(${esc(s.dosya_no)})</span></td><td colspan="2" style="padding:7px 8px;background:#F1F5F9;border-top:1px solid #CBD5E1;font-size:12px;font-weight:bold;text-align:right;white-space:nowrap">Toplam ${s.yuklenenNetKg ? sayi(s.yuklenenNetKg) + " kg" : "-"}</td></tr>`;
       const yuklenen = s.konteynerler.filter((k) => k.yuklendi);
       const hucre = (k?: (typeof yuklenen)[number]) =>
         k
@@ -195,7 +212,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
     ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", LACIVERT)}
     ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı<br>Fatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, "#047857")}
-    ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}`, "#B45309")}
+    ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}<br>boş ekipman (dolum bekleyen): ${o.dolumBekleyen}`, "#B45309")}
   </tr></table>
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}

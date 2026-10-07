@@ -57,7 +57,9 @@ tek fark 6. adımdaki zamanlanmış iş).
 ### 4) Edge function'lar ve gizli anahtarlar (~10 dk)
 ```
 supabase secrets set GEMINI_API_KEY=... RESEND_API_KEY=... GERI_BILDIRIM_ALICI=...
-supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder
+supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder
+# istege bagli: gunluk raporu sirket adreslerine gondermek icin (virgulle)
+supabase secrets set GUNLUK_RAPOR_ALICILARI=adres1@...,adres2@...
 ```
 (Hepsi `verify_jwt` açık; varsayılan ayar budur. `depo-karantina` tek seferlik
 bir araçtı, yeni projeye kurulmaz.)
@@ -78,7 +80,7 @@ Betiğin sonunda yazanları uygulayın:
 - SQL Editor: `select setval('public.ihracat_dosya_sira', <N>);` (N betikte yazar)
 - Geçici şifreleri kullanıcılara güvenli yoldan iletin (şifreler yedekte yoktur).
 
-### 6) Gece yedeği zamanlanmış işi (~2 dk)
+### 6) Zamanlanmış işler: gece yedeği + günlük rapor (~3 dk)
 SQL Editor'de (YENİ projenin adresi ve **anon** anahtarıyla):
 ```sql
 select cron.schedule('gunluk-yedek-maili', '0 0 * * *', $cmd$
@@ -86,6 +88,26 @@ select cron.schedule('gunluk-yedek-maili', '0 0 * * *', $cmd$
     url := 'https://<YENI_REF>.supabase.co/functions/v1/yedekleme-gonder',
     headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
     body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+$cmd$);
+```
+
+Günlük sevkiyat raporu (08:00 dünün raporu, 17:00 bugünün raporu; UTC 05:00 / 14:00):
+```sql
+select cron.schedule('gunluk-rapor-sabah', '0 5 * * *', $cmd$
+  select net.http_post(
+    url := 'https://<YENI_REF>.supabase.co/functions/v1/gunluk-rapor-gonder',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
+    body := '{"slot":"sabah"}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+$cmd$);
+select cron.schedule('gunluk-rapor-aksam', '0 14 * * *', $cmd$
+  select net.http_post(
+    url := 'https://<YENI_REF>.supabase.co/functions/v1/gunluk-rapor-gonder',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
+    body := '{"slot":"aksam"}'::jsonb,
     timeout_milliseconds := 60000
   );
 $cmd$);

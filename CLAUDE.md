@@ -526,6 +526,38 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   yok → sadece service_role). Son 20 saatte başarılı yedek varsa yeni mail
   gönderilmez. Test için gövde `{"deneme": true}`: mail/kayıt yok, sadece özet.
 
+## Günlük sevkiyat raporu (07.10.2026)
+
+- Sayfa `app/rapor/gunluk/page.tsx` (Dashboard → Günlük Rapor; `?tarih=YYYY-MM-DD`
+  ile geçmiş gün) + her gün 08:00 ve 17:00 (TR) giden şirket içi mail. İkisi de
+  AYNI hesabı kullanır: `supabase/functions/_shared/gunluk-rapor.ts`
+  (`gunlukRaporHesapla`, saf TS, import yok; Next tarafı `@/supabase/functions/
+  _shared/gunluk-rapor` ile içe aktarır, `lib/cutoff-utils.ts` tartım
+  fonksiyonlarını oradan yeniden dışa aktarır). Hesap değişecekse SADECE orası.
+- Sevkiyat satırı (kullanıcı örneği): "VIADUC HOL HOL SARLU - 4x - LE SOLEIL -
+  Yükleme Tamamlandı ✔" = müşteri - konteyner adedi - marka (çuval) - durum.
+  Adet = rezervasyonlardaki `konteyner_adedi` toplamı (eklenen daha fazlaysa o);
+  "yüklendi" = DBA yüklü (Kantar Paneli ile aynı). Durum: hepsi DBA'lı →
+  Tamamlandı ✔, en az biri → "Yükleniyor x/n", hiçbiri → Yükleme Bekliyor.
+  Marka konteynerlerin markası ("BRAND" atılır, farklıysa "SAAD & ASLI"), yoksa
+  dosyanın markası. Sadece AÇIK dosyalar; günün yüklenenleri efektif tartım
+  gününe göre (DBA'daki tartım tarihi, yoksa yükleme anı TR).
+- Mail: edge function `gunluk-rapor-gonder` (canlıda v1). pg_cron
+  `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
+  → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
+  `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret
+  ayarı, kod/deploy gerekmez. Müşteriye GİTMEZ.
+- Tekrar koruması: `rapor_gonderimleri` (rapor_tarihi, slot, company_id
+  benzersiz; RLS açık, politika yok; migration `20261007120000`, canlıya
+  UYGULANDI). Aynı slot ikinci kez gönderilmez; gönderim hatasında kayıt silinir.
+  Bir slotu yeniden göndermek için o satır silinir. Gece yedeğine dahil değil
+  (iz kaydı).
+- Test: gövde `{"deneme":true,"slot":"sabah"|"aksam"[,"tarih":"YYYY-MM-DD"]}` →
+  mail/kayıt yok, yanıtta konu + özet + satırlar + HTML. 07.10.2026 canlı
+  doğrulama: akşam 1 konteyner/25.040 kg, sabah (06.10) 3/75.260 kg — SQL ile
+  birebir; gerçek test maili yedek adresine gitti, ikinci çağrı "zaten
+  gönderilmiş" ile atlandı.
+
 ## Donanım / altyapı ve kapasite (05.10.2026)
 
 - SQL Server'daki .mdf/.ldf ayrımı ve auto-growth ayarının karşılığı yok:

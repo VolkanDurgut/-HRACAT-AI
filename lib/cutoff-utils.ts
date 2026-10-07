@@ -336,46 +336,8 @@ export function bugunTarihIstanbul(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
 }
 
-/**
- * DBA belgesinden yapay zeka ile cikarilan "DD.MM.YYYY HH:MM:SS" formatindaki
- * GERCEK tartim tarihini { gun, saat } olarak ayristirir. Bu, konteynerin
- * SISTEME NE ZAMAN YUKLENDIGINDEN (dba_yukleme_tarihi) FARKLI bir bilgidir -
- * personel belgeyi ertesi gun/gec yukleyebilir, bu durumda konteyner yanlis
- * gune dusmemesi icin belgedeki gercek tarih esas alinir. Format tanınamazsa
- * (nadir AI cikarim hatasi) null doner ve cagiran kod yukleme tarihine
- * guvenli sekilde geri doner - hicbir konteyner sessizce kaybolmaz.
- */
-export function tartimTarihiAyristir(deger: string | null | undefined): { gun: string; saat: string } | null {
-  if (!deger) return null;
-  const eslesme = deger.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})[ ,T]+(\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!eslesme) return null;
-  const [, gg, aa, yyyy, ss, dd, sn] = eslesme;
-  return { gun: `${yyyy}-${aa}-${gg}`, saat: `${ss}:${dd}:${sn || "00"}` };
-}
-
-/**
- * Bir konteyner icin "efektif gun/saat" bilgisini dondurur: once DBA
- * belgesindeki GERCEK tartim tarihi denenir, o yoksa/bozuksa (Turkiye
- * saatine cevrilmis) sistem yukleme tarihine guvenli sekilde doner.
- *
- * TEK DOGRU KAYNAK (talep: 29.09.2026): hem Dashboard'daki "Bugun Yuklenen"
- * sayaci hem Gunluk Ihracat Kantar Raporu bu fonksiyonu kullanir. Daha once
- * Dashboard sadece dba_yukleme_tarihi'ne (sisteme yukleme zamani) bakiyordu,
- * rapor ise bu fonksiyonu kullaniyordu - personel bir DBA belgesini ertesi
- * gun yukledinde iki ekran farkli sayilar gosteriyordu (kok neden incelemesi:
- * 29.09.2026, ör. SEGU1669290 - 28 Eylul'de tartilmis, DBA'si 29 Eylul sabahi
- * yuklenmis, Dashboard "bugun" sayarken rapor dogru sekilde 28 Eylul'e
- * atiyordu). Artik ikisi de ayni gunu gosterir.
- */
-export function efektifTartimBilgisi(
-  dbaKontrolSonucu: Record<string, unknown> | null | undefined,
-  dbaYuklemeTarihi: string | null
-): { gun: string; saat: string } | null {
-  const aiTarihi = tartimTarihiAyristir((dbaKontrolSonucu as any)?.tartim_tarih_saat);
-  if (aiTarihi) return aiTarihi;
-  if (!dbaYuklemeTarihi) return null;
-  const yuklemeDate = new Date(dbaYuklemeTarihi);
-  const gun = yuklemeDate.toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
-  const saat = yuklemeDate.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour12: false });
-  return { gun, saat };
-}
+// Tartim tarihi yardimcilari (tartimTarihiAyristir, efektifTartimBilgisi)
+// 07.10.2026'dan beri TEK YERDE: supabase/functions/_shared/gunluk-rapor.ts.
+// Dashboard "Bugun Yuklenen" sayaci, /rapor/gunluk sayfasi ve 08:00/17:00
+// rapor maili (edge function) ayni gunu gostersin diye. Davranis aynidir.
+export { tartimTarihiAyristir, efektifTartimBilgisi } from "@/supabase/functions/_shared/gunluk-rapor";

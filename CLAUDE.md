@@ -424,6 +424,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Proforma okuma (edge function `proforma-oku`) talimatı DEĞİŞTİRİLMEDİ;
   koruma uygulama tarafında.
 
+## Evrak yazdırma — tek sayfa kuralı (07.10.2026)
+
+- HTML evrakların iki çıktı yolu var: (1) uygulamanın PDF'i (`lib/html-to-pdf.ts`,
+  html2canvas → EKRAN stilleri, 800px genişlik, A4 sınırı ≈1131px), (2) tarayıcıdan
+  yazdır / "PDF olarak kaydet" (`@media print` + `@page`). İkincisinde `.sheet`
+  min-height'ı basılabilir alanı (A4 − kenar boşlukları; 12mm'de 273mm ≈1032px)
+  AŞMAMALI, yoksa `margin-top:auto` footer her zaman 2. sayfaya düşer.
+- Quality sertifikası bu yüzden yazdırınca footer'ı 2. sayfaya atıyordu
+  (UNEXBFB090926 / IHR-2026-0086). Düzeltme: print'te `min-height: 270mm` +
+  hafif sıkıştırma (hücre/boşluk; yazı boyutu aynı). Uzun alıcı metinli 0073 ve
+  zorlama vakası dahil tek sayfa; uygulama PDF'i birebir aynı kaldı.
+- Commercial Invoice 30.09'da aynı sebeple düzeltilmişti (print min-height:0).
+  Fumigation (min-height 1000px < 1032px) ve Packing List (10mm kenar) yazdırınca
+  tek sayfa — kontrol edildi. Yeni şablonda bu kurala uy.
+
 ## Sipariş takibi — marka / kalem bazlı (07.10.2026)
 
 - Devam Eden Siparişler (İhracatlar sayfası) artık her sipariş KALEMİNİ

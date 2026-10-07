@@ -158,7 +158,22 @@ const KALITE_SERTIFIKASI_TEMPLATE = `<!DOCTYPE html>
   .print-hint { background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 10px 14px; font-size: 11px; margin-bottom: 14px; border-radius: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #FFFFFF; padding: 0; }
-    .sheet { box-shadow: none; padding: 0; width: auto; }
+    /* Yazdirirken min-height basilabilir alana indirilir (07.10.2026,
+       UNEXBFB090926 / IHR-2026-0086): ekrandaki 1050px (~278mm), 12mm kenar
+       bosluklu A4'un basilabilir yuksekligini (273mm) astigi ve footer
+       margin-top:auto ile en alta yaslandigi icin, icerik kisa olsa bile
+       footer HER ZAMAN 2. sayfaya dusuyordu. 270mm: footer sayfanin altinda
+       kalir, tasmaz. (Uygulamanin urettigi PDF html2canvas ile ekran
+       stilinden alinir; bu kuraldan etkilenmez.) */
+    .sheet { box-shadow: none; padding: 0; width: auto; min-height: 270mm; }
+    /* Uzun alici / notify metinli dosyalarda (orn. IHR-2026-0073) tek sayfaya
+       sigsin diye yazdirirken hucre ve bosluklar biraz daraltilir; yazi
+       boyutlari degismez. */
+    .main-table td { padding: 2px 8px; }
+    .param-table th, .param-table td { padding: 2px 6px; }
+    .closing-text { margin: 5px 0; }
+    .signature-row { margin-top: 6px; margin-bottom: 6px; }
+    .stamp-slot img { max-height: 85px; }
     .print-hint { display: none; }
   }
 </style>

@@ -2,6 +2,7 @@
 import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
+import { asciiYap, gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -118,7 +119,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const lojistikBilgileri = [
       satir("Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani),
       satir("Varis Limani", dosya.varis_limani),
-      satir("Ulke", ulkeAyikla(dosya.varis_limani)),
+      // PDF ile ayni kural (lib/ulke-bul.ts); mailto govdesi ASCII.
+      satir("Gidecegi Ulke", asciiYap(gidecegiUlke(dosya.varis_limani) ?? ulkeAyikla(dosya.varis_limani) ?? "")),
+      satir("Ticaret Yapilan Ulke", asciiYap(ticaretYapilanUlke(dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ)),
       satir("Teslim Sekli", dosya.teslim_sekli),
       satir("Odeme Sekli", dosya.gumruk_odeme_sekli),
       satir("Gemi Adi", rez?.gemi_adi),

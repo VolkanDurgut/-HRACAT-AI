@@ -4,6 +4,7 @@ import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
+import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
 
@@ -123,7 +124,11 @@ function ciz(
   bolumTablosu("LOJISTIK BILGILERI", [
     ["Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani],
     ["Varis Limani", dosya.varis_limani],
-    ["Ulke", ulkeAyikla(dosya.varis_limani)],
+    // 08.10.2026: "Ulke" ikiye ayrildi - varis limaninin ulkesi (gidecegi) ile
+    // proformadaki BUYER'in ulkesi (ticaret yapilan) farkli olabilir
+    // (0091: alici Ispanya, mal Kuba'ya). Bkz. lib/ulke-bul.ts
+    ["Gidecegi Ulke", gidecegiUlke(dosya.varis_limani) ?? ulkeAyikla(dosya.varis_limani)],
+    ["Ticaret Yapilan Ulke", ticaretYapilanUlke(dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ],
     ["Teslim Sekli", dosya.teslim_sekli],
     ["Odeme Sekli", dosya.gumruk_odeme_sekli],
     ["Gemi Adi", rez?.gemi_adi],

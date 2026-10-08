@@ -10,6 +10,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { oransalYenidenYazilabilirMi } from "@/lib/siparis-takip";
+import { varisLimaniSorunu, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -34,7 +35,7 @@ type SilmeHedefi = {
 const emptyForm = {
   booking_no: "", gemi_adi: "", sefer_no: "", acente_ismi: "", gemi_kalkis_tarihi: "", talimat_cutoff: "", talimat_cutoff_saat: "",
   beyanname_cutoff: "", beyanname_cutoff_saat: "", ekipman_alim_yeri: "", ekipman_alim_tarihi: "",
-  yuklenme_limani: "", konteyner_adedi: 0,
+  yuklenme_limani: "", varis_limani: "", konteyner_adedi: 0,
   ardiyesiz_giris: "",
   navlun_tutari: "", lokal_masraf_tutari: "",
 };
@@ -58,6 +59,9 @@ const buildFormFromRez = (rez: Rezervasyon, dosya: Dosya) => ({
   ekipman_alim_yeri: rez.ekipman_alim_yeri || "",
   ekipman_alim_tarihi: rez.ekipman_alim_tarihi ? rez.ekipman_alim_tarihi.split("T")[0] : "",
   yuklenme_limani: rez.yuklenme_limani || "",
+  // Varis limani DOSYAYA aittir (navlun gibi): Lojistik karti, Commercial
+  // Invoice, fatura talimati ve rapor ayni alani kullanir (08.10.2026).
+  varis_limani: dosya.varis_limani || "",
   konteyner_adedi: rez.konteyner_adedi || 0,
   ardiyesiz_giris: (rez as any).ardiyesiz_giris ? (rez as any).ardiyesiz_giris.split("T")[0] : "",
   navlun_tutari: dosya.navlun_tutari?.toString() || "",
@@ -87,6 +91,9 @@ function buildPayload(form: typeof emptyForm) {
 
 function buildDosyaPayload(form: typeof emptyForm) {
   return {
+    // Varis limani dosyanin alanidir; girilen yazim aynen korunur (evraklara
+    // basildigi icin buyuk harfe cevrilmez), sadece bas/son bosluk kirpilir.
+    varis_limani: kirp(form.varis_limani) || null,
     // "1250,50" eskiden 1250 kaydediliyordu (parseFloat virgulde durur) - 03.10.2026
     navlun_tutari: form.navlun_tutari.trim() ? sayiOku(form.navlun_tutari) : null,
     lokal_masraf_tutari: form.lokal_masraf_tutari.trim() ? sayiOku(form.lokal_masraf_tutari) : null,
@@ -107,6 +114,10 @@ function validateForm(form: typeof emptyForm, navlunOpsiyonel: boolean): Record<
   if (!form.sefer_no.trim()) e.sefer_no = zorunlu;
   if (!form.acente_ismi.trim()) e.acente_ismi = zorunlu;
   if (!form.yuklenme_limani.trim()) e.yuklenme_limani = zorunlu;
+  // Lojistik karti ile ayni kural: bos olamaz, yukleme limaniyla ayni olamaz,
+  // Turkiye limani olamaz (lib/varis-limani-kontrol.ts).
+  const varisSorunu = varisLimaniSorunu(form.varis_limani, [form.yuklenme_limani]);
+  if (varisSorunu) e.varis_limani = varisSorunu === "bos" ? zorunlu : VARIS_LIMANI_SORUN_METNI[varisSorunu];
   if (!form.konteyner_adedi || form.konteyner_adedi <= 0) e.konteyner_adedi = zorunlu;
   if (!form.gemi_kalkis_tarihi) e.gemi_kalkis_tarihi = zorunlu;
   if (!form.talimat_cutoff) e.talimat_cutoff = zorunlu;
@@ -222,7 +233,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
  * acikca soylenir, sessizce yutulmaz (01.10.2026).
  */
 function ikincilAdimMesaji(navlunHatasi: string | null, tutar: { basarili: boolean; uyari: string | null }, basariMesaji: string): { mesaj: string; tur: "success" | "error" } {
-  if (navlunHatasi) return { mesaj: `Rezervasyon kaydedildi ancak navlun / lokal masraf kaydedilemedi: ${navlunHatasi}`, tur: "error" };
+  if (navlunHatasi) return { mesaj: `Rezervasyon kaydedildi ancak varış limanı / navlun / lokal masraf kaydedilemedi: ${navlunHatasi}`, tur: "error" };
   if (!tutar.basarili) return { mesaj: "Rezervasyon kaydedildi ancak ürün tutarları güncellenemedi. Lütfen rezervasyonu tekrar kaydedin.", tur: "error" };
   if (tutar.uyari) return { mesaj: `${basariMesaji} ${tutar.uyari}`, tur: "error" };
   return { mesaj: basariMesaji, tur: "success" };
@@ -264,6 +275,11 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
         <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Yükleme Limanı *</label>
         <input value={form.yuklenme_limani} onChange={(e) => update("yuklenme_limani", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         {hataGoster("yuklenme_limani")}
+      </div>
+      <div>
+        <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Varış Limanı *</label>
+        <input value={form.varis_limani} onChange={(e) => update("varis_limani", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="örn: Djibouti Port, Djibouti" />
+        {hataGoster("varis_limani") || <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>Dosyanın varış limanıdır; evraklarda ve fatura talimatında kullanılır.</p>}
       </div>
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Konteyner Adedi *</label>
@@ -470,6 +486,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
           <KartSatiri etiket="Sefer No" deger={rez.sefer_no} mono />
           <KartSatiri etiket="Acente" deger={rez.acente_ismi} />
           <KartSatiri etiket="Yükleme Limanı" deger={rez.yuklenme_limani} />
+          <KartSatiri etiket="Varış Limanı" deger={dosya.varis_limani} />
           <KartSatiri etiket="Konteyner Adedi" deger={kontAdedi > 0 ? String(kontAdedi) : null} />
         </KartBolumu>
 
@@ -547,6 +564,7 @@ export default function RezervasyonTab({ dosyaId, dosya, rezervasyonlar, onRefre
       ...emptyForm,
       navlun_tutari: dosya.navlun_tutari?.toString() || "",
       lokal_masraf_tutari: dosya.lokal_masraf_tutari?.toString() || "",
+      varis_limani: dosya.varis_limani || "",
     });
     setNewErrors({});
     setShowNewForm(true);

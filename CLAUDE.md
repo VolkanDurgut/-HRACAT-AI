@@ -262,6 +262,28 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Boş navlun/lokal masraf evrakları bozmaz: Fatura Talimatı, ECTN satırları
   ve Ek Bilgiler kartı null değeri "–" gösterir / FOB sütununu hesaplamaz.
 
+## Varış limanı rezervasyonda + ticaret yapılan ülke (08.10.2026)
+
+- Rezervasyon formunda "Varış Limanı *" alanı var ama AYRI KOLON YOK: navlun
+  gibi DOSYANIN alanına (`ihracat_dosyalari.varis_limani`) yazılır
+  (`buildDosyaPayload`). Böylece Lojistik kartı, Commercial Invoice, fatura
+  talimatı ve günlük rapor tek kaynaktan okur. Form dosyanın değeriyle dolu
+  açılır; yazım AYNEN korunur (büyük harfe çevrilmez, sadece kırpılır).
+  Doğrulama Lojistik kartıyla aynı (`varisLimaniSorunu`: boş / yükleme
+  limanıyla aynı / Türkiye limanı olamaz). Rezervasyon kartında da görünür.
+- Fatura talimatı (PDF + mail) "Ulke" satırı ikiye ayrıldı:
+  "Gidecegi Ulke" = varış limanının ülkesi, "Ticaret Yapilan Ulke" = proformadaki
+  BUYER'ın (`alici_adresi`) ülkesi. Ayrı ülke alanı yok; serbest metinden
+  `lib/ulke-bul.ts` bulur (TR/EN/FR/ES yazımlar, metnin sonuna en yakın
+  eşleşme, aynı yerde en uzun: "EQUATORIAL GUINEA" > "GUINEA"; varışta ülke
+  yoksa bilinen liman: MARIEL → KÜBA). Sonuç Türkçe büyük harf (mail ASCII:
+  `asciiYap`). Bulunamazsa TAHMİN YOK: "BELIRLENEMEDI - alici adresini kontrol
+  edin". Canlıdaki tüm alıcı adresleri/varış limanları doğru tanındı (0091:
+  İSPANYA → KÜBA, 0076/0065: MEKSİKA → KÜBA, 0077: MAURİTİUS → KOMORLAR).
+  Yeni bir ülke/yazım tanınmazsa `ULKELER` listesine eklenir.
+- Daha önce gönderilmiş fatura talimatlarının KAYITLI mail metni
+  (`fatura_talimati_metni`) değişmez; PDF her zaman güncel veriden üretilir.
+
 ## Rezervasyon silme
 
 - `konteynerler.rezervasyon_id` FK'si `ON DELETE CASCADE`: rezervasyon

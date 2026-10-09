@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
-import VgmMailSection, { VgmMailSectionHandle } from "@/components/vgm-mail-section";
 import FaturaTalimatiSection, { FaturaTalimatiSectionHandle } from "@/components/fatura-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
@@ -26,17 +25,15 @@ type Props = {
   companyId: string; // Şirket bazlı izolasyon için eklendi
 };
 
-export type KonteynerTabHandle = { acVgm: () => void; acFatura: () => void; indirFaturaTalimati: () => void };
+export type KonteynerTabHandle = { acFatura: () => void; indirFaturaTalimati: () => void };
 
 const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab(
   { dosyaId, dosya, konteynerler, rezervasyonlar, onRefresh, onNavigateTab, companyId },
   ref
 ) {
-  const vgmRef = useRef<VgmMailSectionHandle>(null);
   const faturaTalimatiRef = useRef<FaturaTalimatiSectionHandle>(null);
 
   useImperativeHandle(ref, () => ({
-    acVgm: () => vgmRef.current?.ac(),
     acFatura: () => faturaTalimatiRef.current?.acFatura(),
     indirFaturaTalimati: () => faturaTalimatiRef.current?.indirFaturaTalimati(),
   }));
@@ -480,17 +477,6 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
           </div>
         </div>
       )}
-
-      <VgmMailSection
-        ref={vgmRef}
-        dosyaId={dosyaId}
-        dosya={dosya}
-        konteynerler={konteynerler}
-        rezervasyonlar={rezervasyonlar}
-        dbaYuklenenSayisi={dbaYuklenenSayisi}
-        onRefresh={onRefresh}
-        companyId={companyId}
-      />
 
       <FaturaTalimatiSection
         ref={faturaTalimatiRef}

@@ -398,6 +398,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   takibi olmayan ikinci bir yol açıyordu. Geri eklenmez. Sadece okuma
   yapıyordu; `dosya_evraklari` kayıtları etkilenmedi.
 
+## VGM Gönder butonu kaldırıldı (09.10.2026)
+
+- Dosya detayı → Konteynerler sekmesi başlığındaki "VGM Gönder" (mailto
+  penceresi, `components/vgm-mail-section.tsx`) kullanıcı isteğiyle
+  KALDIRILDI — geri eklenmez. VGM artık "VGM İndir" ile PDF olarak indirilip
+  gönderiliyor (`lib/vgm-pdf-builder.ts → indirVgmPdf`); buton tek VGM aksiyonu
+  olduğu için ana (ACCENT) görünümde, tüm konteynerlerde VGM girilmişse aktif.
+- `ihracat_dosyalari.vgm_gonderildi` kolonu ve `getDosyaAkisDurumu().vgmGonderildi`
+  SİLİNMEDİ (eski kayıtların verisi; okuyan ekran yok). Yeni yazan da yok.
+
 ## Yük Sigortası Talimatı — 10. evrak (02.10.2026)
 
 - Evraklar listesindeki 10. satır ("Insurance Policy", sadece müşterinin

@@ -243,22 +243,13 @@ function DosyaDetailContent() {
                 }`;
               return (
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => konteynerTabRef.current?.acVgm()}
-                    disabled={!vgmHazir}
-                    className={btnClass(vgmHazir)}
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    VGM Gönder
-                  </button>
+                  {/* "VGM Gönder" (mailto penceresi) kullanıcı isteğiyle kaldırıldı (09.10.2026); VGM PDF indirilip gönderiliyor. */}
                   <button
                     onClick={() => indirVgmPdf(dosya, rezervasyonlar, konteynerler)}
                     disabled={!vgmHazir}
                     title="VGM raporunu PDF olarak indir"
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      vgmHazir ? "hover:bg-white/5 cursor-pointer" : "cursor-not-allowed opacity-50"
-                    }`}
-                    style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
+                    className={btnClass(vgmHazir)}
+                    style={{ backgroundColor: ACCENT }}
                   >
                     VGM İndir
                   </button>

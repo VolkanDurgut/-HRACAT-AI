@@ -18,8 +18,9 @@ import {
 // ============================================================================
 // GUNLUK SEVKIYAT RAPORU MAILI (gunluk-rapor-gonder) - 07.10.2026
 // ============================================================================
-// pg_cron ile her gun 2 kez tetiklenir (Turkiye saati, UTC+3 sabit):
+// pg_cron ile her gun 3 kez tetiklenir (Turkiye saati, UTC+3 sabit):
 //   "gunluk-rapor-sabah" 05:45 UTC = 08:45 TR -> DUNUN raporu (gunu kapatir; 09.10.2026'ya kadar 08:00)
+//   "gunluk-rapor-ogle"  09:00 UTC = 12:00 TR -> BUGUNUN ara raporu (09.10.2026)
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
 // ozet kutulari + gun icinde yuklenen konteynerler + sevkiyat tablosu
@@ -38,7 +39,8 @@ import {
 //
 // DENEME MODU: govdede {"deneme": true} -> mail GITMEZ, kayit YAZILMAZ; yanitta
 // ozet + konu + mail HTML'i doner (onizleme/test icin). {"slot":"sabah"|"aksam"}
-// ile slot zorlanabilir; verilmezse TR saatine gore secilir (12'den once sabah).
+// (ve "ogle") ile slot zorlanabilir; verilmezse TR saatine gore secilir
+// (11'den once sabah, 15'ten once ogle, sonra aksam).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -53,6 +55,16 @@ const UYGULAMA_URL = "https://ihracatasistanim.com";
 const LACIVERT = "#283474";
 const MARKA_TURUNCU = "#F4A07C";
 const SAYFA_BOYUTU = 1000;
+
+type Slot = "sabah" | "ogle" | "aksam";
+const SLOTLAR: Slot[] = ["sabah", "ogle", "aksam"];
+/** Sabah raporu DUNU kapatir; ogle ve aksam BUGUNU raporlar. */
+const SLOT_BASLIK: Record<Slot, string> = {
+  sabah: "Sabah raporu · 08:45 (dünün özeti)",
+  ogle: "Öğle raporu · 12:00",
+  aksam: "Akşam raporu · 17:00",
+};
+const SLOT_KONU: Record<Slot, string> = { sabah: "(Dün)", ogle: "Öğle", aksam: "Akşam" };
 
 const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 
@@ -152,10 +164,10 @@ function faturaHucresi(s: SevkiyatSatiri): string {
   return `<span style="display:inline-block;padding:2px 9px;border-radius:999px;background:#D1FAE5;color:#047857;font-size:11px;font-weight:bold;white-space:nowrap">Kesildi</span>${alt ? `<div style="color:#64748B;font-size:10px;margin-top:2px;line-height:1.35">${alt}</div>` : ""}`;
 }
 
-function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): string {
+function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
   const o = r.ozet;
-  const gunEtiket = slot === "aksam" ? "Bugün" : "Dün";
-  const baslikGun = slot === "aksam" ? "Bugün" : "Dün";
+  const gunEtiket = slot === "sabah" ? "Dün" : "Bugün";
+  const baslikGun = gunEtiket;
   const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold">${t}</th>`;
   const td = (t: string, ek = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;${ek}">${t}</td>`;
   // Ozet kutulari: kenarlik hucrenin kendisinde -> uc kutu her zaman ayni yukseklikte
@@ -211,7 +223,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi || "Logo")}" style="display:block;width:48px;height:48px;border:0"></td>
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi ? `${sirketAdi} İhracat AI` : "İhracat AI")}</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${slot === "aksam" ? "Akşam raporu · 17:00" : "Sabah raporu · 08:45 (dünün özeti)"}</div></td>
+    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${SLOT_BASLIK[slot]}</div></td>
   </tr></table>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
@@ -242,12 +254,12 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
 </td></tr></table></body></html>`;
 }
 
-function mailKonusu(r: GunlukRapor, slot: "sabah" | "aksam"): string {
+function mailKonusu(r: GunlukRapor, slot: Slot): string {
   const o = r.ozet;
   const parcalar = [`${o.gunYuklenenKonteyner} konteyner yüklendi`];
   if (o.gunTamamlanan) parcalar.push(`${o.gunTamamlanan} sevkiyatın yüklemesi bitti`);
   parcalar.push(o.bekleyenKonteyner ? `${o.bekleyenKonteyner} konteyner yükleme bekliyor` : "bekleyen konteyner yok");
-  return `Güncel İhracat Raporu — ${tarihTR(r.tarih)} ${slot === "aksam" ? "Akşam" : "(Dün)"} | ${parcalar.join(" · ")}`;
+  return `Güncel İhracat Raporu — ${tarihTR(r.tarih)} ${SLOT_KONU[slot]} | ${parcalar.join(" · ")}`;
 }
 
 // ---------------------------------------------------------------- kayit
@@ -280,7 +292,7 @@ Deno.serve(async (req: Request) => {
     const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; slot?: string; tarih?: string };
     const deneme = govde.deneme === true;
     const trSaat = Number(new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul", hour: "2-digit", hour12: false }));
-    const slot: "sabah" | "aksam" = govde.slot === "sabah" || govde.slot === "aksam" ? govde.slot : trSaat < 12 ? "sabah" : "aksam";
+    const slot: Slot = SLOTLAR.includes(govde.slot as Slot) ? (govde.slot as Slot) : trSaat < 11 ? "sabah" : trSaat < 15 ? "ogle" : "aksam";
     const bugun = istanbulBugun();
     // Sabah raporu DUNU kapatir; tarih sadece deneme modunda elle verilebilir.
     const tarih = deneme && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : slot === "sabah" ? gunEkle(bugun, -1) : bugun;

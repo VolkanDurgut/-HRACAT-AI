@@ -619,6 +619,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   satır bazında var). Ekipman satırı "Ekipman alındı 6/10 · Dolum bekleyen 3"
   ("Dolu x" rozetle aynı sayıydı). Mailde kutular eşit yükseklikte (kenarlık
   hücrede).
+- Öğle raporu (09.10.2026): pg_cron `gunluk-rapor-ogle` 09:00 UTC (12:00 TR) →
+  BUGÜNÜN raporu, slot `ogle` (başlık "Öğle raporu · 12:00", konu "Öğle").
+  `rapor_gonderimleri.slot` CHECK'i sabah/ogle/aksam (migration
+  `20261009090000`, canlıya UYGULANDI). Edge function v9.
+- Alıcılar (09.10.2026): secret `GUNLUK_RAPOR_ALICILARI` =
+  bbt@, execution@, operation@, export@ unex.com.tr (kullanıcı panelden girer;
+  değer MCP'den geçmez). Gece yedeği hâlâ `GERI_BILDIRIM_ALICI`.
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

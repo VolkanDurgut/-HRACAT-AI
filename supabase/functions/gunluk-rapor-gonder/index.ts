@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
+  acikMusteriSatirlari,
   DURUM_METNI,
   durumRozetMetni,
   ekipmanOzetMetni,
@@ -18,11 +19,12 @@ import {
 // GUNLUK SEVKIYAT RAPORU MAILI (gunluk-rapor-gonder) - 07.10.2026
 // ============================================================================
 // pg_cron ile her gun 2 kez tetiklenir (Turkiye saati, UTC+3 sabit):
-//   "gunluk-rapor-sabah" 05:00 UTC = 08:00 TR -> DUNUN raporu (gunu kapatir)
+//   "gunluk-rapor-sabah" 05:45 UTC = 08:45 TR -> DUNUN raporu (gunu kapatir; 09.10.2026'ya kadar 08:00)
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
-// ozet kutulari + sevkiyat tablosu ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔")
-// + gun icinde yuklenen konteynerler (07.10.2026 revize: "Kisa Ozet" metni ve
+// ozet kutulari + gun icinde yuklenen konteynerler + sevkiyat tablosu
+// ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔") + tamamlananlarin plaka/tonaji
+// (09.10.2026 revize: sira bu; ozet kutulari sadelesti) (07.10.2026 revize: "Kisa Ozet" metni ve
 // alt bilgi notu kullanici istegiyle kaldirildi). Musteriye GITMEZ; sirket ici alicilara.
 //
 // Alici: GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i varsa o,
@@ -131,7 +133,7 @@ function durumHucresi(s: SevkiyatSatiri, gunEtiket: string): string {
 /**
  * Devam eden / baslamamis sevkiyatta ekipman dagilimi: 3 renkli cubuk
  * (dolu = yesil, ekipmani alinmis bos = amber, ekipmani alinmamis = gri) +
- * "Ekipman 6/10 · Dolu 3 · Dolum bekleyen 3". Tamamlananda gosterilmez.
+ * "Ekipman alındı 6/10 · Dolum bekleyen 3". Tamamlananda gosterilmez.
  */
 function ekipmanCubugu(s: SevkiyatSatiri): string {
   const metin = ekipmanOzetMetni(s);
@@ -156,8 +158,11 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   const baslikGun = slot === "aksam" ? "Bugün" : "Dün";
   const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold">${t}</th>`;
   const td = (t: string, ek = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;${ek}">${t}</td>`;
+  // Ozet kutulari: kenarlik hucrenin kendisinde -> uc kutu her zaman ayni yukseklikte
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
-    `<td style="width:33%;padding:4px;vertical-align:top"><div style="border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:10px;color:#64748B">${alt}</div></div></td>`;
+    `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:11px;color:#475569;line-height:1.45">${alt}</div></td>`;
+  const kutuArasi = `<td style="width:2%;font-size:0;line-height:0">&nbsp;</td>`;
+  const musteriler = acikMusteriSatirlari(r);
 
   const sevkiyatSatirlari = r.sevkiyatlar.length
     ? r.sevkiyatlar
@@ -206,14 +211,20 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi || "Logo")}" style="display:block;width:48px;height:48px;border:0"></td>
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi ? `${sirketAdi} İhracat AI` : "İhracat AI")}</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${slot === "aksam" ? "Akşam raporu · 17:00" : "Sabah raporu · 08:00 (dünün özeti)"}</div></td>
+    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${slot === "aksam" ? "Akşam raporu · 17:00" : "Sabah raporu · 08:45 (dünün özeti)"}</div></td>
   </tr></table>
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
-    ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", LACIVERT)}
-    ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı<br>Fatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, "#047857")}
-    ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}<br>boş ekipman (dolum bekleyen): ${o.dolumBekleyen}`, "#B45309")}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
+    ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", LACIVERT)}${kutuArasi}
+    ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), musteriler.length ? musteriler.map(esc).join("<br>") : "açık sevkiyat yok", "#047857")}${kutuArasi}
+    ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), "açık sevkiyatlarda kalan", "#B45309")}
   </tr></table>
+
+  ${bolumBaslik(`${baslikGun} Yüklenen Konteynerler`)}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+    <tr>${th("Saat")}${th("Konteyner No")}${th("Müşteri")}${th("Marka")}${th("Mühür No")}${th("Plaka")}${th("Net (kg)", true)}</tr>
+    ${yuklenenSatirlari}
+  </table>
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
@@ -223,12 +234,6 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: "sabah" | "aksam"): s
 
   ${bolumBaslik("Yüklemesi Tamamlanan Sevkiyatlar — Plaka ve Tonaj")}
   ${tamamlananBolumu}
-
-  ${bolumBaslik(`${baslikGun} Yüklenen Konteynerler`)}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-    <tr>${th("Saat")}${th("Konteyner No")}${th("Müşteri")}${th("Marka")}${th("Mühür No")}${th("Plaka")}${th("Net (kg)", true)}</tr>
-    ${yuklenenSatirlari}
-  </table>
 
   <div style="margin-top:24px;text-align:center">
     <a href="${UYGULAMA_URL}/rapor/gunluk?tarih=${r.tarih}" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">Raporu uygulamada aç</a>

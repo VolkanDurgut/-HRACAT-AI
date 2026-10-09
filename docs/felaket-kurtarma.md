@@ -93,9 +93,9 @@ select cron.schedule('gunluk-yedek-maili', '0 0 * * *', $cmd$
 $cmd$);
 ```
 
-Günlük sevkiyat raporu (08:00 dünün raporu, 17:00 bugünün raporu; UTC 05:00 / 14:00):
+Günlük sevkiyat raporu (08:45 dünün raporu, 17:00 bugünün raporu; UTC 05:45 / 14:00):
 ```sql
-select cron.schedule('gunluk-rapor-sabah', '0 5 * * *', $cmd$
+select cron.schedule('gunluk-rapor-sabah', '45 5 * * *', $cmd$
   select net.http_post(
     url := 'https://<YENI_REF>.supabase.co/functions/v1/gunluk-rapor-gonder',
     headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),

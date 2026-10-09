@@ -2,7 +2,7 @@
  * GUNLUK RAPOR - ortak hesap (07.10.2026)
  *
  * TEK KAYNAK: hem uygulamadaki /rapor/gunluk sayfasi (Next.js) hem her sabah
- * 08:00 / aksam 17:00 giden rapor maili (edge function gunluk-rapor-gonder)
+ * 08:45 / aksam 17:00 giden rapor maili (edge function gunluk-rapor-gonder)
  * bu dosyayi kullanir; iki cikti ayni sayilari gosterir. Bu yuzden dosya
  * SAF TypeScript'tir: hicbir import yok, Deno / tarayici / Node'a ozel API
  * kullanmaz.
@@ -328,10 +328,26 @@ export function durumRozetMetni(s: SevkiyatSatiri): string {
   return s.durum === "yukleniyor" ? `${s.yuklenen}/${s.konteynerAdedi} Yüklendi` : DURUM_METNI[s.durum];
 }
 
-/** "Ekipman 6/10 · Dolu 3 · Dolum bekleyen 3" (tamamlanan sevkiyatta null). */
+/**
+ * "Ekipman alındı 6/10 · Dolum bekleyen 3" (tamamlanan sevkiyatta null).
+ * 09.10.2026: "Dolu x" kaldirildi - rozetteki "x/n Yüklendi" ile ayni sayiydi.
+ */
 export function ekipmanOzetMetni(s: SevkiyatSatiri): string | null {
   if (s.durum === "tamamlandi") return null;
-  return `Ekipman ${s.eklenen}/${s.konteynerAdedi} · Dolu ${s.yuklenen} · Dolum bekleyen ${s.dolumBekleyen}`;
+  return `Ekipman alındı ${s.eklenen}/${s.konteynerAdedi} · Dolum bekleyen ${s.dolumBekleyen}`;
+}
+
+/**
+ * Ozet kutusu "Açık Sevkiyat" alt metni (09.10.2026): acik sevkiyatlarin
+ * musterileri, tablo sirasiyla, tekrarsiz; birden fazla sevkiyati olanin
+ * yaninda adet. En fazla `azami` satir, kalani "+N müşteri daha".
+ */
+export function acikMusteriSatirlari(r: GunlukRapor, azami = 4): string[] {
+  const sayac = new Map<string, number>();
+  for (const s of r.sevkiyatlar) sayac.set(s.musteri, (sayac.get(s.musteri) || 0) + 1);
+  const satirlar = Array.from(sayac, ([m, n]) => (n > 1 ? `${m} (${n} sevkiyat)` : m));
+  if (satirlar.length <= azami) return satirlar;
+  return [...satirlar.slice(0, azami - 1), `+${satirlar.length - azami + 1} müşteri daha`];
 }
 
 /** "VIADUC HOL HOL SARLU - 4x - LE SOLEIL - Yükleme Tamamlandı ✔" */

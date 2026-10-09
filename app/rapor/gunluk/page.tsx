@@ -14,13 +14,14 @@ import {
   SevkiyatSatiri,
   durumRozetMetni,
   ekipmanOzetMetni,
+  acikMusteriSatirlari,
 } from "@/supabase/functions/_shared/gunluk-rapor";
 
 /**
  * Guncel Ihracat Raporu (yenilendi: 07.10.2026; eski adi "Gunluk Sevkiyat ve
  * Kantar Raporu").
  * Hesap TEK YERDE: supabase/functions/_shared/gunluk-rapor.ts - her sabah
- * 08:00 ve aksam 17:00 giden rapor maili (gunluk-rapor-gonder) ayni sayilari
+ * 08:45 ve aksam 17:00 giden rapor maili (gunluk-rapor-gonder) ayni sayilari
  * kullanir. Sayfa yazdirmaya / PDF'e uygun beyaz belge olarak kalir.
  * ?tarih=YYYY-MM-DD ile belirli gun acilabilir (maildeki baglanti).
  */
@@ -256,15 +257,54 @@ export default function GunlukRaporSayfasi() {
           <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-2 mb-6 sayfa-boleme">
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
-              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: `${o.tamamlanan} yüklendi · ${o.yukleniyor} devam · ${o.bekliyor} başlamadı\nFatura: ${o.faturaKesilen} kesildi · ${o.faturaKesilmeyen} kesilmedi`, r: YESIL },
-              { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: `rezerve ${o.toplamKonteyner} · yüklenen ${o.yuklenenKonteyner}\nboş ekipman (dolum bekleyen): ${o.dolumBekleyen}`, r: AMBER },
+              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: acikMusteriSatirlari(rapor).join("\n") || "açık sevkiyat yok", r: YESIL },
+              { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: "açık sevkiyatlarda kalan", r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>
                 <p className="text-xl font-bold leading-tight" style={{ color: k.r }}>{k.d}</p>
-                <p className="text-[10px] text-slate-500 whitespace-pre-line">{k.a}</p>
+                <p className="text-[11px] text-slate-600 leading-snug whitespace-pre-line">{k.a}</p>
               </div>
             ))}
+          </div>
+
+          {/* GUN YUKLENENLER */}
+          <div className="mb-6">
+            <Baslik>{gunEtiketi} Yüklenen Konteynerler</Baslik>
+            {rapor.gunYuklenenler.length === 0 ? (
+              <p className="text-sm text-slate-400 italic pl-3">Bu tarihte yüklenen konteyner bulunmuyor.</p>
+            ) : (
+              <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr style={{ backgroundColor: LACIVERT }}>
+                    {["Saat", "Konteyner No", "Müşteri", "Marka", "Mühür No", "Plaka", "Net (kg)"].map((b, i) => (
+                      <th key={b} className={`py-2 ${i === 0 ? "pl-3" : ""} pr-2 font-semibold text-white text-[10px] uppercase tracking-wide ${i === 6 ? "text-right pr-3" : "text-left"}`}>{b}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rapor.gunYuklenenler.map((k, i) => (
+                    <tr key={k.id} className="border-b border-slate-100" style={i % 2 === 1 ? { backgroundColor: "#F8FAFC" } : undefined}>
+                      <td className="py-1.5 pl-3 pr-2 text-slate-500 text-[12px]">{k.saat || "—"}</td>
+                      <td className="py-1.5 pr-2 font-mono font-semibold text-slate-800 text-[12px]">{k.konteyner_no}</td>
+                      <td className="py-1.5 pr-2 text-slate-700 text-[12px]">{k.musteri}</td>
+                      <td className="py-1.5 pr-2 text-slate-700 text-[12px]">{k.marka}</td>
+                      <td className="py-1.5 pr-2 text-slate-600 text-[12px]">{k.muhur_no || "-"}</td>
+                      <td className="py-1.5 pr-2 text-slate-600 text-[12px]">{k.plaka || "-"}</td>
+                      <td className="py-1.5 pr-3 text-right font-semibold text-slate-800 text-[12px]">{k.net != null ? sayi(k.net) : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300">
+                    <td colSpan={6} className="pt-2 pl-3 text-xs font-bold text-slate-600">TOPLAM — {rapor.gunYuklenenler.length} konteyner</td>
+                    <td className="pt-2 pr-3 text-right text-xs font-bold text-slate-800">{o.gunYuklenenNetKg ? `${sayi(o.gunYuklenenNetKg)} kg` : ""}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              </div>
+            )}
           </div>
 
           {/* SEVKIYAT DURUMU */}
@@ -338,45 +378,6 @@ export default function GunlukRaporSayfasi() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-
-          {/* GUN YUKLENENLER */}
-          <div className="mb-6">
-            <Baslik>{gunEtiketi} Yüklenen Konteynerler</Baslik>
-            {rapor.gunYuklenenler.length === 0 ? (
-              <p className="text-sm text-slate-400 italic pl-3">Bu tarihte yüklenen konteyner bulunmuyor.</p>
-            ) : (
-              <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr style={{ backgroundColor: LACIVERT }}>
-                    {["Saat", "Konteyner No", "Müşteri", "Marka", "Mühür No", "Plaka", "Net (kg)"].map((b, i) => (
-                      <th key={b} className={`py-2 ${i === 0 ? "pl-3" : ""} pr-2 font-semibold text-white text-[10px] uppercase tracking-wide ${i === 6 ? "text-right pr-3" : "text-left"}`}>{b}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rapor.gunYuklenenler.map((k, i) => (
-                    <tr key={k.id} className="border-b border-slate-100" style={i % 2 === 1 ? { backgroundColor: "#F8FAFC" } : undefined}>
-                      <td className="py-1.5 pl-3 pr-2 text-slate-500 text-[12px]">{k.saat || "—"}</td>
-                      <td className="py-1.5 pr-2 font-mono font-semibold text-slate-800 text-[12px]">{k.konteyner_no}</td>
-                      <td className="py-1.5 pr-2 text-slate-700 text-[12px]">{k.musteri}</td>
-                      <td className="py-1.5 pr-2 text-slate-700 text-[12px]">{k.marka}</td>
-                      <td className="py-1.5 pr-2 text-slate-600 text-[12px]">{k.muhur_no || "-"}</td>
-                      <td className="py-1.5 pr-2 text-slate-600 text-[12px]">{k.plaka || "-"}</td>
-                      <td className="py-1.5 pr-3 text-right font-semibold text-slate-800 text-[12px]">{k.net != null ? sayi(k.net) : "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-slate-300">
-                    <td colSpan={6} className="pt-2 pl-3 text-xs font-bold text-slate-600">TOPLAM — {rapor.gunYuklenenler.length} konteyner</td>
-                    <td className="pt-2 pr-3 text-right text-xs font-bold text-slate-800">{o.gunYuklenenNetKg ? `${sayi(o.gunYuklenenNetKg)} kg` : ""}</td>
-                  </tr>
-                </tfoot>
-              </table>
               </div>
             )}
           </div>

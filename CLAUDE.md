@@ -551,7 +551,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 ## Günlük sevkiyat raporu (07.10.2026)
 
 - Sayfa `app/rapor/gunluk/page.tsx` (Dashboard → Günlük Rapor; `?tarih=YYYY-MM-DD`
-  ile geçmiş gün) + her gün 08:00 ve 17:00 (TR) giden şirket içi mail. İkisi de
+  ile geçmiş gün) + her gün 08:45 ve 17:00 (TR) giden şirket içi mail. İkisi de
   AYNI hesabı kullanır: `supabase/functions/_shared/gunluk-rapor.ts`
   (`gunlukRaporHesapla`, saf TS, import yok; Next tarafı `@/supabase/functions/
   _shared/gunluk-rapor` ile içe aktarır, `lib/cutoff-utils.ts` tartım
@@ -600,7 +600,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (dolum bekleyen)" toplamı eklendi. Tamamlanan sevkiyat başlığında "Varış:"
   (dosyanın `varis_limani`, gösterimde büyük harf; kayıt değişmez).
 - Mail: edge function `gunluk-rapor-gonder` (canlıda v7). pg_cron
-  `gunluk-rapor-sabah` 05:00 UTC → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
+  `gunluk-rapor-sabah` 05:45 UTC (08:45 TR; 09.10.2026'ya kadar 05:00) → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret
   ayarı, kod/deploy gerekmez. Müşteriye GİTMEZ.
@@ -609,6 +609,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   UYGULANDI). Aynı slot ikinci kez gönderilmez; gönderim hatasında kayıt silinir.
   Bir slotu yeniden göndermek için o satır silinir. Gece yedeğine dahil değil
   (iz kaydı).
+- Revize 5 (09.10.2026, kullanıcı: "bana bile karışık geliyor"): sabah maili
+  08:45. Bölüm sırası: {Gün} Yüklenen Konteynerler → Sevkiyat Durumu — Açık
+  Dosyalar → Tamamlananlar (Plaka ve Tonaj) (sayfada en sonda Ek). Özet
+  kutuları sade: "Açık Sevkiyat" altında müşteri isimleri
+  (`acikMusteriSatirlari`, tekrarsız, "(2 sevkiyat)", en fazla 4 satır);
+  "x yüklendi · y devam · z başlamadı / Fatura: …" ve "rezerve · yüklenen /
+  boş ekipman" alt satırları KALDIRILDI — geri eklenmez (bilgi tabloda
+  satır bazında var). Ekipman satırı "Ekipman alındı 6/10 · Dolum bekleyen 3"
+  ("Dolu x" rozetle aynı sayıydı). Mailde kutular eşit yükseklikte (kenarlık
+  hücrede).
+- ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
+  "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
+  aynı slotun otomatik maili için kullanıcı o satırı siler.
 - Test: gövde `{"deneme":true,"slot":"sabah"|"aksam"[,"tarih":"YYYY-MM-DD"]}` →
   mail/kayıt yok, yanıtta konu + özet + satırlar + HTML. 07.10.2026 canlı
   doğrulama: akşam 1 konteyner/25.040 kg, sabah (06.10) 3/75.260 kg — SQL ile

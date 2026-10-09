@@ -28,9 +28,10 @@ import {
 // (09.10.2026 revize: sira bu; ozet kutulari sadelesti) (07.10.2026 revize: "Kisa Ozet" metni ve
 // alt bilgi notu kullanici istegiyle kaldirildi). Musteriye GITMEZ; sirket ici alicilara.
 //
-// Alici: GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i varsa o,
-// yoksa gece yedeginin gittigi GERI_BILDIRIM_ALICI. Sirket adreslerine gecmek
-// icin sadece secret ayarlanir; kod degismez.
+// Alici: SADECE GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i.
+// 09.10.2026: yedek adresine (GERI_BILDIRIM_ALICI) dusme KALDIRILDI - secret
+// yoksa mail GONDERILMEZ, hata doner (rapor yanlis adrese gitmesin).
+// Gonderen adi: "{sirket} Ihracat AI" ("Unex Gida Ihracat AI").
 //
 // TEKRAR KORUMASI: cron herkese acik anon anahtarla cagirir. Her (gun, slot,
 // sirket) icin rapor_gonderimleri tablosuna kayit atilir (benzersiz); ayni
@@ -46,7 +47,7 @@ import {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const ALICILAR = (Deno.env.get("GUNLUK_RAPOR_ALICILARI") || Deno.env.get("GERI_BILDIRIM_ALICI") || "volkandurgut.tr@gmail.com")
+const ALICILAR = (Deno.env.get("GUNLUK_RAPOR_ALICILARI") || "")
   .split(",")
   .map((a) => a.trim())
   .filter(Boolean);
@@ -286,6 +287,12 @@ async function kayitGuncelle(tarih: string, slot: string, companyId: string, ala
   });
 }
 
+/** "Unex Gıda İhracat AI" - mail istemcisinde gorunen gonderen adi (tirnak/acili parantez temizlenir). */
+function gonderenAdi(sirketAdi: string | null): string {
+  const ad = (sirketAdi || "").replace(/[<>"]/g, "").trim();
+  return ad ? `${ad} İhracat AI` : "İhracat AI";
+}
+
 // ---------------------------------------------------------------- handler
 Deno.serve(async (req: Request) => {
   try {
@@ -313,6 +320,7 @@ Deno.serve(async (req: Request) => {
         sonuclar.push({ sirket: s.company_name, tarih, slot, konu, ozet: rapor.ozet, sevkiyat_satirlari: rapor.sevkiyatlar.map(sevkiyatSatiriMetni), html });
         continue;
       }
+      if (ALICILAR.length === 0) throw new Error("GUNLUK_RAPOR_ALICILARI tanımlı değil; mail gönderilmedi.");
       if (!(await gonderimHakkiAl(tarih, slot, s.id))) {
         sonuclar.push({ sirket: s.company_name, tarih, slot, atlandi: "Bu rapor zaten gönderilmiş." });
         continue;
@@ -324,7 +332,7 @@ Deno.serve(async (req: Request) => {
       const mailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: "İhracat AI <bildirim@ihracatasistanim.com>", to: ALICILAR, subject: konu, html }),
+        body: JSON.stringify({ from: `${gonderenAdi(s.company_name)} <bildirim@ihracatasistanim.com>`, to: ALICILAR, subject: konu, html }),
       });
       if (!mailRes.ok) {
         const hata = (await mailRes.text()).slice(0, 300);

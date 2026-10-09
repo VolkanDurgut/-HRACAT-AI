@@ -626,6 +626,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Alıcılar (09.10.2026): secret `GUNLUK_RAPOR_ALICILARI` =
   bbt@, execution@, operation@, export@ unex.com.tr (kullanıcı panelden girer;
   değer MCP'den geçmez). Gece yedeği hâlâ `GERI_BILDIRIM_ALICI`.
+  Rapor artık yedek adresine DÜŞMEZ: secret yoksa mail gitmez, hata döner
+  (mesensei282 kullanıcı isteğiyle rapordan çıkarıldı). Gönderen adı
+  "{şirket} İhracat AI" ("Unex Gıda İhracat AI"; eskiden "İhracat AI").
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

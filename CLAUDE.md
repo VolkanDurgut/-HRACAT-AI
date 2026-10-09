@@ -721,8 +721,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   taşır; `{"kontrol":[bucket, yol]}` dedektörü sınar. KALICI SİLME İÇERMEZ.
   Her taşımadan önce dosyanın kayıtlarda kullanılıp kullanılmadığı tekrar
   kontrol edilir (kullanılıyorsa atlanır).
-- AÇIK: kullanıcı birkaç gün sorun görmezse onayıyla karantina kalıcı
-  silinir (yer ancak o zaman açılır), ardından fonksiyon devre dışı bırakılır.
+- KAPANDI (09.10.2026, kullanıcı onayı): karantina KALICI SİLİNDİ. Önce
+  salt okunur `silme_kontrol` (68/68 silinebilir) + bağımsız SQL taraması (tüm
+  tablolar/JSON: canlı kayıtta 0 eşleşme; sadece `denetim_kayitlari`nda 0076
+  ailesinin eski Draft BL değişim izleri), sonra `kalici_sil` 68/68. Depo
+  170 → 136 MB; 266 kayıt referansının 0'ı kırık. `depo-karantina` artık
+  hiçbir şey yapmayan stub (HTTP 410); çalışan sürüm git geçmişinde.
 - Not: IHR-2026-0086'nın CI ve Phyto arşiv kayıtları "…-DENEME.pdf" adlı
   dosyaları gösteriyor (kayda bağlı, dokunulmadı; evrak yeniden üretilince
   ad düzelir ve eski arşiv otomatik silinir).

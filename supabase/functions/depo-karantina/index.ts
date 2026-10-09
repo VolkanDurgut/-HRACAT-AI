@@ -19,6 +19,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // alanlarinda yeniden aranir; kullaniliyorsa ATLANIR.
 //
 // islem: "rapor" (varsayilan, hicbir sey degismez) | "karantinaya_al" | "geri_al"
+//        | "silme_kontrol" (salt okunur) | "kalici_sil"
+//
+// KALICI SILME (09.10.2026, kullanici onayi): 4 gun sorunsuz gecti. Sadece
+// KARANTINADAKI kopya silinir; her dosya silinmeden hemen once hem eski hem
+// karantina yolu kayitlarda yeniden aranir, kullaniliyorsa ATLANIR.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -124,6 +129,32 @@ async function tasi(bucket: string, kaynak: string, hedef: string): Promise<stri
   return `HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`;
 }
 
+/** Karantinadaki kopya gercekten duruyor mu? (storage list ile birebir ad kontrolu) */
+async function karantinadaVarMi(bucket: string, yol: string): Promise<boolean> {
+  const tam = KARANTINA + yol;
+  const klasor = tam.slice(0, tam.lastIndexOf("/"));
+  const ad = tam.slice(tam.lastIndexOf("/") + 1);
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+    method: "POST",
+    headers: { ...basliklar, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: klasor, search: ad, limit: 100 }),
+  });
+  if (!res.ok) return false;
+  const liste = (await res.json()) as { name: string }[];
+  return liste.some((o) => o.name === ad);
+}
+
+async function sil(bucket: string, yol: string): Promise<string | null> {
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
+    method: "DELETE",
+    headers: { ...basliklar, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: [yol] }),
+  });
+  if (!res.ok) return `HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`;
+  const silinen = (await res.json()) as unknown[];
+  return silinen.length === 1 ? null : `beklenen 1, silinen ${silinen.length}`;
+}
+
 function json(veri: unknown, status = 200) {
   return new Response(JSON.stringify(veri), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -136,10 +167,22 @@ Deno.serve(async (req: Request) => {
   if (Array.isArray(kontrol) && kontrol.length === 2) {
     return json({ kontrol, kullaniliyor: await kullaniliyorMu(String(kontrol[0]), String(kontrol[1])) });
   }
-  if (!["rapor", "karantinaya_al", "geri_al"].includes(islem)) return json({ hata: "gecersiz islem" }, 400);
+  if (!["rapor", "karantinaya_al", "geri_al", "silme_kontrol", "kalici_sil"].includes(islem)) return json({ hata: "gecersiz islem" }, 400);
 
   const sonuc: { bucket: string; yol: string; durum: string }[] = [];
   for (const [bucket, yol] of LISTE) {
+    if (islem === "silme_kontrol" || islem === "kalici_sil") {
+      if ((await kullaniliyorMu(bucket, yol)) || (await kullaniliyorMu(bucket, KARANTINA + yol))) {
+        sonuc.push({ bucket, yol, durum: "ATLANDI_kullaniliyor" });
+        continue;
+      }
+      const var_mi = await karantinadaVarMi(bucket, yol);
+      if (!var_mi) { sonuc.push({ bucket, yol, durum: "karantinada_yok" }); continue; }
+      if (islem === "silme_kontrol") { sonuc.push({ bucket, yol, durum: "silinebilir" }); continue; }
+      const hata = await sil(bucket, KARANTINA + yol);
+      sonuc.push({ bucket, yol, durum: hata ? `HATA ${hata}` : "silindi" });
+      continue;
+    }
     if (islem === "geri_al") {
       const hata = await tasi(bucket, KARANTINA + yol, yol);
       sonuc.push({ bucket, yol, durum: hata ? `HATA ${hata}` : "geri_alindi" });
@@ -158,5 +201,6 @@ Deno.serve(async (req: Request) => {
   }
   const sayim: Record<string, number> = {};
   for (const s of sonuc) { const k = s.durum.startsWith("HATA") ? "HATA" : s.durum; sayim[k] = (sayim[k] || 0) + 1; }
-  return json({ islem, toplam: LISTE.length, sayim, sorunlular: sonuc.filter((s) => s.durum !== "tasinabilir" && s.durum !== "karantinada" && s.durum !== "geri_alindi") });
+  const normal = ["tasinabilir", "karantinada", "geri_alindi", "silinebilir", "silindi"];
+  return json({ islem, toplam: LISTE.length, sayim, sorunlular: sonuc.filter((s) => !normal.includes(s.durum)) });
 });

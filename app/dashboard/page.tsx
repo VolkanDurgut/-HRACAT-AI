@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatDateTR, bugunTarihIstanbul, efektifTartimBilgisi, getCutOffDays } from "@/lib/cutoff-utils";
+import { dosyaAkisiHesapla, rezervasyonlariSirala, type CutoffDurumu } from "@/lib/dashboard-akis";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
-import { Ship, FileText, CheckCircle2, AlertTriangle, Clock, Package, TrendingUp, ChevronRight, ExternalLink, Loader2, LayoutDashboard } from "lucide-react";
+import { Ship, FileText, CheckCircle2, AlertTriangle, Clock, Package, TrendingUp, ChevronRight, ExternalLink, Loader2, LayoutDashboard, RefreshCw, Archive } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { EmptyState } from "@/components/empty-state";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -22,16 +23,37 @@ type DosyaDurum = {
   konteynerler: Konteyner[];
 };
 
+/** Tamamlanan Dosyalar listesi icin hafif satir (sadece son 10 kapali dosya cekilir). */
+type KapaliSatir = {
+  id: string;
+  dosya_no: string | null;
+  alici_firma: string | null;
+  rez: Pick<Rezervasyon, "booking_no" | "konteyner_adedi" | "gemi_kalkis_tarihi"> | null;
+};
+
+const KAPALI_LISTE_LIMITI = 10;
+const YENILEME_MS = 60_000;
+// Dashboard'a gereken konteyner alanlari (eskiden select("*") ile tum DBA JSON'u cekiliyordu)
+const KONTEYNER_KOLONLARI = "id, dosya_id, konteyner_no, net_agirlik_kg, brut_agirlik_kg, pieces, dba_dosya_url";
+const REZERVASYON_KOLONLARI = "id, dosya_id, booking_no, gemi_adi, acente_ismi, yuklenme_limani, konteyner_adedi, gemi_kalkis_tarihi, talimat_cutoff, beyanname_cutoff";
+
 // Cut-off'a kalan gun: Panel ve Rezervasyon karti ile AYNI hesap (takvim gunu
 // farki, saat dilimi donusumu olmadan - bkz. lib/cutoff-utils.ts getCutOffDays).
-// Daha once burada saat farkiyla hesaplaniyordu; cut-off gununun sabahinda
-// Panel "Bugun!" derken Dashboard "1g" gosteriyordu (duzeltme: 01.10.2026).
 function getDaysUntil(dateStr: string | null): number | null {
   return getCutOffDays(dateStr);
 }
 
-function CutoffBadge({ days, label }: { days: number | null; label: string }) {
+function CutoffBadge({ durum, label }: { durum: CutoffDurumu; label: string }) {
+  const days = durum.gun;
   if (days === null) return null;
+  // Ilgili adim bittiyse (talimat: konsimento/Draft BL, beyanname: fatura) alarm verilmez
+  if (durum.tamam) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/5" style={{ color: TEXT_MUTED }} title={`${label} adımı tamamlandı`}>
+        <CheckCircle2 size={11} /> {label}
+      </span>
+    );
+  }
   const color = days < 0 ? "bg-red-500/10 text-red-400" : days <= 1 ? "bg-red-500/10 text-red-400 animate-pulse" : days <= 3 ? "bg-amber-500/10 text-amber-400 animate-pulse" : "bg-white/5 text-slate-300";
   const text = days < 0 ? "Geçti" : days === 0 ? "Bugün!" : `${days}g`;
   return (
@@ -79,36 +101,107 @@ export default function DashboardPage() {
   const { user, yetkiler, companyId, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
   const [durumlar, setDurumlar] = useState<DosyaDurum[]>([]);
+  const [kapalilar, setKapalilar] = useState<KapaliSatir[]>([]);
+  const [kapaliToplam, setKapaliToplam] = useState(0);
+  const [bugunYuklenenSayisi, setBugunYuklenenSayisi] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hata, setHata] = useState<string | null>(null);
+  const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
+  // Ust uste binen yenilemelerde sadece EN SON istegin sonucu yazilir
+  const istekSira = useRef(0);
 
+  /**
+   * Veri (10.10.2026): eskiden TUM dosyalarin (kapalilar dahil) tum
+   * rezervasyon/konteyner kayitlari select("*") ile cekiliyordu - dosya sayisi
+   * arttikca yavaslar, bir noktada URL limitine takilirdi. Artik: acik
+   * dosyalarin detayi + son 10 kapali dosya + bugun yuklenenler icin son 2
+   * gunde DBA'si yuklenmis konteynerler. Hata sessizce yutulmaz.
+   */
   const fetchData = useCallback(async () => {
-    if (!user?.id || !companyId) return; // companyId kontrolü eklendi
-    const { data: dosyaData } = await supabase
-      .from("ihracat_dosyalari")
-      .select(DOSYA_LISTE_KOLONLARI)
-      .eq("company_id", companyId) // Sadece bu şirketin dosyaları kontrol merkezine gelir
-      .order("olusturma_tarihi", { ascending: false })
-      .returns<Dosya[]>();
-    if (!dosyaData) { setDurumlar([]); setLoading(false); return; } // Temiz sıfırlama
+    if (!user?.id || !companyId) return;
+    const sira = ++istekSira.current;
+    const guncelMi = () => sira === istekSira.current;
+    try {
+      const ikiGunOnce = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+      const [acikSonuc, kapaliSonuc, bugunSonuc] = await Promise.all([
+        supabase
+          .from("ihracat_dosyalari")
+          .select(`${DOSYA_LISTE_KOLONLARI}, draft_bl_dosya_url`)
+          .eq("company_id", companyId)
+          .or("durum.is.null,durum.not.in.(Kapalı,Kapali)")
+          .order("olusturma_tarihi", { ascending: false })
+          .returns<Dosya[]>(),
+        supabase
+          .from("ihracat_dosyalari")
+          .select("id, dosya_no, alici_firma", { count: "exact" })
+          .eq("company_id", companyId)
+          .in("durum", ["Kapalı", "Kapali"])
+          .order("olusturma_tarihi", { ascending: false })
+          .limit(KAPALI_LISTE_LIMITI),
+        // Bugun TARTILAN konteyner: tartim bugunse DBA en erken bugun yuklenmistir
+        supabase
+          .from("konteynerler")
+          .select("id, dba_kontrol_sonucu, dba_yukleme_tarihi")
+          .eq("company_id", companyId)
+          .not("dba_dosya_url", "is", null)
+          .gte("dba_yukleme_tarihi", ikiGunOnce),
+      ]);
+      if (acikSonuc.error) throw new Error(`Dosyalar okunamadı: ${acikSonuc.error.message}`);
+      if (kapaliSonuc.error) throw new Error(`Kapalı dosyalar okunamadı: ${kapaliSonuc.error.message}`);
+      if (bugunSonuc.error) throw new Error(`Yüklenen konteynerler okunamadı: ${bugunSonuc.error.message}`);
 
-    const dosyaIds = dosyaData.map((d: Dosya) => d.id);
+      const acikDosyalar = acikSonuc.data || [];
+      const kapaliDosyalar = (kapaliSonuc.data || []) as { id: string; dosya_no: string | null; alici_firma: string | null }[];
+      const acikIdler = acikDosyalar.map((d) => d.id);
+      const rezIdler = [...acikIdler, ...kapaliDosyalar.map((d) => d.id)];
 
-    const [{ data: rezData }, { data: kontData }] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
-      supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
-    ]);
+      const [rezSonuc, kontSonuc] = await Promise.all([
+        rezIdler.length
+          ? supabase.from("rezervasyonlar").select(REZERVASYON_KOLONLARI).eq("company_id", companyId).in("dosya_id", rezIdler)
+          : Promise.resolve({ data: [], error: null }),
+        acikIdler.length
+          ? supabase.from("konteynerler").select(KONTEYNER_KOLONLARI).eq("company_id", companyId).in("dosya_id", acikIdler)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (rezSonuc.error) throw new Error(`Rezervasyonlar okunamadı: ${rezSonuc.error.message}`);
+      if (kontSonuc.error) throw new Error(`Konteynerler okunamadı: ${kontSonuc.error.message}`);
+      if (!guncelMi()) return;
 
-    const combined: DosyaDurum[] = dosyaData.map((d: Dosya) => ({
-      dosya: d,
-      rezervasyonlar: (rezData || []).filter((r: Rezervasyon) => r.dosya_id === d.id),
-      konteynerler: (kontData || []).filter((k: Konteyner) => k.dosya_id === d.id),
-    }));
-
-    setDurumlar(combined);
-    setLoading(false);
+      const rezler = (rezSonuc.data || []) as Rezervasyon[];
+      const konteynerler = (kontSonuc.data || []) as Konteyner[];
+      setDurumlar(acikDosyalar.map((d) => ({
+        dosya: d,
+        rezervasyonlar: rezervasyonlariSirala(rezler.filter((r) => r.dosya_id === d.id)),
+        konteynerler: konteynerler.filter((k) => k.dosya_id === d.id),
+      })));
+      setKapalilar(kapaliDosyalar.map((d) => ({
+        ...d,
+        rez: rezervasyonlariSirala(rezler.filter((r) => r.dosya_id === d.id))[0] ?? null,
+      })));
+      setKapaliToplam(kapaliSonuc.count ?? kapaliDosyalar.length);
+      const bugunStr = bugunTarihIstanbul();
+      setBugunYuklenenSayisi(((bugunSonuc.data || []) as Pick<Konteyner, "dba_kontrol_sonucu" | "dba_yukleme_tarihi">[])
+        .filter((k) => efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi)?.gun === bugunStr).length);
+      setHata(null);
+      setSonGuncelleme(new Date());
+    } catch (e) {
+      if (!guncelMi()) return;
+      // Onceki veri EKRANDA KALIR (bos "dosya yok" gosterilmez); hata ayrica belirtilir
+      setHata(e instanceof Error ? e.message : "Veri okunamadı.");
+    } finally {
+      if (guncelMi()) setLoading(false);
+    }
   }, [user?.id, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Otomatik yenileme: sayfa gorunurken dakikada bir + sekmeye donulunce
+  useEffect(() => {
+    const yenile = () => { if (document.visibilityState === "visible") fetchData(); };
+    const zamanlayici = window.setInterval(yenile, YENILEME_MS);
+    document.addEventListener("visibilitychange", yenile);
+    return () => { window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
+  }, [fetchData]);
 
   useEffect(() => {
     // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
@@ -123,23 +216,8 @@ export default function DashboardPage() {
     }
   }, [authLoading, yetkiler, router]);
 
-  const aciklar = durumlar.filter(d => d.dosya.durum !== "Kapalı" && d.dosya.durum !== "Kapali");
-  const kapalilar = durumlar.filter(d => d.dosya.durum === "Kapalı" || d.dosya.durum === "Kapali");
-
+  const aciklar = durumlar;
   const bekleyenRez = aciklar.filter(d => d.rezervasyonlar.length === 0).length;
-
-  // Bugun GERCEKTEN tartilan (sevk edilen) konteyner sayisi. DBA belgesinden
-  // AI ile cikarilan gercek tartim tarihi esas alinir (efektifTartimBilgisi),
-  // sisteme yukleme zamani (dba_yukleme_tarihi) DEGIL - Gunluk Ihracat Kantar
-  // Raporu ile AYNI TEK DOGRU KAYNAK (talep: 29.09.2026). Boylece personel bir
-  // DBA belgesini ertesi gun yuklerse, Dashboard ve rapor artik farkli sayilar
-  // gostermez (kok neden: SEGU1669290 - 28 Eylul'de tartilmis, DBA'si 29
-  // Eylul sabahi yuklenmis, eskiden Dashboard bunu "bugun" sayiyordu).
-  const bugunStr = bugunTarihIstanbul();
-  const bugunYuklenenSayisi = durumlar.reduce((toplam, d) => toplam + d.konteynerler.filter(k => {
-    const efektif = efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi);
-    return efektif?.gun === bugunStr;
-  }).length, 0);
 
   if (loading) {
     return (
@@ -154,6 +232,15 @@ export default function DashboardPage() {
     );
   }
 
+  const hicVeriYok = durumlar.length === 0 && kapalilar.length === 0;
+  const yenileDugmesi = (
+    <button onClick={() => { setLoading(true); fetchData(); }}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors"
+      style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+      <RefreshCw size={13} /> Yeniden dene
+    </button>
+  );
+
   return (
     <AppShell>
       {/* Baslik */}
@@ -162,14 +249,30 @@ export default function DashboardPage() {
         baslik="Kontrol Merkezi"
         aciklama="Tüm ihracat operasyonlarının anlık durumu"
         className="mb-6"
+        sag={sonGuncelleme && (
+          <span className="text-[11px]" style={{ color: TEXT_MUTED }} title="Sayfa dakikada bir kendiliğinden yenilenir">
+            Son güncelleme {sonGuncelleme.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
       />
+
+      {hata && (
+        <div className="rounded-xl border p-3 mb-6 flex items-center justify-between gap-3 flex-wrap" style={{ backgroundColor: "rgba(248,113,113,0.06)", borderColor: "rgba(248,113,113,0.35)" }}>
+          <p className="text-sm text-red-400 flex items-center gap-2">
+            <AlertTriangle size={15} className="shrink-0" />
+            {hicVeriYok ? "Kontrol merkezi verisi okunamadı." : "Son yenileme başarısız; ekrandaki bilgiler son başarılı okumaya ait."}
+            <span className="text-xs" style={{ color: TEXT_MUTED }}>({hata})</span>
+          </p>
+          {yenileDugmesi}
+        </div>
+      )}
 
       {/* Ozet kartlar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {[
           { key: "aktif", label: "Aktif Dosya", value: aciklar.length, icon: <FileText size={18} />, color: ACCENT, bg: "#0F2A20", pulse: false, href: "/panel" },
           { key: "rezervasyon", label: "Rezervasyon Bekleyen", value: bekleyenRez, icon: <Ship size={18} />, color: bekleyenRez > 0 ? "#F87171" : "#34D399", bg: bekleyenRez > 0 ? "#2A1519" : "#0F2A20", pulse: bekleyenRez > 0, href: "/panel?filter=rezervasyon" },
-          { key: "kapali", label: "Kapalı Dosya", value: kapalilar.length, icon: <CheckCircle2 size={18} />, color: TEXT_MUTED, bg: CARD_BG, pulse: false, href: "/ihracatlar" },
+          { key: "kapali", label: "Kapalı Dosya", value: kapaliToplam, icon: <CheckCircle2 size={18} />, color: TEXT_MUTED, bg: CARD_BG, pulse: false, href: "/ihracatlar" },
         ].map((m, idx) => (
           <div
             key={m.label}
@@ -260,18 +363,63 @@ export default function DashboardPage() {
           </div>
 
           {aciklar.map(({ dosya, rezervasyonlar, konteynerler }, idx) => {
-            const rez = rezervasyonlar[0];
-            const rezVar = rezervasyonlar.length > 0;
-            const faturaKesildi = !!dosya.fatura_dosya_url;
-            const toplamKont = konteynerler.length;
-            const dbaYuklenen = konteynerler.filter(k => k.dba_dosya_url).length;
-            const tumDbaHazir = toplamKont > 0 && dbaYuklenen === toplamKont;
-            const rezervasyonKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
-            const konteynerlerTamam = rezervasyonKontAdedi > 0 && toplamKont === rezervasyonKontAdedi;
-
-            const talimatCutoffGun = getDaysUntil(rez?.talimat_cutoff || null);
-            const beyannameCutoffGun = getDaysUntil(rez?.beyanname_cutoff || null);
+            const akis = dosyaAkisiHesapla({
+              rezervasyonlar,
+              konteynerler,
+              faturaVar: !!dosya.fatura_dosya_url,
+              konsimentoVar: !!dosya.konsimento_dosya_url,
+              draftBlVar: !!dosya.draft_bl_dosya_url,
+            });
+            const rez = akis.anaRezervasyon as Rezervasyon | null;
             const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
+
+            const adimIpucu = (anahtar: string): React.ReactNode => {
+              if (anahtar === "rezervasyon" && rez) {
+                return (
+                  <div className="space-y-1.5 text-xs text-slate-200">
+                    <p><span className="font-semibold text-slate-400">Booking No:</span> {rez.booking_no || "-"}{akis.digerRezervasyonSayisi > 0 ? ` (+${akis.digerRezervasyonSayisi} rezervasyon)` : ""}</p>
+                    <p><span className="font-semibold text-slate-400">Gemi Adı:</span> {rez.gemi_adi || "-"}</p>
+                    <p><span className="font-semibold text-slate-400">Acente:</span> {rez.acente_ismi || "-"}</p>
+                    <p><span className="font-semibold text-slate-400">Yükleme Limanı:</span> {rez.yuklenme_limani || "-"}</p>
+                    <p><span className="font-semibold text-slate-400">Konteyner Adedi:</span> {akis.planlanan || "-"}</p>
+                    <p><span className="font-semibold text-slate-400">Gemi Kalkış:</span> {rez.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</p>
+                  </div>
+                );
+              }
+              if (anahtar === "konteyner" && konteynerler.length > 0) {
+                return (
+                  <table className="text-xs w-full" style={{ minWidth: "280px" }}>
+                    <thead>
+                      <tr className="border-b" style={{ borderColor: CARD_BORDER }}>
+                        <th className="text-left font-semibold text-slate-400 pb-1.5 pr-2">Konteyner</th>
+                        <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Net</th>
+                        <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Brüt</th>
+                        <th className="text-right font-semibold text-slate-400 pb-1.5">Kap</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {konteynerler.map((k) => (
+                        <tr key={k.id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                          <td className="font-mono text-white py-1 pr-2">{k.konteyner_no}</td>
+                          <td className="text-right text-slate-300 py-1 pr-2">{k.net_agirlik_kg || "-"}</td>
+                          <td className="text-right text-slate-300 py-1 pr-2">{(k as any).brut_agirlik_kg || "-"}</td>
+                          <td className="text-right text-slate-300 py-1">{(k as any).pieces || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              }
+              if (anahtar === "fatura" && dosya.fatura_dosya_url) {
+                return (
+                  <a href={dosya.fatura_dosya_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 pointer-events-auto">
+                    <FileText size={14} /> Faturayı Aç
+                  </a>
+                );
+              }
+              return undefined;
+            };
 
             return (
               <div key={dosya.id} className={`rounded-xl border shadow-sm animate-fade-up ${staggerClass}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
@@ -285,7 +433,7 @@ export default function DashboardPage() {
                     </div>
                     {rez?.booking_no && (
                       <span className="ml-2 text-xs font-mono px-2 py-0.5 rounded whitespace-nowrap shrink-0" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
-                        {rez.booking_no}
+                        {rez.booking_no}{akis.digerRezervasyonSayisi > 0 ? ` +${akis.digerRezervasyonSayisi}` : ""}
                       </span>
                     )}
                     {rez?.gemi_adi && (
@@ -295,8 +443,14 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {talimatCutoffGun !== null && <CutoffBadge days={talimatCutoffGun} label="Talimat" />}
-                    {beyannameCutoffGun !== null && <CutoffBadge days={beyannameCutoffGun} label="Beyanname" />}
+                    {akis.kapatmayaHazir && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400"
+                        title="Tüm adımlar tamamlandı. Dosyayı detay sayfasından kapatabilirsiniz.">
+                        <Archive size={11} /> Kapatmaya hazır
+                      </span>
+                    )}
+                    <CutoffBadge durum={akis.talimat} label="Talimat" />
+                    <CutoffBadge durum={akis.beyanname} label="Beyanname" />
                     <Link href={`/dosya/${dosya.id}`}
                       className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                       style={{ backgroundColor: ACCENT }}>
@@ -305,100 +459,53 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Akis adımlari */}
+                {/* Akis adimlari: Rezervasyon -> Konteyner -> Yukleme (DBA) -> Fatura -> Konsimento */}
                 <div className="px-4 py-2">
                   <div className="flex items-start gap-0">
-                    <AkisAdimi
-                      tamamlandi={rezVar}
-                      bekliyor={!rezVar}
-                      label="Rezervasyon"
-                      sublabel={rez?.booking_no || undefined}
-                      tooltip={rezVar ? (
-                        <div className="space-y-1.5 text-xs text-slate-200">
-                          <p><span className="font-semibold text-slate-400">Booking No:</span> {rez?.booking_no || "-"}</p>
-                          <p><span className="font-semibold text-slate-400">Gemi Adı:</span> {rez?.gemi_adi || "-"}</p>
-                          <p><span className="font-semibold text-slate-400">Acente:</span> {rez?.acente_ismi || "-"}</p>
-                          <p><span className="font-semibold text-slate-400">Yükleme Limanı:</span> {rez?.yuklenme_limani || "-"}</p>
-                          <p><span className="font-semibold text-slate-400">Konteyner Adedi:</span> {rez?.konteyner_adedi || "-"}</p>
-                          <p><span className="font-semibold text-slate-400">Gemi Kalkış:</span> {rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</p>
-                        </div>
-                      ) : undefined}
-                    />
-                    <AkisConnector tamamlandi={rezVar} />
-                    <AkisAdimi
-                      tamamlandi={konteynerlerTamam}
-                      bekliyor={rezVar && !konteynerlerTamam}
-                      label="Konteynerler"
-                      sublabel={`${toplamKont}/${rezervasyonKontAdedi}`}
-                      tooltip={toplamKont > 0 ? (
-                        <table className="text-xs w-full" style={{ minWidth: "280px" }}>
-                          <thead>
-                            <tr className="border-b" style={{ borderColor: "#F1F5F9" }}>
-                              <th className="text-left font-semibold text-slate-400 pb-1.5 pr-2">Konteyner</th>
-                              <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Net</th>
-                              <th className="text-right font-semibold text-slate-400 pb-1.5 pr-2">Brüt</th>
-                              <th className="text-right font-semibold text-slate-400 pb-1.5">Kap</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {konteynerler.map((k) => (
-                              <tr key={k.id} className="border-b last:border-0" style={{ borderColor: "#F8FAFC" }}>
-                                <td className="font-mono text-white py-1 pr-2">{k.konteyner_no}</td>
-                                <td className="text-right text-slate-300 py-1 pr-2">{k.net_agirlik_kg || "-"}</td>
-                                <td className="text-right text-slate-300 py-1 pr-2">{(k as any).brut_agirlik_kg || "-"}</td>
-                                <td className="text-right text-slate-300 py-1">{(k as any).pieces || "-"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : undefined}
-                    />
-                    <AkisConnector tamamlandi={konteynerlerTamam} />
-                    <AkisAdimi
-                      tamamlandi={faturaKesildi}
-                      bekliyor={konteynerlerTamam && !faturaKesildi}
-                      label="Fatura Kesildi"
-                      tooltip={faturaKesildi && dosya.fatura_dosya_url ? (
-                        <a href={dosya.fatura_dosya_url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-xs font-medium text-amber-700 hover:text-amber-800 pointer-events-auto">
-                          <FileText size={14} /> Faturayı Aç
-                        </a>
-                      ) : undefined}
-                    />
-                    <AkisConnector tamamlandi={faturaKesildi} />
-                    <AkisAdimi tamamlandi={tumDbaHazir} bekliyor={!tumDbaHazir && toplamKont > 0} label="DBA" sublabel={toplamKont > 0 ? `${dbaYuklenen}/${toplamKont}` : undefined} />
+                    {akis.adimlar.map((adim, i) => (
+                      <React.Fragment key={adim.anahtar}>
+                        {i > 0 && <AkisConnector tamamlandi={akis.adimlar[i - 1].tamam} />}
+                        <AkisAdimi
+                          tamamlandi={adim.tamam}
+                          bekliyor={akis.siradaki === adim.anahtar}
+                          label={adim.etiket}
+                          sublabel={adim.altEtiket}
+                          tooltip={adimIpucu(adim.anahtar)}
+                        />
+                      </React.Fragment>
+                    ))}
                   </div>
                 </div>
 
                 {/* Eksik isler uyarisi */}
-                {(() => {
-                  const eksikler = [];
-                  if (!rezVar) eksikler.push("Rezervasyon girilmedi");
-                  if (rezVar && !konteynerlerTamam) eksikler.push(`${rezervasyonKontAdedi - toplamKont} konteyner eksik`);
-                  if (konteynerlerTamam && !faturaKesildi) eksikler.push("Fatura henüz kesilmedi");
-                  if (toplamKont > 0 && !tumDbaHazir) eksikler.push(`${toplamKont - dbaYuklenen} DBA bekleniyor`);
-                  if (eksikler.length === 0) return null;
-                  return (
-                    <div className="px-4 py-1.5 border-t flex items-center gap-2 flex-wrap" style={{ borderColor: CARD_BORDER }}>
-                      <AlertTriangle size={12} className="text-amber-400 shrink-0" />
-                      {eksikler.map((e, i) => (
-                        <span key={i} className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{e}</span>
-                      ))}
-                    </div>
-                  );
-                })()}
+                {akis.eksikler.length > 0 && (
+                  <div className="px-4 py-1.5 border-t flex items-center gap-2 flex-wrap" style={{ borderColor: CARD_BORDER }}>
+                    <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                    {akis.eksikler.map((e, i) => (
+                      <span key={i} className="text-xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">{e}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Kapali dosyalar - ozet */}
+      {/* Kapali dosyalar - son 10 (tamami Ihracatlar sayfasinda) */}
       {kapalilar.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Package size={16} style={{ color: TEXT_MUTED }} />
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Tamamlanan Dosyalar</h2>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Package size={16} style={{ color: TEXT_MUTED }} />
+              <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Tamamlanan Dosyalar</h2>
+              <span className="text-xs" style={{ color: TEXT_MUTED }}>({kapaliToplam})</span>
+            </div>
+            {kapaliToplam > kapalilar.length && (
+              <Link href="/ihracatlar" className="text-xs font-medium hover:text-emerald-400 inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
+                Tümünü gör <ChevronRight size={13} />
+              </Link>
+            )}
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="overflow-x-auto">
@@ -414,18 +521,17 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {kapalilar.map(({ dosya, rezervasyonlar }, idx) => {
-                  const rez = rezervasyonlar[0];
+                {kapalilar.map((k, idx) => {
                   const staggerClass = idx < 8 ? `stagger-${idx + 1}` : "stagger-8";
                   return (
-                    <tr key={dosya.id} className={`border-b last:border-0 opacity-70 hover:opacity-100 transition-opacity animate-fade-up ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
-                      <td className="px-2 py-2.5 text-sm font-medium text-white whitespace-nowrap">{dosya.dosya_no}</td>
-                      <td className="px-2 py-2.5 text-xs max-w-[110px] truncate" style={{ color: TEXT_MUTED }}>{dosya.alici_firma || "-"}</td>
-                      <td className="px-2 py-2.5 text-xs text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.konteyner_adedi || "-"}</td>
-                      <td className="px-2 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.booking_no || "-"}</td>
-                      <td className="px-2 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{rez?.gemi_kalkis_tarihi ? formatDateTR(rez.gemi_kalkis_tarihi) : "-"}</td>
+                    <tr key={k.id} className={`border-b last:border-0 opacity-70 hover:opacity-100 transition-opacity animate-fade-up ${staggerClass}`} style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-2 py-2.5 text-sm font-medium text-white whitespace-nowrap">{k.dosya_no}</td>
+                      <td className="px-2 py-2.5 text-xs max-w-[110px] truncate" style={{ color: TEXT_MUTED }}>{k.alici_firma || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.rez?.konteyner_adedi || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.rez?.booking_no || "-"}</td>
+                      <td className="px-2 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.rez?.gemi_kalkis_tarihi ? formatDateTR(k.rez.gemi_kalkis_tarihi) : "-"}</td>
                       <td className="px-2 py-2.5 text-right">
-                        <Link href={`/dosya/${dosya.id}`} className="text-xs hover:text-amber-500" style={{ color: TEXT_MUTED }}>
+                        <Link href={`/dosya/${k.id}`} className="text-xs hover:text-amber-500" style={{ color: TEXT_MUTED }}>
                           <ChevronRight size={14} />
                         </Link>
                       </td>
@@ -439,7 +545,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {durumlar.length === 0 && (
+      {hicVeriYok && !hata && (
         <EmptyState
           icon={<Ship size={40} />}
           title="Henüz hiç dosya yok"

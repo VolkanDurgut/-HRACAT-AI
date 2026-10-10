@@ -21,7 +21,7 @@ import {
  * Guncel Ihracat Raporu (yenilendi: 07.10.2026; eski adi "Gunluk Sevkiyat ve
  * Kantar Raporu").
  * Hesap TEK YERDE: supabase/functions/_shared/gunluk-rapor.ts - her sabah
- * 08:45 ve aksam 17:00 giden rapor maili (gunluk-rapor-gonder) ayni sayilari
+ * 09:00, ogle 12:00 ve aksam 17:00 giden rapor maili (gunluk-rapor-gonder) ayni sayilari
  * kullanir. Sayfa yazdirmaya / PDF'e uygun beyaz belge olarak kalir.
  * ?tarih=YYYY-MM-DD ile belirli gun acilabilir (maildeki baglanti).
  */

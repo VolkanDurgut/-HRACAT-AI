@@ -19,7 +19,7 @@ import {
 // GUNLUK SEVKIYAT RAPORU MAILI (gunluk-rapor-gonder) - 07.10.2026
 // ============================================================================
 // pg_cron ile her gun 3 kez tetiklenir (Turkiye saati, UTC+3 sabit):
-//   "gunluk-rapor-sabah" 05:45 UTC = 08:45 TR -> DUNUN raporu (gunu kapatir; 09.10.2026'ya kadar 08:00)
+//   "gunluk-rapor-sabah" 06:00 UTC = 09:00 TR -> DUNUN raporu (gunu kapatir; 10.10.2026'dan beri, once 08:00 / 08:45)
 //   "gunluk-rapor-ogle"  09:00 UTC = 12:00 TR -> BUGUNUN ara raporu (09.10.2026)
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
@@ -61,7 +61,7 @@ type Slot = "sabah" | "ogle" | "aksam";
 const SLOTLAR: Slot[] = ["sabah", "ogle", "aksam"];
 /** Sabah raporu DUNU kapatir; ogle ve aksam BUGUNU raporlar. */
 const SLOT_BASLIK: Record<Slot, string> = {
-  sabah: "Sabah raporu · 08:45 (dünün özeti)",
+  sabah: "Sabah raporu · 09:00 (dünün özeti)",
   ogle: "Öğle raporu · 12:00",
   aksam: "Akşam raporu · 17:00",
 };

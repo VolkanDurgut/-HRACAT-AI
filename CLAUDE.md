@@ -561,7 +561,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 ## Günlük sevkiyat raporu (07.10.2026)
 
 - Sayfa `app/rapor/gunluk/page.tsx` (Dashboard → Günlük Rapor; `?tarih=YYYY-MM-DD`
-  ile geçmiş gün) + her gün 08:45 ve 17:00 (TR) giden şirket içi mail. İkisi de
+  ile geçmiş gün) + her gün 09:00, 12:00 ve 17:00 (TR) giden şirket içi mail. İkisi de
   AYNI hesabı kullanır: `supabase/functions/_shared/gunluk-rapor.ts`
   (`gunlukRaporHesapla`, saf TS, import yok; Next tarafı `@/supabase/functions/
   _shared/gunluk-rapor` ile içe aktarır, `lib/cutoff-utils.ts` tartım
@@ -610,7 +610,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (dolum bekleyen)" toplamı eklendi. Tamamlanan sevkiyat başlığında "Varış:"
   (dosyanın `varis_limani`, gösterimde büyük harf; kayıt değişmez).
 - Mail: edge function `gunluk-rapor-gonder` (canlıda v7). pg_cron
-  `gunluk-rapor-sabah` 05:45 UTC (08:45 TR; 09.10.2026'ya kadar 05:00) → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
+  `gunluk-rapor-sabah` 06:00 UTC (09:00 TR; 10.10.2026'dan beri — önce 08:00, sonra 08:45) → DÜNÜN raporu, `gunluk-rapor-aksam` 14:00 UTC
   → BUGÜNÜN raporu. Alıcı: secret `GUNLUK_RAPOR_ALICILARI` (virgülle), yoksa
   `GERI_BILDIRIM_ALICI` (yedek adresi). Şirket adreslerine geçiş = sadece secret
   ayarı, kod/deploy gerekmez. Müşteriye GİTMEZ.

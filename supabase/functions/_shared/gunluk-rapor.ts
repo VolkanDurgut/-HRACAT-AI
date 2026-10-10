@@ -2,7 +2,7 @@
  * GUNLUK RAPOR - ortak hesap (07.10.2026)
  *
  * TEK KAYNAK: hem uygulamadaki /rapor/gunluk sayfasi (Next.js) hem her sabah
- * 08:45 / aksam 17:00 giden rapor maili (edge function gunluk-rapor-gonder)
+ * 09:00 / ogle 12:00 / aksam 17:00 giden rapor maili (edge function gunluk-rapor-gonder)
  * bu dosyayi kullanir; iki cikti ayni sayilari gosterir. Bu yuzden dosya
  * SAF TypeScript'tir: hicbir import yok, Deno / tarayici / Node'a ozel API
  * kullanmaz.

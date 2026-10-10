@@ -18,7 +18,7 @@ type KullaniciYetki = {
 };
 
 const SAYFA_ETIKETLER: Record<string, string> = {
-  dashboard:  "Dashboard",
+  dashboard:  "Kontrol Merkezi",
   panel:      "Ana Panel",
   yeni_dosya: "Yeni Dosya Aç",
   ihracatlar: "İhracatlar",

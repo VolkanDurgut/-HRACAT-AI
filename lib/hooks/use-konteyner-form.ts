@@ -193,6 +193,56 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     return true;
   }, [companyId, showToast, onRefresh]);
 
+  /**
+   * Konteyner no / muhur no duzeltme (10.10.2026). Hata metni doner (null = basarili
+   * ya da degisiklik yok); hucre hata varsa ACIK kalir.
+   * Kurallar: konteyner no zorunlu + ISO bicimi (4 harf + 7 rakam); DBA yuklu
+   * konteynerin numarasi DEGISTIRILEMEZ (DBA yuklenirken belgedeki no ile birebir
+   * eslestirildi). Muhur no DBA olsa da degisebilir (kirilan muhur yenisiyle
+   * degistirilir), bos birakilabilir. Ayni dosyada ayni konteyner / muhur no iki
+   * kez olamaz. Eski deger denetim_kayitlari'na tetikleyiciyle yazilir.
+   */
+  const handleKimlikDuzelt = useCallback(async (konteynerId: string, alan: "konteyner_no" | "muhur_no", ham: string): Promise<string | null> => {
+    const deger = ham.toUpperCase().replace(/\s/g, "");
+    const etiket = alan === "konteyner_no" ? "Konteyner no" : "Mühür no";
+    if (alan === "konteyner_no") {
+      if (!deger) return "Konteyner no boş bırakılamaz.";
+      if (!/^[A-Z]{4}[0-9]{7}$/.test(deger)) return "Biçim: 4 harf + 7 rakam (örn: ABCU1234567).";
+    }
+    // Karar her zaman veritabanindaki GUNCEL kayda gore verilir (ekran eski olabilir)
+    const { data: mevcut, error: okumaHatasi } = await supabase
+      .from("konteynerler").select("id, dosya_id, konteyner_no, muhur_no, dba_dosya_url")
+      .eq("id", konteynerId).eq("company_id", companyId).maybeSingle();
+    if (okumaHatasi || !mevcut) return `Konteyner kaydı okunamadı${okumaHatasi ? `: ${okumaHatasi.message}` : "."}`;
+    if (alan === "konteyner_no" && mevcut.dba_dosya_url) {
+      return "DBA yüklü konteynerin numarası değiştirilemez. Önce DBA'yı kaldırın.";
+    }
+    const eski = (alan === "konteyner_no" ? mevcut.konteyner_no : mevcut.muhur_no) || "";
+    if (eski === deger) return null;
+    if (deger) {
+      const { data: ayni, error: aramaHatasi } = await supabase
+        .from("konteynerler").select("konteyner_no")
+        .eq("company_id", companyId).eq("dosya_id", mevcut.dosya_id).eq(alan, deger).neq("id", konteynerId).limit(1);
+      if (aramaHatasi) return `Kontrol yapılamadı: ${aramaHatasi.message}`;
+      if (ayni && ayni.length > 0) {
+        return alan === "konteyner_no"
+          ? `${deger} bu dosyada zaten kayıtlı.`
+          : `${deger} mühürü bu dosyada ${ayni[0].konteyner_no} konteynerinde kayıtlı.`;
+      }
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: yazilan, error } = await supabase.from("konteynerler").update({
+      [alan]: deger || null,
+      updated_by: user?.id || null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", konteynerId).eq("company_id", companyId).select("id");
+    const yazmaSorunu = yazmaHatasi(error, yazilan);
+    if (yazmaSorunu) return `${etiket} kaydedilemedi: ${yazmaSorunu}`;
+    showToast(`${etiket} güncellendi: ${eski || "-"} → ${deger || "-"}`, "success");
+    onRefresh();
+    return null;
+  }, [companyId, showToast, onRefresh]);
+
   return {
     showForm, setShowForm,
     saving,
@@ -205,5 +255,6 @@ export function useKonteynerForm(dosyaId: string, onRefresh: () => void, company
     handleManuelAlanKaydet,
     handleTopluEkle,
     handleHepsineUygula,
+    handleKimlikDuzelt,
   };
 }

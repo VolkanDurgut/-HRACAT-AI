@@ -408,6 +408,22 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - `ihracat_dosyalari.vgm_gonderildi` kolonu ve `getDosyaAkisDurumu().vgmGonderildi`
   SİLİNMEDİ (eski kayıtların verisi; okuyan ekran yok). Yeni yazan da yok.
 
+## Konteyner no / mühür no düzeltme (10.10.2026)
+
+- Konteynerler sekmesinde her iki hücrede kalem ikonu (`KimlikHucresi`,
+  `components/konteyner-tab.tsx`): değere tıklamak eskisi gibi KOPYALAR, kalem
+  düzeltme kutusunu açar. Kayıt SADECE Enter / onay ikonuyla (blur ile değil),
+  Esc / çarpı vazgeçer; hata varsa kutu açık kalır.
+- Kurallar tek yerde: `useKonteynerForm().handleKimlikDuzelt` — karar DB'deki
+  GÜNCEL kayda göre. Konteyner no zorunlu + `^[A-Z]{4}[0-9]{7}$`; DBA yüklü
+  konteynerin NUMARASI değiştirilemez (DBA yüklenirken belgedeki no ile birebir
+  eşleştirildi; hücrede kilit ikonu + açıklama). Mühür no DBA varken de
+  değişir (kırılan mühür), boş bırakılabilir. Aynı dosyada aynı konteyner /
+  mühür no ikinci kez olamaz (DB'de unique kısıt YOK, kontrol uygulamada).
+  `updated_by/at` yazılır; eski değer `denetim_konteynerler` tetikleyicisiyle
+  `denetim_kayitlari`na düşer. Daha önce üretilip arşivlenmiş evrak PDF'leri
+  değişmez, evrak yeniden üretilince güncel no basılır.
+
 ## Yük Sigortası Talimatı — 10. evrak (02.10.2026)
 
 - Evraklar listesindeki 10. satır ("Insurance Policy", sadece müşterinin

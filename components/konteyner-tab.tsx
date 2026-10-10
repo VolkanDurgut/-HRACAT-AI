@@ -6,7 +6,7 @@ import { useIrsaliyeUpload } from "@/lib/hooks/use-irsaliye-upload";
 import { useKonteynerForm } from "@/lib/hooks/use-konteyner-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Trash2, Plus, X, CheckCircle2, AlertTriangle, Loader2, Download, Copy, ClipboardList, CopyPlus, Upload
+  Trash2, Plus, X, CheckCircle2, AlertTriangle, Loader2, Download, Copy, ClipboardList, CopyPlus, Upload, Pencil, Lock, Check
 } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
@@ -56,6 +56,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
     handleManuelAlanKaydet,
     handleTopluEkle,
     handleHepsineUygula,
+    handleKimlikDuzelt,
   } = useKonteynerForm(dosyaId, onRefresh, companyId, varsayilanMarka);
 
   const [showTopluForm, setShowTopluForm] = React.useState(false);
@@ -228,21 +229,27 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                   const dbaVeri = k.dba_kontrol_sonucu as { uyusmazliklar?: string[] } | null;
                   const uyusmazlik = (dbaVeri?.uyusmazliklar?.length ?? 0) > 0;
                   return (
-                    <tr key={k.id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
+                    <tr key={k.id} className="group border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                       <td className="px-4 py-3">
-                        <span className="text-sm font-medium text-white font-mono cursor-pointer hover:text-amber-400"
-                          onClick={() => handleKopyala(k.konteyner_no, "Konteyner no")}>
-                          {k.konteyner_no}
-                        </span>
+                        <KimlikHucresi
+                          deger={k.konteyner_no}
+                          etiket="Konteyner no"
+                          vurgulu
+                          placeholder="ABCU1234567"
+                          kilitNedeni={k.dba_dosya_url ? "DBA belgesiyle doğrulandı. Numarayı değiştirmek için önce DBA'yı kaldırın." : null}
+                          onKopyala={() => handleKopyala(k.konteyner_no, "Konteyner no")}
+                          onKaydet={(yeni) => handleKimlikDuzelt(k.id, "konteyner_no", yeni)}
+                        />
                       </td>
-                      <td className="px-4 py-3 text-sm font-mono" style={{ color: TEXT_MUTED }}>
-                        {k.muhur_no ? (
-                          <span className="cursor-pointer hover:text-amber-400"
-                            onClick={() => handleKopyala(k.muhur_no!, "Mühür no")}>
-                            {k.muhur_no}
-                          </span>
-                        ) : "-"}
+                      <td className="px-4 py-3">
+                        <KimlikHucresi
+                          deger={k.muhur_no}
+                          etiket="Mühür no"
+                          placeholder="Mühür no"
+                          onKopyala={() => k.muhur_no && handleKopyala(k.muhur_no, "Mühür no")}
+                          onKaydet={(yeni) => handleKimlikDuzelt(k.id, "muhur_no", yeni)}
+                        />
                       </td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>
@@ -550,5 +557,95 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
 
   return (
     <input autoFocus value={taslak} onChange={(e) => setTaslak(e.target.value)} onBlur={() => kaydet(taslak)} onKeyDown={(e) => { if (e.key === "Enter") kaydet(taslak); if (e.key === "Escape") setDuzenle(false); }} className="text-sm border rounded px-2 py-1 w-full text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="Marka" />
+  );
+}
+// Konteyner no / muhur no hucresi (10.10.2026): degere tiklamak eskisi gibi
+// kopyalar; yanindaki kalem ikonu duzeltme kutusunu acar. Kayit SADECE Enter
+// veya onay ikonuyla yapilir (kimlik alani: blur ile yanlislikla kaydedilmez);
+// Escape / carpi vazgecer. Hata olursa kutu acik kalir ve mesaj gosterilir.
+function KimlikHucresi({ deger, etiket, placeholder, vurgulu, kilitNedeni, onKopyala, onKaydet }: {
+  deger: string | null;
+  etiket: string;
+  placeholder: string;
+  vurgulu?: boolean;
+  kilitNedeni?: string | null;
+  onKopyala: () => void;
+  onKaydet: (yeni: string) => Promise<string | null>;
+}) {
+  const [duzenle, setDuzenle] = React.useState(false);
+  const [taslak, setTaslak] = React.useState(deger || "");
+  const [kaydediyor, setKaydediyor] = React.useState(false);
+  const [hata, setHata] = React.useState<string | null>(null);
+
+  const ac = () => { setTaslak(deger || ""); setHata(null); setDuzenle(true); };
+  const vazgec = () => { if (!kaydediyor) { setDuzenle(false); setHata(null); } };
+  const kaydet = async () => {
+    if (kaydediyor) return;
+    setKaydediyor(true);
+    const sonuc = await onKaydet(taslak);
+    setKaydediyor(false);
+    if (sonuc) { setHata(sonuc); return; }
+    setDuzenle(false);
+  };
+
+  if (duzenle) {
+    return (
+      <div className="min-w-[170px]">
+        <div className="flex items-center gap-1">
+          <input
+            autoFocus
+            value={taslak}
+            disabled={kaydediyor}
+            onChange={(e) => { setTaslak(e.target.value.toUpperCase()); setHata(null); }}
+            onKeyDown={(e) => { if (e.key === "Enter") kaydet(); if (e.key === "Escape") vazgec(); }}
+            placeholder={placeholder}
+            aria-label={`${etiket} düzelt`}
+            className="w-36 px-2 py-1 border rounded text-sm font-mono uppercase text-white"
+            style={{ borderColor: hata ? "#F87171" : "#10B981", backgroundColor: "#12161F" }}
+          />
+          {kaydediyor ? (
+            <Loader2 size={14} className="animate-spin" style={{ color: TEXT_MUTED }} />
+          ) : (
+            <>
+              <button onClick={kaydet} title="Kaydet (Enter)" className="p-1 rounded text-emerald-400 hover:bg-emerald-500/10"><Check size={14} /></button>
+              <button onClick={vazgec} title="Vazgeç (Esc)" className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }}><X size={14} /></button>
+            </>
+          )}
+        </div>
+        {hata && <p className="text-[11px] text-red-400 mt-1 max-w-[240px] leading-snug">{hata}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 whitespace-nowrap">
+      {deger ? (
+        <span
+          className={`font-mono cursor-pointer hover:text-amber-400 text-sm ${vurgulu ? "font-medium text-white" : ""}`}
+          style={vurgulu ? undefined : { color: TEXT_MUTED }}
+          onClick={onKopyala}
+          title="Kopyalamak için tıklayın"
+        >
+          {deger}
+        </span>
+      ) : (
+        <span className="text-sm" style={{ color: TEXT_MUTED }}>-</span>
+      )}
+      {kilitNedeni ? (
+        <span title={kilitNedeni} className="opacity-40 group-hover:opacity-80" style={{ color: TEXT_MUTED }}>
+          <Lock size={11} />
+        </span>
+      ) : (
+        <button
+          onClick={ac}
+          title={`${etiket} düzelt`}
+          aria-label={`${etiket} düzelt`}
+          className="p-0.5 rounded opacity-40 group-hover:opacity-100 hover:text-emerald-400 transition-opacity"
+          style={{ color: TEXT_MUTED }}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
+    </div>
   );
 }

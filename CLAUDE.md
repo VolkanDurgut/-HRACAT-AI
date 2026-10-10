@@ -515,6 +515,27 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   veya etiketli kalem KORUNUR; tonaj konteyner adedini tutmuyorsa uyarı
   çıkar. Eskiden her rezervasyon kaydında bu düzeltmeler sessizce siliniyordu.
 
+## Kontrol Merkezi (eski adı Dashboard, `/dashboard`) — 10.10.2026
+- İş akışı hesabı TEK YERDE: `lib/dashboard-akis.ts` (`dosyaAkisiHesapla`,
+  saf fonksiyon). Adım sırası: Rezervasyon → Konteyner → Yükleme (DBA) →
+  Fatura → Konşimento. Konteyner adedi günlük raporla AYNI kural:
+  `max(rezervasyonlardaki toplam, eklenen)`.
+- Cut-off "tamam" kuralı (beyanname_no fiilen girilmediği için kanıtlanabilir
+  adıma bağlı): Talimat → konşimento talimatı VEYA Draft BL var; Beyanname →
+  fatura var. Tamamlanan cut-off gri tik gösterir, kırmızı alarm vermez.
+- Rezervasyonlar ETD'ye göre sıralanır; kartta en erken ETD'li booking + "+N".
+- Veri: sadece açık dosyaların detayı + son 10 kapalı dosya (toplam sayı
+  `count: exact`) + son 2 günde DBA'sı yüklenen konteynerler (Bugün Yüklenen,
+  DBA tartım tarihine göre). Hata yutulmaz: kırmızı bant + "Yeniden dene";
+  önceki veri ekranda kalır. Sayfa görünürken dakikada bir + sekmeye dönünce yenilenir.
+- Özet 4 kutu: Aktif Dosya (alt satır: rezervasyon bekleyen), Bugün Yüklenen
+  (+ Günlük Rapor), Yüklenecek Konteyner (rapordaki "açık sevkiyatlarda kalan"
+  ile aynı), Cut-off Uyarısı (≤ 2 gün kalan/geçmiş ve ilgili adım bitmemiş).
+- Nabız (animate-pulse) SADECE acil durumda: cut-off ≤ 1 gün ve adım bitmemiş.
+- Tüm adımlar tamamsa "Kapatmaya hazır" rozeti (dosya detayından kapatılır).
+- Menüde adı "Kontrol Merkezi"; sidebar markası `companies.company_name` +
+  "İhracat AI" (Unex Gıda / İhracat AI).
+
 ## Veritabanı genel kontrolü (03.10.2026)
 
 - `public.nextval(text)` sarmalayıcısı anon anahtarıyla RPC'den çağrılabiliyordu

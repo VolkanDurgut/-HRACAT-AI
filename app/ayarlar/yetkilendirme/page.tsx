@@ -27,6 +27,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   analiz:     "Analiz",
   ayarlar:    "Ayarlar",
   draft_onay: "Draft Onay",
+  ic_piyasa:  "İç Piyasa",
 };
 
 const SEKME_ETIKETLER: Record<string, string> = {

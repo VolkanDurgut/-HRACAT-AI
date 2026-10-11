@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -26,6 +26,13 @@ const opsItems: MenuItem[] = [
   { label: "ETD/ETA",       href: "/etd-eta", icon: <Ship size={18} />,      yetkiKey: "etd_eta" },
   { label: "Kantar Paneli", href: "/kantar",  icon: <Weight size={18} />,    yetkiKey: "kantar" },
   { label: "Analiz",        href: "/analiz",  icon: <BarChart3 size={18} />, yetkiKey: "analiz" },
+];
+
+// Ic Piyasa (11.10.2026): SADECE yetkisi olan kullaniciya gorunur (diger
+// menulerin aksine soluk/kilitli hali de gosterilmez - bu bolum ihracat
+// kullanicilarinin ekranini degistirmesin).
+const icPiyasaItems: MenuItem[] = [
+  { label: "İç Piyasa", href: "/ic-piyasa", icon: <Wheat size={18} />, yetkiKey: "ic_piyasa" },
 ];
 
 const ayarlarAltMenu = [
@@ -124,6 +131,15 @@ export default function Sidebar() {
         </div>
 
         {opsItems.map(renderItem)}
+
+        {icPiyasaItems.some((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]) && (
+          <>
+            <div className="pt-3 pb-2 px-3">
+              <div className="h-px" style={{ backgroundColor: BORDER }} />
+            </div>
+            {icPiyasaItems.filter((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}
+          </>
+        )}
 
         {/* Ayarlar accordion — SADECE süper admin e-postaları görebilir (bkz. lib/auth-context.tsx) */}
         {isSuperAdmin ? (

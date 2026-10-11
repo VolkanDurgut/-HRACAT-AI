@@ -16,6 +16,7 @@ export type SayfaYetkileri = {
   ayarlar: boolean;
   etd_eta: boolean;
   draft_onay: boolean;
+  ic_piyasa: boolean; // Ic Piyasa fiyat bilgilendirme formu (11.10.2026)
 };
 
 export type SekmeYetkileri = {
@@ -61,6 +62,7 @@ const VARSAYILAN_YETKILER: KullaniciYetkileri = {
     ayarlar: false,
     etd_eta: false,
     draft_onay: false,
+    ic_piyasa: false,
   },
   sekme_yetkileri: {
     proforma: false,
@@ -135,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setYetkiler({
           sayfa_yetkileri: {
             dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
-            kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false,
+            kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
           },
           sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
         });
@@ -146,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setYetkiler({
         sayfa_yetkileri: {
           dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
-          kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false,
+          kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
         },
         sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
       });

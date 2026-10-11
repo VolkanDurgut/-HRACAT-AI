@@ -73,6 +73,9 @@ const YEDEKLENECEK_TABLOLAR = [
   "geri_bildirimler",
   "banka_presetleri",
   "ai_usage_logs",
+  // Ic piyasa fiyat bilgilendirme formu (11.10.2026)
+  "ic_fiyat_kalemleri",
+  "ic_fiyat_formlari",
 ];
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).

@@ -842,6 +842,40 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `atomic_upsert_pending_depositor` fonksiyonu) kullanıcının BAŞKA bir
   projesine ait — **dokunma, silme, raporlarda sorun olarak işaretleme.**
 
+## İç Piyasa — Yan Mamul Fiyat Bilgilendirme Formu (11.10.2026)
+
+- Sayfa `app/ic-piyasa/page.tsx` (menüde "İç Piyasa", SADECE `sayfa_yetkileri.ic_piyasa`
+  açık kullanıcıya görünür; kilitli/soluk hali gösterilmez). Yetki anahtarı eklendi:
+  `SayfaYetkileri` tipi + varsayılanlar (`lib/auth-context.tsx`), `SAYFA_YETKI_MAP`
+  (`components/app-shell.tsx`), `ilkErisilebilirSayfa` (en sonda), Yetkilendirme etiketi.
+  Mevcut kullanıcılarda anahtar yok → false; yetkiyi süper admin Yetkilendirme'den açar.
+- Yönetim paneli: Ürün / Ambalaj / Birim Fiyat (TL/kg, KDV hariç) / Vade (gün, 0 = Peşin) /
+  Ödeme / Teslim satırları eklenir, düzenlenir, silinir, sıralanır → "Kaydet"
+  (`ic_fiyat_kalemleri`). "Formu Onayla ve Oluştur" kayıtlı tabloyu `ic_fiyat_formlari.kalemler`
+  içine DONDURUR; numara `FBF-YYYY-NNNN` (sayaç `ic_fiyat_formu_sira`) ve geçerlilik
+  (TR takvimiyle onay günü + 3 gün) SUNUCUDA tetikleyiciyle verilir, istemcinin gönderdiği
+  değer ezilir. Onaylı form değiştirilemez/silinemez (UPDATE/DELETE yetkisi yok); fiyat
+  değişirse yeni form. Tetikleyici numara vermeden ÖNCE boş kalem ve şirket kontrolü
+  yapar (reddedilen kayıt sayaç boşluğu bırakmasın). Migration
+  `20261011200000_ic_piyasa_fiyat_formu.sql` (yerel PG'de RLS/numara/değiştirilemezlik
+  testleri geçti).
+- Kullanıcı kararları (11.10.2026): formda "İç Piyasa" yazısı, SATIŞ ŞARTLARI ve KAŞE/İMZA
+  YOK — geri eklenmez. Tasarım Fatura Talimatı'ndan (logo + lacivert başlık + kart tablolar,
+  tek sayfa ölçekleme) + altta Unex antet adres bloğu + sertifika logoları
+  (`lib/images/sertifika-logolari-base64.ts`). Renkler logodan (#283474 / #F4A07C).
+- Ortak kurallar TEK yerde: `lib/ic-piyasa/fiyat-formu.ts` (tipler, `GECERLILIK_GUN = 3` —
+  migration ile AYNI olmalı, şirket bilgileri `FORM_SIRKET`, biçimlendirme). PDF:
+  `lib/ic-piyasa/fiyat-formu-pdf-builder.ts` (jsPDF, Roboto TR; Türkçe içerikli — "PDF
+  İngilizce" kuralının bilinçli istisnası). Telefon görseli 1080×1350:
+  `lib/ic-piyasa/fiyat-formu-gorsel.ts` (canvas, aynı font). Liste/indirme/paylaş:
+  `components/ic-piyasa-gecmis-formlar.tsx` ("Paylaş" sadece dosya paylaşımı destekleyen
+  cihazda; telefonda WhatsApp'a PDF+görsel ekler).
+- Formdaki iletişim satırı "Burak Tuncay · 0541 339 60 04" (`FORM_SIRKET.iletisim`).
+- Gece yedeği: iki tablo `YEDEKLENECEK_TABLOLAR`'a eklendi → `yedekleme-gonder` DEPLOY
+  edilmeden canlı yedeğe girmez.
+- Sıradaki (plan): WhatsApp otomatik gönderim (Meta Cloud API + mevcut numara için
+  Coexistence/BSP) ayrı faz; müşteriye sistemden mail ASKIDA kuralı burada da geçerli.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

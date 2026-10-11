@@ -144,12 +144,14 @@ begin
   end if;
 end $$;
 
-revoke all on table public.ic_fiyat_kalemleri from anon;
-revoke all on table public.ic_fiyat_formlari from anon;
-revoke all on sequence public.ic_fiyat_formu_sira from anon;
+-- Supabase yeni tablolara varsayilan olarak anon/authenticated'a TUM yetkileri
+-- (TRUNCATE dahil - TRUNCATE RLS'i ATLAR) verir. Once hepsi kaldirilir, sonra
+-- sadece gerekenler verilir; boylece onayli formlar gercekten silinemez.
+revoke all on table public.ic_fiyat_kalemleri from anon, authenticated, public;
+revoke all on table public.ic_fiyat_formlari from anon, authenticated, public;
+revoke all on sequence public.ic_fiyat_formu_sira from anon, authenticated, public;
 grant select, insert, update, delete on table public.ic_fiyat_kalemleri to authenticated;
 grant select, insert on table public.ic_fiyat_formlari to authenticated;
-revoke update, delete on table public.ic_fiyat_formlari from authenticated;
 grant usage on sequence public.ic_fiyat_formu_sira to authenticated;
 grant all on table public.ic_fiyat_kalemleri to service_role;
 grant all on table public.ic_fiyat_formlari to service_role;

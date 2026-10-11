@@ -871,8 +871,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `components/ic-piyasa-gecmis-formlar.tsx` ("Paylaş" sadece dosya paylaşımı destekleyen
   cihazda; telefonda WhatsApp'a PDF+görsel ekler).
 - Formdaki iletişim satırı "Burak Tuncay · 0541 339 60 04" (`FORM_SIRKET.iletisim`).
-- Gece yedeği: iki tablo `YEDEKLENECEK_TABLOLAR`'a eklendi → `yedekleme-gonder` DEPLOY
-  edilmeden canlı yedeğe girmez.
+- Gece yedeği: iki tablo `YEDEKLENECEK_TABLOLAR`'a eklendi; `yedekleme-gonder` v9 olarak
+  canlıya DEPLOY EDİLDİ (11.10.2026). Deneme çalışması: 21/21 tablo, geri yükleme testi
+  21/21 birebir, uyarı yok.
+- CANLI DURUM (11.10.2026 kontrol): migration kullanıcı tarafından SQL Editor ile
+  UYGULANDI (bu yüzden `supabase_migrations` geçmişinde görünmez). İki tablo + RLS (6
+  politika) + 2 tetikleyici yerinde; yetkiler sadece authenticated (tablolarda
+  SELECT/INSERT/UPDATE/DELETE, formlarda SELECT/INSERT; TRUNCATE yok, anon yok).
+  `ic_piyasa` yetkisi buraktuncay@ ve volkandurgut.tr@ için açık. Canlı test: boş
+  form reddedildi, sayaç harcanmadı (ilk gerçek form FBF-2026-0001 olur).
 - Sıradaki (plan): WhatsApp otomatik gönderim (Meta Cloud API + mevcut numara için
   Coexistence/BSP) ayrı faz; müşteriye sistemden mail ASKIDA kuralı burada da geçerli.
 

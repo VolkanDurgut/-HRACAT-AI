@@ -49,6 +49,7 @@ type Satir = {
   vade_gun: number | null;
   odeme: string;
   teslim: string;
+  kdv_dahil: boolean;
 };
 
 /** "13,15" / "13.15" / "1.250,50" -> sayi; bos -> null; gecersiz -> NaN */
@@ -75,13 +76,14 @@ function dbdenSatir(k: IcFiyatKalemi): Satir {
     vade_gun: k.vade_gun,
     odeme: k.odeme || "",
     teslim: k.teslim || "",
+    kdv_dahil: !!k.kdv_dahil,
   };
 }
 
 /** Kirli (kaydedilmemis) degisiklik tespiti icin normal bicim. */
 function normal(satirlar: Satir[]) {
   return JSON.stringify(
-    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.fiyat), s.vade_gun, s.odeme.trim(), s.teslim.trim()])
+    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.fiyat), s.vade_gun, s.odeme.trim(), s.teslim.trim(), s.kdv_dahil])
   );
 }
 
@@ -159,11 +161,11 @@ export default function IcPiyasaPage() {
   const satirEkle = () => {
     // Yeni satir, bir ustteki satirin vade/odeme/teslim degerlerini alir (hizli giris).
     const son = satirlar[satirlar.length - 1];
-    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", fiyat: "", vade_gun: son?.vade_gun ?? 30, odeme: son?.odeme || "Çek", teslim: son?.teslim || "Fabrika Teslim" }]);
+    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", fiyat: "", vade_gun: son?.vade_gun ?? 30, odeme: son?.odeme || "Çek", teslim: son?.teslim || "Fabrika Teslim", kdv_dahil: son?.kdv_dahil ?? false }]);
   };
 
   const baslangicListesiniYukle = () => {
-    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, fiyat: "", vade_gun: 30, odeme: "Çek", teslim: "Fabrika Teslim" })));
+    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, fiyat: "", vade_gun: 30, odeme: "Çek", teslim: "Fabrika Teslim", kdv_dahil: false })));
   };
 
   const tasi = (i: number, yon: -1 | 1) =>
@@ -206,12 +208,13 @@ export default function IcPiyasaPage() {
           vade_gun: s.vade_gun,
           odeme: s.odeme.trim() || null,
           teslim: s.teslim.trim() || null,
+          kdv_dahil: s.kdv_dahil,
         };
         if (s.id) {
           const d = dbMap.get(s.id);
           const degismedi = d && d.sira === kayit.sira && d.urun === kayit.urun && (d.ambalaj || null) === kayit.ambalaj &&
             (d.birim_fiyat === null ? null : Number(d.birim_fiyat)) === kayit.birim_fiyat && d.vade_gun === kayit.vade_gun &&
-            (d.odeme || null) === kayit.odeme && (d.teslim || null) === kayit.teslim;
+            (d.odeme || null) === kayit.odeme && (d.teslim || null) === kayit.teslim && !!d.kdv_dahil === kayit.kdv_dahil;
           if (degismedi) continue;
           const { data, error } = await supabase.from("ic_fiyat_kalemleri").update(kayit).eq("id", s.id).eq("company_id", companyId).select("id");
           const hata = yazmaHatasi(error, data);
@@ -355,10 +358,10 @@ export default function IcPiyasaPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[920px]">
+            <table className="w-full text-sm min-w-[1030px]">
               <thead>
                 <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                  {["#", "Ürün", "Ambalaj", "Birim Fiyat (TL/kg)", "Vade", "Ödeme", "Teslim", ""].map((b, i) => (
+                  {["#", "Ürün", "Ambalaj", "Birim Fiyat (TL/kg)", "KDV", "Vade", "Ödeme", "Teslim", ""].map((b, i) => (
                     <th key={i} className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
                   ))}
                 </tr>
@@ -388,6 +391,12 @@ export default function IcPiyasaPage() {
                             {fark !== null && Math.abs(fark) > 0.1 && " · kontrol edin"}
                           </p>
                         )}
+                      </td>
+                      <td className="px-2 py-2 min-w-[110px]">
+                        <select value={s.kdv_dahil ? "dahil" : "haric"} onChange={(e) => guncelle(s.anahtar, { kdv_dahil: e.target.value === "dahil" })} className={inputSinif} style={inputStil} title="Birim fiyata KDV dahil mi?">
+                          <option value="haric">KDV Hariç</option>
+                          <option value="dahil">KDV Dahil</option>
+                        </select>
                       </td>
                       <td className="px-2 py-2 min-w-[105px]">
                         <select value={s.vade_gun ?? ""} onChange={(e) => guncelle(s.anahtar, { vade_gun: e.target.value === "" ? null : Number(e.target.value) })} className={inputSinif} style={inputStil}>
@@ -425,7 +434,7 @@ export default function IcPiyasaPage() {
         )}
         {satirlar.length > 0 && (
           <p className="px-4 py-2.5 text-xs border-t" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-            Birim fiyatlar TL/kg ve KDV hariçtir. Satır silme ve sıralama da &quot;Kaydet&quot; ile kalıcı olur.
+            Birim fiyatlar TL/kg&apos;dır; KDV dahil/hariç her satırda ayrı seçilir. Satır silme ve sıralama da &quot;Kaydet&quot; ile kalıcı olur.
           </p>
         )}
       </div>

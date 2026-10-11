@@ -860,17 +860,27 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `20261011200000_ic_piyasa_fiyat_formu.sql` (yerel PG'de RLS/numara/değiştirilemezlik
   testleri geçti).
 - Kullanıcı kararları (11.10.2026): formda "İç Piyasa" yazısı, SATIŞ ŞARTLARI ve KAŞE/İMZA
-  YOK — geri eklenmez. Tasarım Fatura Talimatı'ndan (logo + lacivert başlık + kart tablolar,
-  tek sayfa ölçekleme) + altta Unex antet adres bloğu + sertifika logoları
-  (`lib/images/sertifika-logolari-base64.ts`). Renkler logodan (#283474 / #F4A07C).
+  YOK — geri eklenmez. Fatura Talimatı görünümü REDDEDİLDİ ("fatura talimatı gibi kötü
+  oldu"); yeni kurumsal B2B tasarım dili (11.10.2026 revize): lacivert başlık bandı +
+  beyaz logo karosu + şeftali şerit, 3 bilgi kartı (Onay / Geçerlilik / Satış İletişim),
+  büyük sağa yaslı fiyatlar, şeftali geçerlilik kutusu, antet + sertifika logoları, koyu
+  alt bant (form no · Sayfa x/y · web). Uzun listede sayfa bölünür (tek sayfaya
+  sıkıştırma YOK). Renkler logodan (#283474 / #F4A07C). Yazı tipi Inter (OFL), TR alt
+  kümesi `lib/fonts/inter-tr-base64.ts` (Regular/SemiBold/Bold, PDF'e gömülü).
+- KDV: her satırda "KDV Hariç / KDV Dahil" seçimi (`ic_fiyat_kalemleri.kdv_dahil`, varsayılan
+  false; migration `20261011230000_ic_piyasa_kdv_secimi.sql`). Formda fiyat altında
+  "TL/kg · + KDV" veya "TL/kg · KDV Dahil". Eski formlarda alan yok → KDV hariç sayılır.
+  KOD PUSH EDİLMEDEN ÖNCE bu migration canlıya uygulanmalı (yoksa Kaydet hata verir).
 - Ortak kurallar TEK yerde: `lib/ic-piyasa/fiyat-formu.ts` (tipler, `GECERLILIK_GUN = 3` —
-  migration ile AYNI olmalı, şirket bilgileri `FORM_SIRKET`, biçimlendirme). PDF:
-  `lib/ic-piyasa/fiyat-formu-pdf-builder.ts` (jsPDF, Roboto TR; Türkçe içerikli — "PDF
+  migration ile AYNI olmalı, şirket bilgileri `FORM_SIRKET`, biçimlendirme, `kdvYazi`). PDF:
+  `lib/ic-piyasa/fiyat-formu-pdf-builder.ts` (jsPDF + Inter; Türkçe içerikli — "PDF
   İngilizce" kuralının bilinçli istisnası). Telefon görseli 1080×1350:
-  `lib/ic-piyasa/fiyat-formu-gorsel.ts` (canvas, aynı font). Liste/indirme/paylaş:
-  `components/ic-piyasa-gecmis-formlar.tsx` ("Paylaş" sadece dosya paylaşımı destekleyen
-  cihazda; telefonda WhatsApp'a PDF+görsel ekler).
-- Formdaki iletişim satırı "Burak Tuncay · 0541 339 60 04" (`FORM_SIRKET.iletisim`).
+  `lib/ic-piyasa/fiyat-formu-gorsel.ts` (canvas + Inter FontFace, aynı tasarım dili).
+  Liste/indirme/paylaş: `components/ic-piyasa-gecmis-formlar.tsx` (listenin üstünde
+  gönderim talimatı; "Paylaş" sadece dosya paylaşımı destekleyen cihazda — telefonda
+  Paylaş → WhatsApp → kişi; bilgisayarda indir → WhatsApp sohbetine sürükle).
+- Formdaki iletişim: Burak Tuncay · 0541 339 60 04 · buraktuncay@unex.com.tr
+  (`FORM_SIRKET.iletisimAd/Tel/Eposta`).
 - Gece yedeği: iki tablo `YEDEKLENECEK_TABLOLAR`'a eklendi; `yedekleme-gonder` v9 olarak
   canlıya DEPLOY EDİLDİ (11.10.2026). Deneme çalışması: 21/21 tablo, geri yükleme testi
   21/21 birebir, uyarı yok.

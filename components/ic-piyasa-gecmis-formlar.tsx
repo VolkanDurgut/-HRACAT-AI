@@ -71,6 +71,10 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
       <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
         <h2 className="text-sm font-semibold text-white">Oluşturulan Formlar</h2>
         <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Son 50 form. PDF ve telefon görseli formun onaylandığı andaki fiyatlarla üretilir.</p>
+        <div className="mt-2 grid gap-1 text-xs md:grid-cols-2" style={{ color: TEXT_MUTED }}>
+          <p><span className="text-white font-medium">Telefondan göndermek:</span> Paylaş → WhatsApp → kişiyi seçin. PDF ve görsel mesaja eklenmiş gelir.</p>
+          <p><span className="text-white font-medium">Bilgisayardan göndermek:</span> PDF veya Görsel&apos;e basıp indirin, WhatsApp&apos;ta sohbete sürükleyip bırakın.</p>
+        </div>
       </div>
       {formlar.length === 0 ? (
         <div className="px-4 py-10 text-center">

@@ -21,6 +21,8 @@ export type IcFiyatKalemi = {
   vade_gun: number | null; // 0 = Pesin
   odeme: string | null;
   teslim: string | null;
+  /** true = fiyata KDV dahil, false = KDV hariç (+ KDV). Migration 20261011230000. */
+  kdv_dahil: boolean;
   guncelleme: string;
 };
 
@@ -32,6 +34,8 @@ export type FormKalemi = {
   vade_gun: number;
   odeme: string;
   teslim: string;
+  /** Eski formlarda (11.10.2026 oncesi) alan yok -> KDV haric sayilir. */
+  kdv_dahil?: boolean;
 };
 
 /** Onaylanmis form (ic_fiyat_formlari). */
@@ -77,7 +81,15 @@ export const FORM_SIRKET = {
   web: "www.unex.com.tr",
   vergi: "Süleymanpaşa V.D. 8920645297",
   iletisim: "Burak Tuncay · 0541 339 60 04 (WhatsApp)",
+  iletisimAd: "Burak Tuncay",
+  iletisimTel: "0541 339 60 04",
+  iletisimEposta: "buraktuncay@unex.com.tr",
 };
+
+/** KDV durumu metni: true -> "KDV Dahil", false/yok -> "+ KDV". */
+export function kdvYazi(dahil: boolean | null | undefined): string {
+  return dahil ? "KDV Dahil" : "+ KDV";
+}
 
 /** 13.15 -> "13,15" */
 export function fiyatYazi(n: number | null | undefined): string {
@@ -148,6 +160,7 @@ export function formKalemleri(satirlar: IcFiyatKalemi[]): FormKalemi[] {
       vade_gun: Number(k.vade_gun),
       odeme: (k.odeme || "").trim(),
       teslim: (k.teslim || "").trim(),
+      kdv_dahil: !!k.kdv_dahil,
     }));
 }
 

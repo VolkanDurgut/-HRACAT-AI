@@ -76,6 +76,10 @@ const YEDEKLENECEK_TABLOLAR = [
   // Ic piyasa fiyat bilgilendirme formu (11.10.2026)
   "ic_fiyat_kalemleri",
   "ic_fiyat_formlari",
+  // Ic piyasa musteri / is emri / sevk (12.10.2026)
+  "ic_musteriler",
+  "ic_is_emirleri",
+  "ic_sevkler",
 ];
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).

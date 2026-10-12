@@ -6,7 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
-import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid } from "lucide-react";
+import { KantarYurtIci } from "@/components/kantar-yurt-ici";
+import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type KonteynerRow = {
@@ -60,6 +61,16 @@ export default function KantarPage() {
   const [okumaHatasi, setOkumaHatasi] = useState(false);
   const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
   const istekSira = useRef(0);
+  // Bolum (12.10.2026): "ihracat" = mevcut DBA akisi (DEGISMEDI), "yurt_ici" =
+  // ic piyasa is emirleri + irsaliye. Secim bu cihazda hatirlanir.
+  const [bolum, setBolum] = useState<"ihracat" | "yurt_ici">("ihracat");
+  useEffect(() => {
+    try { if (window.localStorage.getItem("kantar-bolum") === "yurt_ici") setBolum("yurt_ici"); } catch { /* yoksay */ }
+  }, []);
+  const bolumSec = (b: "ihracat" | "yurt_ici") => {
+    setBolum(b);
+    try { window.localStorage.setItem("kantar-bolum", b); } catch { /* yoksay */ }
+  };
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -316,7 +327,7 @@ export default function KantarPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">Kantar Paneli</h1>
-              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>DBA belgelerini yükleyin</p>
+              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>{bolum === "ihracat" ? "DBA belgelerini yükleyin" : "Yurt içi araçların irsaliyesini yükleyin"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -356,6 +367,18 @@ export default function KantarPage() {
           </div>
         </div>
 
+        {/* Bolum secimi: Ihracat (DBA) / Yurt Ici (irsaliye) */}
+        <div className="shrink-0 inline-flex w-fit rounded-xl border p-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} role="tablist" aria-label="Kantar bölümü">
+          {([["ihracat", "İhracat · DBA", Ship], ["yurt_ici", "Yurt İçi · İrsaliye", Truck]] as const).map(([deger, etiket, Ikon]) => (
+            <button key={deger} role="tab" aria-selected={bolum === deger} onClick={() => bolumSec(deger)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              style={bolum === deger ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>
+              <Ikon size={15} /> {etiket}
+            </button>
+          ))}
+        </div>
+
+        {bolum === "yurt_ici" ? <KantarYurtIci /> : (<>
         {/* Arama */}
         <div className="shrink-0 relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
@@ -577,6 +600,7 @@ export default function KantarPage() {
           )}
           
         </div>
+        </>)}
       </div>
     </div>
   );

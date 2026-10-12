@@ -8,6 +8,7 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
+import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -311,6 +312,7 @@ export default function IcPiyasaPage() {
         baslik="İç Piyasa · Fiyat Bilgilendirme Formu"
         aciklama={`Yan mamul fiyat tablosunu düzenleyin, kaydedin ve formu oluşturun. Form onaylandığı günden itibaren ${GECERLILIK_GUN} gün geçerlidir.`}
       />
+      <IcPiyasaSekmeler />
 
       {okumaHatasi && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "#7F1D1D", backgroundColor: "rgba(127,29,29,0.15)", color: "#FCA5A5" }}>

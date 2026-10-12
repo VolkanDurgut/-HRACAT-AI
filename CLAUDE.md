@@ -893,6 +893,52 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Sıradaki (plan): WhatsApp otomatik gönderim (Meta Cloud API + mevcut numara için
   Coexistence/BSP) ayrı faz; müşteriye sistemden mail ASKIDA kuralı burada da geçerli.
 
+## İç Piyasa — Müşteri, İş Emri, Kantar Yurt İçi (Parça 1, 12.10.2026)
+
+- Akış (kullanıcı kararı): Burak Bey talimat verir → **Volkan** iş emri açar
+  (`/ic-piyasa/is-emirleri`) → **kantarcı** Kantar Paneli › "Yurt İçi · İrsaliye"
+  sekmesinden her araç için irsaliye PDF'ini yükler; plaka + net kg irsaliyeden okunur,
+  kantarcı kontrol edip onaylar (okunamazsa elle, BÜYÜK HARF). Yurt içinde DBA YOK (DBA
+  sadece konteyner tartımında). Kantarcı fiyatı GÖRMEZ, müşteri adı maskeli.
+- Alt menü: `components/ic-piyasa-sekmeler.tsx` (Fiyat Formu / İş Emirleri / Müşteriler);
+  hepsi `ic_piyasa` yetkisiyle (AppShell `/ic-piyasa` önekini eşler).
+- Hedef: TONAJ (`hedef_tur='kg'`, ekranda ton girilir) veya ARAÇ SAYISI
+  (`hedef_tur='arac'`) — Burak Bey bazen tonaj bazen araç sayısı verir. Tutar HER ZAMAN
+  gerçek net kg × birim fiyat. Fiyat/vade/ödeme/teslim geçerli FBF formundan tek tıkla
+  gelir (`fiyat_formu_no` yazılır), müşteriye özel fiyat elle değiştirilebilir.
+- Migration `20261012100000_ic_piyasa_is_emri_sevk.sql`: `ic_musteriler`,
+  `ic_is_emirleri` (IE-YYYY-NNNN, sayaç `ic_is_emri_sira`, tetikleyici numaradan ÖNCE
+  doğrular), `ic_sevkler`, bucket `ic-piyasa-belgeler`
+  (`{company_id}/irsaliye/{is_emri_id}/...pdf`), denetim tetikleyicileri.
+  Yetki: tablolar SADECE `ic_sayfa_yetkisi('ic_piyasa')` + şirket; kantarcı tablolara
+  doğrudan erişemez → `kantar_ic_is_emirleri()`, `kantar_ic_son_sevkler()`,
+  `kantar_ic_sevk_ekle(p_veri, p_kaydet)` (SECURITY DEFINER; `p_kaydet=false` kuru
+  kontrol → uyarılar; aynı irsaliye no/ETTN ikinci kez girilemez; müşteri VKN'si
+  kantarcıya gösterilmez, sadece "uyuşmuyor" uyarısı). Sevk INSERT politikası YOK.
+  Sevk silme (hatalı giriş) sadece yetkili: önce kayıt, başarılıysa PDF.
+  Yerel PG16 + PostgREST 12 ile uçtan uca test edildi (RLS, maskeleme, sayaç boşluğu,
+  FK silme engelleri, storage politikaları).
+- İrsaliye okuma: `lib/ic-piyasa/irsaliye-oku.ts` — tarayıcıda `unpdf@1.1.0` (pdf.js,
+  dinamik import, ücretsiz, yapay zekâ yok). Logo e-İrsaliye PDF'lerinde gerçek metin var
+  (örnekler IRS2026000002477/2468). Okunanlar: irsaliye no, tarih, ETTN, araç/dorse plaka,
+  şoför ADI, alıcı VKN, kalemler (kg/ton → kg; Adet ise net okunmaz). **Şoför TCKN
+  okunmaz/saklanmaz (KVKK).** Build'deki "Critical dependency: the request of a
+  dependency is an expression" uyarısı pdf.js kaynaklı, zararsız.
+  NOT: unpdf 0.x `canvas`'ı optionalDependency olarak kurar (Netlify'da yerel derleme
+  riski) → 1.x seçildi (`@napi-rs/canvas` opsiyonel peer, kurulmaz).
+- Kantar Paneli: üstte "İhracat · DBA" / "Yurt İçi · İrsaliye" sekmesi; İHRACAT AKIŞI
+  DEĞİŞMEDİ (sadece sarmalandı). Seçim `localStorage["kantar-bolum"]`.
+  Bileşen: `components/kantar-yurt-ici.tsx` (dakikada bir + sekmeye dönünce yenilenir).
+- Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR`'a eklendi → migration canlıya
+  uygulandıktan SONRA `yedekleme-gonder` yeniden deploy edilmeli (v10).
+- Parça 2 (sıradaki): Süleyman Bey (lojistik) çıkış onayı — kantarcı onaylayınca tek
+  dokunuşluk link (Şimdi çıkıyor / Saat seç / Bugün çıkmayacak); saat verirse o saatte
+  tekrar "Çıktı mı?" sorulur, onaylanınca müşteriye "yola çıktı"; 30 dk cevap yoksa
+  yetkiliye uyarı. Müşteri takip sayfası (girişsiz, token'lı link) + "Gönderilecek
+  Bildirimler" kutusu (WhatsApp API gelene kadar tek dokunuşla wa.me). İrsaliye MAİLİ
+  YOK (e-İrsaliye GİB'den zaten gidiyor — kullanıcı kararı). GPS ve Logo (GO3/Wings)
+  entegrasyonu sonraki fazlar.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

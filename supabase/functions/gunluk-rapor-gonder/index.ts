@@ -27,6 +27,9 @@ import {
 // ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔") + tamamlananlarin plaka/tonaji
 // (09.10.2026 revize: sira bu; ozet kutulari sadelesti) (07.10.2026 revize: "Kisa Ozet" metni ve
 // alt bilgi notu kullanici istegiyle kaldirildi). Musteriye GITMEZ; sirket ici alicilara.
+// 12.10.2026: maildeki sevkiyat tablosunda BOOKING NO YOK (sadece dosya no) -
+// booking ile yapilan posta aramalarinda gunde 3 rapor acente maillerini
+// gommesin (kullanici karari). Booking /rapor/gunluk sayfasinda gorunmeye devam eder.
 //
 // Alici: SADECE GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i.
 // 09.10.2026: yedek adresine (GERI_BILDIRIM_ALICI) dusme KALDIRILDI - secret
@@ -179,7 +182,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
 
   const sevkiyatSatirlari = r.sevkiyatlar.length
     ? r.sevkiyatlar
-        .map((s, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(s.musteri)}</b>`)}${td(`<b>${s.konteynerAdedi}x</b>`, "text-align:center;white-space:nowrap")}${td(`<b>${esc(s.marka)}</b>`)}${td(durumHucresi(s, gunEtiket))}${td(faturaHucresi(s))}${td(`<span style="color:#64748B;font-size:11px">${esc(s.dosya_no)}${s.booking ? "<br>" + esc(s.booking) : ""}</span>`, "white-space:nowrap")}${td(`<span style="color:#64748B;font-size:11px">${tarihTR(s.etd)}</span>`, "white-space:nowrap")}</tr>`)
+        .map((s, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(s.musteri)}</b>`)}${td(`<b>${s.konteynerAdedi}x</b>`, "text-align:center;white-space:nowrap")}${td(`<b>${esc(s.marka)}</b>`)}${td(durumHucresi(s, gunEtiket))}${td(faturaHucresi(s))}${td(`<span style="color:#64748B;font-size:11px">${esc(s.dosya_no)}</span>`, "white-space:nowrap")}${td(`<span style="color:#64748B;font-size:11px">${tarihTR(s.etd)}</span>`, "white-space:nowrap")}</tr>`)
         .join("")
     : `<tr><td colspan="7" style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">Açık sevkiyat bulunmuyor.</td></tr>`;
 
@@ -241,9 +244,10 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-    <tr>${th("Müşteri")}${th("Adet")}${th("Marka")}${th("Yükleme Durumu")}${th("Fatura")}${th("Dosya / Booking")}${th("ETD")}</tr>
+    <tr>${th("Müşteri")}${th("Adet")}${th("Marka")}${th("Yükleme Durumu")}${th("Fatura")}${th("Dosya")}${th("ETD")}</tr>
     ${sevkiyatSatirlari}
   </table>
+  <div style="margin-top:6px;font-size:11px;color:#94A3B8">Booking numaraları rapor sayfasında yer alır (aşağıdaki “Raporu uygulamada aç”).</div>
 
   ${bolumBaslik("Yüklemesi Tamamlanan Sevkiyatlar — Plaka ve Tonaj")}
   ${tamamlananBolumu}

@@ -676,6 +676,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Rapor artık yedek adresine DÜŞMEZ: secret yoksa mail gitmez, hata döner
   (mesensei282 kullanıcı isteğiyle rapordan çıkarıldı). Gönderen adı
   "{şirket} İhracat AI" ("Unex Gıda İhracat AI"; eskiden "İhracat AI").
+- Booking no MAİLDE YOK (12.10.2026, kullanıcı kararı): acente maillerinde booking ile
+  arama yapılınca günde 3 rapor maili sonuçları gömüyordu. Mailde "Dosya" sütunu sadece
+  dosya no gösterir + "Booking numaraları rapor sayfasında yer alır" notu; booking
+  `/rapor/gunluk` sayfasında görünmeye devam eder (ortak hesap değişmedi). Mail metnine
+  arama anahtarı olabilecek yeni bir numara (booking, konşimento vb.) EKLENMEZ.
+  Edge function v14 deploy; canlı deneme: 5 açık booking'in 0'ı mailde.
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

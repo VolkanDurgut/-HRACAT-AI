@@ -137,7 +137,18 @@ export default function IcMusterilerPage() {
     const { data, error } = await supabase.from("ic_musteriler").delete().eq("id", silinecek.id).eq("company_id", companyId).select("id");
     setSiliniyor(false);
     const hata = yazmaHatasi(error, data);
-    if (hata) { showToast(hataMesaji({ message: hata }), "error"); setSilinecek(null); return; }
+    if (hata) {
+      // Bagli is emirleri varsa hangileri oldugunu ve ne yapilacagini soyle
+      if (/ic_is_emirleri_musteri_id_fkey/.test(hata)) {
+        const { data: bagli } = await supabase.from("ic_is_emirleri").select("is_emri_no, durum").eq("company_id", companyId).eq("musteri_id", silinecek.id).order("olusturma");
+        const liste = (bagli || []).map((b: { is_emri_no: string; durum: string }) => `${b.is_emri_no} (${b.durum === "acik" ? "Açık" : b.durum === "tamamlandi" ? "Tamamlandı" : "İptal"})`).join(", ");
+        showToast(`Bu müşteriye bağlı iş emirleri var: ${liste}. Önce İş Emirleri'nden silin (araç girilmiş olanı önce iptal edip "tamamen sil") ya da müşteriyi pasife alın.`, "error");
+      } else {
+        showToast(hataMesaji({ message: hata }), "error");
+      }
+      setSilinecek(null);
+      return;
+    }
     showToast("Müşteri silindi.", "success");
     setSilinecek(null);
     getir();

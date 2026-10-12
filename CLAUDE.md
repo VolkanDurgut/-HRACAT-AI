@@ -939,20 +939,68 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   görür, sadece RPC; muhasebe@ hiçbirine erişemez. Netlify daca8f1 yayında.
 - Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR`'a eklendi; `yedekleme-gonder` v10
   DEPLOY EDİLDİ. Deneme çalışması: 24/24 tablo, geri yükleme testi 24/24 birebir.
-- Mesaj şablonları (12.10.2026): `lib/ic-piyasa/mesaj-sablonlari.ts` TEK KAYNAK —
+- Mesaj şablonları (12.10.2026): `supabase/functions/_shared/mesaj-sablonlari.ts` TEK KAYNAK
+  (import yok; Next tarafı `lib/ic-piyasa/mesaj-sablonlari.ts` üzerinden yeniden dışa aktarır) —
   siparis_alindi, arac_cikis_saati, arac_yola_cikti, siparis_tamamlandi (UTILITY),
   haftalik_fiyat_formu (MARKETING, PDF ekli), cikis_onayi_talebi (ekip). Meta onayına
   kadar `elleGonderimMetni` (wa.me, link metin sonunda), sonra aynı gövde Meta şablonu
   + "Siparişim" URL düğmesi (`/takip/{token}`). `sablonKurallariniDenetle` Meta
   kurallarını denetler. Metin değişirse Meta'da yeniden onay gerekir; Burak Bey onayı
   olmadan değiştirilmez. Mesajlarda fiyat YOK (takip sayfasında).
-- Parça 2 (sıradaki): Süleyman Bey (lojistik) çıkış onayı — kantarcı onaylayınca tek
-  dokunuşluk link (Şimdi çıkıyor / Saat seç / Bugün çıkmayacak); saat verirse o saatte
-  tekrar "Çıktı mı?" sorulur, onaylanınca müşteriye "yola çıktı"; 30 dk cevap yoksa
-  yetkiliye uyarı. Müşteri takip sayfası (girişsiz, token'lı link) + "Gönderilecek
-  Bildirimler" kutusu (WhatsApp API gelene kadar tek dokunuşla wa.me). İrsaliye MAİLİ
-  YOK (e-İrsaliye GİB'den zaten gidiyor — kullanıcı kararı). GPS ve Logo (GO3/Wings)
-  entegrasyonu sonraki fazlar.
+- Sonraki fazlar: GPS ve Logo (GO3/Wings) entegrasyonu; Pazartesi fiyat listesi gönderimi
+  (müşteri listesi Burak Bey'den gelecek); Meta WhatsApp Cloud API.
+
+## İç Piyasa — Bildirimler, Müşteri Takip, Lojistik Çıkış Onayı (Parça 2, 12.10.2026)
+
+- Migration `20261012200000_ic_piyasa_bildirim_cikis.sql` (kod push edilmeden ÖNCE canlıya
+  uygulanmalı: sayfalar `takip_token`, `cikis_*` kolonlarını ve yeni `kantar_ic_son_sevkler`
+  dönüşünü okur). İhracat tablolarına dokunmaz.
+- `ic_piyasa_ayarlari` (şirket başına tek satır): lojistik adı/e-posta/telefon + yetkili
+  e-posta. Bildirimler › Ayarlar kartından düzenlenir. Unex: Süleyman Bey,
+  lojistik@unex.com.tr, 0553 268 91 01. Lojistik e-postası boşsa çıkış talebi `hata`
+  durumunda kalır (ekranda görünür).
+- `ic_bildirimler` = GİDEN MESAJ KUTUSU (outbox). Sadece tetikleyiciler/RPC'ler yazar;
+  authenticated yalnızca durum/islem_zamani/isleyen/hata günceller. Metin SAKLANMAZ:
+  şablon adı + `degerler` (sıralı dizi) saklanır, metin `mesaj-sablonlari.ts`'ten üretilir.
+  - İş emri açılınca `siparis_alindi`, tamamlanınca `siparis_tamamlandi`, iptalde bekleyen
+    müşteri mesajları `atlandi`.
+  - Sevk girilince `cikis_onayi_talebi` → lojistiğe E-POSTA (otomatik, Resend,
+    bildirim@ihracatasistanim.com) içinde tek dokunuşluk `/cikis/{cikis_token}` linki.
+  - Çıkış: `ic_cikis_uygula` (tek kural yeri). "Çıktı" → müşteriye `arac_yola_cikti`
+    (ilerleme metniyle); "Saat" → `arac_cikis_saati` (önceki saat mesajının yerine geçer);
+    "Bugün değil" → yetkiliye e-posta. Çıktı bir kez işlenir (sonraki istekler `zaten`).
+    İptal edilmiş iş emrinde çıkış işlenmez.
+  - `ic_bildirim_zamanla`: planlanan saat gelince / 60 dk cevap yoksa lojistiğe hatırlatma;
+    +30 dk (planlıda) veya 120 dk (bekleyende) hâlâ yoksa yetkiliye uyarı. Son 3 gün.
+  - E-posta: `ic_bildirim_eposta_al` (skip locked) + `ic_bildirim_eposta_sonuc` (3 deneme,
+    sonra `hata`).
+- MÜŞTERİYE E-POSTA YOK (askıda kuralı). Müşteri mesajları WhatsApp kanalında `bekliyor`
+  olarak durur; Meta onayına kadar Bildirimler sayfasından "WhatsApp'ta Gönder" (wa.me,
+  ücretsiz) → "Gönderildi mi?" onayı ile işaretlenir. Telefon / WhatsApp izni yoksa uyarı.
+  Sekmede bekleyen mesaj sayısı rozeti (`bildirimSayaciniYenile()` olayıyla tazelenir).
+- Edge function `ic-piyasa` (verify_jwt AÇIK, anon anahtarla çağrılır; dosyalar `index.ts` +
+  `../_shared/mesaj-sablonlari.ts`): `takip` (token → bilgi + 15 dk imzalı irsaliye PDF
+  linkleri, depo yolu yanıtta yok), `cikis_bilgi`, `cikis_uygula`, `isle` (zamanla + e-posta
+  kuyruğu, 20'şer). Token'lı RPC'ler (`ic_takip_bilgi`, `ic_cikis_token_*`) SADECE
+  service_role. Token = 32 hex; biçim dışı token DB'ye gitmeden 404.
+- pg_cron `ic-piyasa-bildirim` `*/2 * * * *` → `functions/v1/ic-piyasa` gövde
+  `{"islem":"isle"}`, anon anahtar, timeout 30 sn (diğer işlerle aynı kalıp; komut
+  `docs/felaket-kurtarma.md` adım 6).
+- Girişsiz açık sayfalar (açık tema, logo, noindex): `/takip/[token]` müşteri sipariş takibi
+  (durum zaman çizelgesi, araçlar + irsaliye PDF, ticari koşullar — fiyat SADECE burada,
+  mesajlarda yok); `/cikis/[token]` lojistik mobil ekranı (Şimdi çıkıyor / Saat seç /
+  Bugün çıkmayacak; ad isteğe bağlı, localStorage `ic-cikis-ad`). Çerçeve
+  `components/genel-sayfa-cerceve.tsx`, API `lib/ic-piyasa/genel-api.ts`.
+- İş Emirleri sayfası: Çıkış sütunu + yetkili adına çıkış işleme
+  (`ic_cikis_isle_yetkili`), müşteri takip linki (aç/kopyala), iptal edilmiş iş emrini
+  "araç kayıtlarıyla tamamen sil" (`ic_is_emri_tamamen_sil` → dönen PDF yolları SONRA
+  depodan silinir). Müşteri silinemezse bağlı iş emirleri listelenir.
+- Fiyat kalemleri/formları politikaları `ic_piyasa` yetkisine daraltıldı (kantarcı
+  okuyamaz); `ic_fiyat_formu_hazirla` yetkiyi sayaçtan ÖNCE kontrol eder.
+- Gece yedeği: `ic_piyasa_ayarlari`, `ic_bildirimler` eklendi → `yedekleme-gonder` v11
+  deploy edilmeli (migration'dan SONRA).
+- Testler (scratchpad, yerel PG16 + PostgREST 12 + fonksiyon Node'da Deno taklidiyle):
+  SQL, fonksiyon ve Playwright e2e (bildirim kutusu, çıkış mobil, takip mobil) geçti.
 
 ## Genel çalışma prensibi
 

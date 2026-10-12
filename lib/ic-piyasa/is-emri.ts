@@ -49,7 +49,10 @@ export type IcIsEmri = {
   kapanis_zamani: string | null;
   olusturan_email: string | null;
   olusturma: string;
+  takip_token: string;
 };
+
+export type CikisDurumu = "bekliyor" | "planlandi" | "cikti" | "bugun_degil";
 
 export type IcSevk = {
   id: string;
@@ -68,6 +71,10 @@ export type IcSevk = {
   uyarilar: string[];
   girilen_email: string | null;
   olusturma: string;
+  cikis_durumu: CikisDurumu;
+  cikis_planlanan: string | null;
+  cikis_zamani: string | null;
+  cikis_isleyen: string | null;
 };
 
 /** Kantar Paneli icin (fiyatsiz, musteri maskeli) - kantar_ic_is_emirleri() */
@@ -99,6 +106,9 @@ export type KantarSonSevk = {
   uyari_var: boolean;
   girilen_email: string | null;
   olusturma: string;
+  cikis_durumu: CikisDurumu;
+  cikis_planlanan: string | null;
+  cikis_zamani: string | null;
 };
 
 export const IC_BELGE_BUCKET = "ic-piyasa-belgeler";
@@ -108,6 +118,15 @@ export const DURUM_ETIKET: Record<IsEmriDurum, string> = {
   tamamlandi: "Tamamlandı",
   iptal: "İptal",
 };
+
+/** Cikis durumu kisa metni + renk sinifi (uygulama ici koyu tema) */
+export function cikisEtiketi(s: { cikis_durumu: CikisDurumu; cikis_planlanan: string | null; cikis_zamani: string | null }): { metin: string; sinif: string } {
+  const saat = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" }) : "-");
+  if (s.cikis_durumu === "cikti") return { metin: `Yola çıktı ${saat(s.cikis_zamani)}`, sinif: "bg-emerald-500/15 text-emerald-400" };
+  if (s.cikis_durumu === "planlandi") return { metin: `Planlandı ${saat(s.cikis_planlanan)}`, sinif: "bg-sky-500/15 text-sky-400" };
+  if (s.cikis_durumu === "bugun_degil") return { metin: "Bugün çıkmayacak", sinif: "bg-slate-500/15 text-slate-300" };
+  return { metin: "Çıkış bekleniyor", sinif: "bg-amber-500/15 text-amber-400" };
+}
 
 /** 25500 -> "25.500 kg" */
 export function kgYazi(kg: number | null | undefined): string {

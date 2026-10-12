@@ -80,6 +80,9 @@ const YEDEKLENECEK_TABLOLAR = [
   "ic_musteriler",
   "ic_is_emirleri",
   "ic_sevkler",
+  // Ic piyasa bildirim kutusu + ayarlar (Parca 2, 12.10.2026)
+  "ic_piyasa_ayarlari",
+  "ic_bildirimler",
 ];
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).

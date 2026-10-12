@@ -6,17 +6,17 @@ import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
-import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
+import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { IcIsEmriForm } from "@/components/ic-is-emri-form";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   DURUM_ETIKET, IC_BELGE_BUCKET, IcIsEmri, IcMusteri, IcSevk, IsEmriDurum,
-  hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi, tlYazi, tutarHesapla,
+  cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi, tlYazi, tutarHesapla,
 } from "@/lib/ic-piyasa/is-emri";
 import { fiyatYazi, kdvYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 
@@ -52,7 +52,10 @@ export default function IsEmirleriPage() {
 
   const [formAcik, setFormAcik] = useState(false);
   const [duzenlenen, setDuzenlenen] = useState<IcIsEmri | null>(null);
-  const [durumIslem, setDurumIslem] = useState<{ emir: EmirSatiri; hedef: IsEmriDurum | "sil" } | null>(null);
+  const [durumIslem, setDurumIslem] = useState<{ emir: EmirSatiri; hedef: IsEmriDurum | "sil" | "tamamen_sil" } | null>(null);
+  // Yetkili ekranindan cikis isleme (lojistik baglantisina alternatif)
+  const [cikisDuzen, setCikisDuzen] = useState<{ sevk: IcSevk; mod: "secim" | "saat" } | null>(null);
+  const [cikisSaat, setCikisSaat] = useState("");
   const [silinecekSevk, setSilinecekSevk] = useState<IcSevk | null>(null);
   const [isleniyor, setIsleniyor] = useState(false);
 
@@ -75,6 +78,7 @@ export default function IsEmirleriPage() {
     setSevkler(s);
     setMusteriler((mRes.data || []) as IcMusteri[]);
     setYukleniyor(false);
+    bildirimSayaciniYenile();
   }, [companyId]);
 
   useEffect(() => {
@@ -127,15 +131,54 @@ export default function IsEmirleriPage() {
     if (!durumIslem || !companyId) return;
     const { emir, hedef } = durumIslem;
     setIsleniyor(true);
+    if (hedef === "tamamen_sil") {
+      // Dogru sira: once kayitlar (tek islem, sunucuda), SADECE basariliysa PDF'ler
+      const { data: yollar, error } = await supabase.rpc("ic_is_emri_tamamen_sil", { p_id: emir.id });
+      if (error) { setIsleniyor(false); showToast(hataMesaji(error), "error"); return; }
+      const liste = (yollar as string[] | null) || [];
+      if (liste.length) {
+        const { error: dHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove(liste);
+        if (dHata) console.error("İrsaliye dosyaları silinemedi:", dHata.message);
+      }
+      setIsleniyor(false);
+      showToast(`${emir.is_emri_no} araç kayıtları ve irsaliyeleriyle silindi.`, "success");
+      setDurumIslem(null);
+      getir();
+      return;
+    }
     const sonuc = hedef === "sil"
       ? await supabase.from("ic_is_emirleri").delete().eq("id", emir.id).eq("company_id", companyId).select("id")
       : await supabase.from("ic_is_emirleri").update({ durum: hedef }).eq("id", emir.id).eq("company_id", companyId).select("id");
     setIsleniyor(false);
     const hata = yazmaHatasi(sonuc.error, sonuc.data);
     if (hata) { showToast(hataMesaji({ message: hata }), "error"); return; }
-    showToast(hedef === "sil" ? `${emir.is_emri_no} silindi.` : `${emir.is_emri_no}: ${DURUM_ETIKET[hedef]}.`, "success");
+    showToast(hedef === "sil" ? `${emir.is_emri_no} silindi.` : `${emir.is_emri_no}: ${DURUM_ETIKET[hedef as IsEmriDurum]}.`, "success");
     setDurumIslem(null);
     getir();
+  };
+
+  const cikisIsle = async (sevk: IcSevk, islem: "cikti" | "planla" | "bugun_degil") => {
+    let saat: string | null = null;
+    if (islem === "planla") {
+      const m = cikisSaat.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) { showToast("Saati SS:DD biçiminde girin.", "error"); return; }
+      const bugun = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
+      let t = Date.parse(`${bugun}T${m[1].padStart(2, "0")}:${m[2]}:00+03:00`);
+      if (t < Date.now() - 5 * 60 * 1000) t += 24 * 60 * 60 * 1000;
+      saat = new Date(t).toISOString();
+    }
+    setIsleniyor(true);
+    const { error } = await supabase.rpc("ic_cikis_isle_yetkili", { p_sevk: sevk.id, p_islem: islem, p_saat: saat });
+    setIsleniyor(false);
+    if (error) { showToast(hataMesaji(error), "error"); return; }
+    showToast(islem === "cikti" ? `${sevk.plaka} yola çıktı; müşteri mesajı Bildirimler'e hazırlandı.` : islem === "planla" ? `${sevk.plaka} çıkışı planlandı.` : `${sevk.plaka}: bugün çıkmayacak.`, "success");
+    setCikisDuzen(null);
+    getir();
+  };
+
+  const takipKopyala = async (token: string) => {
+    try { await navigator.clipboard.writeText(`${window.location.origin}/takip/${token}`); showToast("Takip bağlantısı kopyalandı.", "success"); }
+    catch { showToast("Kopyalanamadı.", "error"); }
   };
 
   const sevkSil = async () => {
@@ -264,16 +307,20 @@ export default function IsEmirleriPage() {
                         {e.teslim_adresi && <Bilgi etiket="Teslim adresi" deger={e.teslim_adresi} genis />}
                         {e.notlar && <Bilgi etiket="Not" deger={e.notlar} genis />}
                         <Bilgi etiket="Yüklenen tutar" deger={tutar !== null ? `${tlYazi(tutar)} ${e.kdv_dahil ? "(KDV dahil)" : "+ KDV"}` : "-"} vurgu />
+                        <div className="col-span-2 flex flex-wrap items-end gap-2">
+                          <a href={`/takip/${e.takip_token}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}><Link2 size={12} /> Müşteri takip sayfası</a>
+                          <button onClick={() => takipKopyala(e.takip_token)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}><Copy size={12} /> Bağlantıyı kopyala</button>
+                        </div>
                       </div>
 
                       {ss.length === 0 ? (
                         <p className="text-xs py-3 flex items-center gap-2" style={{ color: TEXT_MUTED }}><Truck size={14} /> Henüz araç yüklenmedi. Kantarcı irsaliyeyi yükleyince burada görünür.</p>
                       ) : (
                         <div className="overflow-x-auto rounded-lg border" style={{ borderColor: CARD_BORDER }}>
-                          <table className="w-full text-xs min-w-[820px]">
+                          <table className="w-full text-xs min-w-[980px]">
                             <thead>
                               <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                                {["#", "Yükleme", "Plaka / Dorse", "Şoför", "Net", "İrsaliye", "Tutar", ""].map((b, i) => (
+                                {["#", "Yükleme", "Plaka / Dorse", "Şoför", "Net", "İrsaliye", "Çıkış", "Tutar", ""].map((b, i) => (
                                   <th key={i} className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${b === "Net" || b === "Tutar" ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
                                 ))}
                               </tr>
@@ -293,6 +340,30 @@ export default function IsEmirleriPage() {
                                       </button>
                                       {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.irsaliye_tarihi)}</span>}
                                     </td>
+                                    <td className="px-3 py-2 whitespace-nowrap">
+                                      <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
+                                      {s.cikis_isleyen && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.cikis_isleyen}</span>}
+                                      {s.cikis_durumu !== "cikti" && e.durum !== "iptal" && (
+                                        cikisDuzen?.sevk.id === s.id ? (
+                                          cikisDuzen.mod === "saat" ? (
+                                            <span className="mt-1 flex items-center gap-1">
+                                              <input type="time" value={cikisSaat} onChange={(ev) => setCikisSaat(ev.target.value)} className="px-1.5 py-1 rounded border text-xs text-white" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }} aria-label="Çıkış saati" />
+                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "planla")} className="px-2 py-1 rounded text-[10px] font-bold text-white" style={{ backgroundColor: ACCENT }}>Kaydet</button>
+                                              <button onClick={() => setCikisDuzen(null)} className="px-1.5 py-1 rounded text-[10px]" style={{ color: TEXT_MUTED }}>Vazgeç</button>
+                                            </span>
+                                          ) : (
+                                            <span className="mt-1 flex flex-wrap items-center gap-1">
+                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "cikti")} className="px-2 py-1 rounded text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500">Çıktı</button>
+                                              <button onClick={() => { setCikisSaat(new Date(Date.now() + 3600e3).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })); setCikisDuzen({ sevk: s, mod: "saat" }); }} className="px-2 py-1 rounded border text-[10px] text-white" style={{ borderColor: CARD_BORDER }}><Clock size={10} className="inline mr-0.5" />Saat</button>
+                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "bugun_degil")} className="px-2 py-1 rounded border text-[10px]" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Bugün değil</button>
+                                              <button onClick={() => setCikisDuzen(null)} className="px-1 py-1 text-[10px]" style={{ color: TEXT_MUTED }}>×</button>
+                                            </span>
+                                          )
+                                        ) : (
+                                          <button onClick={() => setCikisDuzen({ sevk: s, mod: "secim" })} className="block mt-1 text-[10px] underline" style={{ color: TEXT_MUTED }}>Çıkışı işle</button>
+                                        )
+                                      )}
+                                    </td>
                                     <td className="px-3 py-2 text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tlYazi(tutarHesapla(Number(s.net_kg), e.birim_fiyat === null ? null : Number(e.birim_fiyat)))}</td>
                                     <td className="px-3 py-2 text-right">
                                       <button onClick={() => setSilinecekSevk(s)} title="Sevki sil (hatalı giriş)" className="p-1 rounded hover:bg-red-500/10 text-red-400"><Trash2 size={13} /></button>
@@ -301,7 +372,7 @@ export default function IsEmirleriPage() {
                                   {s.uyarilar?.length > 0 && (
                                     <tr>
                                       <td />
-                                      <td colSpan={7} className="px-3 pb-2">
+                                      <td colSpan={8} className="px-3 pb-2">
                                         {s.uyarilar.map((u) => <p key={u} className="flex items-center gap-1.5 text-[11px] text-amber-400"><AlertTriangle size={11} /> {u}</p>)}
                                       </td>
                                     </tr>
@@ -323,6 +394,7 @@ export default function IsEmirleriPage() {
                         )}
                         {e.durum !== "acik" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "acik" })} ikon={<RotateCcw size={13} />}>Yeniden aç</Eylem>}
                         {ss.length === 0 && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "sil" })} ikon={<Trash2 size={13} />} tehlike>Sil</Eylem>}
+                        {ss.length > 0 && e.durum === "iptal" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamen_sil" })} ikon={<Trash2 size={13} />} tehlike>Araç kayıtlarıyla tamamen sil</Eylem>}
                       </div>
                     </div>
                   )}
@@ -346,20 +418,22 @@ export default function IsEmirleriPage() {
         open={!!durumIslem}
         onOpenChange={(o) => !o && setDurumIslem(null)}
         title={
-          durumIslem?.hedef === "sil" ? `${durumIslem.emir.is_emri_no} silinsin mi?`
+          durumIslem?.hedef === "tamamen_sil" ? `${durumIslem.emir.is_emri_no} tamamen silinsin mi?`
+          : durumIslem?.hedef === "sil" ? `${durumIslem.emir.is_emri_no} silinsin mi?`
           : durumIslem?.hedef === "tamamlandi" ? `${durumIslem.emir.is_emri_no} kapatılsın mı?`
           : durumIslem?.hedef === "iptal" ? `${durumIslem.emir.is_emri_no} iptal edilsin mi?`
           : `${durumIslem?.emir.is_emri_no || ""} yeniden açılsın mı?`
         }
         description={
-          durumIslem?.hedef === "sil" ? "Sevk girilmemiş iş emri kalıcı olarak silinir."
+          durumIslem?.hedef === "tamamen_sil" ? `İptal edilmiş iş emri, ${(sevkMap.get(durumIslem.emir.id) || []).length} araç kaydı, irsaliye PDF'leri ve bildirimleriyle kalıcı olarak silinir. Geri alınamaz.`
+          : durumIslem?.hedef === "sil" ? "Sevk girilmemiş iş emri kalıcı olarak silinir."
           : durumIslem?.hedef === "tamamlandi" ? "İş emri tamamlandı olarak kapanır ve Kantar Panelinden kalkar. Gerekirse yeniden açabilirsiniz."
           : durumIslem?.hedef === "iptal" ? "İş emri iptal edilir ve Kantar Panelinden kalkar. Girilmiş sevkler kayıtlı kalır."
           : "İş emri tekrar açık olur ve Kantar Panelinde görünür."
         }
-        confirmLabel={durumIslem?.hedef === "sil" ? "Sil" : "Onayla"}
+        confirmLabel={durumIslem?.hedef === "sil" || durumIslem?.hedef === "tamamen_sil" ? "Sil" : "Onayla"}
         cancelLabel="Vazgeç"
-        destructive={durumIslem?.hedef === "sil" || durumIslem?.hedef === "iptal"}
+        destructive={durumIslem?.hedef === "sil" || durumIslem?.hedef === "tamamen_sil" || durumIslem?.hedef === "iptal"}
         loading={isleniyor}
         onConfirm={durumUygula}
       />

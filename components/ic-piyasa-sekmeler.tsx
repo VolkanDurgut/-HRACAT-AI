@@ -1,28 +1,55 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Users, ClipboardList } from "lucide-react";
+import { FileText, Users, ClipboardList, Bell } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 /**
- * Ic Piyasa alt menusu (12.10.2026): Fiyat Formu / Is Emirleri / Musteriler.
- * Hepsi ayni "ic_piyasa" sayfa yetkisiyle acilir (AppShell /ic-piyasa onekini
- * yetkiye esler).
+ * Ic Piyasa alt menusu (12.10.2026): Fiyat Formu / Is Emirleri / Bildirimler /
+ * Musteriler. Hepsi ayni "ic_piyasa" sayfa yetkisiyle acilir (AppShell
+ * /ic-piyasa onekini yetkiye esler). Bildirimler'de gonderilmeyi bekleyen
+ * musteri mesaji sayisi rozet olarak gorunur.
  */
 const SEKMELER = [
   { href: "/ic-piyasa", etiket: "Fiyat Formu", ikon: FileText },
   { href: "/ic-piyasa/is-emirleri", etiket: "İş Emirleri", ikon: ClipboardList },
+  { href: "/ic-piyasa/bildirimler", etiket: "Bildirimler", ikon: Bell },
   { href: "/ic-piyasa/musteriler", etiket: "Müşteriler", ikon: Users },
 ];
 
+/** Sayfa verisi degisince (is emri acildi, mesaj isaretlendi) rozet hemen tazelensin. */
+export function bildirimSayaciniYenile() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("ic-bildirim-yenile"));
+}
+
 export function IcPiyasaSekmeler() {
   const pathname = usePathname() || "";
+  const { companyId } = useAuth();
+  const [bekleyen, setBekleyen] = useState(0);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let iptal = false;
+    const say = async () => {
+      const { count } = await supabase.from("ic_bildirimler").select("id", { count: "exact", head: true })
+        .eq("company_id", companyId).eq("kanal", "whatsapp").eq("durum", "bekliyor");
+      if (!iptal) setBekleyen(count || 0);
+    };
+    say();
+    const z = window.setInterval(() => { if (document.visibilityState === "visible") say(); }, 60_000);
+    window.addEventListener("ic-bildirim-yenile", say);
+    return () => { iptal = true; window.clearInterval(z); window.removeEventListener("ic-bildirim-yenile", say); };
+  }, [companyId, pathname]);
+
   return (
     <nav className="mb-5 flex flex-wrap gap-1 rounded-xl border p-1 w-fit max-w-full" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label="İç Piyasa bölümleri">
       {SEKMELER.map(({ href, etiket, ikon: Ikon }) => {
         const aktif = href === "/ic-piyasa" ? pathname === "/ic-piyasa" : pathname.startsWith(href);
+        const rozet = href === "/ic-piyasa/bildirimler" && bekleyen > 0;
         return (
           <Link
             key={href}
@@ -32,6 +59,7 @@ export function IcPiyasaSekmeler() {
             style={aktif ? { backgroundColor: ACCENT } : { color: TEXT_MUTED }}
           >
             <Ikon size={14} /> {etiket}
+            {rozet && <span className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold leading-[18px] text-center bg-amber-500 text-black" aria-label={`${bekleyen} mesaj bekliyor`}>{bekleyen}</span>}
           </Link>
         );
       })}

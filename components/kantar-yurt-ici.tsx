@@ -7,7 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import { Loader2, Upload, X, FileText, AlertTriangle, CheckCircle2, Truck, RefreshCw, ScanText, PencilLine } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
-  IC_BELGE_BUCKET, KantarIsEmri, KantarSonSevk, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi,
+  IC_BELGE_BUCKET, KantarIsEmri, KantarSonSevk, cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi,
 } from "@/lib/ic-piyasa/is-emri";
 import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarken, trSayiOku, urunUyusuyor } from "@/lib/ic-piyasa/irsaliye-oku";
 
@@ -18,6 +18,8 @@ import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarke
  * kontrol edip onaylar; okunamazsa elle (BUYUK HARF) yazar.
  * Veri sadece SECURITY DEFINER fonksiyonlarla: kantar_ic_is_emirleri,
  * kantar_ic_son_sevkler, kantar_ic_sevk_ekle (migration 20261012100000).
+ * Parca 2: kayittan sonra lojistige otomatik "cikis onayi" e-postasi gider
+ * (veritabani tetikleyicisi + ic-piyasa edge function); kantarci ek bir sey yapmaz.
  */
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
@@ -262,10 +264,10 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
             </h2>
             <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[680px]">
+                <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      {["Zaman", "Plaka", "Ürün / İş Emri", "Müşteri", "Net", "İrsaliye"].map((b) => (
+                      {["Zaman", "Plaka", "Ürün / İş Emri", "Müşteri", "Net", "İrsaliye", "Çıkış"].map((b) => (
                         <th key={b} className={`px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${b === "Net" ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>
                       ))}
                     </tr>
@@ -283,6 +285,9 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
                             <FileText size={11} /> {s.irsaliye_no || "Gör"}
                           </button>
                           {s.uyari_var && <AlertTriangle size={13} className="inline ml-2 text-amber-400" aria-label="Uyarı var" />}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
                         </td>
                       </tr>
                     ))}

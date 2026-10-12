@@ -121,6 +121,18 @@ select cron.schedule('gunluk-rapor-aksam', '0 14 * * *', $cmd$
 $cmd$);
 ```
 
+İç Piyasa bildirim kutusu (lojistik çıkış onayı e-postaları + hatırlatmalar, 2 dakikada bir):
+```sql
+select cron.schedule('ic-piyasa-bildirim', '*/2 * * * *', $cmd$
+  select net.http_post(
+    url := 'https://<YENI_REF>.supabase.co/functions/v1/ic-piyasa',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
+    body := '{"islem":"isle"}'::jsonb,
+    timeout_milliseconds := 30000
+  );
+$cmd$);
+```
+
 ### 7) Kimlik doğrulama ayarları (~3 dk)
 Authentication → Providers/Settings: **"Allow new users to sign up" KAPALI**
 (kayıtlar manuel). Site URL: `https://ihracatasistanim.com`.

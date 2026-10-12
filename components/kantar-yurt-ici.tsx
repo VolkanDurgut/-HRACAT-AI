@@ -22,7 +22,12 @@ import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarke
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 
-export function KantarYurtIci() {
+export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
+  /** Kantar Paneli ustundeki "Yenile" basilinca artar -> liste yenilenir. */
+  yenileTetik?: number;
+  /** Acik is emri sayisi (dar ekrandaki bolum dugmesi icin). */
+  acikSayiBildir?: (sayi: number) => void;
+} = {}) {
   const { companyId } = useAuth();
   const { showToast } = useToast();
   const [emirler, setEmirler] = useState<KantarIsEmri[]>([]);
@@ -52,7 +57,8 @@ export function KantarYurtIci() {
     setYukleniyor(false);
   }, []);
 
-  useEffect(() => { getir(); }, [getir]);
+  useEffect(() => { getir(); }, [getir, yenileTetik]);
+  useEffect(() => { if (!yukleniyor) acikSayiBildir?.(emirler.length); }, [emirler.length, yukleniyor, acikSayiBildir]);
   useEffect(() => {
     const yenile = () => { if (document.visibilityState === "visible") getir(); };
     const z = window.setInterval(yenile, 60_000);
@@ -177,7 +183,7 @@ export function KantarYurtIci() {
   };
 
   if (yukleniyor) {
-    return <div className="flex-1 flex items-center justify-center" style={{ color: TEXT_MUTED }}><Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} /></div>;
+    return <div className="flex-1 flex items-center justify-center py-10" style={{ color: TEXT_MUTED }}><Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} /></div>;
   }
 
   const bugun = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
@@ -203,7 +209,7 @@ export function KantarYurtIci() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto min-h-0 pb-10 pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
+      <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
         <div className="space-y-3">
           <h2 className="text-sm font-bold flex items-center gap-2 text-white">
             <span className="w-2 h-2 rounded-full bg-sky-500" /> Açık İş Emirleri
@@ -215,7 +221,7 @@ export function KantarYurtIci() {
               <p className="text-sm" style={{ color: TEXT_MUTED }}>Açık yurt içi iş emri yok.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-1 min-[1800px]:grid-cols-2 gap-3">
               {emirler.map((e) => {
                 const oran = ilerlemeOrani(e, Number(e.yuklenen_kg), e.yuklenen_arac);
                 const tamam = hedefTamam(e, Number(e.yuklenen_kg), e.yuklenen_arac);

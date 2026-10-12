@@ -61,16 +61,15 @@ export default function KantarPage() {
   const [okumaHatasi, setOkumaHatasi] = useState(false);
   const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
   const istekSira = useRef(0);
-  // Bolum (12.10.2026): "ihracat" = mevcut DBA akisi (DEGISMEDI), "yurt_ici" =
-  // ic piyasa is emirleri + irsaliye. Secim bu cihazda hatirlanir.
-  const [bolum, setBolum] = useState<"ihracat" | "yurt_ici">("ihracat");
-  useEffect(() => {
-    try { if (window.localStorage.getItem("kantar-bolum") === "yurt_ici") setBolum("yurt_ici"); } catch { /* yoksay */ }
-  }, []);
-  const bolumSec = (b: "ihracat" | "yurt_ici") => {
-    setBolum(b);
-    try { window.localStorage.setItem("kantar-bolum", b); } catch { /* yoksay */ }
-  };
+  // Tek ekran (12.10.2026, kullanici istegi): Ihracat (DBA) ve Yurt Ici
+  // (irsaliye) YAN YANA. Genis ekranda (2xl, >=1536px) iki sutun, her sutun
+  // kendi icinde kayar; dar ekranda (telefon/tablet) alt alta, tek kaydirma +
+  // ustte bolume atlama dugmeleri. Ihracat akisinin icerigi DEGISMEDI.
+  const [yurtIciAcik, setYurtIciAcik] = useState<number | null>(null);
+  const [yurtIciYenile, setYurtIciYenile] = useState(0);
+  const ihracatRef = useRef<HTMLElement>(null);
+  const yurtIciRef = useRef<HTMLElement>(null);
+  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); };
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -317,7 +316,7 @@ export default function KantarPage() {
 
   return (
     <div className="h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
-      <div className="max-w-6xl mx-auto w-full flex flex-col h-full min-h-0 gap-5">
+      <div className="max-w-6xl 2xl:max-w-[1840px] mx-auto w-full flex flex-col h-full min-h-0 gap-4 2xl:gap-5">
 
         {/* Üst Başlık Sabit */}
         <div className="shrink-0 flex items-center justify-between">
@@ -327,7 +326,7 @@ export default function KantarPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">Kantar Paneli</h1>
-              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>{bolum === "ihracat" ? "DBA belgelerini yükleyin" : "Yurt içi araçların irsaliyesini yükleyin"}</p>
+              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>İhracat DBA ve yurt içi irsaliye yükleme</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -348,7 +347,7 @@ export default function KantarPage() {
                 <LayoutGrid size={14} /> Ana Menü
               </button>
             )}
-            <button onClick={fetchKonteynerler}
+            <button onClick={tumunuYenile}
               className="relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
               style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
               title={baglantiSorunu ? `Bağlantı yok — liste ${sonGuncellemeSaat} itibarıyla` : "Canlı — değişiklikler anında yansıyor"}>
@@ -367,18 +366,25 @@ export default function KantarPage() {
           </div>
         </div>
 
-        {/* Bolum secimi: Ihracat (DBA) / Yurt Ici (irsaliye) */}
-        <div className="shrink-0 inline-flex w-fit rounded-xl border p-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} role="tablist" aria-label="Kantar bölümü">
-          {([["ihracat", "İhracat · DBA", Ship], ["yurt_ici", "Yurt İçi · İrsaliye", Truck]] as const).map(([deger, etiket, Ikon]) => (
-            <button key={deger} role="tab" aria-selected={bolum === deger} onClick={() => bolumSec(deger)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-              style={bolum === deger ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>
-              <Ikon size={15} /> {etiket}
+        {/* Dar ekranda bolume atlama (genis ekranda iki sutun zaten yan yana) */}
+        <div className="shrink-0 grid grid-cols-2 gap-2 2xl:hidden">
+          {([["İhracat · DBA", bekleyenler.length, "DBA bekleyen", Ship, ihracatRef], ["Yurt İçi · İrsaliye", yurtIciAcik, "açık iş emri", Truck, yurtIciRef]] as const).map(([etiket, sayi, alt, Ikon, ref]) => (
+            <button key={etiket} onClick={() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left hover:bg-white/5"
+              style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+              <Ikon size={16} style={{ color: ACCENT }} className="shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold text-white truncate">{etiket}</span>
+                <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{sayi ?? "–"} {alt}</span>
+              </span>
             </button>
           ))}
         </div>
 
-        {bolum === "yurt_ici" ? <KantarYurtIci /> : (<>
+        <div className="flex-1 min-h-0 overflow-y-auto 2xl:overflow-hidden grid grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6 2xl:gap-5 pr-1 2xl:pr-0" style={{ scrollbarWidth: "thin" }}>
+        {/* ===== SOL: IHRACAT (DBA) - icerik degismedi ===== */}
+        <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-4 2xl:min-h-0 2xl:rounded-2xl 2xl:border 2xl:p-4 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
+        <BolumBasligi id="kantar-ihracat" ikon={<Ship size={16} />} baslik="İhracat · DBA" aciklama="Konteyner tartımı · DBA belgesi" />
         {/* Arama */}
         <div className="shrink-0 relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
@@ -404,8 +410,8 @@ export default function KantarPage() {
           </div>
         </div>
 
-        {/* İçerik Alanı (Sadece bu bölüm scroll olur) */}
-        <div className="flex-1 overflow-y-auto min-h-0 pb-10 pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
+        {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
+        <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
           
           {/* Bekleyen DBA'lar - tek liste */}
           {bekleyenlerFiltreli.length > 0 && (
@@ -600,7 +606,27 @@ export default function KantarPage() {
           )}
           
         </div>
-        </>)}
+        </section>
+
+        {/* ===== SAG: YURT ICI (irsaliye) ===== */}
+        <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-4 2xl:min-h-0 2xl:rounded-2xl 2xl:border 2xl:p-4 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
+          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={16} />} baslik="Yurt İçi · İrsaliye" aciklama="İç piyasa iş emirleri · araç başına irsaliye" />
+          <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} />
+        </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Kantar Paneli bolum basligi (Ihracat / Yurt Ici). Dar ekranda kaydirirken ustte sabit kalir. */
+function BolumBasligi({ id, ikon, baslik, aciklama }: { id: string; ikon: React.ReactNode; baslik: string; aciklama: string }) {
+  return (
+    <div className="shrink-0 sticky top-0 z-20 2xl:static flex items-center gap-2.5 py-2 2xl:py-0 -mt-1 2xl:mt-0" style={{ backgroundColor: PAGE_BG }}>
+      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>{ikon}</span>
+      <div className="min-w-0">
+        <h2 id={id} className="text-base font-bold text-white leading-tight">{baslik}</h2>
+        <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{aciklama}</p>
       </div>
     </div>
   );

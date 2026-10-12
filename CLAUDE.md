@@ -926,8 +926,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   dependency is an expression" uyarısı pdf.js kaynaklı, zararsız.
   NOT: unpdf 0.x `canvas`'ı optionalDependency olarak kurar (Netlify'da yerel derleme
   riski) → 1.x seçildi (`@napi-rs/canvas` opsiyonel peer, kurulmaz).
-- Kantar Paneli: üstte "İhracat · DBA" / "Yurt İçi · İrsaliye" sekmesi; İHRACAT AKIŞI
-  DEĞİŞMEDİ (sadece sarmalandı). Seçim `localStorage["kantar-bolum"]`.
+- Kantar Paneli TEK EKRAN (revize 12.10.2026, kullanıcı isteği; sekme KALDIRILDI):
+  ≥1536px (2xl) İhracat · DBA (sol, biraz geniş) ve Yurt İçi · İrsaliye (sağ) YAN YANA,
+  her sütun kendi içinde kayar, sayfa kaymaz. <1536px alt alta tek kaydırma + üstte
+  bölüme atlama düğmeleri (sayılarla), bölüm başlıkları yapışkan. 1280/1366'da yan yana
+  denendi: ihracat tablosundaki DBA düğmesi taşıyordu → bilinçli olarak 1536. İHRACAT
+  AKIŞININ İÇERİĞİ DEĞİŞMEDİ. Üstteki "Yenile" iki bölümü de yeniler.
   Bileşen: `components/kantar-yurt-ici.tsx` (dakikada bir + sekmeye dönünce yenilenir).
 - CANLI DURUM (12.10.2026 03:15 kontrol): migration kullanıcı tarafından SQL Editor ile
   UYGULANDI; 3 tablo + 10 politika + bucket + 3 depo politikası + fonksiyonlar yerinde,

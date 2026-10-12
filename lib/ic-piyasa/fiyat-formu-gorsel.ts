@@ -12,12 +12,15 @@ import {
   onayZamaniYazi,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
+import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
 
 /**
  * Telefon gorseli (1080 x 1350, WhatsApp onizlemesinde acmadan okunur).
  * PDF ile AYNI form kaydindan ve AYNI tasarim dilinden (lacivert bant + logo
  * karosu + seftali serit + Inter) cizilir; tarayicida canvas, ek kutuphane yok.
  * Revize 11.10.2026: KDV dahil/haric her urunde; Inter yazi tipi.
+ * Revize 12.10.2026: ozel gun bandi (PDF ile ayni kural, ozel-gunler.ts) ve
+ * alt kutuda siparis sureci cumlesi.
  */
 
 const G = 1080;
@@ -129,9 +132,40 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   ctx.font = f(26, 600);
   ctx.fillText(sigdir(ctx, hitapYazi(form.alici), sag - sol), sol, 470);
 
+  // Ozel gun bandi (formun haftasina denk gelen bayram / kandil / yilbasi)
+  const gunler = formOzelGunleri(trGunu(form.onay_zamani));
+  let ustY = 500;
+  if (gunler.length) {
+    const bantH = 22 + gunler.length * 40;
+    ctx.fillStyle = SEFTALI_ZEMIN;
+    yuvarlak(ctx, sol, 494, sag - sol, bantH, 16);
+    ctx.fill();
+    ctx.fillStyle = LACIVERT;
+    ctx.beginPath();
+    ctx.arc(sol + 40, 494 + bantH / 2, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = SEFTALI;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(sol + 40, 494 + bantH / 2, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    gunler.forEach((g, i) => {
+      const gy = 494 + 39 + i * 40;
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#BE623A";
+      ctx.font = f(20, 600);
+      ctx.fillText(ozelGunTarihYazi(g), sag - 22, gy);
+      const tarihG = ctx.measureText(ozelGunTarihYazi(g)).width;
+      ctx.textAlign = "left";
+      ctx.fillStyle = LACIVERT;
+      ctx.font = f(24, 600);
+      ctx.fillText(sigdir(ctx, g.kisa || g.mesaj, sag - sol - 120 - tarihG), sol + 80, gy);
+    });
+    ustY = 494 + bantH + 22;
+  }
+
   // Urun satirlari
-  const ustY = 500;
-  const altY = 1140;
+  const altY = 1136;
   const n = form.kalemler.length;
   const satirH = Math.min(128, (altY - ustY) / Math.max(n, 1));
   const k = Math.max(0.6, satirH / 128);
@@ -163,19 +197,22 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   });
   ctx.textAlign = "left";
 
-  // Alt: gecerlilik kutusu + iletisim bandi
+  // Alt: gecerlilik + siparis sureci kutusu + iletisim bandi
   ctx.fillStyle = SEFTALI_ZEMIN;
-  yuvarlak(ctx, sol, 1158, sag - sol, 70, 14);
+  yuvarlak(ctx, sol, 1150, sag - sol, 86, 14);
   ctx.fill();
   ctx.fillStyle = SEFTALI;
-  ctx.fillRect(sol, 1170, 6, 46);
+  ctx.fillRect(sol, 1162, 6, 62);
   ctx.fillStyle = LACIVERT;
   ctx.font = f(23, 600);
   ctx.fillText(
     sigdir(ctx, `${onayZamaniYazi(form.onay_zamani).slice(0, 10)} tarihinde onaylanmıştır · ${GECERLILIK_GUN} gün geçerlidir`, sag - sol - 40),
     sol + 26,
-    1201
+    1186
   );
+  ctx.fillStyle = SOLUK;
+  ctx.font = f(20, 400);
+  ctx.fillText(sigdir(ctx, "Siparişinizin her adımında WhatsApp ile bilgilendirilirsiniz; 7/24 takip bağlantısı.", sag - sol - 40), sol + 26, 1218);
 
   ctx.fillStyle = LACIVERT_KOYU;
   ctx.fillRect(0, 1250, G, 100);

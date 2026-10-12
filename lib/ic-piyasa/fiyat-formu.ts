@@ -164,6 +164,41 @@ export function formKalemleri(satirlar: IcFiyatKalemi[]): FormKalemi[] {
     }));
 }
 
+/**
+ * Bilgilendirme ve sevkiyat sartlari (kullanici metni, 12.10.2026). 2. madde
+ * formdaki urunlerin KDV secimine gore yazilir (satirlarla celismesin diye);
+ * 3. madde gecerlilik tarihiyle celismeyecek sekilde netlestirildi (kullanici
+ * onayi). PDF ve gorsel AYNI metni kullanir.
+ */
+export function formSartlari(kalemler: FormKalemi[]): string[] {
+  const hepsiDahil = kalemler.length > 0 && kalemler.every((k) => k.kdv_dahil);
+  const hicbiriDahil = kalemler.every((k) => !k.kdv_dahil);
+  const kdv = hepsiDahil
+    ? "Fiyatlarımıza KDV dahildir."
+    : hicbiriDahil
+    ? "Fiyatlarımıza KDV dahil değildir."
+    : "Fiyatlardaki KDV durumu her ürünün altında ayrıca belirtilmiştir.";
+  return [
+    "İşbu form nihai bir bağlayıcı teklif olmayıp, sektörel fiyat bilgilendirmesi mahiyetindedir.",
+    `${kdv} Sevkiyat ve nakliye detayları sipariş onayında kesinleştirilir.`,
+    "Geçerlilik süresi içinde onaylanan siparişlerde formdaki fiyatlar uygulanır; süre sonrasında sevkiyat günündeki günlük rayiç fiyatlar geçerlidir.",
+    "Ödemeler mutabık kalınan ödeme protokolü çerçevesinde fatura tarihindeki koşullar esas alınarak tahsil edilir.",
+  ];
+}
+
+/**
+ * Siparis sureci (formda zaman cizelgesi). Sistemdeki gercek akisla birebir:
+ * is emri -> siparis_alindi; kantar + e-Irsaliye; lojistik cikis onayi ->
+ * arac_yola_cikti; is emri kapatilinca -> siparis_tamamlandi (takip sayfasi).
+ */
+export const SIPARIS_SURECI: { baslik: string; aciklama: string }[] = [
+  { baslik: "Sipariş Onayı", aciklama: "Siparişiniz kayda alınır; sipariş numaranız ve size özel takip bağlantınız WhatsApp ile iletilir." },
+  { baslik: "Yükleme ve Tartım", aciklama: "Ürününüz fabrikamızda yüklenir, kantarda tartılır ve e-İrsaliyesi düzenlenir." },
+  { baslik: "Yola Çıkış", aciklama: "Araç yola çıktığında plaka, net miktar ve irsaliye numarası WhatsApp ile bildirilir." },
+  { baslik: "Teslim ve Kapanış", aciklama: "Sipariş tamamlandığında sevkiyat özeti iletilir; tüm irsaliyeler takip sayfanızda yer alır." },
+];
+export const SIPARIS_SURECI_NOTU = "Siparişinizi size özel takip bağlantısından 7/24 izleyebilir, irsaliyelerinize anında ulaşabilirsiniz.";
+
 /** Dosya adi: "FBF-2026-0001_Fiyat_Bilgilendirme_Formu" */
 export function formDosyaAdi(formNo: string): string {
   return `${formNo.replace(/[^a-zA-Z0-9_-]/g, "_")}_Fiyat_Bilgilendirme_Formu`;

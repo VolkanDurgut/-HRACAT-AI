@@ -9,7 +9,8 @@ import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
-import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus } from "lucide-react";
+import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper } from "lucide-react";
+import { formOzelGunleri, ozelGunKapsamUyarisi, ozelGunTarihYazi } from "@/lib/ic-piyasa/ozel-gunler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   AMBALAJ_SECENEKLERI,
@@ -251,6 +252,9 @@ export default function IcPiyasaPage() {
   }, [dbSatirlar]);
 
   const formHazir = !kirli && formEksikleri.length === 0;
+  // Bugun onaylanacak formda cikacak ozel gunler (PDF / gorsel ile ayni kural)
+  const bugunkuOzelGunler = useMemo(() => formOzelGunleri(bugunTR()), []);
+  const ozelGunUyarisi = useMemo(() => ozelGunKapsamUyarisi(bugunTR()), []);
 
   const onizlemeFormu = (): IcFiyatFormu => {
     const bugun = bugunTR();
@@ -460,6 +464,18 @@ export default function IcPiyasaPage() {
             <FileCheck2 size={14} /> Formu Onayla ve Oluştur
           </button>
         </div>
+        {bugunkuOzelGunler.length > 0 && (
+          <div className="mt-3 flex items-start gap-2 text-xs" style={{ color: TEXT_MUTED }}>
+            <PartyPopper size={14} className="shrink-0 mt-px" style={{ color: "#F4A07C" }} />
+            <span>
+              Bu formda kutlama bandı çıkacak:{" "}
+              {bugunkuOzelGunler.map((g, i) => (
+                <span key={g.tarih + g.ad}>{i > 0 && " · "}<span className="text-white">{g.ad}</span> ({ozelGunTarihYazi(g)})</span>
+              ))}
+            </span>
+          </div>
+        )}
+        {ozelGunUyarisi && <p className="mt-2 text-xs text-amber-400">{ozelGunUyarisi}</p>}
         {!formHazir && (
           <div className="mt-3 text-xs text-amber-400 space-y-0.5">
             {kirli && <p>Önce fiyat tablosundaki değişiklikleri kaydedin.</p>}

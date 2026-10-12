@@ -859,14 +859,31 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   yapar (reddedilen kayıt sayaç boşluğu bırakmasın). Migration
   `20261011200000_ic_piyasa_fiyat_formu.sql` (yerel PG'de RLS/numara/değiştirilemezlik
   testleri geçti).
-- Kullanıcı kararları (11.10.2026): formda "İç Piyasa" yazısı, SATIŞ ŞARTLARI ve KAŞE/İMZA
-  YOK — geri eklenmez. Fatura Talimatı görünümü REDDEDİLDİ ("fatura talimatı gibi kötü
-  oldu"); yeni kurumsal B2B tasarım dili (11.10.2026 revize): lacivert başlık bandı +
-  beyaz logo karosu + şeftali şerit, 3 bilgi kartı (Onay / Geçerlilik / Satış İletişim),
-  büyük sağa yaslı fiyatlar, şeftali geçerlilik kutusu, antet + sertifika logoları, koyu
-  alt bant (form no · Sayfa x/y · web). Uzun listede sayfa bölünür (tek sayfaya
-  sıkıştırma YOK). Renkler logodan (#283474 / #F4A07C). Yazı tipi Inter (OFL), TR alt
-  kümesi `lib/fonts/inter-tr-base64.ts` (Regular/SemiBold/Bold, PDF'e gömülü).
+- Tasarım (REVİZE 12.10.2026, kullanıcının örnek formu esas alındı, marka renkleriyle):
+  lacivert üst bant → SOLDA logo karosu + "Fiyat Bilgilendirme Formu / Yan Mamul Ürünler",
+  SAĞDA firma kaşe bilgileri (FORM_SIRKET: unvan, adres, T/F, e-posta/web, VD — örnek
+  formdaki sahte A.Ş./Mersis bilgileri KULLANILMAZ); koyu bilgi şeridi (Form No / Onay /
+  Geçerlilik / Dönem: Haftalık Bilgilendirme); "Sayın Müşterimiz / İş Ortağımız" hitap
+  kutusu; özel gün bandı; ürün-fiyat tablosu; BİLGİLENDİRME VE SEVKİYAT ŞARTLARI (4 madde,
+  `formSartlari`: 2. madde ürünlerin KDV seçimine göre yazılır, 3. madde geçerlilikle
+  çelişmeyecek şekilde netleştirildi — kullanıcı onayı); SİPARİŞ SÜRECİ zaman çizelgesi
+  (`SIPARIS_SURECI`, 4 adım: Sipariş Onayı → Yükleme ve Tartım → Yola Çıkış → Teslim ve
+  Kapanış; sistemdeki gerçek bildirim akışıyla birebir); alt bilgi: Sipariş ve bilgi
+  (Burak Tuncay) + sertifikalar. KAŞE / İMZA ALANI YOK (her iki taraf için, kullanıcı
+  kararı). Başlıkta "İç Piyasa" yazısı YOK (11.10 ve 12.10 kararı). 7 ürüne kadar tek
+  sayfa (gerekirse satırlar 11→10 mm sıkışır), daha uzunda bölüm sonraki sayfaya geçer.
+  Eski tasarım: 3 bilgi kartı + geçerlilik kutusu (11.10.2026), yerine geçti.
+- Özel günler (12.10.2026): `lib/ic-piyasa/ozel-gunler.ts`. Kullanıcı seçimi: milli
+  bayramlar + yılbaşı (her yıl otomatik), dini bayramlar ve KANDİLLER (Diyanet takvimi,
+  elle; 2026–2027 girildi, iki kaynakta karşılaştırıldı). SEKTÖR GÜNLERİ SEÇİLMEDİ.
+  Kural: onay günü + 6 gün içine denk gelen gün(ler), en fazla 2; hesap onay gününe bağlı
+  (aynı form her indirildiğinde aynı bant). PDF uzun kurumsal metni, telefon görseli kısa
+  metni (`kisa`) kullanır. Panelde "Bu formda kutlama bandı çıkacak" bilgisi; liste bitmeden
+  60 gün önce panel uyarır (`DINI_KAPSAM_SONU` = 2027-12-31 → 2028 tarihleri eklenmeli).
+- Önceki kararlar (11.10.2026): Fatura Talimatı görünümü REDDEDİLDİ; kurumsal B2B dil:
+  büyük sağa yaslı fiyatlar, koyu alt bant (form no · Sayfa x/y · web). Uzun listede sayfa
+  bölünür (tek sayfaya zorla sıkıştırma YOK). Renkler logodan (#283474 / #F4A07C). Yazı
+  tipi Inter (OFL), TR alt kümesi `lib/fonts/inter-tr-base64.ts` (PDF'e gömülü).
 - KDV: her satırda "KDV Hariç / KDV Dahil" seçimi (`ic_fiyat_kalemleri.kdv_dahil`, varsayılan
   false; migration `20261011230000_ic_piyasa_kdv_secimi.sql`). Formda fiyat altında
   "TL/kg · + KDV" veya "TL/kg · KDV Dahil". Eski formlarda alan yok → KDV hariç sayılır.
@@ -974,6 +991,10 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     +30 dk (planlıda) veya 120 dk (bekleyende) hâlâ yoksa yetkiliye uyarı. Son 3 gün.
   - E-posta: `ic_bildirim_eposta_al` (skip locked) + `ic_bildirim_eposta_sonuc` (3 deneme,
     sonra `hata`).
+- "Siparişiniz tamamlandı" tekrar koruması (migration `20261012220000`): iş emri yeniden
+  açılınca BEKLEYEN tamamlandı mesajı atlanır; tekrar kapatılınca eskisi atlanıp güncel
+  toplamlarla yenisi hazırlanır. Gönderilmiş mesaja dokunulmaz. Hiç sevki olmayan iş emri
+  kapatılırsa tamamlandı mesajı hazırlanmaz.
 - Uyarı e-postaları (cevap yok / bugün çıkmayacak) Alıcı + CC (kullanıcı kararı 12.10.2026:
   Alıcı execution@unex.com.tr, CC bbt@unex.com.tr). `ic_piyasa_ayarlari.yetkili_cc` (virgülle,
   boşluksuz, en fazla 5; CHECK), gönderim anında `ic_bildirim_eposta_al` `ic_bildirimler.cc`'yi

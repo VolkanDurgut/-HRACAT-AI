@@ -32,7 +32,7 @@ type Satir = {
   olusturma: string; islem_zamani: string | null; isleyen: string | null;
   ic_is_emirleri: { is_emri_no: string; ic_musteriler: { id: string; unvan: string; telefon: string | null; whatsapp_izin: boolean } | null } | null;
 };
-type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string };
+type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string };
 type Sekme = "gonderilecek" | "gonderilen" | "eposta";
 
 const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -60,7 +60,7 @@ export default function BildirimlerPage() {
   const [atlanacak, setAtlanacak] = useState<Satir | null>(null);
   const [isleniyor, setIsleniyor] = useState<string | null>(null);
 
-  const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "" });
+  const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "", yetkili_cc: "" });
   const [ayarVar, setAyarVar] = useState(false);
   const [ayarAcik, setAyarAcik] = useState(false);
   const [ayarKaydediliyor, setAyarKaydediliyor] = useState(false);
@@ -72,7 +72,7 @@ export default function BildirimlerPage() {
       supabase.from("ic_bildirimler")
         .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin))")
         .eq("company_id", companyId).order("olusturma", { ascending: false }).limit(300),
-      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc").eq("company_id", companyId).maybeSingle(),
     ]);
     if (bRes.error || aRes.error) { setOkumaHatasi((bRes.error || aRes.error)!.message); setYukleniyor(false); return; }
     setSatirlar((bRes.data || []) as unknown as Satir[]);
@@ -82,6 +82,7 @@ export default function BildirimlerPage() {
       setAyar({
         lojistik_ad: aRes.data.lojistik_ad || "", lojistik_eposta: aRes.data.lojistik_eposta || "",
         lojistik_telefon: aRes.data.lojistik_telefon ? telefonYazi(aRes.data.lojistik_telefon) : "", yetkili_eposta: aRes.data.yetkili_eposta || "",
+        yetkili_cc: (aRes.data.yetkili_cc || "").split(",").join(", "),
       });
     } else {
       setAyarVar(false);
@@ -146,11 +147,16 @@ export default function BildirimlerPage() {
     const epostaRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!loEposta || !epostaRe.test(loEposta)) { showToast("Lojistik e-posta adresi geçersiz.", "error"); return; }
     if (yeEposta && !epostaRe.test(yeEposta)) { showToast("Yetkili e-posta adresi geçersiz.", "error"); return; }
+    const ccListe = ayar.yetkili_cc.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+    const ccHatali = ccListe.find((x) => !epostaRe.test(x));
+    if (ccHatali) { showToast(`CC adresi geçersiz: ${ccHatali}`, "error"); return; }
+    if (ccListe.length > 5) { showToast("CC'ye en fazla 5 adres yazılabilir.", "error"); return; }
+    if (ccListe.length && !yeEposta) { showToast("CC için önce uyarı alıcısını (yetkili e-posta) yazın.", "error"); return; }
     const tel = telefonNormallestir(ayar.lojistik_telefon);
     if (tel === undefined) { showToast("Lojistik telefon numarası geçersiz.", "error"); return; }
     setAyarKaydediliyor(true);
     const { data, error } = await supabase.from("ic_piyasa_ayarlari")
-      .upsert({ company_id: companyId, lojistik_ad: ayar.lojistik_ad.trim() || null, lojistik_eposta: loEposta, lojistik_telefon: tel, yetkili_eposta: yeEposta || null }, { onConflict: "company_id" })
+      .upsert({ company_id: companyId, lojistik_ad: ayar.lojistik_ad.trim() || null, lojistik_eposta: loEposta, lojistik_telefon: tel, yetkili_eposta: yeEposta || null, yetkili_cc: ccListe.length ? Array.from(new Set(ccListe)).join(",") : null }, { onConflict: "company_id" })
       .select("company_id");
     setAyarKaydediliyor(false);
     const hata = yazmaHatasi(error, data);
@@ -192,11 +198,12 @@ export default function BildirimlerPage() {
           <p className="text-xs mt-0.5 mb-3" style={{ color: ayarVar ? TEXT_MUTED : "#FBBF24" }}>
             {ayarVar ? "Çıkış onayı e-postaları lojistiğe, uyarılar yetkiliye gider." : "Lojistik e-posta adresi tanımlanmadan çıkış onayı e-postaları gönderilemez."}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Alan etiket="Lojistik sorumlusu"><input value={ayar.lojistik_ad} onChange={(e) => setAyar({ ...ayar, lojistik_ad: e.target.value })} placeholder="Süleyman Bey" className={inputSinif} style={inputStil} /></Alan>
             <Alan etiket="Lojistik e-posta *"><input value={ayar.lojistik_eposta} onChange={(e) => setAyar({ ...ayar, lojistik_eposta: e.target.value })} inputMode="email" placeholder="lojistik@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
             <Alan etiket="Lojistik telefon"><input value={ayar.lojistik_telefon} onChange={(e) => setAyar({ ...ayar, lojistik_telefon: e.target.value })} inputMode="tel" placeholder="0553 268 91 01" className={inputSinif} style={inputStil} /></Alan>
-            <Alan etiket="Uyarılar (yetkili e-posta)"><input value={ayar.yetkili_eposta} onChange={(e) => setAyar({ ...ayar, yetkili_eposta: e.target.value })} inputMode="email" placeholder={user?.email || ""} className={inputSinif} style={inputStil} /></Alan>
+            <Alan etiket="Uyarılar · Alıcı"><input value={ayar.yetkili_eposta} onChange={(e) => setAyar({ ...ayar, yetkili_eposta: e.target.value })} inputMode="email" placeholder="execution@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
+            <Alan etiket="Uyarılar · CC (virgülle)"><input value={ayar.yetkili_cc} onChange={(e) => setAyar({ ...ayar, yetkili_cc: e.target.value })} inputMode="email" placeholder="bbt@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
           </div>
           <div className="flex justify-end gap-2 mt-3">
             {ayarVar && <button onClick={() => setAyarAcik(false)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button>}

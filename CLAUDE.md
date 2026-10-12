@@ -974,6 +974,11 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     +30 dk (planlıda) veya 120 dk (bekleyende) hâlâ yoksa yetkiliye uyarı. Son 3 gün.
   - E-posta: `ic_bildirim_eposta_al` (skip locked) + `ic_bildirim_eposta_sonuc` (3 deneme,
     sonra `hata`).
+- Uyarı e-postaları (cevap yok / bugün çıkmayacak) Alıcı + CC (kullanıcı kararı 12.10.2026:
+  Alıcı execution@unex.com.tr, CC bbt@unex.com.tr). `ic_piyasa_ayarlari.yetkili_cc` (virgülle,
+  boşluksuz, en fazla 5; CHECK), gönderim anında `ic_bildirim_eposta_al` `ic_bildirimler.cc`'yi
+  doldurur (yalnız alici='yetkili'), edge function Resend'e `cc` verir. Lojistik e-postasında CC
+  YOK. Migration `20261012210000_ic_piyasa_yetkili_cc.sql`.
 - MÜŞTERİYE E-POSTA YOK (askıda kuralı). Müşteri mesajları WhatsApp kanalında `bekliyor`
   olarak durur; Meta onayına kadar Bildirimler sayfasından "WhatsApp'ta Gönder" (wa.me,
   ücretsiz) → "Gönderildi mi?" onayı ile işaretlenir. Telefon / WhatsApp izni yoksa uyarı.

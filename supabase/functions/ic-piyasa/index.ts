@@ -68,7 +68,7 @@ async function imzaliPdf(yol: string): Promise<string | null> {
 // ---------------------------------------------------------------------------
 // Sirket ici e-postalar (lojistik / yetkili)
 // ---------------------------------------------------------------------------
-type Bildirim = { id: string; sablon: string; alici: string; hedef: string; alici_ad: string | null; degerler: string[]; dugme_eki: string | null };
+type Bildirim = { id: string; sablon: string; alici: string; hedef: string; alici_ad: string | null; degerler: string[]; dugme_eki: string | null; cc?: string[] | null };
 
 const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -145,7 +145,7 @@ async function kuyruguIsle(): Promise<{ zamanlanan: number; gonderilen: number; 
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: GONDEREN, to: [b.hedef], subject: konu, html }),
+        body: JSON.stringify({ from: GONDEREN, to: [b.hedef], ...(b.cc && b.cc.length ? { cc: b.cc } : {}), subject: konu, html }),
       });
       if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
       await rpc("ic_bildirim_eposta_sonuc", { p_id: b.id, p_basarili: true });

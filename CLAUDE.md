@@ -929,8 +929,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Kantar Paneli: üstte "İhracat · DBA" / "Yurt İçi · İrsaliye" sekmesi; İHRACAT AKIŞI
   DEĞİŞMEDİ (sadece sarmalandı). Seçim `localStorage["kantar-bolum"]`.
   Bileşen: `components/kantar-yurt-ici.tsx` (dakikada bir + sekmeye dönünce yenilenir).
-- Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR`'a eklendi → migration canlıya
-  uygulandıktan SONRA `yedekleme-gonder` yeniden deploy edilmeli (v10).
+- CANLI DURUM (12.10.2026 03:15 kontrol): migration kullanıcı tarafından SQL Editor ile
+  UYGULANDI; 3 tablo + 10 politika + bucket + 3 depo politikası + fonksiyonlar yerinde,
+  anon RPC yetkisi yok. Rol testleri (canlıda, rollback'li): kantar@ tablolara 0 satır
+  görür, sadece RPC; muhasebe@ hiçbirine erişemez. Netlify daca8f1 yayında.
+- Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR`'a eklendi; `yedekleme-gonder` v10
+  DEPLOY EDİLDİ. Deneme çalışması: 24/24 tablo, geri yükleme testi 24/24 birebir.
 - Parça 2 (sıradaki): Süleyman Bey (lojistik) çıkış onayı — kantarcı onaylayınca tek
   dokunuşluk link (Şimdi çıkıyor / Saat seç / Bugün çıkmayacak); saat verirse o saatte
   tekrar "Çıktı mı?" sorulur, onaylanınca müşteriye "yola çıktı"; 30 dk cevap yoksa

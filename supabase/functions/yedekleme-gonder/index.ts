@@ -80,10 +80,17 @@ const YEDEKLENECEK_TABLOLAR = [
   "ic_musteriler",
   "ic_is_emirleri",
   "ic_sevkler",
-  // Ic piyasa bildirim kutusu + ayarlar (Parca 2, 12.10.2026)
-  "ic_piyasa_ayarlari",
+  // Ic piyasa bildirim kutusu (Parca 2, 12.10.2026)
   "ic_bildirimler",
 ];
+
+// "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer
+// (ornek "_ic_piyasa_ayarlari"). Geri yukleme testi satirlari id ile
+// eslestirdigi icin bunlari test disi tutar; veri yine yedektedir.
+// Deger = sayfalama sirasi.
+const AYAR_TABLOLARI: Record<string, string> = {
+  ic_piyasa_ayarlari: "company_id.asc",
+};
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).
 const DENETIM_TABLOSU = "denetim_kayitlari";
@@ -306,6 +313,18 @@ Deno.serve(async (req: Request) => {
         const satirlar = await tabloyuSayfaliCek(tablo);
         yedek[tablo] = satirlar;
         tabloSayilari.push({ tablo, adet: satirlar.length });
+      } catch (e) {
+        const mesaj = e instanceof Error ? e.message : String(e);
+        uyarilar.push(`Tablo yedeklenemedi: ${mesaj}`);
+        tabloSayilari.push({ tablo, adet: null, not: "OKUNAMADI" });
+      }
+    }
+
+    for (const [tablo, siralama] of Object.entries(AYAR_TABLOLARI)) {
+      try {
+        const satirlar = await tabloyuSayfaliCek(tablo, "", siralama);
+        yedek[`_${tablo}`] = satirlar;
+        tabloSayilari.push({ tablo, adet: satirlar.length, not: "ayar" });
       } catch (e) {
         const mesaj = e instanceof Error ? e.message : String(e);
         uyarilar.push(`Tablo yedeklenemedi: ${mesaj}`);

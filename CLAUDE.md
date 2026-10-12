@@ -997,8 +997,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   depodan silinir). Müşteri silinemezse bağlı iş emirleri listelenir.
 - Fiyat kalemleri/formları politikaları `ic_piyasa` yetkisine daraltıldı (kantarcı
   okuyamaz); `ic_fiyat_formu_hazirla` yetkiyi sayaçtan ÖNCE kontrol eder.
-- Gece yedeği: `ic_piyasa_ayarlari`, `ic_bildirimler` eklendi → `yedekleme-gonder` v11
-  deploy edilmeli (migration'dan SONRA).
+- Gece yedeği: `ic_bildirimler` normal tablo olarak; `ic_piyasa_ayarlari` (id kolonu YOK,
+  anahtar company_id) pakete `_ic_piyasa_ayarlari` olarak girer (`AYAR_TABLOLARI`) — çünkü
+  `yedek_geri_yukleme_testi` satırları `id` ile eşleştirir; id'siz tablo normal listeye
+  konursa her gece "[UYARI]" çıkar (12.10.2026 deneme çalışması yakaladı).
+- BİLİNEN EKSİK (felaket kurtarma): `scripts/yedekten-geri-yukle.mjs` `TABLO_SIRASI`'nda
+  HİÇBİR `ic_*` tablosu yok (FBF'den beri). Veri gece yedeğinde VAR ama betik yüklemez.
+  Eklemek basit değil: REST ile insert tetikleyicileri çalıştırır (FBF/IE numaraları
+  yeniden verilir, iş emri insert'i yeni bildirim satırı üretir). Gerekirse SQL ile
+  `set session_replication_role = replica` altında elle yüklenir. Ayrı iş olarak planlanmalı.
+- CANLI DURUM (12.10.2026 04:55 TR): migration kullanıcı tarafından SQL Editor ile UYGULANDI
+  (2 tablo, 7 çıkış kolonu, takip_token, 11 fonksiyon, 8 tetikleyici; token RPC'leri
+  anon/authenticated'a kapalı doğrulandı). Netlify 3c5eb49 yayında. Edge function
+  `ic-piyasa` v1 deploy (canlı test: geçersiz token 404, `isle` 200). `ic_piyasa_ayarlari`
+  Unex satırı yazıldı. pg_cron `ic-piyasa-bildirim` (jobid 5) çalışıyor. `yedekleme-gonder`
+  v12: deneme 26 tablo, geri yükleme testi 25/25, uyarı yok.
 - Testler (scratchpad, yerel PG16 + PostgREST 12 + fonksiyon Node'da Deno taklidiyle):
   SQL, fonksiyon ve Playwright e2e (bildirim kutusu, çıkış mobil, takip mobil) geçti.
 

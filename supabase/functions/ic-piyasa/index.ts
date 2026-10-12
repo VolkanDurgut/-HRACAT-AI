@@ -125,7 +125,14 @@ function epostaOlustur(b: Bildirim): { konu: string; html: string } {
     case "cikis_bugun_degil":
       return {
         konu: `Bugün çıkmayacak: ${plaka} · ${siparis}`,
-        html: epostaHtml("Araç bugün çıkmayacak", `Lojistik (${saat || "-"}) aracın bugün çıkmayacağını bildirdi. Müşteriye bir şey gönderilmedi.`, satirlar, cikisDugme, "Yeni çıkış saati verildiğinde ya da araç çıktığında aynı düğme kullanılır."),
+        // degerler[4] = isleyen: "Süleyman (bağlantı)" / yetkili e-postası / bos
+        html: epostaHtml(
+          "Araç bugün çıkmayacak",
+          "Araç için “bugün çıkmayacak” bildirildi. Müşteriye bir şey gönderilmedi.",
+          saat && saat !== "-" ? [...satirlar, ["Bildiren", saat.replace(/\s*\(bağlantı\)\s*$/, "").trim()]] : satirlar,
+          cikisDugme,
+          "Yeni çıkış saati verildiğinde ya da araç çıktığında aynı düğme kullanılır."
+        ),
       };
     default:
       throw new Error(`Bilinmeyen e-posta şablonu: ${b.sablon} (${BILDIRIM_ETIKET[b.sablon] || "?"})`);

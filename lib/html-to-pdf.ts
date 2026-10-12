@@ -24,6 +24,9 @@ import html2canvas from "html2canvas";
  *      fiilen decode olmasi beklenir - resim tam yuklenmeden alinan
  *      "fotografta" satirlarin kaymasi/bos kalmasi ihtimali ortadan kalkar.
  */
+/** A4'u bu oranin altinda asan goruntu tek sayfaya oturtulur (bkz. asagi). */
+const SIGDIRMA_TOLERANSI = 1.01;
+
 export async function htmlToPdfBlob(html: string): Promise<Blob> {
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
@@ -60,6 +63,22 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     // Gorseller yerlestikten sonra layout'un oturmasi icin son bir kare payi.
     await new Promise((resolve) => setTimeout(resolve, 100));
 
+    // TABLO YAZI BOYUTU (12.10.2026, IHR-2026-0092 Packing List 2 sayfa):
+    // html2canvas belgeyi kendi kopyasinda "quirks" (eski uyumluluk) kipinde
+    // cizer; bu kipte tarayici <table> icin yazi boyutu/kalinlik/satir
+    // yuksekligini sayfadan DEVRALMAZ (16px'e doner). Sonuc: PDF'teki
+    // tablolar ekrandaki tasarimdan ~%50 buyuk cikiyor, 10 konteynerli PL
+    // 1077px yerine 1549px cizilip 2 sayfaya bolunuyordu (QC/FC/CI de
+    // buyuyordu). Asagidaki kural standart kipin zaten varsayilan davranisidir
+    // (ekran ve yazdirma DEGISMEZ); :where() ile ozgulugu 0'dir, belgelerin
+    // kendi tablo stilleri (.items-table vb.) her zaman onceliklidir.
+    const uyumStili = idoc.createElement("style");
+    uyumStili.setAttribute("data-pdf-uyum", "");
+    uyumStili.textContent =
+      ":where(table){font-size:inherit;font-weight:inherit;font-style:inherit;font-variant:inherit;line-height:inherit;white-space:inherit;text-align:inherit}";
+    (idoc.head || idoc.documentElement).appendChild(uyumStili);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     const hedefEl = (idoc.querySelector(".sheet") as HTMLElement | null) || idoc.body;
 
     // ".print-hint" kutusu (tarayicida elle yazdirmadan once gosterilen
@@ -85,6 +104,13 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     if (goruntuYukseklikMm <= sayfaYukseklikMm) {
       const imgData = canvas.toDataURL("image/png");
       pdf.addImage(imgData, "PNG", 0, 0, sayfaGenislikMm, goruntuYukseklikMm);
+    } else if (goruntuYukseklikMm <= sayfaYukseklikMm * SIGDIRMA_TOLERANSI) {
+      // A4'u %1'den az asan belge (12.10.2026): CoO / Phyto / Health sayfasi
+      // 800x1132px (A4 orani 1131,4px) -> 297,15mm; eskiden ikinci, neredeyse
+      // BOS bir sayfa aciliyordu. Oran korunarak tek sayfaya oturtulur
+      // (en fazla %1 kucultme, yatayda ortalanir; gozle fark edilmez).
+      const genislikMm = (sayfaGenislikMm * sayfaYukseklikMm) / goruntuYukseklikMm;
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", (sayfaGenislikMm - genislikMm) / 2, 0, genislikMm, sayfaYukseklikMm);
     } else {
       const pikselBasinaMm = canvas.width / sayfaGenislikMm;
       const dilimYukseklikPx = Math.floor(sayfaYukseklikMm * pikselBasinaMm);

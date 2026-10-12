@@ -486,6 +486,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Commercial Invoice 30.09'da aynı sebeple düzeltilmişti (print min-height:0).
   Fumigation (min-height 1000px < 1032px) ve Packing List (10mm kenar) yazdırınca
   tek sayfa — kontrol edildi. Yeni şablonda bu kurala uy.
+- Packing List YAZDIRMA taşması (12.10.2026, IHR-2026-0092, 10 konteyner): basılabilir
+  genişlik 190mm = 718px, ekrandaki iç genişlik 736px → ürün açıklaması her satırda 2
+  satıra kırılıyor, 8+ konteynerde imza + alt not 2. sayfaya düşüyordu. Düzeltme: print'te
+  `.sheet { width:736px; zoom:0.9755 }` (ekran düzeninde dizilip orantılı küçülür).
+  Ölçüm (Chromium yazdır): eski 8/10/12 konteyner → 2 sayfa, yeni → 1 sayfa; 5 → 1/1.
+  Uygulamanın PDF düğmesi (html2canvas) bu sorunu YAŞAMIYORDU (0092 eski kodla da tek
+  sayfa) — taşma, belgeyi yeni sekmede açıp tarayıcıdan yazdırınca oluyordu.
+- `lib/html-to-pdf.ts` (12.10.2026): (1) A4'ü %1'den az aşan görüntü tek sayfaya
+  oturtulur (`SIGDIRMA_TOLERANSI`): CoO / Phyto / Health 800×1132px olduğundan eskiden
+  BOŞ bir 2. sayfa açılıyordu; şimdi tek sayfa, görsel fark yok. (2) `:where(table)` font
+  devralma kuralı: ölçümde PL/CI/QC/FC çıktıları eski kodla PİKSEL PİKSEL AYNI (etkisiz,
+  güvenlik amaçlı kaldı). Bu iki dosya + `ic-piyasa` e-posta metni ("Bildiren" satırı)
+  başka bir oturumda yazıldı, bu oturumda ölçülüp doğrulanarak benimsendi.
 
 ## Sipariş takibi — marka / kalem bazlı (07.10.2026)
 
@@ -1044,6 +1057,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `ic-piyasa` v1 deploy (canlı test: geçersiz token 404, `isle` 200). `ic_piyasa_ayarlari`
   Unex satırı yazıldı. pg_cron `ic-piyasa-bildirim` (jobid 5) çalışıyor. `yedekleme-gonder`
   v12: deneme 26 tablo, geri yükleme testi 25/25, uyarı yok.
+- 12.10.2026 10:15: `ic-piyasa` v3 ("Bugün çıkmayacak" e-postasında "Bildiren" satırı;
+  CC canlıda uçtan uca test edildi). Prova kayıtlarının silinmesi için
+  kullanıcıya korumalı SQL verildi (MCP üzerinden canlı DELETE izin vermiyor).
 - Testler (scratchpad, yerel PG16 + PostgREST 12 + fonksiyon Node'da Deno taklidiyle):
   SQL, fonksiyon ve Playwright e2e (bildirim kutusu, çıkış mobil, takip mobil) geçti.
 

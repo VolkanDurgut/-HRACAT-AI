@@ -92,7 +92,12 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
   .print-hint { background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 10px 14px; font-size: 11px; margin-bottom: 16px; border-radius: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #FFFFFF; padding: 0; }
-    .sheet { box-shadow: none; padding: 0; width: auto; }
+    /* Yazdirma (12.10.2026, IHR-2026-0092): basilabilir genislik 190mm = 718px,
+       ekrandaki ic genislik 736px. Bu 18px fark urun aciklamasini her satirda
+       2 satira kiriyor, 10 konteynerde imza + alt not 2. sayfaya dusuyordu.
+       Sayfa ekrandaki genislikte dizilir ve orantili kucultulur (718/736):
+       yazdirma ciktisi ekran ve uygulama PDF'iyle AYNI duzende olur. */
+    .sheet { box-shadow: none; padding: 0; width: 736px; max-width: none; zoom: 0.9755; }
     .print-hint { display: none; }
   }
 </style>

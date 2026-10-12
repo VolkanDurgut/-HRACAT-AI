@@ -939,6 +939,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   görür, sadece RPC; muhasebe@ hiçbirine erişemez. Netlify daca8f1 yayında.
 - Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR`'a eklendi; `yedekleme-gonder` v10
   DEPLOY EDİLDİ. Deneme çalışması: 24/24 tablo, geri yükleme testi 24/24 birebir.
+- Mesaj şablonları (12.10.2026): `lib/ic-piyasa/mesaj-sablonlari.ts` TEK KAYNAK —
+  siparis_alindi, arac_cikis_saati, arac_yola_cikti, siparis_tamamlandi (UTILITY),
+  haftalik_fiyat_formu (MARKETING, PDF ekli), cikis_onayi_talebi (ekip). Meta onayına
+  kadar `elleGonderimMetni` (wa.me, link metin sonunda), sonra aynı gövde Meta şablonu
+  + "Siparişim" URL düğmesi (`/takip/{token}`). `sablonKurallariniDenetle` Meta
+  kurallarını denetler. Metin değişirse Meta'da yeniden onay gerekir; Burak Bey onayı
+  olmadan değiştirilmez. Mesajlarda fiyat YOK (takip sayfasında).
 - Parça 2 (sıradaki): Süleyman Bey (lojistik) çıkış onayı — kantarcı onaylayınca tek
   dokunuşluk link (Şimdi çıkıyor / Saat seç / Bugün çıkmayacak); saat verirse o saatte
   tekrar "Çıktı mı?" sorulur, onaylanınca müşteriye "yola çıktı"; 30 dk cevap yoksa

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FileDown, Image as ImageIcon, Share2, Loader2, FileText, AlertTriangle } from "lucide-react";
+import { FileDown, Image as ImageIcon, Share2, Loader2, FileText, AlertTriangle, Trash2 } from "lucide-react";
+import { supabase, yazmaHatasi } from "@/lib/supabase";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useToast } from "@/lib/toast-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG } from "@/lib/theme";
 import { IcFiyatFormu, eskiBicimForm, formDosyaAdi, formGecerliMi, gunYazi, onayZamaniYazi } from "@/lib/ic-piyasa/fiyat-formu";
@@ -12,10 +14,28 @@ import { IcFiyatFormu, eskiBicimForm, formDosyaAdi, formGecerliMi, gunYazi, onay
  * fiyat tablosu sonradan degisse de eski form ayni cikar.
  * "Paylas" butonu cihaz dosya paylasimini destekliyorsa (telefon) gorunur:
  * PDF + gorsel paylasim menusunden dogrudan WhatsApp'a eklenebilir.
+ * Silme (14.10.2026): onayla silinir; is emrinde kullanilan form sunucuda
+ * reddedilir (migration 20261014130000), silinen formun kopyasi denetim
+ * kaydinda kalir. Form numarasi tekrar verilmez.
  */
-export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) {
+export function IcPiyasaGecmisFormlar({ formlar, silindi }: { formlar: IcFiyatFormu[]; silindi: (id: string) => void }) {
   const { showToast } = useToast();
   const [mesgul, setMesgul] = useState<string | null>(null);
+  const [silinecek, setSilinecek] = useState<IcFiyatFormu | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
+
+  const formuSil = async () => {
+    const f = silinecek;
+    if (!f) return;
+    setSiliniyor(true);
+    const { data, error } = await supabase.from("ic_fiyat_formlari").delete().eq("id", f.id).eq("company_id", f.company_id).select("id");
+    setSiliniyor(false);
+    const hata = yazmaHatasi(error, data);
+    if (hata) { showToast(`${f.form_no} silinemedi: ${hata}`, "error"); return; }
+    setSilinecek(null);
+    silindi(f.id);
+    showToast(`${f.form_no} silindi.`, "success");
+  };
   const [paylasilabilir, setPaylasilabilir] = useState(false);
 
   useEffect(() => {
@@ -134,6 +154,10 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
                             {mesgul === `${f.id}-pay` ? <Loader2 size={13} className="animate-spin" /> : <Share2 size={13} />} Paylaş
                           </button>
                         )}
+                        <button onClick={() => setSilinecek(f)} disabled={!!mesgul || siliniyor} aria-label={`${f.form_no} formunu sil`} title="Formu sil"
+                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50" style={{ borderColor: CARD_BORDER }}>
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -143,6 +167,18 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
           </table>
         </div>
       )}
+      <ConfirmDialog
+        open={!!silinecek}
+        onOpenChange={(a) => { if (!a) setSilinecek(null); }}
+        title={silinecek ? `${silinecek.form_no} silinsin mi?` : "Form silinsin mi?"}
+        description="Form listeden ve sistemden kaldırılır; daha önce gönderdiğiniz PDF/görseller etkilenmez. Bu numara tekrar kullanılmaz. İş emrinde kullanılan form silinemez."
+        confirmLabel="Formu Sil"
+        cancelLabel="Vazgeç"
+        destructive
+        onConfirm={formuSil}
+        loading={siliniyor}
+        loadingLabel="Siliniyor..."
+      />
     </div>
   );
 }

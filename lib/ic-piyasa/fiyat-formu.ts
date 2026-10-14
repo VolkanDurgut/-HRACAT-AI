@@ -94,13 +94,15 @@ export type IcFiyatFormu = {
   olusturan_email: string | null;
   /** Onay anindaki iletisim (migration 20261014110000); eski formlarda null. */
   iletisim?: FormIletisim | null;
+  /** Onay anindaki sartlar, {KDV} cozulmus (migration 20261014130000); eski formlarda null. */
+  sartlar?: string[] | null;
 };
 
 /** Formun "Siparis ve bilgi" iletisim kisisi (panelden duzenlenir, 14.10.2026). */
 export type FormIletisim = { ad: string; telefon: string; whatsapp: boolean; eposta: string | null };
 
 /** Form kayitlari icin secilecek sutunlar (tek yerde; iletisim dahil). */
-export const FORM_SUTUNLARI = "id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email, iletisim";
+export const FORM_SUTUNLARI = "id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email, iletisim, sartlar";
 
 /** Gecerlilik suresi (gun). Sunucudaki tetikleyiciyle AYNI olmalidir
  *  (migration 20261011200000: onay gunu + 3). */
@@ -261,25 +263,68 @@ export function formKalemleri(satirlar: IcFiyatKalemi[]): FormKalemi[] {
 }
 
 /**
- * Bilgilendirme ve sevkiyat sartlari (kullanici metni, 12.10.2026). 2. madde
- * formdaki urunlerin KDV secimine gore yazilir (satirlarla celismesin diye);
- * 3. madde gecerlilik tarihiyle celismeyecek sekilde netlestirildi (kullanici
- * onayi). PDF ve gorsel AYNI metni kullanir.
+ * Bilgilendirme ve sevkiyat sartlari (kullanici metni 12.10.2026; panelden
+ * duzenlenebilir 14.10.2026 - ic_piyasa_ayarlari.form_sartlari).
+ * "{KDV}" yazilan yere formdaki urunlerin KDV secimine gore cumle gelir
+ * (satirlarla celismesin diye). Onaylanan formda maddeler {KDV} COZULMUS
+ * halde dondurulur (ic_fiyat_formlari.sartlar); PDF once ona bakar.
  */
-export function formSartlari(kalemler: FormKalemi[]): string[] {
+export const KDV_YER_TUTUCU = "{KDV}";
+export const SART_EN_AZ = 1;
+export const SART_EN_COK = 8;
+export const SART_MIN_KARAKTER = 5;
+export const SART_MAX_KARAKTER = 500;
+
+export const VARSAYILAN_SARTLAR: string[] = [
+  "İşbu form nihai bir bağlayıcı teklif olmayıp, sektörel fiyat bilgilendirmesi mahiyetindedir.",
+  `${KDV_YER_TUTUCU} Sevkiyat ve nakliye detayları sipariş onayında kesinleştirilir.`,
+  "Geçerlilik süresi içinde onaylanan siparişlerde formdaki fiyatlar uygulanır; süre sonrasında sevkiyat günündeki günlük rayiç fiyatlar geçerlidir.",
+  "Ödemeler mutabık kalınan ödeme protokolü çerçevesinde fatura tarihindeki koşullar esas alınarak tahsil edilir.",
+];
+
+/** Urunlerin KDV secimine gore cumle. */
+export function kdvCumlesi(kalemler: FormKalemi[]): string {
   const hepsiDahil = kalemler.length > 0 && kalemler.every((k) => k.kdv_dahil);
   const hicbiriDahil = kalemler.every((k) => !k.kdv_dahil);
-  const kdv = hepsiDahil
+  return hepsiDahil
     ? "Fiyatlarımıza KDV dahildir."
     : hicbiriDahil
     ? "Fiyatlarımıza KDV dahil değildir."
     : "Fiyatlardaki KDV durumu her ürünün altında ayrıca belirtilmiştir.";
-  return [
-    "İşbu form nihai bir bağlayıcı teklif olmayıp, sektörel fiyat bilgilendirmesi mahiyetindedir.",
-    `${kdv} Sevkiyat ve nakliye detayları sipariş onayında kesinleştirilir.`,
-    "Geçerlilik süresi içinde onaylanan siparişlerde formdaki fiyatlar uygulanır; süre sonrasında sevkiyat günündeki günlük rayiç fiyatlar geçerlidir.",
-    "Ödemeler mutabık kalınan ödeme protokolü çerçevesinde fatura tarihindeki koşullar esas alınarak tahsil edilir.",
-  ];
+}
+
+/** Sablon maddelerini forma yazilacak hale getirir ({KDV} cozulur, bosluklar temizlenir). */
+export function sartlariCoz(sablon: string[] | null | undefined, kalemler: FormKalemi[]): string[] {
+  const kaynak = sablon && sablon.length ? sablon : VARSAYILAN_SARTLAR;
+  const kdv = kdvCumlesi(kalemler);
+  return kaynak
+    .map((m) => m.split(KDV_YER_TUTUCU).join(kdv).replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+/** Formun sartlari: onaylanirken dondurulmus hali, yoksa (eski form) varsayilan. */
+export function formSartlari(form: { kalemler: FormKalemi[]; sartlar?: string[] | null }): string[] {
+  if (Array.isArray(form.sartlar) && form.sartlar.length) return form.sartlar;
+  return sartlariCoz(null, form.kalemler);
+}
+
+/** Panel dogrulamasi (DB kisitiyla AYNI kural). Hata metni ya da null. */
+export function sartlarHatasi(maddeler: string[]): string | null {
+  const temiz = maddeler.map((m) => m.trim());
+  if (temiz.length < SART_EN_AZ) return "En az bir madde olmalı.";
+  if (temiz.length > SART_EN_COK) return `En fazla ${SART_EN_COK} madde eklenebilir.`;
+  for (let i = 0; i < temiz.length; i++) {
+    const n = temiz[i].length;
+    if (n < SART_MIN_KARAKTER) return `${i + 1}. madde çok kısa (en az ${SART_MIN_KARAKTER} karakter).`;
+    if (n > SART_MAX_KARAKTER) return `${i + 1}. madde çok uzun (en fazla ${SART_MAX_KARAKTER} karakter, şu an ${n}).`;
+  }
+  return null;
+}
+
+/** Ayardan okunan degeri dogrular; bozuk/bos ise null (= varsayilan). */
+export function sartSablonuOku(v: unknown): string[] | null {
+  if (!Array.isArray(v) || v.length === 0 || !v.every((x) => typeof x === "string")) return null;
+  return sartlarHatasi(v as string[]) ? null : (v as string[]).map((m) => m.trim());
 }
 
 /**

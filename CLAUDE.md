@@ -1110,6 +1110,29 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Testler (scratchpad, yerel PG16 + PostgREST 12 + fonksiyon Node'da Deno taklidiyle):
   SQL, fonksiyon ve Playwright e2e (bildirim kutusu, çıkış mobil, takip mobil) geçti.
 
+## İç Piyasa — Form silme ve düzenlenebilir şartlar (14.10.2026)
+
+- Migration `20261014130000_ic_piyasa_form_sil_sartlar.sql` (SADECE ekleme).
+  CANLIYA kod push'undan ÖNCE uygulanmalı: sayfa `FORM_SUTUNLARI` ile `sartlar`
+  sütununu okur, sütun yoksa form listesi okunamaz.
+- Form silme: "Oluşturulan Formlar"da çöp kutusu + onay penceresi. Kural
+  (kullanıcı kararı): iş emrine bağlı form silinemez (`ic_fiyat_formu_silinebilir_mi`
+  BEFORE DELETE tetikleyicisi, hata 23503 mesajı ekranda). Silinen formun tam
+  kopyası `denetim_kayitlari`'nda (`denetim_ic_fiyat_formlari`). UPDATE yetkisi
+  yine YOK; numara tekrar verilmez.
+- Şartlar: `ic_piyasa_ayarlari.form_sartlari` (jsonb metin dizisi, 1-8 madde,
+  5-500 karakter; `ic_sartlar_gecerli` kısıtı; NULL = varsayılan 4 madde,
+  `VARSAYILAN_SARTLAR`). `{KDV}` = ürünlerin KDV seçimine göre cümle
+  (`kdvCumlesi`). Onayda `{KDV}` çözülmüş hali `ic_fiyat_formlari.sartlar`'a
+  DONDURULUR; PDF `formSartlari(form)` önce ona bakar, NULL (eski form) →
+  varsayılan (gönderildiği metinle birebir). Varsayılanla aynı kayıt NULL yazılır.
+  Uzun şartlar PDF'te 2. sayfaya geçer (bilinçli, sıkıştırma yok). Telefon
+  görselinde şartlar yok.
+- Sipariş takibi düzeltmesi (14.10.2026, kullanıcı onayı): IHR-2026-0095 tek
+  seferlik açılmıştı → `ana_siparisler` UNEXOMG290926 (OM GENERAL TRADING, 500
+  MTS) açılıp bağlandı; dosya kalemleri standart oransal kuralla 250 MTS /
+  118.750 USD (10 FCL) yapıldı (önceki: 500 MTS / 237.500 USD; denetim kaydında).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

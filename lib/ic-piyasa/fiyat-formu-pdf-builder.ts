@@ -38,7 +38,8 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  *     sutunda "—". Ayni gun: AMBALAJ ayri sutun (Urun | Ambalaj | Teslim |
  *     Pesin | Vadeli), teslimle ayni boy/koyulukta. 14.10 oncesi onaylanmis (tek fiyatli) formlar GONDERILDIGI
  *     HALIYLE cizilir: Vade / Odeme / Teslim / Birim Fiyat (eskiBicimForm).
- *   - Bilgilendirme ve sevkiyat sartlari (formSartlari, 4 madde).
+ *   - Bilgilendirme ve sevkiyat sartlari (formSartlari: onaydaki dondurulmus
+ *     maddeler, eski formda varsayilan 4 madde; 14.10.2026 panelden duzenlenir).
  *   - Siparis sureci zaman cizelgesi (SIPARIS_SURECI, 4 adim) - kase / imza
  *     alani YOK (kullanici karari: her iki taraf icin de kaldirildi).
  * Yazi tipi Inter 400/600/700 (vektor, aranabilir). Sigmazsa bolum bir sonraki
@@ -354,7 +355,7 @@ function tabloBasligi(doc: jsPDF, y: number, eski: boolean): number {
 // Sartlar kutusu
 // ---------------------------------------------------------------------------
 function sartlarOlcu(doc: jsPDF, form: IcFiyatFormu): { satirlar: string[][]; h: number } {
-  const satirlar = formSartlari(form.kalemler).map((m) => bol(doc, m, ICERIK_G - 17, "r", 7.9));
+  const satirlar = formSartlari(form).map((m) => bol(doc, m, ICERIK_G - 17, "r", 7.9));
   const h = 9.4 + satirlar.reduce((s, m) => s + m.length * 3.55 + 0.9, 0) + 2.2;
   return { satirlar, h };
 }

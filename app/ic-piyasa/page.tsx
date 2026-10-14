@@ -9,7 +9,7 @@ import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
-import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil } from "lucide-react";
+import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil, ScrollText } from "lucide-react";
 import { formOzelGunleri, ozelGunKapsamUyarisi, ozelGunTarihYazi } from "@/lib/ic-piyasa/ozel-gunler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -19,6 +19,14 @@ import {
   FormIletisim,
   GECERLILIK_GUN,
   IcFiyatFormu,
+  KDV_YER_TUTUCU,
+  SART_EN_COK,
+  SART_MAX_KARAKTER,
+  VARSAYILAN_SARTLAR,
+  kdvCumlesi,
+  sartSablonuOku,
+  sartlarHatasi,
+  sartlariCoz,
   IcFiyatKalemi,
   TESLIM_SECENEKLERI,
   VADELI_VADE_SECENEKLERI,
@@ -156,6 +164,11 @@ export default function IcPiyasaPage() {
   const [iletisimDuzenle, setIletisimDuzenle] = useState(false);
   const [iletisimTaslak, setIletisimTaslak] = useState({ ad: "", telefon: "", whatsapp: true, eposta: "" });
   const [iletisimKaydediliyor, setIletisimKaydediliyor] = useState(false);
+  // Bilgilendirme ve sevkiyat sartlari (ic_piyasa_ayarlari.form_sartlari, 14.10.2026; null = varsayilan)
+  const [sartSablonu, setSartSablonu] = useState<string[] | null>(null);
+  const [sartDuzenle, setSartDuzenle] = useState(false);
+  const [sartTaslak, setSartTaslak] = useState<string[]>([]);
+  const [sartKaydediliyor, setSartKaydediliyor] = useState(false);
 
   const yetkili = !!yetkiler.sayfa_yetkileri.ic_piyasa;
 
@@ -165,7 +178,7 @@ export default function IcPiyasaPage() {
     const [kRes, fRes, aRes] = await Promise.all([
       supabase.from("ic_fiyat_kalemleri").select("*").eq("company_id", companyId).order("sira", { ascending: true }).order("olusturma", { ascending: true }),
       supabase.from("ic_fiyat_formlari").select(FORM_SUTUNLARI).eq("company_id", companyId).order("onay_zamani", { ascending: false }).limit(50),
-      supabase.from("ic_piyasa_ayarlari").select("form_iletisim_ad, form_iletisim_telefon, form_iletisim_whatsapp, form_iletisim_eposta").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ic_piyasa_ayarlari").select("form_iletisim_ad, form_iletisim_telefon, form_iletisim_whatsapp, form_iletisim_eposta, form_sartlari").eq("company_id", companyId).maybeSingle(),
     ]);
     // Iletisim ayari okunamazsa sayfa calismaya devam eder; form OLUSTURMA
     // kapatilir ki yanlis kisiyle form gitmesin (asagida formHazir).
@@ -173,7 +186,8 @@ export default function IcPiyasaPage() {
       setIletisimOkunamadi(true);
     } else {
       setIletisimOkunamadi(false);
-      const a = aRes.data as { form_iletisim_ad: string | null; form_iletisim_telefon: string | null; form_iletisim_whatsapp: boolean | null; form_iletisim_eposta: string | null } | null;
+      const a = aRes.data as { form_iletisim_ad: string | null; form_iletisim_telefon: string | null; form_iletisim_whatsapp: boolean | null; form_iletisim_eposta: string | null; form_sartlari: unknown } | null;
+      setSartSablonu(sartSablonuOku(a?.form_sartlari));
       setIletisim(a?.form_iletisim_ad && a.form_iletisim_telefon
         ? { ad: a.form_iletisim_ad, telefon: a.form_iletisim_telefon, whatsapp: a.form_iletisim_whatsapp !== false, eposta: a.form_iletisim_eposta || null }
         : VARSAYILAN_ILETISIM);
@@ -315,7 +329,44 @@ export default function IcPiyasaPage() {
       .filter(Boolean) as string[];
   }, [dbSatirlar]);
 
-  const formHazir = !kirli && formEksikleri.length === 0 && !iletisimOkunamadi && !iletisimDuzenle;
+  const formHazir = !kirli && formEksikleri.length === 0 && !iletisimOkunamadi && !iletisimDuzenle && !sartDuzenle;
+
+  // Formda cikacak sartlar (kayitli tablonun KDV secimiyle {KDV} cozulmus)
+  const guncelSartlar = useMemo(() => sartlariCoz(sartSablonu, formKalemleri(dbSatirlar)), [sartSablonu, dbSatirlar]);
+  const guncelKdvCumlesi = useMemo(() => kdvCumlesi(formKalemleri(dbSatirlar)), [dbSatirlar]);
+
+  const sartDuzenlemeyiAc = () => {
+    setSartTaslak([...(sartSablonu || VARSAYILAN_SARTLAR)]);
+    setSartDuzenle(true);
+  };
+  const sartGuncelle = (i: number, v: string) => setSartTaslak((o) => o.map((m, j) => (j === i ? v : m)));
+  const sartTasi = (i: number, yon: -1 | 1) =>
+    setSartTaslak((o) => {
+      const j = i + yon;
+      if (j < 0 || j >= o.length) return o;
+      const y = [...o];
+      [y[i], y[j]] = [y[j], y[i]];
+      return y;
+    });
+
+  const sartKaydet = async () => {
+    if (!companyId) return;
+    const maddeler = sartTaslak.map((m) => m.replace(/\s+/g, " ").trim());
+    const hata = sartlarHatasi(maddeler);
+    if (hata) { showToast(hata, "error"); return; }
+    // Varsayilanla ayniysa null yazilir (ileride varsayilan guncellenirse otomatik gelsin)
+    const varsayilanla = JSON.stringify(maddeler) === JSON.stringify(VARSAYILAN_SARTLAR);
+    const deger = varsayilanla ? null : maddeler;
+    setSartKaydediliyor(true);
+    // Sadece form_sartlari gonderilir; ayni satirdaki diger ayarlar degismez.
+    const { data, error } = await supabase.from("ic_piyasa_ayarlari").upsert({ company_id: companyId, form_sartlari: deger }, { onConflict: "company_id" }).select("company_id");
+    setSartKaydediliyor(false);
+    const yh = yazmaHatasi(error, data);
+    if (yh) { showToast(`Şartlar kaydedilemedi: ${yh}`, "error"); return; }
+    setSartSablonu(deger);
+    setSartDuzenle(false);
+    showToast("Şartlar kaydedildi. Önizleme ve yeni formlarda bu maddeler yer alır.", "success");
+  };
 
   const iletisimDuzenlemeyiAc = () => {
     setIletisimTaslak({ ad: iletisim.ad, telefon: iletisim.telefon, whatsapp: iletisim.whatsapp, eposta: iletisim.eposta || "" });
@@ -362,6 +413,7 @@ export default function IcPiyasaPage() {
       kalemler: formKalemleri(dbSatirlar),
       olusturan_email: user?.email || null,
       iletisim,
+      sartlar: guncelSartlar,
     };
   };
 
@@ -376,7 +428,7 @@ export default function IcPiyasaPage() {
     setOlusturuluyor(true);
     const { data, error } = await supabase
       .from("ic_fiyat_formlari")
-      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar), olusturan_email: user?.email || null, iletisim })
+      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar), olusturan_email: user?.email || null, iletisim, sartlar: guncelSartlar })
       .select(FORM_SUTUNLARI);
     const hata = yazmaHatasi(error, data);
     setOlusturuluyor(false);
@@ -587,6 +639,75 @@ export default function IcPiyasaPage() {
           )}
           {iletisimOkunamadi && <p className="mt-1.5 text-xs text-amber-400">İletişim ayarı okunamadı; yanlış bilgiyle form gitmemesi için form oluşturma kapalı. Sayfayı yenileyin.</p>}
         </div>
+        <div className="mt-3 rounded-lg border px-3 py-2.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs flex items-center gap-2" style={{ color: TEXT_MUTED }}>
+              <ScrollText size={13} className="shrink-0" />
+              <span>Bilgilendirme ve Sevkiyat Şartları</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${sartSablonu ? "bg-emerald-500/15 text-emerald-400" : "bg-white/5"}`} style={sartSablonu ? undefined : { color: TEXT_MUTED }}>
+                {sartSablonu ? "Özel metin" : "Varsayılan metin"}
+              </span>
+            </p>
+            {!sartDuzenle && (
+              <button onClick={sartDuzenlemeyiAc} disabled={iletisimOkunamadi} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER }}>
+                <Pencil size={12} /> Düzenle
+              </button>
+            )}
+          </div>
+          {!sartDuzenle ? (
+            <ol className="mt-2 space-y-1">
+              {guncelSartlar.map((m, i) => (
+                <li key={i} className="flex gap-2 text-xs text-slate-200">
+                  <span className="shrink-0 font-semibold" style={{ color: "#F4A07C" }}>{i + 1}.</span>
+                  <span>{m}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="mt-2">
+              <p className="text-[11px] mb-2" style={{ color: TEXT_MUTED }}>
+                Kaydedince önizleme ve yeni formlarda kullanılır; önceden oluşturulmuş formlar değişmez.{" "}
+                <span className="text-slate-300">{KDV_YER_TUTUCU}</span> yazdığınız yere ürünlerin KDV seçimine göre cümle gelir (şu an: &quot;{guncelKdvCumlesi}&quot;). Uzun metinde şartlar ikinci sayfaya geçebilir; kaydettikten sonra <span className="text-slate-300">Önizle</span> ile kontrol edin.
+              </p>
+              <div className="space-y-2">
+                {sartTaslak.map((m, i) => {
+                  const uzun = m.trim().length > SART_MAX_KARAKTER;
+                  return (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="pt-2 text-xs font-semibold w-5 text-right shrink-0" style={{ color: "#F4A07C" }}>{i + 1}.</span>
+                      <div className="flex-1 min-w-0">
+                        <textarea value={m} onChange={(e) => sartGuncelle(i, e.target.value)} rows={2} aria-label={`${i + 1}. madde`}
+                          className={`${inputSinif} resize-y leading-snug`} style={{ ...inputStil, borderColor: uzun ? "#F87171" : CARD_BORDER }} />
+                        <p className={`text-[10px] mt-0.5 text-right ${uzun ? "text-red-400" : ""}`} style={uzun ? undefined : { color: TEXT_MUTED }}>{m.trim().length} / {SART_MAX_KARAKTER}</p>
+                      </div>
+                      <div className="flex items-center gap-0.5 pt-1 shrink-0">
+                        <button onClick={() => sartTasi(i, -1)} disabled={i === 0} title="Yukarı taşı" className="p-1.5 rounded hover:bg-white/5 disabled:opacity-30" style={{ color: TEXT_MUTED }}><ArrowUp size={13} /></button>
+                        <button onClick={() => sartTasi(i, 1)} disabled={i === sartTaslak.length - 1} title="Aşağı taşı" className="p-1.5 rounded hover:bg-white/5 disabled:opacity-30" style={{ color: TEXT_MUTED }}><ArrowDown size={13} /></button>
+                        <button onClick={() => setSartTaslak((o) => o.filter((_, j) => j !== i))} disabled={sartTaslak.length <= 1} title="Maddeyi sil" className="p-1.5 rounded hover:bg-red-500/10 text-red-400 disabled:opacity-30"><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setSartTaslak((o) => [...o, ""])} disabled={sartTaslak.length >= SART_EN_COK} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER }}>
+                    <Plus size={12} /> Madde ekle
+                  </button>
+                  <button onClick={() => setSartTaslak([...VARSAYILAN_SARTLAR])} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                    <RotateCcw size={12} /> Varsayılan metne dön
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setSartDuzenle(false)} disabled={sartKaydediliyor} className="px-3 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
+                  <button onClick={sartKaydet} disabled={sartKaydediliyor} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white hover:brightness-110 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                    {sartKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Kaydet
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         {bugunkuOzelGunler.length > 0 && (
           <div className="mt-3 flex items-start gap-2 text-xs" style={{ color: TEXT_MUTED }}>
             <PartyPopper size={14} className="shrink-0 mt-px" style={{ color: "#F4A07C" }} />
@@ -603,13 +724,14 @@ export default function IcPiyasaPage() {
           <div className="mt-3 text-xs text-amber-400 space-y-0.5">
             {kirli && <p>Önce fiyat tablosundaki değişiklikleri kaydedin.</p>}
             {iletisimDuzenle && <p>Önce iletişim bilgisini kaydedin ya da vazgeçin.</p>}
+            {sartDuzenle && <p>Önce şartları kaydedin ya da vazgeçin.</p>}
             {!kirli && formEksikleri.slice(0, 6).map((e) => <p key={e}>{e}</p>)}
           </div>
         )}
       </div>
 
       {/* 3) OLUSTURULAN FORMLAR */}
-      <IcPiyasaGecmisFormlar formlar={formlar} />
+      <IcPiyasaGecmisFormlar formlar={formlar} silindi={(id) => setFormlar((o) => o.filter((f) => f.id !== id))} />
 
       <ConfirmDialog
         open={onayAcik}

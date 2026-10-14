@@ -7,6 +7,7 @@ import {
   fiyatYazi,
   formDosyaAdi,
   gunYazi,
+  eskiBicimForm,
   hitapYazi,
   kalemFiyatlari,
   kdvYazi,
@@ -23,7 +24,8 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  * Revize 12.10.2026: ozel gun bandi (PDF ile ayni kural, ozel-gunler.ts) ve
  * alt kutuda siparis sureci cumlesi.
  * Revize 14.10.2026: her urunde PESIN ve VADELI fiyat yan yana (ustlerinde
- * kucuk etiket, vadeli etiketinde vade); odeme bilgisi kaldirildi.
+ * kucuk etiket, vadeli etiketinde vade); odeme bilgisi kaldirildi. 14.10
+ * oncesi tek fiyatli formlar gonderildigi haliyle (tek fiyat) cizilir.
  */
 
 const G = 1080;
@@ -176,6 +178,7 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   const k = Math.max(0.6, satirH / 128);
   ctx.fillStyle = LACIVERT;
   ctx.fillRect(sol, ustY - 4, sag - sol, 3);
+  const eski = eskiBicimForm(form);
   form.kalemler.forEach((u, i) => {
     const y0 = ustY + i * satirH;
     if (i % 2 === 1) {
@@ -183,6 +186,26 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
       ctx.fillRect(sol, y0, sag - sol, satirH);
     }
     const orta = y0 + satirH / 2;
+    if (eski) {
+      // Ozgun tek fiyatli satir (14.10.2026 oncesi formlar)
+      ctx.textAlign = "left";
+      ctx.fillStyle = LACIVERT;
+      ctx.font = f(Math.round(38 * k), 600);
+      ctx.fillText(sigdir(ctx, `${u.urun}`, 560), sol + 16, orta - 10 * k);
+      ctx.fillStyle = SOLUK;
+      ctx.font = f(Math.round(23 * k), 400);
+      ctx.fillText(sigdir(ctx, `${u.ambalaj}  ·  ${vadeYazi(u.vade_gun)}  ·  ${u.odeme || "-"}  ·  ${u.teslim}`, 620), sol + 16, orta + 28 * k);
+      ctx.textAlign = "right";
+      ctx.fillStyle = MUREKKEP;
+      ctx.font = f(Math.round(54 * k), 700);
+      ctx.fillText(fiyatYazi(u.birim_fiyat), sag - 16, orta + 6 * k);
+      ctx.fillStyle = u.kdv_dahil ? LACIVERT : SOLUK;
+      ctx.font = f(Math.round(20 * k), 600);
+      ctx.fillText(`TL/kg · ${kdvYazi(u.kdv_dahil)}`, sag - 16, orta + 36 * k);
+      ctx.fillStyle = CIZGI;
+      ctx.fillRect(sol, y0 + satirH - 2, sag - sol, 2);
+      return;
+    }
     const fiyat = kalemFiyatlari(u);
     // Sag: iki fiyat sutunu (vadeli en sagda, pesin solunda)
     const vadeliSag = sag - 16;

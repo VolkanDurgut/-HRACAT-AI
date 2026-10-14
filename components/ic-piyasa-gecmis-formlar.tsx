@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { FileDown, Image as ImageIcon, Share2, Loader2, FileText } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG } from "@/lib/theme";
-import { IcFiyatFormu, formDosyaAdi, formGecerliMi, gunYazi, onayZamaniYazi } from "@/lib/ic-piyasa/fiyat-formu";
+import { IcFiyatFormu, eskiBicimForm, formDosyaAdi, formGecerliMi, gunYazi, onayZamaniYazi } from "@/lib/ic-piyasa/fiyat-formu";
 
 /**
  * Ic Piyasa - olusturulan (onaylanmis) fiyat formlari listesi (11.10.2026).
@@ -96,7 +96,10 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
                 const gecerli = formGecerliMi(f.gecerlilik_bitis);
                 return (
                   <tr key={f.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
-                    <td className="px-3 py-2.5 font-semibold text-white whitespace-nowrap">{f.form_no}</td>
+                    <td className="px-3 py-2.5 font-semibold text-white whitespace-nowrap">
+                      {f.form_no}
+                      {eskiBicimForm(f) && <span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }} title="14.10.2026 öncesi onaylandı; PDF ve görsel gönderildiği haliyle (tek fiyat, vade ve ödeme) çıkar.">Tek fiyatlı (eski biçim)</span>}
+                    </td>
                     <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>
                       {onayZamaniYazi(f.onay_zamani)}
                       {f.olusturan_email && <span className="block text-[10px]">{f.olusturan_email}</span>}

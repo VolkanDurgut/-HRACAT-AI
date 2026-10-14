@@ -889,7 +889,10 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `birim_fiyat` / `odeme` sütunları eski, panel YAZMAZ/OKUMAZ. Form kalemi iki kuşak:
   yeni {pesin_fiyat, vadeli_fiyat, vade_gun|null}, eski {birim_fiyat, vade_gun(0=peşin),
   odeme} — OKUMA HER ZAMAN `kalemFiyatlari()` ile (eski tek fiyat vadesine göre peşin ya da
-  vadeli sütununa düşer). PDF: iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
+  vadeli sütununa düşer). ESKİ (tek fiyatlı) formlar (`eskiBicimForm`: hiçbir kalemde
+  pesin_fiyat/vadeli_fiyat anahtarı yok) PDF ve görselde GÖNDERİLDİĞİ HALİYLE çizilir
+  (Vade / Ödeme / Teslim / Birim Fiyat — c167fd9 çıktısıyla piksel aynı, ölçüldü); listede
+  "Tek fiyatlı (eski biçim)" etiketi. PDF (yeni formlar): iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
   + KDV"); görsel: her satırda PEŞİN / VADELİ · 30 GÜN etiketli iki fiyat. İş emri formu:
   her ürün için "Peşin" ve "Vadeli · N Gün" düğmeleri (peşin → vade 0); iş emrinin kendi
   Ödeme alanı (Çek/Havale) DURUR, formdan doldurulmaz. Test: Playwright, bellekte Supabase

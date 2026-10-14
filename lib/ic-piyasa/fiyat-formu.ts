@@ -53,6 +53,15 @@ export type FormKalemi = {
   odeme?: string;
 };
 
+/**
+ * Form 14.10.2026 oncesi (tek fiyatli) bicimde mi onaylandi? Onaylanan form
+ * DEGISTIRILEMEZ ilkesi geregi bu formlar PDF / gorselde GONDERILDIGI HALIYLE
+ * (Vade / Odeme / Birim Fiyat) cizilir; bos "Pesin" sutunu gosterilmez.
+ */
+export function eskiBicimForm(form: { kalemler: FormKalemi[] }): boolean {
+  return form.kalemler.length > 0 && form.kalemler.every((k) => !("pesin_fiyat" in k) && !("vadeli_fiyat" in k));
+}
+
 /** Bir form kaleminin fiyatlari (eski/yeni kusak ayni bicimde). */
 export type KalemFiyatlari = { pesin: number | null; vadeli: number | null; vadeGun: number | null };
 

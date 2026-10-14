@@ -41,7 +41,9 @@ export type KullaniciYetkileri = {
 // ----------------------------------------------------------------------------
 const SUPER_ADMIN_EMAILS = [
   "volkandurgut.tr@gmail.com",
-  "buraktuncay@unex.com.tr",
+  // Burak Tuncay: giris e-postasi 14.10.2026'da buraktuncay@ -> bbt@ oldu
+  // (migration 20261014150000; RLS politikalarindaki liste ile AYNI olmali).
+  "bbt@unex.com.tr",
 ];
 
 const SUPER_ADMIN_EMAILS_LOWER = SUPER_ADMIN_EMAILS.map(e => e.toLowerCase());

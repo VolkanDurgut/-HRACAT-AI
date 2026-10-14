@@ -1133,6 +1133,22 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   MTS) açılıp bağlandı; dosya kalemleri standart oransal kuralla 250 MTS /
   118.750 USD (10 FCL) yapıldı (önceki: 500 MTS / 237.500 USD; denetim kaydında).
 
+## Burak Tuncay giriş e-postası (14.10.2026)
+
+- `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,
+  aynı şifre / rol / yetkiler). Migration `20261014150000_burak_eposta_bbt.sql`
+  (tek transaction): 3 RLS politikası (kullanici_yetkileri yönetimi,
+  ihracat_dosyalari okuma, denetim okuma), auth.users + auth.identities,
+  kullanici_yetkileri.email. Kod: `SUPER_ADMIN_EMAILS` (lib/auth-context.tsx).
+  Aynı komut önce panelden elle açılmış BOŞ `bbt@` hesabını (7c41b472…, hiç
+  giriş yok) ve tetikleyicinin onun için açtığı boş şirketi (32a8d2cc…) korumalı
+  biçimde siler. Panelden elle kullanıcı açmak `handle_new_user` ile AYRI şirket
+  oluşturur — kullanıcılar mevcut şirkete bağlanacak şekilde eklenmeli.
+  Süper admin e-postası değişirse bu ikisi BİRLİKTE güncellenir.
+- Eski formlardaki (iletisim = NULL) "buraktuncay@" bilgisi bilinçli olarak
+  korunur (`VARSAYILAN_ILETISIM`; form gönderildiği haliyle açılır). Yeni
+  formlar panel ayarından (bbt@) gelir.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

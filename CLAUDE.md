@@ -283,6 +283,17 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Yeni bir ülke/yazım tanınmazsa `ULKELER` listesine eklenir.
 - Daha önce gönderilmiş fatura talimatlarının KAYITLI mail metni
   (`fatura_talimati_metni`) değişmez; PDF her zaman güncel veriden üretilir.
+- Ürün başına konteyner adedi (muhasebe, 14.10.2026, 0094: 2 BOUHO @465 +
+  2 Ble d'Or @490): PDF ürün tablosunda "Konteyner" + "Miktar (MTS)" sütunları,
+  mailde ürün satırının sonunda `[2 konteyner, 50 MTS]`. Tek kaynak
+  `lib/urun-konteyner-dagilimi.ts` (saf fonksiyon). Kural Packing List ile
+  aynı: konteynerin MARKASI ürün adının içinde geçiyorsa o ürüne sayılır
+  (büyük/küçük harf, ' / ’ farkı yok). Marka tek satırı gösteriyorsa kesin;
+  aynı marka birden çok satırda (0092: 2 × SAAD, fark proforma/fiyat) ya da
+  hiç eşleşme yoksa MİKTARA göre paylaştırılır ve `*` + dipnotla "tahmini"
+  işaretlenir. Kısmi eşleşmede eşleşmeyenler sessizce bir ürüne yazılmaz,
+  `!` dipnotuyla bildirilir. Çok ürünlü dosyada doğru sonuç için ürün adına
+  marka yazılmalı: "ALL PURPOSE WHEAT FLOUR (BOUHO BRAND)".
 
 ## Rezervasyon silme
 

@@ -7,6 +7,7 @@ import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, 
 import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -169,28 +170,41 @@ function ciz(
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
       const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
 
-  const urunRows = urunler.map((u) => {
+  // Muhasebe talebi (14.10.2026): hangi urunden kac konteyner yuklendi.
+  const dagilim = urunKonteynerDagilimi(urunler, konteynerler as any[]);
+  const konteynerHucresi = (i: number) => {
+    const s = dagilim.satirlar[i];
+    if (!s || konteynerler.length === 0) return "-";
+    return s.tahmini ? `${s.konteyner}*` : String(s.konteyner);
+  };
+  const miktarHucresi = (u: any) => {
+    const m = kalemMiktari(u);
+    return m ? m.toLocaleString("tr-TR", { maximumFractionDigits: 3 }) : "-";
+  };
+  const urunRows = urunler.map((u, i) => {
     const ad = u.urun_adi || u.description || "Urun";
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "-";
     const proformaBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
     // FOB teslimde proforma fiyati FOB'dur: FOB sutununa yazilir, CIF bos kalir.
-    if (fiyatlarFob) return [ad, ambalajBoyutu, "-", formatBirimFiyatKg(proformaBirim)];
+    if (fiyatlarFob) return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), "-", formatBirimFiyatKg(proformaBirim)];
     const cifBirim = proformaBirim;
     const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
     // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu 3 ondalikli
     // ve para birimi sembolsuz gosterilir (orn. "0,460") - sistemde TON (MT)
     // basina tutulan deger degismez, sadece bu tablodaki goruntuleme boyle.
-    return [ad, ambalajBoyutu, formatBirimFiyatKg(cifBirim), fobBirim !== null ? formatBirimFiyatKg(fobBirim) : "-"];
+    return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), formatBirimFiyatKg(cifBirim), fobBirim !== null ? formatBirimFiyatKg(fobBirim) : "-"];
   });
 
   if (urunRows.length > 0) {
     autoTable(doc, {
       startY: y,
       head: [
-            [{ content: "URUN VE FIYAT BILGILERI", colSpan: 4 }],
+            [{ content: "URUN VE FIYAT BILGILERI", colSpan: 6 }],
             [
               { content: "Urun", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
               { content: "Ambalaj", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
+              { content: "Konteyner", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal", halign: "center" } },
+              { content: "Miktar (MTS)", styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal", halign: "center" } },
               { content: `CIF Birim Fiyat (${dosya.para_birimi || "USD"}/KG)`, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
               { content: `FOB Birim Fiyat (${dosya.para_birimi || "USD"}/KG)`, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal" } },
             ],
@@ -198,11 +212,15 @@ function ciz(
       body: urunRows,
       theme: "grid",
       styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu },
+      columnStyles: { 2: { halign: "center", cellWidth: 20 }, 3: { halign: "center", cellWidth: 22 } },
       headStyles: { fillColor: LACIVERT, textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
       foot: [
         [
           "Toplam",
           "",
+          // columnStyles footer'a uygulanmaz: ortalama hucre bazinda verilir
+          { content: konteynerler.length ? String(dagilim.toplamKonteyner) : "-", styles: { halign: "center" } },
+          { content: toplamMiktar ? toplamMiktar.toLocaleString("tr-TR", { maximumFractionDigits: 3 }) : "-", styles: { halign: "center" } },
           fiyatlarFob ? "-" : `${formatCurrency(toplamCif, dosya.para_birimi)} ${dosya.para_birimi || "USD"}`,
           toplamFob !== null ? `${formatCurrency(toplamFob, dosya.para_birimi)} ${dosya.para_birimi || "USD"}` : "-",
         ],
@@ -211,6 +229,20 @@ function ciz(
       margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
     });
     y = (doc as any).lastAutoTable.finalY + tablolarArasiBosluk;
+    // Dipnot: miktara gore paylastirilan / urune baglanamayan konteyner varsa
+    const notlar: string[] = [];
+    if (dagilim.satirlar.some((s) => s.tahmini)) notlar.push("* Konteyner markasi urunu ayirt etmiyor; konteyner adedi urun miktarina gore paylastirildi.");
+    if (dagilim.eslesmeyen > 0) notlar.push(`! ${dagilim.eslesmeyen} konteynerin markasi hicbir urunle eslesmedi - konteyner markalarini kontrol edin.`);
+    if (notlar.length) {
+      doc.setFont("Roboto", "normal");
+      doc.setFontSize(Math.max(6, fontBoyu - 1));
+      doc.setTextColor(...GRI);
+      notlar.forEach((n) => {
+        doc.text(n, marginX, y + 1.5);
+        y += Math.max(2.8, 3.4 * olcek);
+      });
+      y += tablolarArasiBosluk;
+    }
   }
 
   // --- Konteyner tablosu (gercek sutunlu tablo + TOPLAM satiri) ---

@@ -9,6 +9,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-dagilimi";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 
 type Props = {
@@ -61,7 +62,16 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     const toplamFob = fiyatlarFob ? toplamCif : dusulecekVarMi ? toplamCif - toplamDusulecek : null;
     const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
     const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
-    const urunSatirlari = urunler.map((u: any) => {
+    // Muhasebe talebi (14.10.2026): her urunden kac konteyner / kac MTS (PDF ile ayni hesap).
+    const dagilim = urunKonteynerDagilimi(urunler as any[], konteynerler as any[]);
+    const adetEki = (u: any, i: number) => {
+      const parcalar = [
+        konteynerler.length && dagilim.satirlar[i] ? konteynerAdetYazi(dagilim.satirlar[i]) : null,
+        kalemMiktari(u) ? `${kalemMiktari(u).toLocaleString("tr-TR", { maximumFractionDigits: 3 })} MTS` : null,
+      ].filter(Boolean);
+      return parcalar.length ? ` [${parcalar.join(", ")}]` : "";
+    };
+    const urunSatirlari = urunler.map((u: any, i: number) => {
       const ad = u.urun_adi || u.description || "Urun";
       // Ayni urun adiyla farkli ambalaj boyutunda (orn. 25 KG / 50 KG) birden
       // fazla kalem olabilir - ayirt edilebilmesi icin ambalaj boyutu da yazilir.
@@ -71,9 +81,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       // Muhasebe talebi: birim fiyatlar KG basina, virgullu 3 ondalikli, para
       // birimi sembolsuz (orn. "0,460") - PDF versiyonuyla tutarli.
       const birim = dosya.para_birimi || "USD";
-      if (fiyatlarFob) return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: FOB ${formatBirimFiyatKg(cifBirim)} ${birim}/KG`;
-      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
-    }).join("\n");
+      if (fiyatlarFob) return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}${adetEki(u, i)}: FOB ${formatBirimFiyatKg(cifBirim)} ${birim}/KG`;
+      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}${adetEki(u, i)}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
+    }).join("\n") + (dagilim.eslesmeyen > 0 ? `\n  ! ${dagilim.eslesmeyen} konteynerin markasi hicbir urunle eslesmedi - kontrol edin.` : "");
     const konteynerSatirlari = konteynerler.map((k, i) => {
       // Muhur/Tip/Marka/Kap/Net/Brut/VGM/Tartim Tarihi - sadece dolu olanlar yazilir.
       const detaylar = [

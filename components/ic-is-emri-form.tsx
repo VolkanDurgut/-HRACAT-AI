@@ -16,15 +16,19 @@ import {
   fiyatYazi,
   formGecerliMi,
   gunYazi,
+  kalemFiyatlari,
   kdvYazi,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
 
 /**
  * Is emri ac / duzenle (12.10.2026).
- * Fiyat, vade, odeme ve teslim GECERLI fiyat formundan tek tikla doldurulur
+ * Fiyat, vade ve teslim GECERLI fiyat formundan tek tikla doldurulur
  * (form numarasi is emrine yazilir); Burak Bey ozel fiyat verdiyse alanlar
  * elle degistirilebilir. Hedef: TONAJ (ton) veya ARAC SAYISI.
+ * 14.10.2026: formda her urunun PESIN ve VADELI fiyati ayri; hangisine
+ * tiklanirsa o fiyat + vade (pesin = 0 gun) yazilir. Odeme sekli formda
+ * olmadigi icin is emrinde elle secilir (degistirilmez).
  */
 
 type Props = {
@@ -135,18 +139,20 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
   const gecerliForm = formlar.find((f) => formGecerliMi(f.gecerlilik_bitis)) || null;
   const kaynakForm = gecerliForm || formlar[0] || null;
 
-  const formdanDoldur = (kalemIndex: number) => {
+  const formdanDoldur = (kalemIndex: number, tur: "pesin" | "vadeli") => {
     if (!kaynakForm) return;
     const k = kaynakForm.kalemler[kalemIndex];
     if (!k) return;
+    const f = kalemFiyatlari(k);
+    const fiyat = tur === "pesin" ? f.pesin : f.vadeli;
+    if (fiyat === null) return;
     setTaslak((t) => ({
       ...t,
       urun: k.urun,
       ambalaj: k.ambalaj,
-      birim_fiyat: fiyatYazi(k.birim_fiyat),
+      birim_fiyat: fiyatYazi(fiyat),
       kdv_dahil: !!k.kdv_dahil,
-      vade_gun: String(k.vade_gun),
-      odeme: k.odeme,
+      vade_gun: tur === "pesin" ? "0" : String(f.vadeGun ?? ""),
       teslim: k.teslim,
       fiyat_formu_id: kaynakForm.id,
       fiyat_formu_no: kaynakForm.form_no,
@@ -215,7 +221,11 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
     if (!taslak.fiyat_formu_id || !kaynakForm || kaynakForm.id !== taslak.fiyat_formu_id) return false;
     const k = kaynakForm.kalemler.find((x) => x.urun === taslak.urun && x.ambalaj === taslak.ambalaj);
     const f = sayiOku(taslak.birim_fiyat);
-    return !!k && f !== null && !Number.isNaN(f) && Math.abs(k.birim_fiyat - f) > 0.001;
+    if (!k || f === null || Number.isNaN(f)) return false;
+    // Pesin is emri (vade 0) formun pesin fiyatiyla, vadeli is emri vadeli fiyatla karsilastirilir
+    const ff = kalemFiyatlari(k);
+    const formFiyati = taslak.vade_gun === "0" ? ff.pesin : ff.vadeli;
+    return formFiyati === null || Math.abs(formFiyati - f) > 0.001;
   })();
 
   return (
@@ -266,18 +276,29 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
                   {gecerliForm
                     ? <span className="text-emerald-400">· {gunYazi(kaynakForm.gecerlilik_bitis)} tarihine kadar geçerli</span>
                     : <span className="text-amber-400">· süresi doldu ({gunYazi(kaynakForm.gecerlilik_bitis)}); fiyatları kontrol edin</span>}
-                  <span>· Ürüne tıklayınca fiyat, vade, ödeme ve teslim doldurulur.</span>
+                  <span>· Peşin veya vadeli fiyata tıklayınca fiyat, vade ve teslim doldurulur.</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {kaynakForm.kalemler.map((k, i) => {
-                    const secili = taslak.fiyat_formu_id === kaynakForm.id && taslak.urun === k.urun && taslak.ambalaj === k.ambalaj;
+                    const f = kalemFiyatlari(k);
+                    const ayniUrun = taslak.fiyat_formu_id === kaynakForm.id && taslak.urun === k.urun && taslak.ambalaj === k.ambalaj;
+                    const secenekler = [
+                      { tur: "pesin" as const, etiket: "Peşin", fiyat: f.pesin, secili: ayniUrun && taslak.vade_gun === "0" },
+                      { tur: "vadeli" as const, etiket: `Vadeli · ${vadeYazi(f.vadeGun)}`, fiyat: f.vadeli, secili: ayniUrun && taslak.vade_gun !== "0" && taslak.vade_gun === String(f.vadeGun ?? "") },
+                    ].filter((x) => x.fiyat !== null);
                     return (
-                      <button key={i} type="button" onClick={() => formdanDoldur(i)}
-                        className="px-2.5 py-1.5 rounded-lg border text-xs text-left transition-colors hover:bg-white/5"
-                        style={secili ? { borderColor: ACCENT, backgroundColor: "rgba(16,185,129,0.12)", color: "white" } : { borderColor: CARD_BORDER, color: "white" }}>
-                        <span className="font-medium">{k.urun}</span> <span style={{ color: TEXT_MUTED }}>{k.ambalaj}</span>
-                        <span className="block font-semibold">{fiyatYazi(k.birim_fiyat)} <span className="font-normal" style={{ color: TEXT_MUTED }}>TL/kg · {kdvYazi(k.kdv_dahil)}</span></span>
-                      </button>
+                      <div key={i} className="rounded-lg border px-2.5 py-1.5 text-xs" style={{ borderColor: ayniUrun ? ACCENT : CARD_BORDER }}>
+                        <p className="text-white"><span className="font-medium">{k.urun}</span> <span style={{ color: TEXT_MUTED }}>{k.ambalaj} · {kdvYazi(k.kdv_dahil)}</span></p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {secenekler.map((x) => (
+                            <button key={x.tur} type="button" onClick={() => formdanDoldur(i, x.tur)} aria-pressed={x.secili}
+                              className="px-2 py-1 rounded-md border text-left transition-colors hover:bg-white/5"
+                              style={x.secili ? { borderColor: ACCENT, backgroundColor: "rgba(16,185,129,0.12)", color: "white" } : { borderColor: CARD_BORDER, color: "white" }}>
+                              <span style={{ color: TEXT_MUTED }}>{x.etiket}</span> <span className="font-semibold">{fiyatYazi(x.fiyat)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>

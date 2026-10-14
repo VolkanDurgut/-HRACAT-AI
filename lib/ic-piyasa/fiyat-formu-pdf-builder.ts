@@ -12,6 +12,7 @@ import {
   formDosyaAdi,
   formSartlari,
   gunYazi,
+  kalemFiyatlari,
   kdvYazi,
   onayZamaniYazi,
   vadeYazi,
@@ -29,6 +30,9 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  *   - Ozel gun bandi (lib/ic-piyasa/ozel-gunler.ts): formun haftasina denk
  *     gelen milli / dini bayram, kandil, yilbasi.
  *   - Urun ve fiyat tablosu (BUYUK fiyat + "TL/kg · + KDV").
+ *     Revize 14.10.2026: PESIN ve VADELI fiyat yan yana iki sutun (vadeli
+ *     fiyatin altinda vadesi); Odeme sutunu kaldirildi. Fiyati olmayan
+ *     sutunda "—". Eski formlar kalemFiyatlari() ile ayni duzende cikar.
  *   - Bilgilendirme ve sevkiyat sartlari (formSartlari, 4 madde).
  *   - Siparis sureci zaman cizelgesi (SIPARIS_SURECI, 4 adim) - kase / imza
  *     alani YOK (kullanici karari: her iki taraf icin de kaldirildi).
@@ -49,6 +53,7 @@ const MUREKKEP: RGB = [29, 35, 51];
 const GOVDE: RGB = [74, 81, 99];
 const SOLUK: RGB = [118, 126, 143];
 const CIZGI: RGB = [226, 229, 237];
+const CIZGI_KOYU: RGB = [176, 182, 197]; // fiyati olmayan sutundaki "—"
 const KART_ZEMIN: RGB = [247, 248, 251];
 const BANT_ACIK: RGB = [196, 203, 230];
 const BEYAZ: RGB = [255, 255, 255];
@@ -61,13 +66,12 @@ const ALT_BILGI_Y = 267; // alt bilginin ust cizgisi
 const SAYFA_SONU = ALT_BILGI_Y - 4; // icerik bu cizgiyi gecmez
 const DEVAM_UST = 30; // devam sayfalarinda icerigin basladigi y
 
-// Urun tablosu sutunlari (mm)
+// Urun tablosu sutunlari (mm). Pesin / vadeli fiyat saga yasli iki sutun.
 const SUTUN = {
   urun: KENAR + 5,
-  vade: KENAR + 74,
-  odeme: KENAR + 94,
-  teslim: KENAR + 119,
-  fiyatSag: SAYFA_G - KENAR - 5,
+  teslim: KENAR + 76,
+  pesinSag: KENAR + 132,
+  vadeliSag: SAYFA_G - KENAR - 5,
 };
 
 type Yazi = "r" | "s" | "b";
@@ -316,10 +320,9 @@ function tabloBasligi(doc: jsPDF, y: number): number {
   const ty = y + 5.6;
   const b = { tip: "s" as Yazi, boy: 7, renk: BEYAZ };
   yazi(doc, "ÜRÜN / AMBALAJ", SUTUN.urun, ty, b);
-  yazi(doc, "VADE", SUTUN.vade, ty, b);
-  yazi(doc, "ÖDEME", SUTUN.odeme, ty, b);
   yazi(doc, "TESLİM", SUTUN.teslim, ty, b);
-  yazi(doc, "BİRİM FİYAT", SUTUN.fiyatSag, ty, { ...b, hiza: "right" });
+  yazi(doc, "PEŞİN FİYAT", SUTUN.pesinSag, ty, { ...b, hiza: "right" });
+  yazi(doc, "VADELİ FİYAT", SUTUN.vadeliSag, ty, { ...b, hiza: "right" });
   return y + h;
 }
 
@@ -456,18 +459,21 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
       doc.setFillColor(250, 251, 253);
       doc.rect(KENAR, y, ICERIK_G, satirH, "F");
     }
-    yazi(doc, k.urun, SUTUN.urun, y + 5 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
+    const urunSatiri = bol(doc, k.urun, SUTUN.teslim - SUTUN.urun - 4, "s", 10.4)[0];
+    yazi(doc, urunSatiri, SUTUN.urun, y + 5 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
     yazi(doc, k.ambalaj, SUTUN.urun, y + 8.9 + kay, { tip: "r", boy: 7.8, renk: SOLUK });
-    yazi(doc, vadeYazi(k.vade_gun), SUTUN.vade, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
-    yazi(doc, k.odeme, SUTUN.odeme, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
     yazi(doc, k.teslim, SUTUN.teslim, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
-    yazi(doc, fiyatYazi(k.birim_fiyat), SUTUN.fiyatSag, y + 6.1 + kay, { tip: "b", boy: 13, renk: MUREKKEP, hiza: "right" });
-    yazi(doc, `TL/kg · ${kdvYazi(k.kdv_dahil)}`, SUTUN.fiyatSag, y + 9.5 + kay, {
-      tip: "s",
-      boy: 6.6,
-      renk: k.kdv_dahil ? LACIVERT : SOLUK,
-      hiza: "right",
-    });
+    const fiyat = kalemFiyatlari(k);
+    const fiyatHucresi = (deger: number | null, sag: number, alt: string) => {
+      if (deger === null) {
+        yazi(doc, "—", sag, y + 7.2 + kay, { tip: "s", boy: 11, renk: CIZGI_KOYU, hiza: "right" });
+        return;
+      }
+      yazi(doc, fiyatYazi(deger), sag, y + 6.1 + kay, { tip: "b", boy: 13, renk: MUREKKEP, hiza: "right" });
+      yazi(doc, alt, sag, y + 9.5 + kay, { tip: "s", boy: 6.6, renk: k.kdv_dahil ? LACIVERT : SOLUK, hiza: "right" });
+    };
+    fiyatHucresi(fiyat.pesin, SUTUN.pesinSag, `TL/kg · ${kdvYazi(k.kdv_dahil)}`);
+    fiyatHucresi(fiyat.vadeli, SUTUN.vadeliSag, `${vadeYazi(fiyat.vadeGun)} vade · ${kdvYazi(k.kdv_dahil)}`);
     y += satirH;
     doc.setDrawColor(...CIZGI);
     doc.setLineWidth(0.2);

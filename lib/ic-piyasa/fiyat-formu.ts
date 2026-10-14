@@ -10,33 +10,68 @@
  * Ihracat tarafiyla hicbir baglantisi yoktur.
  */
 
-/** Panelde duzenlenen guncel satir (ic_fiyat_kalemleri). */
+/**
+ * Panelde duzenlenen guncel satir (ic_fiyat_kalemleri).
+ * Revize 14.10.2026: her urunun PESIN ve VADELI fiyati ayri tutulur
+ * (migration 20261014100000); vade_gun sadece vadeli fiyata aittir. Eski
+ * birim_fiyat / odeme sutunlari veritabaninda durur ama panel kullanmaz.
+ */
 export type IcFiyatKalemi = {
   id: string;
   company_id: string;
   sira: number;
   urun: string;
   ambalaj: string | null;
-  birim_fiyat: number | null;
-  vade_gun: number | null; // 0 = Pesin
-  odeme: string | null;
+  pesin_fiyat: number | null;
+  vadeli_fiyat: number | null;
+  /** Vadeli fiyatin vadesi (gun). */
+  vade_gun: number | null;
   teslim: string | null;
   /** true = fiyata KDV dahil, false = KDV hariç (+ KDV). Migration 20261011230000. */
   kdv_dahil: boolean;
   guncelleme: string;
 };
 
-/** Onaylanan formda dondurulmus satir (ic_fiyat_formlari.kalemler). */
+/**
+ * Onaylanan formda dondurulmus satir (ic_fiyat_formlari.kalemler, jsonb).
+ * Iki kusak vardir; okurken HER ZAMAN kalemFiyatlari() kullanilir:
+ *  - 14.10.2026 sonrasi: pesin_fiyat / vadeli_fiyat (+ vade_gun = vadeli vadesi)
+ *  - oncesi (FBF-2026-0001): tek birim_fiyat + vade_gun (0 = pesin) + odeme
+ */
 export type FormKalemi = {
   urun: string;
   ambalaj: string;
-  birim_fiyat: number;
-  vade_gun: number;
-  odeme: string;
+  pesin_fiyat?: number | null;
+  vadeli_fiyat?: number | null;
+  vade_gun: number | null;
   teslim: string;
   /** Eski formlarda (11.10.2026 oncesi) alan yok -> KDV haric sayilir. */
   kdv_dahil?: boolean;
+  /** Sadece eski formlarda. */
+  birim_fiyat?: number;
+  /** Sadece eski formlarda (artik formda gosterilmez). */
+  odeme?: string;
 };
+
+/** Bir form kaleminin fiyatlari (eski/yeni kusak ayni bicimde). */
+export type KalemFiyatlari = { pesin: number | null; vadeli: number | null; vadeGun: number | null };
+
+function sayiVeyaNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function kalemFiyatlari(k: FormKalemi): KalemFiyatlari {
+  if ("pesin_fiyat" in k || "vadeli_fiyat" in k) {
+    const vadeli = sayiVeyaNull(k.vadeli_fiyat);
+    return { pesin: sayiVeyaNull(k.pesin_fiyat), vadeli, vadeGun: vadeli !== null ? k.vade_gun ?? null : null };
+  }
+  // Eski kusak: tek fiyat; vade 0 ise pesin, degilse o vadenin vadeli fiyati
+  const birim = sayiVeyaNull(k.birim_fiyat);
+  if (k.vade_gun === 0) return { pesin: birim, vadeli: null, vadeGun: null };
+  return { pesin: null, vadeli: birim, vadeGun: birim !== null ? k.vade_gun ?? null : null };
+}
 
 /** Onaylanmis form (ic_fiyat_formlari). */
 export type IcFiyatFormu = {
@@ -54,10 +89,14 @@ export type IcFiyatFormu = {
  *  (migration 20261011200000: onay gunu + 3). */
 export const GECERLILIK_GUN = 3;
 
+/** Is emrindeki odeme sekli (fiyat tablosunda / formda artik yok, 14.10.2026). */
 export const ODEME_SECENEKLERI = ["Nakit / Havale", "Çek", "Kredi Kartı"];
 export const TESLIM_SECENEKLERI = ["Fabrika Teslim", "Adrese Teslim"];
 export const AMBALAJ_SECENEKLERI = ["Dökme", "30 kg Çuval", "35 kg Çuval"];
+/** Is emri vadesi (0 = Pesin). */
 export const VADE_SECENEKLERI = [0, 7, 10, 15, 20, 30, 45, 60];
+/** Fiyat tablosunda vadeli fiyatin vadesi (pesin ayri sutun oldugu icin 0 yok). */
+export const VADELI_VADE_SECENEKLERI = VADE_SECENEKLERI.filter((g) => g > 0);
 
 /** Panel bossa tek tikla yuklenen baslangic listesi (siparis raporundaki
  *  yan mamuller; fiyatlar BOS gelir, Burak Bey doldurur). */
@@ -138,13 +177,14 @@ export function hitapYazi(alici: string | null | undefined): string {
  * Panel satirinin forma girmeye hazir olup olmadigini soyler. Eksik varsa
  * kullaniciya gosterilecek Turkce aciklama dondurur, yoksa null.
  */
-export function satirEksigi(k: Pick<IcFiyatKalemi, "urun" | "ambalaj" | "birim_fiyat" | "vade_gun" | "odeme" | "teslim">): string | null {
+export function satirEksigi(k: Pick<IcFiyatKalemi, "urun" | "ambalaj" | "pesin_fiyat" | "vadeli_fiyat" | "vade_gun" | "teslim">): string | null {
   const eksik: string[] = [];
+  const pesin = sayiVeyaNull(k.pesin_fiyat);
+  const vadeli = sayiVeyaNull(k.vadeli_fiyat);
   if (!k.urun?.trim()) eksik.push("ürün");
   if (!k.ambalaj?.trim()) eksik.push("ambalaj");
-  if (k.birim_fiyat === null || k.birim_fiyat === undefined || !(k.birim_fiyat > 0)) eksik.push("birim fiyat");
-  if (k.vade_gun === null || k.vade_gun === undefined) eksik.push("vade");
-  if (!k.odeme?.trim()) eksik.push("ödeme");
+  if (pesin === null && vadeli === null) eksik.push("peşin veya vadeli fiyat");
+  if (vadeli !== null && !(Number(k.vade_gun) > 0)) eksik.push("vadeli fiyatın vadesi");
   if (!k.teslim?.trim()) eksik.push("teslim");
   return eksik.length ? eksik.join(", ") : null;
 }
@@ -153,15 +193,19 @@ export function satirEksigi(k: Pick<IcFiyatKalemi, "urun" | "ambalaj" | "birim_f
 export function formKalemleri(satirlar: IcFiyatKalemi[]): FormKalemi[] {
   return [...satirlar]
     .sort((a, b) => a.sira - b.sira)
-    .map((k) => ({
-      urun: k.urun.trim(),
-      ambalaj: (k.ambalaj || "").trim(),
-      birim_fiyat: Number(k.birim_fiyat),
-      vade_gun: Number(k.vade_gun),
-      odeme: (k.odeme || "").trim(),
-      teslim: (k.teslim || "").trim(),
-      kdv_dahil: !!k.kdv_dahil,
-    }));
+    .map((k) => {
+      const vadeli = sayiVeyaNull(k.vadeli_fiyat);
+      return {
+        urun: k.urun.trim(),
+        ambalaj: (k.ambalaj || "").trim(),
+        pesin_fiyat: sayiVeyaNull(k.pesin_fiyat),
+        vadeli_fiyat: vadeli,
+        // Vade sadece vadeli fiyat varsa anlamlidir
+        vade_gun: vadeli !== null ? Number(k.vade_gun) : null,
+        teslim: (k.teslim || "").trim(),
+        kdv_dahil: !!k.kdv_dahil,
+      };
+    });
 }
 
 /**

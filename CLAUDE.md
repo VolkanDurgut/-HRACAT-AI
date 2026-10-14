@@ -879,7 +879,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `SayfaYetkileri` tipi + varsayılanlar (`lib/auth-context.tsx`), `SAYFA_YETKI_MAP`
   (`components/app-shell.tsx`), `ilkErisilebilirSayfa` (en sonda), Yetkilendirme etiketi.
   Mevcut kullanıcılarda anahtar yok → false; yetkiyi süper admin Yetkilendirme'den açar.
-- Yönetim paneli: Ürün / Ambalaj / Birim Fiyat (TL/kg, KDV hariç) / Vade (gün, 0 = Peşin) /
+- PEŞİN / VADELİ (14.10.2026, kullanıcı isteği): panel sütunları Ürün / Ambalaj / Peşin
+  Fiyat / Vadeli Fiyat / Vade / KDV / Teslim. ÖDEME sütunu panelden ve formdan KALDIRILDI.
+  `pesin_fiyat`, `vadeli_fiyat` (numeric 12,2; canlıda 12.10'da Gemini elle eklemişti →
+  migration `20261014100000_ic_piyasa_pesin_vadeli.sql` "if not exists" ile resmileştirdi,
+  canlıya uygulandı, veri değişmedi). `vade_gun` artık VADELİ fiyatın vadesi (seçenekler
+  7–60, `VADELI_VADE_SECENEKLERI`). Satır kuralı (`satirEksigi`): en az bir fiyat; vadeli
+  varsa vade > 0. Yalnız peşin/yalnız vadeli ürün olabilir → formda boş sütun "—".
+  `birim_fiyat` / `odeme` sütunları eski, panel YAZMAZ/OKUMAZ. Form kalemi iki kuşak:
+  yeni {pesin_fiyat, vadeli_fiyat, vade_gun|null}, eski {birim_fiyat, vade_gun(0=peşin),
+  odeme} — OKUMA HER ZAMAN `kalemFiyatlari()` ile (eski tek fiyat vadesine göre peşin ya da
+  vadeli sütununa düşer). PDF: iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
+  + KDV"); görsel: her satırda PEŞİN / VADELİ · 30 GÜN etiketli iki fiyat. İş emri formu:
+  her ürün için "Peşin" ve "Vadeli · N Gün" düğmeleri (peşin → vade 0); iş emrinin kendi
+  Ödeme alanı (Çek/Havale) DURUR, formdan doldurulmaz. Test: Playwright, bellekte Supabase
+  taklidi (panel kaydet gövdesinde birim_fiyat/odeme yok, form kalemleri, eski form PDF,
+  iş emri doldurma), yerel PG'de migration iki kez + canlı benzeri durum.
+- (14.10 öncesi) Yönetim paneli: Ürün / Ambalaj / Birim Fiyat (TL/kg, KDV hariç) / Vade (gün, 0 = Peşin) /
   Ödeme / Teslim satırları eklenir, düzenlenir, silinir, sıralanır → "Kaydet"
   (`ic_fiyat_kalemleri`). "Formu Onayla ve Oluştur" kayıtlı tabloyu `ic_fiyat_formlari.kalemler`
   içine DONDURUR; numara `FBF-YYYY-NNNN` (sayaç `ic_fiyat_formu_sira`) ve geçerlilik

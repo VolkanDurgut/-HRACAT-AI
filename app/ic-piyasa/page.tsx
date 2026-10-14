@@ -18,13 +18,13 @@ import {
   GECERLILIK_GUN,
   IcFiyatFormu,
   IcFiyatKalemi,
-  ODEME_SECENEKLERI,
   TESLIM_SECENEKLERI,
-  VADE_SECENEKLERI,
+  VADELI_VADE_SECENEKLERI,
   bugunTR,
   fiyatYazi,
   formKalemleri,
   gunYazi,
+  kalemFiyatlari,
   satirEksigi,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
@@ -32,8 +32,9 @@ import {
 /**
  * IC PIYASA - Yan Mamul Fiyat Bilgilendirme Formu yonetim paneli (11.10.2026).
  *
- * 1) Fiyat tablosu: Urun / Ambalaj / Birim Fiyat / Vade / Odeme / Teslim
- *    satirlari eklenir, duzenlenir, silinir, siralanir -> "Kaydet".
+ * 1) Fiyat tablosu: Urun / Ambalaj / Pesin Fiyat / Vadeli Fiyat / Vade /
+ *    KDV / Teslim satirlari eklenir, duzenlenir, silinir, siralanir -> "Kaydet".
+ *    (14.10.2026: pesin ve vadeli fiyat ayri; Odeme sutunu kaldirildi.)
  * 2) "Formu Onayla ve Olustur": kayitli tablo dondurulur, sunucu FBF-YYYY-NNNN
  *    numarasi ve onay + 3 gun gecerlilik verir, PDF iner.
  * 3) Olusturulan formlar: PDF / telefon gorseli / paylas.
@@ -47,9 +48,9 @@ type Satir = {
   id: string | null;
   urun: string;
   ambalaj: string;
-  fiyat: string; // kullanicinin yazdigi metin ("13,15")
-  vade_gun: number | null;
-  odeme: string;
+  pesin: string; // kullanicinin yazdigi metin ("13,15")
+  vadeli: string;
+  vade_gun: number | null; // vadeli fiyatin vadesi
   teslim: string;
   kdv_dahil: boolean;
 };
@@ -68,15 +69,24 @@ function fiyatOku(metin: string): number | null {
 let anahtarSayaci = 0;
 const yeniAnahtar = () => `yeni-${++anahtarSayaci}`;
 
+const fiyatMetni = (n: number | null | undefined) => (n !== null && n !== undefined ? fiyatYazi(Number(n)) : "");
+const dbSayi = (n: number | null | undefined) => (n === null || n === undefined ? null : Number(n));
+
+/** Gecersiz fiyat metni mi? (bos gecerli; 0 / negatif / bicim hatasi gecersiz) */
+function fiyatHatali(metin: string): boolean {
+  const f = fiyatOku(metin);
+  return f !== null && (Number.isNaN(f) || f <= 0);
+}
+
 function dbdenSatir(k: IcFiyatKalemi): Satir {
   return {
     anahtar: k.id,
     id: k.id,
     urun: k.urun,
     ambalaj: k.ambalaj || "",
-    fiyat: k.birim_fiyat !== null && k.birim_fiyat !== undefined ? fiyatYazi(Number(k.birim_fiyat)) : "",
+    pesin: fiyatMetni(k.pesin_fiyat),
+    vadeli: fiyatMetni(k.vadeli_fiyat),
     vade_gun: k.vade_gun,
-    odeme: k.odeme || "",
     teslim: k.teslim || "",
     kdv_dahil: !!k.kdv_dahil,
   };
@@ -85,13 +95,41 @@ function dbdenSatir(k: IcFiyatKalemi): Satir {
 /** Kirli (kaydedilmemis) degisiklik tespiti icin normal bicim. */
 function normal(satirlar: Satir[]) {
   return JSON.stringify(
-    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.fiyat), s.vade_gun, s.odeme.trim(), s.teslim.trim(), s.kdv_dahil])
+    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.pesin), fiyatOku(s.vadeli), s.vade_gun, s.teslim.trim(), s.kdv_dahil])
   );
 }
 
 const inputSinif =
   "w-full px-2 py-1.5 rounded-md border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
 const inputStil = { backgroundColor: "#0F131A", borderColor: CARD_BORDER } as const;
+
+/** Fiyat girisi + son onaylanan formdaki fiyatla karsilastirma notu. */
+function FiyatGirdisi({ deger, placeholder, etiket, onceki, degistir }: {
+  deger: string;
+  placeholder: string;
+  etiket: string;
+  /** undefined = son formda bu urun yok; null = urun var ama bu fiyat yoktu */
+  onceki: number | null | undefined;
+  degistir: (v: string) => void;
+}) {
+  const f = fiyatOku(deger);
+  const hatali = fiyatHatali(deger);
+  const fark = onceki && f && !Number.isNaN(f) ? (f - onceki) / onceki : null;
+  const dikkat = fark !== null && Math.abs(fark) > 0.1;
+  return (
+    <>
+      <input inputMode="decimal" value={deger} onChange={(e) => degistir(e.target.value)} placeholder={placeholder} aria-label={etiket}
+        className={`${inputSinif} text-right font-semibold`} style={{ ...inputStil, borderColor: hatali ? "#F87171" : CARD_BORDER }} />
+      {onceki !== undefined && (
+        <p className={`text-[10px] mt-1 text-right ${dikkat ? "text-amber-400" : ""}`} style={dikkat ? undefined : { color: TEXT_MUTED }}>
+          Son form: {onceki === null ? "—" : fiyatYazi(onceki)}
+          {fark !== null && fark !== 0 && ` (${fark > 0 ? "+" : ""}${(fark * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}%)`}
+          {dikkat && " · kontrol edin"}
+        </p>
+      )}
+    </>
+  );
+}
 
 export default function IcPiyasaPage() {
   const { user, companyId, yetkiler, loading: authLoading } = useAuth();
@@ -145,11 +183,14 @@ export default function IcPiyasaPage() {
     return () => window.removeEventListener("beforeunload", uyar);
   }, [kirli]);
 
-  // Son onaylanan formdaki fiyat (urun + ambalaj) -> panelde karsilastirma
+  // Son onaylanan formdaki fiyatlar (urun + ambalaj) -> panelde karsilastirma
   const sonFormFiyati = useMemo(() => {
-    const m = new Map<string, number>();
+    const m = new Map<string, { pesin: number | null; vadeli: number | null }>();
     const son = formlar[0];
-    son?.kalemler.forEach((k) => m.set(`${k.urun.trim().toLocaleLowerCase("tr")}|${k.ambalaj.trim().toLocaleLowerCase("tr")}`, k.birim_fiyat));
+    son?.kalemler.forEach((k) => {
+      const f = kalemFiyatlari(k);
+      m.set(`${k.urun.trim().toLocaleLowerCase("tr")}|${k.ambalaj.trim().toLocaleLowerCase("tr")}`, { pesin: f.pesin, vadeli: f.vadeli });
+    });
     return m;
   }, [formlar]);
 
@@ -161,13 +202,13 @@ export default function IcPiyasaPage() {
     setSatirlar((onceki) => onceki.map((s) => (s.anahtar === anahtar ? { ...s, ...alan } : s)));
 
   const satirEkle = () => {
-    // Yeni satir, bir ustteki satirin vade/odeme/teslim degerlerini alir (hizli giris).
+    // Yeni satir, bir ustteki satirin vade/teslim/KDV degerlerini alir (hizli giris).
     const son = satirlar[satirlar.length - 1];
-    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", fiyat: "", vade_gun: son?.vade_gun ?? 30, odeme: son?.odeme || "Çek", teslim: son?.teslim || "Fabrika Teslim", kdv_dahil: son?.kdv_dahil ?? false }]);
+    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", pesin: "", vadeli: "", vade_gun: son?.vade_gun || 30, teslim: son?.teslim || "Fabrika Teslim", kdv_dahil: son?.kdv_dahil ?? false }]);
   };
 
   const baslangicListesiniYukle = () => {
-    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, fiyat: "", vade_gun: 30, odeme: "Çek", teslim: "Fabrika Teslim", kdv_dahil: false })));
+    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, pesin: "", vadeli: "", vade_gun: 30, teslim: "Fabrika Teslim", kdv_dahil: false })));
   };
 
   const tasi = (i: number, yon: -1 | 1) =>
@@ -187,8 +228,8 @@ export default function IcPiyasaPage() {
     for (let i = 0; i < satirlar.length; i++) {
       const s = satirlar[i];
       if (!s.urun.trim()) { showToast(`${i + 1}. satırda ürün adı boş.`, "error"); return; }
-      const f = fiyatOku(s.fiyat);
-      if (f !== null && (Number.isNaN(f) || f <= 0)) { showToast(`${i + 1}. satırda birim fiyat geçersiz: "${s.fiyat}". Örnek: 13,15`, "error"); return; }
+      if (fiyatHatali(s.pesin)) { showToast(`${i + 1}. satırda peşin fiyat geçersiz: "${s.pesin}". Örnek: 13,15`, "error"); return; }
+      if (fiyatHatali(s.vadeli)) { showToast(`${i + 1}. satırda vadeli fiyat geçersiz: "${s.vadeli}". Örnek: 13,65`, "error"); return; }
     }
     setKaydediliyor(true);
     try {
@@ -206,17 +247,17 @@ export default function IcPiyasaPage() {
           sira: i + 1,
           urun: s.urun.trim(),
           ambalaj: s.ambalaj.trim() || null,
-          birim_fiyat: fiyatOku(s.fiyat),
+          pesin_fiyat: fiyatOku(s.pesin),
+          vadeli_fiyat: fiyatOku(s.vadeli),
           vade_gun: s.vade_gun,
-          odeme: s.odeme.trim() || null,
           teslim: s.teslim.trim() || null,
           kdv_dahil: s.kdv_dahil,
         };
         if (s.id) {
           const d = dbMap.get(s.id);
           const degismedi = d && d.sira === kayit.sira && d.urun === kayit.urun && (d.ambalaj || null) === kayit.ambalaj &&
-            (d.birim_fiyat === null ? null : Number(d.birim_fiyat)) === kayit.birim_fiyat && d.vade_gun === kayit.vade_gun &&
-            (d.odeme || null) === kayit.odeme && (d.teslim || null) === kayit.teslim && !!d.kdv_dahil === kayit.kdv_dahil;
+            dbSayi(d.pesin_fiyat) === kayit.pesin_fiyat && dbSayi(d.vadeli_fiyat) === kayit.vadeli_fiyat && d.vade_gun === kayit.vade_gun &&
+            (d.teslim || null) === kayit.teslim && !!d.kdv_dahil === kayit.kdv_dahil;
           if (degismedi) continue;
           const { data, error } = await supabase.from("ic_fiyat_kalemleri").update(kayit).eq("id", s.id).eq("company_id", companyId).select("id");
           const hata = yazmaHatasi(error, data);
@@ -364,56 +405,46 @@ export default function IcPiyasaPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1030px]">
+            <table className="w-full text-sm min-w-[1060px]">
               <thead>
                 <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                  {["#", "Ürün", "Ambalaj", "Birim Fiyat (TL/kg)", "KDV", "Vade", "Ödeme", "Teslim", ""].map((b, i) => (
-                    <th key={i} className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
+                  {["#", "Ürün", "Ambalaj", "Peşin Fiyat (TL/kg)", "Vadeli Fiyat (TL/kg)", "Vade", "KDV", "Teslim", ""].map((b, i) => (
+                    <th key={i} className={`px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${i === 3 || i === 4 ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {satirlar.map((s, i) => {
-                  const f = fiyatOku(s.fiyat);
-                  const fiyatHatali = f !== null && (Number.isNaN(f) || f <= 0);
                   const onceki = sonFormFiyati.get(`${s.urun.trim().toLocaleLowerCase("tr")}|${s.ambalaj.trim().toLocaleLowerCase("tr")}`);
-                  const fark = onceki && f && !Number.isNaN(f) ? (f - onceki) / onceki : null;
-                  const vadeSecenekleri = Array.from(new Set([...VADE_SECENEKLERI, ...(s.vade_gun !== null ? [s.vade_gun] : [])])).sort((a, b) => a - b);
+                  const vadeliVar = fiyatOku(s.vadeli) !== null;
+                  const vadeEksik = vadeliVar && !(Number(s.vade_gun) > 0);
+                  const vadeSecenekleri = Array.from(new Set([...VADELI_VADE_SECENEKLERI, ...(s.vade_gun ? [s.vade_gun] : [])])).sort((a, b) => a - b);
                   return (
                     <tr key={s.anahtar} className="border-t align-top" style={{ borderColor: CARD_BORDER }}>
                       <td className="px-2 py-2 text-xs pt-3.5" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                      <td className="px-2 py-2 min-w-[160px]">
+                      <td className="px-2 py-2 min-w-[150px]">
                         <input list="ic-urun-onerileri" value={s.urun} onChange={(e) => guncelle(s.anahtar, { urun: e.target.value })} placeholder="Ürün adı" className={inputSinif} style={inputStil} />
                       </td>
-                      <td className="px-2 py-2 min-w-[130px]">
+                      <td className="px-2 py-2 min-w-[125px]">
                         <input list="ic-ambalaj-onerileri" value={s.ambalaj} onChange={(e) => guncelle(s.anahtar, { ambalaj: e.target.value })} placeholder="Dökme" className={inputSinif} style={inputStil} />
                       </td>
-                      <td className="px-2 py-2 min-w-[130px]">
-                        <input inputMode="decimal" value={s.fiyat} onChange={(e) => guncelle(s.anahtar, { fiyat: e.target.value })} placeholder="13,15" className={`${inputSinif} text-right font-semibold`} style={{ ...inputStil, borderColor: fiyatHatali ? "#F87171" : CARD_BORDER }} />
-                        {onceki !== undefined && (
-                          <p className={`text-[10px] mt-1 text-right ${fark !== null && Math.abs(fark) > 0.1 ? "text-amber-400" : ""}`} style={fark !== null && Math.abs(fark) > 0.1 ? undefined : { color: TEXT_MUTED }}>
-                            Son form: {fiyatYazi(onceki)}
-                            {fark !== null && fark !== 0 && ` (${fark > 0 ? "+" : ""}${(fark * 100).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}%)`}
-                            {fark !== null && Math.abs(fark) > 0.1 && " · kontrol edin"}
-                          </p>
-                        )}
+                      <td className="px-2 py-2 min-w-[125px]">
+                        <FiyatGirdisi deger={s.pesin} placeholder="13,15" etiket="Peşin fiyat" onceki={onceki ? onceki.pesin : undefined} degistir={(v) => guncelle(s.anahtar, { pesin: v })} />
                       </td>
-                      <td className="px-2 py-2 min-w-[110px]">
-                        <select value={s.kdv_dahil ? "dahil" : "haric"} onChange={(e) => guncelle(s.anahtar, { kdv_dahil: e.target.value === "dahil" })} className={inputSinif} style={inputStil} title="Birim fiyata KDV dahil mi?">
-                          <option value="haric">KDV Hariç</option>
-                          <option value="dahil">KDV Dahil</option>
-                        </select>
+                      <td className="px-2 py-2 min-w-[125px]">
+                        <FiyatGirdisi deger={s.vadeli} placeholder="13,65" etiket="Vadeli fiyat" onceki={onceki ? onceki.vadeli : undefined} degistir={(v) => guncelle(s.anahtar, { vadeli: v })} />
                       </td>
-                      <td className="px-2 py-2 min-w-[105px]">
-                        <select value={s.vade_gun ?? ""} onChange={(e) => guncelle(s.anahtar, { vade_gun: e.target.value === "" ? null : Number(e.target.value) })} className={inputSinif} style={inputStil}>
+                      <td className="px-2 py-2 min-w-[100px]">
+                        <select value={s.vade_gun && s.vade_gun > 0 ? s.vade_gun : ""} onChange={(e) => guncelle(s.anahtar, { vade_gun: e.target.value === "" ? null : Number(e.target.value) })} className={`${inputSinif} ${vadeliVar ? "" : "opacity-50"}`} style={{ ...inputStil, borderColor: vadeEksik ? "#F87171" : CARD_BORDER }} title="Vadeli fiyatın vadesi" aria-label="Vadeli fiyatın vadesi">
                           <option value="">Seçin</option>
                           {vadeSecenekleri.map((g) => <option key={g} value={g}>{vadeYazi(g)}</option>)}
                         </select>
+                        {vadeEksik && <p className="text-[10px] mt-1 text-red-400 whitespace-nowrap">Vade seçin</p>}
                       </td>
-                      <td className="px-2 py-2 min-w-[140px]">
-                        <select value={s.odeme} onChange={(e) => guncelle(s.anahtar, { odeme: e.target.value })} className={inputSinif} style={inputStil}>
-                          <option value="">Seçin</option>
-                          {Array.from(new Set([...ODEME_SECENEKLERI, ...(s.odeme ? [s.odeme] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
+                      <td className="px-2 py-2 min-w-[122px]">
+                        <select value={s.kdv_dahil ? "dahil" : "haric"} onChange={(e) => guncelle(s.anahtar, { kdv_dahil: e.target.value === "dahil" })} className={inputSinif} style={inputStil} title="Fiyatlara KDV dahil mi?">
+                          <option value="haric">KDV Hariç</option>
+                          <option value="dahil">KDV Dahil</option>
                         </select>
                       </td>
                       <td className="px-2 py-2 min-w-[165px]">
@@ -440,7 +471,7 @@ export default function IcPiyasaPage() {
         )}
         {satirlar.length > 0 && (
           <p className="px-4 py-2.5 text-xs border-t" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-            Birim fiyatlar TL/kg&apos;dır; KDV dahil/hariç her satırda ayrı seçilir. Satır silme ve sıralama da &quot;Kaydet&quot; ile kalıcı olur.
+            Fiyatlar TL/kg&apos;dır. Peşin ve vadeli fiyat ayrı girilir; yalnızca peşin satılan üründe vadeli fiyat boş bırakılabilir (formda &quot;—&quot; görünür). Vade, vadeli fiyata aittir. KDV dahil/hariç her satırda ayrı seçilir. Satır silme ve sıralama da &quot;Kaydet&quot; ile kalıcı olur.
           </p>
         )}
       </div>

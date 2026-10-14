@@ -892,7 +892,11 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   vadeli sütununa düşer). ESKİ (tek fiyatlı) formlar (`eskiBicimForm`: hiçbir kalemde
   pesin_fiyat/vadeli_fiyat anahtarı yok) PDF ve görselde GÖNDERİLDİĞİ HALİYLE çizilir
   (Vade / Ödeme / Teslim / Birim Fiyat — c167fd9 çıktısıyla piksel aynı, ölçüldü); listede
-  "Tek fiyatlı (eski biçim)" etiketi. PDF (yeni formlar): iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
+  "Tek fiyatlı (eski biçim)" etiketi. AMBALAJ (14.10.2026, kullanıcı kararı — ürün adının
+  altındaki soluk yazı gözden kaçıyordu): yeni formlarda PDF'te AYRI SÜTUN (Ürün | Ambalaj |
+  Teslim | Peşin | Vadeli), teslimle aynı boy/koyulukta; sığmayan metin tek satır + "…".
+  Görselde ürün adının yanında açık lacivert zeminli etiket (sığmazsa alt satırın başına).
+  Uzun ad / 8 ürün stres testi yapıldı. PDF (yeni formlar): iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
   + KDV"); görsel: her satırda PEŞİN / VADELİ · 30 GÜN etiketli iki fiyat. İş emri formu:
   her ürün için "Peşin" ve "Vadeli · N Gün" düğmeleri (peşin → vade 0); iş emrinin kendi
   Ödeme alanı (Çek/Havale) DURUR, formdan doldurulmaz. Test: Playwright, bellekte Supabase

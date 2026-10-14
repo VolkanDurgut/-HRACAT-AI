@@ -33,7 +33,8 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  *   - Urun ve fiyat tablosu (BUYUK fiyat + "TL/kg · + KDV").
  *     Revize 14.10.2026: PESIN ve VADELI fiyat yan yana iki sutun (vadeli
  *     fiyatin altinda vadesi); Odeme sutunu kaldirildi. Fiyati olmayan
- *     sutunda "—". 14.10 oncesi onaylanmis (tek fiyatli) formlar GONDERILDIGI
+ *     sutunda "—". Ayni gun: AMBALAJ ayri sutun (Urun | Ambalaj | Teslim |
+ *     Pesin | Vadeli), teslimle ayni boy/koyulukta. 14.10 oncesi onaylanmis (tek fiyatli) formlar GONDERILDIGI
  *     HALIYLE cizilir: Vade / Odeme / Teslim / Birim Fiyat (eskiBicimForm).
  *   - Bilgilendirme ve sevkiyat sartlari (formSartlari, 4 madde).
  *   - Siparis sureci zaman cizelgesi (SIPARIS_SURECI, 4 adim) - kase / imza
@@ -68,11 +69,14 @@ const ALT_BILGI_Y = 267; // alt bilginin ust cizgisi
 const SAYFA_SONU = ALT_BILGI_Y - 4; // icerik bu cizgiyi gecmez
 const DEVAM_UST = 30; // devam sayfalarinda icerigin basladigi y
 
-// Urun tablosu sutunlari (mm). Pesin / vadeli fiyat saga yasli iki sutun.
+// Urun tablosu sutunlari (mm). Ambalaj ayri sutun (14.10.2026, kullanici
+// karari: urun adinin altindaki soluk yazi gozden kaciyordu); pesin / vadeli
+// fiyat saga yasli iki sutun.
 const SUTUN = {
   urun: KENAR + 5,
-  teslim: KENAR + 76,
-  pesinSag: KENAR + 132,
+  ambalaj: KENAR + 56,
+  teslim: KENAR + 92,
+  pesinSag: KENAR + 140,
   vadeliSag: SAYFA_G - KENAR - 5,
 };
 // 14.10.2026 oncesi tek fiyatli formlarin ozgun sutunlari (degistirilmedi)
@@ -328,14 +332,16 @@ function tabloBasligi(doc: jsPDF, y: number, eski: boolean): number {
   doc.rect(KENAR, y + h - 2, ICERIK_G, 2, "F");
   const ty = y + 5.6;
   const b = { tip: "s" as Yazi, boy: 7, renk: BEYAZ };
-  yazi(doc, "ÜRÜN / AMBALAJ", SUTUN.urun, ty, b);
   if (eski) {
+    yazi(doc, "ÜRÜN / AMBALAJ", SUTUN.urun, ty, b);
     yazi(doc, "VADE", SUTUN_ESKI.vade, ty, b);
     yazi(doc, "ÖDEME", SUTUN_ESKI.odeme, ty, b);
     yazi(doc, "TESLİM", SUTUN_ESKI.teslim, ty, b);
     yazi(doc, "BİRİM FİYAT", SUTUN_ESKI.fiyatSag, ty, { ...b, hiza: "right" });
     return y + h;
   }
+  yazi(doc, "ÜRÜN", SUTUN.urun, ty, b);
+  yazi(doc, "AMBALAJ", SUTUN.ambalaj, ty, b);
   yazi(doc, "TESLİM", SUTUN.teslim, ty, b);
   yazi(doc, "PEŞİN FİYAT", SUTUN.pesinSag, ty, { ...b, hiza: "right" });
   yazi(doc, "VADELİ FİYAT", SUTUN.vadeliSag, ty, { ...b, hiza: "right" });
@@ -476,10 +482,10 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
       doc.setFillColor(250, 251, 253);
       doc.rect(KENAR, y, ICERIK_G, satirH, "F");
     }
-    const urunSatiri = bol(doc, k.urun, (eski ? SUTUN_ESKI.vade : SUTUN.teslim) - SUTUN.urun - 4, "s", 10.4)[0];
-    yazi(doc, urunSatiri, SUTUN.urun, y + 5 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
-    yazi(doc, k.ambalaj, SUTUN.urun, y + 8.9 + kay, { tip: "r", boy: 7.8, renk: SOLUK });
     if (eski) {
+      const urunSatiri = bol(doc, k.urun, SUTUN_ESKI.vade - SUTUN.urun - 4, "s", 10.4)[0];
+      yazi(doc, urunSatiri, SUTUN.urun, y + 5 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
+      yazi(doc, k.ambalaj, SUTUN.urun, y + 8.9 + kay, { tip: "r", boy: 7.8, renk: SOLUK });
       // Ozgun tek fiyatli satir (14.10.2026 oncesi formlar, gonderildigi haliyle)
       yazi(doc, vadeYazi(k.vade_gun), SUTUN_ESKI.vade, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
       yazi(doc, k.odeme || "-", SUTUN_ESKI.odeme, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
@@ -492,7 +498,15 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
       doc.line(KENAR, y, SAYFA_G - KENAR, y);
       return;
     }
-    yazi(doc, k.teslim, SUTUN.teslim, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
+    // Urun / Ambalaj / Teslim ayni taban cizgisinde; ambalaj ve teslim ayni
+    // boy ve koyulukta (sigmayan metin tek satira kisaltilir, tabloyu bozmaz)
+    const tekSatir = (metin: string, genislik: number, tip: Yazi, boy: number) => {
+      const satirlar = bol(doc, metin || "-", genislik, tip, boy);
+      return satirlar.length > 1 ? `${satirlar[0].replace(/\s+$/, "")}…` : satirlar[0];
+    };
+    yazi(doc, tekSatir(k.urun, SUTUN.ambalaj - SUTUN.urun - 4, "s", 10.4), SUTUN.urun, y + 6.9 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
+    yazi(doc, tekSatir(k.ambalaj, SUTUN.teslim - SUTUN.ambalaj - 4, "r", 9), SUTUN.ambalaj, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
+    yazi(doc, tekSatir(k.teslim, SUTUN.pesinSag - 24 - SUTUN.teslim, "r", 9), SUTUN.teslim, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
     const fiyat = kalemFiyatlari(k);
     const fiyatHucresi = (deger: number | null, sag: number, alt: string) => {
       if (deger === null) {

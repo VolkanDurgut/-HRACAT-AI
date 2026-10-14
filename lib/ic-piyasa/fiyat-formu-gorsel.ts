@@ -26,6 +26,7 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  * Revize 14.10.2026: her urunde PESIN ve VADELI fiyat yan yana (ustlerinde
  * kucuk etiket, vadeli etiketinde vade); odeme bilgisi kaldirildi. 14.10
  * oncesi tek fiyatli formlar gonderildigi haliyle (tek fiyat) cizilir.
+ * Ayni gun: ambalaj, urun adinin yaninda belirgin etiket (PDF'te ayri sutun).
  */
 
 const G = 1080;
@@ -41,6 +42,7 @@ const BANT_ACIK = "#C4CBE6";
 const AILE = "UnexInter";
 const SEFTALI_YAZI = "#BE623A"; // beyaz zeminde okunur seftali (etiketler)
 const FIYAT_SUTUN_G = 210; // pesin / vadeli fiyat sutun genisligi (px)
+const AMBALAJ_ZEMIN = "#E9ECF6"; // ambalaj etiketi zemini (lacivertin acik tonu)
 
 let fontlar: Promise<void> | null = null;
 function fontlariYukle(): Promise<void> {
@@ -212,12 +214,38 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
     const pesinSag = sag - 16 - FIYAT_SUTUN_G;
     const urunG = pesinSag - FIYAT_SUTUN_G - (sol + 16) + 30;
     ctx.textAlign = "left";
-    ctx.fillStyle = LACIVERT;
+    // Urun adi + yaninda belirgin AMBALAJ etiketi (14.10.2026); sigmazsa etiket
+    // alt satirin basina gecer.
+    const x0 = sol + 16;
+    ctx.font = f(Math.round(22 * k), 600);
+    const ambalajMetni = sigdir(ctx, u.ambalaj || "-", 260 * k);
+    const etiketG = ctx.measureText(ambalajMetni).width + 28 * k;
+    const etiketH = 36 * k;
     ctx.font = f(Math.round(38 * k), 600);
-    ctx.fillText(sigdir(ctx, `${u.urun}`, urunG), sol + 16, orta - 10 * k);
+    const adG = ctx.measureText(u.urun).width;
+    const yanYana = adG + 16 * k + etiketG <= urunG;
+    ctx.fillStyle = LACIVERT;
+    ctx.fillText(sigdir(ctx, `${u.urun}`, urunG), x0, orta - 10 * k);
+    const etiketCiz = (ex: number, tabanY: number) => {
+      ctx.fillStyle = AMBALAJ_ZEMIN;
+      yuvarlak(ctx, ex, tabanY - etiketH + 9 * k, etiketG, etiketH, 9 * k);
+      ctx.fill();
+      ctx.fillStyle = LACIVERT;
+      ctx.font = f(Math.round(22 * k), 600);
+      ctx.fillText(ambalajMetni, ex + 14 * k, tabanY);
+    };
     ctx.fillStyle = SOLUK;
-    ctx.font = f(Math.round(23 * k), 400);
-    ctx.fillText(sigdir(ctx, `${u.ambalaj}  ·  ${u.teslim}`, urunG), sol + 16, orta + 22 * k);
+    if (yanYana) {
+      etiketCiz(x0 + adG + 16 * k, orta - 13 * k);
+      ctx.fillStyle = SOLUK;
+      ctx.font = f(Math.round(23 * k), 400);
+      ctx.fillText(sigdir(ctx, u.teslim, urunG), x0, orta + 22 * k);
+    } else {
+      etiketCiz(x0, orta + 22 * k);
+      ctx.fillStyle = SOLUK;
+      ctx.font = f(Math.round(23 * k), 400);
+      ctx.fillText(sigdir(ctx, u.teslim, urunG - etiketG - 16 * k), x0 + etiketG + 16 * k, orta + 22 * k);
+    }
     ctx.fillStyle = u.kdv_dahil ? LACIVERT : SOLUK;
     ctx.font = f(Math.round(20 * k), 600);
     ctx.fillText(`TL/kg · ${kdvYazi(u.kdv_dahil)}`, sol + 16, orta + 50 * k);

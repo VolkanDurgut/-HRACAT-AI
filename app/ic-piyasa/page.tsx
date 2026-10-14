@@ -9,21 +9,26 @@ import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
-import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper } from "lucide-react";
+import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil } from "lucide-react";
 import { formOzelGunleri, ozelGunKapsamUyarisi, ozelGunTarihYazi } from "@/lib/ic-piyasa/ozel-gunler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   AMBALAJ_SECENEKLERI,
   BASLANGIC_URUNLERI,
+  FORM_SUTUNLARI,
+  FormIletisim,
   GECERLILIK_GUN,
   IcFiyatFormu,
   IcFiyatKalemi,
   TESLIM_SECENEKLERI,
   VADELI_VADE_SECENEKLERI,
+  VARSAYILAN_ILETISIM,
   bugunTR,
   fiyatYazi,
   formKalemleri,
   gunYazi,
+  iletisimHatasi,
+  iletisimSatiri,
   kalemFiyatlari,
   satirEksigi,
   vadeYazi,
@@ -145,16 +150,34 @@ export default function IcPiyasaPage() {
   const [onayAcik, setOnayAcik] = useState(false);
   const [olusturuluyor, setOlusturuluyor] = useState(false);
   const [geriAlAcik, setGeriAlAcik] = useState(false);
+  // Formdaki iletisim bilgisi (ic_piyasa_ayarlari.form_iletisim_*, 14.10.2026)
+  const [iletisim, setIletisim] = useState<FormIletisim>(VARSAYILAN_ILETISIM);
+  const [iletisimOkunamadi, setIletisimOkunamadi] = useState(false);
+  const [iletisimDuzenle, setIletisimDuzenle] = useState(false);
+  const [iletisimTaslak, setIletisimTaslak] = useState({ ad: "", telefon: "", whatsapp: true, eposta: "" });
+  const [iletisimKaydediliyor, setIletisimKaydediliyor] = useState(false);
 
   const yetkili = !!yetkiler.sayfa_yetkileri.ic_piyasa;
 
   const verileriGetir = useCallback(async () => {
     if (!companyId) return;
     setOkumaHatasi(null);
-    const [kRes, fRes] = await Promise.all([
+    const [kRes, fRes, aRes] = await Promise.all([
       supabase.from("ic_fiyat_kalemleri").select("*").eq("company_id", companyId).order("sira", { ascending: true }).order("olusturma", { ascending: true }),
-      supabase.from("ic_fiyat_formlari").select("id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email").eq("company_id", companyId).order("onay_zamani", { ascending: false }).limit(50),
+      supabase.from("ic_fiyat_formlari").select(FORM_SUTUNLARI).eq("company_id", companyId).order("onay_zamani", { ascending: false }).limit(50),
+      supabase.from("ic_piyasa_ayarlari").select("form_iletisim_ad, form_iletisim_telefon, form_iletisim_whatsapp, form_iletisim_eposta").eq("company_id", companyId).maybeSingle(),
     ]);
+    // Iletisim ayari okunamazsa sayfa calismaya devam eder; form OLUSTURMA
+    // kapatilir ki yanlis kisiyle form gitmesin (asagida formHazir).
+    if (aRes.error) {
+      setIletisimOkunamadi(true);
+    } else {
+      setIletisimOkunamadi(false);
+      const a = aRes.data as { form_iletisim_ad: string | null; form_iletisim_telefon: string | null; form_iletisim_whatsapp: boolean | null; form_iletisim_eposta: string | null } | null;
+      setIletisim(a?.form_iletisim_ad && a.form_iletisim_telefon
+        ? { ad: a.form_iletisim_ad, telefon: a.form_iletisim_telefon, whatsapp: a.form_iletisim_whatsapp !== false, eposta: a.form_iletisim_eposta || null }
+        : VARSAYILAN_ILETISIM);
+    }
     if (kRes.error || fRes.error) {
       // Okuma hatasi yutulmaz; ekrandaki onceki veri korunur.
       setOkumaHatasi((kRes.error || fRes.error)!.message);
@@ -292,7 +315,35 @@ export default function IcPiyasaPage() {
       .filter(Boolean) as string[];
   }, [dbSatirlar]);
 
-  const formHazir = !kirli && formEksikleri.length === 0;
+  const formHazir = !kirli && formEksikleri.length === 0 && !iletisimOkunamadi && !iletisimDuzenle;
+
+  const iletisimDuzenlemeyiAc = () => {
+    setIletisimTaslak({ ad: iletisim.ad, telefon: iletisim.telefon, whatsapp: iletisim.whatsapp, eposta: iletisim.eposta || "" });
+    setIletisimDuzenle(true);
+  };
+
+  const iletisimKaydet = async () => {
+    if (!companyId) return;
+    const hata = iletisimHatasi(iletisimTaslak);
+    if (hata) { showToast(hata, "error"); return; }
+    setIletisimKaydediliyor(true);
+    const kayit = {
+      company_id: companyId,
+      form_iletisim_ad: iletisimTaslak.ad.trim(),
+      form_iletisim_telefon: iletisimTaslak.telefon.trim().replace(/\s+/g, " "),
+      form_iletisim_whatsapp: iletisimTaslak.whatsapp,
+      form_iletisim_eposta: iletisimTaslak.eposta.trim() || null,
+    };
+    // Sadece form_iletisim_* sutunlari gonderilir; ayni satirdaki bildirim
+    // ayarlari (lojistik / yetkili) degismez.
+    const { data, error } = await supabase.from("ic_piyasa_ayarlari").upsert(kayit, { onConflict: "company_id" }).select("company_id");
+    setIletisimKaydediliyor(false);
+    const yh = yazmaHatasi(error, data);
+    if (yh) { showToast(`İletişim bilgisi kaydedilemedi: ${yh}`, "error"); return; }
+    setIletisim({ ad: kayit.form_iletisim_ad, telefon: kayit.form_iletisim_telefon, whatsapp: kayit.form_iletisim_whatsapp, eposta: kayit.form_iletisim_eposta });
+    setIletisimDuzenle(false);
+    showToast("Formdaki iletişim bilgisi kaydedildi. Yeni formlarda bu bilgi yer alır.", "success");
+  };
   // Bugun onaylanacak formda cikacak ozel gunler (PDF / gorsel ile ayni kural)
   const bugunkuOzelGunler = useMemo(() => formOzelGunleri(bugunTR()), []);
   const ozelGunUyarisi = useMemo(() => ozelGunKapsamUyarisi(bugunTR()), []);
@@ -310,6 +361,7 @@ export default function IcPiyasaPage() {
       gecerlilik_bitis: d.toISOString().slice(0, 10),
       kalemler: formKalemleri(dbSatirlar),
       olusturan_email: user?.email || null,
+      iletisim,
     };
   };
 
@@ -324,8 +376,8 @@ export default function IcPiyasaPage() {
     setOlusturuluyor(true);
     const { data, error } = await supabase
       .from("ic_fiyat_formlari")
-      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar), olusturan_email: user?.email || null })
-      .select("id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email");
+      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar), olusturan_email: user?.email || null, iletisim })
+      .select(FORM_SUTUNLARI);
     const hata = yazmaHatasi(error, data);
     setOlusturuluyor(false);
     if (hata) { showToast(`Form oluşturulamadı: ${hata}`, "error"); return; }
@@ -495,6 +547,46 @@ export default function IcPiyasaPage() {
             <FileCheck2 size={14} /> Formu Onayla ve Oluştur
           </button>
         </div>
+        <div className="mt-3 rounded-lg border px-3 py-2.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+          {!iletisimDuzenle ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs flex items-center gap-2 min-w-0" style={{ color: TEXT_MUTED }}>
+                <Phone size={13} className="shrink-0" />
+                <span className="shrink-0">Formdaki iletişim (Sipariş ve bilgi):</span>
+                <span className="text-white truncate">{iletisimSatiri(iletisim, " · ")}</span>
+              </p>
+              <button onClick={iletisimDuzenlemeyiAc} disabled={iletisimOkunamadi} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER }}>
+                <Pencil size={12} /> Düzenle
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs mb-2" style={{ color: TEXT_MUTED }}>Formun alt bilgisindeki &quot;Sipariş ve bilgi&quot; kişisi. Kaydedince önizleme ve yeni formlarda kullanılır; önceden oluşturulmuş formlar değişmez.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                <label className="block"><span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Ad soyad *</span>
+                  <input value={iletisimTaslak.ad} onChange={(e) => setIletisimTaslak({ ...iletisimTaslak, ad: e.target.value })} placeholder="Burak Tuncay" className={inputSinif} style={inputStil} aria-label="İletişim ad soyad" /></label>
+                <label className="block"><span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Telefon *</span>
+                  <input value={iletisimTaslak.telefon} onChange={(e) => setIletisimTaslak({ ...iletisimTaslak, telefon: e.target.value })} inputMode="tel" placeholder="0541 339 60 04" className={inputSinif} style={inputStil} aria-label="İletişim telefon" /></label>
+                <label className="block"><span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>E-posta</span>
+                  <input value={iletisimTaslak.eposta} onChange={(e) => setIletisimTaslak({ ...iletisimTaslak, eposta: e.target.value })} inputMode="email" placeholder="ad@unex.com.tr" className={inputSinif} style={inputStil} aria-label="İletişim e-posta" /></label>
+                <label className="flex items-center gap-2 text-sm text-white sm:pt-5">
+                  <input type="checkbox" checked={iletisimTaslak.whatsapp} onChange={(e) => setIletisimTaslak({ ...iletisimTaslak, whatsapp: e.target.checked })} className="accent-emerald-500" aria-label="WhatsApp hattı" />
+                  WhatsApp hattı
+                </label>
+              </div>
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Formda: <span className="text-white">{iletisimSatiri({ ad: iletisimTaslak.ad.trim() || "—", telefon: iletisimTaslak.telefon.trim() || "—", whatsapp: iletisimTaslak.whatsapp, eposta: iletisimTaslak.eposta.trim() || null }, " · ")}</span></p>
+                <div className="flex gap-2">
+                  <button onClick={() => setIletisimDuzenle(false)} disabled={iletisimKaydediliyor} className="px-3 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
+                  <button onClick={iletisimKaydet} disabled={iletisimKaydediliyor} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white hover:brightness-110 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                    {iletisimKaydediliyor ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Kaydet
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {iletisimOkunamadi && <p className="mt-1.5 text-xs text-amber-400">İletişim ayarı okunamadı; yanlış bilgiyle form gitmemesi için form oluşturma kapalı. Sayfayı yenileyin.</p>}
+        </div>
         {bugunkuOzelGunler.length > 0 && (
           <div className="mt-3 flex items-start gap-2 text-xs" style={{ color: TEXT_MUTED }}>
             <PartyPopper size={14} className="shrink-0 mt-px" style={{ color: "#F4A07C" }} />
@@ -510,6 +602,7 @@ export default function IcPiyasaPage() {
         {!formHazir && (
           <div className="mt-3 text-xs text-amber-400 space-y-0.5">
             {kirli && <p>Önce fiyat tablosundaki değişiklikleri kaydedin.</p>}
+            {iletisimDuzenle && <p>Önce iletişim bilgisini kaydedin ya da vazgeçin.</p>}
             {!kirli && formEksikleri.slice(0, 6).map((e) => <p key={e}>{e}</p>)}
           </div>
         )}

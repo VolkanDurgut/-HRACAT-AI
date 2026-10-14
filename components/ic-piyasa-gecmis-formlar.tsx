@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FileDown, Image as ImageIcon, Share2, Loader2, FileText } from "lucide-react";
+import { FileDown, Image as ImageIcon, Share2, Loader2, FileText, AlertTriangle } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG } from "@/lib/theme";
 import { IcFiyatFormu, eskiBicimForm, formDosyaAdi, formGecerliMi, gunYazi, onayZamaniYazi } from "@/lib/ic-piyasa/fiyat-formu";
@@ -75,6 +75,15 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
           <p><span className="text-white font-medium">Telefondan göndermek:</span> Paylaş → WhatsApp → kişiyi seçin. PDF ve görsel mesaja eklenmiş gelir.</p>
           <p><span className="text-white font-medium">Bilgisayardan göndermek:</span> PDF veya Görsel&apos;e basıp indirin, WhatsApp&apos;ta sohbete sürükleyip bırakın.</p>
         </div>
+        {formlar.length > 0 && formlar.every(eskiBicimForm) && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "#92400E", backgroundColor: "rgba(146,64,14,0.12)", color: "#FCD34D" }} role="note">
+            <AlertTriangle size={14} className="shrink-0 mt-px" />
+            <span>
+              Listedeki formlar <b>eski tasarımda</b> (tek fiyat) ve onaylandıkları haliyle açılır. Peşin / vadeli fiyat ve ambalaj sütunlu yeni tasarım için
+              yukarıdaki <b>Formu Onayla ve Oluştur</b>&apos;a basın; yeni form bu listeye eklenir.
+            </span>
+          </div>
+        )}
       </div>
       {formlar.length === 0 ? (
         <div className="px-4 py-10 text-center">
@@ -98,7 +107,7 @@ export function IcPiyasaGecmisFormlar({ formlar }: { formlar: IcFiyatFormu[] }) 
                   <tr key={f.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
                     <td className="px-3 py-2.5 font-semibold text-white whitespace-nowrap">
                       {f.form_no}
-                      {eskiBicimForm(f) && <span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }} title="14.10.2026 öncesi onaylandı; PDF ve görsel gönderildiği haliyle (tek fiyat, vade ve ödeme) çıkar.">Tek fiyatlı (eski biçim)</span>}
+                      {eskiBicimForm(f) && <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300" title="14.10.2026 öncesi onaylandı; PDF ve görsel gönderildiği haliyle (tek fiyat, vade ve ödeme) çıkar.">Eski tasarım · tek fiyat</span>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>
                       {onayZamaniYazi(f.onay_zamani)}

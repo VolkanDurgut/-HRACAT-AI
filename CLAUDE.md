@@ -896,7 +896,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   altındaki soluk yazı gözden kaçıyordu): yeni formlarda PDF'te AYRI SÜTUN (Ürün | Ambalaj |
   Teslim | Peşin | Vadeli), teslimle aynı boy/koyulukta; sığmayan metin tek satır + "…".
   Görselde ürün adının yanında açık lacivert zeminli etiket (sığmazsa alt satırın başına).
-  Uzun ad / 8 ürün stres testi yapıldı. PDF (yeni formlar): iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
+  Uzun ad / 8 ürün stres testi yapıldı.
+  İLETİŞİM (14.10.2026): formun alt bilgisindeki "Sipariş ve bilgi" kişisi panelden
+  düzenlenir (Form Oluştur kartı → Düzenle: ad, telefon, WhatsApp hattı, e-posta).
+  Güncel değer `ic_piyasa_ayarlari.form_iletisim_*` (boşsa `VARSAYILAN_ILETISIM` = Burak
+  Tuncay); kayıt SADECE form_iletisim_* sütunlarını upsert eder (bildirim ayarları
+  değişmez). Her yeni form onay anındaki bilgiyi `ic_fiyat_formlari.iletisim` (jsonb)
+  içinde DONDURUR; eski formlarda NULL → varsayılan (gönderildikleri bilgi). Okuma
+  `iletisimOku()`, metin `iletisimSatiri()`, doğrulama `iletisimHatasi()` (DB kısıtlarıyla
+  aynı). Ayar okunamazsa form oluşturma kapanır (yanlış kişiyle form gitmesin). Form
+  seçimi tek yerde: `FORM_SUTUNLARI`. Migration `20261014110000_ic_piyasa_form_iletisim.sql`
+  (canlıya uygulandı). Listede yalnız eski formlar varsa sarı uyarı: yeni tasarım için
+  "Formu Onayla ve Oluştur" (kullanıcı eski formun PDF'ini yeni tasarım sanıyordu).
+  NOT: takip sayfası, WhatsApp şablonu ve genel sayfa alt bilgisinde Burak Bey'in
+  numarası hâlâ sabit (bu adımda kapsam dışı). PDF (yeni formlar): iki sağa yaslı fiyat sütunu (vadeli altında "30 Gün vade ·
   + KDV"); görsel: her satırda PEŞİN / VADELİ · 30 GÜN etiketli iki fiyat. İş emri formu:
   her ürün için "Peşin" ve "Vadeli · N Gün" düğmeleri (peşin → vade 0); iş emrinin kendi
   Ödeme alanı (Çek/Havale) DURUR, formdan doldurulmaz. Test: Playwright, bellekte Supabase

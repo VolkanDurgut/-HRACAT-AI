@@ -9,6 +9,7 @@ import {
   gunYazi,
   eskiBicimForm,
   hitapYazi,
+  iletisimOku,
   kalemFiyatlari,
   kdvYazi,
   onayZamaniYazi,
@@ -292,14 +293,17 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   ctx.fillRect(0, 1250, G, 100);
   ctx.fillStyle = "#ffffff";
   ctx.font = f(30, 700);
-  ctx.fillText(`${FORM_SIRKET.iletisimAd} · ${FORM_SIRKET.iletisimTel}`, sol, 1300);
+  const iletisim = iletisimOku(form.iletisim);
+  ctx.fillText(sigdir(ctx, `${iletisim.ad} · ${iletisim.telefon}`, sag - sol - 170), sol, 1300);
   ctx.fillStyle = BANT_ACIK;
   ctx.font = f(22, 400);
   ctx.fillText(`${FORM_SIRKET.web}  ·  ${FORM_SIRKET.tel}`, sol, 1333);
   ctx.textAlign = "right";
-  ctx.fillStyle = SEFTALI;
-  ctx.font = f(22, 600);
-  ctx.fillText("WhatsApp", sag, 1300);
+  if (iletisim.whatsapp) {
+    ctx.fillStyle = SEFTALI;
+    ctx.font = f(22, 600);
+    ctx.fillText("WhatsApp", sag, 1300);
+  }
 
   return new Promise((ok, hata) => canvas.toBlob((b) => (b ? ok(b) : hata(new Error("Görsel oluşturulamadı"))), "image/png"));
 }

@@ -13,6 +13,8 @@ import {
   formSartlari,
   eskiBicimForm,
   gunYazi,
+  iletisimOku,
+  iletisimSatiri,
   kalemFiyatlari,
   kdvYazi,
   onayZamaniYazi,
@@ -422,7 +424,9 @@ function altBilgi(doc: jsPDF, form: IcFiyatFormu, sayfa: number, toplam: number)
   doc.setLineWidth(0.3);
   doc.line(KENAR, ALT_BILGI_Y, SAYFA_G - KENAR, ALT_BILGI_Y);
   yazi(doc, "SİPARİŞ VE BİLGİ", KENAR, ALT_BILGI_Y + 5.4, { tip: "s", boy: 6.6, renk: SOLUK, aralik: 0.5 });
-  yazi(doc, `${FORM_SIRKET.iletisimAd}  ·  ${FORM_SIRKET.iletisimTel} (WhatsApp)  ·  ${FORM_SIRKET.iletisimEposta}`, KENAR, ALT_BILGI_Y + 10, {
+  // Onay anindaki iletisim (eski formlarda varsayilan = bugunku sabit bilgi)
+  const iletisimMetni = bol(doc, iletisimSatiri(iletisimOku(form.iletisim)), ICERIK_G - 54, "s", 8.2)[0];
+  yazi(doc, iletisimMetni, KENAR, ALT_BILGI_Y + 10, {
     tip: "s",
     boy: 8.2,
     renk: LACIVERT,

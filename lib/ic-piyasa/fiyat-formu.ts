@@ -92,7 +92,15 @@ export type IcFiyatFormu = {
   gecerlilik_bitis: string; // YYYY-MM-DD
   kalemler: FormKalemi[];
   olusturan_email: string | null;
+  /** Onay anindaki iletisim (migration 20261014110000); eski formlarda null. */
+  iletisim?: FormIletisim | null;
 };
+
+/** Formun "Siparis ve bilgi" iletisim kisisi (panelden duzenlenir, 14.10.2026). */
+export type FormIletisim = { ad: string; telefon: string; whatsapp: boolean; eposta: string | null };
+
+/** Form kayitlari icin secilecek sutunlar (tek yerde; iletisim dahil). */
+export const FORM_SUTUNLARI = "id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email, iletisim";
 
 /** Gecerlilik suresi (gun). Sunucudaki tetikleyiciyle AYNI olmalidir
  *  (migration 20261011200000: onay gunu + 3). */
@@ -133,6 +141,41 @@ export const FORM_SIRKET = {
   iletisimTel: "0541 339 60 04",
   iletisimEposta: "buraktuncay@unex.com.tr",
 };
+
+/** Ayar girilmemisse ve 14.10.2026 oncesi formlarda kullanilan bilgi. */
+export const VARSAYILAN_ILETISIM: FormIletisim = {
+  ad: FORM_SIRKET.iletisimAd,
+  telefon: FORM_SIRKET.iletisimTel,
+  whatsapp: true,
+  eposta: FORM_SIRKET.iletisimEposta,
+};
+
+/** Herhangi bir kaynaktan (form.iletisim / ayar) gecerli iletisim; bozuksa varsayilan. */
+export function iletisimOku(v: unknown): FormIletisim {
+  if (!v || typeof v !== "object") return VARSAYILAN_ILETISIM;
+  const o = v as Record<string, unknown>;
+  const ad = typeof o.ad === "string" ? o.ad.trim() : "";
+  const telefon = typeof o.telefon === "string" ? o.telefon.trim() : "";
+  if (!ad || !telefon) return VARSAYILAN_ILETISIM;
+  const eposta = typeof o.eposta === "string" && o.eposta.trim() ? o.eposta.trim() : null;
+  return { ad, telefon, whatsapp: o.whatsapp !== false, eposta };
+}
+
+/** "Burak Tuncay  ·  0541 339 60 04 (WhatsApp)  ·  buraktuncay@unex.com.tr" */
+export function iletisimSatiri(i: FormIletisim, ayrac = "  ·  "): string {
+  return [i.ad, `${i.telefon}${i.whatsapp ? " (WhatsApp)" : ""}`, i.eposta].filter(Boolean).join(ayrac);
+}
+
+/** Panel dogrulamasi (DB kisitlariyla AYNI kural). Hata metni ya da null. */
+export function iletisimHatasi(i: { ad: string; telefon: string; eposta: string }): string | null {
+  const ad = i.ad.trim();
+  if (ad.length < 2 || ad.length > 80) return "Ad soyad 2-80 karakter olmalı.";
+  const tel = i.telefon.trim();
+  if (!/^[0-9+() -]{7,25}$/.test(tel) || tel.replace(/\D/g, "").length < 7) return "Telefon geçersiz. Örnek: 0541 339 60 04";
+  const e = i.eposta.trim();
+  if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "E-posta adresi geçersiz.";
+  return null;
+}
 
 /** KDV durumu metni: true -> "KDV Dahil", false/yok -> "+ KDV". */
 export function kdvYazi(dahil: boolean | null | undefined): string {

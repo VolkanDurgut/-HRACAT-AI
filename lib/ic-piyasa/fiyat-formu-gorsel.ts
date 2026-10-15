@@ -6,6 +6,7 @@ import {
   IcFiyatFormu,
   fiyatYazi,
   formDosyaAdi,
+  formSutunlari,
   gunYazi,
   eskiBicimForm,
   hitapYazi,
@@ -13,6 +14,7 @@ import {
   kalemFiyatlari,
   kdvYazi,
   onayZamaniYazi,
+  sutunGorunur,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
 import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
@@ -28,6 +30,8 @@ import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-
  * kucuk etiket, vadeli etiketinde vade); odeme bilgisi kaldirildi. 14.10
  * oncesi tek fiyatli formlar gonderildigi haliyle (tek fiyat) cizilir.
  * Ayni gun: ambalaj, urun adinin yaninda belirgin etiket (PDF'te ayri sutun).
+ * Revize 15.10.2026: ust bant BEYAZ (PDF ile ayni); formun sutun duzenine
+ * gore gizli sutunlar cizilmez, ozel sutunlar alt satirda "Baslik: deger".
  */
 
 const G = 1080;
@@ -97,33 +101,21 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, G, Y);
 
-  // Ust bant + dekor halkalari + seftali serit
-  ctx.fillStyle = LACIVERT;
-  ctx.fillRect(0, 0, G, 300);
-  ctx.save();
-  ctx.globalAlpha = 0.07;
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(G - 40, 20, 210, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // Ust bant (15.10.2026: beyaz zemin, lacivert yazi) + seftali serit
   ctx.fillStyle = SEFTALI;
   ctx.fillRect(0, 300, G, 12);
 
-  ctx.fillStyle = "#ffffff";
-  yuvarlak(ctx, sol, 64, 150, 150, 26);
-  ctx.fill();
-  ctx.drawImage(logo, sol + 13, 77, 124, 124);
+  ctx.drawImage(logo, sol, 64, 150, 150);
 
   const tx = sol + 186;
   ctx.fillStyle = SEFTALI;
   ctx.font = f(24, 600);
   ctx.fillText("U N E X   G I D A", tx, 104);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = LACIVERT;
   ctx.font = f(56, 700);
   ctx.fillText("Fiyat Bilgilendirme", tx, 168);
   ctx.fillText("Formu", tx, 230);
-  ctx.fillStyle = BANT_ACIK;
+  ctx.fillStyle = SOLUK;
   ctx.font = f(26, 400);
   ctx.fillText("Yan Mamul Ürünler", tx, 272);
 
@@ -182,6 +174,9 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   ctx.fillStyle = LACIVERT;
   ctx.fillRect(sol, ustY - 4, sag - sol, 3);
   const eski = eskiBicimForm(form);
+  const ayar = formSutunlari(form);
+  const gor = (a: Parameters<typeof sutunGorunur>[1]) => sutunGorunur(ayar, a);
+  const fiyatTurleri = (["pesin", "vadeli"] as const).filter((t) => gor(t));
   form.kalemler.forEach((u, i) => {
     const y0 = ustY + i * satirH;
     if (i % 2 === 1) {
@@ -210,24 +205,30 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
       return;
     }
     const fiyat = kalemFiyatlari(u);
-    // Sag: iki fiyat sutunu (vadeli en sagda, pesin solunda)
-    const vadeliSag = sag - 16;
-    const pesinSag = sag - 16 - FIYAT_SUTUN_G;
-    const urunG = pesinSag - FIYAT_SUTUN_G - (sol + 16) + 30;
+    // Sag: gorunur fiyat sutunlari (vadeli en sagda, pesin solunda)
+    const fiyatSaglari = fiyatTurleri.map((_, i) => sag - 16 - (fiyatTurleri.length - 1 - i) * FIYAT_SUTUN_G);
+    const urunG = fiyatSaglari[0] - FIYAT_SUTUN_G - (sol + 16) + 30;
+    // Alt satir: teslim + ozel sutunlar ("Baslik: deger")
+    const altSatir = [
+      gor("teslim") ? u.teslim : "",
+      ...ayar.ozel.map((o) => (u.ozel?.[o.id] ? `${o.baslik}: ${u.ozel[o.id]}` : "")),
+    ].filter(Boolean).join("  ·  ");
     ctx.textAlign = "left";
     // Urun adi + yaninda belirgin AMBALAJ etiketi (14.10.2026); sigmazsa etiket
     // alt satirin basina gecer.
     const x0 = sol + 16;
     ctx.font = f(Math.round(22 * k), 600);
+    const ambalajVar = gor("ambalaj");
     const ambalajMetni = sigdir(ctx, u.ambalaj || "-", 260 * k);
-    const etiketG = ctx.measureText(ambalajMetni).width + 28 * k;
+    const etiketG = ambalajVar ? ctx.measureText(ambalajMetni).width + 28 * k : 0;
     const etiketH = 36 * k;
     ctx.font = f(Math.round(38 * k), 600);
     const adG = ctx.measureText(u.urun).width;
-    const yanYana = adG + 16 * k + etiketG <= urunG;
+    const yanYana = !ambalajVar || adG + 16 * k + etiketG <= urunG;
     ctx.fillStyle = LACIVERT;
     ctx.fillText(sigdir(ctx, `${u.urun}`, urunG), x0, orta - 10 * k);
     const etiketCiz = (ex: number, tabanY: number) => {
+      if (!ambalajVar) return;
       ctx.fillStyle = AMBALAJ_ZEMIN;
       yuvarlak(ctx, ex, tabanY - etiketH + 9 * k, etiketG, etiketH, 9 * k);
       ctx.fill();
@@ -240,16 +241,16 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
       etiketCiz(x0 + adG + 16 * k, orta - 13 * k);
       ctx.fillStyle = SOLUK;
       ctx.font = f(Math.round(23 * k), 400);
-      ctx.fillText(sigdir(ctx, u.teslim, urunG), x0, orta + 22 * k);
+      if (altSatir) ctx.fillText(sigdir(ctx, altSatir, urunG), x0, orta + 22 * k);
     } else {
       etiketCiz(x0, orta + 22 * k);
       ctx.fillStyle = SOLUK;
       ctx.font = f(Math.round(23 * k), 400);
-      ctx.fillText(sigdir(ctx, u.teslim, urunG - etiketG - 16 * k), x0 + etiketG + 16 * k, orta + 22 * k);
+      if (altSatir) ctx.fillText(sigdir(ctx, altSatir, urunG - etiketG - 16 * k), x0 + etiketG + 16 * k, orta + 22 * k);
     }
     ctx.fillStyle = u.kdv_dahil ? LACIVERT : SOLUK;
     ctx.font = f(Math.round(20 * k), 600);
-    ctx.fillText(`TL/kg · ${kdvYazi(u.kdv_dahil)}`, sol + 16, orta + 50 * k);
+    ctx.fillText(gor("kdv") ? `TL/kg · ${kdvYazi(u.kdv_dahil)}` : "TL/kg", sol + 16, orta + 50 * k);
     const fiyatCiz = (deger: number | null, x: number, etiket: string) => {
       ctx.textAlign = "right";
       ctx.fillStyle = SEFTALI_YAZI;
@@ -265,8 +266,10 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
       ctx.font = f(Math.round(48 * k), 700);
       ctx.fillText(fiyatYazi(deger), x, orta + 26 * k);
     };
-    fiyatCiz(fiyat.pesin, pesinSag, "PEŞİN");
-    fiyatCiz(fiyat.vadeli, vadeliSag, fiyat.vadeli !== null ? `VADELİ · ${vadeYazi(fiyat.vadeGun).toLocaleUpperCase("tr")}` : "VADELİ");
+    fiyatTurleri.forEach((t, i) => {
+      if (t === "pesin") fiyatCiz(fiyat.pesin, fiyatSaglari[i], "PEŞİN");
+      else fiyatCiz(fiyat.vadeli, fiyatSaglari[i], fiyat.vadeli !== null && gor("vade") && fiyat.vadeGun !== null ? `VADELİ · ${vadeYazi(fiyat.vadeGun).toLocaleUpperCase("tr")}` : "VADELİ");
+    });
     ctx.fillStyle = CIZGI;
     ctx.fillRect(sol, y0 + satirH - 2, sag - sol, 2);
   });

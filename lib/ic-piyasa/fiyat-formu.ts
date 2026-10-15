@@ -29,6 +29,8 @@ export type IcFiyatKalemi = {
   teslim: string | null;
   /** true = fiyata KDV dahil, false = KDV hariç (+ KDV). Migration 20261011230000. */
   kdv_dahil: boolean;
+  /** Ozel sutun degerleri {sutunId: metin} (migration 20261015100000). */
+  ozel_degerler?: Record<string, string> | null;
   guncelleme: string;
 };
 
@@ -51,6 +53,8 @@ export type FormKalemi = {
   birim_fiyat?: number;
   /** Sadece eski formlarda (artik formda gosterilmez). */
   odeme?: string;
+  /** Ozel sutun degerleri {sutunId: metin} (15.10.2026). */
+  ozel?: Record<string, string>;
 };
 
 /**
@@ -96,13 +100,15 @@ export type IcFiyatFormu = {
   iletisim?: FormIletisim | null;
   /** Onay anindaki sartlar, {KDV} cozulmus (migration 20261014130000); eski formlarda null. */
   sartlar?: string[] | null;
+  /** Onay anindaki sutun duzeni (migration 20261015100000); eski formlarda null = tum standart sutunlar. */
+  sutunlar?: SutunAyari | null;
 };
 
 /** Formun "Siparis ve bilgi" iletisim kisisi (panelden duzenlenir, 14.10.2026). */
 export type FormIletisim = { ad: string; telefon: string; whatsapp: boolean; eposta: string | null };
 
 /** Form kayitlari icin secilecek sutunlar (tek yerde; iletisim dahil). */
-export const FORM_SUTUNLARI = "id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email, iletisim, sartlar";
+export const FORM_SUTUNLARI = "id, company_id, form_no, alici, onay_zamani, gecerlilik_bitis, kalemler, olusturan_email, iletisim, sartlar, sutunlar";
 
 /** Gecerlilik suresi (gun). Sunucudaki tetikleyiciyle AYNI olmalidir
  *  (migration 20261011200000: onay gunu + 3). */
@@ -228,37 +234,132 @@ export function hitapYazi(alici: string | null | undefined): string {
 }
 
 /**
+ * SUTUN DUZENI (15.10.2026, Burak Bey istegi): standart sutunlar formda
+ * gosterilir / gizlenir, en fazla 3 ozel (serbest metin) sutun eklenir.
+ * Guncel ayar ic_piyasa_ayarlari.form_sutunlari; onayda forma dondurulur
+ * (ic_fiyat_formlari.sutunlar). NULL = varsayilan (her sey gorunur, ozel yok)
+ * -> eski formlar birebir ayni cizilir. Urun her zaman gorunur; pesin ve
+ * vadeli fiyattan en az biri gorunur kalmalidir.
+ */
+export const STANDART_SUTUNLAR = [
+  { anahtar: "ambalaj", etiket: "Ambalaj" },
+  { anahtar: "pesin", etiket: "Peşin Fiyat" },
+  { anahtar: "vadeli", etiket: "Vadeli Fiyat" },
+  { anahtar: "vade", etiket: "Vade" },
+  { anahtar: "kdv", etiket: "KDV" },
+  { anahtar: "teslim", etiket: "Teslim" },
+] as const;
+export type StandartSutun = (typeof STANDART_SUTUNLAR)[number]["anahtar"];
+export type OzelSutun = { id: string; baslik: string };
+export type SutunAyari = { gizli: StandartSutun[]; ozel: OzelSutun[] };
+
+export const OZEL_SUTUN_EN_COK = 3;
+export const OZEL_BASLIK_MAX = 24;
+export const OZEL_DEGER_MAX = 40;
+export const VARSAYILAN_SUTUNLAR: SutunAyari = { gizli: [], ozel: [] };
+
+const STANDART_ANAHTARLAR = STANDART_SUTUNLAR.map((s) => s.anahtar) as readonly string[];
+
+/** Herhangi bir kaynaktan (ayar / form) gecerli sutun ayari; bozuksa varsayilan. */
+export function sutunAyariOku(v: unknown): SutunAyari {
+  if (!v || typeof v !== "object") return VARSAYILAN_SUTUNLAR;
+  const o = v as { gizli?: unknown; ozel?: unknown };
+  const gizli = Array.isArray(o.gizli)
+    ? (Array.from(new Set(o.gizli.filter((g): g is StandartSutun => typeof g === "string" && STANDART_ANAHTARLAR.includes(g)))))
+    : [];
+  const ozel = Array.isArray(o.ozel)
+    ? o.ozel
+        .filter((x): x is OzelSutun => !!x && typeof x === "object" && typeof (x as OzelSutun).id === "string" && typeof (x as OzelSutun).baslik === "string")
+        .map((x) => ({ id: x.id, baslik: x.baslik.trim() }))
+        .filter((x) => x.id && x.baslik)
+        .slice(0, OZEL_SUTUN_EN_COK)
+    : [];
+  // Iki fiyat da gizliyse ayar gecersiz -> fiyatlar gorunur kalir
+  const gecerliGizli = gizli.includes("pesin") && gizli.includes("vadeli") ? gizli.filter((g) => g !== "pesin" && g !== "vadeli") : gizli;
+  return { gizli: gecerliGizli, ozel };
+}
+
+export function sutunGorunur(ayar: SutunAyari | null | undefined, anahtar: StandartSutun): boolean {
+  return !(ayar?.gizli || []).includes(anahtar);
+}
+
+/** Varsayilan duzen mi? (her sey gorunur, ozel sutun yok) */
+export function varsayilanSutunMu(ayar: SutunAyari | null | undefined): boolean {
+  return !ayar || ((ayar.gizli || []).length === 0 && (ayar.ozel || []).length === 0);
+}
+
+/** Panel dogrulamasi (DB kisitiyla AYNI kural). Hata metni ya da null. */
+export function sutunAyariHatasi(ayar: SutunAyari): string | null {
+  if (ayar.gizli.includes("pesin") && ayar.gizli.includes("vadeli")) return "Peşin ve vadeli fiyattan en az biri formda görünmeli.";
+  if (ayar.ozel.length > OZEL_SUTUN_EN_COK) return `En fazla ${OZEL_SUTUN_EN_COK} özel sütun eklenebilir.`;
+  const adlar = new Set<string>();
+  for (const o of ayar.ozel) {
+    const b = o.baslik.trim();
+    if (b.length < 2 || b.length > OZEL_BASLIK_MAX) return `Sütun başlığı 2-${OZEL_BASLIK_MAX} karakter olmalı ("${b || "boş"}").`;
+    const k = b.toLocaleLowerCase("tr");
+    if (adlar.has(k)) return `"${b}" başlığı iki kez kullanılmış.`;
+    adlar.add(k);
+  }
+  return null;
+}
+
+/** Ozel sutun degerini (kaydetmeye hazir) temizler. */
+export function ozelDegerTemizle(v: unknown): string {
+  return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, OZEL_DEGER_MAX) : "";
+}
+
+/** Formun sutun duzeni: dondurulmus hali, yoksa varsayilan. */
+export function formSutunlari(form: { sutunlar?: SutunAyari | null }): SutunAyari {
+  return sutunAyariOku(form.sutunlar);
+}
+
+/**
  * Panel satirinin forma girmeye hazir olup olmadigini soyler. Eksik varsa
  * kullaniciya gosterilecek Turkce aciklama dondurur, yoksa null.
  */
-export function satirEksigi(k: Pick<IcFiyatKalemi, "urun" | "ambalaj" | "pesin_fiyat" | "vadeli_fiyat" | "vade_gun" | "teslim">): string | null {
+export function satirEksigi(
+  k: Pick<IcFiyatKalemi, "urun" | "ambalaj" | "pesin_fiyat" | "vadeli_fiyat" | "vade_gun" | "teslim">,
+  ayar: SutunAyari | null = null
+): string | null {
+  // Formda gizlenen sutun zorunlu degildir (15.10.2026)
+  const gor = (a: StandartSutun) => sutunGorunur(ayar, a);
   const eksik: string[] = [];
-  const pesin = sayiVeyaNull(k.pesin_fiyat);
-  const vadeli = sayiVeyaNull(k.vadeli_fiyat);
+  const pesin = gor("pesin") ? sayiVeyaNull(k.pesin_fiyat) : null;
+  const vadeli = gor("vadeli") ? sayiVeyaNull(k.vadeli_fiyat) : null;
   if (!k.urun?.trim()) eksik.push("ürün");
-  if (!k.ambalaj?.trim()) eksik.push("ambalaj");
-  if (pesin === null && vadeli === null) eksik.push("peşin veya vadeli fiyat");
-  if (vadeli !== null && !(Number(k.vade_gun) > 0)) eksik.push("vadeli fiyatın vadesi");
-  if (!k.teslim?.trim()) eksik.push("teslim");
+  if (gor("ambalaj") && !k.ambalaj?.trim()) eksik.push("ambalaj");
+  if (pesin === null && vadeli === null) {
+    eksik.push(gor("pesin") && gor("vadeli") ? "peşin veya vadeli fiyat" : gor("pesin") ? "peşin fiyat" : "vadeli fiyat");
+  }
+  if (vadeli !== null && gor("vade") && !(Number(k.vade_gun) > 0)) eksik.push("vadeli fiyatın vadesi");
+  if (gor("teslim") && !k.teslim?.trim()) eksik.push("teslim");
   return eksik.length ? eksik.join(", ") : null;
 }
 
 /** Panel satirlarini formda dondurulecek bicime cevirir (sira korunur). */
-export function formKalemleri(satirlar: IcFiyatKalemi[]): FormKalemi[] {
+export function formKalemleri(satirlar: IcFiyatKalemi[], ayar: SutunAyari | null = null): FormKalemi[] {
+  const gor = (a: StandartSutun) => sutunGorunur(ayar, a);
+  const ozelSutunlar = ayar?.ozel || [];
   return [...satirlar]
     .sort((a, b) => a.sira - b.sira)
     .map((k) => {
-      const vadeli = sayiVeyaNull(k.vadeli_fiyat);
-      return {
+      // Formda gizlenen fiyat forma girmez (is emri de o fiyati onermesin)
+      const vadeli = gor("vadeli") ? sayiVeyaNull(k.vadeli_fiyat) : null;
+      const vadeGun = vadeli !== null && k.vade_gun !== null && Number(k.vade_gun) > 0 ? Number(k.vade_gun) : null;
+      const kalem: FormKalemi = {
         urun: k.urun.trim(),
         ambalaj: (k.ambalaj || "").trim(),
-        pesin_fiyat: sayiVeyaNull(k.pesin_fiyat),
+        pesin_fiyat: gor("pesin") ? sayiVeyaNull(k.pesin_fiyat) : null,
         vadeli_fiyat: vadeli,
-        // Vade sadece vadeli fiyat varsa anlamlidir
-        vade_gun: vadeli !== null ? Number(k.vade_gun) : null,
+        // Vade sadece vadeli fiyat varsa anlamlidir (gizliyse de is emri icin saklanir)
+        vade_gun: vadeGun,
         teslim: (k.teslim || "").trim(),
         kdv_dahil: !!k.kdv_dahil,
       };
+      if (ozelSutunlar.length) {
+        kalem.ozel = Object.fromEntries(ozelSutunlar.map((o) => [o.id, ozelDegerTemizle(k.ozel_degerler?.[o.id])]));
+      }
+      return kalem;
     });
 }
 

@@ -1133,6 +1133,27 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   MTS) açılıp bağlandı; dosya kalemleri standart oransal kuralla 250 MTS /
   118.750 USD (10 FCL) yapıldı (önceki: 500 MTS / 237.500 USD; denetim kaydında).
 
+## İç Piyasa — Fiyat formu sütun düzeni ve beyaz üst bant (15.10.2026)
+
+- Migration `20261015100000_ic_piyasa_form_sutunlari.sql` (SADECE ekleme; kod
+  push'undan ÖNCE uygulanır — sayfa `form_sutunlari`, `ozel_degerler`, `sutunlar` okur).
+- Panel (Fiyat Tablosu): standart sütun başlıklarındaki göz düğmesiyle Ambalaj /
+  Peşin / Vadeli / Vade / KDV / Teslim formda gösterilir/gizlenir (Ürün her zaman;
+  peşin+vadeli birlikte gizlenemez). "Sütun Ekle" ile en fazla 3 serbest metin
+  sütunu (başlık 2-24, değer ≤ 40 karakter). Gizli sütunun verisi SİLİNMEZ; panelde
+  soluk görünür, formda çıkmaz ve zorunlu sayılmaz. Hepsi "Kaydet" ile.
+- Veri: `ic_piyasa_ayarlari.form_sutunlari` ({gizli, ozel}; NULL = varsayılan),
+  `ic_fiyat_kalemleri.ozel_degerler` ({id: metin}), onayda `ic_fiyat_formlari.sutunlar`
+  + `kalemler[].ozel` DONDURULUR. Gizli fiyat forma null yazılır (iş emri önermesin).
+  Ortak mantık `lib/ic-piyasa/fiyat-formu.ts` (`sutunAyariOku`, `sutunGorunur`,
+  `formKalemleri(satirlar, ayar)`, `satirEksigi(k, ayar)`).
+- PDF: varsayılan düzende (eski formlar dahil) ESKİ sabit sütun konumları birebir;
+  aksi halde `tabloDuzeni` metin sütunlarını paylaştırır, fiyatlar sağa yaslı. Vade
+  ve KDV fiyatın altındaki küçük yazıdadır (gizliyse düşer). Telefon görselinde
+  ambalaj etiketi / alt satır (teslim + "Başlık: değer") / KDV satırı ayara göre.
+- Üst bant (PDF + devam sayfası + telefon görseli) BEYAZ, yazılar lacivert, logo
+  karosuz (Burak Bey, mockB seçildi). Seftali şerit ve alt lacivert bant aynı.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

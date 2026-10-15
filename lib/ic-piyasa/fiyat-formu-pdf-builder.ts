@@ -11,6 +11,7 @@ import {
   fiyatYazi,
   formDosyaAdi,
   formSartlari,
+  formSutunlari,
   eskiBicimForm,
   gunYazi,
   iletisimOku,
@@ -18,7 +19,11 @@ import {
   kalemFiyatlari,
   kdvYazi,
   onayZamaniYazi,
+  sutunGorunur,
+  varsayilanSutunMu,
   vadeYazi,
+  type FormKalemi,
+  type SutunAyari,
 } from "@/lib/ic-piyasa/fiyat-formu";
 import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
 
@@ -156,19 +161,15 @@ function bolumBasligi(doc: jsPDF, y: number, baslik: string, sag?: string) {
 const BANT_Y = 42;
 
 function anaBaslik(doc: jsPDF) {
-  doc.setFillColor(...LACIVERT);
-  doc.rect(0, 0, SAYFA_G, BANT_Y, "F");
-  saydamlik(doc, 0.06);
+  // Revize 15.10.2026 (Burak Bey): ust bant BEYAZ, yazilar lacivert; logo
+  // karosuz dogrudan beyaz zeminde. Alttaki seftali serit korunur.
   doc.setFillColor(255, 255, 255);
-  doc.circle(SAYFA_G + 4, -6, 26, "F");
-  saydamlik(doc, 1);
+  doc.rect(0, 0, SAYFA_G, BANT_Y, "F");
   doc.setFillColor(...SEFTALI);
   doc.rect(0, BANT_Y, SAYFA_G, 2, "F");
 
-  // Logo karosu
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(KENAR, 7, 28, 28, 4, 4, "F");
-  doc.addImage(UNEX_LOGO_BASE64, "PNG", KENAR + 2.5, 9.5, 23, 23);
+  // Logo
+  doc.addImage(UNEX_LOGO_BASE64, "PNG", KENAR + 1, 7, 28, 28);
 
   // Sag: kase bilgileri (sağa yasli)
   const sag = SAYFA_G - KENAR;
@@ -189,12 +190,12 @@ function anaBaslik(doc: jsPDF) {
   const kaseX = sag - kaseG;
   let ky = 11.4;
   unvanSatirlari.forEach((s) => {
-    yazi(doc, s, sag, ky, { tip: "b", boy: unvanBoy, renk: BEYAZ, hiza: "right" });
+    yazi(doc, s, sag, ky, { tip: "b", boy: unvanBoy, renk: LACIVERT, hiza: "right" });
     ky += 3.5;
   });
   ky += 0.6;
   kaseSatirlari.forEach((s) => {
-    yazi(doc, s, sag, ky, { tip: "r", boy: satirBoy, renk: BANT_ACIK, hiza: "right" });
+    yazi(doc, s, sag, ky, { tip: "r", boy: satirBoy, renk: SOLUK, hiza: "right" });
     ky += 3.45;
   });
 
@@ -204,12 +205,12 @@ function anaBaslik(doc: jsPDF) {
   let baslikBoy = 17;
   while (baslikBoy > 12 && genislikOlc(doc, "Fiyat Bilgilendirme Formu", "b", baslikBoy) > azami) baslikBoy -= 0.5;
   yazi(doc, "UNEX GIDA", x, 15, { tip: "s", boy: 7.6, renk: SEFTALI, aralik: 1.1 });
-  yazi(doc, "Fiyat Bilgilendirme Formu", x, 23.8, { tip: "b", boy: baslikBoy, renk: BEYAZ });
-  yazi(doc, "Yan Mamul Ürünler", x, 30.4, { tip: "r", boy: 9.6, renk: BANT_ACIK });
+  yazi(doc, "Fiyat Bilgilendirme Formu", x, 23.8, { tip: "b", boy: baslikBoy, renk: LACIVERT });
+  yazi(doc, "Yan Mamul Ürünler", x, 30.4, { tip: "r", boy: 9.6, renk: SOLUK });
 
   // Ince dikey ayrac (baslik ile kase arasinda)
-  saydamlik(doc, 0.25);
-  doc.setDrawColor(255, 255, 255);
+  saydamlik(doc, 0.35);
+  doc.setDrawColor(...LACIVERT);
   doc.setLineWidth(0.25);
   doc.line(kaseX - 4, 9, kaseX - 4, 33);
   saydamlik(doc, 1);
@@ -217,15 +218,13 @@ function anaBaslik(doc: jsPDF) {
 
 /** Devam sayfalarinin ince ust bandi. */
 function kisaBaslik(doc: jsPDF, form: IcFiyatFormu) {
-  doc.setFillColor(...LACIVERT);
+  doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, SAYFA_G, 20, "F");
   doc.setFillColor(...SEFTALI);
   doc.rect(0, 20, SAYFA_G, 1.4, "F");
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(KENAR, 4, 12, 12, 2, 2, "F");
-  doc.addImage(UNEX_LOGO_BASE64, "PNG", KENAR + 1, 5, 10, 10);
-  yazi(doc, "Fiyat Bilgilendirme Formu", KENAR + 16, 12.3, { tip: "b", boy: 11, renk: BEYAZ });
-  yazi(doc, `${form.form_no} · devam`, SAYFA_G - KENAR, 12.3, { tip: "s", boy: 8.5, renk: BANT_ACIK, hiza: "right" });
+  doc.addImage(UNEX_LOGO_BASE64, "PNG", KENAR, 4, 12, 12);
+  yazi(doc, "Fiyat Bilgilendirme Formu", KENAR + 16, 12.3, { tip: "b", boy: 11, renk: LACIVERT });
+  yazi(doc, `${form.form_no} · devam`, SAYFA_G - KENAR, 12.3, { tip: "s", boy: 8.5, renk: SOLUK, hiza: "right" });
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +327,69 @@ function ozelGunBandi(doc: jsPDF, form: IcFiyatFormu, y: number): number {
 // ---------------------------------------------------------------------------
 // Urun tablosu
 // ---------------------------------------------------------------------------
-function tabloBasligi(doc: jsPDF, y: number, eski: boolean): number {
+/**
+ * Tablo duzeni (15.10.2026): formun dondurulmus sutun ayarina gore. Varsayilan
+ * ayarda (eski formlar dahil) ESKI sabit konumlar birebir kullanilir.
+ * Metin sutunlari: Urun, [Ambalaj], [Teslim], [ozel...]; fiyat sutunlari saga
+ * yasli [Pesin], [Vadeli]. Vade ve KDV fiyatin altindaki kucuk yazidadir.
+ */
+type MetinSutunu = { baslik: string; x: number; g: number; deger: (k: FormKalemi) => string; ana?: boolean };
+type FiyatSutunu = { baslik: string; sag: number; tur: "pesin" | "vadeli" };
+type TabloDuzeni = { metin: MetinSutunu[]; fiyat: FiyatSutunu[]; ayar: SutunAyari };
+
+function tabloDuzeni(form: IcFiyatFormu): TabloDuzeni {
+  const ayar = formSutunlari(form);
+  const gor = (a: Parameters<typeof sutunGorunur>[1]) => sutunGorunur(ayar, a);
+  if (varsayilanSutunMu(ayar)) {
+    return {
+      ayar,
+      metin: [
+        { baslik: "ÜRÜN", x: SUTUN.urun, g: SUTUN.ambalaj - SUTUN.urun - 4, deger: (k) => k.urun, ana: true },
+        { baslik: "AMBALAJ", x: SUTUN.ambalaj, g: SUTUN.teslim - SUTUN.ambalaj - 4, deger: (k) => k.ambalaj },
+        { baslik: "TESLİM", x: SUTUN.teslim, g: SUTUN.pesinSag - 24 - SUTUN.teslim, deger: (k) => k.teslim },
+      ],
+      fiyat: [
+        { baslik: "PEŞİN FİYAT", sag: SUTUN.pesinSag, tur: "pesin" },
+        { baslik: "VADELİ FİYAT", sag: SUTUN.vadeliSag, tur: "vadeli" },
+      ],
+    };
+  }
+  const FIYAT_G = 34;
+  const fiyatTurleri = (["pesin", "vadeli"] as const).filter((t) => gor(t));
+  const sonSag = SUTUN.vadeliSag;
+  const fiyat: FiyatSutunu[] = fiyatTurleri.map((t, i) => ({
+    baslik: t === "pesin" ? "PEŞİN FİYAT" : "VADELİ FİYAT",
+    sag: sonSag - (fiyatTurleri.length - 1 - i) * FIYAT_G,
+    tur: t,
+  }));
+  const metinSon = fiyat[0].sag - 24;
+  const tanimlar: { baslik: string; deger: (k: FormKalemi) => string; agirlik: number; ana?: boolean }[] = [
+    { baslik: "ÜRÜN", deger: (k) => k.urun, agirlik: 1.4, ana: true },
+  ];
+  if (gor("ambalaj")) tanimlar.push({ baslik: "AMBALAJ", deger: (k) => k.ambalaj, agirlik: 1 });
+  if (gor("teslim")) tanimlar.push({ baslik: "TESLİM", deger: (k) => k.teslim, agirlik: 1 });
+  ayar.ozel.forEach((o) => tanimlar.push({ baslik: o.baslik.toLocaleUpperCase("tr"), deger: (k) => k.ozel?.[o.id] || "", agirlik: 1 }));
+  const toplamAgirlik = tanimlar.reduce((t, d) => t + d.agirlik, 0);
+  const alan = metinSon - SUTUN.urun;
+  let x = SUTUN.urun;
+  const metin: MetinSutunu[] = tanimlar.map((d) => {
+    const pay = (alan * d.agirlik) / toplamAgirlik;
+    const s = { baslik: d.baslik, x, g: pay - 4, deger: d.deger, ana: d.ana };
+    x += pay;
+    return s;
+  });
+  return { metin, fiyat, ayar };
+}
+
+/** Fiyatin altindaki kucuk yazi: "TL/kg · + KDV" / "30 Gün vade · + KDV" (gizli parcalar dusurulur). */
+function fiyatAltYazisi(k: FormKalemi, tur: "pesin" | "vadeli", vadeGun: number | null, ayar: SutunAyari): string {
+  const parcalar: string[] = [];
+  parcalar.push(tur === "vadeli" && sutunGorunur(ayar, "vade") && vadeGun !== null ? `${vadeYazi(vadeGun)} vade` : "TL/kg");
+  if (sutunGorunur(ayar, "kdv")) parcalar.push(kdvYazi(k.kdv_dahil));
+  return parcalar.join(" · ");
+}
+
+function tabloBasligi(doc: jsPDF, y: number, eski: boolean, duzen?: TabloDuzeni): number {
   const h = 8.5;
   doc.setFillColor(...LACIVERT);
   doc.roundedRect(KENAR, y, ICERIK_G, h, 1.8, 1.8, "F");
@@ -343,11 +404,12 @@ function tabloBasligi(doc: jsPDF, y: number, eski: boolean): number {
     yazi(doc, "BİRİM FİYAT", SUTUN_ESKI.fiyatSag, ty, { ...b, hiza: "right" });
     return y + h;
   }
-  yazi(doc, "ÜRÜN", SUTUN.urun, ty, b);
-  yazi(doc, "AMBALAJ", SUTUN.ambalaj, ty, b);
-  yazi(doc, "TESLİM", SUTUN.teslim, ty, b);
-  yazi(doc, "PEŞİN FİYAT", SUTUN.pesinSag, ty, { ...b, hiza: "right" });
-  yazi(doc, "VADELİ FİYAT", SUTUN.vadeliSag, ty, { ...b, hiza: "right" });
+  const d = duzen!;
+  d.metin.forEach((m) => {
+    const satir = bol(doc, m.baslik, m.g, "s", 7);
+    yazi(doc, satir.length > 1 ? `${satir[0].replace(/\s+$/, "")}…` : satir[0], m.x, ty, b);
+  });
+  d.fiyat.forEach((f) => yazi(doc, f.baslik, f.sag, ty, { ...b, hiza: "right" }));
   return y + h;
 }
 
@@ -460,6 +522,7 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
 
   let y = bilgiSeridi(doc, form, BANT_Y + 5.5) + 4.5;
   y = hitapKutusu(doc, form, y) + 4;
+  const duzen = tabloDuzeni(form);
   const ozelSonrasi = ozelGunBandi(doc, form, y);
   if (ozelSonrasi > y) y = ozelSonrasi + 3;
 
@@ -468,7 +531,7 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
     if (y + gereken <= SAYFA_SONU) return y;
     doc.addPage();
     kisaBaslik(doc, form);
-    return tabloyla ? tabloBasligi(doc, DEVAM_UST, eski) : DEVAM_UST;
+    return tabloyla ? tabloBasligi(doc, DEVAM_UST, eski, duzen) : DEVAM_UST;
   };
 
   // Urun tablosu (cok satirda sayfa bolunur). Form tek sayfaya birkac mm ile
@@ -480,7 +543,7 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
   y = yerAc(8 + 8.5 + satirH);
   y += 4;
   bolumBasligi(doc, y, "ÜRÜN VE FİYAT LİSTESİ", "Birim fiyatlar TL / kg");
-  y = tabloBasligi(doc, y + 3.2, eski);
+  y = tabloBasligi(doc, y + 3.2, eski, duzen);
   form.kalemler.forEach((k, i) => {
     y = yerAc(satirH, true);
     if (i % 2 === 1) {
@@ -509,9 +572,10 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
       const satirlar = bol(doc, metin || "-", genislik, tip, boy);
       return satirlar.length > 1 ? `${satirlar[0].replace(/\s+$/, "")}…` : satirlar[0];
     };
-    yazi(doc, tekSatir(k.urun, SUTUN.ambalaj - SUTUN.urun - 4, "s", 10.4), SUTUN.urun, y + 6.9 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
-    yazi(doc, tekSatir(k.ambalaj, SUTUN.teslim - SUTUN.ambalaj - 4, "r", 9), SUTUN.ambalaj, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
-    yazi(doc, tekSatir(k.teslim, SUTUN.pesinSag - 24 - SUTUN.teslim, "r", 9), SUTUN.teslim, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
+    duzen.metin.forEach((m) => {
+      if (m.ana) yazi(doc, tekSatir(m.deger(k), m.g, "s", 10.4), m.x, y + 6.9 + kay, { tip: "s", boy: 10.4, renk: LACIVERT });
+      else yazi(doc, tekSatir(m.deger(k), m.g, "r", 9), m.x, y + 6.9 + kay, { tip: "r", boy: 9, renk: MUREKKEP });
+    });
     const fiyat = kalemFiyatlari(k);
     const fiyatHucresi = (deger: number | null, sag: number, alt: string) => {
       if (deger === null) {
@@ -521,8 +585,9 @@ export function fiyatFormuPdfOlustur(form: IcFiyatFormu): jsPDF {
       yazi(doc, fiyatYazi(deger), sag, y + 6.1 + kay, { tip: "b", boy: 13, renk: MUREKKEP, hiza: "right" });
       yazi(doc, alt, sag, y + 9.5 + kay, { tip: "s", boy: 6.6, renk: k.kdv_dahil ? LACIVERT : SOLUK, hiza: "right" });
     };
-    fiyatHucresi(fiyat.pesin, SUTUN.pesinSag, `TL/kg · ${kdvYazi(k.kdv_dahil)}`);
-    fiyatHucresi(fiyat.vadeli, SUTUN.vadeliSag, `${vadeYazi(fiyat.vadeGun)} vade · ${kdvYazi(k.kdv_dahil)}`);
+    duzen.fiyat.forEach((f) =>
+      fiyatHucresi(f.tur === "pesin" ? fiyat.pesin : fiyat.vadeli, f.sag, fiyatAltYazisi(k, f.tur, fiyat.vadeGun, duzen.ayar))
+    );
     y += satirH;
     doc.setDrawColor(...CIZGI);
     doc.setLineWidth(0.2);

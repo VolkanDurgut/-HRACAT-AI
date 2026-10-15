@@ -9,7 +9,7 @@ import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
-import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil, ScrollText } from "lucide-react";
+import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil, ScrollText, EyeOff, Columns3 } from "lucide-react";
 import { formOzelGunleri, ozelGunKapsamUyarisi, ozelGunTarihYazi } from "@/lib/ic-piyasa/ozel-gunler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -20,6 +20,18 @@ import {
   GECERLILIK_GUN,
   IcFiyatFormu,
   KDV_YER_TUTUCU,
+  OZEL_BASLIK_MAX,
+  OZEL_DEGER_MAX,
+  OZEL_SUTUN_EN_COK,
+  STANDART_SUTUNLAR,
+  VARSAYILAN_SUTUNLAR,
+  ozelDegerTemizle,
+  sutunAyariHatasi,
+  sutunAyariOku,
+  sutunGorunur,
+  varsayilanSutunMu,
+  type StandartSutun,
+  type SutunAyari,
   SART_EN_COK,
   SART_MAX_KARAKTER,
   VARSAYILAN_SARTLAR,
@@ -66,6 +78,8 @@ type Satir = {
   vade_gun: number | null; // vadeli fiyatin vadesi
   teslim: string;
   kdv_dahil: boolean;
+  /** Ozel sutun degerleri {sutunId: metin} */
+  ozel: Record<string, string>;
 };
 
 /** "13,15" / "13.15" / "1.250,50" -> sayi; bos -> null; gecersiz -> NaN */
@@ -102,13 +116,25 @@ function dbdenSatir(k: IcFiyatKalemi): Satir {
     vade_gun: k.vade_gun,
     teslim: k.teslim || "",
     kdv_dahil: !!k.kdv_dahil,
+    ozel: { ...(k.ozel_degerler || {}) },
   };
+}
+
+/** Ozel degerlerin karsilastirma / kayit icin duzgun hali (bos degerler atilir, anahtarlar sirali). */
+function ozelNormal(o: Record<string, string> | null | undefined, idler?: string[]): Record<string, string> {
+  const anahtarlar = (idler ?? Object.keys(o || {})).slice().sort();
+  const sonuc: Record<string, string> = {};
+  anahtarlar.forEach((id) => {
+    const v = ozelDegerTemizle(o?.[id]);
+    if (v) sonuc[id] = v;
+  });
+  return sonuc;
 }
 
 /** Kirli (kaydedilmemis) degisiklik tespiti icin normal bicim. */
 function normal(satirlar: Satir[]) {
   return JSON.stringify(
-    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.pesin), fiyatOku(s.vadeli), s.vade_gun, s.teslim.trim(), s.kdv_dahil])
+    satirlar.map((s) => [s.id, s.urun.trim(), s.ambalaj.trim(), fiyatOku(s.pesin), fiyatOku(s.vadeli), s.vade_gun, s.teslim.trim(), s.kdv_dahil, ozelNormal(s.ozel)])
   );
 }
 
@@ -169,6 +195,9 @@ export default function IcPiyasaPage() {
   const [sartDuzenle, setSartDuzenle] = useState(false);
   const [sartTaslak, setSartTaslak] = useState<string[]>([]);
   const [sartKaydediliyor, setSartKaydediliyor] = useState(false);
+  // Sutun duzeni (ic_piyasa_ayarlari.form_sutunlari, 15.10.2026): kayitli + taslak
+  const [sutunAyar, setSutunAyar] = useState<SutunAyari>(VARSAYILAN_SUTUNLAR);
+  const [sutunTaslak, setSutunTaslak] = useState<SutunAyari>(VARSAYILAN_SUTUNLAR);
 
   const yetkili = !!yetkiler.sayfa_yetkileri.ic_piyasa;
 
@@ -178,7 +207,7 @@ export default function IcPiyasaPage() {
     const [kRes, fRes, aRes] = await Promise.all([
       supabase.from("ic_fiyat_kalemleri").select("*").eq("company_id", companyId).order("sira", { ascending: true }).order("olusturma", { ascending: true }),
       supabase.from("ic_fiyat_formlari").select(FORM_SUTUNLARI).eq("company_id", companyId).order("onay_zamani", { ascending: false }).limit(50),
-      supabase.from("ic_piyasa_ayarlari").select("form_iletisim_ad, form_iletisim_telefon, form_iletisim_whatsapp, form_iletisim_eposta, form_sartlari").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ic_piyasa_ayarlari").select("form_iletisim_ad, form_iletisim_telefon, form_iletisim_whatsapp, form_iletisim_eposta, form_sartlari, form_sutunlari").eq("company_id", companyId).maybeSingle(),
     ]);
     // Iletisim ayari okunamazsa sayfa calismaya devam eder; form OLUSTURMA
     // kapatilir ki yanlis kisiyle form gitmesin (asagida formHazir).
@@ -186,8 +215,11 @@ export default function IcPiyasaPage() {
       setIletisimOkunamadi(true);
     } else {
       setIletisimOkunamadi(false);
-      const a = aRes.data as { form_iletisim_ad: string | null; form_iletisim_telefon: string | null; form_iletisim_whatsapp: boolean | null; form_iletisim_eposta: string | null; form_sartlari: unknown } | null;
+      const a = aRes.data as { form_iletisim_ad: string | null; form_iletisim_telefon: string | null; form_iletisim_whatsapp: boolean | null; form_iletisim_eposta: string | null; form_sartlari: unknown; form_sutunlari: unknown } | null;
       setSartSablonu(sartSablonuOku(a?.form_sartlari));
+      const sa = sutunAyariOku(a?.form_sutunlari);
+      setSutunAyar(sa);
+      setSutunTaslak(sa);
       setIletisim(a?.form_iletisim_ad && a.form_iletisim_telefon
         ? { ad: a.form_iletisim_ad, telefon: a.form_iletisim_telefon, whatsapp: a.form_iletisim_whatsapp !== false, eposta: a.form_iletisim_eposta || null }
         : VARSAYILAN_ILETISIM);
@@ -210,7 +242,19 @@ export default function IcPiyasaPage() {
     verileriGetir();
   }, [authLoading, yetkili, verileriGetir]);
 
-  const kirli = useMemo(() => normal(satirlar) !== normal(dbSatirlar.map(dbdenSatir)), [satirlar, dbSatirlar]);
+  const sutunKirli = JSON.stringify(sutunTaslak) !== JSON.stringify(sutunAyar);
+  const kirli = useMemo(
+    () => normal(satirlar) !== normal(dbSatirlar.map(dbdenSatir)) || sutunKirli,
+    [satirlar, dbSatirlar, sutunKirli]
+  );
+  const gorunur = (a: StandartSutun) => sutunGorunur(sutunTaslak, a);
+  const sutunDegistir = (a: StandartSutun) =>
+    setSutunTaslak((o) => ({ ...o, gizli: o.gizli.includes(a) ? o.gizli.filter((g) => g !== a) : [...o.gizli, a] }));
+  const ozelSutunEkle = () =>
+    setSutunTaslak((o) => (o.ozel.length >= OZEL_SUTUN_EN_COK ? o : { ...o, ozel: [...o.ozel, { id: `o${Date.now().toString(36)}`, baslik: "" }] }));
+  const ozelSutunAdi = (id: string, baslik: string) =>
+    setSutunTaslak((o) => ({ ...o, ozel: o.ozel.map((x) => (x.id === id ? { ...x, baslik } : x)) }));
+  const ozelSutunSil = (id: string) => setSutunTaslak((o) => ({ ...o, ozel: o.ozel.filter((x) => x.id !== id) }));
 
   // Kaydedilmemis degisiklik varken sayfadan ayrilma uyarisi
   useEffect(() => {
@@ -241,11 +285,11 @@ export default function IcPiyasaPage() {
   const satirEkle = () => {
     // Yeni satir, bir ustteki satirin vade/teslim/KDV degerlerini alir (hizli giris).
     const son = satirlar[satirlar.length - 1];
-    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", pesin: "", vadeli: "", vade_gun: son?.vade_gun || 30, teslim: son?.teslim || "Fabrika Teslim", kdv_dahil: son?.kdv_dahil ?? false }]);
+    setSatirlar((o) => [...o, { anahtar: yeniAnahtar(), id: null, urun: "", ambalaj: "Dökme", pesin: "", vadeli: "", vade_gun: son?.vade_gun || 30, teslim: son?.teslim || "Fabrika Teslim", kdv_dahil: son?.kdv_dahil ?? false, ozel: {} }]);
   };
 
   const baslangicListesiniYukle = () => {
-    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, pesin: "", vadeli: "", vade_gun: 30, teslim: "Fabrika Teslim", kdv_dahil: false })));
+    setSatirlar(BASLANGIC_URUNLERI.map((u) => ({ anahtar: yeniAnahtar(), id: null, urun: u.urun, ambalaj: u.ambalaj, pesin: "", vadeli: "", vade_gun: 30, teslim: "Fabrika Teslim", kdv_dahil: false, ozel: {} })));
   };
 
   const tasi = (i: number, yon: -1 | 1) =>
@@ -262,6 +306,8 @@ export default function IcPiyasaPage() {
   const kaydet = async () => {
     if (!companyId) return;
     // Dogrulama
+    const sutunHata = sutunAyariHatasi({ ...sutunTaslak, ozel: sutunTaslak.ozel.map((o) => ({ ...o, baslik: o.baslik.trim() })) });
+    if (sutunHata) { showToast(sutunHata, "error"); return; }
     for (let i = 0; i < satirlar.length; i++) {
       const s = satirlar[i];
       if (!s.urun.trim()) { showToast(`${i + 1}. satırda ürün adı boş.`, "error"); return; }
@@ -269,7 +315,19 @@ export default function IcPiyasaPage() {
       if (fiyatHatali(s.vadeli)) { showToast(`${i + 1}. satırda vadeli fiyat geçersiz: "${s.vadeli}". Örnek: 13,65`, "error"); return; }
     }
     setKaydediliyor(true);
+    const ozelIdler = sutunTaslak.ozel.map((o) => o.id);
     try {
+      // 1) Sutun duzeni (degistiyse). Varsayilanla ayniysa NULL yazilir.
+      if (sutunKirli) {
+        const temiz: SutunAyari = { gizli: [...sutunTaslak.gizli].sort(), ozel: sutunTaslak.ozel.map((o) => ({ id: o.id, baslik: o.baslik.replace(/\s+/g, " ").trim() })) };
+        const deger = varsayilanSutunMu(temiz) ? null : temiz;
+        const { data, error } = await supabase.from("ic_piyasa_ayarlari").upsert({ company_id: companyId, form_sutunlari: deger }, { onConflict: "company_id" }).select("company_id");
+        const yh = yazmaHatasi(error, data);
+        if (yh) throw new Error(`Sütun düzeni kaydedilemedi: ${yh}`);
+        const yeni = sutunAyariOku(deger);
+        setSutunAyar(yeni);
+        setSutunTaslak(yeni);
+      }
       const kalanIdler = new Set(satirlar.map((s) => s.id).filter(Boolean) as string[]);
       const silinecek = dbSatirlar.filter((d) => !kalanIdler.has(d.id)).map((d) => d.id);
       if (silinecek.length) {
@@ -289,12 +347,15 @@ export default function IcPiyasaPage() {
           vade_gun: s.vade_gun,
           teslim: s.teslim.trim() || null,
           kdv_dahil: s.kdv_dahil,
+          // Sadece mevcut ozel sutunlarin dolu degerleri (silinen sutunun degeri temizlenir)
+          ozel_degerler: ozelNormal(s.ozel, ozelIdler),
         };
         if (s.id) {
           const d = dbMap.get(s.id);
           const degismedi = d && d.sira === kayit.sira && d.urun === kayit.urun && (d.ambalaj || null) === kayit.ambalaj &&
             dbSayi(d.pesin_fiyat) === kayit.pesin_fiyat && dbSayi(d.vadeli_fiyat) === kayit.vadeli_fiyat && d.vade_gun === kayit.vade_gun &&
-            (d.teslim || null) === kayit.teslim && !!d.kdv_dahil === kayit.kdv_dahil;
+            (d.teslim || null) === kayit.teslim && !!d.kdv_dahil === kayit.kdv_dahil &&
+            JSON.stringify(ozelNormal(d.ozel_degerler)) === JSON.stringify(kayit.ozel_degerler);
           if (degismedi) continue;
           const { data, error } = await supabase.from("ic_fiyat_kalemleri").update(kayit).eq("id", s.id).eq("company_id", companyId).select("id");
           const hata = yazmaHatasi(error, data);
@@ -323,17 +384,19 @@ export default function IcPiyasaPage() {
     if (dbSatirlar.length === 0) return ["Tabloda ürün yok."];
     return dbSatirlar
       .map((k, i) => {
-        const e = satirEksigi(k);
+        const e = satirEksigi(k, sutunAyar);
         return e ? `${i + 1}. satır (${k.urun || "adsız"}): ${e} eksik` : null;
       })
       .filter(Boolean) as string[];
-  }, [dbSatirlar]);
+  }, [dbSatirlar, sutunAyar]);
 
   const formHazir = !kirli && formEksikleri.length === 0 && !iletisimOkunamadi && !iletisimDuzenle && !sartDuzenle;
 
   // Formda cikacak sartlar (kayitli tablonun KDV secimiyle {KDV} cozulmus)
-  const guncelSartlar = useMemo(() => sartlariCoz(sartSablonu, formKalemleri(dbSatirlar)), [sartSablonu, dbSatirlar]);
-  const guncelKdvCumlesi = useMemo(() => kdvCumlesi(formKalemleri(dbSatirlar)), [dbSatirlar]);
+  const guncelSartlar = useMemo(() => sartlariCoz(sartSablonu, formKalemleri(dbSatirlar, sutunAyar)), [sartSablonu, dbSatirlar, sutunAyar]);
+  const guncelKdvCumlesi = useMemo(() => kdvCumlesi(formKalemleri(dbSatirlar, sutunAyar)), [dbSatirlar, sutunAyar]);
+  // Forma dondurulecek sutun duzeni (varsayilansa NULL -> eski formlarla ayni)
+  const formaSutunlar = varsayilanSutunMu(sutunAyar) ? null : sutunAyar;
 
   const sartDuzenlemeyiAc = () => {
     setSartTaslak([...(sartSablonu || VARSAYILAN_SARTLAR)]);
@@ -410,10 +473,11 @@ export default function IcPiyasaPage() {
       alici: alici.trim() || null,
       onay_zamani: new Date().toISOString(),
       gecerlilik_bitis: d.toISOString().slice(0, 10),
-      kalemler: formKalemleri(dbSatirlar),
+      kalemler: formKalemleri(dbSatirlar, sutunAyar),
       olusturan_email: user?.email || null,
       iletisim,
       sartlar: guncelSartlar,
+      sutunlar: formaSutunlar,
     };
   };
 
@@ -428,7 +492,7 @@ export default function IcPiyasaPage() {
     setOlusturuluyor(true);
     const { data, error } = await supabase
       .from("ic_fiyat_formlari")
-      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar), olusturan_email: user?.email || null, iletisim, sartlar: guncelSartlar })
+      .insert({ company_id: companyId, alici: alici.trim() || null, kalemler: formKalemleri(dbSatirlar, sutunAyar), olusturan_email: user?.email || null, iletisim, sartlar: guncelSartlar, sutunlar: formaSutunlar })
       .select(FORM_SUTUNLARI);
     const hata = yazmaHatasi(error, data);
     setOlusturuluyor(false);
@@ -485,6 +549,11 @@ export default function IcPiyasaPage() {
                 <RotateCcw size={14} /> Vazgeç
               </button>
             )}
+            <button onClick={ozelSutunEkle} disabled={kaydediliyor || sutunTaslak.ozel.length >= OZEL_SUTUN_EN_COK}
+              title={sutunTaslak.ozel.length >= OZEL_SUTUN_EN_COK ? `En fazla ${OZEL_SUTUN_EN_COK} özel sütun eklenebilir` : "Forma yeni bir sütun ekleyin (örn. Min. Sipariş)"}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed" style={{ borderColor: CARD_BORDER }}>
+              <Columns3 size={14} /> Sütun Ekle
+            </button>
             <button onClick={satirEkle} disabled={kaydediliyor} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}>
               <Plus size={14} /> Ürün Ekle
             </button>
@@ -509,54 +578,108 @@ export default function IcPiyasaPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1060px]">
+            <table className="w-full text-sm" style={{ minWidth: `${1100 + sutunTaslak.ozel.length * 170}px` }}>
               <thead>
                 <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                  {["#", "Ürün", "Ambalaj", "Peşin Fiyat (TL/kg)", "Vadeli Fiyat (TL/kg)", "Vade", "KDV", "Teslim", ""].map((b, i) => (
-                    <th key={i} className={`px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${i === 3 || i === 4 ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
+                  <th className="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-left" style={{ color: TEXT_MUTED }}>#</th>
+                  <th className="px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-left whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                    Ürün <span className="normal-case font-normal tracking-normal text-[9px] opacity-70">(her zaman)</span>
+                  </th>
+                  {(["ambalaj", "pesin", "vadeli", "vade", "kdv", "teslim"] as const).map((a) => {
+                    const tanim = STANDART_SUTUNLAR.find((x) => x.anahtar === a)!;
+                    const acik = gorunur(a);
+                    // Pesin ve vadeli fiyattan en az biri formda kalmali
+                    const kilitli = acik && (a === "pesin" || a === "vadeli") && !gorunur(a === "pesin" ? "vadeli" : "pesin");
+                    const etiket = a === "pesin" ? "Peşin Fiyat (TL/kg)" : a === "vadeli" ? "Vadeli Fiyat (TL/kg)" : tanim.etiket;
+                    return (
+                      <th key={a} className={`px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${a === "pesin" || a === "vadeli" ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>
+                        <span className={`inline-flex items-center gap-1.5 ${a === "pesin" || a === "vadeli" ? "flex-row-reverse" : ""}`}>
+                          <span className={acik ? "" : "line-through opacity-60"}>{etiket}</span>
+                          <button
+                            type="button"
+                            onClick={() => sutunDegistir(a)}
+                            disabled={kilitli || kaydediliyor}
+                            aria-pressed={acik}
+                            aria-label={`${tanim.etiket} sütununu formda ${acik ? "gizle" : "göster"}`}
+                            title={kilitli ? "Peşin ve vadeli fiyattan en az biri formda görünmeli" : acik ? "Formda görünüyor · gizlemek için tıklayın" : "Formda gizli · göstermek için tıklayın"}
+                            className={`p-1 rounded-md border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${acik ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20" : "border-white/10 hover:bg-white/5"}`}
+                            style={acik ? undefined : { color: TEXT_MUTED }}
+                          >
+                            {acik ? <Eye size={11} /> : <EyeOff size={11} />}
+                          </button>
+                        </span>
+                        {!acik && <span className="block mt-0.5 normal-case tracking-normal font-normal text-[9px] text-amber-400">Formda yok</span>}
+                      </th>
+                    );
+                  })}
+                  {sutunTaslak.ozel.map((o) => (
+                    <th key={o.id} className="px-2 py-1.5 text-left align-middle">
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={o.baslik}
+                          onChange={(e) => ozelSutunAdi(o.id, e.target.value)}
+                          maxLength={OZEL_BASLIK_MAX}
+                          placeholder="Sütun başlığı"
+                          aria-label="Özel sütun başlığı"
+                          className="w-full min-w-[110px] px-2 py-1 rounded-md border text-[11px] font-semibold uppercase tracking-wide text-white placeholder:normal-case placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                          style={{ backgroundColor: "#0F131A", borderColor: o.baslik.trim().length < 2 ? "#F59E0B" : CARD_BORDER }}
+                        />
+                        <button type="button" onClick={() => ozelSutunSil(o.id)} disabled={kaydediliyor} title="Sütunu kaldır" aria-label={`${o.baslik || "Özel"} sütununu kaldır`}
+                          className="p-1 rounded-md hover:bg-red-500/10 text-red-400 shrink-0 disabled:opacity-40"><Trash2 size={12} /></button>
+                      </div>
+                    </th>
                   ))}
+                  <th className="px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
                 {satirlar.map((s, i) => {
                   const onceki = sonFormFiyati.get(`${s.urun.trim().toLocaleLowerCase("tr")}|${s.ambalaj.trim().toLocaleLowerCase("tr")}`);
                   const vadeliVar = fiyatOku(s.vadeli) !== null;
-                  const vadeEksik = vadeliVar && !(Number(s.vade_gun) > 0);
+                  const vadeEksik = vadeliVar && gorunur("vadeli") && gorunur("vade") && !(Number(s.vade_gun) > 0);
                   const vadeSecenekleri = Array.from(new Set([...VADELI_VADE_SECENEKLERI, ...(s.vade_gun ? [s.vade_gun] : [])])).sort((a, b) => a - b);
+                  // Formda gizli sutunun hucresi soluk (veri korunur, formda cikmaz)
+                  const soluk = (a: StandartSutun) => (gorunur(a) ? "" : "opacity-40");
                   return (
                     <tr key={s.anahtar} className="border-t align-top" style={{ borderColor: CARD_BORDER }}>
                       <td className="px-2 py-2 text-xs pt-3.5" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                       <td className="px-2 py-2 min-w-[150px]">
                         <input list="ic-urun-onerileri" value={s.urun} onChange={(e) => guncelle(s.anahtar, { urun: e.target.value })} placeholder="Ürün adı" className={inputSinif} style={inputStil} />
                       </td>
-                      <td className="px-2 py-2 min-w-[125px]">
+                      <td className={`px-2 py-2 min-w-[125px] ${soluk("ambalaj")}`}>
                         <input list="ic-ambalaj-onerileri" value={s.ambalaj} onChange={(e) => guncelle(s.anahtar, { ambalaj: e.target.value })} placeholder="Dökme" className={inputSinif} style={inputStil} />
                       </td>
-                      <td className="px-2 py-2 min-w-[125px]">
+                      <td className={`px-2 py-2 min-w-[125px] ${soluk("pesin")}`}>
                         <FiyatGirdisi deger={s.pesin} placeholder="13,15" etiket="Peşin fiyat" onceki={onceki ? onceki.pesin : undefined} degistir={(v) => guncelle(s.anahtar, { pesin: v })} />
                       </td>
-                      <td className="px-2 py-2 min-w-[125px]">
+                      <td className={`px-2 py-2 min-w-[125px] ${soluk("vadeli")}`}>
                         <FiyatGirdisi deger={s.vadeli} placeholder="13,65" etiket="Vadeli fiyat" onceki={onceki ? onceki.vadeli : undefined} degistir={(v) => guncelle(s.anahtar, { vadeli: v })} />
                       </td>
-                      <td className="px-2 py-2 min-w-[100px]">
+                      <td className={`px-2 py-2 min-w-[100px] ${soluk("vade")}`}>
                         <select value={s.vade_gun && s.vade_gun > 0 ? s.vade_gun : ""} onChange={(e) => guncelle(s.anahtar, { vade_gun: e.target.value === "" ? null : Number(e.target.value) })} className={`${inputSinif} ${vadeliVar ? "" : "opacity-50"}`} style={{ ...inputStil, borderColor: vadeEksik ? "#F87171" : CARD_BORDER }} title="Vadeli fiyatın vadesi" aria-label="Vadeli fiyatın vadesi">
                           <option value="">Seçin</option>
                           {vadeSecenekleri.map((g) => <option key={g} value={g}>{vadeYazi(g)}</option>)}
                         </select>
                         {vadeEksik && <p className="text-[10px] mt-1 text-red-400 whitespace-nowrap">Vade seçin</p>}
                       </td>
-                      <td className="px-2 py-2 min-w-[122px]">
+                      <td className={`px-2 py-2 min-w-[122px] ${soluk("kdv")}`}>
                         <select value={s.kdv_dahil ? "dahil" : "haric"} onChange={(e) => guncelle(s.anahtar, { kdv_dahil: e.target.value === "dahil" })} className={inputSinif} style={inputStil} title="Fiyatlara KDV dahil mi?">
                           <option value="haric">KDV Hariç</option>
                           <option value="dahil">KDV Dahil</option>
                         </select>
                       </td>
-                      <td className="px-2 py-2 min-w-[165px]">
+                      <td className={`px-2 py-2 min-w-[165px] ${soluk("teslim")}`}>
                         <select value={s.teslim} onChange={(e) => guncelle(s.anahtar, { teslim: e.target.value })} className={inputSinif} style={inputStil}>
                           <option value="">Seçin</option>
                           {Array.from(new Set([...TESLIM_SECENEKLERI, ...(s.teslim ? [s.teslim] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
                         </select>
                       </td>
+                      {sutunTaslak.ozel.map((o) => (
+                        <td key={o.id} className="px-2 py-2 min-w-[150px]">
+                          <input value={s.ozel[o.id] || ""} onChange={(e) => guncelle(s.anahtar, { ozel: { ...s.ozel, [o.id]: e.target.value } })}
+                            maxLength={OZEL_DEGER_MAX} placeholder="—" aria-label={`${o.baslik || "Özel sütun"} değeri`} className={inputSinif} style={inputStil} />
+                        </td>
+                      ))}
                       <td className="px-2 py-2 whitespace-nowrap">
                         <div className="flex flex-nowrap items-center gap-0.5 pt-0.5">
                           <button onClick={() => tasi(i, -1)} disabled={i === 0} title="Yukarı taşı" className="p-1.5 rounded hover:bg-white/5 disabled:opacity-30" style={{ color: TEXT_MUTED }}><ArrowUp size={14} /></button>
@@ -575,7 +698,7 @@ export default function IcPiyasaPage() {
         )}
         {satirlar.length > 0 && (
           <p className="px-4 py-2.5 text-xs border-t" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-            Fiyatlar TL/kg&apos;dır. Peşin ve vadeli fiyat ayrı girilir; yalnızca peşin satılan üründe vadeli fiyat boş bırakılabilir (formda &quot;—&quot; görünür). Vade, vadeli fiyata aittir. KDV dahil/hariç her satırda ayrı seçilir. Satır silme ve sıralama da &quot;Kaydet&quot; ile kalıcı olur.
+            Fiyatlar TL/kg&apos;dır. Peşin ve vadeli fiyat ayrı girilir; yalnızca peşin satılan üründe vadeli fiyat boş bırakılabilir (formda &quot;—&quot; görünür). Vade, vadeli fiyata aittir. KDV dahil/hariç her satırda ayrı seçilir. Sütun başlığındaki göz simgesiyle sütunu formda gösterip gizleyebilir, &quot;Sütun Ekle&quot; ile en fazla {OZEL_SUTUN_EN_COK} yeni sütun ekleyebilirsiniz (gizli sütunun verisi silinmez). Satır, sütun ve sıralama değişiklikleri &quot;Kaydet&quot; ile kalıcı olur; önceden oluşturulmuş formlar değişmez.
           </p>
         )}
       </div>
@@ -752,7 +875,7 @@ export default function IcPiyasaPage() {
         confirmLabel="Geri Al"
         cancelLabel="Vazgeç"
         destructive
-        onConfirm={() => { setSatirlar(dbSatirlar.map(dbdenSatir)); setGeriAlAcik(false); }}
+        onConfirm={() => { setSatirlar(dbSatirlar.map(dbdenSatir)); setSutunTaslak(sutunAyar); setGeriAlAcik(false); }}
       />
     </AppShell>
   );

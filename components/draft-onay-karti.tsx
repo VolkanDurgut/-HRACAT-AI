@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, FileCheck2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, FileCheck2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X, Archive } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
@@ -21,7 +21,15 @@ import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certifica
 import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
 import { buildKaliteSertifikasiHtml } from "@/lib/kalite-sertifikasi-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
-import { checkKaliteSertifikasiReadiness, checkFumigationReadiness } from "@/lib/document-readiness";
+import {
+  checkKaliteSertifikasiReadiness,
+  checkFumigationReadiness,
+  checkCommercialInvoiceReadiness,
+  checkPackingListReadiness,
+  checkCertificateOfOriginReadiness,
+  checkPhytosanitaryCertificateReadiness,
+  checkHealthCertificateReadiness,
+} from "@/lib/document-readiness";
 import { MusteriEvrakAyarlari, dosyaEvrakIstiyorMu } from "@/lib/musteri-evrak-ayarlari";
 import { draftFiligranEkle } from "@/lib/watermark";
 
@@ -43,6 +51,13 @@ type Props = {
   /** Musteriye ozel Quality / Fumigation ayarlari (sayfa tek seferde getirir). */
   ayarlar: MusteriEvrakAyarlari;
   onRefresh: () => void;
+  /**
+   * Kapanan dosya (16.10.2026): SADECE goruntuleme - evraklar ve paket
+   * indirilebilir, onay / gonderim / revize aksiyonlari yoktur. Eski
+   * dosyalarda eksik veri olabilecegi icin her belge hazirlik kontrolunden
+   * gecer; eksikse uyari ikonu gosterilir (bos/yanlis belge uretilmez).
+   */
+  arsiv?: boolean;
 };
 
 /**
@@ -50,7 +65,7 @@ type Props = {
  * yatay tablo deseniyle aynı sınıflar/renkler kullanılır - amaç kullanıcının
  * zaten alışık olduğu görünümü korumak.
  */
-export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, ayarlar, onRefresh }: Props) {
+export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, ayarlar, onRefresh, arsiv = false }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -96,6 +111,15 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
 
   const handlePaketIndir = async () => {
     if (!draftBlUrl) return;
+    // Kapanan (eski) dosyada eksik bilgili standart belge varsa paket
+    // uretilmez - eksik/yanlis belgeli paket disari cikmasin.
+    if (arsiv) {
+      const eksikBelgeler = evrakSirasi.filter((x) => x.eksikler && ["ci", "pl", "coo", "phyto", "health"].includes(x.key));
+      if (eksikBelgeler.length) {
+        showToast(`Paket oluşturulamadı; eksik bilgi: ${eksikBelgeler.map((x) => `${x.title} (${x.eksikler!.join(", ")})`).join(" · ")}`, "error");
+        return;
+      }
+    }
     setIndiriliyor(true);
     try {
       const { eklenmeyenler } = await indirTaslakOnayPaketi(dosya, rezervasyonlar, konteynerler, draftBlUrl, ayarlar);
@@ -315,7 +339,22 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         : { key: "fc", title: EVRAK_ADLARI.fumigation, eksikler: fcHazirlik.eksikler }
       : null,
   ];
-  const evrakSirasi: EvrakGosterim[] = evrakListesiHam.filter((x): x is EvrakGosterim => x !== null);
+  // Kapanan dosyada her standart belge ayrica hazirlik kontrolunden gecer
+  // (acik dosyalar sayfada zaten tam set kontrolunden geciyor - davranis ayni).
+  const arsivKontrolleri: Record<string, (d: Dosya, r: Rezervasyon[], k: Konteyner[]) => { hazir: boolean; eksikler: string[] }> = {
+    ci: checkCommercialInvoiceReadiness,
+    pl: checkPackingListReadiness,
+    coo: checkCertificateOfOriginReadiness,
+    phyto: checkPhytosanitaryCertificateReadiness,
+    health: checkHealthCertificateReadiness,
+  };
+  const evrakSirasi: EvrakGosterim[] = evrakListesiHam
+    .filter((x): x is EvrakGosterim => x !== null)
+    .map((x) => {
+      if (!arsiv || !x.builder || !arsivKontrolleri[x.key]) return x;
+      const h = arsivKontrolleri[x.key](dosya, rezervasyonlar, konteynerler);
+      return h.hazir ? x : { key: x.key, title: x.title, eksikler: h.eksikler };
+    });
 
   const IKON_SINIFI = "inline-flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/10 transition-colors";
   const ORIJINAL_RENK = "#7DD3FC"; // Evraklar sekmesindeki "Orijinal" butonuyla ayni (sky-300)
@@ -385,7 +424,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   return (
     <>
     <tr
-      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${sureDoldu ? "bg-red-500/[0.05]" : hatirlatmaKritik ? "bg-red-500/[0.03]" : ""}`}
+      className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors ${arsiv ? "" : sureDoldu ? "bg-red-500/[0.05]" : hatirlatmaKritik ? "bg-red-500/[0.03]" : ""}`}
       style={{ borderColor: CARD_BORDER }}
     >
       {/* Dosya + Musteri (e-posta uyarisi ayni satirda - satir yuksekligi sabit kalsin) */}
@@ -440,7 +479,14 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       {/* Durum: rozet + tek satir bilgi */}
       <td className="px-2.5 py-2.5 align-middle" title={durumTitle}>
         <div className="flex flex-col items-start gap-1 min-w-[140px]">
-          {musteriOnayiAlindi ? (
+          {arsiv ? (
+            <>
+              <span className={ROZET} style={{ color: "#CBD5E1", backgroundColor: "rgba(148,163,184,0.12)" }}><Archive size={11} /> Kapalı</span>
+              <p className="text-[10px] whitespace-nowrap max-w-[190px] truncate" style={{ color: TEXT_MUTED }}>
+                {musteriOnayiAlindi ? (kisaZaman(musteriOnayiTarihi) ? `Müşteri onayı: ${kisaZaman(musteriOnayiTarihi)}` : "Müşteri onayı alındı") : "Dosya kapatıldı"}
+              </p>
+            </>
+          ) : musteriOnayiAlindi ? (
             <span className={`${ROZET} text-green-400 bg-green-500/10`}><CheckCircle2 size={11} /> Onay Geldi</span>
           ) : revizeIstendi ? (
             <span className={`${ROZET} text-orange-400 bg-orange-500/10`}><MessageSquareWarning size={11} /> Revize İstendi</span>
@@ -453,7 +499,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
           ) : (
             <span className={ROZET} style={{ color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.06)" }}>Bekliyor</span>
           )}
-          {typeof durumAltSatir === "string" ? (
+          {arsiv ? null : typeof durumAltSatir === "string" ? (
             <p className="text-[10px] whitespace-nowrap max-w-[190px] truncate" style={{ color: TEXT_MUTED }}>{durumAltSatir}</p>
           ) : (
             durumAltSatir
@@ -476,7 +522,9 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             {indiriliyor ? <Loader2 size={13} className="animate-spin" /> : <FileArchive size={13} />}
           </button>
 
-          {!onaylandi && (
+          {arsiv && <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Salt görüntüleme</span>}
+
+          {!arsiv && !onaylandi && (
             <button
               type="button"
               onClick={handleOnayla}
@@ -489,7 +537,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             </button>
           )}
 
-          {onaylandi && !mailGonderildi && (
+          {!arsiv && onaylandi && !mailGonderildi && (
             <button
               type="button"
               onClick={handleGonderildiIsaretle}
@@ -502,7 +550,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             </button>
           )}
 
-          {mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && (
+          {!arsiv && mailGonderildi && !musteriOnayiAlindi && !revizeIstendi && (
             <>
               <button
                 type="button"
@@ -540,7 +588,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         </div>
       </td>
     </tr>
-    {revizeModalAcik && (
+    {!arsiv && revizeModalAcik && (
       <tr>
         <td colSpan={6} className="p-0">
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setRevizeModalAcik(false)}>

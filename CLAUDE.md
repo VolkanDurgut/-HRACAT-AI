@@ -1133,6 +1133,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   MTS) açılıp bağlandı; dosya kalemleri standart oransal kuralla 250 MTS /
   118.750 USD (10 FCL) yapıldı (önceki: 500 MTS / 237.500 USD; denetim kaydında).
 
+## Draft Onay — Kapanan dosyalar ve arama (16.10.2026)
+
+- `/draft-onay` iki sekme: **Aktif Dosyalar** (28.09 kuralı aynen: açık + tam evrak
+  seti) ve **Kapanan Dosyalar** (kapalı + Draft BL'li, en yeni üstte). Şema değişikliği YOK.
+- Kapanan satır `DraftOnayKarti arsiv` modunda: SALT görüntüleme — evraklar (draft/
+  orijinal) ve Taslak Onay Paketi; Onayla / Gönderildi / Müşteri Onayladı / Revize /
+  Hatırlat YOK, kırmızı süre vurgusu yok, durum "Kapalı" (+ müşteri onay tarihi).
+  Her standart belge `check*Readiness` ile kontrol edilir; eksikse uyarı ikonu,
+  eksik belgeli dosyada paket indirilmez (toast ile eksikler).
+- Arama (iki sekmede birden, sayaçlar "bulunan/toplam"): dosya no, müşteri,
+  proforma, booking, konteyner, fatura no, BL no. Büyük/küçük harf ve I/ı/İ/i farkı
+  gözetilmez (`IHR` tr-küçük harfte `ıhr` olur — `sadelestir` ı→i yapar); boşluk/tire
+  gözetmeden de eşleşir. Sonuç diğer sekmedeyse "Sonuçlara git" bandı.
+
 ## İç Piyasa — Fiyat formu sütun düzeni ve beyaz üst bant (15.10.2026)
 
 - Migration `20261015100000_ic_piyasa_form_sutunlari.sql` (SADECE ekleme; kod

@@ -17,9 +17,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari } from "@/lib/sayi-oku";
-import { siparisIlerlemesiHesapla, acikKalemler, SiparisIlerlemesi } from "@/lib/siparis-takip";
+import { siparisIlerlemesiHesapla, SiparisIlerlemesi, SiparisKalemDurumu } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { SiparisTakipKarti } from "@/components/siparis-takip-karti";
+import { SiparisDevamPenceresi, type DevamOnayi } from "@/components/siparis-devam-penceresi";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 type AnaSiparisWithProgress = AnaSiparis & { ilerleme: SiparisIlerlemesi };
@@ -38,6 +39,9 @@ export default function IhracatlarPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
   const [tamamlanacak, setTamamlanacak] = useState<AnaSiparisWithProgress | null>(null);
   const [tamamlaniyor, setTamamlaniyor] = useState(false);
+  // Sevkiyat secimi penceresi (16.10.2026): guncel kalemler + ilk dosya (sablon)
+  const [devamPenceresi, setDevamPenceresi] = useState<{ siparis: AnaSiparisWithProgress; kalemler: SiparisKalemDurumu[]; ornekDosya: Dosya | null } | null>(null);
+  const [devamOlusturuluyor, setDevamOlusturuluyor] = useState(false);
 
   const SAYFA_BOYUTU = 50;
   const [dahaFazlaVar, setDahaFazlaVar] = useState(true);
@@ -172,30 +176,42 @@ export default function IhracatlarPage() {
     }
   }, [authLoading, yetkiler, router]);
 
+  // "Siparise Devam Et" (16.10.2026): once SEVKIYAT SECIMI penceresi acilir -
+  // hangi markadan kac FCL gidecegi secilir, detayli ambalaj / marka secimden
+  // onerilir (eskiden ilk dosyadan AYNEN kopyalaniyordu: 0095 / 0077'deki
+  // yanlis cuval sayilari). Kalemler GUNCEL veriyle hesaplanir; okunamazsa
+  // pencere acilmaz (yanlis miktarla dosya olusmasin).
   const handleSipariseDevamEt = async (siparis: AnaSiparisWithProgress) => {
     if (!user || !companyId) return;
     setDevamEdiyor(siparis.id);
     try {
-      // Ayni ana siparise bagli TUM dosyalari cek: hem kopyalanacak proforma
-      // bilgileri icin ilk dosya, hem de "kalan urun kalemi" hesabi icin
-      // hepsinin urun_detaylari'na ihtiyac var.
-      const { data: bagliDosyalar } = await supabase
+      // Kopyalanacak proforma bilgileri ve ambalaj sablonu icin siparisin ilk dosyasi
+      const { data: bagliDosyalar, error: dosyaHatasi } = await supabase
         .from("ihracat_dosyalari")
         .select("*")
         .eq("company_id", companyId)
         .eq("ana_siparis_id", siparis.id)
-        .order("olusturma_tarihi", { ascending: true });
-
-      const ornekDosya = (bagliDosyalar || [])[0] || null;
-      // Yeni dosyanin kalemleri: siparisin HENUZ HICBIR DOSYADA OLMAYAN kismi,
-      // marka/kalem bazli (lib/siparis-takip.ts). Guncel veriyle yeniden
-      // hesaplanir; okunamazsa dosya acilmaz (yanlis miktarla dosya olusmasin).
+        .order("olusturma_tarihi", { ascending: true })
+        .limit(1);
+      if (dosyaHatasi) throw dosyaHatasi;
       const veri = await siparisTakipVerisiGetir(companyId, [siparis]);
       if (!veri) throw new Error("Sipariş verisi okunamadı");
-      const kalanKalemler = acikKalemler(siparisIlerlemesiHesapla(siparis, veri.dosyalar, veri.konteynerler));
-      const kalanToplamTutar = kalanKalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
-      const kalanToplamMiktar = kalanKalemler.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
+      const ilerleme = siparisIlerlemesiHesapla(siparis, veri.dosyalar, veri.konteynerler);
+      setDevamPenceresi({ siparis, kalemler: ilerleme.kalemler, ornekDosya: ((bagliDosyalar || [])[0] as Dosya) || null });
+    } catch {
+      showToast("Sipariş bilgileri okunamadı. Lütfen tekrar deneyin.", "error");
+    } finally {
+      setDevamEdiyor(null);
+    }
+  };
 
+  const handleDevamOnayla = async (onay: DevamOnayi) => {
+    if (!user || !companyId || !devamPenceresi) return;
+    const { siparis, ornekDosya } = devamPenceresi;
+    setDevamOlusturuluyor(true);
+    try {
+      const toplamTutar = onay.kalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
+      const toplamMiktar = onay.kalemler.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
       const { data: yeniDosya, error: dbError } = await supabase
         .from("ihracat_dosyalari")
         .insert({
@@ -214,20 +230,21 @@ export default function IhracatlarPage() {
           ambalaj: ornekDosya?.ambalaj || null,
           // Ilk dosyanin varis limani duzeltme notu yeni dosyaya tasinmaz (03.10.2026)
           ham_veri: ornekDosya?.ham_veri ? (({ varis_limani_duzeltme: _atla, ...kalan }) => kalan)(ornekDosya.ham_veri as Record<string, unknown>) : null,
-          marka: ornekDosya?.marka || null,
+          // Marka ve detayli ambalaj SECIMDEN gelir (pencerede onaylandi)
+          marka: onay.marka || ornekDosya?.marka || null,
           sevkiyat_evraklari: ornekDosya?.sevkiyat_evraklari || SEVKIYAT_EVRAKLARI,
           alici_adresi: ornekDosya?.alici_adresi || null,
           consignee: ornekDosya?.consignee || null,
-          detayli_ambalaj: ornekDosya?.detayli_ambalaj || null,
+          detayli_ambalaj: onay.detayliAmbalaj || null,
           hesap_adi: ornekDosya?.hesap_adi || null,
           banka: ornekDosya?.banka || null,
           swift: ornekDosya?.swift || null,
           hesap_numarasi: ornekDosya?.hesap_numarasi || null,
           iban: ornekDosya?.iban || null,
-          urun_detaylari: kalanKalemler.length > 0 ? kalanKalemler : null,
-          toplam_tutar: kalanKalemler.length > 0 ? kalanToplamTutar : null,
-          miktar: kalanKalemler.length > 0 ? String(kalanToplamMiktar) : null,
-          miktar_birimi: kalanKalemler.length > 0 ? "MTS" : null,
+          urun_detaylari: onay.kalemler.length > 0 ? onay.kalemler : null,
+          toplam_tutar: onay.kalemler.length > 0 ? toplamTutar : null,
+          miktar: onay.kalemler.length > 0 ? String(Math.round(toplamMiktar * 100) / 100) : null,
+          miktar_birimi: onay.kalemler.length > 0 ? "MTS" : null,
           durum: "Açık",
           created_by: user.id,
           ana_siparis_id: siparis.id,
@@ -242,7 +259,7 @@ export default function IhracatlarPage() {
       router.push(`/dosya/${yeniDosya.id}?tab=rezervasyon&action=new`);
     } catch {
       showToast("Dosya oluşturulurken hata oluştu.", "error");
-      setDevamEdiyor(null);
+      setDevamOlusturuluyor(false);
     }
   };
 
@@ -355,6 +372,20 @@ export default function IhracatlarPage() {
         loading={tamamlaniyor}
         loadingLabel="Kaydediliyor..."
       />
+
+      {devamPenceresi && (
+        <SiparisDevamPenceresi
+          proformaNo={devamPenceresi.siparis.proforma_no}
+          aliciFirma={devamPenceresi.siparis.alici_firma}
+          paraBirimi={devamPenceresi.siparis.para_birimi || "USD"}
+          kalemler={devamPenceresi.kalemler}
+          ornekDetayliAmbalaj={devamPenceresi.ornekDosya?.detayli_ambalaj || null}
+          ornekMarka={devamPenceresi.ornekDosya?.marka || null}
+          olusturuluyor={devamOlusturuluyor}
+          onKapat={() => { if (!devamOlusturuluyor) setDevamPenceresi(null); }}
+          onOnayla={handleDevamOnayla}
+        />
+      )}
 
       <SayfaBasligi
         ikon={<Archive size={20} />}

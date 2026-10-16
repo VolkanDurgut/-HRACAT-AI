@@ -539,6 +539,31 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   veya etiketli kalem KORUNUR; tonaj konteyner adedini tutmuyorsa uyarı
   çıkar. Eskiden her rezervasyon kaydında bu düzeltmeler sessizce siliniyordu.
 
+## Siparişe Devam Et — Sevkiyat Seçimi (16.10.2026)
+
+- "Siparişe Devam Et" artık dosyayı hemen açmaz: `components/siparis-devam-penceresi.tsx`
+  açılır. Her sipariş kalemi için onay kutusu + FCL (varsayılan: eskisi gibi
+  dosyası açılmamış miktarın tamamı). FCL dosyalanmamış miktara eşitse KESİN MTS
+  kullanılır (252,45 MTS = 10,1 FCL → 252,45; 252,5 değil).
+- Detaylı ambalaj ve marka SEÇİMDEN önerilir (düzenlenebilir, "Öneriye dön").
+  Eskiden ilk dosyadan AYNEN kopyalanıyordu → 0095 / 0077'deki yanlış çuval
+  sayıları. Kural (`lib/siparis-devam.ts` `detayliAmbalajOner`): ilk dosyanın
+  metni şablon; kalemin markasını içeren segment aynen (sayı değişir), yoksa ilk
+  segment başka markası değiştirilerek türetilir (+ kontrol notu), şablon yoksa
+  "PIECES OF 25 KG BAGS (MARKA BRAND)" + not. Segmentler ", " ile birleşir.
+  Marka: tüm seçili kalemlerin parantezli markası varsa "SAAD BRAND" /
+  "ASLI BRAND & SAAD BRAND", yoksa ilk dosyanın markası.
+- Dosyalanmamış miktarı aşan seçim: satırda uyarı + onay kutusu zorunlu.
+- Kap kontrolü (`kapUyumsuzlugu`): detaylı ambalajdaki kap toplamı ≠
+  konteynerlerin "Kap Adeti" toplamı ise Lojistik kartında ve Konteynerler
+  tablosunun TOPLAM satırında uyarı. Sadece tüm konteynerler eklenmiş ve
+  hepsinin kap adedi girilmişse kontrol edilir (yanlış alarm yok). Fatura
+  talimatı / CoO / Phyto / Health / sigorta metni AYNEN kullanır; CI / PL tek
+  segmentte sayıyı zaten konteynerden düzeltir.
+- Kapsam dışı: Yeni Dosya'daki "Mevcut sipariş bulundu" (yüklenen proformadan)
+  akışı değişmedi. Veritabanı değişikliği YOK. Testler: saf fonksiyonlar tsx ile
+  (28 senaryo), pencere Playwright ile.
+
 ## Kontrol Merkezi (eski adı Dashboard, `/dashboard`) — 10.10.2026
 - İş akışı hesabı TEK YERDE: `lib/dashboard-akis.ts` (`dosyaAkisiHesapla`,
   saf fonksiyon). Adım sırası: Rezervasyon → Konteyner → Yükleme (DBA) →

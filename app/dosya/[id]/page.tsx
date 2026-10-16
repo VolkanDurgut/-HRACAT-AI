@@ -332,7 +332,7 @@ function DosyaDetailContent() {
             </div>
             <div className="rounded-xl border shadow-sm p-6 space-y-5 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, animationDelay: "0.25s" }}>
               <div>
-                <LojistikCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+                <LojistikCard dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} onRefresh={fetchData} companyId={companyId} />
               </div>
               <div>
                 <OdemeCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />

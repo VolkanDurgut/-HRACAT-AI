@@ -12,6 +12,7 @@ import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
 import FaturaTalimatiSection, { FaturaTalimatiSectionHandle } from "@/components/fatura-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { kapUyumsuzlugu } from "@/lib/siparis-devam";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -166,6 +167,8 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   const toplamNet = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
   const toplamBrut = konteynerler.reduce((s, k) => s + ((k as any).brut_agirlik_kg || 0), 0);
   const toplamKapAdeti = konteynerler.reduce((s, k) => s + ((k as any).pieces || 0), 0);
+  // Detayli ambalajdaki kap toplami ile karsilastirma (16.10.2026)
+  const kapFarki = kapUyumsuzlugu(dosya.detayli_ambalaj, konteynerler as { pieces?: number | null }[], rezervasyonKonteynerAdedi);
 
   return (
     <div className="space-y-4">
@@ -356,11 +359,24 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                     <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
                       {toplamBrut > 0 ? `${toplamBrut.toLocaleString("tr-TR")} KG` : "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: "white" }}>
+                    <td className="px-4 py-3 text-sm font-bold text-right" style={{ color: kapFarki ? "#FBBF24" : "white" }}>
                       {toplamKapAdeti > 0 ? toplamKapAdeti.toLocaleString("tr-TR") : "-"}
                     </td>
                     <td colSpan={4}></td>
                   </tr>
+                  {kapFarki && (
+                    <tr style={{ backgroundColor: ROW_HEADER_BG }}>
+                      <td colSpan={14} className="px-4 pb-3 pt-0">
+                        <p className="text-[11px] text-amber-400 inline-flex items-start gap-1" role="status">
+                          <AlertTriangle size={12} className="mt-px shrink-0" />
+                          <span>
+                            Kap toplamı ({kapFarki.konteynerToplami.toLocaleString("tr-TR")}) detaylı ambalajdaki sayıyla ({kapFarki.metinToplami.toLocaleString("tr-TR")}) tutmuyor.
+                            {" "}Fatura talimatı ve sertifikalar detaylı ambalajı aynen kullanır; Proforma Bilgileri → Lojistik kartından düzeltin.
+                          </span>
+                        </p>
+                      </td>
+                    </tr>
+                  )}
                 </tfoot>
               )}
             </table>

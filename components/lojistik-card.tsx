@@ -1,15 +1,18 @@
 "use client";
 import React, { useState } from "react";
-import { supabase, Dosya, Rezervasyon, yazmaHatasi } from "@/lib/supabase";
+import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, AlertTriangle } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { varisLimaniSorunu, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
+import { kapUyumsuzlugu } from "@/lib/siparis-devam";
 
 type Props = {
   dosya: Dosya;
   rezervasyonlar: Rezervasyon[];
+  /** Kap adedi kontrolu icin (16.10.2026); verilmezse kontrol yapilmaz. */
+  konteynerler?: Konteyner[];
   onRefresh: () => void;
   companyId: string;
 };
@@ -19,7 +22,7 @@ type Props = {
  * duzenlenebilir kilar. sevkiyat_suresi ham_veri JSONB icinde tutuluyor -
  * kaydederken ham_veri'nin diger alanlarini KORUYARAK sadece bunu gunceller.
  */
-export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, companyId }: Props) {
+export default function LojistikCard({ dosya, rezervasyonlar, konteynerler, onRefresh, companyId }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
@@ -41,6 +44,10 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
     detayli_ambalaj: dosya.detayli_ambalaj || "",
   });
   const [form, setForm] = useState(buildEmptyForm);
+  // Detayli ambalajdaki kap toplami konteynerlerle tutmuyorsa uyari (16.10.2026)
+  const kapFarki = konteynerler
+    ? kapUyumsuzlugu(dosya.detayli_ambalaj, konteynerler as { pieces?: number | null }[], rezervasyonlar.reduce((t, r) => t + (r.konteyner_adedi || 0), 0))
+    : null;
 
   const update = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -107,6 +114,15 @@ export default function LojistikCard({ dosya, rezervasyonlar, onRefresh, company
         <CopyableField dark label="Ambalaj" value={dosya.ambalaj} />
         <div className="col-span-2">
           <CopyableField dark label="Detaylı Ambalaj (Evraklarda Görünen)" value={dosya.detayli_ambalaj} />
+          {kapFarki && (
+            <p className="text-[11px] mt-1.5 text-amber-400 inline-flex items-start gap-1" role="status">
+              <AlertTriangle size={12} className="mt-px shrink-0" />
+              <span>
+                Detaylı ambalajda <b>{kapFarki.metinToplami.toLocaleString("tr-TR")}</b> kap yazıyor, konteynerlerin kap toplamı <b>{kapFarki.konteynerToplami.toLocaleString("tr-TR")}</b>.
+                {" "}Fatura talimatı ve sertifikalar bu metni aynen kullanır; düzenleyerek düzeltin.
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

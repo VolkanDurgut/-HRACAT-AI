@@ -706,6 +706,17 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `/rapor/gunluk` sayfasında görünmeye devam eder (ortak hesap değişmedi). Mail metnine
   arama anahtarı olabilecek yeni bir numara (booking, konşimento vb.) EKLENMEZ.
   Edge function v14 deploy; canlı deneme: 5 açık booking'in 0'ı mailde.
+- ÇAĞRI YETKİSİ (16.10.2026, güvenlik denetimi; edge function v15,
+  `gunluk-rapor-gonder/yetki.ts`): anon anahtar (pg_cron dahil) ile SADECE o anki
+  zamanlanmış slot gönderilir — pencere TR 08:55–09:59 sabah, 11:55–12:59 öğle,
+  16:55–17:59 akşam; gövdedeki slot farklıysa 403; deneme 403; yanıtta şirket
+  adı/özet yok (`{ok,slot,tarih,gonderilen,atlanan}`). Deneme ve slot/tarih seçimi
+  SADECE geçerli kullanıcı oturumu + admin rolü / süper admin ile ve yalnızca kendi
+  şirketi için (`Authorization: Bearer <kullanıcı access_token>`). Anon anahtarla
+  deneme / pencere dışı test ARTIK YAPILAMAZ; slot penceresi dışında yeniden
+  gönderim gerekirse yetkili kullanıcı oturumuyla çağrılır. Cron saatleri
+  değişirse `SLOT_TR_SAATI` de BİRLİKTE güncellenir. Süper admin listesi
+  `SUPER_ADMIN_EPOSTALARI` (auth-context + RLS ile aynı).
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

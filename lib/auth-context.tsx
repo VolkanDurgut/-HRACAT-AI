@@ -43,6 +43,7 @@ const SUPER_ADMIN_EMAILS = [
   "volkandurgut.tr@gmail.com",
   // Burak Tuncay: giris e-postasi 14.10.2026'da buraktuncay@ -> bbt@ oldu
   // (migration 20261014150000; RLS politikalarindaki liste ile AYNI olmali).
+  // Ayni liste: supabase/functions/gunluk-rapor-gonder/yetki.ts (SUPER_ADMIN_EPOSTALARI).
   "bbt@unex.com.tr",
 ];
 

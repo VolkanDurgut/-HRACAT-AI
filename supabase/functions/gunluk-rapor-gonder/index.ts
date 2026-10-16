@@ -14,6 +14,7 @@ import {
   type RaporRezervasyonu,
   type SevkiyatSatiri,
 } from "../_shared/gunluk-rapor.ts";
+import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slot } from "./yetki.ts";
 
 // ============================================================================
 // GUNLUK SEVKIYAT RAPORU MAILI (gunluk-rapor-gonder) - 07.10.2026
@@ -41,7 +42,11 @@ import {
 // slot ikinci kez gonderilmez -> anahtari bilen biri posta kutusunu dolduramaz.
 // Gonderim basarisizsa kayit silinir (sonraki deneme gonderebilsin).
 //
-// DENEME MODU: govdede {"deneme": true} -> mail GITMEZ, kayit YAZILMAZ; yanitta
+// CAGRI YETKISI (16.10.2026): bkz. yetki.ts. Anon anahtarla (pg_cron) sadece o
+// anki zamanlanmis slot gonderilir; deneme ve slot/tarih secimi SADECE yetkili
+// kullanici (admin rolu / super admin) oturumuyla ve yalnizca kendi sirketi icin.
+//
+// DENEME MODU (yetkili kullanici): govdede {"deneme": true} -> mail GITMEZ, kayit YAZILMAZ; yanitta
 // ozet + konu + mail HTML'i doner (onizleme/test icin). {"slot":"sabah"|"aksam"}
 // (ve "ogle") ile slot zorlanabilir; verilmezse TR saatine gore secilir
 // (11'den once sabah, 15'ten once ogle, sonra aksam).
@@ -60,8 +65,6 @@ const LACIVERT = "#283474";
 const MARKA_TURUNCU = "#F4A07C";
 const SAYFA_BOYUTU = 1000;
 
-type Slot = "sabah" | "ogle" | "aksam";
-const SLOTLAR: Slot[] = ["sabah", "ogle", "aksam"];
 /** Sabah raporu DUNU kapatir; ogle ve aksam BUGUNU raporlar. */
 const SLOT_BASLIK: Record<Slot, string> = {
   sabah: "Sabah raporu · 09:00 (dünün özeti)",
@@ -297,20 +300,62 @@ function gonderenAdi(sirketAdi: string | null): string {
   return ad ? `${ad} İhracat AI` : "İhracat AI";
 }
 
+// ---------------------------------------------------------------- yetki
+/**
+ * Gecerli bir KULLANICI oturumu (anon anahtar degil) ve admin rolu / super admin
+ * ise kullanicinin sirketini dondurur; aksi halde null (yetkisiz cagri).
+ */
+async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
+  const baslik = req.headers.get("Authorization") || "";
+  const token = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null;
+  if (jwtRolu(token) !== "authenticated") return null; // anon anahtar / bos: ag cagrisi yapilmaz
+  const kullaniciRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${token}` } });
+  if (!kullaniciRes.ok) {
+    await kullaniciRes.body?.cancel();
+    return null;
+  }
+  const kullanici = (await kullaniciRes.json()) as { id?: string; email?: string };
+  if (!kullanici.id) return null;
+  const roller = await hepsiniCek<{ company_id: string | null; rol: string | null }>(
+    `kullanici_rolleri?select=company_id,rol&user_id=eq.${encodeURIComponent(kullanici.id)}`
+  );
+  const kayit = roller.find((r) => !!r.company_id);
+  if (!kayit?.company_id) return null;
+  const superAdmin = SUPER_ADMIN_EPOSTALARI.includes((kullanici.email || "").toLowerCase());
+  return superAdmin || kayit.rol === "admin" ? kayit.company_id : null;
+}
+
+function jsonYanit(veri: unknown, status = 200): Response {
+  return new Response(JSON.stringify(veri), { status, headers: { "Content-Type": "application/json" } });
+}
+
 // ---------------------------------------------------------------- handler
 Deno.serve(async (req: Request) => {
   try {
     const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; slot?: string; tarih?: string };
-    const deneme = govde.deneme === true;
-    const trSaat = Number(new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul", hour: "2-digit", hour12: false }));
-    const slot: Slot = SLOTLAR.includes(govde.slot as Slot) ? (govde.slot as Slot) : trSaat < 11 ? "sabah" : trSaat < 15 ? "ogle" : "aksam";
+    const yetkiliSirket = await yetkiliKullaniciSirketi(req);
+    const yetkili = yetkiliSirket !== null;
+
+    let slot: Slot;
+    if (yetkili) {
+      // Yetkili kullanici: eski davranis (slot secimi / TR saatine gore)
+      const trSaat = Number(new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul", hour: "2-digit", hour12: false }));
+      slot = SLOTLAR.includes(govde.slot as Slot) ? (govde.slot as Slot) : trSaat < 11 ? "sabah" : trSaat < 15 ? "ogle" : "aksam";
+    } else {
+      // Anon anahtar (pg_cron): sadece o anki zamanlanmis slot; deneme yok
+      const karar = yetkisizCagriKarari(govde, Date.now());
+      if (!karar.izin) return jsonYanit({ ok: false, hata: karar.hata }, karar.durum);
+      slot = karar.slot;
+    }
+    const deneme = yetkili && govde.deneme === true;
     const bugun = istanbulBugun();
-    // Sabah raporu DUNU kapatir; tarih sadece deneme modunda elle verilebilir.
+    // Sabah raporu DUNU kapatir; tarih sadece (yetkili) deneme modunda elle verilebilir.
     const tarih = deneme && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : slot === "sabah" ? gunEkle(bugun, -1) : bugun;
 
-    // Raporlanacak sirketler: acik dosyasi olanlar.
+    // Raporlanacak sirketler: acik dosyasi olanlar (yetkili kullanicida sadece kendi sirketi).
     const sirketDosyalari = await hepsiniCek<{ company_id: string }>(`ihracat_dosyalari?select=company_id&durum=in.(${encodeURIComponent("Açık")},Acik)&order=id`);
-    const sirketIdler = Array.from(new Set(sirketDosyalari.map((d) => d.company_id).filter(Boolean)));
+    const sirketIdler = Array.from(new Set(sirketDosyalari.map((d) => d.company_id).filter(Boolean)))
+      .filter((id) => !yetkili || id === yetkiliSirket);
     const sirketler = sirketIdler.length
       ? await hepsiniCek<{ id: string; company_name: string | null }>(`companies?select=id,company_name&id=in.${inListe(sirketIdler)}&order=id`)
       : [];
@@ -347,7 +392,12 @@ Deno.serve(async (req: Request) => {
       sonuclar.push({ sirket: s.company_name, tarih, slot, gonderildi: true, ozet: rapor.ozet });
     }
 
-    return new Response(JSON.stringify({ ok: true, deneme, slot, tarih, sonuclar }), { headers: { "Content-Type": "application/json" } });
+    if (!yetkili) {
+      // Anon cagriya sirket adi / ozet donmez; sadece sayilar (izleme icin yeterli)
+      const say = (alan: string) => sonuclar.filter((x) => !!(x as Record<string, unknown>)[alan]).length;
+      return jsonYanit({ ok: true, slot, tarih, gonderilen: say("gonderildi"), atlanan: say("atlandi") });
+    }
+    return jsonYanit({ ok: true, deneme, slot, tarih, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("gunluk-rapor-gonder hata:", mesaj);

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
-import { formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatDateTimeTR, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import {
   Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
 } from "lucide-react";
@@ -156,6 +156,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
       await eskiDepoDosyasiniSil(onceki?.draft_bl_dosya_url, dosyaUrl);
 
       onRefresh();
+      cutoffUyarilariniYenile();
     } catch (err: any) {
       // Kayda baglanamayan yeni PDF depoda sahipsiz kalmasin (01.10.2026)
       if (yuklenenYol) await supabase.storage.from("konsimento-talimatlari").remove([yuklenenYol]);
@@ -189,6 +190,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
     }
     await eskiDepoDosyasiniSil(kaldirilanUrl);
     onRefresh();
+    cutoffUyarilariniYenile();
   };
 
   return (

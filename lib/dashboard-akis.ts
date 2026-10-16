@@ -15,7 +15,9 @@ import { getCutOffDays } from "@/lib/cutoff-utils";
  * Cut-off "tamamlandi" kurallari (sistemde beyanname_no fiilen girilmiyor;
  * KANITLANABILIR adimlara baglandi):
  *   Talimat cut-off   -> konsimento talimati yuklendi VEYA Draft BL geldi
- *   Beyanname cut-off -> fatura kesildi (beyanname faturayla verilir)
+ *   Beyanname cut-off -> beyanname dosyasi yuklendi (16.10.2026) VEYA fatura
+ *                        kesildi (beyanname faturayla verilir; beyanname
+ *                        yukleme alani oncesi dosyalar icin korunan kural)
  * Tamamlanan cut-off kirmizi "Gecti" gostermez (biten iste yanlis alarm).
  *
  * Saf fonksiyon: React / Supabase importu yok, tsx ile test edilir.
@@ -38,6 +40,8 @@ export type AkisGirdisi = {
   faturaVar: boolean;
   konsimentoVar: boolean;
   draftBlVar: boolean;
+  /** Beyanname dosyasi yuklendi mi (16.10.2026). Verilmezse false. */
+  beyannameVar?: boolean;
 };
 
 export type AkisAdimAnahtari = "rezervasyon" | "konteyner" | "yukleme" | "fatura" | "konsimento";
@@ -120,7 +124,7 @@ export function dosyaAkisiHesapla(g: AkisGirdisi): DosyaAkisi {
   const siradaki = adimlar.find((a) => !a.tamam)?.anahtar ?? null;
 
   const talimat: CutoffDurumu = { gun: getCutOffDays(enErken(rezler.map((r) => r.talimat_cutoff))), tamam: konsimentoTamam };
-  const beyanname: CutoffDurumu = { gun: getCutOffDays(enErken(rezler.map((r) => r.beyanname_cutoff))), tamam: g.faturaVar };
+  const beyanname: CutoffDurumu = { gun: getCutOffDays(enErken(rezler.map((r) => r.beyanname_cutoff))), tamam: g.faturaVar || !!g.beyannameVar };
 
   const eksikler: string[] = [];
   if (!rezVar) eksikler.push("Rezervasyon girilmedi");

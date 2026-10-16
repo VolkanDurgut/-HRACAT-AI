@@ -27,6 +27,7 @@ import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { indirVgmPdf } from "@/lib/vgm-pdf-builder";
 import TaslakOnayButonu from "@/components/taslak-onay-butonu";
 import DraftBlSection from "@/components/draft-bl-section";
+import BeyannameSection from "@/components/beyanname-section";
 import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section";
 import SigortaTalimatiSection from "@/components/sigorta-talimati-section";
 import { EvrakIkonYuvasi } from "@/components/evrak-ikon-yuvasi";
@@ -350,6 +351,7 @@ function DosyaDetailContent() {
             <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <KonsimentoTalimatiSection dosyaId={dosya.id} dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
+            <BeyannameSection dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           </div>
           <div className="rounded-xl border shadow-sm overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="px-6 py-4 border-b flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>

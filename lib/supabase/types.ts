@@ -95,6 +95,10 @@ export type Dosya = {
   draft_bl_dosya_adi: string | null;
   draft_bl_yukleme_tarihi: string | null;
   draft_bl_kontrol_sonucu: Record<string, unknown> | null;
+  // Gumruk beyannamesi (16.10.2026): doluysa beyanname cut-off sayaci durur
+  beyanname_dosya_url: string | null;
+  beyanname_dosya_adi: string | null;
+  beyanname_yukleme_tarihi: string | null;
   // Musteri draft icin revize istediyse (bkz. migration 20260930140000).
   draft_revize_istendi: boolean | null;
   draft_revize_notu: string | null;

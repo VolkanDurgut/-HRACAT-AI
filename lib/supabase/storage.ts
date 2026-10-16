@@ -95,7 +95,7 @@ export async function eskiDepoDosyasiniSil(eskiUrl: string | null | undefined, y
  */
 export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: string): Promise<(string | null | undefined)[]> {
   const [{ data: dosya }, { data: evraklar }, { data: konteynerler }] = await Promise.all([
-    supabase.from('ihracat_dosyalari').select('fatura_dosya_url, konsimento_dosya_url, draft_bl_dosya_url, proforma_dosya_url').eq('id', dosyaId).eq('company_id', companyId).maybeSingle(),
+    supabase.from('ihracat_dosyalari').select('fatura_dosya_url, konsimento_dosya_url, draft_bl_dosya_url, proforma_dosya_url, beyanname_dosya_url').eq('id', dosyaId).eq('company_id', companyId).maybeSingle(),
     supabase.from('dosya_evraklari').select('dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
     supabase.from('konteynerler').select('dba_dosya_url, irsaliye_dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
   ]);
@@ -105,6 +105,7 @@ export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: 
     dosya?.konsimento_dosya_url,
     dosya?.draft_bl_dosya_url,
     dosya?.proforma_dosya_url,
+    dosya?.beyanname_dosya_url,
     ...((evraklar as any[]) || []).map((e) => e.dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.dba_dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.irsaliye_dosya_url),

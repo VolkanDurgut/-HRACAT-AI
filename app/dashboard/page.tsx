@@ -50,7 +50,7 @@ const REZERVASYON_KOLONLARI = "id, dosya_id, booking_no, gemi_adi, acente_ismi, 
 function CutoffBadge({ durum, label }: { durum: CutoffDurumu; label: string }) {
   const days = durum.gun;
   if (days === null) return null;
-  // Ilgili adim bittiyse (talimat: konsimento/Draft BL, beyanname: fatura) alarm verilmez
+  // Ilgili adim bittiyse (talimat: konsimento/Draft BL, beyanname: beyanname dosyasi/fatura) alarm verilmez
   if (durum.tamam) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/5" style={{ color: TEXT_MUTED }} title={`${label} adımı tamamlandı`}>
@@ -130,7 +130,7 @@ export default function DashboardPage() {
       const [acikSonuc, kapaliSonuc, bugunSonuc] = await Promise.all([
         supabase
           .from("ihracat_dosyalari")
-          .select(`${DOSYA_LISTE_KOLONLARI}, draft_bl_dosya_url`)
+          .select(DOSYA_LISTE_KOLONLARI)
           .eq("company_id", companyId)
           .or("durum.is.null,durum.not.in.(Kapalı,Kapali)")
           .order("olusturma_tarihi", { ascending: false })
@@ -229,6 +229,7 @@ export default function DashboardPage() {
       faturaVar: !!d.dosya.fatura_dosya_url,
       konsimentoVar: !!d.dosya.konsimento_dosya_url,
       draftBlVar: !!d.dosya.draft_bl_dosya_url,
+      beyannameVar: !!d.dosya.beyanname_dosya_url,
     }),
   })), [durumlar]);
   const bekleyenRez = aciklar.filter(d => d.rezervasyonlar.length === 0).length;

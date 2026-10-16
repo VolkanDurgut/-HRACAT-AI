@@ -140,9 +140,41 @@ export function getCutOffLabel(dateStr: string | null): CutOffStyle {
   return { text: `${days} Gün`, color: "text-blue-400", icon: "" };
 }
 
-export function isCutoffApproaching(talimatCutoff: string | null, beyannameCutoff: string | null): boolean {
-  const tDays = getCutOffDays(talimatCutoff);
-  const bDays = getCutOffDays(beyannameCutoff);
+/**
+ * Cut-off "tamamlandi" kurallari (16.10.2026, kullanici istegi) - TEK YER.
+ * Tamamlanan cut-off'ta geri sayim / uyari yoktur; tarih yine gosterilir.
+ *   Talimat   -> konsimento talimati yuklendi (Draft BL geldiyse talimat zaten
+ *                verilmistir; Kontrol Merkezi ile ayni kural)
+ *   Beyanname -> beyanname dosyasi yuklendi (Sevkiyat Evraklari)
+ * Alanlar listede cekilmemisse (undefined) "tamamlanmadi" sayilir - eski davranis.
+ */
+export type CutoffTamamAlanlari = {
+  konsimento_dosya_url?: string | null;
+  draft_bl_dosya_url?: string | null;
+  beyanname_dosya_url?: string | null;
+};
+
+export function talimatCutoffTamamMi(d: CutoffTamamAlanlari | null | undefined): boolean {
+  return !!(d?.konsimento_dosya_url || d?.draft_bl_dosya_url);
+}
+
+export function beyannameCutoffTamamMi(d: CutoffTamamAlanlari | null | undefined): boolean {
+  return !!d?.beyanname_dosya_url;
+}
+
+/** Ust uyari bandini hemen yeniler (belge yuklenince/kaldirilinca 60 sn beklemesin). */
+export const CUTOFF_UYARI_YENILE_OLAYI = "cutoff-uyari-yenile";
+export function cutoffUyarilariniYenile(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(CUTOFF_UYARI_YENILE_OLAYI));
+}
+
+export function isCutoffApproaching(
+  talimatCutoff: string | null,
+  beyannameCutoff: string | null,
+  tamam?: { talimat?: boolean; beyanname?: boolean }
+): boolean {
+  const tDays = tamam?.talimat ? null : getCutOffDays(talimatCutoff);
+  const bDays = tamam?.beyanname ? null : getCutOffDays(beyannameCutoff);
   const days: number[] = [];
   if (tDays !== null) days.push(tDays);
   if (bDays !== null) days.push(bDays);

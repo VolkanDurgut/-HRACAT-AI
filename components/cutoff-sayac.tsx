@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock, CheckCircle2 } from "lucide-react";
 import { useSimdi } from "@/lib/use-simdi";
 import {
   cutoffZamanMs,
@@ -38,7 +38,61 @@ const SEVIYE_STIL: Record<CutoffSeviye, { renk: string; zemin: string; kenar: st
  *   < 10 saat  -> kirmizi + nabiz (uygulama geneli bildirim de bu esikte gelir)
  *   gecmis     -> soluk "Süresi doldu"
  */
-export function CutoffSayac({ deger, kompakt = false }: { deger: string; kompakt?: boolean }) {
+/**
+ * Tamamlanan cut-off (16.10.2026): talimat verildi / beyanname yuklendi ise
+ * sayac CALISMAZ; tarih satiri aynen kalir, altinda yesil durum rozeti cikar
+ * (tamamEtiketi). tamamHref verilirse rozet ilgili belgeyi yeni sekmede acar.
+ */
+export function CutoffSayac({
+  deger,
+  kompakt = false,
+  tamamEtiketi,
+  tamamHref,
+  tamamAciklama,
+}: {
+  deger: string;
+  kompakt?: boolean;
+  tamamEtiketi?: string | null;
+  tamamHref?: string | null;
+  tamamAciklama?: string;
+}) {
+  if (tamamEtiketi) {
+    return <CutoffTamam deger={deger} kompakt={kompakt} etiket={tamamEtiketi} href={tamamHref} aciklama={tamamAciklama} />;
+  }
+  return <CutoffGeriSayim deger={deger} kompakt={kompakt} />;
+}
+
+function CutoffTarihSatiri({ deger }: { deger: string }) {
+  const saat = formatCutoffSaat(deger);
+  return (
+    <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+      {formatCutoffTarihUzun(deger)}
+      {saat !== "-" && <span className="text-slate-300 font-medium"> · {saat}</span>}
+    </p>
+  );
+}
+
+const TAMAM_STIL = { color: "#4ADE80", backgroundColor: "rgba(74,222,128,0.08)", borderColor: "rgba(74,222,128,0.30)" };
+
+function CutoffTamam({ deger, kompakt, etiket, href, aciklama }: { deger: string; kompakt: boolean; etiket: string; href?: string | null; aciklama?: string }) {
+  const tarihVar = cutoffZamanMs(deger) !== null;
+  const rozetSinif = "inline-flex items-center gap-1.5 self-start rounded-md border px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap";
+  const icerik = <><CheckCircle2 size={11} /> {etiket}</>;
+  return (
+    <div className="inline-flex flex-col gap-1">
+      {!kompakt && tarihVar && <CutoffTarihSatiri deger={deger} />}
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`${rozetSinif} hover:brightness-125 transition`} style={TAMAM_STIL} title={aciklama || `${etiket} - belgeyi aç`}>
+          {icerik}
+        </a>
+      ) : (
+        <span className={rozetSinif} style={TAMAM_STIL} title={aciklama || etiket}>{icerik}</span>
+      )}
+    </div>
+  );
+}
+
+function CutoffGeriSayim({ deger, kompakt }: { deger: string; kompakt: boolean }) {
   const simdi = useSimdi();
   const hedef = cutoffZamanMs(deger);
   if (hedef === null) return <span className="text-xs" style={{ color: "#4A5262" }}>—</span>;
@@ -46,16 +100,10 @@ export function CutoffSayac({ deger, kompakt = false }: { deger: string; kompakt
   const kalan = hedef - simdi;
   const seviye = cutoffSeviyesi(kalan);
   const stil = SEVIYE_STIL[seviye];
-  const saat = formatCutoffSaat(deger);
 
   return (
     <div className="inline-flex flex-col gap-1">
-      {!kompakt && (
-        <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>
-          {formatCutoffTarihUzun(deger)}
-          {saat !== "-" && <span className="text-slate-300 font-medium"> · {saat}</span>}
-        </p>
-      )}
+      {!kompakt && <CutoffTarihSatiri deger={deger} />}
       <span
         className="inline-flex items-center gap-1.5 self-start rounded-md border px-1.5 py-0.5 text-[11px] font-semibold whitespace-nowrap tabular-nums"
         style={{ color: stil.renk, backgroundColor: stil.zemin, borderColor: stil.kenar }}

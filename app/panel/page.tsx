@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
-import { isCutoffApproaching, formatDateTR } from "@/lib/cutoff-utils";
+import { isCutoffApproaching, formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
 import { CutoffSayac } from "@/components/cutoff-sayac";
 import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
@@ -110,7 +110,11 @@ function PanelContent() {
 
   const filteredDosyalar = useMemo(() => {
     switch (activeFilter) {
-      case "cutoff": return dosyalar.filter((d) => d.rezervasyonlar.some((r) => isCutoffApproaching(r.talimat_cutoff, r.beyanname_cutoff)));
+      // Talimati verilmis / beyannamesi yuklenmis cut-off "yaklasan" sayilmaz (16.10.2026)
+      case "cutoff": return dosyalar.filter((d) => {
+        const tamam = { talimat: talimatCutoffTamamMi(d), beyanname: beyannameCutoffTamamMi(d) };
+        return d.rezervasyonlar.some((r) => isCutoffApproaching(r.talimat_cutoff, r.beyanname_cutoff, tamam));
+      });
       case "rezervasyon": return dosyalar.filter((d) => d.rezervasyonlar.length === 0 && (d.durum === "Açık" || d.durum === "Acik"));
       case "acik": return dosyalar.filter((d) => d.durum === "Açık" || d.durum === "Acik");
       default: return dosyalar;
@@ -233,12 +237,22 @@ function PanelContent() {
                           </td>
                           <td className="px-3 py-3 align-top">
                             {latestRez!.talimat_cutoff ? (
-                              <CutoffSayac deger={latestRez!.talimat_cutoff} />
+                              <CutoffSayac
+                                deger={latestRez!.talimat_cutoff}
+                                tamamEtiketi={dosya.konsimento_dosya_url ? "Talimat gönderildi" : talimatCutoffTamamMi(dosya) ? "Draft BL alındı" : null}
+                                tamamHref={dosya.konsimento_dosya_url || dosya.draft_bl_dosya_url}
+                                tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"}
+                              />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                           </td>
                           <td className="px-3 py-3 align-top">
                             {latestRez!.beyanname_cutoff ? (
-                              <CutoffSayac deger={latestRez!.beyanname_cutoff} />
+                              <CutoffSayac
+                                deger={latestRez!.beyanname_cutoff}
+                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Beyanname yüklendi" : null}
+                                tamamHref={dosya.beyanname_dosya_url}
+                                tamamAciklama="Beyanname yüklendi - belgeyi aç"
+                              />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                           </td>
                         </>

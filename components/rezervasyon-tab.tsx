@@ -1,11 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { supabase, Rezervasyon, Dosya, MTS_PER_KONTEYNER, depoDosyalariniTopluSil, yazmaHatasi, isDosyaAcik } from "@/lib/supabase";
-import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCutoffTarih, formatCurrency } from "@/lib/cutoff-utils";
+import { formatDateTR, getCutOffDays, getCutOffLabel, formatCutoffSaat, formatCutoffTarih, formatCurrency, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
-import { Trash2, Plus, Package, Check, X } from "lucide-react";
+import { Trash2, Plus, Package, Check, X, CheckCircle2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
@@ -462,6 +462,15 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
     return <span className={`ml-1.5 text-[11px] ${etiket.color}`}>{etiket.text}</span>;
   };
 
+  // Tamamlanan cut-off'ta kalan gun yerine yesil durum (16.10.2026); tarih kalir.
+  const tamamRozeti = (etiket: string) => (
+    <span className="ml-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-green-400"><CheckCircle2 size={11} /> {etiket}</span>
+  );
+  const talimatDurumu = talimatCutoffTamamMi(dosya)
+    ? tamamRozeti(dosya.konsimento_dosya_url ? "Talimat gönderildi" : "Draft BL alındı")
+    : null;
+  const beyannameDurumu = beyannameCutoffTamamMi(dosya) ? tamamRozeti("Beyanname yüklendi") : null;
+
   return (
     <div className="max-w-5xl rounded-xl border shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       {/* Baslik: Booking No + islemler */}
@@ -495,11 +504,11 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
           <KartSatiri etiket="Ardiyesiz Giriş" deger={rez.ardiyesiz_giris ? formatDateTR(rez.ardiyesiz_giris) : null} />
           <KartSatiri
             etiket="Talimat Cut-Off"
-            deger={rez.talimat_cutoff ? <>{formatCutoffTarih(rez.talimat_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span>{kalanGun(rez.talimat_cutoff)}</> : null}
+            deger={rez.talimat_cutoff ? <>{formatCutoffTarih(rez.talimat_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.talimat_cutoff)}</span>{talimatDurumu ?? kalanGun(rez.talimat_cutoff)}</> : null}
           />
           <KartSatiri
             etiket="Beyanname Cut-Off"
-            deger={rez.beyanname_cutoff ? <>{formatCutoffTarih(rez.beyanname_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span>{kalanGun(rez.beyanname_cutoff)}</> : null}
+            deger={rez.beyanname_cutoff ? <>{formatCutoffTarih(rez.beyanname_cutoff)} <span style={{ color: TEXT_MUTED }}>{formatCutoffSaat(rez.beyanname_cutoff)}</span>{beyannameDurumu ?? kalanGun(rez.beyanname_cutoff)}</> : null}
           />
           <KartSatiri
             etiket="Gemi Kalkış"

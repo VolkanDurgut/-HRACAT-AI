@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
-import { formatDateTimeTR } from "@/lib/cutoff-utils";
+import { formatDateTimeTR, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
   FileText, X, Upload, CheckCircle2, AlertTriangle, Loader2, RotateCcw
@@ -144,6 +144,7 @@ export default function KonsimentoTalimatiSection({
       yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
       await eskiDepoDosyasiniSil(onceki?.konsimento_dosya_url, dosyaUrl);
       onRefresh();
+      cutoffUyarilariniYenile();
     } catch (err: any) {
       if (yuklenenYol) await supabase.storage.from("konsimento-talimatlari").remove([yuklenenYol]);
       setKontrolHata(err.message || "Kontrol hatası.");
@@ -179,6 +180,7 @@ export default function KonsimentoTalimatiSection({
     await eskiDepoDosyasiniSil(kaldirilanUrl);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onRefresh();
+    cutoffUyarilariniYenile();
   };
 
   return (

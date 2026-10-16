@@ -1168,6 +1168,26 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Üst bant (PDF + devam sayfası + telefon görseli) BEYAZ, yazılar lacivert, logo
   karosuz (Burak Bey, mockB seçildi). Seftali şerit ve alt lacivert bant aynı.
 
+## Cut-off tamamlandı + Gümrük Beyannamesi (16.10.2026)
+
+- Kural TEK YERDE: `lib/cutoff-utils.ts` → `talimatCutoffTamamMi` (konşimento
+  talimatı VEYA Draft BL yüklü) ve `beyannameCutoffTamamMi` (beyanname dosyası
+  yüklü). Tamamlanan cut-off'ta geri sayım / uyarı YOK, tarih yine görünür.
+- `CutoffSayac` → `tamamEtiketi` verilirse sayaç çalışmaz, tarih + yeşil rozet
+  ("Talimat gönderildi" / "Draft BL alındı" / "Beyanname yüklendi"; `tamamHref`
+  ile belge açılır). Kullanıldığı yerler: Ana Panel sütunları + "Cut-off
+  Yaklaşan" filtresi, Rezervasyon kartı, üst uyarı bandı (`cutoff-uyarilari`).
+- Kontrol Merkezi: beyanname cut-off "tamam" = beyanname yüklü VEYA fatura
+  kesildi (fatura kuralı yükleme alanı öncesi dosyalar için korunur).
+- Beyanname: `components/beyanname-section.tsx` (Sevkiyat Evrakları, Draft BL
+  altı). Kolonlar `ihracat_dosyalari.beyanname_dosya_url / _adi /
+  _yukleme_tarihi` (migration `20261016110000_beyanname_dosyasi.sql`, sadece
+  ekleme). Depo: `konsimento-talimatlari/<dosya_id>/beyanname/...` (mevcut
+  politika). PDF/JPG/PNG ≤ 20 MB, AI kontrolü yok. Dosya silinince depo
+  temizliğine dahil (`dosyaninStorageUrlleriniTopla`). Kolonlar
+  `DOSYA_LISTE_KOLONLARI`'nda (draft_bl_dosya_url de oraya taşındı) — migration
+  uygulanmadan kod yayına alınırsa listeler hata verir: ÖNCE SQL.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

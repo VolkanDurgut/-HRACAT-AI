@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { useSimdi } from "@/lib/use-simdi";
-import { cutoffZamanMs, formatCutoffTarih, formatCutoffSaat, formatKalanSure, CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
+import { cutoffZamanMs, formatCutoffTarih, formatCutoffSaat, formatKalanSure, CUTOFF_UYARI_ESIGI_MS, talimatCutoffTamamMi, beyannameCutoffTamamMi, CUTOFF_UYARI_YENILE_OLAYI } from "@/lib/cutoff-utils";
 import { buildDraftHatirlatmaMailtoUrl } from "@/lib/draft-onay-mail";
 import { draftYanitSonuMs, formatIstanbulTarihSaat } from "@/lib/draft-onay-sure";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -41,6 +41,10 @@ type DosyaOzet = {
   draft_mail_gonderildi_tarihi: string | null;
   draft_musteri_onayi_alindi: boolean | null;
   draft_revize_istendi: boolean | null;
+  // Cut-off tamamlandi bilgisi (16.10.2026): talimat verildi / beyanname yuklendi
+  konsimento_dosya_url: string | null;
+  draft_bl_dosya_url: string | null;
+  beyanname_dosya_url: string | null;
 };
 
 type RezOzet = {
@@ -156,7 +160,7 @@ export default function CutoffUyarilari() {
     const no = ++istekNo.current;
     const { data: dData, error: dHata } = await supabase
       .from("ihracat_dosyalari")
-      .select("id, dosya_no, proforma_no, alici_firma, alici_email:ham_veri->>alici_email, draft_mail_gonderildi, draft_mail_gonderildi_tarihi, draft_musteri_onayi_alindi, draft_revize_istendi")
+      .select("id, dosya_no, proforma_no, alici_firma, alici_email:ham_veri->>alici_email, draft_mail_gonderildi, draft_mail_gonderildi_tarihi, draft_musteri_onayi_alindi, draft_revize_istendi, konsimento_dosya_url, draft_bl_dosya_url, beyanname_dosya_url")
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik")
       .returns<DosyaOzet[]>();
@@ -184,7 +188,14 @@ export default function CutoffUyarilari() {
     const zamanlayici = setInterval(verileriGetir, YENILEME_MS);
     const gorunurluk = () => { if (document.visibilityState === "visible") verileriGetir(); };
     document.addEventListener("visibilitychange", gorunurluk);
-    return () => { clearInterval(zamanlayici); document.removeEventListener("visibilitychange", gorunurluk); };
+    // Talimat / beyanname yuklenince-kaldirilinca hemen yenile (16.10.2026)
+    const yenile = () => { verileriGetir(); };
+    window.addEventListener(CUTOFF_UYARI_YENILE_OLAYI, yenile);
+    return () => {
+      clearInterval(zamanlayici);
+      document.removeEventListener("visibilitychange", gorunurluk);
+      window.removeEventListener(CUTOFF_UYARI_YENILE_OLAYI, yenile);
+    };
   }, [verileriGetir]);
 
   // Son 10 saate girmis, henuz gecmemis cut-off'lar ve draft onay sureleri (en yakin once)
@@ -196,6 +207,9 @@ export default function CutoffUyarilari() {
       if (!dosya) return;
       ([["Talimat", rez.talimat_cutoff], ["Beyanname", rez.beyanname_cutoff]] as const).forEach(([tur, deger]) => {
         if (!deger) return;
+        // Adim tamamlandiysa uyari yok (16.10.2026): talimat verildi / beyanname yuklendi
+        if (tur === "Talimat" && talimatCutoffTamamMi(dosya)) return;
+        if (tur === "Beyanname" && beyannameCutoffTamamMi(dosya)) return;
         const hedefMs = cutoffZamanMs(deger);
         if (hedefMs === null) return;
         const kalan = hedefMs - simdi;

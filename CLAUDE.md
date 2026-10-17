@@ -1224,39 +1224,53 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `DOSYA_LISTE_KOLONLARI`'nda (draft_bl_dosya_url de oraya taşındı) — migration
   uygulanmadan kod yayına alınırsa listeler hata verir: ÖNCE SQL.
 
-## Proforma Oluşturucu — 1. aşama: Veri temeli (17.10.2026)
+## Proforma Oluşturucu (17.10.2026)
 
-- Plan (kullanıcı onaylı, 4 aşama): 1) veri temeli, 2) sihirbaz + 3 sayfa jsPDF
-  (DRAFT_Proforma__Contract.xlsx şablonu birebir; "Son proformadan getir"),
-  3) Onayla ve İmzala / kilit / revizyon / liste, 4) Yeni Dosya Aç entegrasyonu.
-  Sonraki aşamaya, önceki teslim edilip doğrulanmadan GEÇİLMEZ.
-- Menü: "Proformalar" (`/proformalar`, "Yeni Dosya Aç"ın ÜSTÜNDE). Sekmeler
-  (`components/proforma-sekmeler.tsx`): Müşteriler / Ürünler / Şablon Metinleri.
-- Yetki: `sayfa_yetkileri.proformalar` (sayfa) + `sayfa_yetkileri.proforma_imza`
-  (İŞLEM yetkisi; sadece `ihracat@unex.com.tr` — Harun Bey imzalar, diğerleri
-  taslak hazırlar). Migration ilk değerleri: proformalar = yeni_dosya değeri;
-  anahtar zaten varsa dokunmaz.
-- Tablolar (migration `20261017120000_proforma_veri_temeli.sql`, sadece ekleme):
-  `ihracat_musterileri` (kod ^[A-Z]{2,6}$ şirket içinde tekil = proforma no'daki
-  UNEX+KOD+GGAAYY; unvan tekil), `ihracat_urunleri` (ad MARKA HARİÇ; marka her
-  satırda ayrı → "ÜRÜN (MARKA BRAND)"), `proforma_ayarlari` (şirket başına tek
-  satır, NULL = uygulamadaki varsayılan). RLS: şirket + ic_sayfa_yetkisi
-  ('proformalar'). Denetim tetikleyicisi musteri/urun'de (ayarlarda id yok).
-  Yedekleme: musteri/urun YEDEKLENECEK_TABLOLAR'da, proforma_ayarlari
-  AYAR_TABLOLARI'nda.
-- Sabit metinler `lib/proforma/sabitler.ts` (taslaktan AYNEN; sadece kesin yazım
-  hataları düzeltildi: ets→etc., incountry, legalvenue, ﬀ, eksik/çift boşluk).
-  Insurance Policy SADECE CIF/CIP'te basılır (`teslimeGoreEvraklar`). Teslim
-  ifadesi biçimi "CIF DJIBOUTI PORT BASIS". Bankalar tek kaynak `lib/bankalar.ts`
-  (Banka Bilgileri kartı da buradan okur); proformada USD+EUR birlikte basılır.
-- "Geçmişten Aktar" (`components/proforma-gecmisten-aktar.tsx`,
-  `lib/proforma/gecmis.ts`): ihracat_dosyalari SADECE OKUNUR; aynı alıcı (unvan,
-  boşluk/harf farkı yok) için EN SON dosya; kod proforma no'dan; Türkçe kaydedilmiş
-  evrak listesi alınmaz (varsayılan kullanılır); numara önekleri, AGAISNT /
-  MESSAEGE / WTHIN / Certficate düzeltilir; virgülsüz "X PORT ÜLKE" → "X PORT".
-  Hiçbir aday otomatik eklenmez — kullanıcı işaretler, tek insert.
-- Kayıt/doğrulama: `lib/proforma/kayit.ts` (DB CHECK/UNIQUE ile aynı kurallar,
-  `proformaHataMesaji`). Liste düzenleyici: `components/metin-listesi-editor.tsx`.
+- SADELEŞTİRME (kullanıcı geri bildirimi 17.10.2026: "çok karışık, adım adım ne
+  yapacağımı anlamadım, önizleme yok"): günlük kullanım TEK EKRAN —
+  `app/proformalar/page.tsx` = **Yeni Proforma**. Üç kutu: 1 Müşteri (aranabilir
+  liste: kayıtlı kartlar + geçmiş dosyalardaki kartsız alıcılar; seçilince son
+  proforma / son dosyadaki adres, ilgili kişi, ÜRÜNLER, teslim, ödeme, sevkiyat,
+  banka gelir; listede yoksa "Yeni müşteri: …" ile ünvan yazılır, kod önerilir),
+  2 Ürünler (iki katlı satır kartı; tutar / FCL / çuval otomatik), 3 Ödeme ve
+  Sevkiyat (+ "Diğer ayrıntılar": proforma no, tarih, paketleme, marka satırı,
+  evraklar — hepsi otomatik, elle değiştirilince "Otomatik" ile geri alınır).
+  Sağda CANLI ÖNİZLEME (indirilecek PDF'in kendisi, blob iframe; başsız test
+  tarayıcısında beyaz görünür, gerçek Chrome'da çizer). Altta eksik listesi +
+  "Taslak PDF İndir". "Geçmişten Aktar" KALDIRILDI (liste geçmişi zaten gösterir).
+- Bu teslimatta veritabanına HİÇBİR ŞEY YAZILMAZ (kaydetme / proforma listesi /
+  Harun Bey "Onayla ve İmzala" sonraki teslimat; imzalı PDF kayıtsız kalmasın).
+  İndirilen dosya `UNEX…-TASLAK.pdf` (imzasız).
+- Ayarlar (sağ üst "Ayarlar", `components/proforma-sekmeler.tsx`):
+  `/proformalar/musteriler` (Müşteri Kartları, isteğe bağlı), `/proformalar/urunler`,
+  `/proformalar/sablon`. Kart varsa bilgiler karttan, ürünler son dosyadan gelir.
+- Kurallar TEK YERDE `lib/proforma/belge.ts` (saf): `sayiCoz` ("252,45",
+  "50.000"), proforma no UNEX+KOD+GGAAYY, geçerlilik tarih+4, paketleme
+  "15.000 PIECES OF 25 KG PP BAGS (ASLI BRAND) // …", marka satırı "ASLI BRAND &
+  SAAD BRAND", 1. sayfa ikinci kutu ödeme metninden (`%30 ADVANCE` → ADVANCE =
+  toplam×%30; "50.000 USD DEPOSIT" → DEPOSIT 50.000; diğer → BALANCE = toplam),
+  `eksikler`, `belgeOlustur` → `ProformaBelgesi`.
+- PDF `lib/proforma/pdf.ts` (jsPDF, vektör): DRAFT_Proforma__Contract.xlsx
+  ölçüleri birebir (sütun karakter × 5,25 pt, satır pt, sol 0,25 in, üst 0,75 in,
+  gri F2/D9/BF/A6, ince/kalın çizgi, logo / imza konumları). Yazı tipi Roboto
+  Condensed (`lib/fonts/roboto-condensed-base64.ts`, OFL; Aptos Narrow ile harf
+  genişliği ~%0,4 fark). Sayfa 2'de her ürün kendi satırında ("1) …"). Sığmazsa
+  `sik` kademesi (boşluk daralır → yazı 1 pt küçülür); 4 ürün + uzun açıklama
+  3 sayfada kalıyor (test edildi). Bilinçli farklar: tarihler her yerde
+  dd/mm/yyyy (şablonda sayfa 2 mm-dd-yy idi), "10-Insurance" → "10.".
+- Veri temeli (migration `20261017120000_proforma_veri_temeli.sql`, canlıda
+  UYGULANDI 17.10.2026): `ihracat_musterileri` (kod ^[A-Z]{2,6}$ tekil, unvan
+  tekil), `ihracat_urunleri` (ad MARKA HARİÇ), `proforma_ayarlari` (NULL =
+  varsayılan). RLS: şirket + `ic_sayfa_yetkisi('proformalar')`. Yetki:
+  `proformalar` (sayfa; bbt@, ihracat@, volkandurgut.tr@) + `proforma_imza`
+  (işlem; SADECE ihracat@ — Harun Bey). Yedekleme v13'te yeni tablolar var
+  (deneme: 29 tablo, geri yükleme testi 27/27); geri yükleme betiğine eklendi.
+- Sabit metinler `lib/proforma/sabitler.ts` (taslaktan AYNEN, sadece kesin yazım
+  hataları düzeltildi). Insurance Policy SADECE CIF/CIP'te basılır. Bankalar tek
+  kaynak `lib/bankalar.ts`; proformada USD + EUR hesapları birlikte.
+- Sıradaki teslimat: proforma kaydı (tablo + migration), proforma listesi,
+  Harun Bey "Onayla ve İmzala" (imzalı PDF, kilit, revizyon), yeni müşterinin
+  imzada karta dönüşmesi; sonra Yeni Dosya Aç entegrasyonu.
 
 ## Burak Tuncay giriş e-postası (14.10.2026)
 

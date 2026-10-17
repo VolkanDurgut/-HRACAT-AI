@@ -40,6 +40,10 @@ const TABLO_SIRASI = [
   "banka_presetleri",
   "fumigation_ayarlari",
   "kalite_sertifikasi_ayarlari",
+  // Proforma olusturucu (17.10.2026): sadece companies'e bagli, tetikleyicisi numara vermez.
+  // proforma_ayarlari pakette "_proforma_ayarlari" (id'siz ayar) - gerekirse SQL ile elle.
+  "ihracat_musterileri",
+  "ihracat_urunleri",
   "ihracat_dosyalari",
   "sevkiyatlar",
   "rezervasyonlar",

@@ -8,8 +8,7 @@ import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { ProformaSekmeler } from "@/components/proforma-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { GecmistenAktar } from "@/components/proforma-gecmisten-aktar";
-import { Package, Plus, Loader2, Pencil, Trash2, X, Save, AlertCircle, History, ArrowUp, ArrowDown } from "lucide-react";
+import { Package, Plus, Loader2, Pencil, Trash2, X, Save, AlertCircle, ArrowUp, ArrowDown } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { proformaHataMesaji, urunKaydiHazirla, type IhracatUrun } from "@/lib/proforma/kayit";
 
@@ -38,7 +37,6 @@ export default function ProformaUrunlerPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [silinecek, setSilinecek] = useState<IhracatUrun | null>(null);
   const [siliniyor, setSiliniyor] = useState(false);
-  const [aktarAcik, setAktarAcik] = useState(false);
   const [siralaniyor, setSiralaniyor] = useState(false);
 
   const getir = useCallback(async () => {
@@ -119,13 +117,10 @@ export default function ProformaUrunlerPage() {
     <AppShell>
       <SayfaBasligi
         ikon={<Package size={20} />}
-        baslik="Proformalar · Ürünler"
-        aciklama="Proformadaki ürün açıklamaları (DESCRIPTION OF GOODS). Marka her satırda ayrı seçilir ve “ÜRÜN (MARKA BRAND)” olarak basılır."
+        baslik="Proforma Ayarları · Ürünler"
+        aciklama="İsteğe bağlı ürün listesi. Yeni Proforma'da ürün kutusu bu listeyi ve geçmiş dosyalardaki ürünleri önerir; marka her satırda ayrı yazılır."
         sag={
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setAktarAcik(true)} disabled={!!okumaHatasi} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>
-              <History size={14} /> Geçmişten Aktar
-            </button>
             <button onClick={yeniAc} disabled={!!okumaHatasi} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
               <Plus size={14} /> Yeni Ürün
             </button>
@@ -145,16 +140,11 @@ export default function ProformaUrunlerPage() {
         {urunler.length === 0 ? (
           <div className="px-4 py-12 text-center">
             <Package size={30} className="mx-auto mb-2" style={{ color: "#3A4152" }} />
-            <p className="text-sm" style={{ color: TEXT_MUTED }}>Henüz ürün yok. Geçmiş dosyalardaki ürün açıklamalarını aktarabilirsiniz.</p>
+            <p className="text-sm" style={{ color: TEXT_MUTED }}>Henüz ürün eklenmedi. Zorunlu değil: Yeni Proforma geçmiş dosyalardaki ürünleri zaten önerir.</p>
             {!okumaHatasi && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button onClick={() => setAktarAcik(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
-                  <History size={14} /> Geçmişten Aktar
-                </button>
-                <button onClick={yeniAc} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>
-                  <Plus size={14} /> Elle ekle
-                </button>
-              </div>
+              <button onClick={yeniAc} className="mt-4 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>
+                <Plus size={14} /> Ürün ekle
+              </button>
             )}
           </div>
         ) : (
@@ -221,10 +211,6 @@ export default function ProformaUrunlerPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {aktarAcik && companyId && (
-        <GecmistenAktar tur="urun" companyId={companyId} mevcut={urunler} kapat={() => setAktarAcik(false)} eklendi={getir} />
       )}
 
       <ConfirmDialog

@@ -1,61 +1,111 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { supabase, yazmaHatasi } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
-import { ProformaSekmeler } from "@/components/proforma-sekmeler";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { GecmistenAktar } from "@/components/proforma-gecmisten-aktar";
 import { MetinListesiEditor } from "@/components/metin-listesi-editor";
-import { FileSignature, Plus, Search, Loader2, Pencil, Trash2, X, Save, AlertCircle, History, Wand2 } from "lucide-react";
-import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
-import { BANKA_PRESETLERI, bankaBul } from "@/lib/bankalar";
-import { TESLIM_SEKILLERI, VARSAYILAN_EVRAKLAR, aliciKoduOner, sigortaEvrakiMi, sigortaSatictaMi, teslimIfadesiOner } from "@/lib/proforma/sabitler";
-import { BOS_MUSTERI, kodTemizle, musteriKaydiHazirla, musteridenTaslak, proformaHataMesaji, type IhracatMusteri, type MusteriTaslak } from "@/lib/proforma/kayit";
+import { FileSignature, Plus, Trash2, Loader2, Download, Settings, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Eraser } from "lucide-react";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { BANKA_PRESETLERI } from "@/lib/bankalar";
+import type { GecmisDosya } from "@/lib/proforma/gecmis";
+import { proformaHataMesaji, kodTemizle, type IhracatMusteri, type IhracatUrun, type ProformaAyar } from "@/lib/proforma/kayit";
+import { VARSAYILAN_ALT_BILGI, VARSAYILAN_EVRAKLAR, VARSAYILAN_OZEL_SARTLAR, VARSAYILAN_UST_BILGI, aliciKoduOner, sigortaEvrakiMi, sigortaSatictaMi } from "@/lib/proforma/sabitler";
+import {
+  BOS_KALEM,
+  FCL_MTS,
+  IKINCI_KUTU_ETIKETLERI,
+  belgeOlustur,
+  bosTaslak,
+  eksikler,
+  genelSayiYaz,
+  kalemleriHesapla,
+  markaOnerileri,
+  musteriSecenekleri,
+  musteriUygula,
+  otomatikAlanlar,
+  paraSimgesi,
+  paraYaz,
+  teslimSekliBul,
+  toplamlar,
+  urunOnerileri,
+  type IkinciKutuEtiketi,
+  type KalemTaslak,
+  type MusteriSecenegi,
+  type ProformaTaslak,
+} from "@/lib/proforma/belge";
 
 /**
- * PROFORMALAR - Ihracat musteri kartlari (17.10.2026, 1. asama).
- * Proforma sihirbazi (2. asama) alici bilgilerini bu kartlardan doldurur.
- * Kartlar elle veya "Gecmisten Aktar" ile (onayli) olusturulur.
+ * PROFORMALAR - Yeni Proforma (17.10.2026, sadelestirilmis tek ekran).
+ *  1 Musteri  -> secilince son proforma / son dosya bilgileri gelir
+ *  2 Urunler  -> tutar, toplam, FCL, paketleme ve marka satiri otomatik
+ *  3 Odeme ve Sevkiyat -> dolu gelir, kontrol edilir
+ * Sagda CANLI ONIZLEME (indirilecek PDF'in kendisi). Bu teslimatta
+ * veritabanina HICBIR SEY yazilmaz; kaydetme / liste / imza sonraki adim.
  */
 
-const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
-const inputStil = { backgroundColor: "#0F131A", borderColor: CARD_BORDER } as const;
+const DOSYA_ALANLARI =
+  "alici_firma, alici_adresi, ham_veri, varis_limani, teslim_sekli, banka, odeme_sekli, sevkiyat_evraklari, proforma_no, para_birimi, urun_detaylari, olusturma_tarihi";
 
-export default function ProformaMusterilerPage() {
-  const { companyId, yetkiler, loading: authLoading } = useAuth();
+const inp = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
+const inpStil = { backgroundColor: "#0F131A", borderColor: CARD_BORDER } as const;
+
+type Sablon = { ozelSartlar: string[]; altBilgi: string[]; ustBilgi: { tarih: string; revizyon: string }; evraklar: string[] };
+
+export default function YeniProformaPage() {
+  const { companyId, yetkiler, user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const yetkili = !!yetkiler.sayfa_yetkileri.proformalar;
 
-  const [musteriler, setMusteriler] = useState<IhracatMusteri[]>([]);
-  const [varsayilanEvrak, setVarsayilanEvrak] = useState<string[]>(VARSAYILAN_EVRAKLAR);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [okumaHatasi, setOkumaHatasi] = useState<string | null>(null);
-  const [arama, setArama] = useState("");
-  const [pasifleriGoster, setPasifleriGoster] = useState(false);
+  const [kartlar, setKartlar] = useState<IhracatMusteri[]>([]);
+  const [urunler, setUrunler] = useState<IhracatUrun[]>([]);
+  const [dosyalar, setDosyalar] = useState<GecmisDosya[]>([]);
+  const [sablon, setSablon] = useState<Sablon>({
+    ozelSartlar: VARSAYILAN_OZEL_SARTLAR,
+    altBilgi: VARSAYILAN_ALT_BILGI,
+    ustBilgi: { ...VARSAYILAN_UST_BILGI },
+    evraklar: VARSAYILAN_EVRAKLAR,
+  });
 
-  const [duzenlenen, setDuzenlenen] = useState<IhracatMusteri | null>(null);
-  const [formAcik, setFormAcik] = useState(false);
-  const [taslak, setTaslak] = useState<MusteriTaslak>(BOS_MUSTERI);
-  const [kaydediliyor, setKaydediliyor] = useState(false);
-  const [silinecek, setSilinecek] = useState<IhracatMusteri | null>(null);
-  const [siliniyor, setSiliniyor] = useState(false);
-  const [aktarAcik, setAktarAcik] = useState(false);
+  const [t, setT] = useState<ProformaTaslak>(() => bosTaslak());
+  const [kodElle, setKodElle] = useState(false);
+  const [degisti, setDegisti] = useState(false);
+  const [ayrintiAcik, setAyrintiAcik] = useState(false);
+  const [indiriliyor, setIndiriliyor] = useState(false);
 
+  // ------------------------------------------------------------- veri ---
   const getir = useCallback(async () => {
     if (!companyId) return;
     setOkumaHatasi(null);
-    const [m, a] = await Promise.all([
+    const [k, u, a, d] = await Promise.all([
       supabase.from("ihracat_musterileri").select("*").eq("company_id", companyId).order("unvan"),
-      supabase.from("proforma_ayarlari").select("evraklar").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ihracat_urunleri").select("*").eq("company_id", companyId).order("sira"),
+      supabase.from("proforma_ayarlari").select("*").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ihracat_dosyalari").select(DOSYA_ALANLARI).eq("company_id", companyId).order("olusturma_tarihi", { ascending: false }).limit(2000),
     ]);
-    if (m.error) { setOkumaHatasi(proformaHataMesaji(m.error)); setYukleniyor(false); return; }
-    setMusteriler((m.data || []) as IhracatMusteri[]);
-    const ev = (a.data as { evraklar: string[] | null } | null)?.evraklar;
-    setVarsayilanEvrak(Array.isArray(ev) && ev.length ? ev : VARSAYILAN_EVRAKLAR);
+    const hata = k.error || u.error || a.error || d.error;
+    if (hata) {
+      setOkumaHatasi(proformaHataMesaji(hata));
+      setYukleniyor(false);
+      return;
+    }
+    setKartlar((k.data || []) as IhracatMusteri[]);
+    setUrunler((u.data || []) as IhracatUrun[]);
+    setDosyalar((d.data || []) as GecmisDosya[]);
+    const ayar = a.data as ProformaAyar | null;
+    const evr = ayar?.evraklar?.length ? ayar.evraklar : VARSAYILAN_EVRAKLAR;
+    setSablon({
+      ozelSartlar: ayar?.ozel_sartlar?.length ? ayar.ozel_sartlar : VARSAYILAN_OZEL_SARTLAR,
+      altBilgi: ayar?.alt_bilgi?.length ? ayar.alt_bilgi : VARSAYILAN_ALT_BILGI,
+      ustBilgi: { tarih: ayar?.ust_bilgi_tarih || VARSAYILAN_UST_BILGI.tarih, revizyon: ayar?.ust_bilgi_revizyon || VARSAYILAN_UST_BILGI.revizyon },
+      evraklar: evr,
+    });
+    setT((onceki) => (onceki.musteriAnahtari || onceki.unvan ? onceki : { ...onceki, evraklar: [...evr] }));
     setYukleniyor(false);
   }, [companyId]);
 
@@ -64,51 +114,112 @@ export default function ProformaMusterilerPage() {
     getir();
   }, [authLoading, yetkili, getir]);
 
-  const liste = useMemo(() => {
-    const q = arama.trim().toLocaleLowerCase("tr");
-    return musteriler.filter((m) =>
-      (pasifleriGoster || m.aktif) &&
-      (!q || [m.kod, m.unvan, m.varis_limani, m.eposta, m.adres].some((v) => (v || "").toLocaleLowerCase("tr").includes(q)))
-    );
-  }, [musteriler, arama, pasifleriGoster]);
+  const secenekler = useMemo(() => musteriSecenekleri(kartlar, dosyalar), [kartlar, dosyalar]);
+  const urunListesi = useMemo(() => urunOnerileri(urunler, dosyalar), [urunler, dosyalar]);
+  const markaListesi = useMemo(() => markaOnerileri(dosyalar), [dosyalar]);
+  const tumKodlar = useMemo(() => secenekler.map((s) => s.kod), [secenekler]);
+  const secili = useMemo(() => secenekler.find((s) => s.anahtar === t.musteriAnahtari) || null, [secenekler, t.musteriAnahtari]);
 
-  const set = <K extends keyof MusteriTaslak>(k: K, v: MusteriTaslak[K]) => setTaslak((t) => ({ ...t, [k]: v }));
+  // Kaydedilmemis degisiklik varken sayfadan cikista uyar
+  useEffect(() => {
+    if (!degisti) return;
+    const uyar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", uyar);
+    return () => window.removeEventListener("beforeunload", uyar);
+  }, [degisti]);
 
-  const yeniAc = () => { setDuzenlenen(null); setTaslak(BOS_MUSTERI); setFormAcik(true); };
-  const duzenleAc = (m: IhracatMusteri) => { setDuzenlenen(m); setTaslak(musteridenTaslak(m)); setFormAcik(true); };
+  // ------------------------------------------------------- guncelleme ---
+  const guncelle = (f: (x: ProformaTaslak) => ProformaTaslak) => {
+    setDegisti(true);
+    setT((x) => otomatikAlanlar(f(x)));
+  };
+  const alan = <K extends keyof ProformaTaslak>(k: K, v: ProformaTaslak[K]) => guncelle((x) => ({ ...x, [k]: v }));
 
-  const digerKodlar = useMemo(() => musteriler.filter((m) => m.id !== duzenlenen?.id).map((m) => m.kod), [musteriler, duzenlenen]);
-  const kodCakisiyor = !!taslak.kod && digerKodlar.includes(kodTemizle(taslak.kod));
+  const musteriSec = (m: MusteriSecenegi) => {
+    setKodElle(false);
+    guncelle((x) => musteriUygula(x, m, sablon.evraklar));
+  };
+  const yeniMusteri = (unvan: string) => {
+    setKodElle(false);
+    guncelle((x) => ({
+      ...bosTaslak(x.tarih),
+      unvan: unvan.toUpperCase(),
+      kod: aliciKoduOner(unvan, tumKodlar),
+      evraklar: [...sablon.evraklar],
+    }));
+  };
+  const unvanDegis = (v: string) =>
+    guncelle((x) => ({ ...x, unvan: v, kod: !kodElle && !x.musteriAnahtari ? aliciKoduOner(v, tumKodlar) : x.kod }));
 
-  const kaydet = async () => {
-    if (!companyId) return;
-    if (kodCakisiyor) { showToast("Bu alıcı kodu başka bir müşteride kullanılıyor.", "error"); return; }
-    const r = musteriKaydiHazirla(taslak);
-    if ("hata" in r) { showToast(r.hata, "error"); return; }
-    setKaydediliyor(true);
-    const sonuc = duzenlenen
-      ? await supabase.from("ihracat_musterileri").update(r.kayit).eq("id", duzenlenen.id).eq("company_id", companyId).select("id")
-      : await supabase.from("ihracat_musterileri").insert({ ...r.kayit, company_id: companyId }).select("id");
-    setKaydediliyor(false);
-    const hata = yazmaHatasi(sonuc.error, sonuc.data);
-    if (hata) { showToast(`Kaydedilemedi: ${proformaHataMesaji({ message: hata })}`, "error"); return; }
-    showToast(duzenlenen ? "Müşteri kartı güncellendi." : "Müşteri kartı eklendi.", "success");
-    setFormAcik(false);
-    getir();
+  const kalemDegis = (i: number, k: keyof KalemTaslak, v: string) =>
+    guncelle((x) => {
+      const kalemler = x.kalemler.map((s, j) => (j === i ? { ...s, [k]: v } : s));
+      // Listeden bilinen urun secildiyse varsayilan ambalaj gelsin (elle degistirilmemisse)
+      if (k === "urun") {
+        const bilinen = urunListesi.find((u) => u.ad.toLocaleUpperCase("en-US") === v.trim().toLocaleUpperCase("en-US"));
+        if (bilinen && (!x.kalemler[i].ambalajKg || x.kalemler[i].ambalajKg === "25")) kalemler[i] = { ...kalemler[i], ambalajKg: genelSayiYaz(bilinen.kg) };
+      }
+      return { ...x, kalemler };
+    });
+  const kalemEkle = () => guncelle((x) => ({ ...x, kalemler: [...x.kalemler, { ...BOS_KALEM, ambalajKg: x.kalemler[x.kalemler.length - 1]?.ambalajKg || "25" }] }));
+  const kalemSil = (i: number) => guncelle((x) => ({ ...x, kalemler: x.kalemler.length > 1 ? x.kalemler.filter((_, j) => j !== i) : [{ ...BOS_KALEM }] }));
+
+  const temizle = () => {
+    setKodElle(false);
+    setDegisti(false);
+    setT({ ...bosTaslak(), evraklar: [...sablon.evraklar] });
   };
 
-  const sil = async () => {
-    if (!silinecek || !companyId) return;
-    setSiliniyor(true);
-    const { data, error } = await supabase.from("ihracat_musterileri").delete().eq("id", silinecek.id).eq("company_id", companyId).select("id");
-    setSiliniyor(false);
-    const hata = yazmaHatasi(error, data);
-    setSilinecek(null);
-    if (hata) { showToast(proformaHataMesaji({ message: hata }), "error"); return; }
-    showToast("Müşteri kartı silindi.", "success");
-    getir();
+  // ----------------------------------------------------------- hesap ---
+  const hesapli = useMemo(() => kalemleriHesapla(t.kalemler), [t.kalemler]);
+  const top = useMemo(() => toplamlar(hesapli), [hesapli]);
+  const eksik = useMemo(() => eksikler(t), [t]);
+  const simge = paraSimgesi(t.paraBirimi);
+  const teslimSekli = teslimSekliBul(t.teslimIfadesi, t.teslimSekli);
+
+  // ------------------------------------------------- canli onizleme ---
+  const [onizlemeUrl, setOnizlemeUrl] = useState<string | null>(null);
+  const [onizlemeHata, setOnizlemeHata] = useState<string | null>(null);
+  const [onizlemeSayfa, setOnizlemeSayfa] = useState(1);
+  const urlRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (yukleniyor || okumaHatasi) return;
+    let iptal = false;
+    const z = window.setTimeout(async () => {
+      try {
+        const { proformaPdf } = await import("@/lib/proforma/pdf");
+        const belge = belgeOlustur(t, sablon, false);
+        const blob = proformaPdf(belge).output("blob");
+        if (iptal) return;
+        const url = URL.createObjectURL(blob);
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        urlRef.current = url;
+        setOnizlemeUrl(url);
+        setOnizlemeHata(null);
+      } catch (e) {
+        if (!iptal) setOnizlemeHata(e instanceof Error ? e.message : String(e));
+      }
+    }, 500);
+    return () => { iptal = true; window.clearTimeout(z); };
+  }, [t, sablon, yukleniyor, okumaHatasi]);
+  useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
+
+  const indir = async () => {
+    if (eksik.length) { showToast(`Eksik: ${eksik[0].mesaj}`, "error"); return; }
+    setIndiriliyor(true);
+    try {
+      const { proformaPdf, proformaDosyaAdi } = await import("@/lib/proforma/pdf");
+      const belge = belgeOlustur(t, sablon, false);
+      proformaPdf(belge).save(proformaDosyaAdi(belge));
+      showToast("Taslak PDF indirildi.", "success");
+    } catch (e) {
+      showToast(`PDF oluşturulamadı: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      setIndiriliyor(false);
+    }
   };
 
+  // ------------------------------------------------------------ ekran ---
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
     return (
       <AppShell>
@@ -117,28 +228,28 @@ export default function ProformaMusterilerPage() {
     );
   }
 
-  const aktifSayi = musteriler.filter((m) => m.aktif).length;
-  const bankasiz = musteriler.filter((m) => m.aktif && !m.banka).length;
-  const sigortaUyari = !sigortaSatictaMi(taslak.teslim_sekli) && taslak.ozelEvrak && taslak.evraklar.some(sigortaEvrakiMi);
-
   return (
     <AppShell>
       <SayfaBasligi
         ikon={<FileSignature size={20} />}
-        baslik="Proformalar · Müşteriler"
-        aciklama="İhracat alıcı kartları. Proforma hazırlanırken alıcı, teslim, banka, ödeme ve evrak bilgileri bu kartlardan gelir."
+        baslik="Yeni Proforma"
+        aciklama={
+          <>
+            {t.proformaNo ? <>Proforma No <span className="font-mono font-semibold text-emerald-400">{t.proformaNo}</span> · </> : null}
+            Müşteriyi seçin, ürünleri girin, kontrol edip PDF&apos;i indirin.
+          </>
+        }
         sag={
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setAktarAcik(true)} disabled={!!okumaHatasi} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>
-              <History size={14} /> Geçmişten Aktar
+            <button onClick={temizle} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <Eraser size={14} /> Temizle
             </button>
-            <button onClick={yeniAc} disabled={!!okumaHatasi} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-              <Plus size={14} /> Yeni Müşteri
-            </button>
+            <Link href="/proformalar/musteriler" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <Settings size={14} /> Ayarlar
+            </Link>
           </div>
         }
       />
-      <ProformaSekmeler />
 
       {okumaHatasi && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: "#7F1D1D", backgroundColor: "rgba(127,29,29,0.15)", color: "#FCA5A5" }}>
@@ -147,234 +258,355 @@ export default function ProformaMusterilerPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-        <div className="rounded-xl border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Aktif Müşteri</p>
-          <p className="text-2xl font-bold text-white mt-1">{aktifSayi}</p>
-        </div>
-        <div className="rounded-xl border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Bankası Seçilmemiş</p>
-          <p className={`text-2xl font-bold mt-1 ${bankasiz ? "text-amber-400" : "text-emerald-400"}`}>{bankasiz}</p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
-            <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Kod, ünvan, liman veya e-posta ile ara..." className={`${inputSinif} pl-9`} style={inputStil} />
-          </div>
-          <label className="inline-flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: TEXT_MUTED }}>
-            <input type="checkbox" checked={pasifleriGoster} onChange={(e) => setPasifleriGoster(e.target.checked)} className="accent-emerald-500" /> Pasifleri göster
-          </label>
-        </div>
-
-        {liste.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <FileSignature size={30} className="mx-auto mb-2" style={{ color: "#3A4152" }} />
-            <p className="text-sm" style={{ color: TEXT_MUTED }}>{musteriler.length === 0 ? "Henüz müşteri kartı yok. Geçmiş dosyalardaki alıcıları tek seferde aktarabilirsiniz." : "Aramayla eşleşen müşteri yok."}</p>
-            {musteriler.length === 0 && !okumaHatasi && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button onClick={() => setAktarAcik(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
-                  <History size={14} /> Geçmişten Aktar
-                </button>
-                <button onClick={yeniAc} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>
-                  <Plus size={14} /> Elle ekle
-                </button>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
+        {/* ------------------------------------------------ SOL: FORM --- */}
+        <div className="min-w-0 space-y-4">
+          {/* 1 MUSTERI */}
+          <Kutu no={1} baslik="Müşteri" sag="Listeden seçin ya da yeni ünvan yazın">
+            <MusteriSecici secenekler={secenekler} secili={secili} unvan={t.unvan} onSec={musteriSec} onYeni={yeniMusteri} />
+            {secili && (
+              <p className="mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "rgba(16,185,129,0.3)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" }}>
+                <CheckCircle2 size={14} className="mt-px shrink-0" />
+                {secili.sonProforma
+                  ? <>Son proformadan (<span className="font-mono">{secili.sonProforma}</span>) adres, ilgili kişi, ürünler, teslim, ödeme, sevkiyat ve banka getirildi. Aşağıda kontrol edin.</>
+                  : <>Müşteri kartındaki bilgiler getirildi. Aşağıda kontrol edin.</>}
+              </p>
+            )}
+            {(secili || t.unvan) && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_120px]">
+                <Alan etiket="Ünvan (BUYER)">
+                  <input value={t.unvan} onChange={(e) => unvanDegis(e.target.value)} className={inp} style={inpStil} />
+                </Alan>
+                <Alan etiket="Alıcı kodu" not="Proforma no için">
+                  <input value={t.kod} onChange={(e) => { setKodElle(true); alan("kod", kodTemizle(e.target.value)); }} placeholder="CCS" className={`${inp} font-mono`} style={inpStil} />
+                </Alan>
+                <Alan etiket="Adres" tam>
+                  <textarea value={t.adres} onChange={(e) => alan("adres", e.target.value)} rows={2} className={inp} style={inpStil} />
+                </Alan>
+                <Alan etiket="İlgili kişi (ATTENTION TO)" tam not="Proformada aynen basılır: ad, TEL, EMAIL…">
+                  <textarea value={t.ilgiliKisi} onChange={(e) => alan("ilgiliKisi", e.target.value)} rows={3} placeholder={"Mr. Ibraheem Osman\nTEL : +253 …\nEMAIL : …"} className={inp} style={inpStil} />
+                </Alan>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[900px]">
-              <thead>
-                <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                  {["Kod", "Alıcı", "Teslim", "Banka", "Ödeme", ""].map((b, i) => (
-                    <th key={i} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {liste.map((m) => (
-                  <tr key={m.id} className={`border-t ${m.aktif ? "" : "opacity-50"}`} style={{ borderColor: CARD_BORDER }}>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="font-mono font-semibold text-emerald-400">{m.kod}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-semibold text-white">{m.unvan}</p>
-                      <p className="text-xs mt-0.5 max-w-[320px] truncate" style={{ color: TEXT_MUTED }} title={m.adres || ""}>{m.adres || "Adres yok"}{!m.aktif && " · Pasif"}</p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-white">{m.teslim_ifadesi || [m.teslim_sekli, m.varis_limani].filter(Boolean).join(" ") || "-"}</p>
-                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{m.evraklar?.length ? `${m.evraklar.length} evrak (özel liste)` : "Varsayılan evrak listesi"}</p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {m.banka ? <p className="text-white">{bankaBul(m.banka)?.goruntulenenAd}</p> : <p className="text-amber-400 text-xs">Seçilmemiş</p>}
-                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{m.para_birimi}</p>
-                    </td>
-                    <td className="px-4 py-3 text-xs max-w-[260px]" style={{ color: TEXT_MUTED }}>
-                      <p className="line-clamp-2" title={m.odeme_sekli || ""}>{m.odeme_sekli || "-"}</p>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <button onClick={() => duzenleAc(m)} title="Düzenle" className="p-1.5 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }}><Pencil size={14} /></button>
-                      <button onClick={() => setSilinecek(m)} title="Sil" className="p-1.5 rounded hover:bg-red-500/10 text-red-400"><Trash2 size={14} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          </Kutu>
 
-      {formAcik && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="ihr-musteri-baslik">
-          <div className="w-full max-w-3xl rounded-2xl border shadow-2xl my-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
-              <h2 id="ihr-musteri-baslik" className="text-base font-semibold text-white">{duzenlenen ? `Müşteri Kartı · ${duzenlenen.kod}` : "Yeni Müşteri Kartı"}</h2>
-              <button onClick={() => !kaydediliyor && setFormAcik(false)} className="p-1.5 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }} aria-label="Kapat"><X size={16} /></button>
+          {/* 2 URUNLER */}
+          <Kutu no={2} baslik="Ürünler" sag={`1 FCL = ${FCL_MTS} MTS`}>
+            <datalist id="pf-urunler">{urunListesi.map((u) => <option key={u.ad} value={u.ad} />)}</datalist>
+            <datalist id="pf-markalar">{markaListesi.map((m) => <option key={m} value={m} />)}</datalist>
+            <div className="space-y-2">
+              {t.kalemler.map((k, i) => {
+                const h = kalemleriHesapla([k])[0];
+                return (
+                  <div key={i} className="rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                    <div className="grid gap-2 grid-cols-12">
+                      <label className="col-span-12 sm:col-span-8">
+                        <span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>{i + 1}. Ürün (marka hariç)</span>
+                        <input list="pf-urunler" value={k.urun} onChange={(e) => kalemDegis(i, "urun", e.target.value)} placeholder="PREMIUM QUALITY WHEAT FLOUR" className={inp} style={{ ...inpStil, backgroundColor: CARD_BG }} aria-label={`${i + 1}. ürün`} />
+                      </label>
+                      <label className="col-span-12 sm:col-span-4">
+                        <span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Marka</span>
+                        <input list="pf-markalar" value={k.marka} onChange={(e) => kalemDegis(i, "marka", e.target.value.toUpperCase())} placeholder="SAAD" className={inp} style={{ ...inpStil, backgroundColor: CARD_BG }} aria-label={`${i + 1}. marka`} />
+                      </label>
+                      <label className="col-span-4 sm:col-span-2">
+                        <span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Ambalaj (kg)</span>
+                        <input value={k.ambalajKg} onChange={(e) => kalemDegis(i, "ambalajKg", e.target.value)} inputMode="decimal" className={`${inp} text-right`} style={{ ...inpStil, backgroundColor: CARD_BG }} aria-label={`${i + 1}. ambalaj`} />
+                      </label>
+                      <label className="col-span-4 sm:col-span-3">
+                        <span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Miktar (MTS)</span>
+                        <input value={k.mts} onChange={(e) => kalemDegis(i, "mts", e.target.value)} inputMode="decimal" placeholder="örn. 250" className={`${inp} text-right`} style={{ ...inpStil, backgroundColor: CARD_BG }} aria-label={`${i + 1}. miktar`} />
+                      </label>
+                      <label className="col-span-4 sm:col-span-3">
+                        <span className="block text-[11px] mb-1" style={{ color: TEXT_MUTED }}>Fiyat ({t.paraBirimi}/MTS)</span>
+                        <input value={k.fiyat} onChange={(e) => kalemDegis(i, "fiyat", e.target.value)} inputMode="decimal" placeholder="örn. 483" className={`${inp} text-right`} style={{ ...inpStil, backgroundColor: CARD_BG }} aria-label={`${i + 1}. fiyat`} />
+                      </label>
+                      <div className="col-span-12 sm:col-span-4 flex items-end justify-between gap-2">
+                        <div className="pb-1.5">
+                          <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>Tutar</span>
+                          <span className="block text-sm font-semibold text-white whitespace-nowrap">{h ? `${paraYaz(h.tutar)} ${simge}` : "–"}</span>
+                        </div>
+                        <div className="text-right pb-1.5">
+                          {h && <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{genelSayiYaz(h.mts / FCL_MTS)} FCL{h.cuval ? ` · ${paraYaz(h.cuval, 0)} çuval` : ""}</span>}
+                          <button onClick={() => kalemSil(i)} title="Satırı sil" aria-label={`${i + 1}. satırı sil`} className="mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs text-red-400 hover:bg-red-500/10"><Trash2 size={13} /> Sil</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Bolum baslik="Alıcı (BUYER)" />
-              <Alan etiket="Ünvan *" tam>
-                <input value={taslak.unvan} onChange={(e) => set("unvan", e.target.value)} placeholder="CENTRE COMMERCIAL SAAD" className={inputSinif} style={inputStil} autoFocus={!duzenlenen} />
-              </Alan>
-              <Alan etiket="Alıcı kodu *" not={kodCakisiyor ? undefined : "Proforma no: UNEX + KOD + GGAAYY (örn. UNEXCCS160926)"} hata={kodCakisiyor ? "Bu kod başka bir müşteride kullanılıyor." : undefined}>
-                <div className="flex gap-2">
-                  <input value={taslak.kod} onChange={(e) => set("kod", kodTemizle(e.target.value))} placeholder="CCS" className={`${inputSinif} font-mono`} style={{ ...inputStil, borderColor: kodCakisiyor ? "#B91C1C" : CARD_BORDER }} />
-                  <button type="button" onClick={() => set("kod", aliciKoduOner(taslak.unvan, digerKodlar))} disabled={!taslak.unvan.trim()} title="Ünvandan öner" className="shrink-0 inline-flex items-center gap-1 px-2.5 rounded-lg border text-xs hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                    <Wand2 size={13} /> Öner
-                  </button>
-                </div>
-              </Alan>
-              <Alan etiket="E-posta (draft / proforma gönderimi)" not="Birden fazlaysa virgülle ayırın">
-                <input value={taslak.eposta} onChange={(e) => set("eposta", e.target.value)} placeholder="purchase@firma.com, ops@firma.com" className={inputSinif} style={inputStil} />
-              </Alan>
-              <Alan etiket="Adres" tam>
-                <textarea value={taslak.adres} onChange={(e) => set("adres", e.target.value)} rows={2} placeholder="PLACE MAHAMOUD HARBI, DJIBOUTI" className={inputSinif} style={inputStil} />
-              </Alan>
-              <Alan etiket="İlgili kişi (ATTENTION TO)" tam not="Proformada aynen basılır. Örn: MR. IBRAHIM OSMAN / TEL : … / EMAIL : …">
-                <textarea value={taslak.ilgili_kisi} onChange={(e) => set("ilgili_kisi", e.target.value)} rows={3} className={inputSinif} style={inputStil} />
-              </Alan>
+            <button onClick={kalemEkle} className="mt-2 w-full rounded-lg border border-dashed py-2 text-sm font-semibold text-emerald-400 hover:bg-emerald-500/5" style={{ borderColor: "#2A3141" }}>
+              <Plus size={14} className="inline -mt-0.5" /> Ürün satırı ekle
+            </button>
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 text-sm" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <span>Toplam <b className="text-white">{genelSayiYaz(top.mts)} MTS</b></span>
+              <span><b className="text-white">{genelSayiYaz(top.fcl)} FCL</b></span>
+              {top.cuval > 0 && <span><b className="text-white">{paraYaz(top.cuval, 0)}</b> çuval</span>}
+              <span>Tutar <b className="text-white">{paraYaz(top.tutar)} {t.paraBirimi}</b></span>
+            </div>
+          </Kutu>
 
-              <Bolum baslik="Teslim ve Ödeme" />
-              <Alan etiket="Teslim şekli">
-                <select value={taslak.teslim_sekli} onChange={(e) => set("teslim_sekli", e.target.value)} className={inputSinif} style={inputStil}>
-                  <option value="">Seçin</option>
-                  {TESLIM_SEKILLERI.map((t) => <option key={t} value={t}>{t}</option>)}
-                  {taslak.teslim_sekli && !(TESLIM_SEKILLERI as readonly string[]).includes(taslak.teslim_sekli) && <option value={taslak.teslim_sekli}>{taslak.teslim_sekli}</option>}
-                </select>
+          {/* 3 ODEME VE SEVKIYAT */}
+          <Kutu no={3} baslik="Ödeme ve Sevkiyat" sag={secili ? "Son proformadan geldi · gerekirse değiştirin" : undefined}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Alan etiket="Teslim (SHIPMENT TERMS)">
+                <input value={t.teslimIfadesi} onChange={(e) => alan("teslimIfadesi", e.target.value)} placeholder="CIF DJIBOUTI PORT BASIS" className={inp} style={inpStil} />
               </Alan>
-              <Alan etiket="Varış limanı (PORT OF DESTINATION)">
-                <input value={taslak.varis_limani} onChange={(e) => set("varis_limani", e.target.value)} placeholder="DJIBOUTI PORT" className={inputSinif} style={inputStil} />
+              <Alan etiket="Sevkiyat (SHIPMENT METHOD)">
+                <input value={t.sevkiyat} onChange={(e) => alan("sevkiyat", e.target.value)} placeholder="OCTOBER SHIPPING VIA CUL LINE" className={inp} style={inpStil} />
               </Alan>
-              <Alan etiket="Teslim ifadesi (SHIPMENT TERMS)" tam not="Proformada aynen basılır.">
-                <div className="flex gap-2">
-                  <input value={taslak.teslim_ifadesi} onChange={(e) => set("teslim_ifadesi", e.target.value)} placeholder="CIF DJIBOUTI PORT BASIS" className={inputSinif} style={inputStil} />
-                  <button type="button" onClick={() => set("teslim_ifadesi", teslimIfadesiOner(taslak.teslim_sekli, taslak.varis_limani))} disabled={!taslak.teslim_sekli && !taslak.varis_limani.trim()} title="Teslim şekli + limandan oluştur" className="shrink-0 inline-flex items-center gap-1 px-2.5 rounded-lg border text-xs hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                    <Wand2 size={13} /> Oluştur
-                  </button>
-                </div>
+              <Alan etiket="Ödeme (PAYMENT TERMS)" tam>
+                <textarea value={t.odeme} onChange={(e) => alan("odeme", e.target.value)} rows={2} placeholder="%30 ADVANCE PAYMENT, BALANCE WITHIN 3 DAYS AGAINST SCANNED SHIPMENT DOCUMENTS E-MAIL MESSAGE" className={inp} style={inpStil} />
               </Alan>
               <Alan etiket="Banka">
-                <select value={taslak.banka} onChange={(e) => set("banka", e.target.value as MusteriTaslak["banka"])} className={inputSinif} style={inputStil}>
-                  <option value="">Seçilmemiş (proformada seçilir)</option>
+                <select value={t.banka} onChange={(e) => alan("banka", e.target.value as ProformaTaslak["banka"])} className={inp} style={inpStil}>
+                  <option value="">Seçin</option>
                   {BANKA_PRESETLERI.map((b) => <option key={b.anahtar} value={b.anahtar}>{b.goruntulenenAd}</option>)}
                 </select>
               </Alan>
               <Alan etiket="Para birimi">
-                <select value={taslak.para_birimi} onChange={(e) => set("para_birimi", e.target.value === "EUR" ? "EUR" : "USD")} className={inputSinif} style={inputStil}>
+                <select value={t.paraBirimi} onChange={(e) => alan("paraBirimi", e.target.value === "EUR" ? "EUR" : "USD")} className={inp} style={inpStil}>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
                 </select>
               </Alan>
-              <Alan etiket="Ödeme şekli (PAYMENT TERMS)" tam not="Son kullanılan; proforma hazırlanırken değiştirilebilir.">
-                <textarea value={taslak.odeme_sekli} onChange={(e) => set("odeme_sekli", e.target.value)} rows={2} className={inputSinif} style={inputStil} />
-              </Alan>
-              <Alan etiket="Sevkiyat (SHIPMENT METHOD)" tam not="Son kullanılan; proforma hazırlanırken değiştirilebilir.">
-                <textarea value={taslak.sevkiyat_metni} onChange={(e) => set("sevkiyat_metni", e.target.value)} rows={2} className={inputSinif} style={inputStil} />
-              </Alan>
-
-              <Bolum baslik="Evraklar (SHIPPING DOCUMENTS)" />
-              <div className="sm:col-span-2 rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                <label className="flex items-start gap-2.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={taslak.ozelEvrak}
-                    onChange={(e) => setTaslak((t) => ({ ...t, ozelEvrak: e.target.checked, evraklar: e.target.checked && t.evraklar.length === 0 ? [...varsayilanEvrak] : t.evraklar }))}
-                    className="mt-0.5 accent-emerald-500"
-                  />
-                  <span>
-                    <span className="block text-sm text-white">Bu müşteriye özel evrak listesi</span>
-                    <span className="block text-xs" style={{ color: TEXT_MUTED }}>Kapalıysa Şablon Metinleri&apos;ndeki varsayılan liste kullanılır. Insurance Policy yalnızca CIF / CIP teslimde basılır.</span>
-                  </span>
-                </label>
-                {taslak.ozelEvrak && (
-                  <div className="mt-3">
-                    <MetinListesiEditor
-                      deger={taslak.evraklar}
-                      degis={(v) => set("evraklar", v)}
-                      encok={30}
-                      yerTutucu="Commercial Invoice by the Sellers"
-                      ekleEtiketi="Evrak ekle"
-                      vurgula={(e) => (sigortaEvrakiMi(e) && !sigortaSatictaMi(taslak.teslim_sekli) ? `${taslak.teslim_sekli || "Bu teslim şekli"} için proformada basılmaz (sigorta alıcıda).` : null)}
-                    />
+              <Alan etiket="1. sayfadaki ödeme kutusu" tam not={t.ikinciElle ? undefined : "Ödeme metninden önerildi (ör. %30 avans → tutarın %30'u)."}>
+                <div className="flex flex-wrap gap-2">
+                  <select value={t.ikinciEtiket} onChange={(e) => guncelle((x) => ({ ...x, ikinciEtiket: e.target.value as IkinciKutuEtiketi, ikinciElle: true }))} className={`${inp} sm:w-56`} style={inpStil}>
+                    {IKINCI_KUTU_ETIKETLERI.map((e) => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                  <div className="relative flex-1 min-w-[160px]">
+                    <input value={t.ikinciTutar} onChange={(e) => guncelle((x) => ({ ...x, ikinciTutar: e.target.value, ikinciElle: true }))} inputMode="decimal" className={`${inp} text-right pr-8`} style={inpStil} aria-label="Ödeme kutusu tutarı" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: TEXT_MUTED }}>{simge}</span>
                   </div>
-                )}
-                {sigortaUyari && <p className="text-[11px] mt-2 text-amber-400">Not: sigorta satırı listede kalabilir; proforma oluşturulurken teslim şekline göre otomatik çıkarılır.</p>}
-              </div>
-
-              <Alan etiket="Not (proformaya basılmaz)" tam>
-                <textarea value={taslak.notlar} onChange={(e) => set("notlar", e.target.value)} rows={2} className={inputSinif} style={inputStil} />
+                  {t.ikinciElle && (
+                    <button onClick={() => guncelle((x) => ({ ...x, ikinciElle: false }))} className="inline-flex items-center gap-1 px-2.5 rounded-lg border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                      <RotateCcw size={12} /> Öneriye dön
+                    </button>
+                  )}
+                </div>
               </Alan>
-              <label className="sm:col-span-2 flex items-start gap-2.5 cursor-pointer select-none">
-                <input type="checkbox" checked={taslak.aktif} onChange={(e) => set("aktif", e.target.checked)} className="mt-0.5 accent-emerald-500" />
-                <span>
-                  <span className="block text-sm text-white">Aktif</span>
-                  <span className="block text-xs" style={{ color: TEXT_MUTED }}>Pasif müşteri proforma hazırlarken listede çıkmaz.</span>
-                </span>
-              </label>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: CARD_BORDER }}>
-              <button onClick={() => setFormAcik(false)} disabled={kaydediliyor} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
-              <button onClick={kaydet} disabled={kaydediliyor} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
-                {kaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
-              </button>
+
+            {/* Diger ayrintilar */}
+            <button onClick={() => setAyrintiAcik((a) => !a)} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400 hover:underline" aria-expanded={ayrintiAcik}>
+              <ChevronDown size={15} className={`transition-transform ${ayrintiAcik ? "rotate-180" : ""}`} /> Diğer ayrıntılar
+              <span className="font-normal" style={{ color: TEXT_MUTED }}>(proforma no, tarih, paketleme, marka satırı, evraklar)</span>
+            </button>
+            {ayrintiAcik && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                <Alan etiket="Proforma No" not={t.proformaNoElle ? undefined : "Otomatik: UNEX + kod + tarih"}>
+                  <div className="flex gap-2">
+                    <input value={t.proformaNo} onChange={(e) => guncelle((x) => ({ ...x, proformaNo: e.target.value.toUpperCase(), proformaNoElle: true }))} className={`${inp} font-mono`} style={inpStil} />
+                    {t.proformaNoElle && <SifirlaButon onClick={() => guncelle((x) => ({ ...x, proformaNoElle: false }))} />}
+                  </div>
+                </Alan>
+                <Alan etiket="Tarih" not="Geçerlilik: tarih + 4 gün">
+                  <input type="date" value={t.tarih} onChange={(e) => e.target.value && alan("tarih", e.target.value)} className={inp} style={{ ...inpStil, colorScheme: "dark" }} />
+                </Alan>
+                <Alan etiket="Paketleme (PACKAGING)" tam not={t.paketlemeElle ? undefined : "Ürünlerden otomatik yazılır"}>
+                  <div className="flex gap-2">
+                    <textarea value={t.paketleme} onChange={(e) => guncelle((x) => ({ ...x, paketleme: e.target.value, paketlemeElle: true }))} rows={2} className={inp} style={inpStil} />
+                    {t.paketlemeElle && <SifirlaButon onClick={() => guncelle((x) => ({ ...x, paketlemeElle: false }))} />}
+                  </div>
+                </Alan>
+                <Alan etiket="Marka satırı (BRAND & MARKING)" tam not={t.markaElle ? undefined : "Ürünlerin markalarından otomatik"}>
+                  <div className="flex gap-2">
+                    <input value={t.markaSatiri} onChange={(e) => guncelle((x) => ({ ...x, markaSatiri: e.target.value, markaElle: true }))} className={inp} style={inpStil} />
+                    {t.markaElle && <SifirlaButon onClick={() => guncelle((x) => ({ ...x, markaElle: false }))} />}
+                  </div>
+                </Alan>
+                <div className="sm:col-span-2">
+                  <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>Evraklar (SHIPPING DOCUMENTS)</span>
+                  <MetinListesiEditor
+                    deger={t.evraklar}
+                    degis={(v) => alan("evraklar", v)}
+                    encok={30}
+                    ekleEtiketi="Evrak ekle"
+                    vurgula={(e) => (sigortaEvrakiMi(e) && !sigortaSatictaMi(teslimSekli) ? `${teslimSekli || "Bu teslim şekli"} için basılmaz (sigorta alıcıda)` : null)}
+                  />
+                </div>
+              </div>
+            )}
+          </Kutu>
+
+          {/* ALT CUBUK */}
+          <div className="sticky bottom-0 z-10 rounded-xl border px-4 py-3 flex flex-wrap items-center justify-between gap-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="min-w-0 text-xs" style={{ color: TEXT_MUTED }}>
+              {eksik.length ? (
+                <span className="flex items-start gap-1.5 text-amber-400"><AlertCircle size={14} className="mt-px shrink-0" /> {eksik.map((e) => e.mesaj).join(" · ")}</span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 size={14} /> Proforma hazır. Önizlemeyi kontrol edip indirin.</span>
+              )}
+              <span className="block mt-0.5">Hazırlayan: {user?.email || "-"} · Taslak (imzasız)</span>
             </div>
+            <button onClick={indir} disabled={indiriliyor || eksik.length > 0} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+              {indiriliyor ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Taslak PDF İndir
+            </button>
           </div>
         </div>
-      )}
 
-      {aktarAcik && companyId && (
-        <GecmistenAktar tur="musteri" companyId={companyId} mevcut={musteriler} kapat={() => setAktarAcik(false)} eklendi={getir} />
-      )}
-
-      <ConfirmDialog
-        open={!!silinecek}
-        onOpenChange={(o) => !o && setSilinecek(null)}
-        title="Müşteri kartı silinsin mi?"
-        description={`"${silinecek?.unvan || ""}" (${silinecek?.kod || ""}) kartı silinecek. Mevcut ihracat dosyaları etkilenmez. Sadece listeden kaldırmak için kartı pasife alabilirsiniz.`}
-        confirmLabel="Sil"
-        cancelLabel="Vazgeç"
-        destructive
-        loading={siliniyor}
-        loadingLabel="Siliniyor..."
-        onConfirm={sil}
-      />
+        {/* ------------------------------------------- SAG: ONIZLEME --- */}
+        <div className="min-w-0">
+          <div className="xl:sticky xl:top-4 rounded-xl border p-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-white">Canlı Önizleme</h2>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3].map((n) => (
+                  <button key={n} onClick={() => setOnizlemeSayfa(n)} className={`px-2.5 py-1 rounded-md text-xs ${onizlemeSayfa === n ? "text-white" : "hover:bg-white/5"}`} style={onizlemeSayfa === n ? { backgroundColor: ACCENT } : { color: TEXT_MUTED }}>
+                    Sayfa {n}
+                  </button>
+                ))}
+                {onizlemeUrl && (
+                  <a href={onizlemeUrl} target="_blank" rel="noreferrer" title="Yeni sekmede aç" className="ml-1 p-1.5 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }}><ExternalLink size={14} /></a>
+                )}
+              </div>
+            </div>
+            {onizlemeHata ? (
+              <p className="text-sm text-red-400 p-4">Önizleme oluşturulamadı: {onizlemeHata}</p>
+            ) : onizlemeUrl ? (
+              <iframe
+                key={`${onizlemeUrl}-${onizlemeSayfa}`}
+                src={`${onizlemeUrl}#page=${onizlemeSayfa}&toolbar=0&navpanes=0&view=FitH`}
+                title="Proforma önizleme"
+                className="w-full rounded bg-white h-[70vh] min-h-[480px]"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[480px]"><Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} /></div>
+            )}
+            <p className="mt-2 text-[11px]" style={{ color: TEXT_MUTED }}>Siz yazdıkça güncellenir. İndirilen PDF birebir bu belgedir (şablonunuzla aynı, 3 sayfa).</p>
+          </div>
+        </div>
+      </div>
     </AppShell>
   );
 }
 
-function Bolum({ baslik }: { baslik: string }) {
-  return <p className="sm:col-span-2 pt-2 text-[11px] font-semibold uppercase tracking-wider border-b pb-1.5" style={{ color: ACCENT, borderColor: CARD_BORDER }}>{baslik}</p>;
+// ------------------------------------------------------------ parcalar ---
+
+function Kutu({ no, baslik, sag, children }: { no: number; baslik: string; sag?: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: ACCENT }}>{no}</span>
+        <h2 className="text-sm font-semibold text-white">{baslik}</h2>
+        {sag && <span className="ml-auto text-xs" style={{ color: TEXT_MUTED }}>{sag}</span>}
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
 }
 
-function Alan({ etiket, not, hata, tam, children }: { etiket: string; not?: string; hata?: string; tam?: boolean; children: React.ReactNode }) {
+function Alan({ etiket, not, tam, children }: { etiket: string; not?: string; tam?: boolean; children: React.ReactNode }) {
   return (
-    <div className={`block ${tam ? "sm:col-span-2" : ""}`}>
+    <div className={tam ? "sm:col-span-2" : ""}>
       <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>{etiket}</span>
       {children}
-      {hata ? <span className="block text-[10px] mt-1 text-red-400">{hata}</span> : not && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>{not}</span>}
+      {not && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>{not}</span>}
+    </div>
+  );
+}
+
+function SifirlaButon({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} title="Otomatiğe dön" className="shrink-0 inline-flex items-center gap-1 px-2.5 rounded-lg border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+      <RotateCcw size={12} /> Otomatik
+    </button>
+  );
+}
+
+/** Aranabilir musteri secici: kayitli kartlar + gecmis dosyalardaki alicilar. */
+function MusteriSecici({
+  secenekler,
+  secili,
+  unvan,
+  onSec,
+  onYeni,
+}: {
+  secenekler: MusteriSecenegi[];
+  secili: MusteriSecenegi | null;
+  unvan: string;
+  onSec: (m: MusteriSecenegi) => void;
+  onYeni: (unvan: string) => void;
+}) {
+  const [acik, setAcik] = useState(false);
+  const [arama, setArama] = useState("");
+  const kutu = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!acik) return;
+    const kapat = (e: MouseEvent) => { if (kutu.current && !kutu.current.contains(e.target as Node)) setAcik(false); };
+    document.addEventListener("mousedown", kapat);
+    return () => document.removeEventListener("mousedown", kapat);
+  }, [acik]);
+
+  const q = arama.trim().toLocaleLowerCase("en-US");
+  const liste = secenekler.filter((s) => !q || `${s.unvan} ${s.kod} ${s.ozet}`.toLocaleLowerCase("en-US").includes(q));
+  const tamEslesme = secenekler.some((s) => s.unvan.toLocaleLowerCase("en-US") === q);
+
+  return (
+    <div ref={kutu} className="relative">
+      <button
+        type="button"
+        onClick={() => { setAcik((a) => !a); setArama(""); }}
+        className={`${inp} flex items-center justify-between text-left`}
+        style={inpStil}
+        aria-haspopup="listbox"
+        aria-expanded={acik}
+      >
+        <span className={unvan ? "text-white" : "text-slate-500"}>
+          {unvan ? <>{unvan}{secili && <span className="ml-2 font-mono text-xs" style={{ color: TEXT_MUTED }}>{secili.kod}</span>}</> : "Müşteri seçin…"}
+        </span>
+        <ChevronDown size={15} style={{ color: TEXT_MUTED }} />
+      </button>
+      {acik && (
+        <div className="absolute z-30 mt-1 w-full rounded-lg border shadow-2xl" style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }}>
+          <div className="relative p-2 border-b" style={{ borderColor: "#2A3141" }}>
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
+            <input
+              autoFocus
+              value={arama}
+              onChange={(e) => setArama(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setAcik(false);
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (liste.length === 1) { onSec(liste[0]); setAcik(false); }
+                }
+              }}
+              placeholder="Ünvan veya kod ile ara…"
+              className={`${inp} pl-8`}
+              style={inpStil}
+              aria-label="Müşteri ara"
+            />
+          </div>
+          <ul role="listbox" className="max-h-72 overflow-y-auto py-1">
+            {liste.map((s) => (
+              <li key={s.anahtar}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={secili?.anahtar === s.anahtar}
+                  onClick={() => { onSec(s); setAcik(false); }}
+                  className="w-full text-left px-3 py-2 hover:bg-white/5 flex items-center gap-3"
+                >
+                  <span className="w-12 shrink-0 font-mono text-xs font-semibold text-emerald-400">{s.kod}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm text-white truncate">{s.unvan}</span>
+                    <span className="block text-[11px] truncate" style={{ color: TEXT_MUTED }}>{s.ozet || (s.kaynak === "kart" ? "Müşteri kartı" : "Geçmiş dosya")}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+            {liste.length === 0 && <li className="px-3 py-3 text-sm" style={{ color: TEXT_MUTED }}>Eşleşen müşteri yok.</li>}
+          </ul>
+          {arama.trim().length >= 2 && !tamEslesme && (
+            <button type="button" onClick={() => { onYeni(arama.trim()); setAcik(false); }} className="w-full border-t px-3 py-2.5 text-left text-sm font-medium text-emerald-400 hover:bg-white/5" style={{ borderColor: "#2A3141" }}>
+              <Plus size={14} className="inline -mt-0.5" /> Yeni müşteri: <b>{arama.trim().toUpperCase()}</b>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

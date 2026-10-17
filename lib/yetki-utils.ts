@@ -28,6 +28,7 @@ export function ilkErisilebilirSayfa(sayfaYetkileri: Record<string, boolean> | u
     { key: "etd_eta", yol: "/etd-eta" },
     { key: "draft_onay", yol: "/draft-onay" },
     { key: "ic_piyasa", yol: "/ic-piyasa" },
+    { key: "proformalar", yol: "/proformalar" },
   ];
   for (const { key, yol } of oncelikSirasi) {
     if (sayfaYetkileri[key]) return yol;

@@ -82,6 +82,9 @@ const YEDEKLENECEK_TABLOLAR = [
   "ic_sevkler",
   // Ic piyasa bildirim kutusu (Parca 2, 12.10.2026)
   "ic_bildirimler",
+  // Proforma olusturucu - musteri kartlari / urun kutuphanesi (17.10.2026)
+  "ihracat_musterileri",
+  "ihracat_urunleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer
@@ -90,6 +93,7 @@ const YEDEKLENECEK_TABLOLAR = [
 // Deger = sayfalama sirasi.
 const AYAR_TABLOLARI: Record<string, string> = {
   ic_piyasa_ayarlari: "company_id.asc",
+  proforma_ayarlari: "company_id.asc", // Proforma sablon metinleri (17.10.2026)
 };
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).

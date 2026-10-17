@@ -1224,6 +1224,40 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `DOSYA_LISTE_KOLONLARI`'nda (draft_bl_dosya_url de oraya taşındı) — migration
   uygulanmadan kod yayına alınırsa listeler hata verir: ÖNCE SQL.
 
+## Proforma Oluşturucu — 1. aşama: Veri temeli (17.10.2026)
+
+- Plan (kullanıcı onaylı, 4 aşama): 1) veri temeli, 2) sihirbaz + 3 sayfa jsPDF
+  (DRAFT_Proforma__Contract.xlsx şablonu birebir; "Son proformadan getir"),
+  3) Onayla ve İmzala / kilit / revizyon / liste, 4) Yeni Dosya Aç entegrasyonu.
+  Sonraki aşamaya, önceki teslim edilip doğrulanmadan GEÇİLMEZ.
+- Menü: "Proformalar" (`/proformalar`, "Yeni Dosya Aç"ın ÜSTÜNDE). Sekmeler
+  (`components/proforma-sekmeler.tsx`): Müşteriler / Ürünler / Şablon Metinleri.
+- Yetki: `sayfa_yetkileri.proformalar` (sayfa) + `sayfa_yetkileri.proforma_imza`
+  (İŞLEM yetkisi; sadece `ihracat@unex.com.tr` — Harun Bey imzalar, diğerleri
+  taslak hazırlar). Migration ilk değerleri: proformalar = yeni_dosya değeri;
+  anahtar zaten varsa dokunmaz.
+- Tablolar (migration `20261017120000_proforma_veri_temeli.sql`, sadece ekleme):
+  `ihracat_musterileri` (kod ^[A-Z]{2,6}$ şirket içinde tekil = proforma no'daki
+  UNEX+KOD+GGAAYY; unvan tekil), `ihracat_urunleri` (ad MARKA HARİÇ; marka her
+  satırda ayrı → "ÜRÜN (MARKA BRAND)"), `proforma_ayarlari` (şirket başına tek
+  satır, NULL = uygulamadaki varsayılan). RLS: şirket + ic_sayfa_yetkisi
+  ('proformalar'). Denetim tetikleyicisi musteri/urun'de (ayarlarda id yok).
+  Yedekleme: musteri/urun YEDEKLENECEK_TABLOLAR'da, proforma_ayarlari
+  AYAR_TABLOLARI'nda.
+- Sabit metinler `lib/proforma/sabitler.ts` (taslaktan AYNEN; sadece kesin yazım
+  hataları düzeltildi: ets→etc., incountry, legalvenue, ﬀ, eksik/çift boşluk).
+  Insurance Policy SADECE CIF/CIP'te basılır (`teslimeGoreEvraklar`). Teslim
+  ifadesi biçimi "CIF DJIBOUTI PORT BASIS". Bankalar tek kaynak `lib/bankalar.ts`
+  (Banka Bilgileri kartı da buradan okur); proformada USD+EUR birlikte basılır.
+- "Geçmişten Aktar" (`components/proforma-gecmisten-aktar.tsx`,
+  `lib/proforma/gecmis.ts`): ihracat_dosyalari SADECE OKUNUR; aynı alıcı (unvan,
+  boşluk/harf farkı yok) için EN SON dosya; kod proforma no'dan; Türkçe kaydedilmiş
+  evrak listesi alınmaz (varsayılan kullanılır); numara önekleri, AGAISNT /
+  MESSAEGE / WTHIN / Certficate düzeltilir; virgülsüz "X PORT ÜLKE" → "X PORT".
+  Hiçbir aday otomatik eklenmez — kullanıcı işaretler, tek insert.
+- Kayıt/doğrulama: `lib/proforma/kayit.ts` (DB CHECK/UNIQUE ile aynı kurallar,
+  `proformaHataMesaji`). Liste düzenleyici: `components/metin-listesi-editor.tsx`.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

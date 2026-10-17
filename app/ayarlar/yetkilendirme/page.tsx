@@ -28,6 +28,8 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   ayarlar:    "Ayarlar",
   draft_onay: "Draft Onay",
   ic_piyasa:  "İç Piyasa",
+  proformalar: "Proformalar",
+  proforma_imza: "Proforma İmzalama (Onayla ve İmzala)",
 };
 
 const SEKME_ETIKETLER: Record<string, string> = {

@@ -6,6 +6,7 @@ import { CopyableField } from "@/components/copyable-field";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pencil, Check, X, Banknote, Plus, Loader2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { BANKA_PRESETLERI, SABIT_HESAP_ADI } from "@/lib/bankalar";
 
 type Props = {
   dosya: Dosya;
@@ -13,48 +14,7 @@ type Props = {
   companyId: string; // SaaS şirket bazlı izolasyon için eklendi
 };
 
-/**
- * Sirketin kendi banka hesaplari - "Duzenle" modalinda tek tikla otomatik
- * doldurmak icin. Her banka hem USD hem EUR hesabina sahip oldugundan,
- * hangisinin kullanilacagi dosyanin KENDI para birimine (dosya.para_birimi)
- * gore otomatik secilir - kullaniciya ekstra bir soru sorulmaz.
- */
-const BANKA_PRESETLERI: {
-  anahtar: string;
-  goruntulenenAd: string;
-  banka: string;
-  swift: string;
-  usd: { hesap_numarasi: string; iban: string };
-  eur: { hesap_numarasi: string; iban: string };
-}[] = [
-  {
-    anahtar: "denizbank",
-    goruntulenenAd: "Denizbank",
-    banka: "DENIZBANK A.S.",
-    swift: "DENITRISXXX",
-    usd: { hesap_numarasi: "1525-19081507-352", iban: "TR71 0013 4000 0190 8150 7000 02" },
-    eur: { hesap_numarasi: "1525-19081507-361", iban: "TR74 0013 4000 0190 8150 7000 45" },
-  },
-  {
-    anahtar: "vakifbank",
-    goruntulenenAd: "Vakıfbank",
-    banka: "T.C. VAKIFBANK A.S",
-    swift: "TVBATR2AXXX",
-    usd: { hesap_numarasi: "0015 8048 0198 35658", iban: "TR93 0001 5001 5804 8019 8356 58" },
-    eur: { hesap_numarasi: "001 5804 8019 8356 66", iban: "TR71 0001 5001 5804 8019 8356 66" },
-  },
-  {
-    anahtar: "ziraat",
-    goruntulenenAd: "Ziraat Bankası",
-    banka: "T.C. ZIRAAT BANKASI",
-    swift: "TCZBTR2A",
-    usd: { hesap_numarasi: "27 0897 5159 0150 06", iban: "TR82 0001 0027 0897 5159 0150 06" },
-    eur: { hesap_numarasi: "27 0897 5159 0150 07", iban: "TR55 0001 0027 0897 5159 0150 07" },
-  },
-];
-
-/** Sirketin banka hesaplarindaki sabit hesap adi - tum bankalarda ayni. */
-const SABIT_HESAP_ADI = "UNEX GIDA SAN. VE TIC. LTD. STI.";
+// Banka hesaplari: lib/bankalar.ts (TEK KAYNAK, 17.10.2026)
 
 type OzelPreset = {
   id: string;

@@ -13,6 +13,7 @@ import {
   type RaporKonteyneri,
   type RaporRezervasyonu,
   type SevkiyatSatiri,
+  type CutoffDurumu,
 } from "../_shared/gunluk-rapor.ts";
 import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slot } from "./yetki.ts";
 
@@ -31,6 +32,9 @@ import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slo
 // 12.10.2026: maildeki sevkiyat tablosunda BOOKING NO YOK (sadece dosya no) -
 // booking ile yapilan posta aramalarinda gunde 3 rapor acente maillerini
 // gommesin (kullanici karari). Booking /rapor/gunluk sayfasinda gorunmeye devam eder.
+// 19.10.2026: her sevkiyatta talimat / beyanname CUT-OFF (ETD sutununda) + ozetin
+// altinda "Cut-off Uyarisi" kutusu (tamamlanmamis, 48 saatten az kalan / gecen).
+// Kalan sureler GONDERIM ANINA gore (sabah raporu dunu ozetler ama cut-off guncel).
 //
 // Alici: SADECE GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i.
 // 09.10.2026: yedek adresine (GERI_BILDIRIM_ALICI) dusme KALDIRILDI - secret
@@ -107,13 +111,13 @@ const inListe = (idler: string[]) => `(${idler.map((i) => `"${i}"`).join(",")})`
 
 async function sirketRaporu(companyId: string, tarih: string): Promise<GunlukRapor> {
   const acik = await hepsiniCek<RaporDosyasi>(
-    `ihracat_dosyalari?select=id,dosya_no,alici_firma,marka,fatura_dosya_url,fatura_no,fatura_tarihi,varis_limani&company_id=eq.${companyId}&durum=in.(${encodeURIComponent("Açık")},Acik)&order=id`
+    `ihracat_dosyalari?select=id,dosya_no,alici_firma,marka,fatura_dosya_url,fatura_no,fatura_tarihi,varis_limani,konsimento_dosya_url,draft_bl_dosya_url,beyanname_dosya_url&company_id=eq.${companyId}&durum=in.(${encodeURIComponent("Açık")},Acik)&order=id`
   );
   const acikIdler = acik.map((d) => d.id);
   const kolonlar = "id,dosya_id,konteyner_no,muhur_no,plaka,marka,tare_kg,vgm_kg,dba_dosya_url,dba_yukleme_tarihi,dba_kontrol_sonucu";
   const [rezler, acikKont, dbaKont] = await Promise.all([
     acikIdler.length
-      ? hepsiniCek<RaporRezervasyonu>(`rezervasyonlar?select=dosya_id,konteyner_adedi,booking_no,gemi_adi,gemi_kalkis_tarihi&company_id=eq.${companyId}&dosya_id=in.${inListe(acikIdler)}&order=id`)
+      ? hepsiniCek<RaporRezervasyonu>(`rezervasyonlar?select=dosya_id,konteyner_adedi,booking_no,gemi_adi,gemi_kalkis_tarihi,talimat_cutoff,beyanname_cutoff&company_id=eq.${companyId}&dosya_id=in.${inListe(acikIdler)}&order=id`)
       : Promise.resolve([]),
     acikIdler.length
       ? hepsiniCek<RaporKonteyneri>(`konteynerler?select=${kolonlar}&company_id=eq.${companyId}&dosya_id=in.${inListe(acikIdler)}&order=id`)
@@ -125,7 +129,7 @@ async function sirketRaporu(companyId: string, tarih: string): Promise<GunlukRap
   const diger = digerIdler.length
     ? await hepsiniCek<RaporDosyasi>(`ihracat_dosyalari?select=id,dosya_no,alici_firma,marka&company_id=eq.${companyId}&id=in.${inListe(digerIdler)}&order=id`)
     : [];
-  return gunlukRaporHesapla(tarih, acik, rezler, [...acikKont, ...dbaKont], diger);
+  return gunlukRaporHesapla(tarih, acik, rezler, [...acikKont, ...dbaKont], diger, Date.now());
 }
 
 // ---------------------------------------------------------------- mail HTML
@@ -165,6 +169,48 @@ function ekipmanCubugu(s: SevkiyatSatiri): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:5px;width:${gen}px;border-collapse:collapse;border-radius:3px;overflow:hidden"><tr>${parca(s.yuklenen, "#10B981")}${parca(s.dolumBekleyen, "#F59E0B")}${parca(s.ekipmanAlinmayan, "#CBD5E1")}</tr></table><div style="color:#475569;font-size:10px;margin-top:3px;white-space:nowrap">${esc(metin)}</div>`;
 }
 
+/** Cut-off seviyesine gore yazi / zemin rengi (uygulamadaki sayacla ayni esikler). */
+const CUTOFF_RENK: Record<CutoffDurumu["seviye"], [string, string]> = {
+  tamam: ["#047857", "#D1FAE5"],
+  yok: ["#94A3B8", "transparent"],
+  normal: ["#475569", "transparent"],
+  yaklasiyor: ["#B45309", "#FEF3C7"],
+  kritik: ["#B91C1C", "#FEE2E2"],
+  gecti: ["#B91C1C", "#FEE2E2"],
+};
+
+/** "Talimat 21.10 10:00" + durum ("✔ Draft BL alındı" / "1 gün 3 sa kaldı" / "Süresi geçti"). */
+function cutoffSatiri(c: CutoffDurumu): string {
+  const [renk, zemin] = CUTOFF_RENK[c.seviye];
+  const vurgulu = c.seviye === "yaklasiyor" || c.seviye === "kritik" || c.seviye === "gecti";
+  const durum = c.seviye === "tamam" ? `✔ ${esc(c.aciklama)}` : esc(c.aciklama);
+  const durumHtml = vurgulu
+    ? `<span style="display:inline-block;padding:1px 6px;border-radius:999px;background:${zemin};color:${renk};font-weight:bold">${durum}</span>`
+    : `<span style="color:${renk}${c.seviye === "tamam" ? ";font-weight:bold" : ""}">${durum}</span>`;
+  return `<div style="margin-top:4px;font-size:10px;line-height:1.4;white-space:nowrap"><span style="color:#64748B">${c.tur}</span> <b style="color:#1E293B">${c.kisa || "—"}</b><br>${durumHtml}</div>`;
+}
+
+function etdCutoffHucresi(s: SevkiyatSatiri): string {
+  return `<div style="color:#64748B;font-size:11px;white-space:nowrap">ETD <b style="color:#1E293B">${tarihTR(s.etd)}</b></div>${cutoffSatiri(s.talimatCutoff)}${cutoffSatiri(s.beyannameCutoff)}`;
+}
+
+/** Ozetin altinda: tamamlanmamis ve 48 saatten az kalmis / gecmis cut-off'lar (yoksa bos). */
+function cutoffUyariKutusu(r: GunlukRapor, olusturma: string): string {
+  if (!r.cutoffUyarilari.length) return "";
+  const acil = r.cutoffUyarilari.some((u) => u.durum.seviye === "kritik" || u.durum.seviye === "gecti");
+  const [cerceve, zemin, baslikRenk] = acil ? ["#DC2626", "#FEF2F2", "#B91C1C"] : ["#D97706", "#FFFBEB", "#B45309"];
+  const satirlar = r.cutoffUyarilari
+    .map((u) => {
+      const [renk, z] = CUTOFF_RENK[u.durum.seviye];
+      return `<tr><td style="padding:3px 8px 3px 0;font-size:12px;color:#1E293B;white-space:nowrap"><b>${u.durum.tur}</b></td><td style="padding:3px 8px 3px 0;font-size:12px;color:#1E293B">${esc(u.musteri)} <span style="color:#64748B;font-size:11px">(${esc(u.dosya_no)})</span></td><td style="padding:3px 8px 3px 0;font-size:12px;color:#1E293B;white-space:nowrap">${esc(u.durum.metin || "—")}</td><td style="padding:3px 0;text-align:right;white-space:nowrap"><span style="display:inline-block;padding:1px 7px;border-radius:999px;background:${z};color:${renk};font-size:11px;font-weight:bold">${esc(u.durum.aciklama)}</span></td></tr>`;
+    })
+    .join("");
+  return `<div style="margin-top:14px;border:1px solid ${cerceve};border-left:4px solid ${cerceve};background:${zemin};border-radius:4px;padding:8px 12px">
+    <div style="font-size:11px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:${baslikRenk}">Cut-off Uyarısı (${r.cutoffUyarilari.length}) <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:#64748B">· ${esc(olusturma)} itibarıyla · belgesi yüklenmemiş, 48 saatten az kalan / geçen</span></div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;border-collapse:collapse">${satirlar}</table>
+  </div>`;
+}
+
 function faturaHucresi(s: SevkiyatSatiri): string {
   if (!s.faturaKesildi) return `<span style="display:inline-block;padding:2px 9px;border-radius:999px;background:#FEE2E2;color:#B91C1C;font-size:11px;font-weight:bold;white-space:nowrap">Kesilmedi</span>`;
   const alt = [s.faturaNo ? esc(s.faturaNo) : null, s.faturaTarihi ? tarihTR(s.faturaTarihi) : null].filter(Boolean).join("<br>");
@@ -182,10 +228,11 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
     `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:11px;color:#475569;line-height:1.45">${alt}</div></td>`;
   const kutuArasi = `<td style="width:2%;font-size:0;line-height:0">&nbsp;</td>`;
   const musteriler = acikMusteriSatirlari(r);
+  const olusturma = new Date(Date.now()).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   const sevkiyatSatirlari = r.sevkiyatlar.length
     ? r.sevkiyatlar
-        .map((s, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(s.musteri)}</b>`)}${td(`<b>${s.konteynerAdedi}x</b>`, "text-align:center;white-space:nowrap")}${td(`<b>${esc(s.marka)}</b>`)}${td(durumHucresi(s, gunEtiket))}${td(faturaHucresi(s))}${td(`<span style="color:#64748B;font-size:11px">${esc(s.dosya_no)}</span>`, "white-space:nowrap")}${td(`<span style="color:#64748B;font-size:11px">${tarihTR(s.etd)}</span>`, "white-space:nowrap")}</tr>`)
+        .map((s, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(s.musteri)}</b>`)}${td(`<b>${s.konteynerAdedi}x</b>`, "text-align:center;white-space:nowrap")}${td(`<b>${esc(s.marka)}</b>`)}${td(durumHucresi(s, gunEtiket))}${td(faturaHucresi(s))}${td(`<span style="color:#64748B;font-size:11px">${esc(s.dosya_no)}</span>`, "white-space:nowrap")}${td(etdCutoffHucresi(s))}</tr>`)
         .join("")
     : `<tr><td colspan="7" style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">Açık sevkiyat bulunmuyor.</td></tr>`;
 
@@ -238,6 +285,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
     ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), musteriler.length ? musteriler.map(esc).join("<br>") : "açık sevkiyat yok", "#047857")}${kutuArasi}
     ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), "açık sevkiyatlarda kalan", "#B45309")}
   </tr></table>
+  ${cutoffUyariKutusu(r, olusturma)}
 
   ${bolumBaslik(`${baslikGun} Yüklenen Konteynerler`)}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
@@ -247,7 +295,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
 
   ${bolumBaslik("Sevkiyat Durumu — Açık Dosyalar")}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-    <tr>${th("Müşteri")}${th("Adet")}${th("Marka")}${th("Yükleme Durumu")}${th("Fatura")}${th("Dosya")}${th("ETD")}</tr>
+    <tr>${th("Müşteri")}${th("Adet")}${th("Marka")}${th("Yükleme Durumu")}${th("Fatura")}${th("Dosya")}${th("ETD · Cut-off")}</tr>
     ${sevkiyatSatirlari}
   </table>
   <div style="margin-top:6px;font-size:11px;color:#94A3B8">Booking numaraları rapor sayfasında yer alır (aşağıdaki “Raporu uygulamada aç”).</div>
@@ -267,6 +315,7 @@ function mailKonusu(r: GunlukRapor, slot: Slot): string {
   const parcalar = [`${o.gunYuklenenKonteyner} konteyner yüklendi`];
   if (o.gunTamamlanan) parcalar.push(`${o.gunTamamlanan} sevkiyatın yüklemesi bitti`);
   parcalar.push(o.bekleyenKonteyner ? `${o.bekleyenKonteyner} konteyner yükleme bekliyor` : "bekleyen konteyner yok");
+  if (r.cutoffUyarilari.length) parcalar.push(`${r.cutoffUyarilari.length} cut-off uyarısı`);
   return `Güncel İhracat Raporu — ${tarihTR(r.tarih)} ${SLOT_KONU[slot]} | ${parcalar.join(" · ")}`;
 }
 

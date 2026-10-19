@@ -17,6 +17,10 @@
  * Durum: tum planlanan konteynerlerin DBA'si yuklendiyse "tamamlandi",
  * en az biri yuklendiyse "yukleniyor", hic yoksa "bekliyor" (ekranda
  * "Yukleme Baslamadi").
+ *
+ * Cut-off (19.10.2026): her sevkiyatta talimat ve beyanname cut-off'u (en erken
+ * rezervasyon degeri), kalan sure ve durum; tamamlanmamis + 48 saatten az kalan /
+ * gecen cut-off'lar `cutoffUyarilari` listesinde (sayfa ve mail uyari kutusu).
  */
 
 export type RaporDosyasi = {
@@ -29,6 +33,10 @@ export type RaporDosyasi = {
   fatura_no?: string | null;
   fatura_tarihi?: string | null;
   varis_limani?: string | null;
+  /** Cut-off "tamam" kurali icin (lib/cutoff-utils.ts talimatCutoffTamamMi / beyannameCutoffTamamMi ile AYNI). */
+  konsimento_dosya_url?: string | null;
+  draft_bl_dosya_url?: string | null;
+  beyanname_dosya_url?: string | null;
 };
 
 /** Sevkiyattaki tek konteyner (plaka / tonaj gosterimi icin). */
@@ -47,6 +55,9 @@ export type RaporRezervasyonu = {
   booking_no?: string | null;
   gemi_adi?: string | null;
   gemi_kalkis_tarihi?: string | null;
+  /** Ham deger: girilen YEREL saat "+00" etiketiyle saklanir (bkz. CLAUDE.md Cut-off). */
+  talimat_cutoff?: string | null;
+  beyanname_cutoff?: string | null;
 };
 
 export type RaporKonteyneri = {
@@ -100,6 +111,40 @@ export type SevkiyatSatiri = {
    */
   dolumBekleyen: number;
   ekipmanAlinmayan: number;
+  /** Talimat / beyanname cut-off durumu (19.10.2026). */
+  talimatCutoff: CutoffDurumu;
+  beyannameCutoff: CutoffDurumu;
+};
+
+/**
+ * Cut-off seviyesi (uygulamadaki CutoffSayac ile ayni esikler):
+ *   tamam   = ilgili belge yuklendi (sayac yok)
+ *   yok     = cut-off girilmemis
+ *   normal  = 48 saatten fazla var
+ *   yaklasiyor = 48 - 10 saat
+ *   kritik  = 10 saatten az
+ *   gecti   = suresi doldu, belge hala yok
+ */
+export type CutoffSeviyesi = "tamam" | "yok" | "normal" | "yaklasiyor" | "kritik" | "gecti";
+
+export type CutoffDurumu = {
+  tur: "Talimat" | "Beyanname";
+  /** "21.10.2026 10:00" (girildigi yerel saatle; saat dilimi kaydirmasi YOK) */
+  metin: string | null;
+  /** Kisa: "21.10 10:00" */
+  kisa: string | null;
+  seviye: CutoffSeviyesi;
+  /** "2 gün 5 sa kaldı" / "Süresi geçti" / tamamda "Draft BL alındı" */
+  aciklama: string;
+  /** Kalan sure (ms); girilmemisse null. Tamamlansa da hesaplanir (siralama icin). */
+  kalanMs: number | null;
+};
+
+/** Raporun uyari kutusu: tamamlanmamis ve 48 saatten az kalmis / gecmis cut-off'lar. */
+export type CutoffUyarisi = {
+  dosya_no: string;
+  musteri: string;
+  durum: CutoffDurumu;
 };
 
 export type YuklenenKonteyner = {
@@ -119,6 +164,8 @@ export type GunlukRapor = {
   tarih: string;
   sevkiyatlar: SevkiyatSatiri[];
   gunYuklenenler: YuklenenKonteyner[];
+  /** En acil once. Bos = uyari kutusu gosterilmez. */
+  cutoffUyarilari: CutoffUyarisi[];
   ozet: {
     gunYuklenenKonteyner: number;
     gunYuklenenNetKg: number;
@@ -198,6 +245,64 @@ function sevkiyatMarkasi(dosya: RaporDosyasi, konteynerler: RaporKonteyneri[]): 
 
 const DURUM_SIRASI: Record<SevkiyatDurumu, number> = { tamamlandi: 0, yukleniyor: 1, bekliyor: 2 };
 
+// ------------------------------------------------------------- cut-off ---
+const TURKIYE_UTC_OFSET_MS = 3 * 60 * 60 * 1000;
+const SAAT_MS = 60 * 60 * 1000;
+export const CUTOFF_YAKLASIYOR_SAAT = 48;
+export const CUTOFF_KRITIK_SAAT = 10;
+
+/**
+ * Ham cut-off degerini ("2026-10-21T22:30:00+00:00") girildigi YEREL saatle
+ * ayristirir. new Date(...) KULLANILMAZ: deger yerel saatin "+00" etiketiyle
+ * saklanmis halidir, cevirmek 21:00 sonrasini ertesi gune kaydirir
+ * (lib/cutoff-utils.ts cutoffZamanMs ile ayni kural).
+ */
+export function cutoffAyristir(deger: string | null | undefined): { yil: number; ay: number; gun: number; saat: number; dakika: number } | null {
+  const m = String(deger || "").match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  return { yil: +m[1], ay: +m[2], gun: +m[3], saat: m[4] ? +m[4] : 23, dakika: m[5] ? +m[5] : 59 };
+}
+
+const iki = (n: number) => String(n).padStart(2, "0");
+
+/** "2 gün 5 sa" / "5 sa 20 dk" / "40 dk" */
+export function kalanSureMetni(ms: number): string {
+  const dk = Math.max(0, Math.floor(ms / 60000));
+  const gun = Math.floor(dk / 1440);
+  const sa = Math.floor((dk % 1440) / 60);
+  const kalanDk = dk % 60;
+  if (gun > 0) return sa ? `${gun} gün ${sa} sa` : `${gun} gün`;
+  if (sa > 0) return kalanDk ? `${sa} sa ${kalanDk} dk` : `${sa} sa`;
+  return `${kalanDk} dk`;
+}
+
+/**
+ * @param tamamMetni belge yuklendiyse gosterilecek metin (null = tamam degil)
+ * @param simdiMs    raporun olusturuldugu an (Date.now())
+ */
+export function cutoffDurumu(tur: CutoffDurumu["tur"], deger: string | null | undefined, tamamMetni: string | null, simdiMs: number): CutoffDurumu {
+  const p = cutoffAyristir(deger);
+  if (!p) {
+    return { tur, metin: null, kisa: null, seviye: tamamMetni ? "tamam" : "yok", aciklama: tamamMetni || "Girilmedi", kalanMs: null };
+  }
+  const metin = `${iki(p.gun)}.${iki(p.ay)}.${p.yil} ${iki(p.saat)}:${iki(p.dakika)}`;
+  const kisa = `${iki(p.gun)}.${iki(p.ay)} ${iki(p.saat)}:${iki(p.dakika)}`;
+  const kalanMs = Date.UTC(p.yil, p.ay - 1, p.gun, p.saat, p.dakika) - TURKIYE_UTC_OFSET_MS - simdiMs;
+  if (tamamMetni) return { tur, metin, kisa, seviye: "tamam", aciklama: tamamMetni, kalanMs };
+  if (kalanMs <= 0) return { tur, metin, kisa, seviye: "gecti", aciklama: "Süresi geçti", kalanMs };
+  const seviye: CutoffSeviyesi = kalanMs < CUTOFF_KRITIK_SAAT * SAAT_MS ? "kritik" : kalanMs < CUTOFF_YAKLASIYOR_SAAT * SAAT_MS ? "yaklasiyor" : "normal";
+  return { tur, metin, kisa, seviye, aciklama: `${kalanSureMetni(kalanMs)} kaldı`, kalanMs };
+}
+
+/** Rezervasyonlarin EN ERKEN cut-off degeri (ayni dosyada farkli rezervasyon olursa en acili). */
+function enErkenCutoff(rezler: RaporRezervasyonu[], alan: "talimat_cutoff" | "beyanname_cutoff"): string | null {
+  const degerler = rezler.map((r) => r[alan]).filter((v): v is string => !!cutoffAyristir(v));
+  return degerler.sort((a, b) => a.slice(0, 16).localeCompare(b.slice(0, 16)))[0] || null;
+}
+
+/** Uyari kutusuna girer mi: tamamlanmamis ve 48 saatten az kalmis ya da gecmis. */
+export const cutoffUyarisiMi = (c: CutoffDurumu) => c.seviye === "gecti" || c.seviye === "kritik" || c.seviye === "yaklasiyor";
+
 /**
  * @param tarih       rapor gunu (YYYY-MM-DD, Istanbul)
  * @param acikDosyalar ACIK ihracat dosyalari
@@ -213,7 +318,9 @@ export function gunlukRaporHesapla(
   acikDosyalar: RaporDosyasi[],
   rezervasyonlar: RaporRezervasyonu[],
   konteynerler: RaporKonteyneri[],
-  dosyaBilgisi: RaporDosyasi[] = []
+  dosyaBilgisi: RaporDosyasi[] = [],
+  /** Cut-off kalan sureleri icin "simdi" (test edilebilsin diye parametre). */
+  simdiMs: number = Date.now()
 ): GunlukRapor {
   const tekil = new Map<string, RaporKonteyneri>();
   for (const k of konteynerler) tekil.set(k.id, k);
@@ -262,6 +369,14 @@ export function gunlukRaporHesapla(
       varisLimani: d.varis_limani?.trim() ? d.varis_limani.trim().toLocaleUpperCase("en-US") : null,
       dolumBekleyen: Math.max(0, kendi.length - yuklenenler.length),
       ekipmanAlinmayan: Math.max(0, konteynerAdedi - kendi.length),
+      // Tamam kurali uygulamayla ayni: talimat = konsimento talimati VEYA Draft BL; beyanname = beyanname dosyasi
+      talimatCutoff: cutoffDurumu(
+        "Talimat",
+        enErkenCutoff(rezler, "talimat_cutoff"),
+        d.konsimento_dosya_url ? "Talimat gönderildi" : d.draft_bl_dosya_url ? "Draft BL alındı" : null,
+        simdiMs
+      ),
+      beyannameCutoff: cutoffDurumu("Beyanname", enErkenCutoff(rezler, "beyanname_cutoff"), d.beyanname_dosya_url ? "Beyanname yüklendi" : null, simdiMs),
     });
   }
   sevkiyatlar.sort(
@@ -291,10 +406,15 @@ export function gunlukRaporHesapla(
     })
     .sort((a, b) => a.saat.localeCompare(b.saat) || a.konteyner_no.localeCompare(b.konteyner_no));
 
+  const cutoffUyarilari: CutoffUyarisi[] = sevkiyatlar
+    .flatMap((s) => [s.talimatCutoff, s.beyannameCutoff].filter(cutoffUyarisiMi).map((durum) => ({ dosya_no: s.dosya_no, musteri: s.musteri, durum })))
+    .sort((a, b) => (a.durum.kalanMs ?? 0) - (b.durum.kalanMs ?? 0) || a.dosya_no.localeCompare(b.dosya_no) || a.durum.tur.localeCompare(b.durum.tur));
+
   return {
     tarih,
     sevkiyatlar,
     gunYuklenenler,
+    cutoffUyarilari,
     ozet: {
       gunYuklenenKonteyner: gunYuklenenler.length,
       gunYuklenenNetKg: gunYuklenenler.reduce((t, k) => t + (k.net || 0), 0),

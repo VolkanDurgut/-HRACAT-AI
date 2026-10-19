@@ -12,6 +12,7 @@ import {
   RaporKonteyneri,
   RaporRezervasyonu,
   SevkiyatSatiri,
+  CutoffDurumu,
   durumRozetMetni,
   ekipmanOzetMetni,
   acikMusteriSatirlari,
@@ -69,6 +70,64 @@ function EkipmanCubugu({ s }: { s: SevkiyatSatiri }) {
         {s.ekipmanAlinmayan > 0 && <div style={{ width: yuzde(s.ekipmanAlinmayan), backgroundColor: "#CBD5E1" }} />}
       </div>
       <p className="text-[10px] text-slate-600 mt-0.5 whitespace-nowrap">{metin}</p>
+    </div>
+  );
+}
+
+/** Cut-off seviyesine gore [yazi, zemin] (uygulamadaki sayacla ayni esikler; mail ile ayni renkler). */
+const CUTOFF_RENK: Record<CutoffDurumu["seviye"], [string, string]> = {
+  tamam: [YESIL, "#D1FAE5"],
+  yok: ["#94A3B8", "transparent"],
+  normal: ["#475569", "transparent"],
+  yaklasiyor: [AMBER, "#FEF3C7"],
+  kritik: ["#B91C1C", "#FEE2E2"],
+  gecti: ["#B91C1C", "#FEE2E2"],
+};
+
+function CutoffSatiri({ c }: { c: CutoffDurumu }) {
+  const [renk, zemin] = CUTOFF_RENK[c.seviye];
+  const vurgulu = c.seviye === "yaklasiyor" || c.seviye === "kritik" || c.seviye === "gecti";
+  return (
+    <div className="mt-1 text-[10px] leading-snug whitespace-nowrap">
+      <span className="text-slate-500">{c.tur}</span> <span className="font-semibold text-slate-800">{c.kisa || "—"}</span>
+      <br />
+      {vurgulu ? (
+        <span className="inline-block px-1.5 rounded-full font-bold" style={{ backgroundColor: zemin, color: renk }}>{c.aciklama}</span>
+      ) : (
+        <span className={c.seviye === "tamam" ? "font-semibold" : ""} style={{ color: renk }}>{c.seviye === "tamam" ? `✔ ${c.aciklama}` : c.aciklama}</span>
+      )}
+    </div>
+  );
+}
+
+/** Ozetin altinda: belgesi yuklenmemis, 48 saatten az kalan / gecen cut-off'lar. */
+function CutoffUyariKutusu({ rapor, olusturma }: { rapor: GunlukRapor; olusturma: string }) {
+  if (!rapor.cutoffUyarilari.length) return null;
+  const acil = rapor.cutoffUyarilari.some((u) => u.durum.seviye === "kritik" || u.durum.seviye === "gecti");
+  const [cerceve, zemin, baslikRenk] = acil ? ["#DC2626", "#FEF2F2", "#B91C1C"] : ["#D97706", "#FFFBEB", "#B45309"];
+  return (
+    <div className="mb-6 rounded px-3 py-2 sayfa-boleme" style={{ border: `1px solid ${cerceve}`, borderLeft: `4px solid ${cerceve}`, backgroundColor: zemin }}>
+      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: baslikRenk }}>
+        Cut-off Uyarısı ({rapor.cutoffUyarilari.length}){" "}
+        <span className="font-normal normal-case tracking-normal text-slate-500">· {olusturma} itibarıyla · belgesi yüklenmemiş, 48 saatten az kalan / geçen</span>
+      </p>
+      <table className="w-full mt-1 text-xs">
+        <tbody>
+          {rapor.cutoffUyarilari.map((u) => {
+            const [renk, z] = CUTOFF_RENK[u.durum.seviye];
+            return (
+              <tr key={`${u.dosya_no}-${u.durum.tur}`}>
+                <td className="py-0.5 pr-2 font-bold text-slate-800 whitespace-nowrap">{u.durum.tur}</td>
+                <td className="py-0.5 pr-2 text-slate-800">{u.musteri} <span className="text-slate-500 text-[11px]">({u.dosya_no})</span></td>
+                <td className="py-0.5 pr-2 text-slate-800 whitespace-nowrap">{u.durum.metin || "—"}</td>
+                <td className="py-0.5 text-right whitespace-nowrap">
+                  <span className="inline-block px-2 rounded-full text-[11px] font-bold" style={{ backgroundColor: z, color: renk }}>{u.durum.aciklama}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -136,7 +195,7 @@ export default function GunlukRaporSayfasi() {
 
     const { data: acikDosyalar, error: e1 } = await supabase
       .from("ihracat_dosyalari")
-      .select("id, dosya_no, alici_firma, marka, fatura_dosya_url, fatura_no, fatura_tarihi, varis_limani")
+      .select("id, dosya_no, alici_firma, marka, fatura_dosya_url, fatura_no, fatura_tarihi, varis_limani, konsimento_dosya_url, draft_bl_dosya_url, beyanname_dosya_url")
       .eq("company_id", companyId)
       .or("durum.eq.Açık,durum.eq.Acik");
     const acikIdler = (acikDosyalar || []).map((d) => d.id);
@@ -147,7 +206,7 @@ export default function GunlukRaporSayfasi() {
     // JS'te atanir (belge ertesi gun yuklense bile dogru gune duser).
     const [rezSonuc, acikKontSonuc, dbaKontSonuc] = await Promise.all([
       acikIdler.length
-        ? supabase.from("rezervasyonlar").select("dosya_id, konteyner_adedi, booking_no, gemi_adi, gemi_kalkis_tarihi").eq("company_id", companyId).in("dosya_id", acikIdler)
+        ? supabase.from("rezervasyonlar").select("dosya_id, konteyner_adedi, booking_no, gemi_adi, gemi_kalkis_tarihi, talimat_cutoff, beyanname_cutoff").eq("company_id", companyId).in("dosya_id", acikIdler)
         : Promise.resolve({ data: [], error: null }),
       acikIdler.length
         ? supabase.from("konteynerler").select(kolonlar).eq("company_id", companyId).in("dosya_id", acikIdler)
@@ -179,7 +238,8 @@ export default function GunlukRaporSayfasi() {
         (acikDosyalar || []) as RaporDosyasi[],
         (rezSonuc.data || []) as RaporRezervasyonu[],
         [...acikKont, ...((dbaKontSonuc.data || []) as RaporKonteyneri[])],
-        digerDosyalar
+        digerDosyalar,
+        Date.now()
       )
     );
 
@@ -268,6 +328,9 @@ export default function GunlukRaporSayfasi() {
             ))}
           </div>
 
+          {/* CUT-OFF UYARISI (sadece gerektiginde) */}
+          <CutoffUyariKutusu rapor={rapor} olusturma={olusturmaZamani} />
+
           {/* GUN YUKLENENLER */}
           <div className="mb-6">
             <Baslik>{gunEtiketi} Yüklenen Konteynerler</Baslik>
@@ -317,7 +380,7 @@ export default function GunlukRaporSayfasi() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr style={{ backgroundColor: LACIVERT }}>
-                    {["Müşteri", "Adet", "Marka", "Yükleme Durumu", "Fatura", "Dosya / Booking", "ETD"].map((b, i) => (
+                    {["Müşteri", "Adet", "Marka", "Yükleme Durumu", "Fatura", "Dosya / Booking", "ETD · Cut-off"].map((b, i) => (
                       <th key={b} className={`py-2 ${i === 0 ? "pl-3" : ""} pr-2 font-semibold text-white text-[10px] uppercase tracking-wide ${i === 1 ? "text-center" : "text-left"}`}>{b}</th>
                     ))}
                   </tr>
@@ -339,7 +402,11 @@ export default function GunlukRaporSayfasi() {
                       </td>
                       <td className="py-1.5 pr-2"><FaturaRozeti s={s} /></td>
                       <td className="py-1.5 pr-2 text-[11px] text-slate-500 whitespace-nowrap leading-tight">{s.dosya_no}{s.booking ? <><br />{s.booking}</> : null}</td>
-                      <td className="py-1.5 pr-3 text-[11px] text-slate-500 whitespace-nowrap">{tarihKisa(s.etd)}</td>
+                      <td className="py-1.5 pr-3 text-[11px] text-slate-500 whitespace-nowrap align-top">
+                        ETD <span className="font-semibold text-slate-800">{tarihKisa(s.etd)}</span>
+                        <CutoffSatiri c={s.talimatCutoff} />
+                        <CutoffSatiri c={s.beyannameCutoff} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

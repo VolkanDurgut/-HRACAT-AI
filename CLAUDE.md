@@ -742,6 +742,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   gönderim gerekirse yetkili kullanıcı oturumuyla çağrılır. Cron saatleri
   değişirse `SLOT_TR_SAATI` de BİRLİKTE güncellenir. Süper admin listesi
   `SUPER_ADMIN_EPOSTALARI` (auth-context + RLS ile aynı).
+- CUT-OFF (19.10.2026, kullanıcı isteği; edge function v16): sayfa ve 3 mailde
+  sevkiyat tablosunun son sütunu "ETD · Cut-off" — ETD + Talimat ve Beyanname
+  cut-off'u (dd.mm ss:dd, girildiği YEREL saatle; `cutoffAyristir` new Date
+  KULLANMAZ) ve durumu. Kural uygulamayla AYNI: talimat tamam = konşimento
+  talimatı VEYA Draft BL ("✔ Draft BL alındı"), beyanname tamam = beyanname
+  dosyası. Eşikler `CutoffSayac` ile aynı (>48 sa normal, 48–10 amber, <10
+  kırmızı, geçmiş "Süresi geçti"). Birden fazla rezervasyonda EN ERKEN değer.
+  Özet kutularının altında "Cut-off Uyarısı (n)" kutusu SADECE belgesi
+  yüklenmemiş ve 48 saatten az kalan / geçen cut-off varsa (en acil önce); mail
+  konusuna "· n cut-off uyarısı". Kalan süre GÖNDERİM / sayfa açılış anına göre
+  (sabah raporu dünü özetler ama cut-off güncel). Hesap `_shared/gunluk-rapor.ts`
+  (`cutoffDurumu`, `cutoffUyarilari`; `gunlukRaporHesapla(..., simdiMs)`).
+  Sorgular: dosyada `konsimento_dosya_url, draft_bl_dosya_url,
+  beyanname_dosya_url`, rezervasyonda `talimat_cutoff, beyanname_cutoff`.
+  Booking no mailde hâlâ YOK.
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

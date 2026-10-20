@@ -91,8 +91,14 @@ $sifreli = [Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.
 [IO.File]::WriteAllBytes((Join-Path $Hedef 'anahtar.dat'), $sifreli)
 $anahtar = $null
 # İzinler: devralma kapalı; yalnızca SYSTEM (S-1-5-18) ve Yöneticiler (S-1-5-32-544) - SID ile (Türkçe Windows'ta grup adları farklı)
-$icacls = & icacls.exe $Hedef /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' /T /Q 2>&1
+# Önce SADECE klasör (OI/CI bayrakları dosyaya uygulanınca dosya izinsiz kalıyordu), sonra içindekiler klasörden devralır.
+$icacls = & icacls.exe $Hedef /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' /Q 2>&1
 if ($LASTEXITCODE -ne 0) { Dur "Klasör izinleri ayarlanamadı: $icacls" }
+$icacls = & icacls.exe (Join-Path $Hedef '*') /reset /T /Q 2>&1
+if ($LASTEXITCODE -ne 0) { Dur "Dosya izinleri ayarlanamadı: $icacls" }
+foreach ($f in 'dba-ajan.ps1', 'ayar.json', 'anahtar.dat') {
+    try { [void][IO.File]::ReadAllBytes((Join-Path $Hedef $f)) } catch { Dur "$f okunamıyor (izin): $($_.Exception.Message)" }
+}
 Tamam "Kuruldu: dba-ajan.ps1, ayar.json (başlangıç $baslangic), anahtar.dat (şifreli); izinler yalnızca SYSTEM + Yöneticiler"
 
 Baslik '4/5 Görev Zamanlayıcı'

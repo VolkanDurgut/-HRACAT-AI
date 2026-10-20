@@ -48,6 +48,9 @@ const TABLO_SIRASI = [
   "sevkiyatlar",
   "rezervasyonlar",
   "konteynerler",
+  // DBA otomatik yukleme (20.10.2026): kayitlar cihaza ve konteynere bagli -> konteynerlerden sonra
+  "kantar_cihazlari",
+  "dba_otomatik_kayitlari",
   "dosya_evraklari",
   "acente_teklifleri",
   "kullanici_rolleri",

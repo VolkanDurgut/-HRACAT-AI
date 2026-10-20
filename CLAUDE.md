@@ -1303,6 +1303,47 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   korunur (`VARSAYILAN_ILETISIM`; form gönderildiği haliyle açılır). Yeni
   formlar panel ayarından (bbt@) gelir.
 
+## DBA Otomatik Yükleme (20.10.2026)
+
+- Kılavuz: `docs/kantar-dba-otomatik.md`. Solas (kantar PC, DESKTOP-61P8TC5, Win10 Pro
+  22H2) DBA'yı `C:\Truck Scale\DBA\<12 hane belge no>_<yükleten>.pdf` olarak yazar
+  (belge no = kantar no 2587 + yıl + sıra). Dosya adında konteyner no YOK; PDF'in
+  içinde (JasperReports, GERÇEK METİN katmanı).
+- Kantar PC görevi `scripts/kantar-dba/dba-ajan.ps1` (Görev Zamanlayıcı, SYSTEM, her
+  dakika; PS 5.1 uyumlu, SADECE ASCII). İş kuralı İÇERMEZ; PDF'i edge function
+  `dba-otomatik`e gönderir (verify_jwt KAPALI; yetki `x-cihaz-anahtari`, DB'de sadece
+  SHA-256 özeti, `kantar_cihazlari`). Solas klasörüne YAZMAZ. Durum `C:\UnexDBA\durum.json`,
+  anahtar DPAPI LocalMachine `anahtar.dat`, klasör izni SYSTEM + Yöneticiler (SID ile).
+  Kurulum `kurulum.ps1` (önce sunucuyla dener, sonra kurar), kaldırma `kaldir.ps1`.
+- PDF okuma `supabase/functions/_shared/dba-metin.ts` (saf TS, YAPAY ZEKÂ YOK): unpdf
+  metni etiketleri ayrı / değerleri ayrı bloklarda verir → KONUMA göre (aynı satır,
+  sağ sütun) eşlenir. Çift kontrol: sayfada tek ISO 6346 geçerli konteyner no, belge no
+  = dosya adı, kantar no + Unex VKN, ağırlık tutarlılığı, plaka biçimi. Şüphede
+  "okunamadi" (elle yüklenir). pdf.js aldığı ArrayBuffer'ı detach eder → okuyucuya KOPYA.
+- Karar TEK YERDE (migration `20261020100000_dba_otomatik_yukleme.sql`):
+  `dba_otomatik_esles` → `dba_otomatik_degerlendir` (yazmaz) → canlıda PDF depoya
+  (elle yüklemeyle aynı yol `dba/<dosya_id>/<konteyner>_<ms>.pdf`) → `dba_otomatik_uygula`
+  (satır FOR UPDATE, koşullar yeniden, `dba_dosya_url is null` koşullu yazım; olmazsa
+  PDF geri silinir). ASLA üzerine yazmaz. `konteynerler (company_id, dba_belge_no)` TEKİL
+  indeks (aynı DBA iki konteynere yazılamaz). Denetim kaydında `degistiren_email =
+  dba-otomatik`. `dba_kontrol_sonucu.kaynak = 'otomatik'` (panelde "Oto" rozeti).
+- `kantar_cihazlari.canli = false` = DENEME MODU (okur/eşleştirir/kaydeder, konteynere ve
+  depoya YAZMAZ). Canlıya geçiş/geri alma tek UPDATE; acil durdurma `aktif = false`.
+- Durumlar (`dba_otomatik_kayitlari`, belge başına tek satır): yuklendi, eslesti (deneme),
+  zaten_yuklu, beklemede (10 dk'da bir, 72 saat), eslesmedi, cakisma (30 dk, 72 saat),
+  okunamadi, yoksayildi. "yuklendi/eslesti" sonradan "zaten_yuklu"ya düşürülmez.
+  Görev `tekrar_dk`'ya uyar (null = bir daha gönderme); ağ/5xx hatasında 2/5/10/30 dk.
+- Kantar Paneli `components/kantar-dba-otomasyon.tsx`: `kantar_dba_otomasyon_durumu()` +
+  `dba_otomatik_yoksay()` (kantar yetkisi + kendi şirketi). Cihaz yoksa / fonksiyon yoksa
+  HİÇBİR ŞEY göstermez. Tablolar istemciye kapalı (sadece bu iki RPC).
+- `x-islem: dogrulama` (cihaz anahtarıyla, SALT OKUNUR): kayıtlı DBA PDF'lerini okuyup
+  sistemdeki değerlerle karşılaştırır (`?bas=0&adet=10`).
+- Yedek: iki tablo `YEDEKLENECEK_TABLOLAR` + geri yükleme `TABLO_SIRASI`'nda.
+- Testler (scratchpad): okuyucu 22 senaryo (3 gerçek DBA + 5 DBA olmayan PDF + 13 bozuk),
+  SQL 49 kontrol + eşzamanlılık, edge function 37 (yerel PG + Node), görev 26 (pwsh 7,
+  tr-TR kültürü). Windows'a özel kısımlar (DPAPI, Görev Zamanlayıcı, icacls) sadece
+  ayrıştırıcıyla kontrol edildi; kurulum betiği her adımı doğrulayıp raporlar.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

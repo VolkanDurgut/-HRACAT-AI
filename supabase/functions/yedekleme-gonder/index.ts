@@ -85,6 +85,9 @@ const YEDEKLENECEK_TABLOLAR = [
   // Proforma olusturucu - musteri kartlari / urun kutuphanesi (17.10.2026)
   "ihracat_musterileri",
   "ihracat_urunleri",
+  // DBA otomatik yukleme - kantar cihazlari (anahtarin SADECE SHA-256 ozeti) ve belge kayitlari (20.10.2026)
+  "kantar_cihazlari",
+  "dba_otomatik_kayitlari",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

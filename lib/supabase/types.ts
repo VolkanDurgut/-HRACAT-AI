@@ -223,6 +223,9 @@ export type DbaKontrolSonucu = {
   yuklenecegi_yer: string;
   net_agirlik_kg: number;
   uyusmazliklar: string[];
+  /** 20.10.2026: "otomatik" = kantar bilgisayarindan (dba-otomatik, metin okuma); yoksa elle (yapay zeka). */
+  kaynak?: "otomatik";
+  okuma?: "metin";
 };
 
 // Konsimento kontrol sonucu tipi

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { KantarYurtIci } from "@/components/kantar-yurt-ici";
+import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
@@ -24,7 +25,7 @@ type KonteynerRow = {
   dba_dosya_url: string | null;
   dba_dosya_adi: string | null;
   dba_yukleme_tarihi: string | null;
-  dba_kontrol_sonucu: { uyusmazliklar?: string[] } | null;
+  dba_kontrol_sonucu: { uyusmazliklar?: string[]; kaynak?: string } | null;
   dba_belge_no: string | null;
   irsaliye_dosya_url: string | null;
   irsaliye_dosya_adi: string | null;
@@ -67,9 +68,11 @@ export default function KantarPage() {
   // ustte bolume atlama dugmeleri. Ihracat akisinin icerigi DEGISMEDI.
   const [yurtIciAcik, setYurtIciAcik] = useState<number | null>(null);
   const [yurtIciYenile, setYurtIciYenile] = useState(0);
+  // Otomatik DBA (20.10.2026): durum seridi; Yenile'de ve canli degisiklikte tazelenir
+  const [dbaOtoYenile, setDbaOtoYenile] = useState(0);
   const ihracatRef = useRef<HTMLElement>(null);
   const yurtIciRef = useRef<HTMLElement>(null);
-  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); };
+  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); setDbaOtoYenile((n) => n + 1); };
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -167,6 +170,7 @@ export default function KantarPage() {
       .channel("kantar-konteynerler")
       .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler", filter: `company_id=eq.${companyId}` }, () => {
         fetchKonteynerler();
+        setDbaOtoYenile((n) => n + 1);
       })
       .subscribe((durum) => {
         if (durum === "SUBSCRIBED") {
@@ -410,6 +414,9 @@ export default function KantarPage() {
           </div>
         </div>
 
+        {/* Otomatik DBA durumu + elle kontrol gereken belgeler (cihaz tanimli degilse gorunmez) */}
+        <KantarDbaOtomasyon yenileTetik={dbaOtoYenile} />
+
         {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
         <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
           
@@ -570,9 +577,12 @@ export default function KantarPage() {
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <span title={uyusmazlik ? "Uyuşmazlık var" : "Onaylı"}>
+                              <span title={uyusmazlik ? "Uyuşmazlık var" : k.dba_kontrol_sonucu?.kaynak === "otomatik" ? "Onaylı · kantar bilgisayarından otomatik yüklendi" : "Onaylı"}>
                                 {uyusmazlik ? <AlertTriangle size={15} className="text-amber-400" /> : <CheckCircle2 size={15} className="text-emerald-400" />}
                               </span>
+                              {k.dba_kontrol_sonucu?.kaynak === "otomatik" && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-sky-500/10 text-sky-400" title="Kantar bilgisayarından otomatik yüklendi">Oto</span>
+                              )}
                               {k.dba_dosya_url && (
                                 <a href={k.dba_dosya_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} title="DBA Belgesini Gör">
                                   <FileText size={13} />

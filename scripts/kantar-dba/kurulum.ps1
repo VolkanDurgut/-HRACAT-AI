@@ -36,7 +36,7 @@ if (-not $kimlik.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator
 }
 Tamam 'Yönetici yetkisi var'
 if (-not (Test-Path -LiteralPath $SolasKlasoru)) { Dur "Solas klasörü bulunamadı: $SolasKlasoru" }
-$ornek = @(Get-ChildItem -LiteralPath $SolasKlasoru -File -Filter '*.pdf' | Where-Object { $_.Name -match '^\d{12}_.+\.pdf$' })
+$ornek = @(Get-ChildItem -LiteralPath $SolasKlasoru -File -Filter '*.pdf' | Where-Object { $_.Name -match '^\d{12}_.*\.pdf$' })
 Tamam "Solas klasörü: $SolasKlasoru ($($ornek.Count) DBA dosyası)"
 $kaynak = Join-Path $PSScriptRoot 'dba-ajan.ps1'
 if (-not (Test-Path -LiteralPath $kaynak)) { Dur "dba-ajan.ps1 bu klasörde yok: $PSScriptRoot" }

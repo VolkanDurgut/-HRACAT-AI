@@ -61,6 +61,13 @@ const ETIKETLER = {
 } as const;
 type EtiketAnahtari = keyof typeof ETIKETLER;
 
+/**
+ * Degeri BOS olabilen alanlar. "Yukleten Unvan": Eylul 2026 belgelerinin 32'sinde
+ * operator bos birakmis (canli dogrulama 20.10.2026; yapay zeka 5'ine yanlislikla
+ * liman adini yazmisti). Eslestirmede kullanilmaz, sadece bilgi.
+ */
+const BOS_OLABILIR: ReadonlySet<EtiketAnahtari> = new Set<EtiketAnahtari>(["yukleten"]);
+
 const BASLIK = "KONTEYNER DOĞRULANMIŞ BRÜT AĞIRLIK BELGESİ";
 /** Etiket ile degerin y farki (pt). Sablonda satirlar ~17 pt arali, ayni satir farki <= 4 pt. */
 const SATIR_TOLERANSI = 6;
@@ -124,7 +131,13 @@ export function dbaAlanlariniOku(
     const adaylar = p
       .filter((x) => x.x >= e.x + SUTUN_ARALIGI && Math.abs(x.y - e.y) <= SATIR_TOLERANSI)
       .sort((a, b) => Math.abs(a.y - e.y) - Math.abs(b.y - e.y) || a.x - b.x);
-    if (adaylar.length === 0) return { tamam: false, hata: `"${etiket}" alanının değeri okunamadı.` };
+    if (adaylar.length === 0) {
+      if (BOS_OLABILIR.has(anahtar)) {
+        oku[anahtar] = "";
+        continue;
+      }
+      return { tamam: false, hata: `"${etiket}" alanının değeri okunamadı.` };
+    }
     // Ayni satirda birden fazla parca varsa (uzun unvan bolunmus olabilir) soldan saga birlestir
     const satirY = adaylar[0].y;
     oku[anahtar] = sade(
@@ -191,7 +204,7 @@ export function dbaAlanlariniOku(
   const yukleten = oku.yukleten || "";
   const kantarUnvan = oku.kantarUnvan || "";
   const yer = oku.yer || "";
-  if (!yukleten || !kantarUnvan || !yer) return { tamam: false, hata: "Yükleten / kantar firması / liman alanlarından biri boş." };
+  if (!kantarUnvan || !yer) return { tamam: false, hata: "Kantar firması / liman alanlarından biri boş." };
 
   return {
     tamam: true,

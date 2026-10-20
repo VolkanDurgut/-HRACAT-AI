@@ -1339,9 +1339,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - `x-islem: dogrulama` (cihaz anahtarıyla, SALT OKUNUR): kayıtlı DBA PDF'lerini okuyup
   sistemdeki değerlerle karşılaştırır (`?bas=0&adet=10`).
 - Yedek: iki tablo `YEDEKLENECEK_TABLOLAR` + geri yükleme `TABLO_SIRASI`'nda.
-- Testler (scratchpad): okuyucu 22 senaryo (3 gerçek DBA + 5 DBA olmayan PDF + 13 bozuk),
-  SQL 49 kontrol + eşzamanlılık, edge function 37 (yerel PG + Node), görev 26 (pwsh 7,
-  tr-TR kültürü). Windows'a özel kısımlar (DPAPI, Görev Zamanlayıcı, icacls) sadece
+- "Yükleten Ünvan" BOŞ olabilir (`BOS_OLABILIR`): Eylül belgelerinin 32'sinde operatör boş
+  bırakmış; yapay zekâ 5'ine liman adı yazmıştı. Boşsa Solas dosyayı `<12 hane>_.pdf`
+  adlandırır → görev deseni `^\d{12}_.*\.pdf$` (görev v1.0.1).
+- CANLI DOĞRULAMA (20.10.2026, edge function v2, `dogrulama`): kayıtlı 174 DBA'nın 174'ü
+  okundu; konteyner no / plaka / dara / VGM / tartım / payload / araç boş 174'ünde birebir;
+  tek fark 5 belgede yapay zekânın yanlış yükleteni. 18 eşzamanlı istekte platform 7'sine
+  503 BOOT_ERROR verdi (kod hatası değil; görev tek tek gönderir, 503'te 2 dk sonra dener).
+  Doğrulamada kullanılan ilk anahtar sohbette paylaşıldığı için İPTAL edildi
+  (`aktif=false`); kantar PC için yeni anahtar üretildi. `yedekleme-gonder` v14: 31 tablo,
+  geri yükleme testi 29/29.
+- Testler (scratchpad): okuyucu 25 kontrol (3 gerçek DBA + 5 DBA olmayan PDF + 13 bozuk +
+  yükleten boş), SQL 49 kontrol + eşzamanlılık, edge function 32 (yerel PG + Node), görev 25
+  (pwsh 7, tr-TR kültürü). Windows'a özel kısımlar (DPAPI, Görev Zamanlayıcı, icacls) sadece
   ayrıştırıcıyla kontrol edildi; kurulum betiği her adımı doğrulayıp raporlar.
 
 ## Genel çalışma prensibi

@@ -1,9 +1,10 @@
 #Requires -Version 5.1
 # ============================================================================
-# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.0.0
+# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.0.1
 # ============================================================================
 # Windows Gorev Zamanlayici her dakika calistirir (SYSTEM hesabi, pencere yok).
 # Solas'in C:\Truck Scale\DBA klasorune yazdigi "<12 hane>_<yukleten>.pdf"
+# (yukleten bos birakilirsa "<12 hane>_.pdf")
 # dosyalarini sunucuya (edge function dba-otomatik) gonderir. Butun kararlari
 # SUNUCU verir; bu betik is kurali icermez.
 #
@@ -26,7 +27,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
-$SURUM = '1.0.0'
+$SURUM = '1.0.1'
 $AZAMI_DOSYA_ISTEK = 15          # bir calismada en fazla gonderilecek belge
 $AZAMI_CALISMA_SN = 480          # 8 dk (gorev zaman siniri 10 dk)
 $KARARLILIK_SN = 15              # Solas yazmayi bitirsin diye son degisiklikten sonra beklenen sure
@@ -155,7 +156,7 @@ try {
   $anahtarGecersiz = $false
 
   $adaylar = @(Get-ChildItem -LiteralPath $klasor -File -Filter '*.pdf' -ErrorAction Stop |
-    Where-Object { $_.Name -match '^\d{12}_.+\.pdf$' -and $_.LastWriteTime -ge $esik } |
+    Where-Object { $_.Name -match '^\d{12}_.*\.pdf$' -and $_.LastWriteTime -ge $esik } |
     Sort-Object LastWriteTime)
 
   foreach ($f in $adaylar) {

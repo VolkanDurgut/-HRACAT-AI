@@ -29,7 +29,7 @@ type Sorun = {
 type Durum = { cihazlar: Cihaz[]; bugun: { yuklendi: number; eslesti: number; zaten_yuklu: number }; sorunlar: Sorun[] };
 
 const DURUM_ETIKETI: Record<Sorun["durum"], { metin: string; sinif: string; ipucu: string }> = {
-  beklemede: { metin: "Konteyner bekleniyor", sinif: "bg-amber-500/10 text-amber-400", ipucu: "Konteyner henüz açık bir dosyaya eklenmemiş. Eklenince belge otomatik yüklenir (72 saat boyunca denenir)." },
+  beklemede: { metin: "Konteyner bekleniyor", sinif: "bg-amber-500/10 text-amber-400", ipucu: "Konteyner henüz açık bir dosyaya eklenmemiş. Konteyner eklendikten sonra 1–2 dakika içinde belge otomatik yüklenir; elle yüklemeye gerek yok (72 saat beklenir)." },
   eslesmedi: { metin: "Eşleşmedi", sinif: "bg-red-500/10 text-red-400", ipucu: "Belge hiçbir açık dosyadaki konteynerle eşleşmedi. Gerekirse DBA düğmesiyle elle yükleyin ya da listeden kaldırın." },
   cakisma: { metin: "Çakışma", sinif: "bg-red-500/10 text-red-400", ipucu: "Otomatik yükleme güvenli değil (konteynerde başka DBA var, konteyner birden fazla dosyada ya da belge başka konteynerde). Kontrol edip elle yükleyin." },
   okunamadi: { metin: "Okunamadı", sinif: "bg-red-500/10 text-red-400", ipucu: "PDF okunamadı veya doğrulanamadı. DBA düğmesiyle elle yükleyin." },
@@ -61,7 +61,10 @@ export function KantarDbaOtomasyon({ yenileTetik = 0 }: { yenileTetik?: number }
     if (sira !== istekSira.current) return;
     // Hata (ag kesintisi / ozellik kurulmamis): eski veri kalir, yeni bir sey gosterilmez
     if (error || !data) return;
-    setVeri(data as Durum);
+    // Beklenmeyen bicim tum Kantar Paneli'ni cokertmesin: dogrulanmayan yanit yok sayilir
+    const d = data as Partial<Durum>;
+    if (!Array.isArray(d.cihazlar) || !Array.isArray(d.sorunlar) || !d.bugun || typeof d.bugun !== "object") return;
+    setVeri(d as Durum);
     setSimdi(Date.now());
   }, []);
 

@@ -19,16 +19,24 @@ import { dbaAlanlariniOku, dosyaAdindanBelgeNo, type DbaVerisi, type MetinParcas
 //
 // Istek (POST):
 //   x-cihaz-anahtari: unexdba_<64 hex>
-//   x-islem: "belge" | "sinyal" | "dogrulama"
+//   x-islem: "belge" | "sinyal" | "bekleyen" | "dogrulama"
 //   belge     : govde = PDF, x-dosya-adi = base64(UTF-8 dosya adi), x-ajan-surumu
 //   sinyal    : govde yok (gorev her calistiginda "buradayim")
+//   bekleyen  : govde JSON {"belgeler":["<12 hane>",...]} (en fazla 50) - "beklemede"
+//               (konteyneri henuz sisteme girilmemis) belgelerden hangilerinin artik
+//               yeniden gonderilmesi gerektigini soyler: { hazir: [...] }. PDF'siz,
+//               SALT OKUNUR; gorev (>= 1.1.0) her dakika sorar, konteyner eklenince
+//               belge 1-2 dk icinde yuklenir (20.10.2026).
 //   dogrulama : SALT OKUNUR - kayitli DBA PDF'lerini okuyup sistemdeki degerlerle
 //               karsilastirir (okuyucunun gercek belgelerle sinanmasi); ?bas=0&adet=10
 // Yanit: { ok, karar, mod, mesaj, tekrar_dk } - tekrar_dk: gorevin ayni belgeyi kac
 // dakika sonra yeniden gondermesi gerektigi (null = bir daha gonderme).
 // ============================================================================
 
-const SURUM = "1.0.0";
+const SURUM = "1.1.0";
+/** Bu surumden itibaren gorev "bekleyen" sorgusunu yapar; beklemedeki PDF saatte bir yedek olarak gonderilir. */
+const BEKLEYEN_DESTEKLI_AJAN = [1, 1, 0];
+const BEKLEMEDE_YEDEK_DK = 60;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const KOVA = "konsimento-talimatlari";
@@ -143,7 +151,15 @@ async function depodanSil(yol: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------- belge
-async function belgeIsle(req: Request, cihaz: Cihaz): Promise<Response> {
+function surumEnAz(surum: string, en: number[]): boolean {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(surum.trim());
+  if (!m) return false;
+  const p = [Number(m[1]), Number(m[2]), Number(m[3])];
+  for (let i = 0; i < 3; i++) if (p[i] !== en[i]) return p[i] > en[i];
+  return true;
+}
+
+async function belgeIsle(req: Request, cihaz: Cihaz, ajanSurumu: string): Promise<Response> {
   const dosyaAdi = dosyaAdiCoz(req.headers.get("x-dosya-adi"));
   if (!dosyaAdi) return yanit({ ok: false, hata: "Dosya adı eksik veya geçersiz." }, 400);
   const belgeNo = dosyaAdindanBelgeNo(dosyaAdi);
@@ -164,7 +180,10 @@ async function belgeIsle(req: Request, cihaz: Cihaz): Promise<Response> {
   });
 
   if (karar.karar !== "eslesti" || karar.mod !== "canli") {
-    return yanit({ ok: true, karar: karar.karar, mod: karar.mod, mesaj: karar.mesaj, tekrar_dk: karar.tekrar_dk ?? null });
+    let tekrar = (karar.tekrar_dk ?? null) as number | null;
+    // Yeni gorev konteyner eklendi mi diye her dakika PDF'siz soruyor; PDF'in kendisi sadece yedek olarak saatte bir
+    if (karar.karar === "beklemede" && tekrar !== null && surumEnAz(ajanSurumu, BEKLEYEN_DESTEKLI_AJAN)) tekrar = BEKLEMEDE_YEDEK_DK;
+    return yanit({ ok: true, karar: karar.karar, mod: karar.mod, mesaj: karar.mesaj, tekrar_dk: tekrar });
   }
 
   // CANLI + tam eslesme: once PDF depoya (elle yuklemeyle ayni yol), sonra kilitli yazim
@@ -186,6 +205,51 @@ async function belgeIsle(req: Request, cihaz: Cihaz): Promise<Response> {
   }
   if (sonuc.uygulandi !== true) await depodanSil(yol);
   return yanit({ ok: true, karar: sonuc.karar, mod: "canli", mesaj: sonuc.mesaj, tekrar_dk: sonuc.tekrar_dk ?? null });
+}
+
+// ---------------------------------------------------------------- bekleyen (salt okunur)
+type BekleyenKayit = { dba_belge_no: string; durum: string; konteyner_no: string | null; ilk_gorulme: string };
+
+async function bekleyenKontrol(req: Request, cihaz: Cihaz): Promise<Response> {
+  let govde: unknown;
+  try {
+    govde = await req.json();
+  } catch {
+    return yanit({ ok: false, hata: "Gövde JSON değil." }, 400);
+  }
+  const liste = (govde as { belgeler?: unknown })?.belgeler;
+  if (!Array.isArray(liste) || liste.length > 50 || !liste.every((b) => typeof b === "string" && /^\d{12}$/.test(b))) {
+    return yanit({ ok: false, hata: "belgeler: en fazla 50 adet 12 haneli belge no." }, 400);
+  }
+  const belgeler = Array.from(new Set(liste as string[]));
+  if (belgeler.length === 0) return yanit({ ok: true, hazir: [] });
+
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/dba_otomatik_kayitlari?company_id=eq.${cihaz.company_id}&dba_belge_no=in.(${belgeler.join(",")})` +
+      `&select=dba_belge_no,durum,konteyner_no,ilk_gorulme`,
+    { headers: basliklar }
+  );
+  if (!res.ok) throw new Error(`Kayıtlar okunamadı (HTTP ${res.status})`);
+  const kayitlar = new Map(((await res.json()) as BekleyenKayit[]).map((k) => [k.dba_belge_no, k]));
+
+  // Kural TEK YERDE: dba_otomatik_esles (gonderim aninda da ayni fonksiyon karar verir).
+  // "Hala beklemede" OLMAYAN her belge yeniden gonderilir; kesin sonucu belge islemi yazar.
+  const hazir: string[] = [];
+  for (const b of belgeler) {
+    const k = kayitlar.get(b);
+    if (!k || k.durum !== "beklemede" || !k.konteyner_no) {
+      hazir.push(b);
+      continue;
+    }
+    const e = await rpc<{ karar: string }[]>("dba_otomatik_esles", {
+      p_company: cihaz.company_id,
+      p_belge: b,
+      p_konteyner: k.konteyner_no,
+      p_ilk_gorulme: k.ilk_gorulme,
+    });
+    if ((e?.[0]?.karar ?? "beklemede") !== "beklemede") hazir.push(b);
+  }
+  return yanit({ ok: true, hazir });
 }
 
 // ---------------------------------------------------------------- dogrulama (salt okunur)
@@ -264,7 +328,11 @@ Deno.serve(async (req: Request) => {
     }
     if (islem === "belge") {
       await rpc("dba_otomatik_sinyal", { p_cihaz_id: cihaz.id, p_surum: ajanSurumu || "?" });
-      return await belgeIsle(req, cihaz);
+      return await belgeIsle(req, cihaz, ajanSurumu);
+    }
+    if (islem === "bekleyen") {
+      await rpc("dba_otomatik_sinyal", { p_cihaz_id: cihaz.id, p_surum: ajanSurumu || "?" });
+      return await bekleyenKontrol(req, cihaz);
     }
     if (islem === "dogrulama") return await dogrula(req, cihaz);
     return yanit({ ok: false, hata: "Bilinmeyen işlem." }, 400);

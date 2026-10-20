@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # ============================================================================
-# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.0.1
+# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.1.0
 # ============================================================================
 # Windows Gorev Zamanlayici her dakika calistirir (SYSTEM hesabi, pencere yok).
 # Solas'in C:\Truck Scale\DBA klasorune yazdigi "<12 hane>_<yukleten>.pdf"
@@ -15,6 +15,10 @@
 #    klasor izinleri yalnizca SYSTEM + Yoneticiler (kurulum.ps1 ayarlar).
 #  - Ayni anda tek kopya calisir (Gorev Zamanlayici + mutex).
 #
+# KONTEYNER SONRADAN GIRILIRSE (1.1.0): sunucu "beklemede" dediyse (konteyner henuz
+# sisteme girilmemis) gorev her dakika PDF gondermeden "bekleyen" sorusunu sorar;
+# konteyner eklenince belge ayni dakika gonderilir (PDF yedek olarak saatte bir).
+#
 # Gunluk: <kok>\gunluk\YYYY-MM.log (6 aydan eski gunlukler silinir).
 # Bu dosya bilerek SADECE ASCII karakter icerir (Windows PowerShell 5.1 BOM'suz
 # dosyayi ANSI okur; Turkce karakter bozulmasin).
@@ -27,12 +31,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
-$SURUM = '1.0.1'
+$SURUM = '1.1.0'
 $AZAMI_DOSYA_ISTEK = 15          # bir calismada en fazla gonderilecek belge
 $AZAMI_CALISMA_SN = 480          # 8 dk (gorev zaman siniri 10 dk)
 $KARARLILIK_SN = 15              # Solas yazmayi bitirsin diye son degisiklikten sonra beklenen sure
 $AZAMI_BOYUT = 5MB
 $SINYAL_DK = 5
+$AZAMI_BEKLEYEN = 50            # bir "bekleyen" sorusunda en fazla belge
 
 $gunlukKlasoru = Join-Path $Kok 'gunluk'
 $durumDosyasi = Join-Path $Kok 'durum.json'
@@ -97,13 +102,13 @@ function Anahtar-Oku {
   return [System.Text.Encoding]::UTF8.GetString($acik)
 }
 
-function Istek-Gonder($istemci, [string]$adres, [hashtable]$basliklar, [byte[]]$govde) {
+function Istek-Gonder($istemci, [string]$adres, [hashtable]$basliklar, [byte[]]$govde, [string]$icerikTuru = 'application/pdf') {
   # Donus: @{ Durum = <HTTP kodu veya 0>; Veri = <json nesnesi veya $null>; Hata = <metin> }
   $mesaj = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $adres)
   foreach ($k in $basliklar.Keys) { [void]$mesaj.Headers.TryAddWithoutValidation($k, [string]$basliklar[$k]) }
   if ($null -ne $govde) {
     $icerik = New-Object System.Net.Http.ByteArrayContent(, $govde)
-    $icerik.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue('application/pdf')
+    $icerik.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue($icerikTuru)
     $mesaj.Content = $icerik
   }
   try {
@@ -158,6 +163,39 @@ try {
   $adaylar = @(Get-ChildItem -LiteralPath $klasor -File -Filter '*.pdf' -ErrorAction Stop |
     Where-Object { $_.Name -match '^\d{12}_.*\.pdf$' -and $_.LastWriteTime -ge $esik } |
     Sort-Object LastWriteTime)
+
+  # Bekleyenler: konteyneri henuz sisteme girilmemis belgeler. Sunucuya PDF'siz sorulur;
+  # konteyner eklendiyse (veya belge artik beklemede degilse) bu calismada hemen gonderilir.
+  $bekleyenler = @{}
+  foreach ($f in $adaylar) {
+    if ($bekleyenler.Count -ge $AZAMI_BEKLEYEN) { break }
+    if (-not $dosyalar.ContainsKey($f.Name)) { continue }
+    $k = $dosyalar[$f.Name]
+    if ($k['sonuc'] -ne 'beklemede' -or $null -eq $k['tekrar']) { continue }
+    if ((Zaman-Coz $k['tekrar']) -le $simdi) { continue }   # zamani zaten gelmis, asagida gonderilecek
+    $bekleyenler[$f.Name.Substring(0, 12)] = $f.Name
+  }
+  if ($bekleyenler.Count -gt 0) {
+    $json = '{"belgeler":["' + (@($bekleyenler.Keys) -join '","') + '"]}'
+    $b = $ortak.Clone(); $b['x-islem'] = 'bekleyen'
+    $y = Istek-Gonder $istemci $adres $b ($utf8.GetBytes($json)) 'application/json'
+    if ($y.Durum -eq 200 -and $null -ne $y.Veri) {
+      $basarili++
+      $durum['sonSinyal'] = (Get-Date).ToString('o')   # sunucu bu istekte sinyali de gunceller
+      foreach ($belge in @($y.Veri['hazir'])) {
+        if ($null -eq $belge) { continue }
+        $belge = [string]$belge
+        if (-not $bekleyenler.ContainsKey($belge)) { continue }
+        $ad = $bekleyenler[$belge]
+        $dosyalar[$ad]['tekrar'] = $simdi.AddSeconds(-1).ToString('o')
+        Gunluk "BILGI | $ad | konteyner sisteme eklendi, belge simdi gonderiliyor"
+      }
+    } elseif ($y.Durum -eq 401) {
+      $anahtarGecersiz = $true
+      Gunluk 'HATA | bekleyen: cihaz anahtari reddedildi (401)'
+    }
+    # Diger hatalar sessiz: belge zaten yedek zamaninda (tekrar) yeniden gonderilir
+  }
 
   foreach ($f in $adaylar) {
     if ($gonderilen -ge $AZAMI_DOSYA_ISTEK -or $anahtarGecersiz) { break }
@@ -226,8 +264,8 @@ try {
     Durum-Yaz $durum   # her belgeden sonra kaydet (kesinti olursa ayni belge iki kez islenmesin)
   }
 
-  # Sinyal: belge gonderilmediyse 5 dakikada bir "buradayim"
-  if ($gonderilen -eq 0 -and -not $anahtarGecersiz) {
+  # Sinyal: belge gonderilmediyse 5 dakikada bir "buradayim" (bekleyen sorusu da sinyal sayilir)
+  if ($gonderilen -eq 0 -and -not $anahtarGecersiz -and $basarili -eq 0) {
     $sonSinyal = $null
     if ($durum.ContainsKey('sonSinyal')) { $sonSinyal = Zaman-Coz $durum['sonSinyal'] }
     if ($null -eq $sonSinyal -or ((Get-Date) - $sonSinyal).TotalMinutes -ge $SINYAL_DK) {

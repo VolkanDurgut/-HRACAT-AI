@@ -1349,8 +1349,24 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Doğrulamada kullanılan ilk anahtar sohbette paylaşıldığı için İPTAL edildi
   (`aktif=false`); kantar PC için yeni anahtar üretildi. `yedekleme-gonder` v14: 31 tablo,
   geri yükleme testi 29/29.
+- KONTEYNER SONRADAN GİRİLİRSE (20.10.2026, kullanıcı isteği): görev 1.1.0 "beklemede"
+  belgeleri her dakika PDF'siz `x-islem: bekleyen` ({"belgeler":[...]} ≤50) ile sorar;
+  sunucu (edge function v3, kayıt + `dba_otomatik_esles`, SALT OKUNUR, sinyal yerine
+  geçer) hâlâ beklemede OLMAYANLARI `hazir` döner, görev onları aynı çalışmada gönderir
+  → konteyner eklendikten 1–2 dk sonra DBA yüklenir. 1.1.0+ görevde beklemedeki PDF'in
+  yedek tekrarı 60 dk (eski görevde 10). Veritabanı değişikliği YOK.
+  Görev güncelleme kantar PC'de `guncelle.ps1` (anahtar istemez).
+- ELLE YÜKLEME KORUMASI (20.10.2026, `lib/hooks/use-dba-upload.ts`, tek kullanan Kantar
+  Paneli): başlamadan güncel kayıt okunur (DBA doluysa yeşil "zaten yüklü" bilgisi, AI
+  okuma / depo yükleme YOK), yazım `.is('dba_dosya_url', null)` koşullu; 0 satırsa
+  "zaten yüklü" + yüklenen PDF geri silinir. Eski "yeniden yüklemede eski PDF'i sil"
+  yolu kaldırıldı (DBA değiştirmek = Konteynerler sekmesinde kaldır + yükle).
+  `kantar-dba-otomasyon` beklenmeyen RPC yanıtında paneli çökertmez (biçim kontrolü).
+- KURULUM İZİN HATASI (20.10.2026): ilk kurulum `icacls ... (OI)(CI)F /T` ile dosyaları
+  İZİNSİZ bırakıyordu (görev sonucu 1, günlük yok). Düzeltme: izin önce sadece klasöre,
+  sonra `icacls "C:\UnexDBA\*" /reset /T` + okunabilirlik kontrolü.
 - Testler (scratchpad): okuyucu 25 kontrol (3 gerçek DBA + 5 DBA olmayan PDF + 13 bozuk +
-  yükleten boş), SQL 49 kontrol + eşzamanlılık, edge function 32 (yerel PG + Node), görev 25
+  yükleten boş), SQL 49 kontrol + eşzamanlılık, edge function 45 (yerel PG + Node), görev 31, elle yükleme koruması Playwright 10
   (pwsh 7, tr-TR kültürü). Windows'a özel kısımlar (DPAPI, Görev Zamanlayıcı, icacls) sadece
   ayrıştırıcıyla kontrol edildi; kurulum betiği her adımı doğrulayıp raporlar.
 

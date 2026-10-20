@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, eskiDepoDosyasiniSil, yazmaHatasi } from '@/lib/supabase';
+import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } from '@/lib/supabase';
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -8,7 +8,16 @@ type DbaYukleResult = {
   success: boolean;
   uyusmazliklar: string[];
   error?: string;
+  /** Konteynerin DBA'si zaten yuklu (ornegin otomatik); hicbir sey degismedi. */
+  zatenYuklu?: boolean;
 };
+
+const ZATEN_YUKLU_MESAJI =
+  "Bu konteynerin DBA'sı zaten yüklü (kantar bilgisayarından otomatik yüklenmiş). Tekrar yüklemenize gerek yok.";
+
+class ZatenYukluHatasi extends Error {
+  constructor() { super(ZATEN_YUKLU_MESAJI); }
+}
 
 type UseDbaUploadReturn = {
   yukleniyor: Record<string, boolean>;
@@ -29,6 +38,12 @@ type UseDbaUploadReturn = {
  * 4. Ayni DBA belgesinin baska bir konteynere yuklenip yuklenmedigini kontrol eder
  * 5. Konteyner no uyusmazligi kontrol eder
  * 6. Sonuclari konteynerler tablosuna kaydeder
+ *
+ * MUKERRER YUKLEME YOK (20.10.2026): DBA'lar kantar bilgisayarindan otomatik da
+ * yuklendigi icin (dba-otomatik) elle yukleme SADECE DBA'si bos konteynere yapilir:
+ * baslamadan once guncel kayit okunur, yazim `dba_dosya_url is null` kosuluyla
+ * yapilir. Ekran yenilenmeden once otomatik yuklenmisse elle yukleme durur,
+ * yuklenen PDF geri silinir, mevcut DBA'ya dokunulmaz.
  */
 export function useDbaUpload(): UseDbaUploadReturn {
   const [yukleniyor, setYukleniyor] = useState<Record<string, boolean>>({});
@@ -52,6 +67,17 @@ export function useDbaUpload(): UseDbaUploadReturn {
 
     let yuklenenYol: string | null = null; // kayda baglanamazsa depodan geri silinir
     try {
+      // 0. Guncel kayit: DBA bu arada (otomatik) yuklendiyse hic baslama
+      const { data: guncel, error: guncelHata } = await supabase
+        .from('konteynerler')
+        .select('dba_dosya_url')
+        .eq('company_id', companyId)
+        .eq('id', konteyner.id)
+        .maybeSingle();
+      if (guncelHata) throw new Error(`Konteyner okunamadı: ${guncelHata.message}`);
+      if (!guncel) throw new Error('Konteyner bulunamadı veya bu işlem için yetkiniz yok.');
+      if (guncel.dba_dosya_url) throw new ZatenYukluHatasi();
+
       // 1. Storage'a yukle
       const timestamp = Date.now();
       const path = `dba/${konteyner.dosya_id}/${konteyner.konteyner_no}_${timestamp}.pdf`;
@@ -107,17 +133,8 @@ export function useDbaUpload(): UseDbaUploadReturn {
         );
       }
 
-      // 6a. Yeniden yuklemede eski DBA'nin adresi (kayit basariyla guncellenince
-      // depodan silinir - sahipsiz PDF kalmasin, 05.10.2026). Taze okunur;
-      // okunamazsa hicbir sey silinmez.
-      const { data: onceki } = await supabase
-        .from('konteynerler')
-        .select('dba_dosya_url')
-        .eq('company_id', companyId)
-        .eq('id', konteyner.id)
-        .maybeSingle();
-
       // 6. Veritabanini guncelle (Net, Brut, Kap Adeti DBA'dan etkilenmez - idari personel tarafindan elle girilir)
+      // Sadece DBA'si hala bossa yazilir (otomatik yuklemeyle ayni anda olursa ustune yazilmaz).
       const { data: guncellenen, error: updateError } = await supabase
         .from('konteynerler')
         .update({
@@ -132,23 +149,43 @@ export function useDbaUpload(): UseDbaUploadReturn {
         })
         .eq('company_id', companyId)
         .eq('id', konteyner.id)
+        .is('dba_dosya_url', null)
         .select('id');
+      if (!updateError && (!guncellenen || guncellenen.length === 0)) {
+        // 0 satir: ya bu arada DBA yuklendi ya da yetki (RLS) yok
+        const { data: sonDurum } = await supabase
+          .from('konteynerler')
+          .select('dba_dosya_url')
+          .eq('company_id', companyId)
+          .eq('id', konteyner.id)
+          .maybeSingle();
+        if (sonDurum?.dba_dosya_url) throw new ZatenYukluHatasi();
+      }
       // 0 satir guncellendiyse (RLS) de basarili sayilmaz (01.10.2026)
       const guncellemeHatasi = yazmaHatasi(updateError, guncellenen);
-      if (guncellemeHatasi) throw new Error(`DBA bilgileri kaydedilemedi: ${guncellemeHatasi}`);
+      if (guncellemeHatasi) {
+        // Ayni DBA belge no baska konteynerde (tekil indeks, 20.10.2026)
+        if (/konteynerler_dba_belge_no_tekil|duplicate key/i.test(guncellemeHatasi)) {
+          throw new Error('Bu DBA belgesi başka bir konteynere yüklenmiş. Aynı DBA iki konteynere yüklenemez.');
+        }
+        throw new Error(`DBA bilgileri kaydedilemedi: ${guncellemeHatasi}`);
+      }
       yuklenenYol = null; // kayit basarili
-      await eskiDepoDosyasiniSil(onceki?.dba_dosya_url, dosyaUrl);
 
       return { success: true, uyusmazliklar: [] };
     } catch (err) {
       if (yuklenenYol) await supabase.storage.from('konsimento-talimatlari').remove([yuklenenYol]);
+      if (err instanceof ZatenYukluHatasi) {
+        showToast(ZATEN_YUKLU_MESAJI, 'success');
+        return { success: false, uyusmazliklar: [], error: ZATEN_YUKLU_MESAJI, zatenYuklu: true };
+      }
       const message = err instanceof Error ? err.message : 'Hata oluştu.';
       setHatalar((prev) => ({ ...prev, [konteyner.id]: message }));
       return { success: false, uyusmazliklar: [], error: message };
     } finally {
       setYukleniyor((prev) => ({ ...prev, [konteyner.id]: false }));
     }
-  }, [companyId]);
+  }, [companyId, showToast]);
 
   const kaldirDba = useCallback(async (konteynerId: string, dbaDosyaUrl?: string | null) => {
     if (!companyId) return;

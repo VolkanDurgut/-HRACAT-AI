@@ -22,6 +22,16 @@ düğmesi yedek olarak yerinde kalır.
    elle yüklerse otomatik yükleme geri çekilir. **Asla üzerine yazmaz.**
 4. Yüklenen alanlar elle yüklemeyle aynıdır (plaka, dara, VGM, belge no, PDF).
    Kantar Paneli'nde satırın yanında "Oto" rozeti görünür.
+5. **Konteyner sonradan girilirse** (DBA önce oluştu, personel konteyneri sonra
+   ekledi): belge "Konteyner bekleniyor" durumunda bekler. Görev (1.1.0+) her dakika
+   sunucuya PDF göndermeden "konteyner eklendi mi?" diye sorar; eklendiği dakika
+   belgeyi gönderir → konteyner eklendikten **1–2 dakika** sonra DBA yüklenir
+   (72 saat beklenir). PDF'in kendisi yedek olarak saatte bir yeniden gönderilir.
+6. **Mükerrer yükleme yok:** DBA'sı olan konteynerde Kantar Paneli'nde yükleme
+   düğmesi yoktur. Ekran yenilenmeden önce otomatik yüklenmişse elle yükleme
+   başlamadan durur ("zaten yüklü" bilgisi); aynı anda olursa yazım
+   `dba_dosya_url is null` koşuluyla yapıldığı için ikincisi yazılmaz ve yüklediği
+   PDF geri silinir. Hiçbir yol mevcut DBA'nın üzerine yazmaz.
 
 ## Kantar Paneli › "Otomatik DBA"
 
@@ -30,7 +40,7 @@ düğmesi yedek olarak yerinde kalır.
 
 | Durum | Anlamı | Ne yapılır |
 |---|---|---|
-| Konteyner bekleniyor | Konteyner henüz açık bir dosyaya eklenmemiş | Konteyner eklenince 10 dk içinde kendiliğinden yüklenir (72 saat denenir) |
+| Konteyner bekleniyor | Konteyner henüz açık bir dosyaya eklenmemiş | Konteyner eklenince 1–2 dk içinde kendiliğinden yüklenir (72 saat beklenir; görev 1.0.x'te 10 dk) |
 | Eşleşmedi | 72 saatte eşleşmedi / konteyner sadece kapalı dosyada | Gerekirse DBA düğmesiyle elle yükleyin ya da listeden kaldırın |
 | Çakışma | Konteynerde başka DBA var (yeniden tartım), konteyner birden fazla açık dosyada ya da belge başka konteynerde | Kontrol edip elle düzeltin |
 | Okunamadı | PDF DBA değil / doğrulanamadı | DBA düğmesiyle elle yükleyin |
@@ -105,5 +115,13 @@ update public.kantar_cihazlari set canli = false where ad = 'Kantar PC (DESKTOP-
 - Gönderilenlerin kaydı: `C:\UnexDBA\durum.json` (silinirse sorun olmaz: sunucu
   yüklenmiş belgeleri tanır, çift yükleme olmaz).
 - Görev Zamanlayıcı'da görev adı: **UnexDBA Otomatik Yukleme**.
-- Güncelleme: yeni `dba-ajan.ps1` ile `kurulum.ps1` yeniden çalıştırılır
-  (başlangıç tarihi ve ayarlar korunur, yeni anahtar istenir — aynı anahtar girilebilir).
+- **Görev güncelleme (anahtar istemez):** yeni `dba-ajan.ps1` ile aynı klasördeki
+  `guncelle.ps1` Yönetici PowerShell'de çalıştırılır
+  (`powershell -NoProfile -ExecutionPolicy Bypass -File .\guncelle.ps1`). Sadece görev
+  betiğini değiştirir (sözdizimi kontrolü, tek hamlede değiştirme, izin sıfırlama),
+  görevi bir kez çalıştırıp sonucu gösterir. Anahtar / ayar / durum / günlük değişmez.
+- `kurulum.ps1` yeniden çalıştırılırsa anahtar yeniden istenir (anahtar bir kez
+  gösterildiği için elinizde yoksa yeni anahtar üretilir).
+- Kurulum 20.10.2026 düzeltmesi: ilk sürüm dosya izinlerini klasörle birlikte
+  (`/T`) verdiği için dosyalar izinsiz kalıyordu (görev sonucu 1, günlük yok).
+  Düzeltme: `icacls "C:\UnexDBA\*" /reset /T /Q` (kurulum artık bunu kendisi yapar).

@@ -8,10 +8,11 @@ import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { IcIsEmriForm } from "@/components/ic-is-emri-form";
+import { IcSiparisFormuPenceresi } from "@/components/ic-siparis-formu-penceresi";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -19,12 +20,15 @@ import {
   cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi, tlYazi, tutarHesapla,
 } from "@/lib/ic-piyasa/is-emri";
 import { fiyatYazi, kdvYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
+import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-piyasa/siparis-formu";
 
 /**
  * Ic Piyasa - Is Emirleri (12.10.2026).
  * Yetkili (Volkan) Burak Bey'in talimatiyla is emri acar; kantarci Kantar
  * Paneli > Yurt Ici'nden her arac icin irsaliye yukler. Burada ilerleme,
  * araclar, irsaliyeler ve tutar (net kg x birim fiyat) gorulur.
+ * 21.10.2026: "Sipariş Formundan Aç" - musteriyle imzalanan sipariş formu
+ * okunur, is emri bu bilgilerle hazirlanir ve form is emrine eklenir.
  */
 
 type Filtre = "acik" | "tamamlandi" | "iptal" | "tumu";
@@ -52,6 +56,8 @@ export default function IsEmirleriPage() {
 
   const [formAcik, setFormAcik] = useState(false);
   const [duzenlenen, setDuzenlenen] = useState<IcIsEmri | null>(null);
+  const [siparisPencere, setSiparisPencere] = useState(false);
+  const [onDolum, setOnDolum] = useState<{ musteriId: string; ek: SiparisEki } | null>(null);
   const [durumIslem, setDurumIslem] = useState<{ emir: EmirSatiri; hedef: IsEmriDurum | "sil" | "tamamen_sil" } | null>(null);
   // Yetkili ekranindan cikis isleme (lojistik baglantisina alternatif)
   const [cikisDuzen, setCikisDuzen] = useState<{ sevk: IcSevk; mod: "secim" | "saat" } | null>(null);
@@ -120,10 +126,10 @@ export default function IsEmirleriPage() {
   const bugunSevkler = sevkler.filter((s) => new Date(s.olusturma).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugunTR);
   const uyariliSayi = sevkler.filter((s) => s.uyarilar?.length && emirler.find((e) => e.id === s.is_emri_id)?.durum === "acik").length;
 
-  const irsaliyeAc = async (yol: string) => {
+  const irsaliyeAc = async (yol: string, ad = "İrsaliye") => {
     const pencere = window.open("", "_blank");
     const { data, error } = await supabase.storage.from(IC_BELGE_BUCKET).createSignedUrl(yol, 60 * 10);
-    if (error || !data?.signedUrl) { pencere?.close(); showToast(`İrsaliye açılamadı: ${error?.message || "bilinmeyen hata"}`, "error"); return; }
+    if (error || !data?.signedUrl) { pencere?.close(); showToast(`${ad} açılamadı: ${error?.message || "bilinmeyen hata"}`, "error"); return; }
     if (pencere) pencere.location.href = data.signedUrl; else window.location.href = data.signedUrl;
   };
 
@@ -138,7 +144,7 @@ export default function IsEmirleriPage() {
       const liste = (yollar as string[] | null) || [];
       if (liste.length) {
         const { error: dHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove(liste);
-        if (dHata) console.error("İrsaliye dosyaları silinemedi:", dHata.message);
+        if (dHata) console.error("İrsaliye / sipariş formu dosyaları silinemedi:", dHata.message);
       }
       setIsleniyor(false);
       showToast(`${emir.is_emri_no} araç kayıtları ve irsaliyeleriyle silindi.`, "success");
@@ -152,6 +158,11 @@ export default function IsEmirleriPage() {
     setIsleniyor(false);
     const hata = yazmaHatasi(sonuc.error, sonuc.data);
     if (hata) { showToast(hataMesaji({ message: hata }), "error"); return; }
+    // Kayit silindiyse sipariş formu PDF'i de silinir (once kayit, sonra dosya)
+    if (hedef === "sil" && emir.siparis_formu_yolu) {
+      const { error: dHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove([emir.siparis_formu_yolu]);
+      if (dHata) console.error("Sipariş formu silinemedi:", dHata.message);
+    }
     showToast(hedef === "sil" ? `${emir.is_emri_no} silindi.` : `${emir.is_emri_no}: ${DURUM_ETIKET[hedef as IsEmriDurum]}.`, "success");
     setDurumIslem(null);
     getir();
@@ -209,14 +220,17 @@ export default function IsEmirleriPage() {
       <SayfaBasligi
         ikon={<ClipboardList size={20} />}
         baslik="İç Piyasa · İş Emirleri"
-        aciklama="İş emri açın; kantarcı her araç için irsaliyeyi Kantar Paneli › Yurt İçi'nden yükler. Plaka ve net kg irsaliyeden okunur."
+        aciklama="Müşteriyle imzalanan sipariş formundan iş emri açın; kantarcı her araç için irsaliyeyi Kantar Paneli › Yurt İçi'nden yükler. Plaka ve net kg irsaliyeden okunur."
         sag={
           <>
             <button onClick={getir} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Yenile">
               <RefreshCw size={14} />
             </button>
-            <button onClick={() => { setDuzenlenen(null); setFormAcik(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
+            <button onClick={() => { setDuzenlenen(null); setOnDolum(null); setFormAcik(true); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}>
               <Plus size={14} /> Yeni İş Emri
+            </button>
+            <button onClick={() => setSiparisPencere(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
+              <FileInput size={14} /> Sipariş Formundan Aç
             </button>
           </>
         }
@@ -303,11 +317,17 @@ export default function IsEmirleriPage() {
                         <Bilgi etiket="Vade / Ödeme" deger={`${e.vade_gun !== null ? vadeYazi(e.vade_gun) : "-"} · ${e.odeme || "-"}`} />
                         <Bilgi etiket="Talimat" deger={e.talimat_veren || "-"} />
                         <Bilgi etiket="Müşteri sipariş no" deger={e.musteri_siparis_no || "-"} />
+                        {(e.siparis_tarihi || e.siparis_formu_yolu) && <Bilgi etiket="Sipariş formu tarihi" deger={gunAyYil(e.siparis_tarihi)} />}
+                        {(e.nakliye || e.teslim_suresi_gun !== null) && <Bilgi etiket="Nakliye / Teslim süresi" deger={`${e.nakliye ? NAKLIYE_ETIKET[e.nakliye] : "-"} · ${e.teslim_suresi_gun !== null ? `${e.teslim_suresi_gun} gün` : "-"}`} />}
+                        {ozellikleriOku(e.urun_ozellikleri).length > 0 && <Bilgi etiket="Ürün özellikleri" deger={ozellikleriOku(e.urun_ozellikleri).map((x) => `${x.ad}: ${x.deger}`).join(" · ")} genis />}
                         <Bilgi etiket="Açılış" deger={`${tarihSaatYazi(e.olusturma)}${e.olusturan_email ? ` · ${e.olusturan_email}` : ""}`} genis />
                         {e.teslim_adresi && <Bilgi etiket="Teslim adresi" deger={e.teslim_adresi} genis />}
                         {e.notlar && <Bilgi etiket="Not" deger={e.notlar} genis />}
                         <Bilgi etiket="Yüklenen tutar" deger={tutar !== null ? `${tlYazi(tutar)} ${e.kdv_dahil ? "(KDV dahil)" : "+ KDV"}` : "-"} vurgu />
                         <div className="col-span-2 flex flex-wrap items-end gap-2">
+                          {e.siparis_formu_yolu && (
+                            <button onClick={() => irsaliyeAc(e.siparis_formu_yolu as string, "Sipariş formu")} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-emerald-400 hover:bg-emerald-500/10" style={{ borderColor: CARD_BORDER }} title={e.siparis_formu_adi || "Sipariş formu"}><FileText size={12} /> Sipariş formu</button>
+                          )}
                           <a href={`/takip/${e.takip_token}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}><Link2 size={12} /> Müşteri takip sayfası</a>
                           <button onClick={() => takipKopyala(e.takip_token)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}><Copy size={12} /> Bağlantıyı kopyala</button>
                         </div>
@@ -387,7 +407,7 @@ export default function IsEmirleriPage() {
                       <div className="flex flex-wrap gap-2 mt-3">
                         {e.durum === "acik" && (
                           <>
-                            <Eylem onClick={() => { setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
+                            <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
                             <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamam}>Tamamlandı olarak kapat</Eylem>
                             <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "iptal" })} ikon={<XCircle size={13} />}>İptal et</Eylem>
                           </>
@@ -407,11 +427,20 @@ export default function IsEmirleriPage() {
 
       <IcIsEmriForm
         acik={formAcik}
-        kapat={() => setFormAcik(false)}
-        kaydedildi={() => { setFormAcik(false); getir(); }}
+        kapat={() => { setFormAcik(false); setOnDolum(null); }}
+        kaydedildi={() => { setFormAcik(false); setOnDolum(null); getir(); }}
         musteriler={musteriler}
         duzenlenen={duzenlenen}
         sevkVar={!!duzenlenen && (sevkMap.get(duzenlenen.id)?.length ?? 0) > 0}
+        onDolum={duzenlenen ? null : onDolum}
+      />
+
+      <IcSiparisFormuPenceresi
+        acik={siparisPencere}
+        kapat={() => setSiparisPencere(false)}
+        musteriler={musteriler}
+        musterilerDegisti={getir}
+        devam={(musteriId, ek) => { setSiparisPencere(false); setDuzenlenen(null); setOnDolum({ musteriId, ek }); setFormAcik(true); }}
       />
 
       <ConfirmDialog

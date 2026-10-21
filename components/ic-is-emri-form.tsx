@@ -5,9 +5,10 @@ import Link from "next/link";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, X, Save, FileText, Truck, Scale } from "lucide-react";
+import { Loader2, X, Save, FileText, Truck, Scale, Upload, Trash2, Plus, ExternalLink, AlertTriangle } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
-import { IcIsEmri, IcMusteri, hataMesaji } from "@/lib/ic-piyasa/is-emri";
+import { IC_BELGE_BUCKET, IcIsEmri, IcMusteri, hataMesaji } from "@/lib/ic-piyasa/is-emri";
+import { AZAMI_FORM_BAYT, AZAMI_OZELLIK, NAKLIYE_ETIKET, SiparisEki, UrunOzelligi, gunAyYil, isEmriOnDolum, ozellikleriHazirla, ozellikleriOku, siparisFormuYolu } from "@/lib/ic-piyasa/siparis-formu";
 import {
   IcFiyatFormu,
   ODEME_SECENEKLERI,
@@ -29,6 +30,11 @@ import {
  * 14.10.2026: formda her urunun PESIN ve VADELI fiyati ayri; hangisine
  * tiklanirsa o fiyat + vade (pesin = 0 gun) yazilir. Odeme sekli formda
  * olmadigi icin is emrinde elle secilir (degistirilmez).
+ * 21.10.2026: SIPARIS FORMU - "Sipariş Formundan Aç" penceresinden gelinirse
+ * (`onDolum`) okunan bilgiler alanlara yazilir ve PDF kayitla birlikte depoya
+ * (<sirket>/siparis/<uuid>.pdf) yuklenir. Sira: once PDF, sonra kayit; kayit
+ * olmazsa PDF geri silinir; form degistirilir / kaldirilirsa ESKI PDF ancak
+ * kayit basarili olduktan sonra silinir.
  */
 
 type Props = {
@@ -38,6 +44,8 @@ type Props = {
   musteriler: IcMusteri[];
   duzenlenen: IcIsEmri | null;
   sevkVar: boolean;
+  /** Sipariş formundan acilis: secilen / olusturulan musteri + form */
+  onDolum?: { musteriId: string; ek: SiparisEki } | null;
 };
 
 type Taslak = {
@@ -58,12 +66,17 @@ type Taslak = {
   talimat_veren: string;
   musteri_siparis_no: string;
   notlar: string;
+  siparis_tarihi: string;
+  nakliye: "" | "alici" | "satici";
+  teslim_suresi_gun: string;
+  urun_ozellikleri: UrunOzelligi[];
 };
 
 const BOS: Taslak = {
   musteri_id: "", urun: "", ambalaj: "Dökme", hedef_tur: "kg", hedef_ton: "", hedef_arac: "",
   birim_fiyat: "", kdv_dahil: false, vade_gun: "30", odeme: "Çek", teslim: "Fabrika Teslim", teslim_adresi: "",
   fiyat_formu_id: null, fiyat_formu_no: null, talimat_veren: "Burak Tuncay", musteri_siparis_no: "", notlar: "",
+  siparis_tarihi: "", nakliye: "", teslim_suresi_gun: "", urun_ozellikleri: [],
 };
 
 const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -84,12 +97,16 @@ function sayiOku(metin: string): number | null {
 const sayiYaz = (n: number | null | undefined, basamak = 3) =>
   n === null || n === undefined ? "" : Number(n).toLocaleString("tr-TR", { maximumFractionDigits: basamak, useGrouping: false });
 
-export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, sevkVar }: Props) {
+export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, sevkVar, onDolum }: Props) {
   const { companyId, user } = useAuth();
   const { showToast } = useToast();
   const [taslak, setTaslak] = useState<Taslak>(BOS);
   const [formlar, setFormlar] = useState<IcFiyatFormu[]>([]);
   const [kaydediliyor, setKaydediliyor] = useState(false);
+  // Sipariş formu PDF'i: yeni secilen dosya / mevcut formun kaldirilmasi
+  const [yeniForm, setYeniForm] = useState<File | null>(null);
+  const [formKaldir, setFormKaldir] = useState(false);
+  const [okumaUyarilari, setOkumaUyarilari] = useState<string[]>([]);
 
   useEffect(() => {
     if (!acik) return;
@@ -112,11 +129,46 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
         talimat_veren: duzenlenen.talimat_veren || "",
         musteri_siparis_no: duzenlenen.musteri_siparis_no || "",
         notlar: duzenlenen.notlar || "",
+        siparis_tarihi: duzenlenen.siparis_tarihi || "",
+        nakliye: duzenlenen.nakliye || "",
+        teslim_suresi_gun: duzenlenen.teslim_suresi_gun !== null && duzenlenen.teslim_suresi_gun !== undefined ? String(duzenlenen.teslim_suresi_gun) : "",
+        urun_ozellikleri: ozellikleriOku(duzenlenen.urun_ozellikleri),
       });
+      setYeniForm(null);
+      setOkumaUyarilari([]);
+    } else if (onDolum) {
+      // Sipariş formundan: okunan bilgiler (okunamadiysa sadece musteri + PDF)
+      const o = onDolum.ek.okuma ? isEmriOnDolum(onDolum.ek.okuma) : null;
+      const m = musteriler.find((x) => x.id === onDolum.musteriId);
+      setTaslak({
+        ...BOS,
+        musteri_id: onDolum.musteriId,
+        urun: o?.urun || "",
+        hedef_tur: "kg",
+        hedef_ton: o?.hedef_kg ? sayiYaz(o.hedef_kg / 1000) : "",
+        birim_fiyat: o?.birim_fiyat !== null && o?.birim_fiyat !== undefined ? fiyatYazi(o.birim_fiyat) : "",
+        kdv_dahil: o?.kdv_dahil ?? false,
+        vade_gun: o?.vade_gun !== null && o?.vade_gun !== undefined ? String(o.vade_gun) : "",
+        // Formda odeme araci (cek / havale) yok: bilincli secilsin
+        odeme: "",
+        teslim: o?.teslim || "",
+        teslim_adresi: o?.teslim_adresi || m?.adres || "",
+        siparis_tarihi: o?.siparis_tarihi || "",
+        nakliye: o?.nakliye || "",
+        teslim_suresi_gun: o?.teslim_suresi_gun !== null && o?.teslim_suresi_gun !== undefined ? String(o.teslim_suresi_gun) : "",
+        urun_ozellikleri: o?.urun_ozellikleri || [],
+      });
+      setYeniForm(onDolum.ek.dosya);
+      setOkumaUyarilari(onDolum.ek.okuma ? onDolum.ek.okuma.uyarilar : ["Formdan bilgi okunamadı; alanları elle doldurun. Form iş emrine eklenecek."]);
     } else {
       setTaslak(BOS);
+      setYeniForm(null);
+      setOkumaUyarilari([]);
     }
-  }, [acik, duzenlenen]);
+    setFormKaldir(false);
+    // musteriler bilerek bagimlilik degil: liste yenilenince kullanicinin duzenlemesi ezilmesin
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acik, duzenlenen, onDolum]);
 
   useEffect(() => {
     if (!acik || !companyId) return;
@@ -183,6 +235,12 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
     if (fiyat !== null && (Number.isNaN(fiyat) || fiyat < 0)) { showToast(`Birim fiyat geçersiz: "${taslak.birim_fiyat}". Örnek: 13,15`, "error"); return; }
     const vade = taslak.vade_gun === "" ? null : Number(taslak.vade_gun);
     if (vade !== null && (!Number.isInteger(vade) || vade < 0 || vade > 365)) { showToast("Vade 0-365 gün olmalı.", "error"); return; }
+    if (taslak.siparis_tarihi && !/^\d{4}-\d{2}-\d{2}$/.test(taslak.siparis_tarihi)) { showToast("Sipariş tarihi geçersiz.", "error"); return; }
+    const teslimSuresi = taslak.teslim_suresi_gun === "" ? null : Number(taslak.teslim_suresi_gun);
+    if (teslimSuresi !== null && (!Number.isInteger(teslimSuresi) || teslimSuresi < 0 || teslimSuresi > 365)) { showToast("Teslim süresi 0-365 gün olmalı.", "error"); return; }
+    const oz = ozellikleriHazirla(taslak.urun_ozellikleri);
+    if (oz.hata) { showToast(oz.hata, "error"); return; }
+    if (yeniForm && (yeniForm.size > AZAMI_FORM_BAYT || !/\.pdf$/i.test(yeniForm.name))) { showToast("Sipariş formu PDF olmalı ve 10 MB'ı geçmemeli.", "error"); return; }
 
     const kayit = {
       musteri_id: taslak.musteri_id,
@@ -202,20 +260,77 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
       talimat_veren: taslak.talimat_veren.trim() || null,
       musteri_siparis_no: taslak.musteri_siparis_no.trim() || null,
       notlar: taslak.notlar.trim() || null,
+      siparis_tarihi: taslak.siparis_tarihi || null,
+      nakliye: taslak.nakliye || null,
+      teslim_suresi_gun: teslimSuresi,
+      urun_ozellikleri: oz.deger,
     };
     setKaydediliyor(true);
+
+    // Form PDF'i degisecekse eski yol kayittan TAZE okunur (silme sadece kayit basariliysa)
+    let eskiYol: string | null = null;
+    if (duzenlenen && (yeniForm || formKaldir)) {
+      const { data: taze, error: tazeHata } = await supabase.from("ic_is_emirleri").select("siparis_formu_yolu").eq("id", duzenlenen.id).eq("company_id", companyId).maybeSingle();
+      if (tazeHata) { setKaydediliyor(false); showToast(`Kaydedilemedi: ${tazeHata.message}`, "error"); return; }
+      eskiYol = (taze as { siparis_formu_yolu: string | null } | null)?.siparis_formu_yolu || null;
+    }
+    // Once PDF, sonra kayit
+    let yeniYol: string | null = null;
+    if (yeniForm) {
+      yeniYol = siparisFormuYolu(companyId);
+      const { error: yHata } = await supabase.storage.from(IC_BELGE_BUCKET).upload(yeniYol, yeniForm, { contentType: "application/pdf", upsert: false });
+      if (yHata) { setKaydediliyor(false); showToast(`Sipariş formu yüklenemedi: ${yHata.message}`, "error"); return; }
+    }
+    const formAlanlari = yeniYol
+      ? { siparis_formu_yolu: yeniYol, siparis_formu_adi: yeniForm!.name.slice(0, 255) }
+      : formKaldir ? { siparis_formu_yolu: null, siparis_formu_adi: null } : {};
     const sonuc = duzenlenen
-      ? await supabase.from("ic_is_emirleri").update(kayit).eq("id", duzenlenen.id).eq("company_id", companyId).select("id, is_emri_no")
-      : await supabase.from("ic_is_emirleri").insert({ ...kayit, company_id: companyId, olusturan_email: user?.email || null }).select("id, is_emri_no");
-    setKaydediliyor(false);
+      ? await supabase.from("ic_is_emirleri").update({ ...kayit, ...formAlanlari }).eq("id", duzenlenen.id).eq("company_id", companyId).select("id, is_emri_no")
+      : await supabase.from("ic_is_emirleri").insert({ ...kayit, ...formAlanlari, company_id: companyId, olusturan_email: user?.email || null }).select("id, is_emri_no");
     const hata = yazmaHatasi(sonuc.error, sonuc.data);
-    if (hata) { showToast(`Kaydedilemedi: ${hataMesaji({ message: hata })}`, "error"); return; }
+    if (hata) {
+      if (yeniYol) await supabase.storage.from(IC_BELGE_BUCKET).remove([yeniYol]); // sahipsiz PDF kalmasin
+      setKaydediliyor(false);
+      showToast(`Kaydedilemedi: ${hataMesaji({ message: hata })}`, "error");
+      return;
+    }
+    if (eskiYol && eskiYol !== yeniYol) {
+      const { error: sHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove([eskiYol]);
+      if (sHata) console.error("Eski sipariş formu silinemedi:", sHata.message);
+    }
+    setKaydediliyor(false);
     const no = (sonuc.data as { is_emri_no: string }[])[0]?.is_emri_no;
     showToast(duzenlenen ? `${no} güncellendi.` : `${no} açıldı. Kantar Panelinde görünür.`, "success");
     kaydedildi();
   };
 
+  const formAc = async () => {
+    if (yeniForm) {
+      const url = URL.createObjectURL(yeniForm);
+      window.open(url, "_blank", "noopener");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    const yol = duzenlenen?.siparis_formu_yolu;
+    if (!yol) return;
+    const pencere = window.open("", "_blank");
+    const { data, error } = await supabase.storage.from(IC_BELGE_BUCKET).createSignedUrl(yol, 60 * 10);
+    if (error || !data?.signedUrl) { pencere?.close(); showToast(`Sipariş formu açılamadı: ${error?.message || "bilinmeyen hata"}`, "error"); return; }
+    if (pencere) pencere.location.href = data.signedUrl; else window.location.href = data.signedUrl;
+  };
+  const formSec = (f: File | undefined) => {
+    if (!f) return;
+    if (!/\.pdf$/i.test(f.name) || (f.type && f.type !== "application/pdf")) { showToast("Sipariş formu PDF olmalı.", "error"); return; }
+    if (f.size > AZAMI_FORM_BAYT) { showToast("Sipariş formu 10 MB'ı geçmemeli.", "error"); return; }
+    setYeniForm(f);
+    setFormKaldir(false);
+  };
+  const ozellikDegistir = (i: number, alan: keyof UrunOzelligi, deger: string) =>
+    setTaslak((t) => ({ ...t, urun_ozellikleri: t.urun_ozellikleri.map((x, j) => (j === i ? { ...x, [alan]: deger } : x)) }));
+
   if (!acik) return null;
+
+  const mevcutFormAdi = !formKaldir && !yeniForm ? duzenlenen?.siparis_formu_adi || (duzenlenen?.siparis_formu_yolu ? "Sipariş formu" : null) : null;
 
   const fiyatDegisti = (() => {
     if (!taslak.fiyat_formu_id || !kaynakForm || kaynakForm.id !== taslak.fiyat_formu_id) return false;
@@ -264,6 +379,66 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
                 </Alan>
               </div>
             )}
+          </section>
+
+          {/* Siparis formu (21.10.2026) */}
+          <section>
+            <BolumBaslik>Sipariş Formu</BolumBaslik>
+            {okumaUyarilari.length > 0 && (
+              <div className="rounded-lg border px-3 py-2 mb-3 text-xs space-y-1" style={{ borderColor: "rgba(251,191,36,0.35)", backgroundColor: "rgba(251,191,36,0.06)" }} role="status">
+                <p className="font-semibold text-amber-400">Formdan okunanları kontrol edin:</p>
+                {okumaUyarilari.map((u) => <p key={u} className="flex items-start gap-1.5 text-amber-300"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {u}</p>)}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {yeniForm || mevcutFormAdi ? (
+                <span className="inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs text-white max-w-full" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                  <FileText size={13} className="text-emerald-400 shrink-0" />
+                  <span className="truncate max-w-[260px]" title={yeniForm?.name || mevcutFormAdi || ""}>{yeniForm?.name || mevcutFormAdi}</span>
+                  {yeniForm && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400">Kaydedince eklenir</span>}
+                  <button type="button" onClick={formAc} className="inline-flex items-center gap-1 hover:text-white" style={{ color: TEXT_MUTED }} title="Formu görüntüle"><ExternalLink size={12} /> Gör</button>
+                  <button type="button" onClick={() => { if (yeniForm) setYeniForm(null); else setFormKaldir(true); }} className="hover:text-red-400" style={{ color: TEXT_MUTED }} title="Formu kaldır" aria-label="Formu kaldır"><Trash2 size={12} /></button>
+                </span>
+              ) : (
+                <span className="text-xs" style={{ color: TEXT_MUTED }}>{formKaldir ? "Form kaydedince kaldırılacak." : "Sipariş formu eklenmemiş."}</span>
+              )}
+              <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                <Upload size={12} /> {yeniForm || mevcutFormAdi ? "Değiştir" : "Form ekle (PDF)"}
+                <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => { formSec(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Alan etiket="Sipariş tarihi">
+                <input type="date" value={taslak.siparis_tarihi} onChange={(e) => setTaslak({ ...taslak, siparis_tarihi: e.target.value })} className={inputSinif} style={{ ...inputStil, colorScheme: "dark" }} />
+              </Alan>
+              <Alan etiket="Ürün nakliyesi">
+                <select value={taslak.nakliye} onChange={(e) => setTaslak({ ...taslak, nakliye: e.target.value as Taslak["nakliye"] })} className={inputSinif} style={inputStil}>
+                  <option value="">Belirtilmedi</option>
+                  <option value="alici">{NAKLIYE_ETIKET.alici}</option>
+                  <option value="satici">{NAKLIYE_ETIKET.satici}</option>
+                </select>
+              </Alan>
+              <Alan etiket="Teslim süresi (gün)">
+                <input value={taslak.teslim_suresi_gun} onChange={(e) => setTaslak({ ...taslak, teslim_suresi_gun: e.target.value.replace(/\D/g, "").slice(0, 3) })} inputMode="numeric" placeholder="7" className={`${inputSinif} text-right`} style={inputStil} />
+              </Alan>
+            </div>
+            <div className="mt-3">
+              <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>Ürün özellikleri</span>
+              {taslak.urun_ozellikleri.length === 0 && <p className="text-xs mb-1.5" style={{ color: TEXT_MUTED }}>Özellik yok.</p>}
+              <div className="space-y-1.5">
+                {taslak.urun_ozellikleri.map((x, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+                    <input value={x.ad} onChange={(e) => ozellikDegistir(i, "ad", e.target.value)} maxLength={40} placeholder="Rutubet" aria-label={`${i + 1}. özellik adı`} className={inputSinif} style={inputStil} />
+                    <input value={x.deger} onChange={(e) => ozellikDegistir(i, "deger", e.target.value)} maxLength={60} placeholder="%14 En Çok" aria-label={`${i + 1}. özellik değeri`} className={inputSinif} style={inputStil} />
+                    <button type="button" onClick={() => setTaslak((t) => ({ ...t, urun_ozellikleri: t.urun_ozellikleri.filter((_, j) => j !== i) }))} className="px-2 rounded-lg border hover:bg-red-500/10 text-red-400" style={{ borderColor: CARD_BORDER }} aria-label={`${i + 1}. özelliği sil`}><Trash2 size={13} /></button>
+                  </div>
+                ))}
+              </div>
+              {taslak.urun_ozellikleri.length < AZAMI_OZELLIK && (
+                <button type="button" onClick={() => setTaslak((t) => ({ ...t, urun_ozellikleri: [...t.urun_ozellikleri, { ad: "", deger: "" }] }))} className="mt-1.5 inline-flex items-center gap-1 text-xs hover:text-white" style={{ color: TEXT_MUTED }}><Plus size={12} /> Özellik ekle</button>
+              )}
+              {taslak.siparis_tarihi && <p className="text-[10px] mt-2" style={{ color: TEXT_MUTED }}>Form tarihi: {gunAyYil(taslak.siparis_tarihi)}</p>}
+            </div>
           </section>
 
           {/* Fiyat formundan doldur */}
@@ -334,6 +509,7 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
                   <option value="">Seçin</option>
                   {Array.from(new Set([...ODEME_SECENEKLERI, ...(taslak.odeme ? [taslak.odeme] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
+                {onDolum && !duzenlenen && !taslak.odeme && <span className="block text-[10px] mt-1 text-amber-400">Formda ödeme aracı yok; seçin.</span>}
               </Alan>
               <Alan etiket="Teslim" genis>
                 <select value={taslak.teslim} onChange={(e) => setTaslak({ ...taslak, teslim: e.target.value })} className={inputSinif} style={inputStil}>

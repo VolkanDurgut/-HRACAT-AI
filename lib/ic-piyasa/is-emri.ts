@@ -50,6 +50,13 @@ export type IcIsEmri = {
   olusturan_email: string | null;
   olusturma: string;
   takip_token: string;
+  /** Siparis formundan (21.10.2026; migration 20261021100000) */
+  siparis_tarihi: string | null;
+  nakliye: "alici" | "satici" | null;
+  teslim_suresi_gun: number | null;
+  urun_ozellikleri: unknown;
+  siparis_formu_yolu: string | null;
+  siparis_formu_adi: string | null;
 };
 
 export type CikisDurumu = "bekliyor" | "planlandi" | "cikti" | "bugun_degil";

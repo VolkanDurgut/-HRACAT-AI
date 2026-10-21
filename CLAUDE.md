@@ -1287,6 +1287,47 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Harun Bey "Onayla ve İmzala" (imzalı PDF, kilit, revizyon), yeni müşterinin
   imzada karta dönüşmesi; sonra Yeni Dosya Aç entegrasyonu.
 
+## İç Piyasa — Sipariş Formundan İş Emri (21.10.2026)
+
+- Süreci başlatan belge: müşteriyle imzalanan Unex Excel şablonu "SİPARİŞ FORMU" PDF'i
+  (örnek: Alize - Kırık Buğday - 14.10.2026; GERÇEK metin katmanı var). İş Emirleri
+  sayfasında ana düğme **"Sipariş Formundan Aç"** (`components/ic-siparis-formu-penceresi.tsx`),
+  yanında eski "Yeni İş Emri" (elle) durur.
+- Okuma `lib/ic-piyasa/siparis-formu-oku.ts` (saf, YAPAY ZEKÂ YOK, tarayıcıda unpdf):
+  etiket solda / değer aynı satırda sağda → KONUMA göre; seçimler (ürün cinsi, nakliye,
+  ödeme) "✔" (✓ ☑ ✅ veya tek "X") işaretinin hemen sağındaki metin. Ürün adı
+  `urunAdi` (K.BUĞDAY → "Kırık Buğday", BASLANGIC_URUNLERI yazımı). Miktar TON/KG → kg;
+  fiyat TL/KG (TL/TON → /1000 + uyarı; döviz → boş + uyarı); "+ KDV" → hariç, "KDV DAHİL"
+  → dahil, yazmıyorsa null + uyarı; Vadeli → "… 30 Gün" → 30, Peşin → 0. Yetkili satırında
+  e-posta varsa e-posta sayılır. Şüphede alan BOŞ + `uyarilar` (tahmin yok). Metin yoksa
+  (`metin_yok`, taranmış) / başlık yoksa (`form_degil`) → müşteri listeden seçilir, form
+  yine eklenir, alanlar elle. Testler: gerçek form + 36 varyant (scratchpad `sf/test.ts`).
+- Müşteri (kullanıcı kararları 21.10.2026): eşleşme önce VKN, sonra ünvan (`katla`; iki aynı
+  ünvanda eşleşme yok). Kart yoksa formdaki bilgilerle yeni kart önerilir, **WhatsApp izni
+  KAPALI gelir** (kullanıcı işaretler). Kart varsa farklar tablosu; kart SADECE "kartı
+  güncelle" işaretlenirse ve SADECE farklı + formda dolu alanlarla güncellenir
+  (`musteriKartiFarklari`; boş form alanı kartı silmez). Aynı müşteri + form tarihi + ürünle
+  açık iş emri varsa mükerrer uyarısı (engellemez).
+- İş emri formu (`components/ic-is-emri-form.tsx`, `onDolum` prop): okunanlar alanlara
+  yazılır, kullanıcı onaylayınca kaydedilir. Nakliye Alıcıya → "Fabrika Teslim", Satıcıya →
+  "Adrese Teslim" (`nakliyedenTeslim`); formda ödeme aracı olmadığı için Ödeme BOŞ gelir
+  (amber uyarı). Yeni "Sipariş Formu" bölümü düzenlemede de var: form ekle/değiştir/kaldır,
+  sipariş tarihi, nakliye, teslim süresi, ürün özellikleri (≤20; ad ≤40, değer ≤60).
+  Ürün özellikleri SADECE iş emrinde; kantar paneli DEĞİŞMEDİ (kullanıcı kararı).
+- PDF: `ic-piyasa-belgeler/<şirket>/siparis/<uuid>.pdf`. Sıra: (değişiyorsa eski yol kayıttan
+  TAZE okunur) → PDF yüklenir → kayıt; kayıt olmazsa yeni PDF geri silinir; başarılıysa eski
+  PDF silinir. İş emri "Sil" sonrası ve `ic_is_emri_tamamen_sil` (artık form yolunu da
+  döndürür) sonrası PDF depodan silinir.
+- Migration `20261021100000_ic_piyasa_siparis_formu.sql` (SADECE ekleme + izin daraltma;
+  kod push'undan ÖNCE): `ic_is_emirleri.siparis_tarihi / nakliye (alici|satici) /
+  teslim_suresi_gun / urun_ozellikleri (jsonb dizi ≤20) / siparis_formu_yolu (kendi
+  şirketinin siparis/ klasörü, .pdf, ".." yok — CHECK) / siparis_formu_adi`. Depo:
+  `siparis/` yalnız ic_piyasa yükler; **kantarcı artık SADECE `irsaliye/` okur** (önceden
+  şirket klasörünün tamamını okuyabiliyordu; sipariş formunda fiyat var). Yerel PG'de 39
+  migration + yeni migration 2 kez + 19 izin/kısıt testi geçti.
+- Testler: okuyucu 37, yardımcılar 17 (`sf/yardimci_test.ts`), Playwright 42 (`sf/e2e.py`:
+  yeni müşteri, farklı kart, kayıt hatasında PDF geri silme, form olmayan PDF, 390 px).
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

@@ -29,6 +29,11 @@
  * gonderen numaranin profil fotografi Unex logosu; Meta'ya geciste sablon
  * basligi `meta_ust` (logo gorseli / irsaliye belgesi). Takip sayfasi ic
  * kullanim icin durur (is emri detayi).
+ *
+ * 22.10.2026: musteri mesajlarinin sonunda (alt bilgiden once) ILETISIM
+ * satiri: "Sorularınız için lojistik sorumlumuz Süleyman Bey: 0553 268 91 01".
+ * Ad / telefon Bildirimler > Ayarlar'daki lojistik sorumlusundan gelir
+ * (`iletisim: true` olan sablonlar). Meta'ya geciste govdeye degisken olarak eklenir.
  */
 
 export type SablonKategori = "UTILITY" | "MARKETING";
@@ -50,6 +55,8 @@ export type MesajSablonu = {
   govde: string;
   degiskenler: { no: number; ad: string; ornek: string }[];
   alt?: string;
+  /** Sonuna lojistik iletisim satiri eklenir (musteri sorulari dogru kisiye gitsin) */
+  iletisim?: true;
   dugme?: { tur: "url"; metin: string; adres: string; ornek_ek: string };
 };
 
@@ -59,6 +66,7 @@ const ALT_BILGI = "Unex Gıda San. ve Tic. Ltd. Şti.";
 export const MESAJ_SABLONLARI: MesajSablonu[] = [
   {
     ad: "siparis_alindi",
+    iletisim: true,
     baslik: "Siparişiniz alındı",
     ne_zaman: "İş emri açıldığında",
     alici: "musteri",
@@ -84,6 +92,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
   },
   {
     ad: "arac_cikis_saati",
+    iletisim: true,
     baslik: "Araç çıkış saati",
     ne_zaman: "Lojistik çıkış için saat verdiğinde (isteğe bağlı)",
     alici: "musteri",
@@ -104,6 +113,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
   },
   {
     ad: "arac_yola_cikti",
+    iletisim: true,
     baslik: "Aracınız yola çıktı",
     ne_zaman: "Lojistik çıkışı onayladığında (her araç için)",
     alici: "musteri",
@@ -133,6 +143,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
   },
   {
     ad: "siparis_tamamlandi",
+    iletisim: true,
     baslik: "Siparişiniz tamamlandı",
     ne_zaman: "İş emri tamamlandı olarak kapatıldığında",
     alici: "musteri",
@@ -217,11 +228,21 @@ export function govdeDoldur(sablon: MesajSablonu, degerler: string[]): string {
  * Meta onayi gelene kadar elle (wa.me) gonderilecek duz metin:
  * ust baslik kalin (*...*), govde, takip linki, alt bilgi.
  */
-export function elleGonderimMetni(sablon: MesajSablonu, degerler: string[], dugmeEki?: string): string {
+/** "Sorularınız için lojistik sorumlumuz Süleyman Bey: 0553 268 91 01" (ad ya da telefon yoksa null) */
+export function iletisimSatiri(i?: { ad?: string | null; telefon?: string | null } | null): string | null {
+  const ad = (i?.ad || "").trim();
+  const tel = (i?.telefon || "").trim();
+  if (!ad || !tel) return null;
+  return `Sorularınız için lojistik sorumlumuz ${ad}: ${tel}`;
+}
+
+export function elleGonderimMetni(sablon: MesajSablonu, degerler: string[], dugmeEki?: string, iletisim?: { ad?: string | null; telefon?: string | null } | null): string {
   const parcalar: string[] = [];
   if (sablon.ust?.tur === "metin") parcalar.push(`*${sablon.ust.metin}*`);
   parcalar.push(govdeDoldur(sablon, degerler));
   if (sablon.dugme && dugmeEki) parcalar.push(`${sablon.dugme.metin}: ${sablon.dugme.adres.replace("{{1}}", dugmeEki)}`);
+  const il = sablon.iletisim ? iletisimSatiri(iletisim) : null;
+  if (il) parcalar.push(il);
   if (sablon.alt) parcalar.push(`_${sablon.alt}_`);
   return parcalar.join("\n\n");
 }

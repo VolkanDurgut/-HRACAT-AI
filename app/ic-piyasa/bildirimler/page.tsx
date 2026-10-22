@@ -80,6 +80,8 @@ export default function BildirimlerPage() {
 
   const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "", yetkili_cc: "" });
   const [ayarVar, setAyarVar] = useState(false);
+  // Musteri mesajlarindaki iletisim satiri: KAYITLI ayardan (formdaki kaydedilmemis degisiklik degil)
+  const [iletisim, setIletisim] = useState<{ ad: string; telefon: string } | null>(null);
   const [ayarAcik, setAyarAcik] = useState(false);
   const [ayarKaydediliyor, setAyarKaydediliyor] = useState(false);
 
@@ -95,6 +97,7 @@ export default function BildirimlerPage() {
     if (bRes.error || aRes.error) { setOkumaHatasi((bRes.error || aRes.error)!.message); setYukleniyor(false); return; }
     setSatirlar((bRes.data || []) as unknown as Satir[]);
     bildirimSayaciniYenile();
+    setIletisim(aRes.data ? { ad: aRes.data.lojistik_ad || "", telefon: aRes.data.lojistik_telefon ? telefonYazi(aRes.data.lojistik_telefon) : "" } : null);
     if (aRes.data) {
       setAyarVar(true);
       setAyar({
@@ -125,7 +128,7 @@ export default function BildirimlerPage() {
   const metni = (s: Satir) => {
     const sb = sablonBul(s.sablon);
     if (!sb) return null;
-    try { return elleGonderimMetni(sb, s.degerler, s.dugme_eki || undefined); } catch { return null; }
+    try { return elleGonderimMetni(sb, s.degerler, s.dugme_eki || undefined, iletisim); } catch { return null; }
   };
 
   const isaretle = async (s: Satir, durum: "gonderildi" | "atlandi") => {
@@ -249,7 +252,7 @@ export default function BildirimlerPage() {
         <div className="rounded-xl border p-4 mb-5" style={{ backgroundColor: CARD_BG, borderColor: ayarVar ? CARD_BORDER : "#92400E" }}>
           <h2 className="text-sm font-semibold text-white">Bildirim Ayarları</h2>
           <p className="text-xs mt-0.5 mb-3" style={{ color: ayarVar ? TEXT_MUTED : "#FBBF24" }}>
-            {ayarVar ? "Çıkış onayı e-postaları lojistiğe, uyarılar yetkiliye gider." : "Lojistik e-posta adresi tanımlanmadan çıkış onayı e-postaları gönderilemez."}
+            {ayarVar ? "Çıkış onayı e-postaları lojistiğe, uyarılar yetkiliye gider. Lojistik sorumlusu ve telefonu müşteri mesajlarının sonunda iletişim olarak yazar." : "Lojistik e-posta adresi tanımlanmadan çıkış onayı e-postaları gönderilemez."}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <Alan etiket="Lojistik sorumlusu"><input value={ayar.lojistik_ad} onChange={(e) => setAyar({ ...ayar, lojistik_ad: e.target.value })} placeholder="Süleyman Bey" className={inputSinif} style={inputStil} /></Alan>

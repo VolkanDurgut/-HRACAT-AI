@@ -1364,6 +1364,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   varsa yeni kart AÇILMAZ. Müşteriler formunda uyarı; sipariş formu penceresinde mevcut
   aktif kart seçilir, kullanıcı farkları görüp tekrar onaylar (pasifse aktifleştirme
   istenir). Testler: yardımcılar 23, Playwright `sf/e2e3.py` (detay, mükerrer, paylaşım).
+- İletişim satırı (22.10.2026, kullanıcı: müşteri soruları Süleyman Bey'e gitsin):
+  `iletisim: true` olan 4 müşteri şablonunda alt bilgiden önce "Sorularınız için
+  lojistik sorumlumuz {ad}: {telefon}" (`iletisimSatiri`). Ad/telefon Bildirimler ›
+  Ayarlar'daki KAYITLI lojistik sorumlusundan; biri boşsa satır yazılmaz. DB/SQL değişmedi.
+  Meta'ya geçişte govdeye değişken olarak eklenecek. Kalıcı çözüm önerisi: ortak şirket
+  WhatsApp Business numarası (logolu profil, Süleyman Bey + yetkili bağlı cihaz).
 - Sipariş formu YENİ SÜRÜM (21.10.2026, Bonkalit): fiyat etiketi "Ürün Kg Fiyatı"
   (değer "15,90 TL", birim etiketten → TL/kg, KDV yazmaz → uyarı, varsayılan KDV Hariç);
   sağ etiket sütunu x≈313. Özellik tablosunda çok satırlı etiket ("HCL'de / Çözülmeyen /

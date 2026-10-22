@@ -11,6 +11,11 @@ import {
 } from "@/lib/ic-piyasa/is-emri";
 import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarken, trSayiOku, urunUyusuyor } from "@/lib/ic-piyasa/irsaliye-oku";
 
+/** Elle yazilan irsaliye no: okuyucuyla ayni kural (A-Z0-9, 3-20). */
+const IRSALIYE_NO_RE = /^[A-Z0-9]{3,20}$/;
+/** e-Irsaliye PDF'i ETTN adiyla indirilir: "8BDBB562-6147-449C-A089-E0ABC17CE395.pdf" (tarayicinin "(1)" ekine izin var). */
+const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})(?:\s*\(\d+\))?\.pdf$/i;
+
 /**
  * Kantar Paneli > Yurt Ici (12.10.2026).
  * Kantarci acik is emirlerini (musteri MASKELI, FIYATSIZ) gorur; her arac
@@ -77,12 +82,14 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
   const [plaka, setPlaka] = useState("");
   const [dorse, setDorse] = useState("");
   const [net, setNet] = useState("");
+  // Irsaliye no okunamadiysa (gorsel/taranmis PDF) kantarci elle yazar
+  const [irsNoElle, setIrsNoElle] = useState("");
   const [uyarilar, setUyarilar] = useState<string[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const kontrolSira = useRef(0);
 
   const pencereAc = (e: KantarIsEmri) => {
-    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setUyarilar(null); setHata(null);
+    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setUyarilar(null); setHata(null);
   };
   const pencereKapat = () => { if (adim !== "kaydediliyor") setSecili(null); };
 
@@ -100,6 +107,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
       o = null;
     }
     setOkuma(o);
+    setIrsNoElle("");
     setPlaka(o?.plaka || "");
     setDorse(o?.dorsePlaka || "");
     setNet(o?.netKg ? o.netKg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "");
@@ -114,7 +122,12 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
   const plakaSon = plakaBicimle(plaka);
   const elleDuzeltildi = !!okuma && ((!!okuma.plaka && okuma.plaka !== plakaSon) || (okuma.netKg !== null && netSayi !== null && Math.abs(okuma.netKg - netSayi) > 0.001));
   const urunFarkli = secili && okuma ? urunUyusuyor(secili.urun, okuma.urun) === false : false;
-  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000;
+  const irsNoOkundu = !!okuma?.irsaliyeNo;
+  const irsNoSon = irsNoElle.trim().toUpperCase();
+  const irsNoGecerli = !irsNoSon || IRSALIYE_NO_RE.test(irsNoSon);
+  // e-Irsaliye dosyalari cogu zaman ETTN adini tasir (ör. 8BDBB562-....pdf)
+  const ettnDosyaAdindan = dosya ? (dosya.name.match(ETTN_DOSYA_RE)?.[1]?.toUpperCase() || null) : null;
+  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000 && (irsNoOkundu || irsNoGecerli);
 
   const dosyaYolu = useRef<string>("");
   const veri = useCallback((yol: string) => ({
@@ -122,9 +135,9 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
     plaka: plakaSon,
     dorse_plaka: dorse ? plakaBicimle(dorse) : null,
     net_kg: netSayi,
-    irsaliye_no: okuma?.irsaliyeNo || null,
+    irsaliye_no: okuma?.irsaliyeNo || irsNoSon || null,
     irsaliye_tarihi: okuma?.tarih || null,
-    ettn: okuma?.ettn || null,
+    ettn: okuma?.ettn || ettnDosyaAdindan,
     sofor_ad: okuma?.soforAd || null,
     alici_vkn: okuma?.aliciVkn || null,
     irsaliye_urun: okuma?.urun || null,
@@ -136,7 +149,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
       irsaliye_no: okuma.irsaliyeNo, tarih: okuma.tarih, plaka: okuma.plaka, dorse: okuma.dorsePlaka,
       net_kg: okuma.netKg, urun: okuma.urun, alici_unvan: okuma.aliciUnvan, kalemler: okuma.kalemler,
     } : null,
-  }), [secili, plakaSon, dorse, netSayi, okuma, dosya, elleDuzeltildi, urunFarkli]);
+  }), [secili, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, dosya, elleDuzeltildi, urunFarkli]);
 
   // Girdi degistikce sunucuda KURU kontrol (kaydetmeden uyarilari getirir)
   useEffect(() => {
@@ -337,7 +350,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
                           İrsaliyeden okundu{okuma.irsaliyeNo ? ` · ${okuma.irsaliyeNo}` : ""}{okuma.tarih ? ` · ${tarihSaatYazi(okuma.tarih)}` : ""}{okuma.urun ? ` · ${okuma.urun}` : ""}{okuma.soforAd ? ` · Şoför: ${okuma.soforAd}` : ""}
                         </p>
                       ) : (
-                        <p className="text-amber-400">İrsaliye okunamadı. Plaka ve net ağırlığı irsaliyeye bakarak yazın.</p>
+                        <p className="text-amber-400">İrsaliye okunamadı (PDF metin değil, görüntü). Plaka, net ağırlık ve irsaliye no&apos;yu irsaliyeye bakarak yazın.</p>
                       )}
                     </div>
                   </div>
@@ -356,6 +369,17 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
                         className="w-full px-3 py-3 rounded-lg border text-lg font-bold text-right text-white placeholder:text-slate-600 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                         style={{ backgroundColor: "#0F131A", borderColor: net && (netSayi === null || netSayi <= 0 || netSayi > 60000) ? "#F87171" : CARD_BORDER }} />
                     </label>
+                    {!irsNoOkundu && (
+                      <label className="block col-span-2">
+                        <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>İrsaliye no (irsaliyenin üstünde yazar)</span>
+                        <input value={irsNoElle} onChange={(ev) => setIrsNoElle(ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20))}
+                          placeholder="IRS2026000001234" autoCapitalize="characters" spellCheck={false} aria-label="İrsaliye no"
+                          className="w-full px-3 py-2 rounded-lg border text-sm font-semibold tracking-wide text-white uppercase placeholder:text-slate-600 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                          style={{ backgroundColor: "#0F131A", borderColor: irsNoGecerli ? CARD_BORDER : "#F87171" }} />
+                        {!irsNoGecerli && <span className="block text-[11px] mt-1 text-red-400">Harf ve rakamlardan oluşan 3-20 karakter olmalı.</span>}
+                        {ettnDosyaAdindan && <span className="block text-[11px] mt-1" style={{ color: TEXT_MUTED }}>ETTN dosya adından alındı.</span>}
+                      </label>
+                    )}
                     <label className="block col-span-2">
                       <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>Dorse plakası (varsa)</span>
                       <input value={dorse} onChange={(ev) => setDorse(plakaYazarken(ev.target.value))} onBlur={() => setDorse(dorse ? plakaBicimle(dorse) : "")} autoCapitalize="characters"

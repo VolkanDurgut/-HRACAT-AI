@@ -1089,6 +1089,14 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   denendi: ihracat tablosundaki DBA düğmesi taşıyordu → bilinçli olarak 1536. İHRACAT
   AKIŞININ İÇERİĞİ DEĞİŞMEDİ. Üstteki "Yenile" iki bölümü de yeniler.
   Bileşen: `components/kantar-yurt-ici.tsx` (dakikada bir + sekmeye dönünce yenilenir).
+- Görüntü (taranmış) irsaliye PDF'i (22.10.2026, canlıda ilk Bonkalit aracı): PDF metin
+  değil resimse okunamaz (AI/OCR YOK, bilinçli). O zaman pencerede plaka/net/dorse'nin
+  yanında "İrsaliye no" alanı da çıkar (A-Z0-9, 3-20, büyük harf; boş bırakılabilir →
+  sunucu "İrsaliye numarası okunamadı" uyarısı verir, eski davranış). Dosya adı ETTN ise
+  (`XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX.pdf`, "(1)" eki olabilir) ETTN dosya adından
+  alınır → mükerrer irsaliye kontrolü yine çalışır. Okunan değer varsa elle alan GİZLİ.
+  RPC değişmedi (irsaliye_no/ettn zaten p_veri'den geliyordu). irsaliye_no, araç yola
+  çıktı mesajında kullanılır — bu yüzden elle girilmesi önemli.
 - CANLI DURUM (12.10.2026 03:15 kontrol): migration kullanıcı tarafından SQL Editor ile
   UYGULANDI; 3 tablo + 10 politika + bucket + 3 depo politikası + fonksiyonlar yerinde,
   anon RPC yetkisi yok. Rol testleri (canlıda, rollback'li): kantar@ tablolara 0 satır

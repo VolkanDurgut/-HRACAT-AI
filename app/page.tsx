@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { Loader2, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
+import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 /**
@@ -20,11 +21,9 @@ import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from
  * Arka plan gorseli (22.10.2026, kullanicinin 5504x3072 / 17 MB PNG'si): SADECE
  * giris ekraninda. WebP'ye cevrilip 5 boyutta (828-3840 px, 18-179 KB)
  * `public/images/giris/` altinda; tarayici ekranina uygun olani indirir
- * (srcSet). Ustunde koyu ortu var (form okunurlugu). Uygulama ici sayfalarda
- * KULLANILMAZ (tablolar/okunurluk, performans).
+ * (srcSet). Ustunde koyu ortu var (form okunurlugu). Ortak bilesen:
+ * components/arka-plan-gorseli.tsx (uygulama icinde daha koyu ortuyle).
  */
-const ARKA_GENISLIKLER = [828, 1280, 1920, 2560, 3840] as const;
-const ARKA_SRCSET = ARKA_GENISLIKLER.map((w) => `/images/giris/giris-arka-${w}.webp ${w}w`).join(", ");
 export default function GirisSayfasi() {
   const { user, loading, yetkiler, signIn } = useAuth();
   const router = useRouter();
@@ -67,19 +66,7 @@ export default function GirisSayfasi() {
   return (
     <main className="relative isolate min-h-screen flex flex-col items-center justify-center px-4 py-10 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
       {/* Dekoratif arka plan (ekran okuyucuya kapali); yuklenemezse koyu zemin kalir */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/images/giris/giris-arka-1920.webp"
-        srcSet={ARKA_SRCSET}
-        // object-cover: dik ekranda gorsel yukseklige gore buyur (en-boy 1,79) -> genislik yerine onu sec
-        sizes="max(100vw, 179vh)"
-        alt=""
-        aria-hidden="true"
-        decoding="async"
-        className="absolute inset-0 -z-20 h-full w-full object-cover object-center select-none pointer-events-none"
-      />
-      <div aria-hidden="true" className="absolute inset-0 -z-10 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse at center, rgba(11,15,20,0.55) 0%, rgba(11,15,20,0.30) 45%, rgba(11,15,20,0.70) 100%)" }} />
+      <ArkaPlanGorseli tur="giris" />
       <div className="w-full max-w-[400px]">
         {/* Marka */}
         <div className="flex items-center justify-center gap-3 mb-8">

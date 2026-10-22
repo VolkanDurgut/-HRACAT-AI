@@ -7,6 +7,7 @@ import { useEffect, useMemo } from "react";
 import Sidebar from "@/components/sidebar";
 import DestekWidget from "@/components/destek-widget";
 import CutoffUyarilari from "@/components/cutoff-uyarilari";
+import { ArkaPlanGorseli, useArkaPlanTercihi } from "@/components/arka-plan-gorseli";
 import { Loader2, LogOut, ShieldAlert } from "lucide-react";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
@@ -34,6 +35,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading, yetkiler, isSuperAdmin, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname() || "";
+  // Arka plan gorseli (22.10.2026): kullanici kenar cubugundan kapatabilir
+  const [arkaPlan] = useArkaPlanTercihi();
 
   const isAyarlarPath = pathname.startsWith(AYARLAR_PREFIX);
 
@@ -123,7 +126,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: PAGE_BG }}>
+    // isolate: arka plan gorseli (-z) bu kabin zemininin USTUNDE, icerigin altinda kalir
+    <div className="relative isolate min-h-screen overflow-x-hidden" style={{ backgroundColor: PAGE_BG }}>
+      {arkaPlan && <ArkaPlanGorseli tur="uygulama" />}
       <Sidebar />
       <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">

@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, Image as ImageIcon } from "lucide-react";
+import { useArkaPlanTercihi } from "@/components/arka-plan-gorseli";
 
 type MenuItem = {
   label: string;
@@ -73,6 +74,9 @@ export default function Sidebar() {
     return () => { iptal = true; };
   }, [companyId]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [arkaPlan, setArkaPlan] = useArkaPlanTercihi();
+  // Gorsel aciksa kenar cubugu hafif saydam (harita kenardan devam etsin); kapaliysa eskisi gibi
+  const sidebarZemin = arkaPlan ? "rgba(11,15,20,0.86)" : SIDEBAR_BG;
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
   const isActive = (href: string) => {
@@ -188,6 +192,22 @@ export default function Sidebar() {
             <p className="text-xs break-all leading-snug" style={{ color: TEXT_MUTED }}>{user.email}</p>
           </div>
         )}
+        {/* Arka plan gorseli tercihi (bu tarayicida hatirlanir) */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={arkaPlan}
+          onClick={() => setArkaPlan(!arkaPlan)}
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors duration-150"
+          style={{ color: TEXT_MUTED }}
+          title={arkaPlan ? "Arka plan görselini kapat" : "Arka plan görselini aç"}
+        >
+          <ImageIcon size={18} />
+          <span className="flex-1 text-left">Arka plan</span>
+          <span className="relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors" style={{ backgroundColor: arkaPlan ? NAVY : BORDER }}>
+            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${arkaPlan ? "translate-x-3.5" : "translate-x-0.5"}`} />
+          </span>
+        </button>
         <button
           onClick={() => { signOut(); closeMobile(); }}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"
@@ -218,7 +238,7 @@ export default function Sidebar() {
         className={`fixed left-0 top-0 bottom-0 w-[240px] flex flex-col z-[56] border-r transition-transform duration-300 ease-out md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ backgroundColor: SIDEBAR_BG, borderColor: BORDER }}
+        style={{ backgroundColor: sidebarZemin, borderColor: BORDER }}
       >
         <button onClick={closeMobile} className="absolute top-4 right-4 hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
           <X size={20} />
@@ -226,7 +246,7 @@ export default function Sidebar() {
         {navContent}
       </aside>
 
-      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] flex-col z-50 border-r" style={{ backgroundColor: SIDEBAR_BG, borderColor: BORDER }}>
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] flex-col z-50 border-r" style={{ backgroundColor: sidebarZemin, borderColor: BORDER }}>
         {navContent}
       </aside>
     </>

@@ -917,8 +917,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `app/page.tsx`. Orijinal 5504×3072 PNG 17 MB → WebP 5 boyut `public/images/giris/
   giris-arka-{828,1280,1920,2560,3840}.webp` (18–184 KB, toplam ~430 KB), `<img srcSet
   sizes="max(100vw, 179vh)">` (dik ekranda yüksekliğe göre seçer), üstte koyu radyal örtü,
-  kart %90 opak + blur. Görsel yüklenemezse koyu zemin kalır. Uygulama içi sayfalarda
-  KULLANILMAZ (tablo okunurluğu / performans); orijinal PNG repoya EKLENMEDİ.
+  kart %90 opak + blur. Görsel yüklenemezse koyu zemin kalır. Orijinal PNG repoya EKLENMEDİ.
+- UYGULAMA İÇİ (22.10.2026, kullanıcı isteği): aynı görsel `components/arka-plan-gorseli.tsx`
+  (`ArkaPlanGorseli tur="giris"|"uygulama"`) ile AppShell'de TAM EKRAN, `position: fixed`
+  (kaydırmada yeniden çizilmez), daha koyu örtü (%60–84). Kartlar/tablolar OPAK kalır
+  (okunurluk); görsel boşluklarda ve kenarlarda görünür. backdrop-blur BİLEREK yok
+  (performans). Kenar çubuğu görsel açıkken %86 opak. Kenar çubuğu altında "Arka plan"
+  anahtarı (`useArkaPlanTercihi`, localStorage `arka-plan-gorseli`, tarayıcı başına,
+  varsayılan açık). Kantar Paneli ve girişsiz sayfalar (takip, çıkış, rapor) AppShell
+  kullanmadığı için görselsiz. Sayfa geçişinde görsel yeniden indirilmez (önbellek).
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).
 - `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;

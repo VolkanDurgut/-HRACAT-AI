@@ -75,8 +75,6 @@ export default function Sidebar() {
   }, [companyId]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [arkaPlan, setArkaPlan] = useArkaPlanTercihi();
-  // Gorsel aciksa kenar cubugu hafif saydam (harita kenardan devam etsin); kapaliysa eskisi gibi
-  const sidebarZemin = arkaPlan ? "rgba(11,15,20,0.86)" : SIDEBAR_BG;
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
   const isActive = (href: string) => {
@@ -86,6 +84,12 @@ export default function Sidebar() {
   };
 
   const closeMobile = () => setMobileOpen(false);
+
+  // macOS tarzi (22.10.2026): yuzen, kenarlari yuvarlak cam panel. Arka plan gorseli
+  // aciksa yari saydam + bulanik (harita alttan sezilir); kapaliysa duz koyu panel.
+  const panelStil: React.CSSProperties = arkaPlan
+    ? { backgroundColor: "rgba(16,20,28,0.62)", borderColor: "rgba(255,255,255,0.08)", backdropFilter: "blur(20px) saturate(140%)", WebkitBackdropFilter: "blur(20px) saturate(140%)" }
+    : { backgroundColor: SIDEBAR_BG, borderColor: BORDER };
 
   const renderItem = (item: MenuItem) => {
     const active = isActive(item.href);
@@ -97,13 +101,15 @@ export default function Sidebar() {
           key={item.href}
           href={item.href}
           onClick={closeMobile}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 ${
-            active ? "font-medium text-white" : "font-medium hover:bg-white/5"
+          aria-current={active ? "page" : undefined}
+          className={`group relative flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${
+            active ? "text-white" : "hover:bg-white/[0.06] hover:text-white"
           }`}
-          style={active ? { backgroundColor: NAVY } : { color: TEXT_MUTED }}
+          style={active ? { backgroundColor: "rgba(16,185,129,0.16)" } : { color: TEXT_MUTED }}
         >
-          <span className="shrink-0">{item.icon}</span>
-          <span>{item.label}</span>
+          {active && <span aria-hidden="true" className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full" style={{ backgroundColor: NAVY }} />}
+          <span className="shrink-0" style={active ? { color: NAVY } : undefined}>{item.icon}</span>
+          <span className="truncate">{item.label}</span>
         </Link>
       );
     }
@@ -111,85 +117,89 @@ export default function Sidebar() {
     return (
       <div
         key={item.href}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-not-allowed select-none opacity-40"
+        className="flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium cursor-not-allowed select-none opacity-40"
         style={{ color: TEXT_MUTED }}
         title="Bu bölüme erişim yetkiniz yok"
       >
         <span className="shrink-0">{item.icon}</span>
-        <span>{item.label}</span>
+        <span className="truncate">{item.label}</span>
       </div>
     );
   };
 
+  const Bolum = ({ baslik }: { baslik: string }) => (
+    <p className="px-2.5 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#5B6576" }}>{baslik}</p>
+  );
+
+  const basHarf = (user?.email || "?").trim().charAt(0).toLocaleUpperCase("tr");
+
   const navContent = (
     <>
-      <Link href="/dashboard" onClick={closeMobile} className="px-5 py-5 border-b flex items-center gap-3 hover:bg-white/5 transition-colors" style={{ borderColor: BORDER }}>
+      <Link href="/dashboard" onClick={closeMobile} className="mx-2 mt-2 px-3 py-3 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
         <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div className="min-w-0">
           {sirketAdi && <p className="text-[11px] font-medium leading-tight truncate" style={{ color: TEXT_MUTED }}>{sirketAdi}</p>}
           <h1 className="font-semibold text-[15px] leading-tight text-white">İhracat AI</h1>
         </div>
       </Link>
+      <div className="mx-4 h-px" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />
 
-      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {mainItems.map(renderItem)}
+      <nav className="flex-1 px-2 pb-3 overflow-y-auto" aria-label="Ana menü">
+        <Bolum baslik="İhracat" />
+        <div className="space-y-0.5">{mainItems.map(renderItem)}</div>
 
-        <div className="pt-3 pb-2 px-3">
-          <div className="h-px" style={{ backgroundColor: BORDER }} />
-        </div>
-
-        {opsItems.map(renderItem)}
+        <Bolum baslik="Operasyon" />
+        <div className="space-y-0.5">{opsItems.map(renderItem)}</div>
 
         {icPiyasaItems.some((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]) && (
           <>
-            <div className="pt-3 pb-2 px-3">
-              <div className="h-px" style={{ backgroundColor: BORDER }} />
-            </div>
-            {icPiyasaItems.filter((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}
+            <Bolum baslik="Yurt İçi" />
+            <div className="space-y-0.5">{icPiyasaItems.filter((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}</div>
           </>
         )}
 
         {/* Ayarlar accordion — SADECE süper admin e-postaları görebilir (bkz. lib/auth-context.tsx) */}
         {isSuperAdmin ? (
-          <div>
+          <>
+            <Bolum baslik="Yönetim" />
             <button
               onClick={() => setAyarlarAcik(!ayarlarAcik)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 hover:bg-white/5`}
+              aria-expanded={ayarlarAcik}
+              className="w-full flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium transition-colors duration-150 hover:bg-white/[0.06] hover:text-white"
               style={{ color: pathname.startsWith("/ayarlar") ? "#FFFFFF" : TEXT_MUTED }}
             >
               <span className="shrink-0"><Settings size={18} /></span>
               <span className="flex-1 text-left">Ayarlar</span>
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 ${ayarlarAcik ? "rotate-180" : ""}`}
-              />
+              <ChevronDown size={14} className={`transition-transform duration-200 ${ayarlarAcik ? "rotate-180" : ""}`} />
             </button>
             {ayarlarAcik && (
-              <div className="ml-4 mt-1 space-y-0.5 border-l-2 pl-3" style={{ borderColor: BORDER }}>
+              <div className="ml-[18px] mt-0.5 space-y-0.5 border-l pl-2.5" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
                 {ayarlarAltMenu.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={closeMobile}
-                    className={`flex items-center gap-2 px-2 py-2 rounded-lg text-sm transition-colors duration-150 ${
-                      isActive(item.href) ? "font-medium text-white" : "hover:bg-white/5"
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg text-[13px] transition-colors duration-150 ${
+                      isActive(item.href) ? "font-medium text-white" : "hover:bg-white/[0.06] hover:text-white"
                     }`}
-                    style={{ color: isActive(item.href) ? "#FFFFFF" : TEXT_MUTED, backgroundColor: isActive(item.href) ? NAVY : undefined }}
+                    style={{ color: isActive(item.href) ? "#FFFFFF" : TEXT_MUTED, backgroundColor: isActive(item.href) ? "rgba(16,185,129,0.16)" : undefined }}
                   >
-                    <span className="shrink-0">{item.icon}</span>
-                    <span>{item.label}</span>
+                    <span className="shrink-0" style={isActive(item.href) ? { color: NAVY } : undefined}>{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
                   </Link>
                 ))}
               </div>
             )}
-          </div>
+          </>
         ) : null /* Süper admin değilse Ayarlar/Yetkilendirme menüde hiç görünmez — soluk placeholder bile göstermiyoruz */}
       </nav>
 
-      <div className="px-3 pb-3 pt-2 border-t space-y-1" style={{ borderColor: BORDER }}>
+      <div className="m-2 p-2 rounded-xl border space-y-0.5" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(255,255,255,0.025)" }}>
         {user?.email && (
-          <div className="px-3 py-2">
-            <p className="text-xs break-all leading-snug" style={{ color: TEXT_MUTED }}>{user.email}</p>
+          <div className="flex items-center gap-2.5 px-1.5 py-1.5">
+            <span aria-hidden="true" className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[12px] font-semibold text-white" style={{ background: "linear-gradient(135deg, #10B981, #283474)" }}>{basHarf}</span>
+            <p className="text-xs leading-snug truncate min-w-0" style={{ color: TEXT_MUTED }} title={user.email}>{user.email}</p>
           </div>
         )}
         {/* Arka plan gorseli tercihi (bu tarayicida hatirlanir) */}
@@ -198,22 +208,22 @@ export default function Sidebar() {
           role="switch"
           aria-checked={arkaPlan}
           onClick={() => setArkaPlan(!arkaPlan)}
-          className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors duration-150"
+          className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-white/[0.06] hover:text-white transition-colors duration-150"
           style={{ color: TEXT_MUTED }}
           title={arkaPlan ? "Arka plan görselini kapat" : "Arka plan görselini aç"}
         >
-          <ImageIcon size={18} />
+          <ImageIcon size={16} />
           <span className="flex-1 text-left">Arka plan</span>
-          <span className="relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors" style={{ backgroundColor: arkaPlan ? NAVY : BORDER }}>
+          <span className="relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors" style={{ backgroundColor: arkaPlan ? NAVY : "#2A3141" }}>
             <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${arkaPlan ? "translate-x-3.5" : "translate-x-0.5"}`} />
           </span>
         </button>
         <button
           onClick={() => { signOut(); closeMobile(); }}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"
+          className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"
           style={{ color: TEXT_MUTED }}
         >
-          <LogOut size={18} />
+          <LogOut size={16} />
           Çıkış Yap
         </button>
       </div>
@@ -224,6 +234,7 @@ export default function Sidebar() {
     <>
       <button
         onClick={() => setMobileOpen(true)}
+        aria-label="Menüyü aç"
         className="fixed top-4 left-4 z-[60] md:hidden p-2 rounded-lg text-white shadow-lg transition-transform duration-150 active:scale-95"
         style={{ backgroundColor: NAVY }}
       >
@@ -231,22 +242,23 @@ export default function Sidebar() {
       </button>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-[55] bg-black/40 md:hidden transition-opacity duration-200" onClick={closeMobile} />
+        <div className="fixed inset-0 z-[55] bg-black/50 md:hidden transition-opacity duration-200" onClick={closeMobile} />
       )}
 
       <aside
-        className={`fixed left-0 top-0 bottom-0 w-[240px] flex flex-col z-[56] border-r transition-transform duration-300 ease-out md:hidden ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed left-2 top-2 bottom-2 w-[240px] flex flex-col z-[56] rounded-2xl border shadow-2xl transition-transform duration-300 ease-out md:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-[110%]"
         }`}
-        style={{ backgroundColor: sidebarZemin, borderColor: BORDER }}
+        style={panelStil}
       >
-        <button onClick={closeMobile} className="absolute top-4 right-4 hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
+        <button onClick={closeMobile} aria-label="Menüyü kapat" className="absolute top-4 right-4 hover:text-white transition-colors" style={{ color: TEXT_MUTED }}>
           <X size={20} />
         </button>
         {navContent}
       </aside>
 
-      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[240px] flex-col z-50 border-r" style={{ backgroundColor: sidebarZemin, borderColor: BORDER }}>
+      {/* Masaustu: yuzen panel (sol/ust/alt 12px bosluk); icerik md:ml-[240px] ile cakismaz */}
+      <aside className="hidden md:flex fixed left-3 top-3 bottom-3 w-[224px] flex-col z-50 rounded-2xl border shadow-[0_8px_32px_rgba(0,0,0,0.35)]" style={panelStil} aria-label="Kenar çubuğu">
         {navContent}
       </aside>
     </>

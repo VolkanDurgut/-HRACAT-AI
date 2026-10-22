@@ -926,6 +926,14 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   anahtarı (`useArkaPlanTercihi`, localStorage `arka-plan-gorseli`, tarayıcı başına,
   varsayılan açık). Kantar Paneli ve girişsiz sayfalar (takip, çıkış, rapor) AppShell
   kullanmadığı için görselsiz. Sayfa geçişinde görsel yeniden indirilmez (önbellek).
+- KENAR ÇUBUĞU macOS tarzı (22.10.2026, kullanıcı isteği; `components/sidebar.tsx`):
+  masaüstünde YÜZEN panel (sol/üst/alt 12px boşluk, 224px, 16px köşe, gölge; içerik
+  `md:ml-[240px]` değişmedi). Görsel açıkken cam (rgba(16,20,28,0.62) + blur 20px — tek
+  öğe, performans sorunu yok), kapalıyken düz `#0B0F14`. Bölüm başlıkları: İhracat /
+  Operasyon / Yurt İçi / Yönetim (süper admin). Aktif öğe: yumuşak yeşil zemin + solda
+  3px çizgi + yeşil ikon + `aria-current`. Altta kullanıcı kartı (baş harf avatar,
+  e-posta, Arka plan anahtarı, Çıkış). Mobil çekmece aynı stil. Menü öğeleri, sırası ve
+  yetki/kilit davranışı DEĞİŞMEDİ. Test `sf/e2e7.py`.
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).
 - `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;

@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, Image as ImageIcon } from "lucide-react";
-import { useArkaPlanTercihi } from "@/components/arka-plan-gorseli";
+import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -45,7 +44,6 @@ const ayarlarAltMenu = [
 ];
 
 const NAVY = "#10B981";
-const SIDEBAR_BG = "#0B0F14";
 const BORDER = "#1E2530";
 const TEXT_MUTED = "#8B95A5";
 
@@ -74,7 +72,6 @@ export default function Sidebar() {
     return () => { iptal = true; };
   }, [companyId]);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [arkaPlan, setArkaPlan] = useArkaPlanTercihi();
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
   const isActive = (href: string) => {
@@ -85,11 +82,12 @@ export default function Sidebar() {
 
   const closeMobile = () => setMobileOpen(false);
 
-  // macOS tarzi (22.10.2026): yuzen, kenarlari yuvarlak cam panel. Arka plan gorseli
-  // aciksa yari saydam + bulanik (harita alttan sezilir); kapaliysa duz koyu panel.
-  const panelStil: React.CSSProperties = arkaPlan
-    ? { backgroundColor: "rgba(16,20,28,0.62)", borderColor: "rgba(255,255,255,0.08)", backdropFilter: "blur(20px) saturate(140%)", WebkitBackdropFilter: "blur(20px) saturate(140%)" }
-    : { backgroundColor: SIDEBAR_BG, borderColor: BORDER };
+  // macOS tarzi (22.10.2026): yuzen, kenarlari yuvarlak cam panel; arka plan gorseli
+  // her zaman acik oldugu icin yari saydam + bulanik (harita alttan sezilir).
+  const panelStil: React.CSSProperties = {
+    backgroundColor: "rgba(16,20,28,0.62)", borderColor: "rgba(255,255,255,0.08)",
+    backdropFilter: "blur(20px) saturate(140%)", WebkitBackdropFilter: "blur(20px) saturate(140%)",
+  };
 
   const renderItem = (item: MenuItem) => {
     const active = isActive(item.href);
@@ -202,22 +200,6 @@ export default function Sidebar() {
             <p className="text-xs leading-snug truncate min-w-0" style={{ color: TEXT_MUTED }} title={user.email}>{user.email}</p>
           </div>
         )}
-        {/* Arka plan gorseli tercihi (bu tarayicida hatirlanir) */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={arkaPlan}
-          onClick={() => setArkaPlan(!arkaPlan)}
-          className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-white/[0.06] hover:text-white transition-colors duration-150"
-          style={{ color: TEXT_MUTED }}
-          title={arkaPlan ? "Arka plan görselini kapat" : "Arka plan görselini aç"}
-        >
-          <ImageIcon size={16} />
-          <span className="flex-1 text-left">Arka plan</span>
-          <span className="relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors" style={{ backgroundColor: arkaPlan ? NAVY : "#2A3141" }}>
-            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${arkaPlan ? "translate-x-3.5" : "translate-x-0.5"}`} />
-          </span>
-        </button>
         <button
           onClick={() => { signOut(); closeMobile(); }}
           className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"

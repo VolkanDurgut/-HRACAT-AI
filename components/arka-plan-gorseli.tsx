@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 /**
  * Dunya haritasi arka plan gorseli (22.10.2026, kullanicinin gorseli).
@@ -10,7 +10,8 @@ import React, { useEffect, useState } from "react";
  * Tek dosya seti: public/images/giris/giris-arka-{828..3840}.webp (18-184 KB),
  * tarayici ekrana uygun TEK boyutu indirir. `position: fixed` -> kaydirmada
  * yeniden cizilmez; bulaniklik (backdrop-blur) BILEREK yok (performans).
- * Kullanici kenar cubugundan kapatabilir (bu tarayicida hatirlanir).
+ * HER ZAMAN acik (22.10.2026 kullanici karari: ac/kapa anahtari kaldirildi).
+ * Kullanildigi yerler: giris ekrani, AppShell (tum uygulama sayfalari), Kantar Paneli.
  */
 
 const GENISLIKLER = [828, 1280, 1920, 2560, 3840] as const;
@@ -38,30 +39,4 @@ export function ArkaPlanGorseli({ tur }: { tur: "giris" | "uygulama" }) {
       <div aria-hidden="true" className="fixed inset-0 -z-10 pointer-events-none" style={{ background: ORTU[tur] }} />
     </>
   );
-}
-
-// ---- Kullanici tercihi (uygulama ici): localStorage, sekmeler arasi esitlenir ----
-const ANAHTAR = "arka-plan-gorseli";
-const OLAY = "arka-plan-gorseli-degisti";
-
-function oku(): boolean {
-  try { return window.localStorage.getItem(ANAHTAR) !== "kapali"; } catch { return true; }
-}
-
-/** Uygulama ici arka plan acik mi (varsayilan: acik) + degistirici */
-export function useArkaPlanTercihi(): [boolean, (acik: boolean) => void] {
-  const [acik, setAcik] = useState(true);
-  useEffect(() => {
-    setAcik(oku());
-    const guncelle = () => setAcik(oku());
-    window.addEventListener(OLAY, guncelle);
-    window.addEventListener("storage", guncelle);
-    return () => { window.removeEventListener(OLAY, guncelle); window.removeEventListener("storage", guncelle); };
-  }, []);
-  const degistir = (yeni: boolean) => {
-    try { window.localStorage.setItem(ANAHTAR, yeni ? "acik" : "kapali"); } catch { /* gizli pencere */ }
-    setAcik(yeni);
-    window.dispatchEvent(new Event(OLAY));
-  };
-  return [acik, degistir];
 }

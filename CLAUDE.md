@@ -921,18 +921,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - UYGULAMA İÇİ (22.10.2026, kullanıcı isteği): aynı görsel `components/arka-plan-gorseli.tsx`
   (`ArkaPlanGorseli tur="giris"|"uygulama"`) ile AppShell'de TAM EKRAN, `position: fixed`
   (kaydırmada yeniden çizilmez), daha koyu örtü (%60–84). Kartlar/tablolar OPAK kalır
-  (okunurluk); görsel boşluklarda ve kenarlarda görünür. backdrop-blur BİLEREK yok
-  (performans). Kenar çubuğu görsel açıkken %86 opak. Kenar çubuğu altında "Arka plan"
-  anahtarı (`useArkaPlanTercihi`, localStorage `arka-plan-gorseli`, tarayıcı başına,
-  varsayılan açık). Kantar Paneli ve girişsiz sayfalar (takip, çıkış, rapor) AppShell
-  kullanmadığı için görselsiz. Sayfa geçişinde görsel yeniden indirilmez (önbellek).
+  (okunurluk); görsel boşluklarda ve kenarlarda görünür. HER ZAMAN AÇIK — "Arka plan"
+  aç/kapa anahtarı kullanıcı kararıyla KALDIRILDI (22.10.2026), geri eklenmez (eski
+  localStorage `arka-plan-gorseli` değeri artık okunmaz). Kantar Paneli de görselli
+  (`app/kantar/page.tsx` kök kabı `relative isolate`; dar ekranda yapışkan bölüm başlığı
+  %92 opak, 2xl'de saydam). Girişsiz sayfalar (takip, çıkış, rapor) görselsiz. Sayfa
+  geçişinde görsel yeniden indirilmez (önbellek).
 - KENAR ÇUBUĞU macOS tarzı (22.10.2026, kullanıcı isteği; `components/sidebar.tsx`):
   masaüstünde YÜZEN panel (sol/üst/alt 12px boşluk, 224px, 16px köşe, gölge; içerik
-  `md:ml-[240px]` değişmedi). Görsel açıkken cam (rgba(16,20,28,0.62) + blur 20px — tek
-  öğe, performans sorunu yok), kapalıyken düz `#0B0F14`. Bölüm başlıkları: İhracat /
+  `md:ml-[240px]` değişmedi). Cam (rgba(16,20,28,0.62) + blur 20px — tek öğe, performans
+  sorunu yok). Bölüm başlıkları: İhracat /
   Operasyon / Yurt İçi / Yönetim (süper admin). Aktif öğe: yumuşak yeşil zemin + solda
   3px çizgi + yeşil ikon + `aria-current`. Altta kullanıcı kartı (baş harf avatar,
-  e-posta, Arka plan anahtarı, Çıkış). Mobil çekmece aynı stil. Menü öğeleri, sırası ve
+  e-posta, Çıkış). Mobil çekmece aynı stil. Menü öğeleri, sırası ve
   yetki/kilit davranışı DEĞİŞMEDİ. Test `sf/e2e7.py`.
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).

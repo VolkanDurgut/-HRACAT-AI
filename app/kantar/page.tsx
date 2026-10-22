@@ -10,6 +10,7 @@ import { KantarYurtIci } from "@/components/kantar-yurt-ici";
 import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
+import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 
 type KonteynerRow = {
   id: string;
@@ -319,7 +320,9 @@ export default function KantarPage() {
   }
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
+    // isolate: arka plan gorseli (-z) zeminin ustunde, icerigin altinda (22.10.2026)
+    <div className="relative isolate h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
+      <ArkaPlanGorseli tur="uygulama" />
       <div className="max-w-6xl 2xl:max-w-[1840px] mx-auto w-full flex flex-col h-full min-h-0 gap-4 2xl:gap-5">
 
         {/* Üst Başlık Sabit */}
@@ -632,7 +635,7 @@ export default function KantarPage() {
 /** Kantar Paneli bolum basligi (Ihracat / Yurt Ici). Dar ekranda kaydirirken ustte sabit kalir. */
 function BolumBasligi({ id, ikon, baslik, aciklama }: { id: string; ikon: React.ReactNode; baslik: string; aciklama: string }) {
   return (
-    <div className="shrink-0 sticky top-0 z-20 2xl:static flex items-center gap-2.5 py-2 2xl:py-0 -mt-1 2xl:mt-0" style={{ backgroundColor: PAGE_BG }}>
+    <div className="shrink-0 sticky top-0 z-20 2xl:static flex items-center gap-2.5 py-2 2xl:py-0 -mt-1 2xl:mt-0 bg-[rgba(11,15,20,0.92)] 2xl:bg-transparent">
       <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>{ikon}</span>
       <div className="min-w-0">
         <h2 id={id} className="text-base font-bold text-white leading-tight">{baslik}</h2>

@@ -14,11 +14,13 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
  * /ic-piyasa onekini yetkiye esler). Bildirimler'de gonderilmeyi bekleyen
  * musteri mesaji sayisi rozet olarak gorunur.
  */
+// 22.10.2026: Is Emirleri ilk sekme ve menunun acilis sayfasi; Fiyat Formu sona alindi
+// (adresi /ic-piyasa olarak kaldi - yer imleri bozulmasin).
 const SEKMELER = [
-  { href: "/ic-piyasa", etiket: "Fiyat Formu", ikon: FileText },
   { href: "/ic-piyasa/is-emirleri", etiket: "İş Emirleri", ikon: ClipboardList },
   { href: "/ic-piyasa/bildirimler", etiket: "Bildirimler", ikon: Bell },
   { href: "/ic-piyasa/musteriler", etiket: "Müşteriler", ikon: Users },
+  { href: "/ic-piyasa", etiket: "Fiyat Formu", ikon: FileText },
 ];
 
 /** Sayfa verisi degisince (is emri acildi, mesaj isaretlendi) rozet hemen tazelensin. */

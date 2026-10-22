@@ -10,9 +10,9 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download,
+  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search,
 } from "lucide-react";
-import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { BILDIRIM_ETIKET, elleGonderimMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 
@@ -27,6 +27,8 @@ import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefo
  * irsaliye PDF'iyle birlikte PAYLASILIR (Web Share: telefonda / WhatsApp
  * masaustu uygulamasinda kisi veya grup secilir). Paylasim desteklenmiyorsa
  * metin WhatsApp'ta acilir, PDF "İrsaliyeyi indir" ile indirilip sohbete eklenir.
+ * 22.10.2026 (kullanici karari): TEK EKRAN - ustte gonderilecek mesajlar, altta
+ * WhatsApp + sirket ici e-postalarin birlesik "Bildirim Akisi" (filtre + arama).
  */
 
 type Satir = {
@@ -41,7 +43,7 @@ type Satir = {
 /** "IRS2026000002468" / "59 AGD 271" -> dosya adina uygun */
 const dosyaAdi = (x: string) => x.replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü_-]+/g, "_").replace(/^_+|_+$/g, "") || "irsaliye";
 type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string };
-type Sekme = "gonderilecek" | "gonderilen" | "eposta";
+type AkisFiltre = "tumu" | "whatsapp" | "eposta" | "sorunlu";
 
 const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
 const inputStil = { backgroundColor: "#0F131A", borderColor: CARD_BORDER } as const;
@@ -62,7 +64,8 @@ export default function BildirimlerPage() {
   const [satirlar, setSatirlar] = useState<Satir[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [okumaHatasi, setOkumaHatasi] = useState<string | null>(null);
-  const [sekme, setSekme] = useState<Sekme>("gonderilecek");
+  const [akisFiltre, setAkisFiltre] = useState<AkisFiltre>("tumu");
+  const [akisArama, setAkisArama] = useState("");
   const [onayBekleyen, setOnayBekleyen] = useState<string | null>(null); // WhatsApp acildi, "gonderildi mi?" sorusu
   const [kopyalanan, setKopyalanan] = useState<string | null>(null);
   const [atlanacak, setAtlanacak] = useState<Satir | null>(null);
@@ -120,9 +123,24 @@ export default function BildirimlerPage() {
   }, [yetkili, getir]);
 
   const gonderilecek = useMemo(() => satirlar.filter((s) => s.kanal === "whatsapp" && s.durum === "bekliyor").sort((a, b) => a.olusturma.localeCompare(b.olusturma)), [satirlar]);
-  const gonderilen = useMemo(() => satirlar.filter((s) => s.kanal === "whatsapp" && s.durum !== "bekliyor"), [satirlar]);
-  const epostalar = useMemo(() => satirlar.filter((s) => s.kanal === "eposta"), [satirlar]);
-  const epostaSorunu = epostalar.filter((s) => s.durum === "hata").length;
+  // Bildirim akisi: gonderilmeyi bekleyen WhatsApp mesajlari DISINDAKI her sey (en yeni ustte)
+  const akis = useMemo(() => satirlar.filter((s) => !(s.kanal === "whatsapp" && s.durum === "bekliyor")), [satirlar]);
+  const akisSayilari = useMemo(() => ({
+    tumu: akis.length,
+    whatsapp: akis.filter((s) => s.kanal === "whatsapp").length,
+    eposta: akis.filter((s) => s.kanal === "eposta").length,
+    sorunlu: akis.filter(sorunlu).length,
+  }), [akis]);
+  const akisListe = useMemo(() => {
+    const q = akisArama.trim().toLocaleLowerCase("tr");
+    return akis.filter((s) =>
+      (akisFiltre === "tumu" || (akisFiltre === "sorunlu" ? sorunlu(s) : s.kanal === akisFiltre)) &&
+      (!q || [s.ic_is_emirleri?.is_emri_no, s.ic_is_emirleri?.ic_musteriler?.unvan, s.alici_ad, s.hedef, BILDIRIM_ETIKET[s.sablon], ...(s.degerler || [])]
+        .some((v) => (v || "").toLocaleLowerCase("tr").includes(q)))
+    );
+  }, [akis, akisFiltre, akisArama]);
+  const bugunTR = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
+  const bugunGonderilen = satirlar.filter((s) => s.durum === "gonderildi" && s.islem_zamani && new Date(s.islem_zamani).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugunTR).length;
 
   const telefonu = (s: Satir) => s.hedef || s.ic_is_emirleri?.ic_musteriler?.telefon || null;
   const metni = (s: Satir) => {
@@ -270,98 +288,119 @@ export default function BildirimlerPage() {
         </div>
       )}
 
-      <div className="inline-flex flex-wrap rounded-lg border p-0.5 mb-4" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-        {([["gonderilecek", `Gönderilecek (${gonderilecek.length})`], ["gonderilen", `Gönderilenler (${gonderilen.length})`], ["eposta", `Şirket içi e-postalar (${epostalar.length})${epostaSorunu ? " ⚠" : ""}`]] as [Sekme, string][]).map(([k, e]) => (
-          <button key={k} onClick={() => setSekme(k)} className="px-3 py-1.5 rounded-md text-xs font-medium" style={sekme === k ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>{e}</button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+        <OzetKutu baslik="Gönderilecek Mesaj" deger={gonderilecek.length} renk={gonderilecek.length ? "text-amber-400" : "text-emerald-400"} alt={gonderilecek.length ? "WhatsApp'tan gönderilmeyi bekliyor" : "Bekleyen mesaj yok"} />
+        <OzetKutu baslik="Bugün Gönderilen" deger={bugunGonderilen} renk="text-white" alt="Müşteri mesajı ve şirket içi e-posta" />
+        <OzetKutu baslik="E-posta Sorunu" deger={akisSayilari.sorunlu} renk={akisSayilari.sorunlu ? "text-red-400" : "text-emerald-400"} alt={akisSayilari.sorunlu ? "Aşağıda “Sorunlu” filtresiyle görün" : "Tüm e-postalar yolunda"} />
       </div>
 
-      {sekme === "gonderilecek" && (
-        gonderilecek.length === 0 ? (
-          <Bos metin="Gönderilecek müşteri mesajı yok. İş emri açıldığında, araç yola çıktığında ve iş emri tamamlandığında mesajlar burada hazır olur." />
-        ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {gonderilecek.map((s) => {
-              const tel = telefonu(s);
-              const metin = metni(s);
-              const m = s.ic_is_emirleri?.ic_musteriler;
-              return (
-                <div key={s.id} className="rounded-xl border flex flex-col" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-                  <div className="px-4 pt-4 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">{BILDIRIM_ETIKET[s.sablon] || s.sablon}</p>
-                      <p className="text-xs mt-0.5 truncate" style={{ color: TEXT_MUTED }}>{s.ic_is_emirleri?.is_emri_no || "-"} · {m?.unvan || s.alici_ad || "-"} · {tarihSaatYazi(s.olusturma)}</p>
-                    </div>
-                    <span className="text-[11px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tel ? telefonYazi(tel) : ""}</span>
-                  </div>
-                  <pre className="mx-4 mt-3 rounded-lg p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200 max-h-64 overflow-y-auto" style={{ backgroundColor: "#0F131A" }}>{metin || "Mesaj metni oluşturulamadı (eksik bilgi)."}</pre>
-                  {(!tel || (m && !m.whatsapp_izin)) && (
-                    <div className="mx-4 mt-2 text-xs text-amber-400 flex items-start gap-1.5">
-                      <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-                      <span>{!tel ? "Müşteri kartında telefon yok. " : "Müşteri kartında WhatsApp izni işaretli değil. "}<Link href="/ic-piyasa/musteriler" className="underline">Müşteriler</Link></span>
-                    </div>
-                  )}
-                  {s.ic_sevkler && !paylasilabilir && (
-                    <p className="mx-4 mt-2 text-xs flex items-start gap-1.5" style={{ color: TEXT_MUTED }}>
-                      <AlertTriangle size={13} className="mt-0.5 shrink-0 text-sky-400" />
-                      <span>İrsaliyeyi mesajla birlikte göndermek için: önce <b className="text-white">WhatsApp&apos;ta Gönder</b>, sonra <b className="text-white">İrsaliyeyi indir</b> ve PDF&apos;i sohbete sürükleyin. Telefonda ya da WhatsApp masaüstü uygulamasında tek dokunuşla &quot;Paylaş&quot; çıkar.</span>
-                    </p>
-                  )}
-                  <div className="p-4 mt-auto">
-                    {onayBekleyen === s.id ? (
-                      <div className="rounded-lg border p-3" style={{ borderColor: "#065F46", backgroundColor: "rgba(16,185,129,0.08)" }}>
-                        <p className="text-sm text-white mb-2">Mesajı WhatsApp&apos;ta gönderdiniz mi?</p>
-                        <div className="flex flex-wrap gap-2">
-                          <button disabled={isleniyor === s.id} onClick={() => isaretle(s, "gonderildi")} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
-                            {isleniyor === s.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Evet, gönderildi
-                          </button>
-                          <button onClick={() => setOnayBekleyen(null)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Hayır, sonra</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {s.ic_sevkler && paylasilabilir && (
-                          <button disabled={!metin || dosyaIsleniyor === s.id} onClick={() => paylas(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40" style={{ backgroundColor: "#1FA855" }} title="Mesaj ve irsaliye PDF'i birlikte; WhatsApp'ta kişi veya grup seçin">
-                            {dosyaIsleniyor === s.id ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />} Paylaş (mesaj + irsaliye)
-                          </button>
-                        )}
-                        <button disabled={!tel || !metin} onClick={() => whatsappAc(s)} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-40 ${s.ic_sevkler && paylasilabilir ? "border text-white" : "text-white"}`} style={s.ic_sevkler && paylasilabilir ? { borderColor: CARD_BORDER } : { backgroundColor: "#1FA855" }}>
-                          <MessageCircle size={15} /> WhatsApp&apos;ta Gönder
-                        </button>
-                        {s.ic_sevkler && (
-                          <button disabled={dosyaIsleniyor === s.id} onClick={() => irsaliyeIndir(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
-                            <Download size={14} /> İrsaliyeyi indir
-                          </button>
-                        )}
-                        <button disabled={!metin} onClick={() => kopyala(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
-                          {kopyalanan === s.id ? <Check size={14} /> : <Copy size={14} />} {kopyalanan === s.id ? "Kopyalandı" : "Metni kopyala"}
-                        </button>
-                        <button onClick={() => setAtlanacak(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                          <SkipForward size={14} /> Atla
-                        </button>
-                        {s.dugme_eki && (
-                          <a href={`/takip/${s.dugme_eki}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                            <ExternalLink size={14} /> Takip sayfası
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+      <section className="mb-6" aria-labelledby="gonderilecek-baslik">
+        <h2 id="gonderilecek-baslik" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: TEXT_MUTED }}>
+          <MessageCircle size={14} /> Gönderilecek Mesajlar ({gonderilecek.length})
+        </h2>
+        {gonderilecek.length === 0 ? (
+          <div className="rounded-xl border px-4 py-4 text-sm flex items-center gap-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+            <Check size={15} className="text-emerald-400 shrink-0" /> Gönderilecek müşteri mesajı yok. İş emri açıldığında, araç yola çıktığında ve iş emri tamamlandığında mesajlar burada hazır olur.
           </div>
-        )
-      )}
+        ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {gonderilecek.map((s) => {
+            const tel = telefonu(s);
+            const metin = metni(s);
+            const m = s.ic_is_emirleri?.ic_musteriler;
+            return (
+              <div key={s.id} className="rounded-xl border flex flex-col" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                <div className="px-4 pt-4 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white">{BILDIRIM_ETIKET[s.sablon] || s.sablon}</p>
+                    <p className="text-xs mt-0.5 truncate" style={{ color: TEXT_MUTED }}>{s.ic_is_emirleri?.is_emri_no || "-"} · {m?.unvan || s.alici_ad || "-"} · {tarihSaatYazi(s.olusturma)}</p>
+                  </div>
+                  <span className="text-[11px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tel ? telefonYazi(tel) : ""}</span>
+                </div>
+                <pre className="mx-4 mt-3 rounded-lg p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200 max-h-[22rem] overflow-y-auto" style={{ backgroundColor: "#0F131A" }}>{metin || "Mesaj metni oluşturulamadı (eksik bilgi)."}</pre>
+                {(!tel || (m && !m.whatsapp_izin)) && (
+                  <div className="mx-4 mt-2 text-xs text-amber-400 flex items-start gap-1.5">
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                    <span>{!tel ? "Müşteri kartında telefon yok. " : "Müşteri kartında WhatsApp izni işaretli değil. "}<Link href="/ic-piyasa/musteriler" className="underline">Müşteriler</Link></span>
+                  </div>
+                )}
+                {s.ic_sevkler && !paylasilabilir && (
+                  <p className="mx-4 mt-2 text-xs flex items-start gap-1.5" style={{ color: TEXT_MUTED }}>
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0 text-sky-400" />
+                    <span>İrsaliyeyi mesajla birlikte göndermek için: önce <b className="text-white">WhatsApp&apos;ta Gönder</b>, sonra <b className="text-white">İrsaliyeyi indir</b> ve PDF&apos;i sohbete sürükleyin. Telefonda ya da WhatsApp masaüstü uygulamasında tek dokunuşla &quot;Paylaş&quot; çıkar.</span>
+                  </p>
+                )}
+                <div className="p-4 mt-auto">
+                  {onayBekleyen === s.id ? (
+                    <div className="rounded-lg border p-3" style={{ borderColor: "#065F46", backgroundColor: "rgba(16,185,129,0.08)" }}>
+                      <p className="text-sm text-white mb-2">Mesajı WhatsApp&apos;ta gönderdiniz mi?</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button disabled={isleniyor === s.id} onClick={() => isaretle(s, "gonderildi")} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                          {isleniyor === s.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Evet, gönderildi
+                        </button>
+                        <button onClick={() => setOnayBekleyen(null)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Hayır, sonra</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {s.ic_sevkler && paylasilabilir && (
+                        <button disabled={!metin || dosyaIsleniyor === s.id} onClick={() => paylas(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40" style={{ backgroundColor: "#1FA855" }} title="Mesaj ve irsaliye PDF'i birlikte; WhatsApp'ta kişi veya grup seçin">
+                          {dosyaIsleniyor === s.id ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />} Paylaş (mesaj + irsaliye)
+                        </button>
+                      )}
+                      <button disabled={!tel || !metin} onClick={() => whatsappAc(s)} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-40 ${s.ic_sevkler && paylasilabilir ? "border text-white" : "text-white"}`} style={s.ic_sevkler && paylasilabilir ? { borderColor: CARD_BORDER } : { backgroundColor: "#1FA855" }}>
+                        <MessageCircle size={15} /> WhatsApp&apos;ta Gönder
+                      </button>
+                      {s.ic_sevkler && (
+                        <button disabled={dosyaIsleniyor === s.id} onClick={() => irsaliyeIndir(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
+                          <Download size={14} /> İrsaliyeyi indir
+                        </button>
+                      )}
+                      <button disabled={!metin} onClick={() => kopyala(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
+                        {kopyalanan === s.id ? <Check size={14} /> : <Copy size={14} />} {kopyalanan === s.id ? "Kopyalandı" : "Metni kopyala"}
+                      </button>
+                      <button onClick={() => setAtlanacak(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                        <SkipForward size={14} /> Atla
+                      </button>
+                      {s.dugme_eki && (
+                        <a href={`/takip/${s.dugme_eki}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                          <ExternalLink size={14} /> Takip sayfası
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        )}
+      </section>
 
-      {sekme === "gonderilen" && <Tablo satirlar={gonderilen} bos="Henüz gönderilen ya da atlanan mesaj yok." />}
-      {sekme === "eposta" && <Tablo satirlar={epostalar} eposta bos="Henüz şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." />}
+      <section className="rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-labelledby="akis-baslik">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
+          <h2 id="akis-baslik" className="text-sm font-semibold text-white mr-1">Bildirim Akışı</h2>
+          <div className="inline-flex flex-wrap rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+            {([["tumu", "Tümü"], ["whatsapp", "WhatsApp"], ["eposta", "Şirket içi e-posta"], ["sorunlu", "Sorunlu"]] as [AkisFiltre, string][]).map(([k, e]) => (
+              <button key={k} onClick={() => setAkisFiltre(k)} className="px-3 py-1.5 rounded-md text-xs font-medium"
+                style={akisFiltre === k ? { backgroundColor: k === "sorunlu" && akisSayilari.sorunlu ? "#B91C1C" : ACCENT, color: "white" } : { color: k === "sorunlu" && akisSayilari.sorunlu ? "#F87171" : TEXT_MUTED }}>
+                {e} ({akisSayilari[k]})
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+            <input value={akisArama} onChange={(e) => setAkisArama(e.target.value)} placeholder="İş emri no, müşteri, plaka veya alıcı..." className={`${inputSinif} pl-9`} style={inputStil} />
+          </div>
+        </div>
+        <Tablo satirlar={akisListe} bos={akis.length === 0 ? "Henüz gönderilen mesaj ya da şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." : "Bu filtrede kayıt yok."} />
+      </section>
 
       <ConfirmDialog
         open={!!atlanacak}
         onOpenChange={(o) => !o && setAtlanacak(null)}
         title="Mesaj atlansın mı?"
-        description={`"${atlanacak ? BILDIRIM_ETIKET[atlanacak.sablon] || atlanacak.sablon : ""}" mesajı gönderilmeden listeden kalkar (Gönderilenler sekmesinde "Atlandı" olarak görünür).`}
+        description={`"${atlanacak ? BILDIRIM_ETIKET[atlanacak.sablon] || atlanacak.sablon : ""}" mesajı gönderilmeden listeden kalkar (Bildirim Akışı'nda "Atlandı" olarak görünür).`}
         confirmLabel="Atla"
         cancelLabel="Vazgeç"
         loading={!!atlanacak && isleniyor === atlanacak.id}
@@ -371,27 +410,43 @@ export default function BildirimlerPage() {
   );
 }
 
-function Tablo({ satirlar, eposta, bos }: { satirlar: Satir[]; eposta?: boolean; bos: string }) {
-  if (satirlar.length === 0) return <Bos metin={bos} />;
+/** Teslim edilemeyen e-posta (hata) ya da yeniden denenen e-posta */
+const sorunlu = (s: Satir) => s.durum === "hata" || (s.kanal === "eposta" && s.durum === "bekliyor" && s.deneme > 0);
+
+const ALICI_ETIKET: Record<Satir["alici"], string> = { musteri: "Müşteri", lojistik: "Lojistik", yetkili: "Yetkili" };
+
+function Tablo({ satirlar, bos }: { satirlar: Satir[]; bos: string }) {
+  if (satirlar.length === 0) return <p className="px-4 py-10 text-center text-sm" style={{ color: TEXT_MUTED }}>{bos}</p>;
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
-          <thead>
-            <tr style={{ backgroundColor: "#0F131A" }}>
-              {["Mesaj", "İş emri", eposta ? "Alıcı" : "Müşteri", "Oluşturma", "Durum", "İşlem"].map((b) => (
-                <th key={b} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {satirlar.map((s) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[860px]">
+        <thead>
+          <tr style={{ backgroundColor: ROW_HEADER_BG }}>
+            {["Kanal", "Mesaj", "İş emri", "Alıcı", "Oluşturma", "Durum", "İşlem"].map((b) => (
+              <th key={b} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {satirlar.map((s) => {
+            const eposta = s.kanal === "eposta";
+            return (
               <tr key={s.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }}>
-                <td className="px-4 py-2.5 text-white">{eposta ? <span className="inline-flex items-center gap-1.5"><Mail size={13} style={{ color: TEXT_MUTED }} />{BILDIRIM_ETIKET[s.sablon] || s.sablon}</span> : BILDIRIM_ETIKET[s.sablon] || s.sablon}
-                  {s.degerler?.[0] && eposta && <span className="block text-xs" style={{ color: TEXT_MUTED }}>{s.degerler[0]}</span>}
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  {eposta
+                    ? <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-400"><Mail size={11} /> E-posta</span>
+                    : <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400"><MessageCircle size={11} /> WhatsApp</span>}
+                </td>
+                <td className="px-4 py-2.5 text-white">{BILDIRIM_ETIKET[s.sablon] || s.sablon}
+                  {eposta && s.degerler?.[0] && <span className="block text-xs" style={{ color: TEXT_MUTED }}>{s.degerler[0]}</span>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.ic_is_emirleri?.is_emri_no || "-"}</td>
-                <td className="px-4 py-2.5 text-white">{eposta ? (s.hedef || <span className="text-red-400">tanımsız</span>) : s.ic_is_emirleri?.ic_musteriler?.unvan || s.alici_ad || "-"}</td>
+                <td className="px-4 py-2.5 text-white max-w-[260px]">
+                  <span className="block truncate" title={eposta ? s.hedef || "" : s.ic_is_emirleri?.ic_musteriler?.unvan || s.alici_ad || ""}>
+                    {eposta ? (s.hedef || <span className="text-red-400">tanımsız</span>) : s.ic_is_emirleri?.ic_musteriler?.unvan || s.alici_ad || "-"}
+                  </span>
+                  <span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{ALICI_ETIKET[s.alici]}</span>
+                </td>
                 <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.olusturma)}</td>
                 <td className="px-4 py-2.5">
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DURUM_ROZET[s.durum].sinif}`}>{DURUM_ROZET[s.durum].etiket}</span>
@@ -399,19 +454,20 @@ function Tablo({ satirlar, eposta, bos }: { satirlar: Satir[]; eposta?: boolean;
                 </td>
                 <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.islem_zamani ? `${tarihSaatYazi(s.islem_zamani)}${s.isleyen ? ` · ${s.isleyen}` : ""}` : "-"}</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-function Bos({ metin }: { metin: string }) {
+function OzetKutu({ baslik, deger, alt, renk }: { baslik: string; deger: number; alt: string; renk: string }) {
   return (
-    <div className="rounded-xl border px-4 py-12 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <Bell size={28} className="mx-auto mb-2" style={{ color: "#3A4152" }} />
-      <p className="text-sm max-w-lg mx-auto" style={{ color: TEXT_MUTED }}>{metin}</p>
+    <div className="rounded-xl border p-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{baslik}</p>
+      <p className={`text-2xl font-bold mt-1 ${renk}`}>{deger}</p>
+      <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{alt}</p>
     </div>
   );
 }

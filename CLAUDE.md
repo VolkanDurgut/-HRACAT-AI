@@ -1377,6 +1377,31 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   değer = +40pt sağı; hizalı olmayan etiket satırı bloğu değere en iyi ortalayan satıra
   bağlanır. Okuyucu testleri 45 (`sf/test.ts` 9. bölüm, `sf/bonkalite.pdf`).
 
+## İç Piyasa — Açılış İş Emirleri, Ana Panel düzeni, tek ekran Bildirimler (22.10.2026)
+
+- Menüdeki "İç Piyasa" artık `/ic-piyasa/is-emirleri`'ne gider (sidebar `isActive`: tüm
+  `/ic-piyasa` alt sayfalarında aktif); `ilkErisilebilirSayfa` da oraya. Sekme sırası:
+  İş Emirleri · Bildirimler · Müşteriler · Fiyat Formu. Fiyat Formu adresi `/ic-piyasa`
+  olarak KALDI (yer imleri bozulmasın).
+- İş Emirleri = Ana Panel düzeni: tablo (İş Emri No + durum · Müşteri + fiyat/vade · Ürün +
+  ambalaj/teslim · Sipariş tarihi + teslim süresi · Yükleme ilerleme çubuğu · Araçlar + çıkış
+  bekleyen · İşlemler [sipariş formu ikonu, Detay]) + altında DURUM ADIMLARI satırı
+  (Sipariş Formu → Müşteriye Bildirildi [siparis_alindi gönderildi; bekliyorsa amber] →
+  Yükleme %/araç → Yola Çıktı x/y → Tamamlandı; irsaliye uyarısı, "n mesaj gönderilmeyi
+  bekliyor" → Bildirimler, yüklenen tutar). Satıra / Detay'a tıklayınca eski detay (bilgiler,
+  araç tablosu, çıkış işleme, Düzenle/Kapat/İptal/Sil) aynı tabloda açılır — işlev kaybı yok.
+  Bildirim durumu için `ic_bildirimler` (is_emri_id, sablon, durum, kanal) okunur; okunamazsa
+  adımlar gri kalır.
+- Bildirimler TEK EKRAN (sekmeler kaldırıldı): 3 özet kutu (Gönderilecek / Bugün Gönderilen /
+  E-posta Sorunu) → "Gönderilecek Mesajlar" kartları (davranış aynı) → "Bildirim Akışı":
+  WhatsApp (gönderilen/atlanan) + şirket içi e-postalar tek tabloda (Kanal, Mesaj, İş emri,
+  Alıcı + Müşteri/Lojistik/Yetkili, Oluşturma, Durum, İşlem); filtre Tümü / WhatsApp /
+  Şirket içi e-posta / Sorunlu (hata veya yeniden denenen e-posta) + arama (iş emri, müşteri,
+  plaka, alıcı). Mesaj kutusu max-h 22rem (iletişim satırı görünsün). Veri/SQL değişmedi.
+- Testler: `sf/e2e5.py` (menü, sekme sırası, tablo, adımlar, detay, mobil; tek ekran filtre/
+  arama). `sf/e2e.py`'nin "okunanlar" iki kontrolü TEK ADIM'dan (b16aa95) beri eskidir
+  (okunanlar artık giriş alanlarında; `e2e2.py` kapsar).
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

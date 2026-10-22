@@ -34,7 +34,8 @@ const opsItems: MenuItem[] = [
 // menulerin aksine soluk/kilitli hali de gosterilmez - bu bolum ihracat
 // kullanicilarinin ekranini degistirmesin).
 const icPiyasaItems: MenuItem[] = [
-  { label: "İç Piyasa", href: "/ic-piyasa", icon: <Wheat size={18} />, yetkiKey: "ic_piyasa" },
+  // 22.10.2026: acilis sayfasi Is Emirleri (kullanici karari); tum /ic-piyasa alt sayfalarinda aktif
+  { label: "İç Piyasa", href: "/ic-piyasa/is-emirleri", icon: <Wheat size={18} />, yetkiKey: "ic_piyasa" },
 ];
 
 const ayarlarAltMenu = [
@@ -76,6 +77,7 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
+    if (href.startsWith("/ic-piyasa")) return pathname.startsWith("/ic-piyasa");
     return pathname.startsWith(href);
   };
 

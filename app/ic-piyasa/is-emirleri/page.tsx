@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
@@ -12,7 +13,7 @@ import { IcSiparisFormuPenceresi } from "@/components/ic-siparis-formu-penceresi
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -47,6 +48,8 @@ export default function IsEmirleriPage() {
 
   const [emirler, setEmirler] = useState<EmirSatiri[]>([]);
   const [sevkler, setSevkler] = useState<IcSevk[]>([]);
+  // Is emri basina musteri bildirimi durumu (durum adimlari satiri icin; okunamazsa adim gri kalir)
+  const [bildirimler, setBildirimler] = useState<{ is_emri_id: string; sablon: string; durum: string; kanal: string }[]>([]);
   const [musteriler, setMusteriler] = useState<IcMusteri[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [okumaHatasi, setOkumaHatasi] = useState<string | null>(null);
@@ -79,6 +82,10 @@ export default function IsEmirleriPage() {
       const sRes = await supabase.from("ic_sevkler").select("*").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id)).order("olusturma");
       if (sRes.error) { setOkumaHatasi(sRes.error.message); setYukleniyor(false); return; }
       s = (sRes.data || []) as IcSevk[];
+      const bRes = await supabase.from("ic_bildirimler").select("is_emri_id, sablon, durum, kanal").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id));
+      setBildirimler(bRes.error ? [] : ((bRes.data || []) as { is_emri_id: string; sablon: string; durum: string; kanal: string }[]));
+    } else {
+      setBildirimler([]);
     }
     setEmirler(e);
     setSevkler(s);
@@ -104,6 +111,17 @@ export default function IsEmirleriPage() {
     sevkler.forEach((s) => m.set(s.is_emri_id, [...(m.get(s.is_emri_id) || []), s]));
     return m;
   }, [sevkler]);
+
+  const bildirimMap = useMemo(() => {
+    const m = new Map<string, { alindi: string | null; bekleyen: number }>();
+    for (const b of bildirimler) {
+      const x = m.get(b.is_emri_id) || { alindi: null, bekleyen: 0 };
+      if (b.sablon === "siparis_alindi") x.alindi = b.durum;
+      if (b.kanal === "whatsapp" && b.durum === "bekliyor") x.bekleyen += 1;
+      m.set(b.is_emri_id, x);
+    }
+    return m;
+  }, [bildirimler]);
 
   const sayilar = useMemo(() => ({
     acik: emirler.filter((e) => e.durum === "acik").length,
@@ -220,7 +238,7 @@ export default function IsEmirleriPage() {
       <SayfaBasligi
         ikon={<ClipboardList size={20} />}
         baslik="İç Piyasa · İş Emirleri"
-        aciklama="Müşteriyle imzalanan sipariş formundan iş emri açın; kantarcı her araç için irsaliyeyi Kantar Paneli › Yurt İçi'nden yükler. Plaka ve net kg irsaliyeden okunur."
+        aciklama={`${sayilar.acik} açık iş emri · Sipariş formundan iş emri açın; kantarcı her aracın irsaliyesini Kantar Paneli'nden yükler.`}
         sag={
           <>
             <button onClick={getir} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Yenile">
@@ -273,155 +291,224 @@ export default function IsEmirleriPage() {
             <p className="text-sm" style={{ color: TEXT_MUTED }}>{emirler.length === 0 ? "Henüz iş emri yok." : "Bu filtrede iş emri yok."}</p>
           </div>
         ) : (
-          <ul>
-            {liste.map((e) => {
-              const ss = sevkMap.get(e.id) || [];
-              const kg = ss.reduce((t, s) => t + Number(s.net_kg), 0);
-              const oran = ilerlemeOrani(e, kg, ss.length);
-              const tamam = hedefTamam(e, kg, ss.length);
-              const acik = acikDetay === e.id;
-              const tutar = tutarHesapla(kg, e.birim_fiyat === null ? null : Number(e.birim_fiyat));
-              const uyari = ss.some((s) => s.uyarilar?.length);
-              return (
-                <li key={e.id} className="border-t first:border-t-0" style={{ borderColor: CARD_BORDER }}>
-                  <button onClick={() => setAcikDetay(acik ? null : e.id)} className="w-full text-left px-4 py-3 hover:bg-white/[0.02] grid grid-cols-[auto_1fr] md:grid-cols-[auto_minmax(0,2.2fr)_minmax(0,1.6fr)_minmax(0,1.6fr)] gap-x-4 gap-y-2 items-center" aria-expanded={acik}>
-                    <span style={{ color: TEXT_MUTED }}>{acik ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-bold text-white">{e.is_emri_no}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DURUM_RENK[e.durum]}`}>{DURUM_ETIKET[e.durum]}</span>
-                        {uyari && <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-500/15 text-amber-400"><AlertTriangle size={10} /> Uyarı</span>}
-                      </div>
-                      <p className="text-sm text-white truncate mt-0.5" title={e.ic_musteriler?.unvan}>{e.ic_musteriler?.kisa_ad || e.ic_musteriler?.unvan || "-"}</p>
-                    </div>
-                    <div className="col-start-2 md:col-start-auto min-w-0">
-                      <p className="text-sm text-white">{e.urun} <span style={{ color: TEXT_MUTED }}>{e.ambalaj || ""}</span></p>
-                      <p className="text-xs" style={{ color: TEXT_MUTED }}>{e.birim_fiyat !== null ? `${fiyatYazi(Number(e.birim_fiyat))} TL/kg · ${kdvYazi(e.kdv_dahil)}` : "Fiyat yok"} · {e.teslim || "-"}</p>
-                    </div>
-                    <div className="col-start-2 md:col-start-auto min-w-0">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-white">{ilerlemeYazi(e, kg, ss.length)}</span>
-                        <span className={tamam ? "text-emerald-400" : ""} style={tamam ? undefined : { color: TEXT_MUTED }}>Hedef: {hedefYazi(e)}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
-                      </div>
-                    </div>
-                  </button>
-
-                  {acik && (
-                    <div className="px-4 pb-4 md:pl-12">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs rounded-lg border p-3 mb-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                        <Bilgi etiket="Müşteri" deger={e.ic_musteriler?.unvan || "-"} genis />
-                        <Bilgi etiket="Fiyat formu" deger={e.fiyat_formu_no || "Elle girildi"} />
-                        <Bilgi etiket="Vade / Ödeme" deger={`${e.vade_gun !== null ? vadeYazi(e.vade_gun) : "-"} · ${e.odeme || "-"}`} />
-                        <Bilgi etiket="Talimat" deger={e.talimat_veren || "-"} />
-                        <Bilgi etiket="Müşteri sipariş no" deger={e.musteri_siparis_no || "-"} />
-                        {(e.siparis_tarihi || e.siparis_formu_yolu) && <Bilgi etiket="Sipariş formu tarihi" deger={gunAyYil(e.siparis_tarihi)} />}
-                        {(e.nakliye || e.teslim_suresi_gun !== null) && <Bilgi etiket="Nakliye / Teslim süresi" deger={`${e.nakliye ? NAKLIYE_ETIKET[e.nakliye] : "-"} · ${e.teslim_suresi_gun !== null ? `${e.teslim_suresi_gun} gün` : "-"}`} />}
-                        {ozellikleriOku(e.urun_ozellikleri).length > 0 && <Bilgi etiket="Ürün özellikleri" deger={ozellikleriOku(e.urun_ozellikleri).map((x) => `${x.ad}: ${x.deger}`).join(" · ")} genis />}
-                        <Bilgi etiket="Açılış" deger={`${tarihSaatYazi(e.olusturma)}${e.olusturan_email ? ` · ${e.olusturan_email}` : ""}`} genis />
-                        {e.teslim_adresi && <Bilgi etiket="Teslim adresi" deger={e.teslim_adresi} genis />}
-                        {e.notlar && <Bilgi etiket="Not" deger={e.notlar} genis />}
-                        <Bilgi etiket="Yüklenen tutar" deger={tutar !== null ? `${tlYazi(tutar)} ${e.kdv_dahil ? "(KDV dahil)" : "+ KDV"}` : "-"} vurgu />
-                        <div className="col-span-2 flex flex-wrap items-end gap-2">
-                          {e.siparis_formu_yolu && (
-                            <button onClick={() => irsaliyeAc(e.siparis_formu_yolu as string, "Sipariş formu")} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-emerald-400 hover:bg-emerald-500/10" style={{ borderColor: CARD_BORDER }} title={e.siparis_formu_adi || "Sipariş formu"}><FileText size={12} /> Sipariş formu</button>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  {["İş Emri No", "Müşteri", "Ürün", "Sipariş", "Yükleme", "Araçlar", "İşlemler"].map((b, i) => (
+                    <th key={b} className={`${i === 6 ? "text-right" : "text-left"} px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap`} style={{ color: TEXT_MUTED }}>{b}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {liste.map((e) => {
+                  const ss = sevkMap.get(e.id) || [];
+                  const kg = ss.reduce((t, s) => t + Number(s.net_kg), 0);
+                  const oran = ilerlemeOrani(e, kg, ss.length);
+                  const tamam = hedefTamam(e, kg, ss.length);
+                  const acik = acikDetay === e.id;
+                  const tutar = tutarHesapla(kg, e.birim_fiyat === null ? null : Number(e.birim_fiyat));
+                  const uyari = ss.some((s) => s.uyarilar?.length);
+                  const cikan = ss.filter((s) => s.cikis_durumu === "cikti").length;
+                  const bekleyenCikis = ss.length - cikan;
+                  const b = bildirimMap.get(e.id);
+                  const adimlar = [
+                    { etiket: "Sipariş Formu", tamam: !!e.siparis_formu_yolu },
+                    { etiket: b?.alindi === "gonderildi" ? "Müşteriye Bildirildi" : b?.alindi === "bekliyor" ? "Bildirim Bekliyor" : "Müşteriye Bildirim", tamam: b?.alindi === "gonderildi", uyari: b?.alindi === "bekliyor" },
+                    { etiket: ss.length ? `Yükleme ${e.hedef_tur === "kg" ? `%${Math.min(100, Math.round(oran * 100))}` : `${ss.length}/${e.hedef_arac ?? "-"}`}` : "Yükleme", tamam },
+                    { etiket: ss.length ? `Yola Çıktı ${cikan}/${ss.length}` : "Yola Çıktı", tamam: ss.length > 0 && cikan === ss.length },
+                    { etiket: "Tamamlandı", tamam: e.durum === "tamamlandi" },
+                  ];
+                  return (
+                    <React.Fragment key={e.id}>
+                      <tr className="border-b hover:bg-white/[0.03] transition-colors cursor-pointer" style={{ borderColor: CARD_BORDER }} onClick={() => setAcikDetay(acik ? null : e.id)}>
+                        <td className="px-3 py-3 align-top">
+                          <p className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.is_emri_no}</p>
+                          <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DURUM_RENK[e.durum]}`}>{DURUM_ETIKET[e.durum]}</span>
+                        </td>
+                        <td className="px-3 py-3 align-top max-w-[240px]">
+                          <p className="text-xs font-medium text-white truncate" title={e.ic_musteriler?.unvan}>{e.ic_musteriler?.kisa_ad || e.ic_musteriler?.unvan || "-"}</p>
+                          <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{e.birim_fiyat !== null ? `${fiyatYazi(Number(e.birim_fiyat))} TL/kg · ${kdvYazi(e.kdv_dahil)}` : "Fiyat yok"}{e.vade_gun !== null ? ` · ${vadeYazi(e.vade_gun)}` : ""}</p>
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <p className="text-xs text-white whitespace-nowrap">{e.urun}</p>
+                          <p className="text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{[e.ambalaj, e.teslim].filter(Boolean).join(" · ") || "-"}</p>
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          <p className="text-xs" style={{ color: TEXT_MUTED }}>{e.siparis_tarihi ? gunAyYil(e.siparis_tarihi) : tarihSaatYazi(e.olusturma).slice(0, 10)}</p>
+                          {e.teslim_suresi_gun !== null && <p className="text-[10px]" style={{ color: TEXT_MUTED }}>Teslim {e.teslim_suresi_gun} gün</p>}
+                        </td>
+                        <td className="px-3 py-3 align-top min-w-[210px]">
+                          <div className="flex items-center justify-between gap-3 text-[11px] mb-1">
+                            <span className="text-white whitespace-nowrap">{ilerlemeYazi(e, kg, ss.length)}</span>
+                            <span className={`whitespace-nowrap ${tamam ? "text-emerald-400" : ""}`} style={tamam ? undefined : { color: TEXT_MUTED }}>{hedefYazi(e)}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
+                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {ss.length === 0 ? <span className="text-xs" style={{ color: "#4A5262" }}>—</span> : (
+                            <>
+                              <p className="text-xs text-white">{ss.length} araç</p>
+                              <p className="text-[10px]" style={{ color: bekleyenCikis ? "#FBBF24" : "#4ADE80" }}>{bekleyenCikis ? `${bekleyenCikis} çıkış bekliyor` : "Hepsi yola çıktı"}</p>
+                            </>
                           )}
-                          <a href={`/takip/${e.takip_token}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}><Link2 size={12} /> Müşteri takip sayfası</a>
-                          <button onClick={() => takipKopyala(e.takip_token)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}><Copy size={12} /> Bağlantıyı kopyala</button>
-                        </div>
-                      </div>
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {e.siparis_formu_yolu && (
+                              <button onClick={(ev) => { ev.stopPropagation(); irsaliyeAc(e.siparis_formu_yolu as string, "Sipariş formu"); }} title="Sipariş formunu görüntüle"
+                                className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:opacity-90" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
+                                <FileText size={13} />
+                              </button>
+                            )}
+                            <button onClick={(ev) => { ev.stopPropagation(); setAcikDetay(acik ? null : e.id); }} aria-expanded={acik}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap" style={{ backgroundColor: ACCENT }}>
+                              {acik ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Detay
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                        <td colSpan={7} className="px-4 py-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {adimlar.map((a) => (
+                              <span key={a.etiket} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${a.tamam ? "bg-green-500/10 text-green-400" : a.uyari ? "bg-amber-500/10 text-amber-400" : ""}`}
+                                style={!a.tamam && !a.uyari ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${a.tamam ? "bg-green-500" : a.uyari ? "bg-amber-400" : ""}`} style={!a.tamam && !a.uyari ? { backgroundColor: "#4A5262" } : undefined} />
+                                {a.etiket}
+                              </span>
+                            ))}
+                            {uyari && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400"><AlertTriangle size={10} /> İrsaliye uyarısı</span>}
+                            {!!b?.bekleyen && (
+                              <Link href="/ic-piyasa/bildirimler" onClick={(ev) => ev.stopPropagation()} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20">
+                                <Bell size={10} /> {b.bekleyen} mesaj gönderilmeyi bekliyor
+                              </Link>
+                            )}
+                            {tutar !== null && ss.length > 0 && <span className="text-[10px] ml-auto whitespace-nowrap" style={{ color: TEXT_MUTED }}>Yüklenen tutar: <span className="text-white">{tlYazi(tutar)}</span> {e.kdv_dahil ? "(KDV dahil)" : "+ KDV"}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                      {acik && (
+                        <tr className="border-b" style={{ borderColor: CARD_BORDER }}>
+                          <td colSpan={7} className="p-0">
+      <div className="px-4 pt-3 pb-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs rounded-lg border p-3 mb-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                              <Bilgi etiket="Müşteri" deger={e.ic_musteriler?.unvan || "-"} genis />
+                              <Bilgi etiket="Fiyat formu" deger={e.fiyat_formu_no || "Elle girildi"} />
+                              <Bilgi etiket="Vade / Ödeme" deger={`${e.vade_gun !== null ? vadeYazi(e.vade_gun) : "-"} · ${e.odeme || "-"}`} />
+                              <Bilgi etiket="Talimat" deger={e.talimat_veren || "-"} />
+                              <Bilgi etiket="Müşteri sipariş no" deger={e.musteri_siparis_no || "-"} />
+                              {(e.siparis_tarihi || e.siparis_formu_yolu) && <Bilgi etiket="Sipariş formu tarihi" deger={gunAyYil(e.siparis_tarihi)} />}
+                              {(e.nakliye || e.teslim_suresi_gun !== null) && <Bilgi etiket="Nakliye / Teslim süresi" deger={`${e.nakliye ? NAKLIYE_ETIKET[e.nakliye] : "-"} · ${e.teslim_suresi_gun !== null ? `${e.teslim_suresi_gun} gün` : "-"}`} />}
+                              {ozellikleriOku(e.urun_ozellikleri).length > 0 && <Bilgi etiket="Ürün özellikleri" deger={ozellikleriOku(e.urun_ozellikleri).map((x) => `${x.ad}: ${x.deger}`).join(" · ")} genis />}
+                              <Bilgi etiket="Açılış" deger={`${tarihSaatYazi(e.olusturma)}${e.olusturan_email ? ` · ${e.olusturan_email}` : ""}`} genis />
+                              {e.teslim_adresi && <Bilgi etiket="Teslim adresi" deger={e.teslim_adresi} genis />}
+                              {e.notlar && <Bilgi etiket="Not" deger={e.notlar} genis />}
+                              <Bilgi etiket="Yüklenen tutar" deger={tutar !== null ? `${tlYazi(tutar)} ${e.kdv_dahil ? "(KDV dahil)" : "+ KDV"}` : "-"} vurgu />
+                              <div className="col-span-2 flex flex-wrap items-end gap-2">
+                                {e.siparis_formu_yolu && (
+                                  <button onClick={() => irsaliyeAc(e.siparis_formu_yolu as string, "Sipariş formu")} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-emerald-400 hover:bg-emerald-500/10" style={{ borderColor: CARD_BORDER }} title={e.siparis_formu_adi || "Sipariş formu"}><FileText size={12} /> Sipariş formu</button>
+                                )}
+                                <a href={`/takip/${e.takip_token}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}><Link2 size={12} /> Müşteri takip sayfası</a>
+                                <button onClick={() => takipKopyala(e.takip_token)} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}><Copy size={12} /> Bağlantıyı kopyala</button>
+                              </div>
+                            </div>
 
-                      {ss.length === 0 ? (
-                        <p className="text-xs py-3 flex items-center gap-2" style={{ color: TEXT_MUTED }}><Truck size={14} /> Henüz araç yüklenmedi. Kantarcı irsaliyeyi yükleyince burada görünür.</p>
-                      ) : (
-                        <div className="overflow-x-auto rounded-lg border" style={{ borderColor: CARD_BORDER }}>
-                          <table className="w-full text-xs min-w-[980px]">
-                            <thead>
-                              <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                                {["#", "Yükleme", "Plaka / Dorse", "Şoför", "Net", "İrsaliye", "Çıkış", "Tutar", ""].map((b, i) => (
-                                  <th key={i} className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${b === "Net" || b === "Tutar" ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {ss.map((s, i) => (
-                                <React.Fragment key={s.id}>
-                                  <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
-                                    <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-white">{tarihSaatYazi(s.olusturma)}<span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{s.girilen_email || ""}</span></td>
-                                    <td className="px-3 py-2 whitespace-nowrap"><span className="font-bold text-white">{s.plaka}</span>{s.dorse_plaka && <span className="block text-[10px]" style={{ color: TEXT_MUTED }}>Dorse: {s.dorse_plaka}</span>}</td>
-                                    <td className="px-3 py-2 text-white">{s.sofor_ad || "-"}</td>
-                                    <td className="px-3 py-2 text-right font-semibold text-white whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                      <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
-                                        <FileText size={11} /> {s.irsaliye_no || "Gör"}
-                                      </button>
-                                      {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.irsaliye_tarihi)}</span>}
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                      <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
-                                      {s.cikis_isleyen && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.cikis_isleyen}</span>}
-                                      {s.cikis_durumu !== "cikti" && e.durum !== "iptal" && (
-                                        cikisDuzen?.sevk.id === s.id ? (
-                                          cikisDuzen.mod === "saat" ? (
-                                            <span className="mt-1 flex items-center gap-1">
-                                              <input type="time" value={cikisSaat} onChange={(ev) => setCikisSaat(ev.target.value)} className="px-1.5 py-1 rounded border text-xs text-white" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }} aria-label="Çıkış saati" />
-                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "planla")} className="px-2 py-1 rounded text-[10px] font-bold text-white" style={{ backgroundColor: ACCENT }}>Kaydet</button>
-                                              <button onClick={() => setCikisDuzen(null)} className="px-1.5 py-1 rounded text-[10px]" style={{ color: TEXT_MUTED }}>Vazgeç</button>
-                                            </span>
-                                          ) : (
-                                            <span className="mt-1 flex flex-wrap items-center gap-1">
-                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "cikti")} className="px-2 py-1 rounded text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500">Çıktı</button>
-                                              <button onClick={() => { setCikisSaat(new Date(Date.now() + 3600e3).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })); setCikisDuzen({ sevk: s, mod: "saat" }); }} className="px-2 py-1 rounded border text-[10px] text-white" style={{ borderColor: CARD_BORDER }}><Clock size={10} className="inline mr-0.5" />Saat</button>
-                                              <button disabled={isleniyor} onClick={() => cikisIsle(s, "bugun_degil")} className="px-2 py-1 rounded border text-[10px]" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Bugün değil</button>
-                                              <button onClick={() => setCikisDuzen(null)} className="px-1 py-1 text-[10px]" style={{ color: TEXT_MUTED }}>×</button>
-                                            </span>
-                                          )
-                                        ) : (
-                                          <button onClick={() => setCikisDuzen({ sevk: s, mod: "secim" })} className="block mt-1 text-[10px] underline" style={{ color: TEXT_MUTED }}>Çıkışı işle</button>
-                                        )
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tlYazi(tutarHesapla(Number(s.net_kg), e.birim_fiyat === null ? null : Number(e.birim_fiyat)))}</td>
-                                    <td className="px-3 py-2 text-right">
-                                      <button onClick={() => setSilinecekSevk(s)} title="Sevki sil (hatalı giriş)" className="p-1 rounded hover:bg-red-500/10 text-red-400"><Trash2 size={13} /></button>
-                                    </td>
-                                  </tr>
-                                  {s.uyarilar?.length > 0 && (
-                                    <tr>
-                                      <td />
-                                      <td colSpan={8} className="px-3 pb-2">
-                                        {s.uyarilar.map((u) => <p key={u} className="flex items-center gap-1.5 text-[11px] text-amber-400"><AlertTriangle size={11} /> {u}</p>)}
-                                      </td>
+                            {ss.length === 0 ? (
+                              <p className="text-xs py-3 flex items-center gap-2" style={{ color: TEXT_MUTED }}><Truck size={14} /> Henüz araç yüklenmedi. Kantarcı irsaliyeyi yükleyince burada görünür.</p>
+                            ) : (
+                              <div className="overflow-x-auto rounded-lg border" style={{ borderColor: CARD_BORDER }}>
+                                <table className="w-full text-xs min-w-[980px]">
+                                  <thead>
+                                    <tr style={{ backgroundColor: ROW_HEADER_BG }}>
+                                      {["#", "Yükleme", "Plaka / Dorse", "Şoför", "Net", "İrsaliye", "Çıkış", "Tutar", ""].map((b, i) => (
+                                        <th key={i} className={`px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${b === "Net" || b === "Tutar" ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
+                                      ))}
                                     </tr>
-                                  )}
-                                </React.Fragment>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                                  </thead>
+                                  <tbody>
+                                    {ss.map((s, i) => (
+                                      <React.Fragment key={s.id}>
+                                        <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
+                                          <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>{i + 1}</td>
+                                          <td className="px-3 py-2 whitespace-nowrap text-white">{tarihSaatYazi(s.olusturma)}<span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{s.girilen_email || ""}</span></td>
+                                          <td className="px-3 py-2 whitespace-nowrap"><span className="font-bold text-white">{s.plaka}</span>{s.dorse_plaka && <span className="block text-[10px]" style={{ color: TEXT_MUTED }}>Dorse: {s.dorse_plaka}</span>}</td>
+                                          <td className="px-3 py-2 text-white">{s.sofor_ad || "-"}</td>
+                                          <td className="px-3 py-2 text-right font-semibold text-white whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
+                                          <td className="px-3 py-2 whitespace-nowrap">
+                                            <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
+                                              <FileText size={11} /> {s.irsaliye_no || "Gör"}
+                                            </button>
+                                            {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.irsaliye_tarihi)}</span>}
+                                          </td>
+                                          <td className="px-3 py-2 whitespace-nowrap">
+                                            <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
+                                            {s.cikis_isleyen && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.cikis_isleyen}</span>}
+                                            {s.cikis_durumu !== "cikti" && e.durum !== "iptal" && (
+                                              cikisDuzen?.sevk.id === s.id ? (
+                                                cikisDuzen.mod === "saat" ? (
+                                                  <span className="mt-1 flex items-center gap-1">
+                                                    <input type="time" value={cikisSaat} onChange={(ev) => setCikisSaat(ev.target.value)} className="px-1.5 py-1 rounded border text-xs text-white" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }} aria-label="Çıkış saati" />
+                                                    <button disabled={isleniyor} onClick={() => cikisIsle(s, "planla")} className="px-2 py-1 rounded text-[10px] font-bold text-white" style={{ backgroundColor: ACCENT }}>Kaydet</button>
+                                                    <button onClick={() => setCikisDuzen(null)} className="px-1.5 py-1 rounded text-[10px]" style={{ color: TEXT_MUTED }}>Vazgeç</button>
+                                                  </span>
+                                                ) : (
+                                                  <span className="mt-1 flex flex-wrap items-center gap-1">
+                                                    <button disabled={isleniyor} onClick={() => cikisIsle(s, "cikti")} className="px-2 py-1 rounded text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-500">Çıktı</button>
+                                                    <button onClick={() => { setCikisSaat(new Date(Date.now() + 3600e3).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" })); setCikisDuzen({ sevk: s, mod: "saat" }); }} className="px-2 py-1 rounded border text-[10px] text-white" style={{ borderColor: CARD_BORDER }}><Clock size={10} className="inline mr-0.5" />Saat</button>
+                                                    <button disabled={isleniyor} onClick={() => cikisIsle(s, "bugun_degil")} className="px-2 py-1 rounded border text-[10px]" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Bugün değil</button>
+                                                    <button onClick={() => setCikisDuzen(null)} className="px-1 py-1 text-[10px]" style={{ color: TEXT_MUTED }}>×</button>
+                                                  </span>
+                                                )
+                                              ) : (
+                                                <button onClick={() => setCikisDuzen({ sevk: s, mod: "secim" })} className="block mt-1 text-[10px] underline" style={{ color: TEXT_MUTED }}>Çıkışı işle</button>
+                                              )
+                                            )}
+                                          </td>
+                                          <td className="px-3 py-2 text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tlYazi(tutarHesapla(Number(s.net_kg), e.birim_fiyat === null ? null : Number(e.birim_fiyat)))}</td>
+                                          <td className="px-3 py-2 text-right">
+                                            <button onClick={() => setSilinecekSevk(s)} title="Sevki sil (hatalı giriş)" className="p-1 rounded hover:bg-red-500/10 text-red-400"><Trash2 size={13} /></button>
+                                          </td>
+                                        </tr>
+                                        {s.uyarilar?.length > 0 && (
+                                          <tr>
+                                            <td />
+                                            <td colSpan={8} className="px-3 pb-2">
+                                              {s.uyarilar.map((u) => <p key={u} className="flex items-center gap-1.5 text-[11px] text-amber-400"><AlertTriangle size={11} /> {u}</p>)}
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
 
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {e.durum === "acik" && (
-                          <>
-                            <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
-                            <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamam}>Tamamlandı olarak kapat</Eylem>
-                            <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "iptal" })} ikon={<XCircle size={13} />}>İptal et</Eylem>
-                          </>
-                        )}
-                        {e.durum !== "acik" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "acik" })} ikon={<RotateCcw size={13} />}>Yeniden aç</Eylem>}
-                        {ss.length === 0 && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "sil" })} ikon={<Trash2 size={13} />} tehlike>Sil</Eylem>}
-                        {ss.length > 0 && e.durum === "iptal" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamen_sil" })} ikon={<Trash2 size={13} />} tehlike>Araç kayıtlarıyla tamamen sil</Eylem>}
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {e.durum === "acik" && (
+                                <>
+                                  <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
+                                  <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamam}>Tamamlandı olarak kapat</Eylem>
+                                  <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "iptal" })} ikon={<XCircle size={13} />}>İptal et</Eylem>
+                                </>
+                              )}
+                              {e.durum !== "acik" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "acik" })} ikon={<RotateCcw size={13} />}>Yeniden aç</Eylem>}
+                              {ss.length === 0 && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "sil" })} ikon={<Trash2 size={13} />} tehlike>Sil</Eylem>}
+                              {ss.length > 0 && e.durum === "iptal" && <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamen_sil" })} ikon={<Trash2 size={13} />} tehlike>Araç kayıtlarıyla tamamen sil</Eylem>}
+                            </div>
+                          </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

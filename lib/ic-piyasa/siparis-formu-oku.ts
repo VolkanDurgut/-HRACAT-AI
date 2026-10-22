@@ -231,8 +231,11 @@ export function siparisFormunuOku(parcalarHam: MetinParcasi[]): SiparisFormuSonu
 
   // ---- Sevkiyat ve odeme (sag tablo): etiket "Xxx :" x ~ 323
   const SAG_ETIKETLER = ["Ürün Miktarı", "Ürün Fiyatı", "Ürün Nakliyesi", "Teslim Yeri", "Sevk Adresi", "Teslim Süresi", "Ödeme", "Vadeli ise"] as const;
+  // Form surumleri: "Ürün Fiyatı" (14.10) / "Ürün Kg Fiyatı" (21.10)
+  const ESDEGER: Record<string, string[]> = { "Ürün Fiyatı": ["Ürün Kg Fiyatı"] };
   const sagEtiket = (e: string) => {
-    const l = p.filter((x) => katla(x.metin).replace(/ ?:$/, "") === katla(e) && (!sevkBaslik || (x.y < sevkBaslik.y && x.x > sevkBaslik.x - 120)) && x.y > altSinir);
+    const adlar = [e, ...(ESDEGER[e] || [])].map(katla);
+    const l = p.filter((x) => adlar.includes(katla(x.metin).replace(/ ?:$/, "")) && (!sevkBaslik || (x.y < sevkBaslik.y && x.x > sevkBaslik.x - 120)) && x.y > altSinir);
     return l.length === 1 ? l[0] : null;
   };
   const sagEtiketler = SAG_ETIKETLER.map(sagEtiket);
@@ -287,7 +290,7 @@ export function siparisFormunuOku(parcalarHam: MetinParcasi[]): SiparisFormuSonu
     } else if (/\/\s*TON|TL TON/.test(k) || /\/\s*TON/i.test(fiyatHam)) {
       tlKg = tlKg === null ? null : Math.round((tlKg / 1000) * 10000) / 10000;
       uyarilar.push("Fiyat ton başına yazılmış; kg fiyatına çevrildi, kontrol edin.");
-    } else if (!/\/\s*KG/i.test(fiyatHam) && !/TL KG/.test(k)) {
+    } else if (!/\/\s*KG/i.test(fiyatHam) && !/TL KG/.test(k) && !/\bKG\b/.test(katla(sagEtiketler[1]?.metin || ""))) {
       uyarilar.push("Fiyat birimi (TL/KG) yazmıyor; kg fiyatı varsayıldı, kontrol edin.");
     }
     const kdvDahil = /KDV DAHIL/.test(k) ? true : /\+ ?KDV|KDV HARIC/.test(k) || /\+\s*KDV/i.test(fiyatHam) ? false : null;
@@ -329,18 +332,37 @@ export function siparisFormunuOku(parcalarHam: MetinParcasi[]): SiparisFormuSonu
     uyarilar.push("Ödeme (peşin / vadeli) işareti okunamadı.");
   }
 
-  // ---- Urun ozellikleri (sol tablo): deger 100 < x < 310, etiket x < 100 ve y farki <= 8
+  // ---- Urun ozellikleri (sol tablo): etiket sutunu en soldaki x; deger etiketin
+  // 40pt+ sagi ve sag tablonun solu. Cok satirli etiket ("HCL'de / Çözülmeyen / Kül")
+  // degere hizali satirla birlikte, bloku degere en iyi ortalayan satira baglanir.
   const ozellikler: { ad: string; deger: string }[] = [];
   if (ozBaslik) {
-    // Sag tablonun etiket sutunu (x ~ 323) ozellik degeri sayilmasin
+    // Sag tablonun etiket sutunu (x ~ 313-323) ozellik degeri sayilmasin
     const sagIlk = sagEtiketler.find(Boolean);
     const sagSutun = sagIlk ? sagIlk.x - 5 : 310;
-    const bolge = p.filter((x) => x.y < ozBaslik.y - 3 && x.y > altSinir);
-    const degerler = bolge.filter((x) => x.x > 100 && x.x < sagSutun).sort((a, b) => b.y - a.y);
-    for (const d of degerler) {
-      if (/^[-–—]+$/.test(d.metin)) continue;
-      const ad = sade(bolge.filter((x) => x.x < 100 && Math.abs(x.y - d.y) <= 8).sort((a, b) => b.y - a.y).map((x) => x.metin).join(" "));
-      if (ad) ozellikler.push({ ad, deger: d.metin });
+    const bolge = p.filter((x) => x.y < ozBaslik.y - 3 && x.y > altSinir && x.x < sagSutun && x.metin.trim());
+    const etiketX = bolge.length ? Math.min(...bolge.map((x) => x.x)) : 0;
+    const etiketler = bolge.filter((x) => x.x < etiketX + 40);
+    const satirlar = bolge.filter((x) => x.x >= etiketX + 40).sort((a, b) => b.y - a.y).map((d) => ({ d, adlar: [] as MetinParcasi[] }));
+    if (satirlar.length) {
+      const serbest: MetinParcasi[] = [];
+      for (const e of etiketler) {
+        const hizali = satirlar.find((r) => Math.abs(r.d.y - e.y) <= 2);
+        if (hizali) hizali.adlar.push(e); else serbest.push(e);
+      }
+      for (const e of serbest.sort((a, b) => b.y - a.y)) {
+        const sapma = (r: { d: MetinParcasi; adlar: MetinParcasi[] }) => {
+          const ys = [...r.adlar.map((x) => x.y), e.y];
+          return Math.abs(ys.reduce((t, y) => t + y, 0) / ys.length - r.d.y);
+        };
+        const aday = satirlar.filter((r) => Math.abs(r.d.y - e.y) <= 14).sort((a, b) => sapma(a) - sapma(b))[0];
+        if (aday) aday.adlar.push(e);
+      }
+      for (const r of satirlar) {
+        if (/^[-–—]+$/.test(r.d.metin.trim())) continue;
+        const ad = sade(r.adlar.sort((a, b) => b.y - a.y).map((x) => x.metin).join(" "));
+        if (ad) ozellikler.push({ ad, deger: sade(r.d.metin) });
+      }
     }
   }
 

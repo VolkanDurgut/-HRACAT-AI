@@ -1364,6 +1364,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   varsa yeni kart AÇILMAZ. Müşteriler formunda uyarı; sipariş formu penceresinde mevcut
   aktif kart seçilir, kullanıcı farkları görüp tekrar onaylar (pasifse aktifleştirme
   istenir). Testler: yardımcılar 23, Playwright `sf/e2e3.py` (detay, mükerrer, paylaşım).
+- Sipariş formu YENİ SÜRÜM (21.10.2026, Bonkalit): fiyat etiketi "Ürün Kg Fiyatı"
+  (değer "15,90 TL", birim etiketten → TL/kg, KDV yazmaz → uyarı, varsayılan KDV Hariç);
+  sağ etiket sütunu x≈313. Özellik tablosunda çok satırlı etiket ("HCL'de / Çözülmeyen /
+  Kül") ve sola taşan değer (Aflatoksin x≈93): etiket sütunu = bölgedeki en küçük x,
+  değer = +40pt sağı; hizalı olmayan etiket satırı bloğu değere en iyi ortalayan satıra
+  bağlanır. Okuyucu testleri 45 (`sf/test.ts` 9. bölüm, `sf/bonkalite.pdf`).
 
 ## Burak Tuncay giriş e-postası (14.10.2026)
 

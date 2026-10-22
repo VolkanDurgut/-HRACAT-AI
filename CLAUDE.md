@@ -913,6 +913,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kaldırıldı — bunların hiçbiri geri eklenmemeli. `iyzipay` /
   `@types/iyzipay` npm paketleri ve `next.config.js`'teki ilgili ayar da
   kaldırıldı; build artık hiçbir IYZICO_* ortam değişkenine ihtiyaç duymaz.
+- Giriş ekranı arka planı (22.10.2026, kullanıcının dünya haritası görseli): SADECE
+  `app/page.tsx`. Orijinal 5504×3072 PNG 17 MB → WebP 5 boyut `public/images/giris/
+  giris-arka-{828,1280,1920,2560,3840}.webp` (18–184 KB, toplam ~430 KB), `<img srcSet
+  sizes="max(100vw, 179vh)">` (dik ekranda yüksekliğe göre seçer), üstte koyu radyal örtü,
+  kart %90 opak + blur. Görsel yüklenemezse koyu zemin kalır. Uygulama içi sayfalarda
+  KULLANILMAZ (tablo okunurluğu / performans); orijinal PNG repoya EKLENMEDİ.
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).
 - `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;

@@ -16,7 +16,15 @@ import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from
  *
  * Kayit formu ve "Sifremi unuttum" akisi BILEREK YOK (01.10.2026): kullanicilar
  * Supabase Dashboard'dan manuel eklenir, sifre sifirlama yonetici isidir.
+ *
+ * Arka plan gorseli (22.10.2026, kullanicinin 5504x3072 / 17 MB PNG'si): SADECE
+ * giris ekraninda. WebP'ye cevrilip 5 boyutta (828-3840 px, 18-179 KB)
+ * `public/images/giris/` altinda; tarayici ekranina uygun olani indirir
+ * (srcSet). Ustunde koyu ortu var (form okunurlugu). Uygulama ici sayfalarda
+ * KULLANILMAZ (tablolar/okunurluk, performans).
  */
+const ARKA_GENISLIKLER = [828, 1280, 1920, 2560, 3840] as const;
+const ARKA_SRCSET = ARKA_GENISLIKLER.map((w) => `/images/giris/giris-arka-${w}.webp ${w}w`).join(", ");
 export default function GirisSayfasi() {
   const { user, loading, yetkiler, signIn } = useAuth();
   const router = useRouter();
@@ -57,7 +65,21 @@ export default function GirisSayfasi() {
     "w-full pl-9 pr-3 py-2.5 rounded-lg border text-sm text-white placeholder:text-slate-500 outline-none transition-colors focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/60";
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-10" style={{ backgroundColor: PAGE_BG }}>
+    <main className="relative isolate min-h-screen flex flex-col items-center justify-center px-4 py-10 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
+      {/* Dekoratif arka plan (ekran okuyucuya kapali); yuklenemezse koyu zemin kalir */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/images/giris/giris-arka-1920.webp"
+        srcSet={ARKA_SRCSET}
+        // object-cover: dik ekranda gorsel yukseklige gore buyur (en-boy 1,79) -> genislik yerine onu sec
+        sizes="max(100vw, 179vh)"
+        alt=""
+        aria-hidden="true"
+        decoding="async"
+        className="absolute inset-0 -z-20 h-full w-full object-cover object-center select-none pointer-events-none"
+      />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse at center, rgba(11,15,20,0.55) 0%, rgba(11,15,20,0.30) 45%, rgba(11,15,20,0.70) 100%)" }} />
       <div className="w-full max-w-[400px]">
         {/* Marka */}
         <div className="flex items-center justify-center gap-3 mb-8">
@@ -70,7 +92,7 @@ export default function GirisSayfasi() {
         </div>
 
         {/* Giris karti */}
-        <div className="rounded-xl border p-6 sm:p-8 shadow-2xl" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="rounded-xl border p-6 sm:p-8 shadow-2xl backdrop-blur-md" style={{ backgroundColor: `${CARD_BG}E6`, borderColor: CARD_BORDER }}>
           <h1 className="text-xl font-bold text-white">Giriş Yap</h1>
           <p className="text-sm mt-1 mb-6" style={{ color: TEXT_MUTED }}>Kurumsal e-posta adresiniz ve şifrenizle oturum açın.</p>
 
@@ -133,7 +155,7 @@ export default function GirisSayfasi() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px]" style={{ color: "#4A5262" }}>© {new Date().getFullYear()} Unex Gıda · İhracat AI</p>
+        <p className="mt-6 text-center text-[11px]" style={{ color: TEXT_MUTED }}>© {new Date().getFullYear()} Unex Gıda · İhracat AI</p>
       </div>
     </main>
   );

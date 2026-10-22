@@ -441,6 +441,7 @@ export default function IsEmirleriPage() {
         musteriler={musteriler}
         musterilerDegisti={getir}
         devam={(musteriId, ek) => { setSiparisPencere(false); setDuzenlenen(null); setOnDolum({ musteriId, ek }); setFormAcik(true); }}
+        acildi={() => { setSiparisPencere(false); getir(); }}
       />
 
       <ConfirmDialog

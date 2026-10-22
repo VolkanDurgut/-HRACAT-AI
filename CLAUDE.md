@@ -1327,6 +1327,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   migration + yeni migration 2 kez + 19 izin/kısıt testi geçti.
 - Testler: okuyucu 37, yardımcılar 17 (`sf/yardimci_test.ts`), Playwright 42 (`sf/e2e.py`:
   yeni müşteri, farklı kart, kayıt hatasında PDF geri silme, form olmayan PDF, 390 px).
+- TEK ADIM (22.10.2026, kullanıcı: "bütün bilgiler formda, neden iki kere iş yapıyoruz"):
+  okunan bilgiler AYNI pencerede düzenlenebilir alanlar (ürün, ambalaj, ton, fiyat, KDV,
+  vade, ödeme aracı [isteğe bağlı, uyarısız], nakliye→teslim, teslim süresi, tarih);
+  tek "İş Emrini Aç" / "Müşteri Kartını Oluştur ve İş Emrini Aç" → kart (gerekirse) →
+  PDF → iş emri (`lib/ic-piyasa/is-emri-ac.ts` `isEmriniFormlaAc`; kayıt olmazsa PDF
+  geri silinir). Kart oluştuktan sonra iş emri hata verirse kart SEÇİLİ kalır, tekrar
+  denemede ikinci kart açılmaz. İkinci pencere (tam iş emri formu) SADECE okunamayan
+  PDF'te ("İş emrini hazırla"). Not / talimat / özellik düzeltme açıldıktan sonra
+  "Düzenle"den. Playwright `sf/e2e2.py` 24/24.
 
 ## Burak Tuncay giriş e-postası (14.10.2026)
 

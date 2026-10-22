@@ -10,11 +10,11 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle,
+  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { BILDIRIM_ETIKET, elleGonderimMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
-import { hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
+import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 
 /**
  * Ic Piyasa - Bildirimler (12.10.2026).
@@ -23,6 +23,10 @@ import { hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/l
  * yetkili "WhatsApp'ta Gonder" ile kendi telefonundan gonderir ve "Gonderildi"
  * isaretler; hicbir mesaj kaybolmaz. Lojistik / yetkili e-postalari otomatik
  * gider (ic-piyasa edge function); durumlari burada izlenir.
+ * 22.10.2026: musteri mesajlarinda baglanti YOK. "Aracınız yola çıktı" mesaji
+ * irsaliye PDF'iyle birlikte PAYLASILIR (Web Share: telefonda / WhatsApp
+ * masaustu uygulamasinda kisi veya grup secilir). Paylasim desteklenmiyorsa
+ * metin WhatsApp'ta acilir, PDF "İrsaliyeyi indir" ile indirilip sohbete eklenir.
  */
 
 type Satir = {
@@ -31,7 +35,11 @@ type Satir = {
   durum: "bekliyor" | "gonderiliyor" | "gonderildi" | "atlandi" | "hata"; hata: string | null; deneme: number;
   olusturma: string; islem_zamani: string | null; isleyen: string | null;
   ic_is_emirleri: { is_emri_no: string; ic_musteriler: { id: string; unvan: string; telefon: string | null; whatsapp_izin: boolean } | null } | null;
+  ic_sevkler: { irsaliye_dosya_yolu: string; irsaliye_no: string | null; plaka: string } | null;
 };
+
+/** "IRS2026000002468" / "59 AGD 271" -> dosya adina uygun */
+const dosyaAdi = (x: string) => x.replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü_-]+/g, "_").replace(/^_+|_+$/g, "") || "irsaliye";
 type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string };
 type Sekme = "gonderilecek" | "gonderilen" | "eposta";
 
@@ -59,6 +67,16 @@ export default function BildirimlerPage() {
   const [kopyalanan, setKopyalanan] = useState<string | null>(null);
   const [atlanacak, setAtlanacak] = useState<Satir | null>(null);
   const [isleniyor, setIsleniyor] = useState<string | null>(null);
+  const [paylasilabilir, setPaylasilabilir] = useState(false);
+  const [dosyaIsleniyor, setDosyaIsleniyor] = useState<string | null>(null);
+
+  // Cihaz PDF paylasimini destekliyor mu (telefon / WhatsApp masaustu)?
+  useEffect(() => {
+    try {
+      const deneme = new File([new Uint8Array([37, 80, 68, 70])], "deneme.pdf", { type: "application/pdf" });
+      setPaylasilabilir(typeof navigator !== "undefined" && !!navigator.canShare && navigator.canShare({ files: [deneme] }));
+    } catch { setPaylasilabilir(false); }
+  }, []);
 
   const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "", yetkili_cc: "" });
   const [ayarVar, setAyarVar] = useState(false);
@@ -70,7 +88,7 @@ export default function BildirimlerPage() {
     setOkumaHatasi(null);
     const [bRes, aRes] = await Promise.all([
       supabase.from("ic_bildirimler")
-        .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin))")
+        .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin)), ic_sevkler(irsaliye_dosya_yolu, irsaliye_no, plaka)")
         .eq("company_id", companyId).order("olusturma", { ascending: false }).limit(300),
       supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc").eq("company_id", companyId).maybeSingle(),
     ]);
@@ -131,6 +149,41 @@ export default function BildirimlerPage() {
     if (!tel || !metin) return;
     window.open(`https://wa.me/${tel}?text=${encodeURIComponent(metin)}`, "_blank", "noopener");
     setOnayBekleyen(s.id);
+  };
+
+  // Irsaliye PDF'i (yola cikti mesaji)
+  const irsaliyeDosyasi = async (s: Satir): Promise<File | null> => {
+    const sv = s.ic_sevkler;
+    if (!sv) return null;
+    const { data, error } = await supabase.storage.from(IC_BELGE_BUCKET).download(sv.irsaliye_dosya_yolu);
+    if (error || !data) { showToast(`İrsaliye alınamadı: ${error?.message || "bilinmeyen hata"}`, "error"); return null; }
+    return new File([data], `${dosyaAdi(sv.irsaliye_no || sv.plaka)}.pdf`, { type: "application/pdf" });
+  };
+
+  const paylas = async (s: Satir) => {
+    const metin = metni(s);
+    if (!metin) return;
+    setDosyaIsleniyor(s.id);
+    const dosya = await irsaliyeDosyasi(s);
+    setDosyaIsleniyor(null);
+    if (!dosya) return;
+    try {
+      await navigator.share({ files: [dosya], text: metin });
+      setOnayBekleyen(s.id);
+    } catch (e) {
+      if ((e as { name?: string })?.name !== "AbortError") showToast("Paylaşılamadı; metni WhatsApp'ta açıp irsaliyeyi indirerek ekleyin.", "error");
+    }
+  };
+
+  const irsaliyeIndir = async (s: Satir) => {
+    setDosyaIsleniyor(s.id);
+    const dosya = await irsaliyeDosyasi(s);
+    setDosyaIsleniyor(null);
+    if (!dosya) return;
+    const url = URL.createObjectURL(dosya);
+    const a = document.createElement("a");
+    a.href = url; a.download = dosya.name; document.body.appendChild(a); a.click(); a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   const kopyala = async (s: Satir) => {
@@ -245,6 +298,12 @@ export default function BildirimlerPage() {
                       <span>{!tel ? "Müşteri kartında telefon yok. " : "Müşteri kartında WhatsApp izni işaretli değil. "}<Link href="/ic-piyasa/musteriler" className="underline">Müşteriler</Link></span>
                     </div>
                   )}
+                  {s.ic_sevkler && !paylasilabilir && (
+                    <p className="mx-4 mt-2 text-xs flex items-start gap-1.5" style={{ color: TEXT_MUTED }}>
+                      <AlertTriangle size={13} className="mt-0.5 shrink-0 text-sky-400" />
+                      <span>İrsaliyeyi mesajla birlikte göndermek için: önce <b className="text-white">WhatsApp&apos;ta Gönder</b>, sonra <b className="text-white">İrsaliyeyi indir</b> ve PDF&apos;i sohbete sürükleyin. Telefonda ya da WhatsApp masaüstü uygulamasında tek dokunuşla &quot;Paylaş&quot; çıkar.</span>
+                    </p>
+                  )}
                   <div className="p-4 mt-auto">
                     {onayBekleyen === s.id ? (
                       <div className="rounded-lg border p-3" style={{ borderColor: "#065F46", backgroundColor: "rgba(16,185,129,0.08)" }}>
@@ -258,9 +317,19 @@ export default function BildirimlerPage() {
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        <button disabled={!tel || !metin} onClick={() => whatsappAc(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40" style={{ backgroundColor: "#1FA855" }}>
+                        {s.ic_sevkler && paylasilabilir && (
+                          <button disabled={!metin || dosyaIsleniyor === s.id} onClick={() => paylas(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40" style={{ backgroundColor: "#1FA855" }} title="Mesaj ve irsaliye PDF'i birlikte; WhatsApp'ta kişi veya grup seçin">
+                            {dosyaIsleniyor === s.id ? <Loader2 size={15} className="animate-spin" /> : <Share2 size={15} />} Paylaş (mesaj + irsaliye)
+                          </button>
+                        )}
+                        <button disabled={!tel || !metin} onClick={() => whatsappAc(s)} className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold hover:brightness-110 disabled:opacity-40 ${s.ic_sevkler && paylasilabilir ? "border text-white" : "text-white"}`} style={s.ic_sevkler && paylasilabilir ? { borderColor: CARD_BORDER } : { backgroundColor: "#1FA855" }}>
                           <MessageCircle size={15} /> WhatsApp&apos;ta Gönder
                         </button>
+                        {s.ic_sevkler && (
+                          <button disabled={dosyaIsleniyor === s.id} onClick={() => irsaliyeIndir(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
+                            <Download size={14} /> İrsaliyeyi indir
+                          </button>
+                        )}
                         <button disabled={!metin} onClick={() => kopyala(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
                           {kopyalanan === s.id ? <Check size={14} /> : <Copy size={14} />} {kopyalanan === s.id ? "Kopyalandı" : "Metni kopyala"}
                         </button>

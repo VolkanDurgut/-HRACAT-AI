@@ -22,6 +22,13 @@
  *
  * Metin degisirse Meta'da sablon YENIDEN onaya gider. Burak Bey onayi
  * alinmadan degistirilmez.
+ *
+ * 22.10.2026 (kullanici karari): MUSTERI mesajlarinda BAGLANTI YOK (takip
+ * linki ihracatasistanim.com alan adini gosteriyordu). "Aracınız yola çıktı"
+ * mesajiyla irsaliye PDF'i paylasilir (Bildirimler > Paylaş). Marka: mesaji
+ * gonderen numaranin profil fotografi Unex logosu; Meta'ya geciste sablon
+ * basligi `meta_ust` (logo gorseli / irsaliye belgesi). Takip sayfasi ic
+ * kullanim icin durur (is emri detayi).
  */
 
 export type SablonKategori = "UTILITY" | "MARKETING";
@@ -35,8 +42,10 @@ export type MesajSablonu = {
   alici: SablonAlici;
   kategori: SablonKategori;
   dil: "tr";
-  /** Ust bilgi: duz metin ya da belge (PDF). Logo Meta profil fotografindan gelir. */
+  /** Ust bilgi: duz metin ya da belge (PDF). Elle (wa.me) gonderimde kalin baslik olur. */
   ust?: { tur: "metin"; metin: string } | { tur: "belge"; aciklama: string };
+  /** Meta sablonunun basligi (Meta'ya geciste): Unex logosu gorseli ya da irsaliye belgesi */
+  meta_ust?: { tur: "gorsel"; aciklama: string } | { tur: "belge"; aciklama: string };
   /** Govde: {{1}}..{{n}} degiskenleri */
   govde: string;
   degiskenler: { no: number; ad: string; ornek: string }[];
@@ -62,7 +71,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       "Ürün: {{3}}\n" +
       "Miktar: {{4}}\n" +
       "Teslim: {{5}}\n\n" +
-      "Yükleme ve sevkiyat aşamalarında size ayrıca bilgi vereceğiz. Siparişinizin durumunu aşağıdaki bağlantıdan takip edebilirsiniz.",
+      "Yükleme ve sevkiyat aşamalarında size ayrıca bilgi vereceğiz.",
     degiskenler: [
       { no: 1, ad: "Müşteri ünvanı", ornek: "Erdoğanlar Un Gıda San. Tic. Ltd. Şti." },
       { no: 2, ad: "İş emri no", ornek: "IE-2026-0001" },
@@ -71,7 +80,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       { no: 5, ad: "Teslim şekli", ornek: "Fabrika Teslim" },
     ],
     alt: ALT_BILGI,
-    dugme: { tur: "url", metin: "Siparişim", adres: TAKIP_ADRESI + "{{1}}", ornek_ek: "a1b2c3d4" },
+    meta_ust: { tur: "gorsel", aciklama: "Unex logosu" },
   },
   {
     ad: "arac_cikis_saati",
@@ -91,7 +100,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       { no: 4, ad: "Planlanan saat", ornek: "15:30" },
     ],
     alt: ALT_BILGI,
-    dugme: { tur: "url", metin: "Siparişim", adres: TAKIP_ADRESI + "{{1}}", ornek_ek: "a1b2c3d4" },
+    meta_ust: { tur: "gorsel", aciklama: "Unex logosu" },
   },
   {
     ad: "arac_yola_cikti",
@@ -109,7 +118,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       "Net miktar: {{5}}\n" +
       "İrsaliye no: {{6}}\n" +
       "Sevk durumu: {{7}}\n\n" +
-      "İrsaliye ve sevkiyat detaylarını aşağıdaki bağlantıdan görüntüleyebilirsiniz.",
+      "Araca ait irsaliye bu mesajla birlikte gönderilmiştir.",
     degiskenler: [
       { no: 1, ad: "Müşteri ünvanı", ornek: "Erdoğanlar Un Gıda San. Tic. Ltd. Şti." },
       { no: 2, ad: "İş emri no", ornek: "IE-2026-0001" },
@@ -120,7 +129,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       { no: 7, ad: "İlerleme", ornek: "26.220 / 75.000 kg (1. araç)" },
     ],
     alt: ALT_BILGI,
-    dugme: { tur: "url", metin: "Siparişim", adres: TAKIP_ADRESI + "{{1}}", ornek_ek: "a1b2c3d4" },
+    meta_ust: { tur: "belge", aciklama: "İrsaliye PDF'i" },
   },
   {
     ad: "siparis_tamamlandi",
@@ -135,7 +144,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       "{{2}} numaralı siparişinizin sevkiyatı tamamlanmıştır.\n\n" +
       "Ürün: {{3}}\n" +
       "Toplam: {{4}} araç, {{5}}\n\n" +
-      "Bizi tercih ettiğiniz için teşekkür ederiz. Tüm irsaliyelere aşağıdaki bağlantıdan ulaşabilirsiniz.",
+      "Bizi tercih ettiğiniz için teşekkür ederiz.",
     degiskenler: [
       { no: 1, ad: "Müşteri ünvanı", ornek: "Erdoğanlar Un Gıda San. Tic. Ltd. Şti." },
       { no: 2, ad: "İş emri no", ornek: "IE-2026-0001" },
@@ -144,7 +153,7 @@ export const MESAJ_SABLONLARI: MesajSablonu[] = [
       { no: 5, ad: "Toplam net kg", ornek: "76.940 kg" },
     ],
     alt: ALT_BILGI,
-    dugme: { tur: "url", metin: "Siparişim", adres: TAKIP_ADRESI + "{{1}}", ornek_ek: "a1b2c3d4" },
+    meta_ust: { tur: "gorsel", aciklama: "Unex logosu" },
   },
   {
     ad: "haftalik_fiyat_formu",

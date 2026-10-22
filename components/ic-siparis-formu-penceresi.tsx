@@ -8,7 +8,7 @@ import { AlertTriangle, CheckCircle2, FileText, Loader2, Upload, UserPlus, Users
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { IcMusteri, hataMesaji, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 import { siparisFormuPdfOku, type SiparisFormuOkuma } from "@/lib/ic-piyasa/siparis-formu-oku";
-import { AZAMI_FORM_BAYT, NAKLIYE_ETIKET, SiparisEki, isEmriOnDolum, musteriEsle, musteriKartiFarklari, nakliyedenTeslim } from "@/lib/ic-piyasa/siparis-formu";
+import { AZAMI_FORM_BAYT, NAKLIYE_ETIKET, SiparisEki, isEmriOnDolum, musteriEsle, musteriKartiFarklari, musteriMukerrer, nakliyedenTeslim } from "@/lib/ic-piyasa/siparis-formu";
 import { ODEME_SECENEKLERI, TESLIM_SECENEKLERI, VADE_SECENEKLERI, fiyatYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 import { trSayiOku } from "@/lib/ic-piyasa/irsaliye-oku";
 import { isEmriniFormlaAc } from "@/lib/ic-piyasa/is-emri-ac";
@@ -147,6 +147,21 @@ export function IcSiparisFormuPenceresi({ acik, kapat, musteriler, musterilerDeg
       const eposta = yeniKart.eposta.trim();
       if (eposta && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eposta)) { showToast("E-posta adresi geçersiz.", "error"); return null; }
       if (yeniKart.whatsapp_izin && !tel) { showToast("WhatsApp izni için telefon numarası gerekli.", "error"); return null; }
+      // Mukerrer kart engeli: ayni unvan / telefon zaten kayitliysa o kart secilir,
+      // kullanici farklari gorup tekrar onaylar (ikinci kart ACILMAZ)
+      const ayni = musteriMukerrer(musteriler, { unvan, telefon: tel || null });
+      if (ayni) {
+        const neden = ayni.neden === "unvan" ? "ünvanla" : "telefonla";
+        if (!ayni.musteri.aktif) {
+          showToast(`Bu ${neden} kayıtlı pasif bir müşteri var: "${ayni.musteri.unvan}". Yeni kart açılmadı; Müşteriler sekmesinden kartı aktifleştirip tekrar deneyin.`, "error");
+          return null;
+        }
+        setSecilenMusteri(ayni.musteri.id);
+        setYeniKart(null);
+        setKartGuncelle(false);
+        showToast(`Bu ${neden} kayıtlı müşteri bulundu: "${ayni.musteri.unvan}". Yeni kart açılmadı, mevcut kart seçildi; bilgileri kontrol edip tekrar onaylayın.`, "error");
+        return null;
+      }
       const { data, error } = await supabase.from("ic_musteriler").insert({
         company_id: companyId, unvan, vergi_dairesi: yeniKart.vergi_dairesi.trim() || null, vergi_no: vergiNo || null,
         adres: yeniKart.adres.trim() || null, yetkili_ad: yeniKart.yetkili_ad.trim() || null, telefon: tel, eposta: eposta || null,

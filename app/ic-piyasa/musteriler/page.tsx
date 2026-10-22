@@ -8,14 +8,18 @@ import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Users, Plus, Search, Loader2, Pencil, Trash2, X, Save, AlertCircle, MessageCircle, CalendarClock } from "lucide-react";
+import { Users, Plus, Search, Loader2, X, Save, AlertCircle, MessageCircle, CalendarClock, ChevronRight } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { IcMusteri, hataMesaji, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
+import { musteriMukerrer } from "@/lib/ic-piyasa/siparis-formu";
+import { IcMusteriDetay } from "@/components/ic-musteri-detay";
 
 /**
  * Ic Piyasa - Musteri kartlari (12.10.2026).
  * Is emri, fiyat listesi gonderimi ve (ileride) WhatsApp bildirimleri bu
  * kartlara baglanir. Iş emri olan musteri silinemez; pasife alinir.
+ * 22.10.2026: satira tiklayinca Detay paneli (is emirleri, araclar);
+ * Duzenle / Sil panelden. Ayni unvan veya ayni telefonla ikinci kart acilmaz.
  */
 
 type Taslak = {
@@ -67,6 +71,7 @@ export default function IcMusterilerPage() {
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [silinecek, setSilinecek] = useState<IcMusteri | null>(null);
   const [siliniyor, setSiliniyor] = useState(false);
+  const [detayId, setDetayId] = useState<string | null>(null);
 
   const getir = useCallback(async () => {
     if (!companyId) return;
@@ -90,6 +95,9 @@ export default function IcMusterilerPage() {
     );
   }, [musteriler, arama, pasifleriGoster]);
 
+  const detay = detayId ? musteriler.find((m) => m.id === detayId) || null : null;
+  const detayKapat = useCallback(() => setDetayId(null), []);
+
   const yeniAc = () => { setDuzenlenen(null); setTaslak(BOS); setFormAcik(true); };
   const duzenleAc = (m: IcMusteri) => { setDuzenlenen(m); setTaslak(taslaktan(m)); setFormAcik(true); };
 
@@ -104,6 +112,12 @@ export default function IcMusterilerPage() {
     const eposta = taslak.eposta.trim();
     if (eposta && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eposta)) { showToast("E-posta adresi geçersiz.", "error"); return; }
     if (taslak.whatsapp_izin && !tel) { showToast("WhatsApp izni için telefon numarası gerekli.", "error"); return; }
+    // Mukerrer kart engeli: ayni unvan veya ayni telefon baska kartta varsa
+    const ayni = musteriMukerrer(musteriler, { unvan, telefon: tel || null }, duzenlenen?.id);
+    if (ayni) {
+      showToast(`Bu ${ayni.neden === "unvan" ? "ünvanla" : "telefonla"} kayıtlı bir müşteri zaten var: "${ayni.musteri.unvan}"${ayni.musteri.aktif ? "" : " (pasif)"}. Mevcut kartı kullanın veya düzenleyin.`, "error");
+      return;
+    }
 
     const kayit = {
       unvan,
@@ -150,6 +164,7 @@ export default function IcMusterilerPage() {
       return;
     }
     showToast("Müşteri silindi.", "success");
+    if (detayId === silinecek.id) setDetayId(null);
     setSilinecek(null);
     getir();
   };
@@ -230,7 +245,7 @@ export default function IcMusterilerPage() {
               </thead>
               <tbody>
                 {liste.map((m) => (
-                  <tr key={m.id} className={`border-t ${m.aktif ? "" : "opacity-50"}`} style={{ borderColor: CARD_BORDER }}>
+                  <tr key={m.id} onClick={() => setDetayId(m.id)} className={`border-t cursor-pointer hover:bg-white/[0.03] ${m.aktif ? "" : "opacity-50"}`} style={{ borderColor: CARD_BORDER }}>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-white">{m.unvan}</p>
                       {(m.kisa_ad || !m.aktif) && (
@@ -254,8 +269,9 @@ export default function IcMusterilerPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <button onClick={() => duzenleAc(m)} title="Düzenle" className="p-1.5 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }}><Pencil size={14} /></button>
-                      <button onClick={() => setSilinecek(m)} title="Sil" className="p-1.5 rounded hover:bg-red-500/10 text-red-400"><Trash2 size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setDetayId(m.id); }} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}>
+                        Detay <ChevronRight size={13} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -265,8 +281,18 @@ export default function IcMusterilerPage() {
         )}
       </div>
 
+      {detay && companyId && (
+        <IcMusteriDetay
+          musteri={detay}
+          companyId={companyId}
+          kapat={detayKapat}
+          duzenle={() => duzenleAc(detay)}
+          sil={() => setSilinecek(detay)}
+        />
+      )}
+
       {formAcik && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="musteri-form-baslik">
+        <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="musteri-form-baslik">
           <div className="w-full max-w-2xl rounded-2xl border shadow-2xl my-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
               <h2 id="musteri-form-baslik" className="text-base font-semibold text-white">{duzenlenen ? "Müşteriyi Düzenle" : "Yeni Müşteri"}</h2>

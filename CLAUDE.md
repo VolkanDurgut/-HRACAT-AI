@@ -1077,8 +1077,8 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (import yok; Next tarafı `lib/ic-piyasa/mesaj-sablonlari.ts` üzerinden yeniden dışa aktarır) —
   siparis_alindi, arac_cikis_saati, arac_yola_cikti, siparis_tamamlandi (UTILITY),
   haftalik_fiyat_formu (MARKETING, PDF ekli), cikis_onayi_talebi (ekip). Meta onayına
-  kadar `elleGonderimMetni` (wa.me, link metin sonunda), sonra aynı gövde Meta şablonu
-  + "Siparişim" URL düğmesi (`/takip/{token}`). `sablonKurallariniDenetle` Meta
+  kadar `elleGonderimMetni` (wa.me), sonra aynı gövde Meta şablonu. 22.10.2026'dan
+  beri müşteri mesajlarında bağlantı/düğme YOK (aşağıdaki 22.10.2026 bölümü). `sablonKurallariniDenetle` Meta
   kurallarını denetler. Metin değişirse Meta'da yeniden onay gerekir; Burak Bey onayı
   olmadan değiştirilmez. Mesajlarda fiyat YOK (takip sayfasında).
 - Sonraki fazlar: GPS ve Logo (GO3/Wings) entegrasyonu; Pazartesi fiyat listesi gönderimi
@@ -1336,6 +1336,34 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   denemede ikinci kart açılmaz. İkinci pencere (tam iş emri formu) SADECE okunamayan
   PDF'te ("İş emrini hazırla"). Not / talimat / özellik düzeltme açıldıktan sonra
   "Düzenle"den. Playwright `sf/e2e2.py` 24/24.
+
+## İç Piyasa — Bağlantısız müşteri mesajları, irsaliye paylaşımı, müşteri detayı (22.10.2026)
+
+- Müşteri WhatsApp mesajlarında BAĞLANTI YOK (kullanıcı onayı: "ihracatasistanim"
+  alan adı müşteriye tutarsız görünüyordu). `mesaj-sablonlari.ts`'ten siparis_alindi,
+  arac_cikis_saati, arac_yola_cikti, siparis_tamamlandi'nın "Siparişim" düğmesi
+  kaldırıldı; gövde sonları buna göre yazıldı. `cikis_onayi_talebi` (şirket içi) çıkış
+  bağlantısını KORUR. `takip/` sayfası ve `takip_token` duruyor (Bildirimler'de iç
+  "Takip sayfası" bağlantısı). Edge function bu şablonları gönderimde kullanmıyor
+  (Meta yok) → yeniden yayın gerekmedi. Meta'ya gönderilirken: `meta_ust` alanı —
+  üç şablonda Unex logolu GÖRSEL başlık, arac_yola_cikti'de BELGE başlık (irsaliye
+  PDF'i). Logo ayrıca gönderen numaranın WhatsApp profil fotoğrafı olmalı. Metinler
+  Burak Bey'e bildirilmeli (CLAUDE.md kuralı; Meta'ya henüz gönderilmedi).
+- Bildirimler › "Aracınız yola çıktı": `ic_bildirimler.sevk_id → ic_sevkler` ile
+  irsaliye okunur. Cihaz dosya paylaşımını destekliyorsa (telefon, WhatsApp masaüstü
+  uygulaması) "Paylaş (mesaj + irsaliye)" → `navigator.share({files,text})`, sonra
+  "gönderdiniz mi?" onayı. Desteklemiyorsa (WhatsApp Web) "WhatsApp'ta Gönder" +
+  "İrsaliyeyi indir" (dosya adı irsaliye no) + "PDF'i sohbete sürükleyin" yönergesi.
+- Müşteriler: satırdaki kalem → "Detay" (satıra tıklamak da açar). Sağ panel
+  `components/ic-musteri-detay.tsx` (yalnız okur): kart bilgileri, özet (iş emri / açık /
+  sevk ton / araç), iş emirleri (sipariş tarihi, ilerleme, durum, sipariş formu PDF),
+  son 10 araç (çıkış durumu, irsaliye PDF). Düzenle / Sil panelden; Esc önce üstteki
+  pencereyi kapatır.
+- Mükerrer kart engeli `musteriMukerrer` (`lib/ic-piyasa/siparis-formu.ts`): aynı ünvan
+  (`katla`, Türkçe harf/noktalama farkı yok) veya aynı telefon başka kartta (pasif dahil)
+  varsa yeni kart AÇILMAZ. Müşteriler formunda uyarı; sipariş formu penceresinde mevcut
+  aktif kart seçilir, kullanıcı farkları görüp tekrar onaylar (pasifse aktifleştirme
+  istenir). Testler: yardımcılar 23, Playwright `sf/e2e3.py` (detay, mükerrer, paylaşım).
 
 ## Burak Tuncay giriş e-postası (14.10.2026)
 

@@ -49,6 +49,30 @@ export function musteriEsle(musteriler: IcMusteri[], a: SiparisAlici): IcMusteri
   return null;
 }
 
+/**
+ * Mukerrer kart engeli (22.10.2026): ayni unvan (Turkce harf / noktalama farki
+ * yok sayilir) veya ayni telefon baska bir kartta varsa o karti doner.
+ * `haric`: duzenlenen kartin kendisi. Pasif kartlar da sayilir.
+ */
+export function musteriMukerrer(
+  musteriler: IcMusteri[],
+  a: { unvan: string | null; telefon: string | null },
+  haric?: string | null
+): { musteri: IcMusteri; neden: "unvan" | "telefon" } | null {
+  const digerleri = musteriler.filter((m) => m.id !== haric);
+  const k = a.unvan ? katla(a.unvan) : "";
+  if (k) {
+    const u = digerleri.find((m) => katla(m.unvan) === k);
+    if (u) return { musteri: u, neden: "unvan" };
+  }
+  const t = a.telefon ? telefonNormallestir(a.telefon) : null;
+  if (t) {
+    const v = digerleri.find((m) => !!m.telefon && m.telefon === t);
+    if (v) return { musteri: v, neden: "telefon" };
+  }
+  return null;
+}
+
 export type KartFarki = { alan: "unvan" | "vergi_dairesi" | "vergi_no" | "adres" | "yetkili_ad" | "telefon" | "eposta"; etiket: string; kart: string | null; form: string };
 
 /** Formda DOLU olup kartta farkli olan alanlar (bos form alani karti silmez) */

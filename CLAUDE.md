@@ -1398,6 +1398,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Alıcı + Müşteri/Lojistik/Yetkili, Oluşturma, Durum, İşlem); filtre Tümü / WhatsApp /
   Şirket içi e-posta / Sorunlu (hata veya yeniden denenen e-posta) + arama (iş emri, müşteri,
   plaka, alıcı). Mesaj kutusu max-h 22rem (iletişim satırı görünsün). Veri/SQL değişmedi.
+- Bildirim Akışı satırına tıklayınca (22.10.2026, kullanıcı isteği) altında ayrıntı açılır
+  (aynı anda tek satır): WhatsApp → müşteriye giden METİN (`elleGonderimMetni`, kayıtlı
+  `degerler` + güncel şablon + iletişim satırı; "şablon sonradan değiştiyse küçük fark
+  olabilir" notu — metin DB'de saklanmadığı için) + telefon + "Metni kopyala"; e-posta →
+  Alıcı, CC (`ic_bildirimler.cc`), Plaka/Sipariş/Ürün/Net (+ Planlanan saat / Bildiren),
+  deneme sayısı (alan sırası edge function `epostaOlustur` ile aynı). Lojistiğin tek
+  kullanımlık çıkış bağlantısı GÖSTERİLMEZ (tıklanırsa çıkış işlenebilir).
 - Testler: `sf/e2e5.py` (menü, sekme sırası, tablo, adımlar, detay, mobil; tek ekran filtre/
   arama). `sf/e2e.py`'nin "okunanlar" iki kontrolü TEK ADIM'dan (b16aa95) beri eskidir
   (okunanlar artık giriş alanlarında; `e2e2.py` kapsar).

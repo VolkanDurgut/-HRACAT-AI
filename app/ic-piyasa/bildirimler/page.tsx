@@ -10,7 +10,7 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search,
+  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { BILDIRIM_ETIKET, elleGonderimMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
@@ -35,7 +35,7 @@ type Satir = {
   id: string; sablon: string; alici: "musteri" | "lojistik" | "yetkili"; kanal: "whatsapp" | "eposta";
   hedef: string | null; alici_ad: string | null; degerler: string[]; dugme_eki: string | null;
   durum: "bekliyor" | "gonderiliyor" | "gonderildi" | "atlandi" | "hata"; hata: string | null; deneme: number;
-  olusturma: string; islem_zamani: string | null; isleyen: string | null;
+  olusturma: string; islem_zamani: string | null; isleyen: string | null; cc: string[] | null;
   ic_is_emirleri: { is_emri_no: string; ic_musteriler: { id: string; unvan: string; telefon: string | null; whatsapp_izin: boolean } | null } | null;
   ic_sevkler: { irsaliye_dosya_yolu: string; irsaliye_no: string | null; plaka: string } | null;
 };
@@ -93,7 +93,7 @@ export default function BildirimlerPage() {
     setOkumaHatasi(null);
     const [bRes, aRes] = await Promise.all([
       supabase.from("ic_bildirimler")
-        .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin)), ic_sevkler(irsaliye_dosya_yolu, irsaliye_no, plaka)")
+        .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, cc, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin)), ic_sevkler(irsaliye_dosya_yolu, irsaliye_no, plaka)")
         .eq("company_id", companyId).order("olusturma", { ascending: false }).limit(300),
       supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc").eq("company_id", companyId).maybeSingle(),
     ]);
@@ -393,7 +393,7 @@ export default function BildirimlerPage() {
             <input value={akisArama} onChange={(e) => setAkisArama(e.target.value)} placeholder="İş emri no, müşteri, plaka veya alıcı..." className={`${inputSinif} pl-9`} style={inputStil} />
           </div>
         </div>
-        <Tablo satirlar={akisListe} bos={akis.length === 0 ? "Henüz gönderilen mesaj ya da şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." : "Bu filtrede kayıt yok."} />
+        <Tablo satirlar={akisListe} metni={metni} hataBildir={(m) => showToast(m, "error")} bos={akis.length === 0 ? "Henüz gönderilen mesaj ya da şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." : "Bu filtrede kayıt yok."} />
       </section>
 
       <ConfirmDialog
@@ -415,8 +415,21 @@ const sorunlu = (s: Satir) => s.durum === "hata" || (s.kanal === "eposta" && s.d
 
 const ALICI_ETIKET: Record<Satir["alici"], string> = { musteri: "Müşteri", lojistik: "Lojistik", yetkili: "Yetkili" };
 
-function Tablo({ satirlar, bos }: { satirlar: Satir[]; bos: string }) {
+/** Sirket ici e-posta alanlari (edge function "ic-piyasa" epostaOlustur ile ayni sira) */
+function epostaAlanlari(s: Satir): [string, string][] {
+  const d = (i: number) => String(s.degerler?.[i] ?? "").trim();
+  const alanlar: [string, string][] = [["Plaka", d(0)], ["Sipariş", d(1)], ["Ürün", d(2)], ["Net miktar", d(3)]];
+  if (d(4) && d(4) !== "-") alanlar.push([s.sablon === "cikis_bugun_degil" ? "Bildiren" : "Planlanan saat", d(4).replace(/\s*\(bağlantı\)\s*$/, "")]);
+  return alanlar.filter(([, v]) => v);
+}
+
+function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni: (s: Satir) => string | null; hataBildir: (m: string) => void; bos: string }) {
+  const [acik, setAcik] = useState<string | null>(null);
+  const [kopyalanan, setKopyalanan] = useState<string | null>(null);
   if (satirlar.length === 0) return <p className="px-4 py-10 text-center text-sm" style={{ color: TEXT_MUTED }}>{bos}</p>;
+  const kopyala = async (id: string, metin: string) => {
+    try { await navigator.clipboard.writeText(metin); setKopyalanan(id); window.setTimeout(() => setKopyalanan((k) => (k === id ? null : k)), 2000); } catch { hataBildir("Kopyalanamadı; metni seçip elle kopyalayın."); }
+  };
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm min-w-[860px]">
@@ -430,12 +443,19 @@ function Tablo({ satirlar, bos }: { satirlar: Satir[]; bos: string }) {
         <tbody>
           {satirlar.map((s) => {
             const eposta = s.kanal === "eposta";
+            const ac = acik === s.id;
+            const metin = !eposta ? metni(s) : null;
             return (
-              <tr key={s.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }}>
+              <React.Fragment key={s.id}>
+              <tr className={`border-t align-top cursor-pointer transition-colors ${ac ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`} style={{ borderColor: CARD_BORDER }}
+                onClick={() => setAcik(ac ? null : s.id)} aria-expanded={ac} title={ac ? "Gizle" : eposta ? "E-posta ayrıntısını göster" : "Gönderilen mesaj metnini göster"}>
                 <td className="px-4 py-2.5 whitespace-nowrap">
-                  {eposta
-                    ? <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-400"><Mail size={11} /> E-posta</span>
-                    : <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400"><MessageCircle size={11} /> WhatsApp</span>}
+                  <span className="inline-flex items-center gap-2">
+                    <span style={{ color: TEXT_MUTED }}>{ac ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+                    {eposta
+                      ? <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-400"><Mail size={11} /> E-posta</span>
+                      : <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-400"><MessageCircle size={11} /> WhatsApp</span>}
+                  </span>
                 </td>
                 <td className="px-4 py-2.5 text-white">{BILDIRIM_ETIKET[s.sablon] || s.sablon}
                   {eposta && s.degerler?.[0] && <span className="block text-xs" style={{ color: TEXT_MUTED }}>{s.degerler[0]}</span>}
@@ -454,6 +474,38 @@ function Tablo({ satirlar, bos }: { satirlar: Satir[]; bos: string }) {
                 </td>
                 <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.islem_zamani ? `${tarihSaatYazi(s.islem_zamani)}${s.isleyen ? ` · ${s.isleyen}` : ""}` : "-"}</td>
               </tr>
+              {ac && (
+                <tr style={{ backgroundColor: "rgba(255,255,255,0.03)" }}>
+                  <td />
+                  <td colSpan={6} className="px-4 pb-4 pt-1">
+                    {!eposta ? (
+                      <div className="max-w-2xl">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Mesaj metni · {s.hedef ? telefonYazi(s.hedef) : "telefon yok"}</p>
+                          {metin && (
+                            <button onClick={(e) => { e.stopPropagation(); kopyala(s.id, metin); }} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }}>
+                              {kopyalanan === s.id ? <Check size={12} /> : <Copy size={12} />} {kopyalanan === s.id ? "Kopyalandı" : "Metni kopyala"}
+                            </button>
+                          )}
+                        </div>
+                        <pre className="rounded-lg border p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>{metin || "Mesaj metni oluşturulamadı (eksik bilgi)."}</pre>
+                        <p className="text-[11px] mt-1.5" style={{ color: TEXT_MUTED }}>Metin, mesajın kayıtlı bilgilerinden güncel şablonla oluşturulur; şablon sonradan değiştiyse gönderilen metinden küçük farkları olabilir.</p>
+                      </div>
+                    ) : (
+                      <div className="max-w-2xl rounded-lg border p-3" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>
+                        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
+                          <dt style={{ color: TEXT_MUTED }}>Alıcı</dt><dd className="text-white break-all">{s.hedef || "-"}</dd>
+                          {!!s.cc?.length && (<><dt style={{ color: TEXT_MUTED }}>CC</dt><dd className="text-white break-all">{s.cc.join(", ")}</dd></>)}
+                          {epostaAlanlari(s).map(([k, v]) => (<React.Fragment key={k}><dt style={{ color: TEXT_MUTED }}>{k}</dt><dd className="text-white">{v}</dd></React.Fragment>))}
+                          {s.deneme > 0 && (<><dt style={{ color: TEXT_MUTED }}>Deneme</dt><dd className="text-white">{s.deneme}</dd></>)}
+                        </dl>
+                        {s.dugme_eki && <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }}>E-postada lojistiğin çıkışı bildirdiği tek kullanımlık bağlantı vardır (güvenlik için burada gösterilmez).</p>}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             );
           })}
         </tbody>

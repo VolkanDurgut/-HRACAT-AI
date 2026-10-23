@@ -1,5 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { BILDIRIM_ETIKET, SITE_ADRESI, cikisAdresi, takipAdresi } from "../_shared/mesaj-sablonlari.ts";
+import {
+  BILDIRIM_ETIKET, SITE_ADRESI, cikisAdresi, takipAdresi,
+  MUSTERI_EPOSTA_SABLONLARI, musteriEpostaHtml, musteriEpostaKonusu, musteriEpostaMetni, sablonBul,
+} from "../_shared/mesaj-sablonlari.ts";
 
 // ============================================================================
 // IC PIYASA (ic-piyasa) - 12.10.2026
@@ -16,8 +19,13 @@ import { BILDIRIM_ETIKET, SITE_ADRESI, cikisAdresi, takipAdresi } from "../_shar
 // Veritabanina SADECE service_role ile, SADECE su fonksiyonlarla erisir:
 // ic_takip_bilgi, ic_cikis_token_bilgi, ic_cikis_token_isle,
 // ic_bildirim_zamanla, ic_bildirim_eposta_al, ic_bildirim_eposta_sonuc
-// (migration 20261012200000). Musteriye e-posta GONDERMEZ (askida kurali):
-// kuyruktaki e-postalar yalnizca lojistik ve yetkili (sirket ici) icindir.
+// (migration 20261012200000).
+// 23.10.2026: MUSTERI E-POSTASI (migration 20261023120000). WhatsApp'i olmayan
+// musteriye ayni metin e-postayla; "yola cikti"da irsaliye PDF'i EKLI. Kuyruk
+// (ic_bildirim_eposta_al) musteri e-postasini SADECE ayarlardan otomatik
+// gonderim acildiktan SONRA olusmussa verir. Gonderen = ayardaki dogrulanmis
+// unex.com.tr adresi, yanit = lojistik. "musteri_deneme": oturumdaki
+// kullanicinin KENDI adresine ornek e-posta (musteriye gitmez).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -25,6 +33,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const GONDEREN = "Unex Gıda İç Piyasa <bildirim@ihracatasistanim.com>";
 const KOVA = "ic-piyasa-belgeler";
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +72,62 @@ async function imzaliPdf(yol: string): Promise<string | null> {
   if (!res.ok) return null;
   const d = await res.json();
   return d?.signedURL ? `${SUPABASE_URL}/storage/v1${d.signedURL}` : null;
+}
+
+/** Depodan PDF'i indirip base64 dondurur (e-posta eki). Yoksa / buyukse null. */
+async function pdfBase64(yol: string): Promise<string | null> {
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${KOVA}/${yol.split("/").map(encodeURIComponent).join("/")}`, { headers: { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` } });
+  if (!res.ok) return null;
+  const bayt = new Uint8Array(await res.arrayBuffer());
+  if (bayt.length === 0 || bayt.length > 10 * 1024 * 1024) return null;
+  let ikili = "";
+  for (let i = 0; i < bayt.length; i += 0x8000) ikili += String.fromCharCode(...bayt.subarray(i, i + 0x8000));
+  return btoa(ikili);
+}
+
+type MusteriBilgi = { gonderen: string | null; yanit: string | null; iletisim_ad: string | null; iletisim_telefon: string | null; irsaliye_yolu: string | null; irsaliye_no: string | null };
+
+/** Musteri e-postasinin Resend govdesi (konu, html, text, ek). Eksik bilgide hata firlatir (yarim e-posta gitmez). */
+async function musteriEpostasi(sablonAdi: string, degerler: string[], bilgi: MusteriBilgi, deneme = false): Promise<{ from: string; reply_to?: string; subject: string; html: string; text: string; attachments?: { filename: string; content: string }[] }> {
+  if (!(MUSTERI_EPOSTA_SABLONLARI as readonly string[]).includes(sablonAdi)) throw new Error(`Müşteri e-postası şablonu değil: ${sablonAdi}`);
+  const sablon = sablonBul(sablonAdi);
+  if (!sablon) throw new Error(`Şablon bulunamadı: ${sablonAdi}`);
+  if (!bilgi.gonderen) throw new Error("Müşteri e-postası gönderen adresi tanımlı değil (Bildirimler › Ayarlar).");
+  // Telefon WhatsApp metniyle ayni bicimde (lib/ic-piyasa/is-emri.ts telefonYazi): 905532689101 -> 0553 268 91 01
+  const tm = (bilgi.iletisim_telefon || "").match(/^90(\d{3})(\d{3})(\d{2})(\d{2})$/);
+  const iletisim = { ad: bilgi.iletisim_ad, telefon: tm ? `0${tm[1]} ${tm[2]} ${tm[3]} ${tm[4]}` : bilgi.iletisim_telefon };
+  let ekler: { filename: string; content: string }[] | undefined;
+  let ekNotu: string | null = null;
+  if (sablonAdi === "arac_yola_cikti") {
+    if (!bilgi.irsaliye_yolu) {
+      if (!deneme) throw new Error("İrsaliye dosyası bulunamadı; e-posta eksik gitmesin diye gönderilmedi.");
+    } else {
+      const icerik = await pdfBase64(bilgi.irsaliye_yolu);
+      if (!icerik) throw new Error("İrsaliye PDF'i depodan okunamadı.");
+      const ad = (bilgi.irsaliye_no || "irsaliye").replace(/[^A-Za-z0-9_-]/g, "") || "irsaliye";
+      ekler = [{ filename: `${ad}.pdf`, content: icerik }];
+      ekNotu = `Ek: ${ad}.pdf (irsaliye)`;
+    }
+  }
+  const konu = musteriEpostaKonusu(sablon, degerler);
+  return {
+    from: `Unex Gıda <${bilgi.gonderen}>`,
+    ...(bilgi.yanit ? { reply_to: bilgi.yanit } : {}),
+    subject: deneme ? `[DENEME] ${konu}` : konu,
+    html: musteriEpostaHtml(sablon, degerler, iletisim, ekNotu),
+    text: musteriEpostaMetni(sablon, degerler, iletisim),
+    ...(ekler ? { attachments: ekler } : {}),
+  };
+}
+
+async function resendGonder(govde: Record<string, unknown>): Promise<void> {
+  if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify(govde),
+  });
+  if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,14 +212,17 @@ async function kuyruguIsle(): Promise<{ zamanlanan: number; gonderilen: number; 
   for (const b of isler || []) {
     try {
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
-      if (b.alici === "musteri") throw new Error("Müşteriye e-posta gönderimi kapalı.");
-      const { konu, html } = epostaOlustur(b);
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: GONDEREN, to: [b.hedef], ...(b.cc && b.cc.length ? { cc: b.cc } : {}), subject: konu, html }),
-      });
-      if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const cc = b.cc && b.cc.length ? { cc: b.cc.filter((x) => x && x.toLowerCase() !== b.hedef.toLowerCase()) } : {};
+      if (b.alici === "musteri") {
+        // Kuyruk bunu yalnizca otomatik gonderim aciksa verir (ic_bildirim_eposta_al)
+        const bilgi = await rpc<MusteriBilgi | null>("ic_musteri_eposta_bilgi", { p_id: b.id });
+        if (!bilgi) throw new Error("Müşteri e-postası bilgisi okunamadı.");
+        const e = await musteriEpostasi(b.sablon, (b.degerler || []).map((d) => String(d ?? "")), bilgi);
+        await resendGonder({ ...e, to: [b.hedef], ...cc });
+      } else {
+        const { konu, html } = epostaOlustur(b);
+        await resendGonder({ from: GONDEREN, to: [b.hedef], ...cc, subject: konu, html });
+      }
       await rpc("ic_bildirim_eposta_sonuc", { p_id: b.id, p_basarili: true });
       gonderilen++;
     } catch (e) {
@@ -204,6 +272,25 @@ Deno.serve(async (req: Request) => {
     }
     if (islem === "isle") {
       return json({ basarili: true, ...(await kuyruguIsle()) });
+    }
+    if (islem === "musteri_deneme") {
+      // Oturumdaki kullanicinin KENDI adresine ornek "Araciniz yola cikti" e-postasi
+      const yetki = req.headers.get("Authorization") || "";
+      const kullanici = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: ANON_KEY, Authorization: yetki } });
+      if (!kullanici.ok) return json({ hata: "Oturum doğrulanamadı. Sayfayı yenileyip tekrar deneyin." }, 401);
+      const eposta = String((await kullanici.json())?.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eposta)) return json({ hata: "Hesabınızda e-posta adresi yok." }, 400);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/ic_musteri_eposta_deneme`, { method: "POST", headers: { apikey: ANON_KEY, Authorization: yetki, "Content-Type": "application/json" }, body: "{}" });
+      const metin = await res.text();
+      if (!res.ok) {
+        let m = metin; try { m = JSON.parse(metin).message || metin; } catch { /* duz */ }
+        return json({ hata: m.slice(0, 300) }, res.status === 401 || res.status === 403 ? 403 : 400);
+      }
+      const bilgi = JSON.parse(metin) as MusteriBilgi;
+      const degerler = ["ÖRNEK MÜŞTERİ A.Ş.", "IE-2026-0000", "59 ABC 123 (Dorse: 59 ABC 124)", "Kepek (Dökme)", "26.220 kg", bilgi.irsaliye_no || "IRS2026000000000", "26.220 / 100.000 kg (1. araç)"];
+      const e = await musteriEpostasi("arac_yola_cikti", degerler, bilgi, true);
+      await resendGonder({ ...e, to: [eposta] });
+      return json({ basarili: true, alici: eposta, gonderen: bilgi.gonderen, ek: !!e.attachments });
     }
     return json({ hata: "Bilinmeyen işlem." }, 400);
   } catch (e) {

@@ -10,10 +10,10 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
-  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search, ChevronDown, ChevronRight,
+  Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search, ChevronDown, ChevronRight, Send, ShieldCheck, Paperclip,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
-import { BILDIRIM_ETIKET, elleGonderimMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
+import { BILDIRIM_ETIKET, elleGonderimMetni, musteriEpostaKonusu, musteriEpostaMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 
 /**
@@ -29,6 +29,12 @@ import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefo
  * metin WhatsApp'ta acilir, PDF "İrsaliyeyi indir" ile indirilip sohbete eklenir.
  * 22.10.2026 (kullanici karari): TEK EKRAN - ustte gonderilecek mesajlar, altta
  * WhatsApp + sirket ici e-postalarin birlesik "Bildirim Akisi" (filtre + arama).
+ * 23.10.2026: MUSTERI E-POSTASI. WhatsApp'i olmayan musteriye mesaj e-posta
+ * kanalinda hazirlanir (ic_bildirim_ekle). Otomatik gonderim KAPALIYKEN (ya da
+ * acilmadan once olusmus mesajlarda) kartta "Outlook ile gonder" (alici, CC, konu,
+ * metin hazir; irsaliye "İrsaliyeyi indir" ile eklenir). ACIKKEN sistem lojistik@
+ * adresinden irsaliye EKLI gonderir. Ayarlar > Musteri e-postasi: gonderen, CC,
+ * "Deneme e-postasi (kendime)", otomatik gonderim anahtari.
  */
 
 type Satir = {
@@ -43,6 +49,9 @@ type Satir = {
 /** "IRS2026000002468" / "59 AGD 271" -> dosya adina uygun */
 const dosyaAdi = (x: string) => x.replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü_-]+/g, "_").replace(/^_+|_+$/g, "") || "irsaliye";
 type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string };
+type MusteriEpostaAyar = { gonderen: string; cc: string; aktif: boolean; aktifZaman: string | null };
+const ME_VARSAYILAN: MusteriEpostaAyar = { gonderen: "lojistik@unex.com.tr", cc: "bbt@unex.com.tr, execution@unex.com.tr, lojistik@unex.com.tr", aktif: false, aktifZaman: null };
+const EPOSTA_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type AkisFiltre = "tumu" | "whatsapp" | "eposta" | "sorunlu";
 
 const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -87,6 +96,12 @@ export default function BildirimlerPage() {
   const [iletisim, setIletisim] = useState<{ ad: string; telefon: string } | null>(null);
   const [ayarAcik, setAyarAcik] = useState(false);
   const [ayarKaydediliyor, setAyarKaydediliyor] = useState(false);
+  // Musteri e-postasi: kayitli hali (kart davranisi buna gore) + duzenlenen form
+  const [meKayitli, setMeKayitli] = useState<MusteriEpostaAyar>({ ...ME_VARSAYILAN, gonderen: "", cc: "" });
+  const [meForm, setMeForm] = useState<MusteriEpostaAyar>(ME_VARSAYILAN);
+  const [meKaydediliyor, setMeKaydediliyor] = useState(false);
+  const [denemeGidiyor, setDenemeGidiyor] = useState(false);
+  const [aktifOnay, setAktifOnay] = useState(false);
 
   const getir = useCallback(async () => {
     if (!companyId) return;
@@ -95,7 +110,7 @@ export default function BildirimlerPage() {
       supabase.from("ic_bildirimler")
         .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, cc, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin)), ic_sevkler(irsaliye_dosya_yolu, irsaliye_no, plaka)")
         .eq("company_id", companyId).order("olusturma", { ascending: false }).limit(300),
-      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc, musteri_eposta_gonderen, musteri_eposta_cc, musteri_eposta_aktif, musteri_eposta_aktif_zaman").eq("company_id", companyId).maybeSingle(),
     ]);
     if (bRes.error || aRes.error) { setOkumaHatasi((bRes.error || aRes.error)!.message); setYukleniyor(false); return; }
     setSatirlar((bRes.data || []) as unknown as Satir[]);
@@ -108,6 +123,13 @@ export default function BildirimlerPage() {
         lojistik_telefon: aRes.data.lojistik_telefon ? telefonYazi(aRes.data.lojistik_telefon) : "", yetkili_eposta: aRes.data.yetkili_eposta || "",
         yetkili_cc: (aRes.data.yetkili_cc || "").split(",").join(", "),
       });
+      const me: MusteriEpostaAyar = {
+        gonderen: aRes.data.musteri_eposta_gonderen || "", cc: (aRes.data.musteri_eposta_cc || "").split(",").filter(Boolean).join(", "),
+        aktif: !!aRes.data.musteri_eposta_aktif, aktifZaman: aRes.data.musteri_eposta_aktif_zaman || null,
+      };
+      setMeKayitli(me);
+      // Hic kaydedilmemisse form kullanici kararindaki varsayilanlarla dolu gelir
+      setMeForm(me.gonderen ? me : { ...ME_VARSAYILAN, aktif: false, aktifZaman: null });
     } else {
       setAyarVar(false);
       setAyarAcik(true);
@@ -122,9 +144,12 @@ export default function BildirimlerPage() {
     return () => window.clearInterval(z);
   }, [yetkili, getir]);
 
-  const gonderilecek = useMemo(() => satirlar.filter((s) => s.kanal === "whatsapp" && s.durum === "bekliyor").sort((a, b) => a.olusturma.localeCompare(b.olusturma)), [satirlar]);
-  // Bildirim akisi: gonderilmeyi bekleyen WhatsApp mesajlari DISINDAKI her sey (en yeni ustte)
-  const akis = useMemo(() => satirlar.filter((s) => !(s.kanal === "whatsapp" && s.durum === "bekliyor")), [satirlar]);
+  // Musteri e-postasini sistem mi gonderecek? (acik + acildigi andan sonra olusmus) - SQL ic_bildirim_eposta_al ile ayni kural
+  const otomatikGidecek = useCallback((s: Satir) => s.alici === "musteri" && s.kanal === "eposta" && meKayitli.aktif && !!meKayitli.gonderen && !!meKayitli.aktifZaman && s.olusturma >= meKayitli.aktifZaman, [meKayitli]);
+  const elleGonderilecek = useCallback((s: Satir) => s.durum === "bekliyor" && (s.kanal === "whatsapp" || (s.alici === "musteri" && s.kanal === "eposta" && !otomatikGidecek(s))), [otomatikGidecek]);
+  const gonderilecek = useMemo(() => satirlar.filter(elleGonderilecek).sort((a, b) => a.olusturma.localeCompare(b.olusturma)), [satirlar, elleGonderilecek]);
+  // Bildirim akisi: elle gonderilmeyi bekleyen mesajlar DISINDAKI her sey (en yeni ustte)
+  const akis = useMemo(() => satirlar.filter((s) => !elleGonderilecek(s)), [satirlar, elleGonderilecek]);
   const akisSayilari = useMemo(() => ({
     tumu: akis.length,
     whatsapp: akis.filter((s) => s.kanal === "whatsapp").length,
@@ -147,6 +172,26 @@ export default function BildirimlerPage() {
     const sb = sablonBul(s.sablon);
     if (!sb) return null;
     try { return elleGonderimMetni(sb, s.degerler, s.dugme_eki || undefined, iletisim); } catch { return null; }
+  };
+  /** Musteri e-postasi: konu + duz metin (otomatik gonderimle AYNI uretici). Eksik bilgide null. */
+  const epostasi = (s: Satir): { konu: string; metin: string } | null => {
+    const sb = sablonBul(s.sablon);
+    if (!sb) return null;
+    try { return { konu: musteriEpostaKonusu(sb, s.degerler), metin: musteriEpostaMetni(sb, s.degerler, iletisim) }; } catch { return null; }
+  };
+  const meCcListe = meKayitli.cc.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+
+  const outlookAc = (s: Satir) => {
+    const e = epostasi(s);
+    if (!s.hedef || !e) return;
+    const cc = meCcListe.filter((x) => x.toLowerCase() !== (s.hedef || "").toLowerCase());
+    const q = [cc.length ? `cc=${encodeURIComponent(cc.join(","))}` : "", `subject=${encodeURIComponent(e.konu)}`, `body=${encodeURIComponent(e.metin)}`].filter(Boolean).join("&");
+    // Gizli baglantiyla acilir (varsayilan e-posta uygulamasi: Outlook); sayfa yerinde kalir
+    const a = document.createElement("a");
+    a.href = `mailto:${encodeURIComponent(s.hedef)}?${q}`;
+    a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    setOnayBekleyen(s.id);
   };
 
   const isaretle = async (s: Satir, durum: "gonderildi" | "atlandi") => {
@@ -208,7 +253,7 @@ export default function BildirimlerPage() {
   };
 
   const kopyala = async (s: Satir) => {
-    const metin = metni(s);
+    const metin = s.kanal === "eposta" ? epostasi(s)?.metin : metni(s);
     if (!metin) return;
     try { await navigator.clipboard.writeText(metin); setKopyalanan(s.id); window.setTimeout(() => setKopyalanan((k) => (k === s.id ? null : k)), 2000); }
     catch { showToast("Kopyalanamadı; metni seçip elle kopyalayın.", "error"); }
@@ -238,6 +283,42 @@ export default function BildirimlerPage() {
     showToast("Bildirim ayarları kaydedildi.", "success");
     setAyarAcik(false);
     getir();
+  };
+
+  const meKaydet = async (aktif: boolean) => {
+    if (!companyId) return;
+    if (!ayarVar) { showToast("Önce bildirim ayarlarını kaydedin.", "error"); return; }
+    const gonderen = meForm.gonderen.trim().toLowerCase();
+    if (!EPOSTA_RE.test(gonderen)) { showToast("Gönderen e-posta adresi geçersiz.", "error"); return; }
+    if (!/@unex\.com\.tr$/.test(gonderen)) { showToast("Gönderen adres unex.com.tr alan adında olmalı (müşteri kendi alan adınızdan almalı).", "error"); return; }
+    const ccListe = Array.from(new Set(meForm.cc.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)));
+    const ccHatali = ccListe.find((x) => !EPOSTA_RE.test(x));
+    if (ccHatali) { showToast(`CC adresi geçersiz: ${ccHatali}`, "error"); return; }
+    if (ccListe.length > 5) { showToast("CC'ye en fazla 5 adres yazılabilir.", "error"); return; }
+    setMeKaydediliyor(true);
+    const { data, error } = await supabase.from("ic_piyasa_ayarlari")
+      .update({ musteri_eposta_gonderen: gonderen, musteri_eposta_cc: ccListe.length ? ccListe.join(",") : null, musteri_eposta_aktif: aktif })
+      .eq("company_id", companyId).select("company_id");
+    setMeKaydediliyor(false);
+    setAktifOnay(false);
+    const hata = yazmaHatasi(error, data);
+    if (hata) { showToast(`Kaydedilemedi: ${hataMesaji({ message: hata })}`, "error"); return; }
+    showToast(aktif !== meKayitli.aktif ? (aktif ? "Otomatik müşteri e-postası AÇILDI. Bundan sonra oluşan mesajlar sistemden gider." : "Otomatik müşteri e-postası kapatıldı.") : "Müşteri e-postası ayarları kaydedildi.", "success");
+    getir();
+  };
+
+  const denemeGonder = async () => {
+    if (meForm.gonderen.trim().toLowerCase() !== meKayitli.gonderen) { showToast("Önce gönderen adresi kaydedin.", "error"); return; }
+    setDenemeGidiyor(true);
+    const { data, error } = await supabase.functions.invoke("ic-piyasa", { body: { islem: "musteri_deneme" } });
+    setDenemeGidiyor(false);
+    let hata = (data as { hata?: string } | null)?.hata || null;
+    if (error && !hata) {
+      try { hata = (await (error as { context?: Response }).context?.json())?.hata || error.message; } catch { hata = error.message; }
+    }
+    if (hata) { showToast(`Deneme gönderilemedi: ${/not verified|domain/i.test(hata) ? "unex.com.tr alan adı Resend'de henüz doğrulanmadı." : hata}`, "error"); return; }
+    const d = data as { alici?: string; ek?: boolean };
+    showToast(`Deneme e-postası ${d.alici || "adresinize"} gönderildi${d.ek ? " (irsaliye ekli)" : ""}. Gelen kutunuzu ve istenmeyen klasörünü kontrol edin.`, "success");
   };
 
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
@@ -285,11 +366,47 @@ export default function BildirimlerPage() {
               {ayarKaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
             </button>
           </div>
+
+          {ayarVar && (
+            <div className="mt-5 pt-4 border-t" style={{ borderColor: CARD_BORDER }} aria-labelledby="me-baslik">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="me-baslik" className="text-sm font-semibold text-white flex items-center gap-2"><Mail size={14} /> Müşteri e-postası</h3>
+                  <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>WhatsApp&apos;ı olmayan, kartında e-posta bulunan müşterilere mesajlar e-postayla gider. &quot;Aracınız yola çıktı&quot; e-postasında irsaliye PDF&apos;i ektedir.</p>
+                </div>
+                <span className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full font-medium ${meKayitli.aktif ? "bg-emerald-500/15 text-emerald-400" : "bg-slate-500/15 text-slate-300"}`}>
+                  {meKayitli.aktif ? <><ShieldCheck size={12} /> Otomatik gönderim açık</> : "Otomatik gönderim kapalı · Outlook ile elle"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <Alan etiket="Gönderen (unex.com.tr) *"><input value={meForm.gonderen} onChange={(e) => setMeForm({ ...meForm, gonderen: e.target.value })} inputMode="email" placeholder="lojistik@unex.com.tr" className={inputSinif} style={inputStil} aria-label="Müşteri e-postası gönderen" /></Alan>
+                <Alan etiket="CC (virgülle, en fazla 5)"><input value={meForm.cc} onChange={(e) => setMeForm({ ...meForm, cc: e.target.value })} inputMode="email" placeholder="bbt@unex.com.tr, execution@unex.com.tr" className={inputSinif} style={inputStil} aria-label="Müşteri e-postası CC" /></Alan>
+              </div>
+              <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }}>
+                Yanıtlar lojistik e-postasına ({ayar.lojistik_eposta || "-"}) gelir. Otomatik gönderim için unex.com.tr alan adı Resend&apos;de doğrulanmış olmalı; önce &quot;Deneme&quot; ile kendinize gönderip kontrol edin. Açıldığı andan ÖNCE hazırlanmış mesajlar otomatik gitmez, yukarıda elle gönderilir.
+              </p>
+              <div className="flex flex-wrap justify-end gap-2 mt-3">
+                <button onClick={denemeGonder} disabled={denemeGidiyor || !meKayitli.gonderen} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER }} title={meKayitli.gonderen ? "Örnek e-posta yalnızca sizin adresinize gider" : "Önce gönderen adresi kaydedin"}>
+                  {denemeGidiyor ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Deneme e-postası (kendime)
+                </button>
+                <button onClick={() => meKaydet(meKayitli.aktif)} disabled={meKaydediliyor} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER }}>
+                  {meKaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
+                </button>
+                {meKayitli.aktif ? (
+                  <button onClick={() => meKaydet(false)} disabled={meKaydediliyor} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-50" style={{ borderColor: "#7F1D1D" }}>Otomatik gönderimi kapat</button>
+                ) : (
+                  <button onClick={() => setAktifOnay(true)} disabled={meKaydediliyor || !meKayitli.gonderen} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }} title={meKayitli.gonderen ? "" : "Önce gönderen adresi kaydedin"}>
+                    <ShieldCheck size={14} /> Otomatik gönderimi aç
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <OzetKutu baslik="Gönderilecek Mesaj" deger={gonderilecek.length} renk={gonderilecek.length ? "text-amber-400" : "text-emerald-400"} alt={gonderilecek.length ? "WhatsApp'tan gönderilmeyi bekliyor" : "Bekleyen mesaj yok"} />
+        <OzetKutu baslik="Gönderilecek Mesaj" deger={gonderilecek.length} renk={gonderilecek.length ? "text-amber-400" : "text-emerald-400"} alt={gonderilecek.length ? "Gönderilmeyi bekliyor (WhatsApp / e-posta)" : "Bekleyen mesaj yok"} />
         <OzetKutu baslik="Bugün Gönderilen" deger={bugunGonderilen} renk="text-white" alt="Müşteri mesajı ve şirket içi e-posta" />
         <OzetKutu baslik="E-posta Sorunu" deger={akisSayilari.sorunlu} renk={akisSayilari.sorunlu ? "text-red-400" : "text-emerald-400"} alt={akisSayilari.sorunlu ? "Aşağıda “Sorunlu” filtresiyle görün" : "Tüm e-postalar yolunda"} />
       </div>
@@ -305,6 +422,61 @@ export default function BildirimlerPage() {
         ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {gonderilecek.map((s) => {
+            if (s.kanal === "eposta") {
+              const e = epostasi(s);
+              const m2 = s.ic_is_emirleri?.ic_musteriler;
+              return (
+                <div key={s.id} className="rounded-xl border flex flex-col" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+                  <div className="px-4 pt-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white flex items-center gap-2">{BILDIRIM_ETIKET[s.sablon] || s.sablon}<span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-sky-500/10 text-sky-400"><Mail size={10} /> E-posta</span></p>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: TEXT_MUTED }}>{s.ic_is_emirleri?.is_emri_no || "-"} · {m2?.unvan || s.alici_ad || "-"} · {tarihSaatYazi(s.olusturma)}</p>
+                    </div>
+                  </div>
+                  <dl className="mx-4 mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                    <dt style={{ color: TEXT_MUTED }}>Alıcı</dt><dd className="text-white break-all">{s.hedef || "-"}</dd>
+                    {meCcListe.length > 0 && (<><dt style={{ color: TEXT_MUTED }}>CC</dt><dd className="text-white break-all">{meCcListe.join(", ")}</dd></>)}
+                    <dt style={{ color: TEXT_MUTED }}>Konu</dt><dd className="text-white">{e?.konu || "-"}</dd>
+                    {s.ic_sevkler && (<><dt style={{ color: TEXT_MUTED }}>Ek</dt><dd className="text-white inline-flex items-center gap-1"><Paperclip size={11} /> {dosyaAdi(s.ic_sevkler.irsaliye_no || s.ic_sevkler.plaka)}.pdf</dd></>)}
+                  </dl>
+                  <pre className="mx-4 mt-3 rounded-lg p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200 max-h-[22rem] overflow-y-auto" style={{ backgroundColor: "#0F131A" }}>{e?.metin || "E-posta metni oluşturulamadı (eksik bilgi)."}</pre>
+                  <p className="mx-4 mt-2 text-xs flex items-start gap-1.5" style={{ color: TEXT_MUTED }}>
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0 text-sky-400" />
+                    <span>{meKayitli.aktif ? "Bu mesaj otomatik gönderim açılmadan önce hazırlandı; " : "Otomatik gönderim kapalı; "}<b className="text-white">Outlook ile gönder</b> ile e-posta hazır açılır{s.ic_sevkler ? <>, <b className="text-white">İrsaliyeyi indir</b> ile PDF&apos;i ekleyin</> : null}.</span>
+                  </p>
+                  <div className="p-4 mt-auto">
+                    {onayBekleyen === s.id ? (
+                      <div className="rounded-lg border p-3" style={{ borderColor: "#065F46", backgroundColor: "rgba(16,185,129,0.08)" }}>
+                        <p className="text-sm text-white mb-2">E-postayı gönderdiniz mi?</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button disabled={isleniyor === s.id} onClick={() => isaretle(s, "gonderildi")} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                            {isleniyor === s.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Evet, gönderildi
+                          </button>
+                          <button onClick={() => setOnayBekleyen(null)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Hayır, sonra</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        <button disabled={!s.hedef || !e} onClick={() => outlookAc(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40" style={{ backgroundColor: "#0F6CBD" }}>
+                          <Mail size={15} /> Outlook ile gönder
+                        </button>
+                        {s.ic_sevkler && (
+                          <button disabled={dosyaIsleniyor === s.id} onClick={() => irsaliyeIndir(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
+                            <Download size={14} /> İrsaliyeyi indir
+                          </button>
+                        )}
+                        <button disabled={!e} onClick={() => kopyala(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm text-white hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER }}>
+                          {kopyalanan === s.id ? <Check size={14} /> : <Copy size={14} />} {kopyalanan === s.id ? "Kopyalandı" : "Metni kopyala"}
+                        </button>
+                        <button onClick={() => setAtlanacak(s)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                          <SkipForward size={14} /> Atla
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
             const tel = telefonu(s);
             const metin = metni(s);
             const m = s.ic_is_emirleri?.ic_musteriler;
@@ -381,7 +553,7 @@ export default function BildirimlerPage() {
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
           <h2 id="akis-baslik" className="text-sm font-semibold text-white mr-1">Bildirim Akışı</h2>
           <div className="inline-flex flex-wrap rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-            {([["tumu", "Tümü"], ["whatsapp", "WhatsApp"], ["eposta", "Şirket içi e-posta"], ["sorunlu", "Sorunlu"]] as [AkisFiltre, string][]).map(([k, e]) => (
+            {([["tumu", "Tümü"], ["whatsapp", "WhatsApp"], ["eposta", "E-posta"], ["sorunlu", "Sorunlu"]] as [AkisFiltre, string][]).map(([k, e]) => (
               <button key={k} onClick={() => setAkisFiltre(k)} className="px-3 py-1.5 rounded-md text-xs font-medium"
                 style={akisFiltre === k ? { backgroundColor: k === "sorunlu" && akisSayilari.sorunlu ? "#B91C1C" : ACCENT, color: "white" } : { color: k === "sorunlu" && akisSayilari.sorunlu ? "#F87171" : TEXT_MUTED }}>
                 {e} ({akisSayilari[k]})
@@ -393,8 +565,19 @@ export default function BildirimlerPage() {
             <input value={akisArama} onChange={(e) => setAkisArama(e.target.value)} placeholder="İş emri no, müşteri, plaka veya alıcı..." className={`${inputSinif} pl-9`} style={inputStil} />
           </div>
         </div>
-        <Tablo satirlar={akisListe} metni={metni} hataBildir={(m) => showToast(m, "error")} bos={akis.length === 0 ? "Henüz gönderilen mesaj ya da şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." : "Bu filtrede kayıt yok."} />
+        <Tablo satirlar={akisListe} metni={metni} epostasi={epostasi} otomatikGidecek={otomatikGidecek} hataBildir={(m) => showToast(m, "error")} bos={akis.length === 0 ? "Henüz gönderilen mesaj ya da şirket içi e-posta yok. Kantar araç yükleyince lojistiğe çıkış onayı e-postası gider." : "Bu filtrede kayıt yok."} />
       </section>
+
+      <ConfirmDialog
+        open={aktifOnay}
+        onOpenChange={(o) => !o && setAktifOnay(false)}
+        title="Otomatik müşteri e-postası açılsın mı?"
+        description={`Bundan sonra hazırlanan müşteri e-postaları (WhatsApp'ı olmayan müşteriler) ${meKayitli.gonderen || "gönderen"} adresinden otomatik gider; "yola çıktı" e-postasında irsaliye ektedir. Önce unex.com.tr alan adının Resend'de doğrulandığından ve deneme e-postasının size ulaştığından emin olun. Daha önce hazırlanmış mesajlar otomatik gitmez.`}
+        confirmLabel="Evet, aç"
+        cancelLabel="Vazgeç"
+        loading={meKaydediliyor}
+        onConfirm={() => meKaydet(true)}
+      />
 
       <ConfirmDialog
         open={!!atlanacak}
@@ -423,7 +606,7 @@ function epostaAlanlari(s: Satir): [string, string][] {
   return alanlar.filter(([, v]) => v);
 }
 
-function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni: (s: Satir) => string | null; hataBildir: (m: string) => void; bos: string }) {
+function Tablo({ satirlar, metni, epostasi, otomatikGidecek, hataBildir, bos }: { satirlar: Satir[]; metni: (s: Satir) => string | null; epostasi: (s: Satir) => { konu: string; metin: string } | null; otomatikGidecek: (s: Satir) => boolean; hataBildir: (m: string) => void; bos: string }) {
   const [acik, setAcik] = useState<string | null>(null);
   const [kopyalanan, setKopyalanan] = useState<string | null>(null);
   if (satirlar.length === 0) return <p className="px-4 py-10 text-center text-sm" style={{ color: TEXT_MUTED }}>{bos}</p>;
@@ -443,12 +626,14 @@ function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni:
         <tbody>
           {satirlar.map((s) => {
             const eposta = s.kanal === "eposta";
+            const musteriEp = eposta && s.alici === "musteri";
             const ac = acik === s.id;
             const metin = !eposta ? metni(s) : null;
+            const ep = musteriEp ? epostasi(s) : null;
             return (
               <React.Fragment key={s.id}>
               <tr className={`border-t align-top cursor-pointer transition-colors ${ac ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`} style={{ borderColor: CARD_BORDER }}
-                onClick={() => setAcik(ac ? null : s.id)} aria-expanded={ac} title={ac ? "Gizle" : eposta ? "E-posta ayrıntısını göster" : "Gönderilen mesaj metnini göster"}>
+                onClick={() => setAcik(ac ? null : s.id)} aria-expanded={ac} title={ac ? "Gizle" : musteriEp ? "E-posta metnini göster" : eposta ? "E-posta ayrıntısını göster" : "Gönderilen mesaj metnini göster"}>
                 <td className="px-4 py-2.5 whitespace-nowrap">
                   <span className="inline-flex items-center gap-2">
                     <span style={{ color: TEXT_MUTED }}>{ac ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
@@ -458,7 +643,7 @@ function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni:
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-white">{BILDIRIM_ETIKET[s.sablon] || s.sablon}
-                  {eposta && s.degerler?.[0] && <span className="block text-xs" style={{ color: TEXT_MUTED }}>{s.degerler[0]}</span>}
+                  {eposta && s.degerler?.[0] && <span className="block text-xs" style={{ color: TEXT_MUTED }}>{musteriEp ? s.ic_is_emirleri?.ic_musteriler?.unvan || s.alici_ad : s.degerler[0]}</span>}
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.ic_is_emirleri?.is_emri_no || "-"}</td>
                 <td className="px-4 py-2.5 text-white max-w-[260px]">
@@ -470,6 +655,7 @@ function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni:
                 <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.olusturma)}</td>
                 <td className="px-4 py-2.5">
                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${DURUM_ROZET[s.durum].sinif}`}>{DURUM_ROZET[s.durum].etiket}</span>
+                  {musteriEp && s.durum === "bekliyor" && otomatikGidecek(s) && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Otomatik gönderilecek</span>}
                   {s.hata && <span className="block text-[11px] mt-1 text-red-400 max-w-[260px]">{s.hata}</span>}
                 </td>
                 <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.islem_zamani ? `${tarihSaatYazi(s.islem_zamani)}${s.isleyen ? ` · ${s.isleyen}` : ""}` : "-"}</td>
@@ -490,6 +676,17 @@ function Tablo({ satirlar, metni, hataBildir, bos }: { satirlar: Satir[]; metni:
                         </div>
                         <pre className="rounded-lg border p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>{metin || "Mesaj metni oluşturulamadı (eksik bilgi)."}</pre>
                         <p className="text-[11px] mt-1.5" style={{ color: TEXT_MUTED }}>Metin, mesajın kayıtlı bilgilerinden güncel şablonla oluşturulur; şablon sonradan değiştiyse gönderilen metinden küçük farkları olabilir.</p>
+                      </div>
+                    ) : musteriEp ? (
+                      <div className="max-w-2xl">
+                        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm mb-2">
+                          <dt style={{ color: TEXT_MUTED }}>Alıcı</dt><dd className="text-white break-all">{s.hedef || "-"}</dd>
+                          {!!s.cc?.length && (<><dt style={{ color: TEXT_MUTED }}>CC</dt><dd className="text-white break-all">{s.cc.join(", ")}</dd></>)}
+                          <dt style={{ color: TEXT_MUTED }}>Konu</dt><dd className="text-white">{ep?.konu || "-"}</dd>
+                          {s.ic_sevkler && (<><dt style={{ color: TEXT_MUTED }}>Ek</dt><dd className="text-white">{s.ic_sevkler.irsaliye_no || s.ic_sevkler.plaka}.pdf (irsaliye)</dd></>)}
+                          {s.deneme > 0 && (<><dt style={{ color: TEXT_MUTED }}>Deneme</dt><dd className="text-white">{s.deneme}</dd></>)}
+                        </dl>
+                        <pre className="rounded-lg border p-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-200" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>{ep?.metin || "E-posta metni oluşturulamadı (eksik bilgi)."}</pre>
                       </div>
                     ) : (
                       <div className="max-w-2xl rounded-lg border p-3" style={{ backgroundColor: "#0F131A", borderColor: CARD_BORDER }}>

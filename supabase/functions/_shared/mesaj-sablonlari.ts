@@ -290,3 +290,78 @@ export const BILDIRIM_ETIKET: Record<string, string> = {
 export const SITE_ADRESI = "https://ihracatasistanim.com";
 export const takipAdresi = (token: string) => `${SITE_ADRESI}/takip/${token}`;
 export const cikisAdresi = (token: string) => `${SITE_ADRESI}/cikis/${token}`;
+
+// ---------------------------------------------------------------------------
+// MUSTERI E-POSTASI (23.10.2026) - WhatsApp'i olmayan musteriye ayni metin
+// e-postayla gider (otomatik: edge function ic-piyasa / elle: Outlook mailto).
+// Govde WhatsApp sablonundan (govdeDoldur) uretilir: TEK KAYNAK. Baglanti YOK
+// (22.10.2026 karari), gorsel YOK (logo adresi yabanci alan adi gosterirdi).
+// "Araciniz yola cikti" e-postasinda irsaliye PDF'i EK olarak gider.
+// ---------------------------------------------------------------------------
+
+type Iletisim = { ad?: string | null; telefon?: string | null } | null | undefined;
+
+/** E-posta konusu (gelen kutusunda aranabilir: is emri no + ozet). */
+export function musteriEpostaKonusu(sablon: MesajSablonu, degerler: string[]): string {
+  const d = (i: number) => String(degerler[i] ?? "").replace(/\s+/g, " ").trim();
+  switch (sablon.ad) {
+    case "siparis_alindi": return `Siparişiniz alındı · ${d(1)} · ${d(2)}`;
+    case "arac_cikis_saati": return `Araç çıkış saati · ${d(1)} · ${d(2)}`;
+    case "arac_yola_cikti": return `Aracınız yola çıktı · ${d(1)} · ${d(2)}${d(5) && d(5) !== "-" ? ` · İrsaliye ${d(5)}` : ""}`;
+    case "siparis_tamamlandi": return `Siparişiniz tamamlandı · ${d(1)} · ${d(2)}`;
+    default: return `${sablon.baslik} · Unex Gıda`;
+  }
+}
+
+const IMZA = "Saygılarımızla,\nUnex Gıda San. ve Tic. Ltd. Şti.";
+
+/** Duz metin govde (Outlook mailto ve e-postanin text/plain kismi). */
+export function musteriEpostaMetni(sablon: MesajSablonu, degerler: string[], iletisim?: Iletisim): string {
+  const parcalar = [govdeDoldur(sablon, degerler)];
+  const il = sablon.iletisim ? iletisimSatiri(iletisim) : null;
+  if (il) parcalar.push(il);
+  parcalar.push(IMZA);
+  return parcalar.join("\n\n");
+}
+
+const htmlKacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * Kurumsal (B2B) HTML govde: lacivert ust serit + seftali cizgi, baslik, govde
+ * paragraflari; "Etiket: deger" satirlari iki sutunlu bilgi tablosu olur.
+ * Tablo tabanli + satir ici stil (Outlook uyumu), dis kaynak / gorsel YOK.
+ */
+export function musteriEpostaHtml(sablon: MesajSablonu, degerler: string[], iletisim?: Iletisim, ekNotu?: string | null): string {
+  const govde = govdeDoldur(sablon, degerler);
+  const bloklar = govde.split(/\n{2,}/).map((blok) => {
+    const satirlar = blok.split("\n").map((x) => x.trim()).filter(Boolean);
+    const tablo = satirlar.length > 0 && satirlar.every((x) => /^[^:]{2,30}:\s+\S/.test(x));
+    if (tablo) {
+      const tr = satirlar.map((x) => {
+        const i = x.indexOf(":");
+        return `<tr><td style="padding:7px 18px 7px 0;color:#6B7290;font-size:14px;white-space:nowrap;vertical-align:top;">${htmlKacis(x.slice(0, i))}</td><td style="padding:7px 0;color:#1B2352;font-size:15px;font-weight:600;">${htmlKacis(x.slice(i + 1).trim())}</td></tr>`;
+      }).join("");
+      return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #E6E8F0;border-bottom:1px solid #E6E8F0;width:100%;">${tr}</table>`;
+    }
+    return `<p style="margin:0 0 16px;color:#1B2352;font-size:15px;line-height:1.6;">${satirlar.map(htmlKacis).join("<br>")}</p>`;
+  }).join("");
+  const il = sablon.iletisim ? iletisimSatiri(iletisim) : null;
+  const ek = ekNotu ? `<p style="margin:0 0 16px;padding:10px 14px;background:#F4F6FB;border-left:3px solid #283474;color:#1B2352;font-size:13px;">${htmlKacis(ekNotu)}</p>` : "";
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${htmlKacis(sablon.baslik)}</title></head>
+<body style="margin:0;background:#F3F4F8;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F8;padding:24px 12px;"><tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;border-radius:12px;overflow:hidden;border:1px solid #E6E8F0;">
+<tr><td style="background:#1B2352;padding:20px 28px;border-bottom:4px solid #F4A07C;">
+<p style="margin:0;color:#F4A07C;font-size:12px;letter-spacing:3px;font-weight:700;">UNEX GIDA</p>
+<p style="margin:6px 0 0;color:#FFFFFF;font-size:21px;font-weight:700;">${htmlKacis(sablon.baslik)}</p>
+</td></tr>
+<tr><td style="padding:26px 28px 8px;">${bloklar}${ek}
+${il ? `<p style="margin:0 0 16px;color:#1B2352;font-size:14px;">${htmlKacis(il)}</p>` : ""}
+<p style="margin:8px 0 0;color:#1B2352;font-size:14px;line-height:1.6;">Saygılarımızla,<br><strong>Unex Gıda San. ve Tic. Ltd. Şti.</strong></p>
+</td></tr>
+<tr><td style="padding:18px 28px 22px;"><p style="margin:0;padding-top:14px;border-top:1px solid #E6E8F0;color:#8B91A8;font-size:12px;line-height:1.5;">Bu e-posta sipariş süreciniz hakkında bilgilendirme amacıyla gönderilmiştir. Yanıtlarınız lojistik ekibimize iletilir.</p></td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+/** Musteri e-postasi olarak gidebilen sablonlar. */
+export const MUSTERI_EPOSTA_SABLONLARI = ["siparis_alindi", "arac_cikis_saati", "arac_yola_cikti", "siparis_tamamlandi"] as const;

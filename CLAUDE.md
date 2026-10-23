@@ -1468,6 +1468,56 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Playwright `sip/gecmis_e2e.py` 24 (metin + görüntü irsaliye, hatada PDF geri silme, mobil);
   e2e2/e2e3/e2e5 regresyon geçti.
 
+## İç Piyasa — Müşteriye e-posta kanalı, irsaliye ekli (23.10.2026)
+
+- KARAR (kullanıcı, 23.10.2026): WhatsApp'ı olmayan müşterilere (Trakya Birlik, Tarım Kredi —
+  sadece e-posta var) mesajlar e-postayla, "yola çıktı"da irsaliye PDF'i EKLİ, tam otomatik.
+  01.10.2026 "müşteriye sistemden e-posta ASKIDA" kuralı İÇ PİYASA müşteri bilgilendirmeleri
+  için şu şartla kalktı: gönderen KENDİ alan adımız (unex.com.tr, Resend'de doğrulanmış;
+  ücretsiz planda 3 alan adı) + ayardan AÇIKÇA açılmadıkça hiçbir müşteri e-postası
+  sistemden gitmez. İhracat (draft onay vb.) için askı kuralı AYNEN geçerli.
+- Kanal kuralı TEK YER `ic_bildirim_ekle` (migration `20261023120000_ic_piyasa_musteri_eposta.sql`):
+  alici='musteri' → müşteri WhatsApp'lı (telefon + izin) ise WhatsApp (değişmedi); değilse
+  kartta geçerli tek e-posta varsa kanal='eposta', hedef=e-posta; ikisi de yoksa eskisi gibi
+  WhatsApp (ekranda "telefon yok"). Müşteriler listesinde "E-posta" rozeti aynı kuralla.
+- Ayarlar (`ic_piyasa_ayarlari`): `musteri_eposta_gonderen` (UI yalnız @unex.com.tr kabul eder),
+  `musteri_eposta_cc` (≤5; kullanıcı: bbt@, execution@, lojistik@), `musteri_eposta_aktif`
+  (varsayılan false; gönderen yoksa açılamaz — CHECK), `musteri_eposta_aktif_zaman`
+  (tetikleyici yazar: false→true anı, kapatınca null; istemci yazamaz).
+- Kuyruk `ic_bildirim_eposta_al`: müşteri e-postası SADECE aktif + gönderen var + satır
+  `olusturma >= aktif_zaman` ise alınır → açmadan önce biriken eski mesajlar ASLA toplu
+  gitmez (ekranda "Outlook ile gönder" ile elle). CC müşteri için `musteri_eposta_cc`'den.
+  `ic_musteri_eposta_bilgi(p_id)` (SADECE service_role): gönderen, yanıt (lojistik e-postası),
+  iletişim, irsaliye yolu/no. `ic_musteri_eposta_deneme()` (ic_piyasa yetkisi): deneme için.
+- Edge function `ic-piyasa` v4 (23.10.2026 deploy; v3 repo ile birebir doğrulandıktan sonra):
+  müşteri e-postası `from: "Unex Gıda <gönderen>"`, `reply_to` lojistik, HTML + text,
+  "yola çıktı"da irsaliye PDF'i depodan service_role ile okunup base64 EK (`<irsaliye no>.pdf`);
+  irsaliye yoksa / okunamazsa e-posta GÖNDERİLMEZ (hata, 3 deneme). Hedef CC'de de varsa
+  CC'den düşer. `islem:"musteri_deneme"`: kullanıcı JWT'si ile `/auth/v1/user` → SADECE
+  kullanıcının KENDİ adresine "[DENEME]" e-postası (son irsaliye ekli); anon anahtarla 401.
+  Şirket içi e-postalar DEĞİŞMEDİ (bildirim@ihracatasistanim.com).
+- Metin TEK KAYNAK `_shared/mesaj-sablonlari.ts`: `musteriEpostaKonusu` (konu: "Aracınız yola
+  çıktı · IE-… · plaka · İrsaliye …"), `musteriEpostaMetni` (WhatsApp gövdesi + iletişim satırı
+  + "Saygılarımızla, Unex Gıda…"), `musteriEpostaHtml` (lacivert/şeftali kurumsal şablon,
+  "Etiket: değer" satırları tablo; BAĞLANTI ve GÖRSEL YOK — logo ihracatasistanim.com'dan
+  yüklenirdi). Telefon WhatsApp'la aynı biçim (0553 268 91 01).
+- Bildirimler: e-posta kanalı müşteri mesajı, otomatik gönderim kapalıyken (ya da açılıştan
+  önce oluşmuşsa) "Gönderilecek Mesajlar"da kart: Alıcı / CC / Konu / Ek + "Outlook ile gönder"
+  (mailto: to, cc, subject, body — Türkçe karakterli; gizli `<a>` ile açılır) + "İrsaliyeyi
+  indir" + "Gönderildi mi?" onayı / Atla. Açıkken akışta "Otomatik gönderilecek". Ayarlar >
+  "Müşteri e-postası": gönderen, CC, Kaydet, "Deneme e-postası (kendime)", "Otomatik
+  gönderimi aç" (ConfirmDialog) / "kapat". Akış filtresi "Şirket içi e-posta" → "E-posta".
+  Sekme rozeti ve İş Emirleri "n mesaj bekliyor" müşteri e-postasını da sayar.
+- AÇMA ADIMLARI (kullanıcı): Resend > Domains > unex.com.tr ekle → verdiği DKIM (TXT
+  `resend._domainkey`) + `send` alt alan MX/TXT kayıtlarını DNS'e gir → Verify → (API anahtarı
+  yalnız ihracatasistanim.com'a kısıtlıysa "Full access" anahtar) → Bildirimler > Ayarlar >
+  Deneme → gelen kutusu kontrolü → Otomatik gönderimi aç. Kök SPF'teki ÇİFT kayıt sorunu
+  (01.10.2026 tespiti) Resend'i engellemez (Resend `send.unex.com.tr` kullanır, DKIM ile
+  hizalanır) ama günlük Outlook postası için ayrıca düzeltilmeli.
+- Testler: yerel PG 15 senaryo (`sip/eposta_test.sql`), edge function Node + sahte Resend 21
+  (`edge3/test.mjs`: ek birebir, CC, hata durumlarında e-posta gitmez, şirket içi değişmedi,
+  deneme yalnız kendine), Playwright 29 (`sip/eposta_e2e.py`), e2e2/3/4/5/8 + gecmis_e2e regresyon.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

@@ -8,7 +8,7 @@ import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Users, Plus, Search, Loader2, X, Save, AlertCircle, MessageCircle, CalendarClock, ChevronRight } from "lucide-react";
+import { Users, Plus, Search, Loader2, X, Save, AlertCircle, MessageCircle, CalendarClock, ChevronRight, Mail } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { IcMusteri, hataMesaji, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 import { musteriMukerrer } from "@/lib/ic-piyasa/siparis-formu";
@@ -264,8 +264,10 @@ export default function IcMusterilerPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {m.whatsapp_izin && <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-emerald-500/15 text-emerald-400"><MessageCircle size={10} /> WhatsApp</span>}
+                        {/* WhatsApp yoksa bildirimler e-postayla gider (SQL ic_bildirim_ekle ile ayni kural, 23.10.2026) */}
+                        {!(m.whatsapp_izin && m.telefon) && /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test((m.eposta || "").trim()) && <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-sky-500/15 text-sky-300" title="WhatsApp olmadığı için sipariş ve sevk bilgilendirmeleri e-postayla gider"><Mail size={10} /> E-posta</span>}
                         {m.haftalik_fiyat_listesi && <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-sky-500/15 text-sky-400"><CalendarClock size={10} /> Pazartesi listesi</span>}
-                        {!m.whatsapp_izin && !m.haftalik_fiyat_listesi && <span className="text-xs" style={{ color: TEXT_MUTED }}>-</span>}
+                        {!m.whatsapp_izin && !m.haftalik_fiyat_listesi && !(m.eposta || "").trim() && <span className="text-xs" style={{ color: TEXT_MUTED }}>-</span>}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right">

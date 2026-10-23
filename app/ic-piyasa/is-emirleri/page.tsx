@@ -50,7 +50,7 @@ export default function IsEmirleriPage() {
   const [emirler, setEmirler] = useState<EmirSatiri[]>([]);
   const [sevkler, setSevkler] = useState<IcSevk[]>([]);
   // Is emri basina musteri bildirimi durumu (durum adimlari satiri icin; okunamazsa adim gri kalir)
-  const [bildirimler, setBildirimler] = useState<{ is_emri_id: string; sablon: string; durum: string; kanal: string }[]>([]);
+  const [bildirimler, setBildirimler] = useState<{ is_emri_id: string; sablon: string; durum: string; kanal: string; alici: string }[]>([]);
   const [musteriler, setMusteriler] = useState<IcMusteri[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [okumaHatasi, setOkumaHatasi] = useState<string | null>(null);
@@ -85,8 +85,8 @@ export default function IsEmirleriPage() {
       const sRes = await supabase.from("ic_sevkler").select("*").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id)).order("olusturma");
       if (sRes.error) { setOkumaHatasi(sRes.error.message); setYukleniyor(false); return; }
       s = (sRes.data || []) as IcSevk[];
-      const bRes = await supabase.from("ic_bildirimler").select("is_emri_id, sablon, durum, kanal").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id));
-      setBildirimler(bRes.error ? [] : ((bRes.data || []) as { is_emri_id: string; sablon: string; durum: string; kanal: string }[]));
+      const bRes = await supabase.from("ic_bildirimler").select("is_emri_id, sablon, durum, kanal, alici").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id));
+      setBildirimler(bRes.error ? [] : ((bRes.data || []) as { is_emri_id: string; sablon: string; durum: string; kanal: string; alici: string }[]));
     } else {
       setBildirimler([]);
     }
@@ -120,7 +120,8 @@ export default function IsEmirleriPage() {
     for (const b of bildirimler) {
       const x = m.get(b.is_emri_id) || { alindi: null, bekleyen: 0 };
       if (b.sablon === "siparis_alindi") x.alindi = b.durum;
-      if (b.kanal === "whatsapp" && b.durum === "bekliyor") x.bekleyen += 1;
+      // Musteriye gidecek (WhatsApp ya da musteri e-postasi) bekleyen mesaj
+      if (b.durum === "bekliyor" && (b.kanal === "whatsapp" || b.alici === "musteri")) x.bekleyen += 1;
       m.set(b.is_emri_id, x);
     }
     return m;

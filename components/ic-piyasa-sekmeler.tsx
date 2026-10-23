@@ -38,7 +38,8 @@ export function IcPiyasaSekmeler() {
     let iptal = false;
     const say = async () => {
       const { count } = await supabase.from("ic_bildirimler").select("id", { count: "exact", head: true })
-        .eq("company_id", companyId).eq("kanal", "whatsapp").eq("durum", "bekliyor");
+        // Elle gonderilecek musteri mesajlari: WhatsApp + musteri e-postasi (23.10.2026)
+        .eq("company_id", companyId).eq("durum", "bekliyor").or("kanal.eq.whatsapp,alici.eq.musteri");
       if (!iptal) setBekleyen(count || 0);
     };
     say();

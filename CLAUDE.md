@@ -1019,6 +1019,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (aynı form her indirildiğinde aynı bant). PDF uzun kurumsal metni, telefon görseli kısa
   metni (`kisa`) kullanır. Panelde "Bu formda kutlama bandı çıkacak" bilgisi; liste bitmeden
   60 gün önce panel uyarır (`DINI_KAPSAM_SONU` = 2027-12-31 → 2028 tarihleri eklenmeli).
+- Özel gün kuralı REVİZE (23.10.2026, kullanıcı: "belgeyi pazartesi ilettiğimizde 29 Ekim
+  haftasına giriyor diye insanların önceden bayramını kutlayamayız"; FBF-2026-0009, onay
+  23.10, "29 Ekim Cumhuriyet Bayramımız kutlu olsun" basıyordu). Tek fonksiyon
+  `formOzelGunSatirlari(onayGunu)` (PDF, telefon görseli, panel; eski `formOzelGunleri`
+  KALDIRILDI): KUTLAMA sadece onay günü özel günün KENDİSİ ise (çok günlü bayramda bayram
+  süresince) — önceden "kutlu olsun" ASLA yazılmaz. Onay + 6 gün içindeki RESMÎ TATİLLER
+  için kurumsal BİLGİ satırı: "28 Ekim Çarşamba 13.00'ten itibaren ve 29 Ekim Perşembe günü
+  Cumhuriyet Bayramı nedeniyle resmî tatildir. Sipariş ve sevkiyat planlamanızda dikkate
+  almanızı rica ederiz." (form hangi gün iletilirse iletilsin doğru). Arife yarım günü
+  (28 Ekim, Ramazan/Kurban arifesi; 2429 s. Kanun) metne yazılır. Kandiller tatil değil →
+  sadece o gün kutlama. 1 Mayıs ve 15 Temmuz resmî tatil olarak EKLENDİ (yalnız bilgi,
+  kutlama yok). En fazla 2 satır, önce kutlama. Görünüm: kutlama şeftali bant + rozet;
+  yalnız tatil → açık lacivert bant (#EEF1F9) + takvim ikonu, sağda "Resmî tatil" (PDF) /
+  tarih (telefon). Panel: "Bugün onaylanan formda çıkacak: Kutlama / Resmî tatil bilgisi".
+  Hesap hâlâ onay gününe bağlı; eski formlar yeniden indirilince YENİ kurala göre çizilir
+  (0009 artık bilgi satırı basar). Testler: `sf/ozel_gun_test.ts` 24 (2026–2027 her gün
+  ileri tarihli kutlama 0), `sf/ozel_panel.py` 6, PDF/görsel çıktıları gözle kontrol edildi.
 - Önceki kararlar (11.10.2026): Fatura Talimatı görünümü REDDEDİLDİ; kurumsal B2B dil:
   büyük sağa yaslı fiyatlar, koyu alt bant (form no · Sayfa x/y · web). Uzun listede sayfa
   bölünür (tek sayfaya zorla sıkıştırma YOK). Renkler logodan (#283474 / #F4A07C). Yazı

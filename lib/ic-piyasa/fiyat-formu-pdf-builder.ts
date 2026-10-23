@@ -25,7 +25,7 @@ import {
   type FormKalemi,
   type SutunAyari,
 } from "@/lib/ic-piyasa/fiyat-formu";
-import { formOzelGunleri, ozelGunTarihYazi, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
+import { formOzelGunSatirlari, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
 
 /**
  * YAN MAMUL FIYAT BILGILENDIRME FORMU - kurumsal tasarim (revize 12.10.2026).
@@ -297,28 +297,44 @@ function hitapKutusu(doc: jsPDF, form: IcFiyatFormu, y: number): number {
 const OZEL_SATIR = 4.1; // mesaj satir araligi
 const OZEL_ARA = 1.6; // iki gun arasi
 
+const TATIL_ZEMIN: RGB = [238, 241, 249]; // lacivertin cok acik tonu (resmi tatil bilgisi)
+
 function ozelGunBandi(doc: jsPDF, form: IcFiyatFormu, y: number): number {
-  const gunler = formOzelGunleri(trGunu(form.onay_zamani));
-  if (!gunler.length) return y;
-  const mesajlar = gunler.map((g) => bol(doc, g.mesaj, ICERIK_G - 50, "s", 8.8));
-  const icerik = mesajlar.reduce((t, m) => t + m.length * OZEL_SATIR, 0) + (gunler.length - 1) * OZEL_ARA;
+  // Kural tek yerde (ozel-gunler.ts): kutlama SADECE o gun; yaklasan resmi tatil = bilgi satiri
+  const satirlar = formOzelGunSatirlari(trGunu(form.onay_zamani));
+  if (!satirlar.length) return y;
+  const kutlamaVar = satirlar[0].tur === "kutlama";
+  const mesajlar = satirlar.map((g) => bol(doc, g.metin, ICERIK_G - 50, g.tur === "tatil" ? "r" : "s", 8.8));
+  const icerik = mesajlar.reduce((t, m) => t + m.length * OZEL_SATIR, 0) + (satirlar.length - 1) * OZEL_ARA;
   const h = Math.max(10, icerik + 5.2);
-  doc.setFillColor(...SEFTALI_ZEMIN);
+  doc.setFillColor(...(kutlamaVar ? SEFTALI_ZEMIN : TATIL_ZEMIN));
   doc.roundedRect(KENAR, y, ICERIK_G, h, 2.2, 2.2, "F");
-  // Dekor: lacivert disk icinde seftali halka (kutlama rozeti)
   const cx = KENAR + 7.5;
   const cy = y + h / 2;
   doc.setFillColor(...LACIVERT);
   doc.circle(cx, cy, 3.6, "F");
-  doc.setDrawColor(...SEFTALI);
-  doc.setLineWidth(0.6);
-  doc.circle(cx, cy, 2.1, "S");
-  doc.setFillColor(...SEFTALI);
-  doc.circle(cx, cy, 0.8, "F");
+  if (kutlamaVar) {
+    // Dekor: lacivert disk icinde seftali halka (kutlama rozeti)
+    doc.setDrawColor(...SEFTALI);
+    doc.setLineWidth(0.6);
+    doc.circle(cx, cy, 2.1, "S");
+    doc.setFillColor(...SEFTALI);
+    doc.circle(cx, cy, 0.8, "F");
+  } else {
+    // Dekor: lacivert disk icinde beyaz takvim yapragi (resmi tatil bilgisi)
+    doc.setDrawColor(...BEYAZ);
+    doc.setLineWidth(0.35);
+    doc.rect(cx - 1.7, cy - 1.3, 3.4, 2.9, "S");
+    doc.setFillColor(...BEYAZ);
+    doc.rect(cx - 1.7, cy - 1.3, 3.4, 0.8, "F");
+    doc.line(cx - 0.9, cy - 1.9, cx - 0.9, cy - 1.0);
+    doc.line(cx + 0.9, cy - 1.9, cx + 0.9, cy - 1.0);
+  }
   let sy = y + (h - icerik) / 2 + 3.1;
-  gunler.forEach((g, i) => {
-    yazi(doc, mesajlar[i], KENAR + 14, sy, { tip: "s", boy: 8.8, renk: LACIVERT });
-    yazi(doc, ozelGunTarihYazi(g), SAYFA_G - KENAR - 5, sy, { tip: "s", boy: 7.3, renk: SEFTALI_KOYU, hiza: "right" });
+  satirlar.forEach((g, i) => {
+    const tatil = g.tur === "tatil";
+    yazi(doc, mesajlar[i], KENAR + 14, sy, { tip: tatil ? "r" : "s", boy: 8.8, renk: tatil ? MUREKKEP : LACIVERT });
+    yazi(doc, tatil ? "Resmî tatil" : g.tarihYazi, SAYFA_G - KENAR - 5, sy, { tip: "s", boy: 7.3, renk: tatil && !kutlamaVar ? LACIVERT : SEFTALI_KOYU, hiza: "right" });
     sy += mesajlar[i].length * OZEL_SATIR + OZEL_ARA;
   });
   return y + h;

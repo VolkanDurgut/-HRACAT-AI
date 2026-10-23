@@ -9,8 +9,8 @@ import AppShell from "@/components/app-shell";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcPiyasaGecmisFormlar } from "@/components/ic-piyasa-gecmis-formlar";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
-import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, Phone, Pencil, ScrollText, EyeOff, Columns3 } from "lucide-react";
-import { formOzelGunleri, ozelGunKapsamUyarisi, ozelGunTarihYazi } from "@/lib/ic-piyasa/ozel-gunler";
+import { Wheat, Plus, Trash2, Save, Loader2, ArrowUp, ArrowDown, FileCheck2, Eye, RotateCcw, AlertCircle, ListPlus, PartyPopper, CalendarDays, Phone, Pencil, ScrollText, EyeOff, Columns3 } from "lucide-react";
+import { formOzelGunSatirlari, ozelGunKapsamUyarisi } from "@/lib/ic-piyasa/ozel-gunler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   AMBALAJ_SECENEKLERI,
@@ -459,7 +459,7 @@ export default function IcPiyasaPage() {
     showToast("Formdaki iletişim bilgisi kaydedildi. Yeni formlarda bu bilgi yer alır.", "success");
   };
   // Bugun onaylanacak formda cikacak ozel gunler (PDF / gorsel ile ayni kural)
-  const bugunkuOzelGunler = useMemo(() => formOzelGunleri(bugunTR()), []);
+  const bugunkuOzelGunler = useMemo(() => formOzelGunSatirlari(bugunTR()), []);
   const ozelGunUyarisi = useMemo(() => ozelGunKapsamUyarisi(bugunTR()), []);
 
   const onizlemeFormu = (): IcFiyatFormu => {
@@ -833,11 +833,13 @@ export default function IcPiyasaPage() {
         </div>
         {bugunkuOzelGunler.length > 0 && (
           <div className="mt-3 flex items-start gap-2 text-xs" style={{ color: TEXT_MUTED }}>
-            <PartyPopper size={14} className="shrink-0 mt-px" style={{ color: "#F4A07C" }} />
+            {bugunkuOzelGunler[0].tur === "kutlama"
+              ? <PartyPopper size={14} className="shrink-0 mt-px" style={{ color: "#F4A07C" }} />
+              : <CalendarDays size={14} className="shrink-0 mt-px text-sky-300" />}
             <span>
-              Bu formda kutlama bandı çıkacak:{" "}
+              Bugün onaylanan formda çıkacak:{" "}
               {bugunkuOzelGunler.map((g, i) => (
-                <span key={g.tarih + g.ad}>{i > 0 && " · "}<span className="text-white">{g.ad}</span> ({ozelGunTarihYazi(g)})</span>
+                <span key={g.tur + g.gun.tarih + g.gun.ad}>{i > 0 && " · "}{g.tur === "kutlama" ? "Kutlama" : "Resmî tatil bilgisi"}: <span className="text-white">{g.tur === "kutlama" ? g.gun.ad : g.gun.tatilAd}</span> ({g.tarihYazi})</span>
               ))}
             </span>
           </div>

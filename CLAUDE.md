@@ -1003,7 +1003,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   SAĞDA firma kaşe bilgileri (FORM_SIRKET: unvan, adres, T/F, e-posta/web, VD — örnek
   formdaki sahte A.Ş./Mersis bilgileri KULLANILMAZ); koyu bilgi şeridi (Form No / Onay /
   Geçerlilik / Dönem: Haftalık Bilgilendirme); "Sayın Müşterimiz / İş Ortağımız" hitap
-  kutusu; özel gün bandı; ürün-fiyat tablosu; BİLGİLENDİRME VE SEVKİYAT ŞARTLARI (4 madde,
+  kutusu; ürün-fiyat tablosu; BİLGİLENDİRME VE SEVKİYAT ŞARTLARI (4 madde,
   `formSartlari`: 2. madde ürünlerin KDV seçimine göre yazılır, 3. madde geçerlilikle
   çelişmeyecek şekilde netleştirildi — kullanıcı onayı); SİPARİŞ SÜRECİ zaman çizelgesi
   (`SIPARIS_SURECI`, 4 adım: Sipariş Onayı → Yükleme ve Tartım → Yola Çıkış → Teslim ve
@@ -1012,30 +1012,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kararı). Başlıkta "İç Piyasa" yazısı YOK (11.10 ve 12.10 kararı). 7 ürüne kadar tek
   sayfa (gerekirse satırlar 11→10 mm sıkışır), daha uzunda bölüm sonraki sayfaya geçer.
   Eski tasarım: 3 bilgi kartı + geçerlilik kutusu (11.10.2026), yerine geçti.
-- Özel günler (12.10.2026): `lib/ic-piyasa/ozel-gunler.ts`. Kullanıcı seçimi: milli
-  bayramlar + yılbaşı (her yıl otomatik), dini bayramlar ve KANDİLLER (Diyanet takvimi,
-  elle; 2026–2027 girildi, iki kaynakta karşılaştırıldı). SEKTÖR GÜNLERİ SEÇİLMEDİ.
-  Kural: onay günü + 6 gün içine denk gelen gün(ler), en fazla 2; hesap onay gününe bağlı
-  (aynı form her indirildiğinde aynı bant). PDF uzun kurumsal metni, telefon görseli kısa
-  metni (`kisa`) kullanır. Panelde "Bu formda kutlama bandı çıkacak" bilgisi; liste bitmeden
-  60 gün önce panel uyarır (`DINI_KAPSAM_SONU` = 2027-12-31 → 2028 tarihleri eklenmeli).
-- Özel gün kuralı REVİZE (23.10.2026, kullanıcı: "belgeyi pazartesi ilettiğimizde 29 Ekim
-  haftasına giriyor diye insanların önceden bayramını kutlayamayız"; FBF-2026-0009, onay
-  23.10, "29 Ekim Cumhuriyet Bayramımız kutlu olsun" basıyordu). Tek fonksiyon
-  `formOzelGunSatirlari(onayGunu)` (PDF, telefon görseli, panel; eski `formOzelGunleri`
-  KALDIRILDI): KUTLAMA sadece onay günü özel günün KENDİSİ ise (çok günlü bayramda bayram
-  süresince) — önceden "kutlu olsun" ASLA yazılmaz. Onay + 6 gün içindeki RESMÎ TATİLLER
-  için kurumsal BİLGİ satırı: "28 Ekim Çarşamba 13.00'ten itibaren ve 29 Ekim Perşembe günü
-  Cumhuriyet Bayramı nedeniyle resmî tatildir. Sipariş ve sevkiyat planlamanızda dikkate
-  almanızı rica ederiz." (form hangi gün iletilirse iletilsin doğru). Arife yarım günü
-  (28 Ekim, Ramazan/Kurban arifesi; 2429 s. Kanun) metne yazılır. Kandiller tatil değil →
-  sadece o gün kutlama. 1 Mayıs ve 15 Temmuz resmî tatil olarak EKLENDİ (yalnız bilgi,
-  kutlama yok). En fazla 2 satır, önce kutlama. Görünüm: kutlama şeftali bant + rozet;
-  yalnız tatil → açık lacivert bant (#EEF1F9) + takvim ikonu, sağda "Resmî tatil" (PDF) /
-  tarih (telefon). Panel: "Bugün onaylanan formda çıkacak: Kutlama / Resmî tatil bilgisi".
-  Hesap hâlâ onay gününe bağlı; eski formlar yeniden indirilince YENİ kurala göre çizilir
-  (0009 artık bilgi satırı basar). Testler: `sf/ozel_gun_test.ts` 24 (2026–2027 her gün
-  ileri tarihli kutlama 0), `sf/ozel_panel.py` 6, PDF/görsel çıktıları gözle kontrol edildi.
+- ÖZEL GÜN BANDI KALDIRILDI (23.10.2026, kullanıcı kararı: "çok gereksiz, doğru
+  çalıştıramıyoruz"). 12.10'da eklenen bayram/kandil kutlama bandı önceden kutlama
+  yapıyordu (FBF-2026-0009, onay 23.10 → "29 Ekim ... kutlu olsun"); aynı gün denenen
+  "resmî tatil bilgisi" satırı da beğenilmedi. `lib/ic-piyasa/ozel-gunler.ts` SİLİNDİ;
+  PDF, telefon görseli ve paneldeki bilgi satırı kaldırıldı. GERİ EKLENMEZ. Eski formlar
+  yeniden indirilince bantsız çizilir (veri değişmedi, DB'de alan yoktu).
 - Önceki kararlar (11.10.2026): Fatura Talimatı görünümü REDDEDİLDİ; kurumsal B2B dil:
   büyük sağa yaslı fiyatlar, koyu alt bant (form no · Sayfa x/y · web). Uzun listede sayfa
   bölünür (tek sayfaya zorla sıkıştırma YOK). Renkler logodan (#283474 / #F4A07C). Yazı

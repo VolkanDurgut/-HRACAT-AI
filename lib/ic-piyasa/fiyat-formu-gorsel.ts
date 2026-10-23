@@ -17,15 +17,14 @@ import {
   sutunGorunur,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
-import { formOzelGunSatirlari, trGunu } from "@/lib/ic-piyasa/ozel-gunler";
 
 /**
  * Telefon gorseli (1080 x 1350, WhatsApp onizlemesinde acmadan okunur).
  * PDF ile AYNI form kaydindan ve AYNI tasarim dilinden (lacivert bant + logo
  * karosu + seftali serit + Inter) cizilir; tarayicida canvas, ek kutuphane yok.
  * Revize 11.10.2026: KDV dahil/haric her urunde; Inter yazi tipi.
- * Revize 12.10.2026: ozel gun bandi (PDF ile ayni kural, ozel-gunler.ts) ve
- * alt kutuda siparis sureci cumlesi.
+ * Revize 12.10.2026: alt kutuda siparis sureci cumlesi (ozel gun bandi
+ * 23.10.2026'da kaldirildi).
  * Revize 14.10.2026: her urunde PESIN ve VADELI fiyat yan yana (ustlerinde
  * kucuk etiket, vadeli etiketinde vade); odeme bilgisi kaldirildi. 14.10
  * oncesi tek fiyatli formlar gonderildigi haliyle (tek fiyat) cizilir.
@@ -40,7 +39,6 @@ const LACIVERT = "#283474";
 const LACIVERT_KOYU = "#1B2352";
 const SEFTALI = "#F4A07C";
 const SEFTALI_ZEMIN = "#FDF2EC";
-const TATIL_ZEMIN = "#EEF1F9"; // resmi tatil bilgisi bandi (PDF ile ayni ton)
 const MUREKKEP = "#1D2333";
 const SOLUK = "#767E8F";
 const CIZGI = "#E2E5ED";
@@ -135,54 +133,8 @@ export async function fiyatFormuGorselOlustur(form: IcFiyatFormu): Promise<Blob>
   ctx.font = f(26, 600);
   ctx.fillText(sigdir(ctx, hitapYazi(form.alici), sag - sol), sol, 470);
 
-  // Ozel gun bandi (ozel-gunler.ts): kutlama SADECE o gun; yaklasan resmi tatil = bilgi
-  const gunler = formOzelGunSatirlari(trGunu(form.onay_zamani));
-  let ustY = 500;
-  if (gunler.length) {
-    const kutlamaVar = gunler[0].tur === "kutlama";
-    const bantH = 22 + gunler.length * 40;
-    const ix = sol + 40;
-    const iy = 494 + bantH / 2;
-    ctx.fillStyle = kutlamaVar ? SEFTALI_ZEMIN : TATIL_ZEMIN;
-    yuvarlak(ctx, sol, 494, sag - sol, bantH, 16);
-    ctx.fill();
-    ctx.fillStyle = LACIVERT;
-    ctx.beginPath();
-    ctx.arc(ix, iy, 20, 0, Math.PI * 2);
-    ctx.fill();
-    if (kutlamaVar) {
-      ctx.strokeStyle = SEFTALI;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(ix, iy, 11, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      // Beyaz takvim yapragi
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(ix - 9, iy - 7, 18, 16);
-      ctx.fillRect(ix - 9, iy - 7, 18, 5);
-      ctx.beginPath();
-      ctx.moveTo(ix - 5, iy - 11); ctx.lineTo(ix - 5, iy - 5);
-      ctx.moveTo(ix + 5, iy - 11); ctx.lineTo(ix + 5, iy - 5);
-      ctx.stroke();
-    }
-    gunler.forEach((g, i) => {
-      const gy = 494 + 39 + i * 40;
-      const tatil = g.tur === "tatil";
-      ctx.textAlign = "right";
-      ctx.fillStyle = tatil && !kutlamaVar ? LACIVERT : "#BE623A";
-      ctx.font = f(20, 600);
-      ctx.fillText(g.tarihYazi, sag - 22, gy);
-      const tarihG = ctx.measureText(g.tarihYazi).width;
-      ctx.textAlign = "left";
-      ctx.fillStyle = tatil ? MUREKKEP : LACIVERT;
-      ctx.font = f(24, tatil ? 400 : 600);
-      ctx.fillText(sigdir(ctx, g.kisa, sag - sol - 120 - tarihG), sol + 80, gy);
-    });
-    ustY = 494 + bantH + 22;
-  }
+  // Ozel gun bandi 23.10.2026'da kullanici karariyla KALDIRILDI (geri eklenmez).
+  const ustY = 500;
 
   // Urun satirlari
   const altY = 1136;

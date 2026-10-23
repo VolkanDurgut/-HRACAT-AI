@@ -1438,6 +1438,36 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   arama). `sf/e2e.py`'nin "okunanlar" iki kontrolü TEK ADIM'dan (b16aa95) beri eskidir
   (okunanlar artık giriş alanlarında; `e2e2.py` kapsar).
 
+## İç Piyasa — Sistem öncesi (geçmiş) araç kaydı ve sipariş listesi eşitleme (23.10.2026)
+
+- Amaç (kullanıcı): Burak Bey'in Excel "Sipariş Listesi" ile sistemi eşitlemek. Belgeler
+  farklı olabilir (Unex sipariş formu / müşterinin sipariş yazısı, ör. Trakya Birlik
+  ASA0006704 / sadece WhatsApp mesajı) → elle "Yeni İş Emri": her PDF "Sipariş Formu"
+  olarak eklenebilir, sipariş no "Müşteri sipariş no"ya, mesaj metni Notlar'a. Fiyat boş
+  bırakılabilir (Artı Grup TMO buğday, fiyat sonra). Bu müşteriler siparişten haberdar →
+  açılışta oluşan "Siparişiniz alındı" mesajı Bildirimler'de "Atla" (kullanıcı kararı).
+- Sistem öncesi yüklenen araçlar (kullanıcı kararı: "bildirimsiz geçmiş araç"): İş emri
+  detayında "Sistem öncesi araç ekle" (`components/ic-gecmis-sevk-penceresi.tsx`, sadece
+  AÇIK iş emri). İrsaliye PDF'i ZORUNLU (kolon NOT NULL; okunabiliyorsa plaka / net /
+  irsaliye no / tarih / ETTN dolar, görüntü PDF'te elle; ETTN dosya adından da alınır),
+  yükleme tarihi (bugün veya geçmiş ≤365 gün), irsaliye no zorunlu. Sıra: PDF depoya →
+  RPC; RPC hata verirse PDF geri silinir.
+- Migration `20261023100000_ic_piyasa_gecmis_sevk.sql` (SADECE ekleme; KOD PUSH'UNDAN ÖNCE —
+  İş Emirleri araç tablosu ve müşteri detayı `gecmis` kolonunu okur): `ic_sevkler.gecmis`
+  (varsayılan false; sadece `ic_gecmis_sevk_ekle` true yazar, sonradan değişmez).
+  `ic_sevk_koru`: geçmişte `cikis_durumu='cikti'`, `cikis_isleyen='Sistem öncesi kayıt'`.
+  `ic_bildirim_sevk`: geçmişte ERKEN ÇIKIŞ → lojistik e-postası YOK; çıkış hiç işlenmediği
+  için müşteriye "yola çıktı" mesajı da YOK. `ic_gecmis_sevk_ekle(p_veri)` SECURITY DEFINER,
+  yalnız `ic_piyasa` + kendi şirketi (kantarcı/anon kapalı); kantarla aynı plaka/net/
+  mükerrer irsaliye no-ETTN/dosya yolu kuralları; zaman = girilen günün 12:00 (TR) →
+  olusturma / irsaliye_tarihi / cikis_zamani. Ekranda geçmiş araçta SAAT YAZILMAZ
+  (`cikisEtiketi` `gecmis` → "Yola çıktı"), "Sistem öncesi" rozeti. İlerleme, tutar,
+  kantar listesi ve sonraki müşteri mesajları geçmiş araçları SAYAR (eşitlemenin amacı).
+- Testler: yerel PG (migration 2 kez, 14 senaryo: bildirimsizlik, normal kantar sevki
+  hâlâ bildirim üretir, yetki, mükerrer, tarih, kapalı iş emri, bayrak kilidi, anon),
+  Playwright `sip/gecmis_e2e.py` 24 (metin + görüntü irsaliye, hatada PDF geri silme, mobil);
+  e2e2/e2e3/e2e5 regresyon geçti.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

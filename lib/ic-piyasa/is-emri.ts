@@ -82,6 +82,8 @@ export type IcSevk = {
   cikis_planlanan: string | null;
   cikis_zamani: string | null;
   cikis_isleyen: string | null;
+  /** Sistem oncesi (gecmis) arac kaydi - bildirim uretmez (23.10.2026). Eski sema: undefined. */
+  gecmis?: boolean;
 };
 
 /** Kantar Paneli icin (fiyatsiz, musteri maskeli) - kantar_ic_is_emirleri() */
@@ -127,9 +129,10 @@ export const DURUM_ETIKET: Record<IsEmriDurum, string> = {
 };
 
 /** Cikis durumu kisa metni + renk sinifi (uygulama ici koyu tema) */
-export function cikisEtiketi(s: { cikis_durumu: CikisDurumu; cikis_planlanan: string | null; cikis_zamani: string | null }): { metin: string; sinif: string } {
+export function cikisEtiketi(s: { cikis_durumu: CikisDurumu; cikis_planlanan: string | null; cikis_zamani: string | null; gecmis?: boolean }): { metin: string; sinif: string } {
   const saat = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" }) : "-");
-  if (s.cikis_durumu === "cikti") return { metin: `Yola çıktı ${saat(s.cikis_zamani)}`, sinif: "bg-emerald-500/15 text-emerald-400" };
+  // Sistem oncesi arac: gercek cikis saati bilinmiyor (kayitta gunun 12:00'si) -> saat yazilmaz
+  if (s.cikis_durumu === "cikti") return { metin: s.gecmis ? "Yola çıktı" : `Yola çıktı ${saat(s.cikis_zamani)}`, sinif: "bg-emerald-500/15 text-emerald-400" };
   if (s.cikis_durumu === "planlandi") return { metin: `Planlandı ${saat(s.cikis_planlanan)}`, sinif: "bg-sky-500/15 text-sky-400" };
   if (s.cikis_durumu === "bugun_degil") return { metin: "Bugün çıkmayacak", sinif: "bg-slate-500/15 text-slate-300" };
   return { metin: "Çıkış bekleniyor", sinif: "bg-amber-500/15 text-amber-400" };

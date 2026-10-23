@@ -11,9 +11,10 @@ import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa
 import { IcIsEmriForm } from "@/components/ic-is-emri-form";
 import { IcSiparisFormuPenceresi } from "@/components/ic-siparis-formu-penceresi";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { IcGecmisSevkPenceresi, GecmisSevkEmri } from "@/components/ic-gecmis-sevk-penceresi";
 import {
   ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -66,6 +67,8 @@ export default function IsEmirleriPage() {
   const [cikisDuzen, setCikisDuzen] = useState<{ sevk: IcSevk; mod: "secim" | "saat" } | null>(null);
   const [cikisSaat, setCikisSaat] = useState("");
   const [silinecekSevk, setSilinecekSevk] = useState<IcSevk | null>(null);
+  // Sistem oncesi (gecmis) arac ekleme penceresi
+  const [gecmisEmir, setGecmisEmir] = useState<GecmisSevkEmri | null>(null);
   const [isleniyor, setIsleniyor] = useState(false);
 
   const getir = useCallback(async () => {
@@ -417,7 +420,7 @@ export default function IsEmirleriPage() {
                             </div>
 
                             {ss.length === 0 ? (
-                              <p className="text-xs py-3 flex items-center gap-2" style={{ color: TEXT_MUTED }}><Truck size={14} /> Henüz araç yüklenmedi. Kantarcı irsaliyeyi yükleyince burada görünür.</p>
+                              <p className="text-xs py-3 flex items-center gap-2" style={{ color: TEXT_MUTED }}><Truck size={14} /> Henüz araç yüklenmedi. Kantarcı irsaliyeyi yükleyince burada görünür. Sistem öncesi yüklenen araçları aşağıdan ekleyin.</p>
                             ) : (
                               <div className="overflow-x-auto rounded-lg border" style={{ borderColor: CARD_BORDER }}>
                                 <table className="w-full text-xs min-w-[980px]">
@@ -433,7 +436,11 @@ export default function IsEmirleriPage() {
                                       <React.Fragment key={s.id}>
                                         <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
                                           <td className="px-3 py-2" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                                          <td className="px-3 py-2 whitespace-nowrap text-white">{tarihSaatYazi(s.olusturma)}<span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{s.girilen_email || ""}</span></td>
+                                          <td className="px-3 py-2 whitespace-nowrap text-white">
+                                            {s.gecmis ? new Date(s.olusturma).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : tarihSaatYazi(s.olusturma)}
+                                            {s.gecmis && <span className="ml-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-sky-500/15 text-sky-300" title="Sistem kurulmadan önce yüklendi; bildirim gönderilmedi"><History size={10} /> Sistem öncesi</span>}
+                                            <span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{s.girilen_email || ""}</span>
+                                          </td>
                                           <td className="px-3 py-2 whitespace-nowrap"><span className="font-bold text-white">{s.plaka}</span>{s.dorse_plaka && <span className="block text-[10px]" style={{ color: TEXT_MUTED }}>Dorse: {s.dorse_plaka}</span>}</td>
                                           <td className="px-3 py-2 text-white">{s.sofor_ad || "-"}</td>
                                           <td className="px-3 py-2 text-right font-semibold text-white whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
@@ -441,7 +448,7 @@ export default function IsEmirleriPage() {
                                             <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
                                               <FileText size={11} /> {s.irsaliye_no || "Gör"}
                                             </button>
-                                            {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.irsaliye_tarihi)}</span>}
+                                            {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.gecmis ? new Date(s.irsaliye_tarihi).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : tarihSaatYazi(s.irsaliye_tarihi)}</span>}
                                           </td>
                                           <td className="px-3 py-2 whitespace-nowrap">
                                             <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
@@ -491,6 +498,7 @@ export default function IsEmirleriPage() {
                               {e.durum === "acik" && (
                                 <>
                                   <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
+                                  <Eylem onClick={() => setGecmisEmir({ id: e.id, is_emri_no: e.is_emri_no, urun: e.urun, musteri: e.ic_musteriler?.unvan || "-" })} ikon={<History size={13} />}>Sistem öncesi araç ekle</Eylem>
                                   <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamam}>Tamamlandı olarak kapat</Eylem>
                                   <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "iptal" })} ikon={<XCircle size={13} />}>İptal et</Eylem>
                                 </>
@@ -530,6 +538,12 @@ export default function IsEmirleriPage() {
         devam={(musteriId, ek) => { setSiparisPencere(false); setDuzenlenen(null); setOnDolum({ musteriId, ek }); setFormAcik(true); }}
         acildi={() => { setSiparisPencere(false); getir(); }}
       />
+
+      {gecmisEmir && companyId && (
+        <IcGecmisSevkPenceresi emir={gecmisEmir} companyId={companyId}
+          onKapat={() => setGecmisEmir(null)}
+          onKaydedildi={() => { setGecmisEmir(null); getir(); }} />
+      )}
 
       <ConfirmDialog
         open={!!durumIslem}

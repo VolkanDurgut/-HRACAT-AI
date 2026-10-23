@@ -26,6 +26,7 @@ type Sevk = {
   cikis_durumu: CikisDurumu;
   cikis_planlanan: string | null;
   cikis_zamani: string | null;
+  gecmis?: boolean;
 };
 
 type Emir = {
@@ -67,7 +68,7 @@ export function IcMusteriDetay({
     setHata(null);
     const { data, error } = await supabase
       .from("ic_is_emirleri")
-      .select("id, is_emri_no, urun, hedef_tur, hedef_kg, hedef_arac, durum, siparis_tarihi, olusturma, siparis_formu_yolu, ic_sevkler(id, plaka, net_kg, irsaliye_no, irsaliye_dosya_yolu, olusturma, cikis_durumu, cikis_planlanan, cikis_zamani)")
+      .select("id, is_emri_no, urun, hedef_tur, hedef_kg, hedef_arac, durum, siparis_tarihi, olusturma, siparis_formu_yolu, ic_sevkler(id, plaka, net_kg, irsaliye_no, irsaliye_dosya_yolu, olusturma, cikis_durumu, cikis_planlanan, cikis_zamani, gecmis)")
       .eq("company_id", companyId)
       .eq("musteri_id", musteri.id)
       .order("olusturma", { ascending: false })
@@ -222,7 +223,7 @@ export function IcMusteriDetay({
                           const c = cikisEtiketi(s);
                           return (
                             <tr key={s.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
-                              <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.olusturma)}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: TEXT_MUTED }}>{s.gecmis ? new Date(s.olusturma).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : tarihSaatYazi(s.olusturma)}</td>
                               <td className="px-3 py-2 whitespace-nowrap font-medium text-white">{s.plaka}</td>
                               <td className="px-3 py-2 whitespace-nowrap text-xs" style={{ color: TEXT_MUTED }}>{s.is_emri_no}</td>
                               <td className="px-3 py-2 whitespace-nowrap text-white">{kgYazi(s.net_kg)}</td>

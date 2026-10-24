@@ -3,6 +3,74 @@ html, body {
   max-width: 100%;
 }
 
+/* -----------------------------------------------------------------------------
+   Mobil kaydirma / ekran sabitligi (24.10.2026). Ayrinti: CLAUDE.md "Mobil".
+   ----------------------------------------------------------------------------- */
+html {
+  /* Telefon yan cevrilince iOS yazilari kendiliginden buyutmesin (yerlesim ziplamasi) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Koyu uygulama ekranlari (arka plan gorseli olan her sayfa: giris, AppShell, Kantar):
+   ust/alt esnemede beyaz zemin gorunmesin, sayfa lastik gibi esneyip ziplamasin. */
+html:has([data-sabit-zemin]),
+html:has([data-sabit-zemin]) body {
+  background-color: #0B0F14;
+}
+html:has([data-sabit-zemin]) {
+  overscroll-behavior-y: none;
+}
+html:has([data-sabit-zemin]) ::-webkit-scrollbar-thumb { background: #2A3141; }
+html:has([data-sabit-zemin]) ::-webkit-scrollbar-thumb:hover { background: #3A4357; }
+
+/* Sabit arka plan katmani: telefonda adres cubugu acilip kapanirken yeniden
+   boyutlanip kaymasin -> en buyuk gorunum yuksekligine sabitlenir. */
+.sabit-zemin {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Pencereler / cekmece / yatay tablolar: icteki kaydirma sona gelince
+   arkadaki sayfaya aktarilmaz (zincirleme kaydirma yok). */
+[role="dialog"], [role="alertdialog"], [aria-modal="true"] {
+  overscroll-behavior: contain;
+}
+.fixed.inset-0.overflow-y-auto,
+.fixed.overflow-y-auto {
+  overscroll-behavior-y: contain;
+}
+.overflow-x-auto {
+  overscroll-behavior-x: contain;
+}
+
+/* Dokunmatik cihazlar (telefon / tablet) */
+@media (hover: none) and (pointer: coarse) {
+  /* iOS 16px altindaki giris alanina dokununca sayfayi yakinlastirip kaydirir.
+     Yazi boyu 16px -> yakinlastirma ve yana kayma olmaz (pinch-zoom acik kalir). */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Acik pencere / mobil menu varken arkadaki sayfa kaymaz (masaustu degismez). */
+  html:has([aria-modal="true"]),
+  html:has(.fixed.inset-0[class*="bg-black/"]) {
+    overflow: hidden;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

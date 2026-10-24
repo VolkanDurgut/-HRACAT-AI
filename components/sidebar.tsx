@@ -142,7 +142,7 @@ export default function Sidebar() {
       </Link>
       <div className="mx-4 h-px" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />
 
-      <nav className="flex-1 px-2 pb-3 overflow-y-auto" aria-label="Ana menü">
+      <nav className="flex-1 px-2 pb-3 overflow-y-auto overscroll-contain" aria-label="Ana menü">
         <Bolum baslik="İhracat" />
         <div className="space-y-0.5">{mainItems.map(renderItem)}</div>
 

@@ -1518,6 +1518,34 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (`edge3/test.mjs`: ek birebir, CC, hata durumlarında e-posta gitmez, şirket içi değişmedi,
   deneme yalnız kendine), Playwright 29 (`sip/eposta_e2e.py`), e2e2/3/4/5/8 + gecmis_e2e regresyon.
 
+## Mobil kaydırma ve ekran sabitliği (24.10.2026)
+
+- Kullanıcı: "mobilde ekran kayıyor, çok hızlı aşağı kayıyor, kaydırma profesyonel olmalı".
+  Tamamı CSS (`app/globals.css` başındaki "Mobil kaydirma" bölümü) + 2 küçük bileşen
+  değişikliği; veri / SQL / sayfa düzeni DEĞİŞMEDİ. Doğal (iOS/Android) kaydırma hızına
+  DOKUNULMAZ (scroll ele geçiren JS yok — erişilebilirlik ve "takılma" riski).
+- Arka plan görseli (`ArkaPlanGorseli`) `.sabit-zemin` sınıfıyla `100lvh` + ayrı katman:
+  telefonda adres çubuğu açılıp kapanırken görsel yeniden boyutlanıp kaymıyor.
+  `data-sabit-zemin` işareti olan sayfalarda (giriş, AppShell, Kantar) html/body zemini
+  koyu `#0B0F14` ve `overscroll-behavior-y: none` (üst/altta lastik esneme + beyaz zemin
+  yok; Android'de aşağı çekip yenileme de kapanır — sayfalarda Yenile düğmesi / otomatik
+  yenileme var). Girişsiz açık tema sayfalar (rapor, takip, çıkış) ETKİLENMEZ.
+- Dokunmatik cihazda (`hover: none` + `pointer: coarse`): metin giriş alanları / select /
+  textarea 16px (iOS 16px altında alana dokununca sayfayı yakınlaştırıp yana kaydırıyordu;
+  pinch-zoom açık kalır, `maximum-scale` KULLANILMAZ). Açık pencere (`aria-modal`) veya
+  `fixed inset-0 bg-black/…` örtüsü (mobil menü dahil) varken `html` kaydırması kilitli;
+  konum korunur. Masaüstünde kilit ve yazı boyu DEĞİŞMEDİ (kaydırma çubuğu kayması olmasın).
+- Pencereler, `fixed overflow-y-auto` paneller, mobil menü listesi: `overscroll-behavior:
+  contain` (iç kaydırma sona gelince arkadaki sayfa kaymaz). `.overflow-x-auto` tablolarda
+  yatay zincirleme yok. iOS yatay çevirmede yazı büyütme kapalı (`text-size-adjust: 100%`).
+- Yeni pencere yazarken: `fixed inset-0 bg-black/..` örtüsü veya `aria-modal="true"` kullan
+  (kilit otomatik gelir). AppShell `main`'deki `overflow-x-hidden` BİLEREK bırakıldı
+  (`clip`'e çevirmek proformalardaki `sticky` öğeleri ilk kez çalıştırıp düzeni değiştirir).
+- Test (scratchpad `mobil/`): iPhone 13 ile 26 sayfa/sekme (veri dolu dahil) yatay taşma 0,
+  16px altı giriş 0; davranış 16/16 (görsel sabit, menü/pencere kilidi + konum, masaüstü
+  değişmedi, rapor açık tema). Regresyon e2e2/3/4/5/8, gecmis_e2e, eposta_e2e geçti.
+  `sf/e2e7.py`'nin "Arka plan" anahtarı adımı 22.10'dan beri eskidir.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

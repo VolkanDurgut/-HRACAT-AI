@@ -11,6 +11,8 @@ import React from "react";
  * tarayici ekrana uygun TEK boyutu indirir. `position: fixed` -> kaydirmada
  * yeniden cizilmez; bulaniklik (backdrop-blur) BILEREK yok (performans).
  * HER ZAMAN acik (22.10.2026 kullanici karari: ac/kapa anahtari kaldirildi).
+ * Telefonda adres cubugu acilip kapanirken kaymasin diye `.sabit-zemin` (100lvh,
+ * globals.css); `data-sabit-zemin` koyu sayfa zeminini ve esneme kilidini acar (24.10.2026).
  * Kullanildigi yerler: giris ekrani, AppShell (tum uygulama sayfalari), Kantar Paneli.
  */
 
@@ -34,9 +36,10 @@ export function ArkaPlanGorseli({ tur }: { tur: "giris" | "uygulama" }) {
         alt=""
         aria-hidden="true"
         decoding="async"
-        className="fixed inset-0 -z-20 h-full w-full object-cover object-center select-none pointer-events-none"
+        data-sabit-zemin=""
+        className="sabit-zemin -z-20 object-cover object-center select-none pointer-events-none"
       />
-      <div aria-hidden="true" className="fixed inset-0 -z-10 pointer-events-none" style={{ background: ORTU[tur] }} />
+      <div aria-hidden="true" className="sabit-zemin -z-10 pointer-events-none" style={{ background: ORTU[tur] }} />
     </>
   );
 }

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 
 // ============================================================================
 // GUNLUK VERI YEDEGI (yedekleme-gonder)
@@ -40,6 +41,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 //    tablolara gercekten yuklenir; satirlar canliyla md5 karsilastirilir ve
 //    tablolar arasi baglar kontrol edilir. Sonuc mailde yazar; sorun varsa
 //    konu "[UYARI]". Canliya hicbir sey yazilmaz.
+//  - MAIL GORUNUMU (26.10.2026): gunluk raporla ayni kurumsal tasarim, tablolar
+//    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
+//    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
 //  - KULLANICI LISTESI (05.10.2026): pakete "_kullanicilar" eklenir (kimlik,
 //    e-posta, tarihler; SIFRE YOK) - yeni projede ayni kimlikle yeniden
 //    olusturmak icin (docs/felaket-kurtarma.md).
@@ -282,10 +286,6 @@ function yuzdeYaz(oran: number): string {
   return `%${(oran * 100).toFixed(1).replace(".", ",")}`;
 }
 
-function escapeHtml(deger: string): string {
-  return deger.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 function mbYaz(bayt: number): string {
   return `${(bayt / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -460,51 +460,37 @@ Deno.serve(async (req: Request) => {
       uyarilar,
     };
 
-    if (deneme) return jsonCevap(ozet);
+    const saat = simdi.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
+    const ekAdi = `ihracat-ai-yedek-${tarih.replace(/\./g, "-")}.json`;
+    const mailGirdisi = {
+      tarih,
+      saat,
+      ekSigiyor,
+      ekAdi,
+      ekBayt: jsonBayt,
+      toplamKayit,
+      tablolar: tabloSayilari,
+      kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
+      bucketlar: bucketOzeti,
+      geriYukleme: geriYukleme ? { tablo_sayisi: geriYukleme.tablo_sayisi, birebir: geriYukleme.birebir, bag_sorunlari: geriYukleme.bag_sorunlari } : null,
+      uyarilar,
+      kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,
+    };
+    const html = yedekMailHtml(mailGirdisi);
+
+    if (deneme) return jsonCevap({ ...ozet, html });
 
     // ---- Mail ----
-    const tabloSatirlari = tabloSayilari
-      .map((t) => `<tr><td style="padding:2px 12px 2px 0;">${escapeHtml(t.tablo)}</td><td style="padding:2px 0;text-align:right;">${t.adet === null ? "<b style=\"color:#b91c1c\">OKUNAMADI</b>" : t.adet}${t.not && t.adet !== null ? ` <span style="color:#6b7280">(${escapeHtml(t.not)})</span>` : ""}</td></tr>`)
-      .join("");
-    const bucketSatirlari = Object.entries(bucketOzeti)
-      .map(([b, o]) => `<li>${escapeHtml(b)}: ${o.dosya} dosya, ${mbYaz(o.bayt)}</li>`)
-      .join("");
-    const uyariBlogu = uyarilar.length
-      ? `<div style="background:#fef2f2;border:1px solid #fecaca;padding:10px 14px;border-radius:8px;margin:12px 0;"><b>Uyarılar:</b><ul>${uyarilar.map((u) => `<li>${escapeHtml(u)}</li>`).join("")}</ul></div>`
-      : "";
-    const kapasiteRenk = { normal: "#15803d", uyari: "#b45309", kritik: "#b91c1c", olculemedi: "#6b7280" };
-    const kapasiteSatirlari = kapasite
-      .map((k) => {
-        const d = kapasiteDurumu(k.oran);
-        const deger = k.oran === null ? "ölçülemedi" : `${mbYaz(k.bayt!)} / ${mbYaz(k.kota)} (${yuzdeYaz(k.oran)})`;
-        return `<tr><td style="padding:2px 12px 2px 0;">${escapeHtml(k.kaynak)}</td><td style="padding:2px 0;text-align:right;color:${kapasiteRenk[d]};font-weight:${d === "normal" ? "400" : "700"};">${deger}</td></tr>`;
-      })
-      .join("");
-    const geriYuklemeSatiri = geriYukleme
-      ? `<p style="margin-top:14px;"><b>Geri yükleme testi:</b> ${geriYukleme.birebir}/${geriYukleme.tablo_sayisi} tablo birebir geri yüklendi${geriYukleme.bag_sorunlari.length === 0 ? ", tablolar arası bağlar tutarlı" : ""}. ${geriYukleme.birebir === geriYukleme.tablo_sayisi && geriYukleme.bag_sorunlari.length === 0 ? "✅" : "⚠️"}</p>`
-      : `<p style="margin-top:14px;"><b>Geri yükleme testi:</b> <b style="color:#b91c1c">çalıştırılamadı</b> (uyarılara bakın).</p>`;
-    const html = `
-<p>İhracat AI veritabanınızın ${tarih} tarihli otomatik yedeği ${ekSigiyor ? "ektedir" : "<b>bu sefer eke sığmadı</b>"}.</p>
-${uyariBlogu}
-<p><b>Toplam ${toplamKayit} kayıt, ${tabloSayilari.length} tablo.</b></p>
-<table style="border-collapse:collapse;font-size:13px;">${tabloSatirlari}</table>
-${geriYuklemeSatiri}
-<p style="margin-top:14px;"><b>Kapasite (Free plan kotası):</b> %85'te uyarı, %90'da kritik.</p>
-<table style="border-collapse:collapse;font-size:13px;">${kapasiteSatirlari}</table>
-<p style="margin-top:14px;"><b>Dosyalar (PDF vb.):</b> Yedekte sadece dosya <i>listesi</i> vardır; dosyaların kendisi mail ekine sığmadığı için yedekte değildir ve Supabase Storage'da durur.</p>
-<ul>${bucketSatirlari || "<li>-</li>"}</ul>
-<p>Bu dosyayı güvenli bir yerde (örn. bilgisayarınızda veya bulut depolamada) saklamanızı öneririz.</p>`;
-
     const mailGovdesi: Record<string, unknown> = {
       from: "İhracat AI <bildirim@ihracatasistanim.com>",
       to: [YEDEK_ALICI],
-      subject: `${uyarilar.length ? "[UYARI] " : ""}İhracat AI - Günlük Veri Yedeği (${tarih})`,
+      subject: yedekMailKonusu(mailGirdisi),
       html,
     };
     if (ekSigiyor) {
       mailGovdesi.attachments = [
         {
-          filename: `ihracat-ai-yedek-${tarih.replace(/\./g, "-")}.json`,
+          filename: ekAdi,
           content: btoa(unescape(encodeURIComponent(jsonIcerik))),
         },
       ];

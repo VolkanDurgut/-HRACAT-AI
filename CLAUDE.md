@@ -707,7 +707,25 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Canlıdaki sürüm repodaki koddur (Supabase v5, 05.10.2026). Fonksiyonu değiştirince
   ayrıca DEPLOY edilmesi gerekir (Supabase MCP `deploy_edge_function` veya CLI)
   — commit/push tek başına canlıyı değiştirmez.
-- Yeni bir iş tablosu eklenirse `YEDEKLENECEK_TABLOLAR` listesine de eklenmeli.
+- Yeni bir iş tablosu eklenirse `YEDEKLENECEK_TABLOLAR` listesine de eklenmeli. Mail görünümü
+  (`mail.ts` → `TABLO_BILGISI`) için Türkçe ad + grup da eklenir (eklenmezse "Diğer"de teknik
+  adıyla çıkar).
+- MAIL GÖRÜNÜMÜ (26.10.2026, kullanıcı: "günlük rapor gibi temaya uygun; 0 olanlar nedir?"):
+  `supabase/functions/yedekleme-gonder/mail.ts` (saf, görünüm) — günlük raporla aynı dil (logo,
+  lacivert #283474 / şeftali #F4A07C): durum bandı (yeşil "Yedek alındı ve doğrulandı" ya da
+  kırmızı "Dikkat edilmesi gerekenler"), 4 kutu (Toplam kayıt · Geri yükleme testi · Veritabanı
+  · Dosya deposu + doluluk çubuğu), tablolar Türkçe adıyla GRUPLU (İhracat operasyonu / Evrak
+  ayarları / Proforma / İç piyasa / Kantar ve DBA / Kullanıcılar ve sistem), dosya deposu
+  klasörleri Türkçe açıklamalı, altta ek + öneri. Konu, alıcı, ek, yedek içeriği, geri yükleme
+  testi, kapasite eşikleri DEĞİŞMEDİ. Deneme yanıtına `html` eklendi (önizleme; veri yok).
+  SIFIR KAYITLI TABLOLAR (26.10.2026 kod + DB kontrolü, `BOS_ACIKLAMA`): `sevkiyatlar`,
+  `plakalar` = KULLANILMIYOR (ilk tasarımdan; kodda okuyan/yazan yok; rezervasyon/konteyner
+  `sevkiyat_id` FK'leri hep NULL) — SİLİNMEDİ (geri alınamaz; kullanıcı onayıyla ayrı migration);
+  `acente_teklifleri` = özellik var ("Acentelerden Teklif Al", Proforma Yükle sonrası) henüz
+  kullanılmadı (`acenteler`de Haziran'dan 2 deneme kaydı: MSC, MAERSK — volkandurgut e-postalı);
+  `banka_presetleri`, `ihracat_musterileri`, `proforma_ayarlari` = boş olması normal
+  (isteğe bağlı / varsayılan). Test scratchpad `yedekmail/` (esbuild + Deno/fetch taklidi:
+  deneme, gerçek, uyarılı senaryo; 820/390 px görüntü).
   `denetim_kayitlari` sadece son 7 günüyle girer; `depositors` ve
   `contact_messages` bilerek hariç.
 - Tablolar 1000'erlik sayfalarla çekilir; okunamayan tablo mail konusunda

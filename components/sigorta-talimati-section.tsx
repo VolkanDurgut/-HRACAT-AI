@@ -3,7 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { Download, X, Lock, RotateCcw, Pencil } from "lucide-react";
-import InfoTooltip from "@/components/info-tooltip";
+import { EvrakHazirlikUyarisi } from "@/components/evrak-hazirlik-uyarisi";
+import { eksikKaynaklari, type EksikKaynak } from "@/lib/evrak-hazirlik-kaynak";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { EvrakIkonYuvasi, EVRAK_IKON_BUTON_SINIFI } from "@/components/evrak-ikon-yuvasi";
 import {
@@ -46,6 +47,16 @@ const ALAN_SIRASI: { anahtar: keyof SigortaTalimatiAlanlari; genis?: boolean; or
   { anahtar: "agirlikSatiri", genis: true, ornek: "BRÜT : 126.000,00 KGS , NET : 125.000,00 KGS" },
 ];
 
+
+/** Indirme engeli (sigortaTalimatiHazirlik ile AYNI kosul): once rezervasyon, sonra tum konteynerler. */
+function sigortaEngelKaynaklari(rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[]): EksikKaynak[] {
+  const rezAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+  if (rezervasyonlar.length === 0 || rezAdedi === 0) {
+    return [{ anahtar: "rezervasyon", etiket: "Rezervasyon", alanlar: ["Konteyner adedi"] }];
+  }
+  return [{ anahtar: "konteyner", etiket: `Konteyner bilgileri (${konteynerler.length}/${rezAdedi})`, alanlar: [`${konteynerler.length}/${rezAdedi} konteyner eklendi`] }];
+}
+
 export default function SigortaTalimatiSection({ dosya, rezervasyonlar, konteynerler }: Props) {
   const varsayilan = useMemo(() => sigortaTalimatiVarsayilanlari(dosya, rezervasyonlar, konteynerler), [dosya, rezervasyonlar, konteynerler]);
   const hazirlik = sigortaTalimatiHazirlik(rezervasyonlar, konteynerler, varsayilan);
@@ -64,10 +75,9 @@ export default function SigortaTalimatiSection({ dosya, rezervasyonlar, konteyne
 
   if (!hazirlik.acilabilir) {
     return (
-      <div className="flex items-center gap-1.5">
-        <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-          <span className="font-semibold text-amber-400">Sigorta talimatı hazır değil:</span> {hazirlik.engel}
-        </InfoTooltip>
+      <div className="flex items-center gap-1.5 min-w-0">
+        {/* 25.10.2026: unlem + ipucu yerine satirda gorunen uyari (kural degismedi) */}
+        <EvrakHazirlikUyarisi evrakAdi="Sigorta talimatı" kaynaklar={sigortaEngelKaynaklari(rezervasyonlar, konteynerler)} />
         <EvrakIkonYuvasi />
       </div>
     );
@@ -79,11 +89,9 @@ export default function SigortaTalimatiSection({ dosya, rezervasyonlar, konteyne
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 min-w-0">
         {hazirlik.eksikler.length > 0 && (
-          <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-            <span className="font-semibold text-amber-400">Boş alanlar:</span> {hazirlik.eksikler.join(", ")}. Kalem ikonuyla açılan pencereden doldurup indirebilirsiniz.
-          </InfoTooltip>
+          <EvrakHazirlikUyarisi evrakAdi="Sigorta talimatı" kaynaklar={eksikKaynaklari(hazirlik.eksikler)} />
         )}
         <button
           onClick={() => indirSigortaTalimatiPdf(varsayilan, dosyaAdi)}

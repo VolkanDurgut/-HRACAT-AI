@@ -370,11 +370,11 @@ function DosyaDetailContent() {
                     return (
                       <div
                         key={tanim.anahtar}
-                        className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border hover:bg-white/[0.03] transition-colors"
+                        className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 rounded-lg border hover:bg-white/[0.03] transition-colors"
                         style={{ borderColor: CARD_BORDER }}
                         title={orijinalMetin}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 sm:shrink-0">
                           <span className="text-xs font-semibold w-5 shrink-0" style={{ color: TEXT_MUTED }}>{i + 1}.</span>
                           <FileCheck size={15} className="shrink-0" style={{ color: TEXT_MUTED }} />
                           <span className="text-sm font-medium text-white truncate">{tanim.baslik}</span>
@@ -384,7 +384,9 @@ function DosyaDetailContent() {
                             Draft/Orijinal tum satirlarda ayni hizada. Kopyala ikonlari
                             kullanici istegiyle kaldirildi - geri eklenmez; musterinin
                             evrak sarti metni satirin title'inda (uzerine gelince). */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        {/* 25.10.2026: telefonda hazirlik uyarisi basligi ezmesin diye alta iner (flex-wrap);
+                            genis ekranda baslik tam kalir, uyari metni kendi icinde 2 satira kirilir */}
+                        <div className="flex items-center gap-1.5 ml-auto min-w-0 shrink-0 sm:shrink">
                           {tanim.evrakTuru ? (
                             <EvrakOlusturButtons dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler} show={tanim.evrakTuru} />
                           ) : tanim.anahtar === "Insurance" ? (

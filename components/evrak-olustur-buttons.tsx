@@ -5,7 +5,8 @@ import { supabase, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from 
 import { useToast } from "@/lib/toast-context";
 import { useAuth } from "@/lib/auth-context";
 import { FileText, Pencil, Loader2, CheckCircle2 } from "lucide-react";
-import InfoTooltip from "@/components/info-tooltip";
+import { EvrakHazirlikUyarisi } from "@/components/evrak-hazirlik-uyarisi";
+import { eksikKaynaklari } from "@/lib/evrak-hazirlik-kaynak";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
 import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildFumigationHtml } from "@/lib/fumigation-builder";
@@ -42,7 +43,7 @@ function turkceSadelestir(metin: string): string {
 
 // Uc evrak turunun sabit meta bilgisi - hem ilk uretimde hem "Orijinali Olustur"
 // akisinda AYNI dosya adini/storage yolunu yeniden turetmek icin kullanilir.
-// evrakAdi sadece hazirlik uyarisi (InfoTooltip) basliginda kullanilir; PDF
+// evrakAdi sadece hazirlik uyarisinin (EvrakHazirlikUyarisi) erisilebilirlik etiketinde kullanilir; PDF
 // dosya adi artik lib/evrak-dosya-adi.ts -> buildEvrakPdfDosyaAdi ile uretilir
 // (Taslak Onay Paketi'yle BIREBIR AYNI kural - talep: 01.10.2026).
 const EVRAK_META: Record<"ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", { evrakTipi: string; siraNo: number; evrakAdi: string }> = {
@@ -351,11 +352,9 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
    * durum rozeti + Draft + Orijinal butonlari. */
   const renderEvrakButonlari = (tip: "ci" | "pl" | "coo" | "phyto" | "health" | "fc" | "qc", hazirlik: { hazir: boolean; eksikler: string[] }, etiket: string) => {
     if (!hazirlik.hazir) {
-      return (
-        <InfoTooltip variant="warning" position="bottom" align="right" width="w-64" size={14}>
-          <span className="font-semibold text-amber-400">{etiket} eksik bilgiler:</span> {hazirlik.eksikler.join(", ")}
-        </InfoTooltip>
-      );
+      // 25.10.2026: sari unlem + uzerine gelince liste yerine satirda gorunen uyari
+      // (hangi belge / adim tamamlaninca evrak olusturulabilir). Kural degismedi.
+      return <EvrakHazirlikUyarisi evrakAdi={etiket} kaynaklar={eksikKaynaklari(hazirlik.eksikler)} />;
     }
     const meta = EVRAK_META[tip];
     const kayit = durumlar[meta.evrakTipi];
@@ -466,8 +465,8 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
         // (bkz. components/evrak-ikon-yuvasi.tsx). CI'daki ECTN kutusu butonlarin
         // ALTINA, Orijinal'in sag kenarina hizali konur: yana konunca dar kartta
         // "Commercial Invoice" basligini kesiyor ve hizayi bozuyordu.
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-col items-end gap-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             {renderEvrakButonlari(show, tekSatirHazirlik[show], TEK_SATIR_ETIKETLERI[show])}
             <EvrakIkonYuvasi>
               {show === "qc" && (

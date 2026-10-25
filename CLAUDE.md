@@ -1581,6 +1581,29 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   adımları, özet, tek seferlik / takip başlat / mevcut sipariş, okuma hatası, mobil 390).
   `yenidosya_test.py` / `devam_test.py` eski düğme adını ("Dosyayı Oluştur") kullanır.
 
+## Evrak hazırlık uyarısı — "Bekleniyor: …" (25.10.2026)
+
+- Kullanıcı: "CI hizasındaki sarı ünlem (üzerine gelince eksikler) kalksın; yerine orada
+  yanıp sönen uyarı, hangi belgeler yüklenince evrak oluşacak". Evraklar listesindeki 7 evrak
+  (`evrak-olustur-buttons.tsx` → `renderEvrakButonlari`, tek satır ve İhracatlar çekmecesindeki
+  "both" görünümü) + Sigorta talimatı (`sigorta-talimati-section.tsx`) artık InfoTooltip yerine
+  `components/evrak-hazirlik-uyarisi.tsx` (`EvrakHazirlikUyarisi`) gösterir:
+  "● Bekleniyor: Fatura · Konşimento talimatı". Nokta yanıp söner + kenar hafifçe ışıldar
+  (`globals.css` `.evrak-uyari-nokta/.evrak-uyari-nabiz`; "hareketi azalt" ayarında durur).
+  Alan ayrıntısı (Fatura: Fatura No, Fatura Tarihi …) title + aria-label'da.
+- Alan → kaynak eşlemesi TEK YER `lib/evrak-hazirlik-kaynak.ts` (`eksikKaynaklari`, iş akışı
+  sırası: Proforma bilgileri · Lojistik bilgileri · Rezervasyon · Konteyner bilgileri · Fatura ·
+  Konşimento talimatı · Draft BL · Ek Bilgiler). `document-readiness.ts` / `sigorta-talimati.ts`'e
+  YENİ eksik etiketi eklenirse buraya da eklenir (eklenmezse kaybolmaz, kendi adıyla en sonda
+  çıkar; birim testi tüm etiketlerin eşlendiğini denetler). Sigorta engeli: rezervasyon yoksa
+  "Rezervasyon", konteyner eksikse "Konteyner bilgileri (1/2)".
+- Hazırlık KURALLARI, butonlar, Draft/Orijinal hizası DEĞİŞMEDİ. Satır: telefonda uyarı başlığın
+  altına iner (flex-wrap); geniş ekranda başlık tam kalır, uyarı kendi içinde 2 satıra kırılır.
+  InfoTooltip bileşeni diğer sayfalarda kullanılmaya devam ediyor (silinmedi).
+- Testler (scratchpad `evrak/`): eşleme birim 6/6 (35 etiket), Playwright 19/19 (CI/QC/Health/
+  Sigorta metinleri, BL'de uyarı yok, hazır dosyada uyarı yok + Draft hizası, hareketi azalt,
+  mobil 390), İhracatlar çekmecesi; e2e2/3/5/8 + proforma regresyon geçti.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

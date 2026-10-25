@@ -767,6 +767,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Sorgular: dosyada `konsimento_dosya_url, draft_bl_dosya_url,
   beyanname_dosya_url`, rezervasyonda `talimat_cutoff, beyanname_cutoff`.
   Booking no mailde hâlâ YOK.
+- AÇIK SEVKİYAT KUTUSU (25.10.2026, kullanıcı: "+2 müşteri daha çirkin; açık olanların HEPSİ
+  görünmeli; tamamlananlar yeşil, konteynere alınanlar sarı, işlem yapılmayanlar normal"):
+  sayfa + 3 mailde TÜM müşteriler (sınır YOK), `acikMusteriler` (`_shared/gunluk-rapor.ts`):
+  müşterinin TÜM açık sevkiyatları birlikte → hepsi DBA'lı = `tamamlandi` (yeşil #047857,
+  kalın), en az birinde konteyner eklendi / yüklendi = `islemde` (amber #B45309, kalın —
+  beyaz zeminde okunur sarı), hiçbiri = `baslamadi` (normal #334155). Birden fazla durum
+  varsa altta küçük lejant. `acikMusteriSatirlari` artık sınırsız (geriye uyum). Edge
+  function v17 (mail); sayfa Netlify. Test: scratchpad `mailfn/calistir_renk.mjs` (6 müşteri,
+  renkler) + `rapor2/test.py` (sayfa 8/8).
 - ÖNEMLİ: `{"deneme":true}` mail GÖNDERMEZ (sadece HTML döner). Kullanıcı
   "test maili" isterse deneme OLMADAN gönderilir → o slotun kaydı yazılır;
   aynı slotun otomatik maili için kullanıcı o satırı siler.

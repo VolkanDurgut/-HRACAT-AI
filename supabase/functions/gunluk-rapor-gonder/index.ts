@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
-  acikMusteriSatirlari,
+  acikMusteriler,
+  MUSTERI_DURUM_RENGI,
+  MUSTERI_DURUM_ETIKETI,
   DURUM_METNI,
   durumRozetMetni,
   ekipmanOzetMetni,
@@ -227,7 +229,15 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
     `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:22px;font-weight:bold;color:${renk};line-height:1.2">${deger}</div><div style="font-size:11px;color:#475569;line-height:1.45">${alt}</div></td>`;
   const kutuArasi = `<td style="width:2%;font-size:0;line-height:0">&nbsp;</td>`;
-  const musteriler = acikMusteriSatirlari(r);
+  // Acik Sevkiyat kutusu (25.10.2026): TUM musteriler, durum rengiyle (sayfa ile ayni kural)
+  const musteriListesi = acikMusteriler(r);
+  const musteriDurumlari = (["tamamlandi", "islemde", "baslamadi"] as const).filter((d) => musteriListesi.some((m) => m.durum === d));
+  const musterilerHtml = musteriListesi.length
+    ? musteriListesi.map((m) => `<span style="color:${MUSTERI_DURUM_RENGI[m.durum]};${m.durum === "baslamadi" ? "" : "font-weight:bold;"}">${esc(m.metin)}</span>`).join("<br>") +
+      (musteriDurumlari.length > 1
+        ? `<div style="margin-top:5px;font-size:10px;color:#94A3B8;line-height:1.4">${musteriDurumlari.map((d) => `<span style="white-space:nowrap"><span style="color:${MUSTERI_DURUM_RENGI[d]}">&#9679;</span> ${MUSTERI_DURUM_ETIKETI[d]}</span>`).join(" &middot; ")}</div>`
+        : "")
+    : "açık sevkiyat yok";
   const olusturma = new Date(Date.now()).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   const sevkiyatSatirlari = r.sevkiyatlar.length
@@ -282,7 +292,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
     ${kutu(`${baslikGun} Yüklenen`, String(o.gunYuklenenKonteyner), o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", LACIVERT)}${kutuArasi}
-    ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), musteriler.length ? musteriler.map(esc).join("<br>") : "açık sevkiyat yok", "#047857")}${kutuArasi}
+    ${kutu("Açık Sevkiyat", String(o.acikSevkiyat), musterilerHtml, "#047857")}${kutuArasi}
     ${kutu("Yüklenecek Konteyner", String(o.bekleyenKonteyner), "açık sevkiyatlarda kalan", "#B45309")}
   </tr></table>
   ${cutoffUyariKutusu(r, olusturma)}

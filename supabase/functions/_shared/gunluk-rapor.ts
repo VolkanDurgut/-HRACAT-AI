@@ -458,16 +458,48 @@ export function ekipmanOzetMetni(s: SevkiyatSatiri): string | null {
 }
 
 /**
- * Ozet kutusu "Açık Sevkiyat" alt metni (09.10.2026): acik sevkiyatlarin
- * musterileri, tablo sirasiyla, tekrarsiz; birden fazla sevkiyati olanin
- * yaninda adet. En fazla `azami` satir, kalani "+N müşteri daha".
+ * Ozet kutusu "Açık Sevkiyat" musteri listesi (revize 25.10.2026, kullanici: "+2 musteri
+ * daha cirkin, acik olanlarin HEPSI gorunmeli; tamamlananlar yesil, konteynere alinanlar
+ * sari, hicbir islem yapilmayanlar normal"). Tablo sirasiyla, tekrarsiz; birden fazla
+ * sevkiyati olanin yaninda adet. SINIR YOK.
+ * Musteri durumu (musterinin TUM acik sevkiyatlari birlikte):
+ *   tamamlandi = hepsinin yuklemesi bitti (DBA'lar tam)
+ *   islemde    = en az birinde konteyner eklendi (bos ekipman alindi) veya yuklendi
+ *   baslamadi  = hicbirinde konteyner yok, hicbir sey yuklenmedi
  */
-export function acikMusteriSatirlari(r: GunlukRapor, azami = 4): string[] {
-  const sayac = new Map<string, number>();
-  for (const s of r.sevkiyatlar) sayac.set(s.musteri, (sayac.get(s.musteri) || 0) + 1);
-  const satirlar = Array.from(sayac, ([m, n]) => (n > 1 ? `${m} (${n} sevkiyat)` : m));
-  if (satirlar.length <= azami) return satirlar;
-  return [...satirlar.slice(0, azami - 1), `+${satirlar.length - azami + 1} müşteri daha`];
+export type MusteriDurumu = "tamamlandi" | "islemde" | "baslamadi";
+export type AcikMusteri = { ad: string; sevkiyat: number; metin: string; durum: MusteriDurumu };
+
+export const MUSTERI_DURUM_RENGI: Record<MusteriDurumu, string> = {
+  tamamlandi: "#047857", // yesil (tablodaki "Tamamlandı" rozetiyle ayni)
+  islemde: "#B45309",    // sari / amber (beyaz zeminde okunur ton)
+  baslamadi: "#334155",  // normal metin
+};
+export const MUSTERI_DURUM_ETIKETI: Record<MusteriDurumu, string> = {
+  tamamlandi: "Yükleme tamamlandı",
+  islemde: "Konteynere alındı",
+  baslamadi: "İşlem yok",
+};
+
+export function acikMusteriler(r: GunlukRapor): AcikMusteri[] {
+  const harita = new Map<string, SevkiyatSatiri[]>();
+  for (const s of r.sevkiyatlar) {
+    if (!harita.has(s.musteri)) harita.set(s.musteri, []);
+    harita.get(s.musteri)!.push(s);
+  }
+  return Array.from(harita, ([ad, liste]) => {
+    const durum: MusteriDurumu = liste.every((s) => s.durum === "tamamlandi")
+      ? "tamamlandi"
+      : liste.some((s) => s.yuklenen > 0 || s.eklenen > 0)
+      ? "islemde"
+      : "baslamadi";
+    return { ad, sevkiyat: liste.length, metin: liste.length > 1 ? `${ad} (${liste.length} sevkiyat)` : ad, durum };
+  });
+}
+
+/** Eski arayuz: sadece metinler (artik sinirsiz). */
+export function acikMusteriSatirlari(r: GunlukRapor): string[] {
+  return acikMusteriler(r).map((m) => m.metin);
 }
 
 /** "VIADUC HOL HOL SARLU - 4x - LE SOLEIL - Yükleme Tamamlandı ✔" */

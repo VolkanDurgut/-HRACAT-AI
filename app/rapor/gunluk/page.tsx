@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Fragment, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -15,7 +15,9 @@ import {
   CutoffDurumu,
   durumRozetMetni,
   ekipmanOzetMetni,
-  acikMusteriSatirlari,
+  acikMusteriler,
+  MUSTERI_DURUM_RENGI,
+  MUSTERI_DURUM_ETIKETI,
 } from "@/supabase/functions/_shared/gunluk-rapor";
 
 /**
@@ -155,6 +157,40 @@ function Baslik({ children }: { children: React.ReactNode }) {
     <div className="flex items-center gap-2 mb-2.5">
       <div className="w-1 h-4 rounded-sm" style={{ backgroundColor: MARKA_TURUNCU }} />
       <h2 className="text-xs font-bold uppercase tracking-widest" style={{ color: LACIVERT }}>{children}</h2>
+    </div>
+  );
+}
+
+/**
+ * "Açık Sevkiyat" kutusu (25.10.2026): acik sevkiyati olan TUM musteriler ("+N musteri
+ * daha" yok), durumuna gore renkli: yesil = yukleme tamamlandi, sari = konteynere alindi
+ * (ekipman alindi / yukleniyor), normal = islem yok. Hesap _shared/gunluk-rapor.ts
+ * (acikMusteriler) - mail ile AYNI.
+ */
+function AcikMusteriListesi({ rapor }: { rapor: Parameters<typeof acikMusteriler>[0] }) {
+  const liste = acikMusteriler(rapor);
+  if (liste.length === 0) return <p className="text-[11px] text-slate-600 leading-snug">açık sevkiyat yok</p>;
+  const durumlar = (["tamamlandi", "islemde", "baslamadi"] as const).filter((d) => liste.some((m) => m.durum === d));
+  return (
+    <div data-acik-musteriler="">
+      <ul className="text-[11px] leading-snug space-y-0.5">
+        {liste.map((m) => (
+          <li key={m.ad} data-durum={m.durum} title={MUSTERI_DURUM_ETIKETI[m.durum]}
+            className={m.durum === "baslamadi" ? "" : "font-semibold"} style={{ color: MUSTERI_DURUM_RENGI[m.durum] }}>
+            {m.metin}
+          </li>
+        ))}
+      </ul>
+      {durumlar.length > 1 && (
+        <p className="mt-1.5 text-[9.5px] text-slate-400 leading-snug">
+          {durumlar.map((d, i) => (
+            <Fragment key={d}>
+              {i > 0 && " · "}
+              <span className="whitespace-nowrap"><span style={{ color: MUSTERI_DURUM_RENGI[d] }}>●</span> {MUSTERI_DURUM_ETIKETI[d]}</span>
+            </Fragment>
+          ))}
+        </p>
+      )}
     </div>
   );
 }
@@ -317,13 +353,13 @@ export default function GunlukRaporSayfasi() {
           <div className="grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-2 mb-6 sayfa-boleme">
             {[
               { e: `${gunEtiketi} Yüklenen`, d: `${o.gunYuklenenKonteyner}`, a: o.gunYuklenenNetKg ? `konteyner · ${sayi(o.gunYuklenenNetKg)} kg` : "konteyner", r: LACIVERT },
-              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: acikMusteriSatirlari(rapor).join("\n") || "açık sevkiyat yok", r: YESIL },
+              { e: "Açık Sevkiyat", d: `${o.acikSevkiyat}`, a: <AcikMusteriListesi rapor={rapor} />, r: YESIL },
               { e: "Yüklenecek Konteyner", d: `${o.bekleyenKonteyner}`, a: "açık sevkiyatlarda kalan", r: AMBER },
             ].map((k) => (
               <div key={k.e} className="rounded border border-slate-200 px-3 py-2" style={{ borderTop: `3px solid ${k.r}` }}>
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{k.e}</p>
                 <p className="text-xl font-bold leading-tight" style={{ color: k.r }}>{k.d}</p>
-                <p className="text-[11px] text-slate-600 leading-snug whitespace-pre-line">{k.a}</p>
+                {typeof k.a === "string" ? <p className="text-[11px] text-slate-600 leading-snug whitespace-pre-line">{k.a}</p> : k.a}
               </div>
             ))}
           </div>

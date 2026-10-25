@@ -1559,6 +1559,28 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Süleyman, volkandurgut.tr@ Volkan. kantar@, mudur@, muhasebe@ isimsiz (kullanıcıdan bekleniyor).
   Yeni kullanıcı eklenince listeye bir satır eklenir. Test scratchpad `destek/test.py` 16/16.
 
+## Proforma Yükle — AI asistan görünümü (25.10.2026)
+
+- Kullanıcı: "Yeni dosya aç, Proforma Yükle olarak; AI ajanı gibi modern, sadece PDF yükle
+  gibi kalmasın". Menü / sayfa başlığı / Kontrol Merkezi boş durum düğmesi "Proforma Yükle"
+  (ikon `FileUp`); Yetkilendirme etiketi "Proforma Yükle (yeni dosya)". ADRES `/yeni-dosya` ve
+  yetki anahtarı `yeni_dosya` DEĞİŞMEDİ (yer imleri / yetkiler bozulmasın).
+- Görünüm `components/proforma-asistan.tsx`: `ProformaAsistanYukleme` (asistan başlığı,
+  hitaplı karşılama `kullaniciHitabi`, okunan bilgi etiketleri, sürüklerken yanan alan,
+  dosya çipi + kaldır, "Proformayı Oku ve Dosyayı Hazırla"), `ProformaAsistanIlerleme`
+  (adımlar sayfanın GERÇEK `asama` durumuna bağlı: okuma → liman → siparis → dosya; sahte
+  zamanlayıcı yok, sadece saniye sayacı), `ProformaOkumaOzeti` (dosya açılmadan önce
+  alıcı / proforma no / tutar / miktar / teslim-ödeme / limanlar; kritik alan boşsa
+  "Okunamadı — dosyada kontrol edin", varış limanı düzeltme notu burada).
+- İş mantığı DEĞİŞMEDİ: `proforma-oku` çağrısı, `varisLimaniniDogrula`, ana sipariş soruları,
+  `createDosya` insert gövdesi (sadece dönüşe `dosya_no` eklendi), proforma PDF arşivi.
+  Okuma hatası artık ayrı mesaj ("Proforma okunamadı…", dosya seçili kalır); kayıt hatası
+  eski mesaj. PDF kontrolü uzantıya da bakar (bazı Windows'ta tür boş gelir).
+  Başarı ekranı ve rezervasyon adımında "İhracat dosyası oluşturuldu · IHR-…" +
+  "Dosyayı Görüntüle". Test scratchpad `proforma/test.py` 29/29 (okuma/liman/sipariş
+  adımları, özet, tek seferlik / takip başlat / mevcut sipariş, okuma hatası, mobil 390).
+  `yenidosya_test.py` / `devam_test.py` eski düğme adını ("Dosyayı Oluştur") kullanır.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

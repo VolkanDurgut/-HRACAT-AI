@@ -10,14 +10,21 @@ import { useToast } from "@/lib/toast-context";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import AcenteTeklifSection from "@/components/acente-teklif-section";
-import { Upload, FileText, Check, Loader2, Package, AlertCircle, FolderPlus } from "lucide-react";
+import { Check, Loader2, Package, AlertCircle, FileUp } from "lucide-react";
+import { ProformaAsistanYukleme, ProformaAsistanIlerleme, ProformaOkumaOzeti, AsistanAsamasi } from "@/components/proforma-asistan";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 
+// 25.10.2026: sayfa "Proforma Yukle" (AI asistan gorunumu); adres ve yetki anahtari (yeni_dosya) degismedi.
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
+
+/** PDF mi? Bazi Windows/tarayici birlesimlerinde dosya turu bos gelir -> uzantiya da bakilir. */
+function pdfMi(file: File): boolean {
+  return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+}
 
 export default function YeniDosyaPage() {
   const { user, companyId, yetkiler, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
@@ -41,6 +48,9 @@ export default function YeniDosyaPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [dosyaId, setDosyaId] = useState<string | null>(null);
+  const [dosyaNo, setDosyaNo] = useState<string | null>(null);
+  // Asistan ilerlemesi: GERCEK adimlarda ilerler (suslu/sahte animasyon degil)
+  const [asama, setAsama] = useState<AsistanAsamasi>("okuma");
   const [proformData, setProformData] = useState<any | null>(null);
   // Varis limani duzeltme notu (03.10.2026, bkz. varisLimaniniDogrula)
   const [varisLimaniNotu, setVarisLimaniNotuState] = useState<string | null>(null);
@@ -66,7 +76,7 @@ export default function YeniDosyaPage() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type === "application/pdf" && file.size <= 20 * 1024 * 1024) {
+    if (file && pdfMi(file) && file.size <= 20 * 1024 * 1024) {
       setPdfFile(file);
       setError(null);
     } else {
@@ -76,7 +86,7 @@ export default function YeniDosyaPage() {
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type === "application/pdf" && file.size <= 20 * 1024 * 1024) {
+    if (file && pdfMi(file) && file.size <= 20 * 1024 * 1024) {
       setPdfFile(file);
       setError(null);
     } else {
@@ -97,7 +107,9 @@ export default function YeniDosyaPage() {
     setError(null);
     setVarisLimaniNotu(null);
     setStep("reading");
+    setAsama("okuma");
 
+    let okumaBasarisiz = false;
     try {
       let extracted: any = null;
       try {
@@ -121,13 +133,16 @@ export default function YeniDosyaPage() {
       }
 
       if (!extracted) {
+        okumaBasarisiz = true;
         throw new Error("PDF okunamadı.");
       }
 
+      setAsama("liman");
       extracted = await varisLimaniniDogrula(extracted);
       setProformData(extracted);
 
       // Ayni proforma_no'ya sahip ve AYNI ŞİRKETE ait bir ana siparis var mi kontrol et
+      setAsama("siparis");
       if (extracted.proforma_no) {
         const { data: existingAnaSiparis } = await supabase
           .from("ana_siparisler")
@@ -160,10 +175,16 @@ export default function YeniDosyaPage() {
       }
 
       // proforma_no yoksa direkt dosya olustur (ana siparis baglanmadan)
+      setAsama("dosya");
       await createDosya(extracted, null);
     } catch {
-      setError("Dosya oluşturulurken hata oluştu. Lütfen tekrar deneyin.");
-      showToast("Dosya oluşturulurken hata oluştu.", "error");
+      if (okumaBasarisiz) {
+        setError("Proforma okunamadı. Dosyanın proformanın kendisi olduğundan (taranmış resim değil, metin içeren PDF) emin olup tekrar deneyin.");
+        showToast("Proforma okunamadı.", "error");
+      } else {
+        setError("Dosya oluşturulurken hata oluştu. Lütfen tekrar deneyin.");
+        showToast("Dosya oluşturulurken hata oluştu.", "error");
+      }
       setStep("upload");
       setLoading(false);
     }
@@ -253,11 +274,12 @@ export default function YeniDosyaPage() {
           created_by: user.id,
           ana_siparis_id: anaSiparisId,
         })
-        .select("id")
+        .select("id, dosya_no")
         .single();
 
       if (dbError) throw dbError;
       setDosyaId(data.id);
+      setDosyaNo((data as { dosya_no?: string | null }).dosya_no || null);
 
       // Orijinal proforma PDF'ini storage'a yukle (talep: 26.09.2026 - "Proforma
       // Goruntule/Incele" butonu icin). BEST-EFFORT: basarisiz olsa bile dosya
@@ -347,64 +369,41 @@ export default function YeniDosyaPage() {
   return (
     <AppShell>
       <SayfaBasligi
-        ikon={<FolderPlus size={20} />}
-        baslik="Yeni İhracat Dosyası Aç"
-        aciklama="Proforma faturayı yükleyin, sistem otomatik olarak ihracat dosyasını oluştursun."
+        ikon={<FileUp size={20} />}
+        baslik="Proforma Yükle"
+        aciklama="Proformayı yükleyin; İhracat AI belgeyi okuyup ihracat dosyanızı oluştursun."
         className="mb-6"
       />
 
       <div className="max-w-4xl">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">
-            {error}
+          <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-xl text-sm mb-4" role="alert">
+            <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-400" />
+            <span>{error}</span>
           </div>
         )}
 
         {step === "upload" && (
-          <div className="rounded-xl border shadow-sm p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              className="border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer hover:border-amber-400 hover:bg-white/[0.03]"
-              style={{ borderColor: pdfFile ? "#F59E0B" : CARD_BORDER }}
-              onClick={() => document.getElementById("pdf-input")?.click()}
-            >
-              <Upload size={40} className="mx-auto mb-4" style={{ color: "#4A5262" }} />
-              {pdfFile ? (
-                <div className="flex items-center justify-center gap-2">
-                  <FileText size={20} className="text-amber-400" />
-                  <span className="text-sm font-medium text-white">{pdfFile.name}</span>
-                  <Check size={16} className="text-green-400" />
-                </div>
-              ) : (
-                <>
-                  <p className="font-medium" style={{ color: TEXT_MUTED }}>PDF dosyanızı buraya sürükleyin</p>
-                  <p className="text-sm mt-1" style={{ color: "#5A6272" }}>veya dosya seçmek için tıklayın (max 20MB)</p>
-                </>
-              )}
-              <input id="pdf-input" type="file" accept=".pdf" className="hidden" onChange={handleFileSelect} />
-            </div>
-            <button
-              onClick={handleUpload}
-              disabled={!pdfFile || loading}
-              className="mt-6 w-full py-3 rounded-lg text-white font-medium text-sm transition-all duration-200 hover:opacity-90 disabled:opacity-40"
-              style={{ backgroundColor: ACCENT }}
-            >
-              Dosyayı Oluştur
-            </button>
-          </div>
+          <ProformaAsistanYukleme
+            dosya={pdfFile}
+            mesgul={loading}
+            onDrop={handleDrop}
+            onSec={handleFileSelect}
+            onTemizle={() => { setPdfFile(null); setError(null); const i = document.getElementById("pdf-input") as HTMLInputElement | null; if (i) i.value = ""; }}
+            onBaslat={handleUpload}
+          />
         )}
 
         {step === "reading" && (
-          <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <Loader2 size={40} className="mx-auto animate-spin mb-4 text-amber-400" />
-            <p className="text-white font-medium">İhracat dosyanız hazırlanıyor</p>
-            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Bu işlem birkaç saniye sürebilir</p>
-          </div>
+          <ProformaAsistanIlerleme dosyaAdi={pdfFile?.name || "proforma.pdf"} asama={asama} />
         )}
 
         {step === "ana_siparis_check" && proformData && (
-          <div className="rounded-xl border shadow-sm p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <ProformaOkumaOzeti veri={proformData} toplamMts={getProformaMts(proformData)} uyari={varisLimaniNotu} />
+        )}
+
+        {step === "ana_siparis_check" && proformData && (
+          <div className="rounded-xl border shadow-sm p-5 sm:p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
             {mevcutAnaSiparis ? (
               <>
                 <div className="flex items-start gap-3 mb-5">
@@ -511,14 +510,33 @@ export default function YeniDosyaPage() {
         )}
 
         {step === "success" && (
-          <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <Check size={40} className="mx-auto text-green-400 mb-4" />
-            <p className="text-white font-medium">Tamamlandı!</p>
+          <div className="rounded-xl border shadow-sm p-10 sm:p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+            <div className="mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: `${ACCENT}1F`, boxShadow: `0 0 0 6px ${ACCENT}0F` }}>
+              <Check size={28} style={{ color: ACCENT }} />
+            </div>
+            <p className="text-white font-semibold">İhracat dosyası oluşturuldu{dosyaNo ? ` · ${dosyaNo}` : ""}</p>
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>Sıradaki adımlar hazırlanıyor…</p>
           </div>
         )}
 
         {step === "reservation_choice" && (
           <div className="space-y-4 animate-fade-up">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3" style={{ backgroundColor: `${ACCENT}0F`, borderColor: `${ACCENT}4D` }}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Check size={18} className="shrink-0" style={{ color: ACCENT }} />
+                <p className="text-sm text-white">
+                  <span className="font-semibold">İhracat dosyası oluşturuldu{dosyaNo ? ` · ${dosyaNo}` : ""}.</span>
+                  <span style={{ color: TEXT_MUTED }}> Sırada rezervasyon ya da navlun teklifi var.</span>
+                </p>
+              </div>
+              <button
+                onClick={() => router.push(`/dosya/${dosyaId}`)}
+                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors text-white"
+                style={{ borderColor: CARD_BORDER }}
+              >
+                Dosyayı Görüntüle
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <h3 className="font-semibold text-white mb-1">Rezervasyon Ekle</h3>

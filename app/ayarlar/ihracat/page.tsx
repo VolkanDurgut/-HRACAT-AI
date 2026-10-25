@@ -81,7 +81,7 @@ export default function IhracatAyarlariPage() {
       <div className="rounded-xl border shadow-sm p-5 max-w-xl animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <label className="block text-sm font-semibold mb-1 text-white">Varsayılan DİİB No</label>
         <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
-          Bu alana girdiğiniz değer, bundan sonra <b>Yeni Dosya Aç</b> ile açılan her
+          Bu alana girdiğiniz değer, bundan sonra <b>Proforma Yükle</b> ile açılan her
           dosyanın DİİB No alanına otomatik olarak yazılır. Dahilde işleme rejimi
           limiti dolup DİİB No değiştiğinde buradan güncelleyin — siz burayı tekrar
           değiştirene kadar yeni açılan tüm dosyalarda aynı değer kullanılır.

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FolderPlus, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -19,7 +19,8 @@ const mainItems: MenuItem[] = [
   { label: "Ana Panel",     href: "/panel",       icon: <FolderOpen size={18} />,      yetkiKey: "panel" },
   // Proforma olusturucu (17.10.2026): "Yeni Dosya Ac"in hemen ustunde (kullanici karari)
   { label: "Proformalar",   href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
-  { label: "Yeni Dosya Aç", href: "/yeni-dosya", icon: <FolderPlus size={18} />,      yetkiKey: "yeni_dosya" },
+  // 25.10.2026: "Yeni Dosya Ac" -> "Proforma Yukle" (kullanici karari; adres ve yetki ayni)
+  { label: "Proforma Yükle", href: "/yeni-dosya", icon: <FileUp size={18} />,        yetkiKey: "yeni_dosya" },
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
   { label: "Draft Onay",    href: "/draft-onay",  icon: <FileCheck2 size={18} />,      yetkiKey: "draft_onay" },
 ];

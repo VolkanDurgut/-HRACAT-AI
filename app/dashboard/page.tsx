@@ -603,7 +603,7 @@ export default function DashboardPage() {
           description="İlk ihracat dosyanızı proforma yükleyerek oluşturun."
           action={
             <Link href="/yeni-dosya" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90" style={{ backgroundColor: ACCENT }}>
-              Yeni Dosya Aç
+              Proforma Yükle
             </Link>
           }
         />

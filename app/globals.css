@@ -185,3 +185,8 @@ html:has([data-sabit-zemin]) ::-webkit-scrollbar-thumb:hover { background: #3A43
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* Analiz > Sevkiyat Haritasi: hat uzerinde akan kesik cizgi (26.10.2026); hareketi azalt'ta durur */
+@keyframes analiz-harita-akis { to { stroke-dashoffset: -20; } }
+.analiz-harita-akis { animation: analiz-harita-akis 1.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .analiz-harita-akis { animation: none; } }

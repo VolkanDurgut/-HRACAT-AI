@@ -11,13 +11,15 @@ import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Loader2, Ship, Globe2, X, Clock, Truck, BarChart3, Anchor, AlertTriangle, Lightbulb } from "lucide-react";
+import { Users, Package, Loader2, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { acenteLimanNavlunlari, BELIRSIZ_LIMAN, type LimanNavlunu } from "@/lib/analiz-acente-navlun";
 import { analizOzeti } from "@/lib/analiz-ozet";
-import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni } from "@/components/analiz-paneli";
+import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni, KATEGORI_RENKLERI, DIGER_RENGI } from "@/components/analiz-paneli";
+import { SevkiyatHaritasi, type HaritaHatti, type HaritaLimani } from "@/components/analiz-harita";
+import { cikisMerkezi, type CikisMerkezi } from "@/lib/liman-koordinat";
 import { ayAdi } from "@/lib/analiz-ozet";
 
 /**
@@ -538,6 +540,37 @@ export default function AnalizPage() {
     return birimler.length > 1 ? { enAz: Math.min(...birimler), enCok: Math.max(...birimler) } : null;
   }, [limanlar]);
 
+  // Sevkiyat haritasi (26.10.2026): varis limani anahtari basina toplamlar + cikis -> varis hatlari.
+  const haritaLimanlari = useMemo<HaritaLimani[]>(() =>
+    Object.entries(limanlar).map(([ad, v]) => ({
+      ad,
+      konteyner: v.konteyner,
+      dosya: v.adet,
+      satirlar: [
+        `Hacim ${tutarKisa(v.tutar)}`,
+        v.mts > 0 && v.tutar > 0 ? `Ortalama ${tutarTam(v.tutar / v.mts)} / MTS` : null,
+        v.teslim.size ? `Teslim: ${Array.from(v.teslim).sort().join(", ")}` : null,
+      ].filter((x): x is string => !!x),
+    })), [limanlar, tutarKisa, tutarTam]);
+  const haritaHatlari = useMemo<HaritaHatti[]>(() => {
+    const dosyaCikisi = (d: DosyaFull): CikisMerkezi | null =>
+      cikisMerkezi(d.rezervasyonlar.map((r) => r.yuklenme_limani).find((y) => !!y?.trim())) || cikisMerkezi(d.yuklenme_limani);
+    // Cikisi taninmayan dosya en cok kullanilan cikistan cizilir (tahmin degil: hat temsili, liman verisi aynen)
+    const sayac = new Map<string, { m: CikisMerkezi; n: number }>();
+    filtrelenmis.forEach((d) => { const c = dosyaCikisi(d); if (c) sayac.set(c.ad, { m: c, n: (sayac.get(c.ad)?.n || 0) + 1 }); });
+    const varsayilan = Array.from(sayac.values()).sort((a, b) => b.n - a.n)[0]?.m || null;
+    const hat = new Map<string, HaritaHatti>();
+    filtrelenmis.forEach((d) => {
+      const liman = analizLimani(d); if (!liman) return;
+      const c = dosyaCikisi(d) || varsayilan; if (!c) return;
+      const anahtar = `${c.ad}|${liman}`;
+      const mevcut = hat.get(anahtar);
+      hat.set(anahtar, { cikis: c, liman, konteyner: (mevcut?.konteyner || 0) + konteynerSayisi(d) });
+    });
+    return Array.from(hat.values());
+  }, [filtrelenmis]);
+  const teslimSeridi = teslimSatirlari.map((t, i) => ({ ad: t.ad, pay: t.pay ?? 0, renk: KATEGORI_RENKLERI[i] ?? DIGER_RENGI }));
+
   // Otomatik Ozet (26.10.2026): ekrandaki kartlarla AYNI toplamlardan kurala gore cumleler.
   const ozetCumleleri = useMemo(() => {
     const m = musteriSatirlari[0];
@@ -653,7 +686,7 @@ export default function AnalizPage() {
           {/* Duzen kurali (26.10.2026, kullanici: "cok tutarsiz"): her satirdaki kartlar AYNI
               yukseklikte (items-stretch), sutunlari kisa/uzun kartlarla doldurup bosluk birakmayiz;
               uzun Acenteler karti tam genislikte. */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 min-[1400px]:grid-cols-6 gap-3 mb-4">
             <GostergeKutusu sira={1} etiket="Toplam Hacim" deger={tutarTam(toplamHacim)} alt={`${filtrelenmis.length} dosya`}
               seri={aylikTrend.filter((a) => a.anahtar <= buAy).map((a) => a.tutar)}
               dipnot={referansAy ? <>{referansAyEtiketi}: <span className="text-white font-semibold">{tutarKisa(referansAy.tutar)}</span></> : "—"} />
@@ -665,7 +698,12 @@ export default function AnalizPage() {
               dipnot={referansAy ? <>{referansAyEtiketi}: <span className="text-white font-semibold">{referansAy.mts.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} MTS</span></> : "—"} />
             <GostergeKutusu sira={4} etiket="Ortalama Birim Fiyat" deger={toplamMts > 0 && toplamHacim > 0 ? tutarTam(toplamHacim / toplamMts) : "—"} alt={toplamMts > 0 ? `${paraBirimi} / MTS · tüm teslim şekilleri` : "miktar girilmemiş"}
               dipnot={birimFiyatAraligi ? <>Liman aralığı: <span className="text-white font-semibold">{tutarTam(birimFiyatAraligi.enAz)}–{tutarTam(birimFiyatAraligi.enCok)}</span></> : "Liman karşılaştırması yok"} />
-            <GostergeKutusu sira={5} className="col-span-2 md:col-span-1" etiket="Tamamlanan Dosya" deger={<>{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></>} alt={`${acikSayisi} açık dosya`}
+            <GostergeKutusu sira={5} etiket="Teslim Şekli"
+              deger={teslimSatirlari[0] ? <>{teslimSatirlari[0].ad} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>{yuzde(teslimSatirlari[0].pay ?? 0)}</span></> : "—"}
+              alt={teslimSatirlari.slice(1).map((t) => `${t.ad} ${yuzde(t.pay ?? 0)}`).join(" · ") || "tek teslim şekli"}
+              serit={teslimSeridi}
+              dipnot={teslimSatirlari[0] ? <>{teslimSatirlari[0].ad}: <span className="text-white font-semibold">{teslimSatirlari[0].deger} · {teslimSatirlari[0].alt}</span></> : "—"} />
+            <GostergeKutusu sira={6} etiket="Tamamlanan Dosya" deger={<>{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></>} alt={`${acikSayisi} açık dosya`}
               ilerleme={filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0}
               dipnot={<>Tamamlanma: <span className="text-white font-semibold">{yuzde(filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0)}</span></>} />
           </div>
@@ -680,8 +718,14 @@ export default function AnalizPage() {
             </div>
           </div>
 
-          {/* Dort siralama karti: hepsi en fazla 8 satir (+ Diger), ayni yukseklik */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+          {/* Harita + varis limanlari listesi (ornek paneldeki harita fikri, gercek veriyle) */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4">
+            <SevkiyatHaritasi className="xl:col-span-8" limanlar={haritaLimanlari} hatlar={haritaHatlari} />
+            <ListeKarti className="xl:col-span-4" ikon={<Globe2 size={12} />} baslik="Varış Limanları" olcuEtiketi="Konteyner · pay" satirlar={limanSatirlari} />
+          </div>
+
+          {/* Uc siralama karti: en fazla 8 satir (+ Diger), ayni yukseklik */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
             <DagilimKarti
               ikon={<Users size={12} />}
               baslik="Müşteri Dağılımı"
@@ -691,26 +735,17 @@ export default function AnalizPage() {
               altBilgi={<><span>Toplam {musteriSatirlari.length} müşteri</span><span className="text-white font-semibold">{tutarKisa(toplamHacim)}</span></>}
               data-musteri-dagilimi=""
             />
-            <ListeKarti ikon={<Globe2 size={12} />} baslik="Varış Limanları" olcuEtiketi="Konteyner · pay" satirlar={limanSatirlari} />
             <ListeKarti ikon={<Anchor size={12} />} baslik="Birim Fiyat (Liman)" olcuEtiketi={`Ortalama ${paraBirimi}/MTS`} satirlar={birimFiyatSatirlari} />
-            <ListeKarti ikon={<Clock size={12} />} baslik="Ortalama Transit Süresi" olcuEtiketi="ETD → ETA, gün" satirlar={transitSatirlari} bosMetin="ETA girilince hesaplanır" />
+            <ListeKarti className="md:col-span-2 xl:col-span-1" ikon={<Clock size={12} />} baslik="Ortalama Transit Süresi" olcuEtiketi="ETD → ETA, gün" satirlar={transitSatirlari} bosMetin="ETA girilince hesaplanır" />
           </div>
 
           <div className="mb-4">
             <AcenteNavlunKarti satirlar={acenteSatirlari} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-12 gap-4">
-            <DagilimKarti
-              className="xl:col-span-3"
-              ikon={<Truck size={12} />}
-              baslik="Teslim Şekli"
-              olcuEtiketi="Dosya · pay"
-              satirlar={teslimSatirlari.map((t) => ({ anahtar: t.anahtar, ad: t.ad, deger: t.deger, pay: t.pay ?? 0, alt: t.alt }))}
-              digerDeger={(_, adet) => `${adet} şekil`}
-              altBilgi={<><span>Toplam {teslimSatirlari.length} teslim şekli</span><span className="text-white font-semibold">{teslimSatirlari.reduce((t, x) => t + x.olcu, 0)} dosya</span></>}
-            />
-            <Panel className="xl:col-span-4" ikon={<Ship size={12} />} baslik="Gemi Başına Konteyner" sag="Detay için tıklayın">
+          {/* Tablolar: genis sutunlar (26.10.2026, 1492 px'te tablolar kesilip yatay kaydirma cikiyordu) */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            <Panel className="xl:col-span-5" ikon={<Ship size={12} />} baslik="Gemi Başına Konteyner" sag="Detay için tıklayın">
               {gemiler.length === 0 ? (
                 <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
               ) : (
@@ -728,7 +763,7 @@ export default function AnalizPage() {
                       {gemiler.map((g, i) => (
                         <tr key={g.ad} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }} onClick={() => handleGemiClick(g.ad)}>
                           <td className="px-4 py-2.5 text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                          <td className="px-4 py-2.5 text-xs font-medium text-white whitespace-nowrap">{g.ad}</td>
+                          <td className="px-4 py-2.5 text-xs font-medium text-white leading-snug">{g.ad}</td>
                           <td className="px-4 py-2.5 text-xs text-center tabular-nums" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
                           <td className="px-4 py-2.5 text-xs text-right font-semibold text-white tabular-nums">{g.konteyner}</td>
                         </tr>
@@ -738,7 +773,7 @@ export default function AnalizPage() {
                 </div>
               )}
             </Panel>
-            <Panel className="lg:col-span-2 xl:col-span-5" ikon={<Package size={12} />} baslik="Son Tamamlanan Sevkiyatlar" sag="Dosyayı açmak için tıklayın">
+            <Panel className="xl:col-span-7" ikon={<Package size={12} />} baslik="Son Tamamlanan Sevkiyatlar" sag="Dosyayı açmak için tıklayın">
               {sonSevkiyatlar.length === 0 ? (
                 <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Tamamlanan sevkiyat yok</p>
               ) : (

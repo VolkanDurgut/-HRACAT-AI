@@ -422,6 +422,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Yüzde her yerde tam sayı (`yuzdeMetni`, "<%1"); tutarlar kuruşsuz (`tutarKurussuz`).
   Dağılım kartlarının altında toplam satırı. Test `analizpanel/test.py` 36 (satır
   yükseklik eşitliği, acente 4 sütun, dipnotlar) + acente 11.
+- SEVKİYAT HARİTASI + son düzen (26.10.2026, kullanıcının ikinci örnek görseli): satırlar
+  6 gösterge (Teslim Şekli artık GÖSTERGE: en çok kullanılan + pay şeridi; ayrı kart
+  kaldırıldı; ≥1400 px tek satır) → Aylık (8) + Özet (4) → **Sevkiyat Haritası (8) + Varış
+  Limanları (4)** → Müşteri Dağılımı · Birim Fiyat · Transit → Acenteler (tam genişlik) →
+  Gemi (5) + Son Tamamlanan (7) (1492 px'te tablolar kesilip yatay kaydırma çıkıyordu;
+  gemi adı artık satır kırar). Harita `components/analiz-harita.tsx`: Türkiye çıkış limanı
+  (yükleme limanından: Marport/Kumport/Mardaş/Asyaport/Ambarlı = İstanbul; Mersin, İzmir,
+  İskenderun, Gemlik) → varış limanı TEMSİLÎ eğri (gerçek rota değil, altta yazılı), dairenin
+  büyüklüğü konteyner (karekök ölçek), üzerine gelince/odakta ayrıntı (konteyner, dosya,
+  hacim, $/MTS, teslim), etiketler çakışmayacak şekilde yerleşir (sığmayan gizlenir).
+  Koordinat tablosu `lib/liman-koordinat.ts` (`limanAnahtari` anahtarlarıyla; listede
+  olmayan liman ÇİZİLMEZ, kart altında "Haritada konumu olmayan: …" — yeni liman buraya
+  eklenir). Dünya haritası `lib/dunya-haritasi.ts` = Natural Earth 110m önceden SVG yoluna
+  çevrildi (YENİ PAKET YOK; üretici scratchpad `harita/gen.mjs`). Kart zemini opak + üstte
+  çok hafif yeşil ton (`KART_ZEMINI`). Müşteri adları 2 satıra kadar. Test
+  `analizpanel/test.py` 54 (1280/1366/1492/1527/1920/390; tablolarda yatay kaydırma yok,
+  harita noktaları/hat/ipucu/etiket) + acente 11 + özet birim 11.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

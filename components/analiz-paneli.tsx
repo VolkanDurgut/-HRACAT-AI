@@ -14,6 +14,9 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 export const KATEGORI_RENKLERI = ["#3987E5", "#D95926", "#199E70", "#C98500", "#D55181", "#9085E9"];
 export const DIGER_RENGI = "#4B5563";
 
+/** Kart zemini: OPAK (okunurluk kurali) + ustte cok hafif marka yesili tonu. */
+export const KART_ZEMINI = `linear-gradient(180deg, rgba(16,185,129,0.045) 0%, rgba(16,185,129,0) 38%), ${CARD_BG}`;
+
 /** Sayfanin her yerinde AYNI yuzde bicimi: tam sayi, cok kucukse "<%1". */
 export function yuzdeMetni(pay: number): string {
   const p = pay * 100;
@@ -30,7 +33,7 @@ export function Panel({ baslik, ikon, sag, children, className = "", govdeSinifi
   govdeSinifi?: string;
 } & React.HTMLAttributes<HTMLElement>) {
   return (
-    <section className={`rounded-xl border overflow-hidden animate-fade-up flex flex-col ${className}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} {...rest}>
+    <section className={`rounded-xl border overflow-hidden animate-fade-up flex flex-col ${className}`} style={{ background: KART_ZEMINI, borderColor: CARD_BORDER }} {...rest}>
       <div className="px-4 py-3 border-b flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
         <h2 className="flex items-center gap-1.5 min-w-0 text-[13px] font-semibold text-white">
           {ikon && <span className="shrink-0" style={{ color: TEXT_MUTED }}>{ikon}</span>}
@@ -68,20 +71,22 @@ function Egilim({ seri, etiket }: { seri: number[]; etiket: string }) {
   );
 }
 
-export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, dipnot, sira = 1, className = "" }: {
+export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, serit, dipnot, sira = 1, className = "" }: {
   etiket: string;
   deger: React.ReactNode;
   alt: React.ReactNode;
   seri?: number[];
   /** 0-1 arasi: altta ilerleme cubugu (egilim cizgisi yerine). */
   ilerleme?: number;
+  /** 0-1 paylarla renkli pay seridi (ilerleme cubugu yerine). */
+  serit?: { ad: string; pay: number; renk: string }[];
   /** Kutunun altindaki ayrac cizgili kucuk satir (her kutuda olsun ki yukseklikler esit kalsin). */
   dipnot?: React.ReactNode;
   sira?: number;
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border p-4 animate-fade-up stagger-${Math.min(sira, 6)} flex flex-col ${className}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-gosterge={etiket}>
+    <div className={`rounded-xl border p-4 animate-fade-up stagger-${Math.min(sira, 6)} flex flex-col ${className}`} style={{ background: KART_ZEMINI, borderColor: CARD_BORDER }} data-gosterge={etiket}>
       <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{etiket}</p>
       <p className="text-2xl font-bold text-white tabular-nums mt-1 leading-tight truncate">{deger}</p>
       <p className="text-[10px] mt-0.5 truncate" style={{ color: TEXT_MUTED }}>{alt}</p>
@@ -91,6 +96,11 @@ export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, dipnot, sir
         {ilerleme !== undefined && (
           <div className="w-full rounded-full h-1.5 mt-3" style={{ backgroundColor: CARD_BORDER }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ilerleme * 100)} aria-label={etiket}>
             <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, ilerleme * 100))}%`, backgroundColor: ACCENT }} />
+          </div>
+        )}
+        {serit && serit.length > 0 && (
+          <div className="flex h-1.5 rounded-full overflow-hidden gap-[2px] mt-3" style={{ backgroundColor: CARD_BORDER }} role="img" aria-label={serit.map((s) => `${s.ad} ${yuzdeMetni(s.pay)}`).join(", ")}>
+            {serit.filter((s) => s.pay > 0).map((s) => <div key={s.ad} title={`${s.ad}: ${yuzdeMetni(s.pay)}`} style={{ width: `${s.pay * 100}%`, backgroundColor: s.renk, minWidth: 3 }} />)}
           </div>
         )}
         {dipnot && (
@@ -269,7 +279,7 @@ export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, 
               <li key={b.anahtar} className="flex items-center gap-2 py-1 px-1 -mx-1 rounded hover:bg-white/[0.03]" title={b.ipucu} data-dagilim={b.ad}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.renk }} aria-hidden />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs text-white truncate">{b.ad}</span>
+                  <span className="block text-xs text-white line-clamp-2 break-words leading-snug">{b.ad}</span>
                   {b.alt && <span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{b.alt}</span>}
                 </span>
                 <span className="text-xs font-semibold text-white tabular-nums shrink-0">{b.deger}</span>

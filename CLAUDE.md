@@ -1546,6 +1546,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   değişmedi, rapor açık tema). Regresyon e2e2/3/4/5/8, gecmis_e2e, eposta_e2e geçti.
   `sf/e2e7.py`'nin "Arka plan" anahtarı adımı 22.10'dan beri eskidir.
 
+## Sorun Bildir — kişiye özel teşekkür (25.10.2026)
+
+- `components/destek-widget.tsx` gönderim sonrası: "Mesajınız alındı, Burak Bey." +
+  "Unex'e sağladığınız katkı için teşekkür ederiz." + türe göre cümle (`TESEKKUR_DETAYI`:
+  sorun incelenecek / öneri değerlendirmeye alındı / şikayet öncelikli) + "Volkan Durgut ·
+  İhracat AI". Sadece ekran; edge function, e-posta ve gönderim gövdesi DEĞİŞMEDİ.
+- Kullanıcı adları Supabase'te KAYITLI DEĞİL (user_metadata boş; 25.10.2026 kontrol). Hitap
+  `lib/kullanici-hitap.ts` (`HITAPLAR`, e-posta → "Ad Bey/Hanım"; e-posta `toLowerCase`, TR
+  locale DEĞİL) ya da ileride `user_metadata.hitap`. Listede yoksa İSİMSİZ "Mesajınız alındı."
+  (yanlış isim / Bey-Hanım tahmini yapılmaz). Kayıtlı: bbt@ Burak, ihracat@ Harun, lojistik@
+  Süleyman, volkandurgut.tr@ Volkan. kantar@, mudur@, muhasebe@ isimsiz (kullanıcıdan bekleniyor).
+  Yeni kullanıcı eklenince listeye bir satır eklenir. Test scratchpad `destek/test.py` 16/16.
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,

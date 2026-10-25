@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { X, Loader2, Paperclip, Send, CheckCircle2, AlertTriangle, Lightbulb, Frown, Trash2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
+import { kullaniciHitabi } from "@/lib/kullanici-hitap";
 
 type GeriBildirimTuru = "sorun" | "oneri" | "sikayet";
 
@@ -13,6 +14,13 @@ const TUR_SECENEKLERI: { deger: GeriBildirimTuru; etiket: string; icon: React.Re
   { deger: "oneri", etiket: "Öneri", icon: <Lightbulb size={15} />, renk: "#10B981" },
   { deger: "sikayet", etiket: "Şikayet", icon: <Frown size={15} />, renk: "#DC2626" },
 ];
+
+/** Gonderim sonrasi ture gore ikinci cumle (25.10.2026, kurumsal dil). */
+const TESEKKUR_DETAYI: Record<GeriBildirimTuru, string> = {
+  sorun: "Bildirdiğiniz sorun en kısa sürede incelenecek ve size dönüş yapılacaktır.",
+  oneri: "Öneriniz değerlendirmeye alındı; sonucu hakkında size bilgi verilecektir.",
+  sikayet: "Şikayetiniz öncelikli olarak ele alınacak ve size dönüş yapılacaktır.",
+};
 
 const MAKS_DOSYA_BOYUTU = 8 * 1024 * 1024; // 8 MB
 
@@ -97,6 +105,7 @@ export default function DestekWidget() {
   };
 
   if (!user) return null;
+  const hitap = kullaniciHitabi(user.email, user.user_metadata);
 
   return (
     <>
@@ -141,24 +150,36 @@ export default function DestekWidget() {
           </div>
 
           {gonderildi ? (
-            <div className="flex flex-col items-center text-center px-6 py-8 gap-3">
-              <img
-                src="/images/VolkanDurgut.webp"
-                alt="Volkan Durgut"
-                className="w-16 h-16 rounded-full object-cover"
-                style={{ border: `2px solid ${ACCENT}` }}
-              />
-              <CheckCircle2 size={26} style={{ color: ACCENT }} />
-              <p className="text-sm text-white font-medium leading-relaxed">
-                Mesajınız bana ulaştı, teşekkür ederim.
+            <div className="flex flex-col items-center text-center px-6 py-7 gap-3" role="status" aria-live="polite">
+              <div className="relative">
+                <img
+                  src="/images/VolkanDurgut.webp"
+                  alt="Volkan Durgut"
+                  className="w-16 h-16 rounded-full object-cover"
+                  style={{ border: `2px solid ${ACCENT}` }}
+                />
+                <span
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: CARD_BG }}
+                >
+                  <CheckCircle2 size={20} style={{ color: ACCENT }} />
+                </span>
+              </div>
+              <p className="text-base text-white font-semibold leading-snug mt-1">
+                Mesajınız alındı{hitap ? `, ${hitap}` : ""}.
+              </p>
+              <p className="text-sm text-white/90 leading-relaxed">
+                Unex&apos;e sağladığınız katkı için teşekkür ederiz.
               </p>
               <p className="text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>
-                En kısa sürede inceleyip dönüş yapacağım.
-                <br />— Volkan Durgut
+                {TESEKKUR_DETAYI[tur]}
+              </p>
+              <p className="text-[11px] pt-2 mt-1 border-t w-full" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }}>
+                Volkan Durgut · İhracat AI
               </p>
               <button
                 onClick={panelKapat}
-                className="mt-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
+                className="mt-1 px-5 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-90"
                 style={{ backgroundColor: ACCENT }}
               >
                 Kapat

@@ -14,6 +14,13 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 export const KATEGORI_RENKLERI = ["#3987E5", "#D95926", "#199E70", "#C98500", "#D55181", "#9085E9"];
 export const DIGER_RENGI = "#4B5563";
 
+/** Sayfanin her yerinde AYNI yuzde bicimi: tam sayi, cok kucukse "<%1". */
+export function yuzdeMetni(pay: number): string {
+  const p = pay * 100;
+  if (p > 0 && p < 1) return "<%1";
+  return `%${Math.round(p)}`;
+}
+
 export function Panel({ baslik, ikon, sag, children, className = "", govdeSinifi = "", ...rest }: {
   baslik: React.ReactNode;
   ikon?: React.ReactNode;
@@ -61,13 +68,15 @@ function Egilim({ seri, etiket }: { seri: number[]; etiket: string }) {
   );
 }
 
-export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, sira = 1, className = "" }: {
+export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, dipnot, sira = 1, className = "" }: {
   etiket: string;
   deger: React.ReactNode;
   alt: React.ReactNode;
   seri?: number[];
   /** 0-1 arasi: altta ilerleme cubugu (egilim cizgisi yerine). */
   ilerleme?: number;
+  /** Kutunun altindaki ayrac cizgili kucuk satir (her kutuda olsun ki yukseklikler esit kalsin). */
+  dipnot?: React.ReactNode;
   sira?: number;
   className?: string;
 }) {
@@ -77,11 +86,15 @@ export function GostergeKutusu({ etiket, deger, alt, seri, ilerleme, sira = 1, c
       <p className="text-2xl font-bold text-white tabular-nums mt-1 leading-tight truncate">{deger}</p>
       <p className="text-[10px] mt-0.5 truncate" style={{ color: TEXT_MUTED }}>{alt}</p>
       <div className="mt-auto">
-        {seri && <Egilim seri={seri} etiket={etiket} />}
+        {/* 2 ayla egilim cizgisi anlamsiz (duz cizgi) - en az 3 ay */}
+        {seri && seri.length >= 3 && <Egilim seri={seri} etiket={etiket} />}
         {ilerleme !== undefined && (
           <div className="w-full rounded-full h-1.5 mt-3" style={{ backgroundColor: CARD_BORDER }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ilerleme * 100)} aria-label={etiket}>
             <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, ilerleme * 100))}%`, backgroundColor: ACCENT }} />
           </div>
+        )}
+        {dipnot && (
+          <p className="text-[10px] mt-3 pt-2 border-t truncate" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }} data-dipnot="">{dipnot}</p>
         )}
       </div>
     </div>
@@ -101,12 +114,13 @@ function guzelOlcek(max: number, adet = 4): { ust: number; adim: number } {
   return { ust: Math.ceil(max / adim) * adim, adim };
 }
 
-export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi }: {
+export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi, ikon }: {
   veri: AylikVeri[];
   buAy: string;
   tutarKisa: (n: number) => string;
   tutarTam: (n: number) => string;
   paraBirimi: string;
+  ikon?: React.ReactNode;
 }) {
   const [olcu, setOlcu] = useState<Olcu>("tutar");
   const bicim = (v: number, kisa = true) =>
@@ -127,6 +141,7 @@ export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi }: {
   return (
     <Panel
       baslik="Aylık Sevkiyat"
+      ikon={ikon}
       className="xl:col-span-8"
       data-aylik-grafik=""
       sag={
@@ -219,13 +234,15 @@ export type DagilimSatiri = { anahtar: string; ad: string; deger: string; pay: n
  * Pay seridi (yan yana bolumler, 2px bosluk) + lejant. Ilk {azami} satir kendi renginde,
  * kalani "Diger" (gri) olarak birlesir — renk siraya gore sabit, 7. renk uretilmez.
  */
-export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, azami = KATEGORI_RENKLERI.length, className = "", ...rest }: {
+export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, altBilgi, azami = KATEGORI_RENKLERI.length, className = "", ...rest }: {
   baslik: string;
   ikon?: React.ReactNode;
   olcuEtiketi: string;
   satirlar: DagilimSatiri[];
   /** "Diger" satirinin deger metni (pay toplamindan). */
   digerDeger?: (pay: number, adet: number) => string;
+  /** Kartin en altinda (ayrac cizgili) toplam satiri. */
+  altBilgi?: React.ReactNode;
   azami?: number;
   className?: string;
 } & React.HTMLAttributes<HTMLElement>) {
@@ -237,17 +254,17 @@ export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, 
     ...(kalan.length > 0 ? [{ anahtar: "__diger", ad: `Diğer (${kalan.length})`, deger: digerDeger ? digerDeger(kalanPay, kalan.length) : "", pay: kalanPay, renk: DIGER_RENGI, ipucu: kalan.map((s) => s.ad).join("\n"), alt: undefined }] : []),
   ];
   return (
-    <Panel baslik={baslik} ikon={ikon} sag={olcuEtiketi} className={className} govdeSinifi="px-4 py-3" {...rest}>
+    <Panel baslik={baslik} ikon={ikon} sag={olcuEtiketi} className={className} govdeSinifi="px-4 py-3 flex flex-col" {...rest}>
       {bolumler.length === 0 ? (
         <p className="py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
       ) : (
         <>
           <div className="flex h-3 rounded-full overflow-hidden gap-[2px]" style={{ backgroundColor: ROW_HEADER_BG }} role="img" aria-label={`${baslik} payları`}>
             {bolumler.filter((b) => b.pay > 0).map((b) => (
-              <div key={b.anahtar} title={`${b.ad}: %${(b.pay * 100).toFixed(1)}`} style={{ width: `${b.pay * 100}%`, backgroundColor: b.renk, minWidth: 3 }} />
+              <div key={b.anahtar} title={`${b.ad}: ${yuzdeMetni(b.pay)}`} style={{ width: `${b.pay * 100}%`, backgroundColor: b.renk, minWidth: 3 }} />
             ))}
           </div>
-          <ul className="mt-3 space-y-0.5">
+          <ul className="mt-3 mb-3 space-y-0.5">
             {bolumler.map((b) => (
               <li key={b.anahtar} className="flex items-center gap-2 py-1 px-1 -mx-1 rounded hover:bg-white/[0.03]" title={b.ipucu} data-dagilim={b.ad}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.renk }} aria-hidden />
@@ -256,10 +273,13 @@ export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, 
                   {b.alt && <span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{b.alt}</span>}
                 </span>
                 <span className="text-xs font-semibold text-white tabular-nums shrink-0">{b.deger}</span>
-                <span className="text-[11px] tabular-nums w-10 text-right shrink-0" style={{ color: TEXT_MUTED }}>%{(b.pay * 100).toLocaleString("tr-TR", { maximumFractionDigits: b.pay < 0.1 ? 1 : 0 })}</span>
+                <span className="text-[11px] tabular-nums w-10 text-right shrink-0" style={{ color: TEXT_MUTED }}>{yuzdeMetni(b.pay)}</span>
               </li>
             ))}
           </ul>
+          {altBilgi && (
+            <p className="mt-auto pt-2 border-t text-[10px] flex justify-between gap-2" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }} data-alt-bilgi="">{altBilgi}</p>
+          )}
         </>
       )}
     </Panel>

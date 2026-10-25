@@ -412,6 +412,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   kuralları, Varış Limanları / Acenteler / Birim Fiyat / Transit / Gemi / Son Tamamlanan
   kartları DEĞİŞMEDİ; eski "Müşteriler" listesi Müşteri Dağılımı'na dönüştü. Test
   scratchpad `analizpanel/` (özet birim 11, Playwright 28 — 1280/1527/1920/390) + acente 11.
+- DÜZEN DÜZELTMESİ (26.10.2026, kullanıcı: "çok tutarsız"): KURAL — aynı satırdaki kartlar
+  AYNI yükseklikte (grid varsayılan stretch; `items-start` KULLANILMAZ), kısa kart uzun kartın
+  yanında boşluk bırakmaz. Satırlar: 5 gösterge (hepsinde ayraçlı dipnot: bu ay / liman birim
+  fiyat aralığı / tamamlanma %; eğilim çizgisi SADECE ≥3 ay) → Aylık Sevkiyat (8) + Otomatik
+  Özet (4) → 4 sıralama kartı (Müşteri Dağılımı · Varış Limanları · Birim Fiyat · Transit) →
+  "Acenteler ve Navlun Fiyatları" TAM GENİŞLİK, içi 4 sütun → Teslim Şekli (3) · Gemi (4) ·
+  Son Tamamlanan (5). Tüm kartlar `Panel` çerçevesi (aynı başlık / ikon / sağ etiket).
+  Yüzde her yerde tam sayı (`yuzdeMetni`, "<%1"); tutarlar kuruşsuz (`tutarKurussuz`).
+  Dağılım kartlarının altında toplam satırı. Test `analizpanel/test.py` 36 (satır
+  yükseklik eşitliği, acente 4 sütun, dipnotlar) + acente 11.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

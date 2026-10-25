@@ -400,6 +400,18 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   YER `lib/analiz-acente-navlun.ts` (`acenteLimanNavlunlari`, saf; liman `analizLimani` ile
   birleştirilir, geçersiz liman "Liman belirtilmemiş" en altta, farklı para birimi ayrı satır).
   Durum / yıl filtreleri uygulanır. Test scratchpad `acente/` birim 13 + Playwright 11.
+- PANEL DÜZENİ (26.10.2026, kullanıcının örnek analiz paneli esas alındı): üstte 5 gösterge
+  (`GostergeKutusu`: Hacim / Konteyner / MTS aylık eğilim çizgisiyle [ileri tarihli aylar
+  hariç], Ortalama Birim Fiyat = toplam hacim / toplam MTS, Tamamlanan ilerleme çubuğuyla);
+  "Aylık Sevkiyat" büyük grafik (`AylikGrafik`, TEK eksen, ölçü seçimi Hacim / Konteyner /
+  MTS — çift eksen YOK; ETD'si bu aydan ileri aylar kesikli "Planlanan"); "Müşteri Dağılımı"
+  ve "Teslim Şekli" `DagilimKarti` (pay şeridi + lejant; ilk 6 sabit sıralı kategorik renk,
+  kalanı gri "Diğer (n)"; 7. renk üretilmez); "Otomatik Özet" (`OzetKarti`,
+  `lib/analiz-ozet.ts` `analizOzeti` — YAPAY ZEKÂ YOK, ekrandaki toplamlardan kurala göre
+  cümle; tahmin yok). Bileşenler `components/analiz-paneli.tsx` (hesap YAPMAZ). Hesap
+  kuralları, Varış Limanları / Acenteler / Birim Fiyat / Transit / Gemi / Son Tamamlanan
+  kartları DEĞİŞMEDİ; eski "Müşteriler" listesi Müşteri Dağılımı'na dönüştü. Test
+  scratchpad `analizpanel/` (özet birim 11, Playwright 28 — 1280/1527/1920/390) + acente 11.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

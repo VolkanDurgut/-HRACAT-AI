@@ -11,11 +11,13 @@ import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck, BarChart3, Anchor, AlertTriangle } from "lucide-react";
+import { Users, Package, Loader2, Ship, Globe2, X, Clock, Truck, BarChart3, Anchor, AlertTriangle, Lightbulb } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { acenteLimanNavlunlari, BELIRSIZ_LIMAN, type LimanNavlunu } from "@/lib/analiz-acente-navlun";
+import { analizOzeti } from "@/lib/analiz-ozet";
+import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti } from "@/components/analiz-paneli";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -119,7 +121,7 @@ function ListeKarti({ ikon, baslik, olcuEtiketi, satirlar, bosMetin = "Veri yok"
   return (
     <div className={`rounded-xl border overflow-hidden animate-fade-up ${className}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
-        <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>{ikon}<span className="text-xs font-semibold text-white">{baslik}</span></div>
+        <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>{ikon}<span className="text-[13px] font-semibold text-white">{baslik}</span></div>
         <span className="text-[10px]" style={{ color: TEXT_MUTED }}>{olcuEtiketi}</span>
       </div>
       {satirlar.length === 0 ? (
@@ -169,7 +171,7 @@ function AcenteNavlunKarti({ satirlar }: { satirlar: AcenteSatiri[] }) {
   return (
     <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-acente-karti="">
       <div className="px-4 py-3 border-b flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
-        <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}><Ship size={12} /><span className="text-xs font-semibold text-white">Acenteler</span></div>
+        <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}><Ship size={12} /><span className="text-[13px] font-semibold text-white">Acenteler</span></div>
         <span className="text-[10px] text-right" style={{ color: TEXT_MUTED }}>Konteyner · pay · navlun / kont.</span>
       </div>
       {satirlar.length === 0 ? (
@@ -343,39 +345,41 @@ export default function AnalizPage() {
 
   // Aylik hacim: gemi kalkis ayina gore, aradaki bos aylar da gosterilir.
   const aylikTrend = useMemo(() => {
-    const sayac: Record<string, { tutar: number; konteyner: number; dosya: number }> = {};
+    const sayac: Record<string, { tutar: number; konteyner: number; mts: number; dosya: number }> = {};
     filtrelenmis.forEach((d) => {
       const t = sevkiyatTarihi(d); if (!t) return;
       const ay = t.slice(0, 7);
-      if (!sayac[ay]) sayac[ay] = { tutar: 0, konteyner: 0, dosya: 0 };
+      if (!sayac[ay]) sayac[ay] = { tutar: 0, konteyner: 0, mts: 0, dosya: 0 };
       sayac[ay].tutar += d.toplam_tutar || 0;
       sayac[ay].konteyner += konteynerSayisi(d);
+      sayac[ay].mts += dosyaMts(d);
       sayac[ay].dosya += 1;
     });
     const aylar = Object.keys(sayac).sort();
     if (aylar.length === 0) return [];
-    const sonuc: { anahtar: string; ay: string; tutar: number; konteyner: number; dosya: number }[] = [];
+    const sonuc: { anahtar: string; ay: string; tutar: number; konteyner: number; mts: number; dosya: number }[] = [];
     let [y, m] = aylar[0].split("-").map(Number);
     const [sonY, sonM] = aylar[aylar.length - 1].split("-").map(Number);
     while (y < sonY || (y === sonY && m <= sonM)) {
       const anahtar = `${y}-${String(m).padStart(2, "0")}`;
       const ay = new Date(y, m - 1, 1).toLocaleDateString("tr-TR", { month: "short", year: "numeric" });
-      sonuc.push({ anahtar, ay, ...(sayac[anahtar] || { tutar: 0, konteyner: 0, dosya: 0 }) });
+      sonuc.push({ anahtar, ay, ...(sayac[anahtar] || { tutar: 0, konteyner: 0, mts: 0, dosya: 0 }) });
       m += 1; if (m > 12) { m = 1; y += 1; }
     }
     return sonuc;
   }, [filtrelenmis]);
-  const maxAylik = Math.max(...aylikTrend.map((a) => a.tutar), 0);
+  // Bu ay (Istanbul): grafikte ileri tarihli ETD aylari "planlanan" cizilir.
+  const buAy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" }).slice(0, 7);
 
-  const musteriSatirlari = useMemo<ListeSatiri[]>(() => {
+  const musteriSatirlari = useMemo<(ListeSatiri & { pay: number; dosya: number })[]>(() => {
     const s: Record<string, { tutar: number; adet: number; konteyner: number }> = {};
     filtrelenmis.forEach((d) => {
       const m = d.alici_firma?.trim(); if (!m) return;
       if (!s[m]) s[m] = { tutar: 0, adet: 0, konteyner: 0 };
       s[m].tutar += d.toplam_tutar || 0; s[m].adet += 1; s[m].konteyner += konteynerSayisi(d);
     });
-    return Object.entries(s).sort((a, b) => b[1].tutar - a[1].tutar).slice(0, 8).map(([ad, v]) => ({
-      anahtar: ad, ad, deger: tutarKisa(v.tutar), olcu: v.tutar,
+    return Object.entries(s).sort((a, b) => b[1].tutar - a[1].tutar).map(([ad, v]) => ({
+      anahtar: ad, ad, deger: tutarKisa(v.tutar), olcu: v.tutar, dosya: v.adet,
       pay: toplamHacim > 0 ? v.tutar / toplamHacim : 0,
       alt: `${v.adet} dosya · ${v.konteyner} konteyner`,
       ipucu: `${ad}: ${tutarTam(v.tutar)}`,
@@ -525,6 +529,26 @@ export default function AnalizPage() {
       .slice(0, 8),
     [filtrelenmis]);
 
+  // Otomatik Ozet (26.10.2026): ekrandaki kartlarla AYNI toplamlardan kurala gore cumleler.
+  const ozetCumleleri = useMemo(() => {
+    const m = musteriSatirlari[0];
+    const l = limanSatirlari[0];
+    const a = acenteSatirlari[0];
+    const al = a?.limanlar.find((x) => x.son !== null && x.liman !== BELIRSIZ_LIMAN);
+    return analizOzeti({
+      dosya: filtrelenmis.length,
+      acik: acikSayisi,
+      konteyner: toplamKonteyner,
+      miktarMetni: toplamMts > 0 ? `${toplamMts.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} MTS` : null,
+      hacimMetni: tutarKisa(toplamHacim),
+      musteri: m ? { ad: m.ad, pay: m.pay, dosya: m.dosya } : null,
+      liman: l ? { ad: l.ad, konteyner: l.olcu, pay: l.pay ?? 0 } : null,
+      acente: a ? { ad: a.ad, konteyner: a.olcu, navlun: al && al.son !== null ? { liman: al.liman, metin: navlunYazi(al.son, al.paraBirimi) } : null } : null,
+      aylar: aylikTrend.map((x) => ({ anahtar: x.anahtar, konteyner: x.konteyner })),
+      buAy,
+    });
+  }, [musteriSatirlari, limanSatirlari, acenteSatirlari, filtrelenmis.length, acikSayisi, toplamKonteyner, toplamMts, tutarKisa, toplamHacim, aylikTrend, buAy]);
+
   const durumSecenekleri: { deger: DurumFiltre; ad: string }[] = [
     { deger: "tumu", ad: "Tümü" },
     { deger: "acik", ad: "Açık" },
@@ -617,72 +641,45 @@ export default function AnalizPage() {
             </div>
           )}
 
-          {/* Özet kartlar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            {[
-              { etiket: "Toplam Hacim", deger: tutarTam(toplamHacim), alt: `${filtrelenmis.length} dosya` },
-              { etiket: "Toplam Konteyner", deger: toplamKonteyner.toLocaleString("tr-TR"), alt: "rezervasyonlardaki adet" },
-              { etiket: "Toplam Miktar", deger: toplamMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 }), alt: "metrik ton (MTS)" },
-              { etiket: "Tamamlanan Dosya", deger: <>{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></>, alt: `${acikSayisi} açık dosya` },
-            ].map((k, i) => (
-              <div key={k.etiket} className={`rounded-xl border p-4 animate-fade-up stagger-${i + 1}`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>{k.etiket}</p>
-                <p className="text-2xl font-bold text-white tabular-nums">{k.deger}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.alt}</p>
-              </div>
-            ))}
+          {/* Gostergeler (26.10.2026 panel duzeni): deger + aylik egilim */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
+            <GostergeKutusu sira={1} etiket="Toplam Hacim" deger={tutarTam(toplamHacim)} alt={`${filtrelenmis.length} dosya`} seri={aylikTrend.filter((a) => a.anahtar <= buAy).map((a) => a.tutar)} />
+            <GostergeKutusu sira={2} etiket="Toplam Konteyner" deger={toplamKonteyner.toLocaleString("tr-TR")} alt="rezervasyonlardaki adet" seri={aylikTrend.filter((a) => a.anahtar <= buAy).map((a) => a.konteyner)} />
+            <GostergeKutusu sira={3} etiket="Toplam Miktar" deger={toplamMts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} alt="metrik ton (MTS)" seri={aylikTrend.filter((a) => a.anahtar <= buAy).map((a) => a.mts)} />
+            <GostergeKutusu sira={4} etiket="Ortalama Birim Fiyat" deger={toplamMts > 0 && toplamHacim > 0 ? tutarTam(toplamHacim / toplamMts) : "—"} alt={toplamMts > 0 ? `${paraBirimi} / MTS · tüm teslim şekilleri` : "miktar girilmemiş"} />
+            <GostergeKutusu sira={5} className="col-span-2 md:col-span-1" etiket="Tamamlanan Dosya" deger={<>{kapaliSayisi} <span className="text-base font-normal" style={{ color: TEXT_MUTED }}>/ {filtrelenmis.length}</span></>} alt={`${acikSayisi} açık dosya`} ilerleme={filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0} />
           </div>
 
-          {/* Aylık hacim */}
-          {aylikTrend.length > 0 && (
-            <div className="rounded-xl border mb-4 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
-                <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>
-                  <BarChart2 size={12} />
-                  <span className="text-xs font-semibold text-white">Aylık Sevkiyat Hacmi</span>
-                </div>
-                <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Gemi kalkış ayına göre ({paraBirimi})</span>
-              </div>
-              <div className="px-4 pt-4 pb-3">
-                <div className="flex items-end gap-3" style={{ height: 150 }}>
-                  {aylikTrend.map((item) => (
-                    <div key={item.anahtar} className="flex-1 h-full flex flex-col items-center justify-end group min-w-0">
-                      <div className="relative w-full flex flex-col items-center">
-                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 text-white text-[10px] px-2 py-1.5 rounded-md border whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-lg" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-                          <p className="font-semibold">{item.ay}</p>
-                          <p>{tutarTam(item.tutar)}</p>
-                          <p style={{ color: TEXT_MUTED }}>{item.dosya} dosya · {item.konteyner} konteyner</p>
-                        </div>
-                        <span className="text-[10px] font-semibold text-white mb-1 tabular-nums whitespace-nowrap">{item.tutar > 0 ? tutarKisa(item.tutar) : "—"}</span>
-                        <div
-                          className="w-full max-w-[56px] rounded-t group-hover:opacity-80 transition-opacity"
-                          style={{ height: maxAylik > 0 && item.tutar > 0 ? `${Math.max((item.tutar / maxAylik) * 100, 2)}px` : "1px", backgroundColor: item.tutar > 0 ? ACCENT : CARD_BORDER }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-3 border-t pt-1.5" style={{ borderColor: CARD_BORDER }}>
-                  {aylikTrend.map((item) => (
-                    <div key={item.anahtar} className="flex-1 text-center min-w-0">
-                      <p className="text-[10px] text-white truncate">{item.ay}</p>
-                      <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{item.konteyner} kont.</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4 items-stretch">
+            {aylikTrend.length > 0 && (
+              <AylikGrafik veri={aylikTrend} buAy={buAy} tutarKisa={tutarKisa} tutarTam={tutarTam} paraBirimi={paraBirimi} />
+            )}
+            <DagilimKarti
+              className={aylikTrend.length > 0 ? "xl:col-span-4" : "xl:col-span-12"}
+              ikon={<Users size={12} />}
+              baslik="Müşteri Dağılımı"
+              olcuEtiketi={`${musteriSatirlari.length} müşteri · hacim payı`}
+              satirlar={musteriSatirlari.map((m) => ({ anahtar: m.anahtar, ad: m.ad, deger: m.deger, pay: m.pay, alt: m.alt, ipucu: m.ipucu }))}
+              digerDeger={(pay) => tutarKisa(pay * toplamHacim)}
+              data-musteri-dagilimi=""
+            />
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
-            <ListeKarti ikon={<Users size={12} />} baslik="Müşteriler" olcuEtiketi="Hacim · pay" satirlar={musteriSatirlari} />
+            <OzetKarti cumleler={ozetCumleleri} ikon={<Lightbulb size={12} />} />
             <ListeKarti ikon={<Globe2 size={12} />} baslik="Varış Limanları" olcuEtiketi="Konteyner · pay" satirlar={limanSatirlari} />
             <AcenteNavlunKarti satirlar={acenteSatirlari} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
             <ListeKarti ikon={<Anchor size={12} />} baslik="Birim Fiyat (Liman)" olcuEtiketi={`Ortalama ${paraBirimi}/MTS`} satirlar={birimFiyatSatirlari} />
-            <ListeKarti ikon={<Truck size={12} />} baslik="Teslim Şekli" olcuEtiketi="Dosya · pay" satirlar={teslimSatirlari} />
+            <DagilimKarti
+              ikon={<Truck size={12} />}
+              baslik="Teslim Şekli"
+              olcuEtiketi="Dosya · pay"
+              satirlar={teslimSatirlari.map((t) => ({ anahtar: t.anahtar, ad: t.ad, deger: t.deger, pay: t.pay ?? 0, alt: t.alt }))}
+              digerDeger={(_, adet) => `${adet} şekil`}
+            />
             <ListeKarti ikon={<Clock size={12} />} baslik="Ortalama Transit Süresi" olcuEtiketi="ETD → ETA, gün" satirlar={transitSatirlari} bosMetin="ETA girilince hesaplanır" />
           </div>
 
@@ -691,7 +688,7 @@ export default function AnalizPage() {
               <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
                 <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>
                   <Ship size={12} />
-                  <span className="text-xs font-semibold text-white">Gemi Başına Konteyner</span>
+                  <span className="text-[13px] font-semibold text-white">Gemi Başına Konteyner</span>
                 </div>
                 <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Detay için tıklayın</span>
               </div>
@@ -727,7 +724,7 @@ export default function AnalizPage() {
               <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: CARD_BORDER }}>
                 <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}>
                   <Package size={12} />
-                  <span className="text-xs font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
+                  <span className="text-[13px] font-semibold text-white">Son Tamamlanan Sevkiyatlar</span>
                 </div>
                 <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Dosyayı açmak için tıklayın</span>
               </div>

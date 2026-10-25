@@ -449,6 +449,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   üstünde / odak içeride / "hareketi azalt" açıkken DURUR (azaltta animasyon da yok). Filtre
   değişince 1. sayfaya döner. Teslim Şekli kartı zaten göstergeye taşındığı için `DagilimKarti`
   yalnız müşteride. Test `analizpanel/test.py` 63 + `test_azalt.py` 3.
+- DENİZ ROTASI (26.10.2026, kullanıcı: "haritayı gerçek deniz rotası yapamıyor muyuz?"):
+  harita hatları artık temsilî eğri DEĞİL, deniz yolu: `lib/deniz-rotasi.ts` (saf) — ~110
+  deniz düğümü (boğaz/kanal eksenleri, açık deniz noktaları) + kenarlar, Dijkstra ile EN KISA
+  yol: Çanakkale → Ege → Süveyş → Kızıldeniz → Bab-el Mandeb (Doğu Afrika / Asya, Malakka),
+  Cebelitarık → Batı Afrika / Atlantik → Florida Boğazı / Rüzgâr Geçidi (Küba, Veracruz),
+  İstanbul Boğazı → Karadeniz. Mersin/İskenderun Çanakkale'den GEÇMEZ. Gemilerin anlık izi
+  (AIS) ücretli dış servis ister — YAPILMADI; rota YAKLAŞIKTIR (aktarma limanı, armatörün
+  Ümit Burnu tercihi vb. farklı olabilir; harita altında yazar). İpucu: "İstanbul → DJIBOUTI:
+  ≈ 2.170 deniz mili · Çanakkale Boğazı → Süveyş Kanalı → Bab-el Mandeb" (kart sol üstte
+  sabit, rotayı kapatmaz). Ağa bağlı olmayan liman → eski temsilî eğri (ince kesik) + not.
+  YENİ LİMAN: `LIMAN_KOORDINAT` + `LIMAN_GIRISI` (bağlı deniz düğümü), gerekirse düğüm/kenar;
+  SONRA MUTLAKA scratchpad `harita/rota_test.ts` (Natural Earth 1:50m: hiçbir düğüm/kenar/
+  yumuşatılmış köşe karaya girmez — boğaz/kanal kenarları `dar: true` ile muaf; her çıkış ×
+  her liman rotalı; ~4 dk sürer). 26.10: 163 kenar, 345 rota, 142 köşe temiz.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

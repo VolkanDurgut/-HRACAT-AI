@@ -2,7 +2,8 @@
 
 /**
  * Analiz > Sevkiyat Haritasi (26.10.2026, kullanicinin ornek panelindeki harita fikri).
- * Turkiye cikis limani -> varis limani temsili hatlari, varis limaninda konteynere gore
+ * Turkiye cikis limani -> varis limani DENIZ YOLU rotalari (lib/deniz-rotasi.ts: bogazlar /
+ * kanallar uzerinden en kisa yol, yaklasik; aga bagli olmayan liman icin temsili egri), varis limaninda konteynere gore
  * buyuyen daire, uzerine gelince / odaklaninca ayrinti karti. Harita SVG'si onceden
  * uretilmis yol verisidir (lib/dunya-haritasi.ts), yeni paket yok. Hesap YAPMAZ.
  */
@@ -10,6 +11,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { KARA_YOLU, SINIR_YOLU } from "@/lib/dunya-haritasi";
 import { haritaKirpmasi, hatYolu, izdusum, limanKoordinati, type CikisMerkezi } from "@/lib/liman-koordinat";
+import { denizRotasi, rotaYolu } from "@/lib/deniz-rotasi";
 import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { Panel } from "@/components/analiz-paneli";
 
@@ -73,10 +75,31 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
     return Array.from(m.values());
   }, [hatlar]);
 
+  // Her hat icin deniz rotasi (yoksa temsili egri); liman basina en kisa rota ipucunda gosterilir.
+  const rotalar = useMemo(() => hatlar.map((h) => {
+    const k = limanKoordinati(h.liman);
+    if (!k) return null;
+    const r = denizRotasi(h.cikis.ad, [h.cikis.enlem, h.cikis.boylam], h.liman, k);
+    return r
+      ? { hat: h, d: rotaYolu(r.noktalar), nm: r.nm, gecisler: r.gecisler, noktalar: r.noktalar, temsili: false }
+      : { hat: h, d: hatYolu(izdusum(h.cikis.enlem, h.cikis.boylam), izdusum(k[0], k[1])), nm: null, gecisler: [] as string[], noktalar: [] as [number, number][], temsili: true };
+  }).filter((x): x is NonNullable<typeof x> => x !== null), [hatlar]);
+  const limanRotasi = useMemo(() => {
+    const m = new Map<string, (typeof rotalar)[number]>();
+    rotalar.forEach((r) => { const o = m.get(r.hat.liman); if (!o || r.hat.konteyner > o.hat.konteyner) m.set(r.hat.liman, r); });
+    return m;
+  }, [rotalar]);
+  const temsiliVar = rotalar.some((r) => r.temsili);
+
   const kirpma = useMemo(() => {
-    const noktalar = [...cizilenler.map((l) => izdusum(l.k[0], l.k[1])), ...cikislar.map((c) => izdusum(c.enlem, c.boylam))];
+    const noktalar = [
+      ...cizilenler.map((l) => izdusum(l.k[0], l.k[1])),
+      ...cikislar.map((c) => izdusum(c.enlem, c.boylam)),
+      // rotanin uzandigi yerler de gorunsun (Atlantik, Umit Burnu…)
+      ...rotalar.flatMap((r) => r.noktalar.map(([e, b]) => izdusum(e, b))),
+    ];
     return haritaKirpmasi(noktalar, boyut.w > 0 && boyut.h > 0 ? boyut.w / boyut.h : 2.2);
-  }, [cizilenler, cikislar, boyut]);
+  }, [cizilenler, cikislar, rotalar, boyut]);
 
   const pikselde = (enlem: number, boylam: number) => {
     const [x, y] = izdusum(enlem, boylam);
@@ -124,15 +147,14 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
             <path d={KARA_YOLU} fill="rgba(16,185,129,0.09)" stroke="rgba(16,185,129,0.28)" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
             <path d={SINIR_YOLU} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
             <g className="analiz-harita-hatlar" fill="none" strokeLinecap="round">
-              {hatlar.map((h, i) => {
-                const k = limanKoordinati(h.liman);
-                if (!k) return null;
-                const d = hatYolu(izdusum(h.cikis.enlem, h.cikis.boylam), izdusum(k[0], k[1]));
+              {/* Secili rota en ustte cizilsin: secili olmayanlar once */}
+              {[...rotalar].sort((a, b) => Number(a.hat.liman === secili) - Number(b.hat.liman === secili)).map((r) => {
+                const h = r.hat;
                 const vurgu = secili === null || secili === h.liman;
                 return (
-                  <g key={`${h.cikis.ad}-${h.liman}-${i}`} opacity={vurgu ? 1 : 0.18} data-hat={h.liman}>
-                    <path d={d} stroke={ACCENT} strokeOpacity="0.25" strokeWidth={2 + 5 * Math.sqrt(h.konteyner / maxHat)} vectorEffect="non-scaling-stroke" />
-                    <path d={d} stroke="#6EE7B7" strokeOpacity="0.9" strokeWidth="1.2" strokeDasharray="4 6" className="analiz-harita-akis" vectorEffect="non-scaling-stroke" />
+                  <g key={`${h.cikis.ad}-${h.liman}`} opacity={vurgu ? 1 : 0.15} data-hat={h.liman} data-rota={r.temsili ? "temsili" : "deniz"}>
+                    <path d={r.d} stroke={ACCENT} strokeOpacity={secili === h.liman ? 0.4 : 0.22} strokeWidth={2 + 4 * Math.sqrt(h.konteyner / maxHat)} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    <path d={r.d} stroke="#6EE7B7" strokeOpacity="0.9" strokeWidth="1.2" strokeDasharray={r.temsili ? "2 6" : "4 6"} strokeLinejoin="round" className="analiz-harita-akis" vectorEffect="non-scaling-stroke" />
                   </g>
                 );
               })}
@@ -182,13 +204,13 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
         {/* Ayrinti karti */}
         {seciliNokta && (
           <div
-            className="absolute z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[170px]"
+            className="absolute z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[170px] max-w-[260px]"
             style={{
               backgroundColor: "#1A1F2B",
               borderColor: "#2A3141",
-              left: Math.min(Math.max(seciliNokta.x - 85, 8), Math.max(8, boyut.w - 190)),
-              top: seciliNokta.y - seciliNokta.r - 12 > 110 ? seciliNokta.y - seciliNokta.r - 8 : seciliNokta.y + seciliNokta.r + 8,
-              transform: seciliNokta.y - seciliNokta.r - 12 > 110 ? "translateY(-100%)" : undefined,
+              // Sol ust koseye sabit: secilen rotanin ve limanin USTUNU kapatmasin
+              left: 12,
+              top: 12,
             }}
             data-harita-ipucu=""
           >
@@ -198,6 +220,18 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
               <div className="h-1 rounded-full" style={{ width: `${toplamK > 0 ? (seciliNokta.konteyner / toplamK) * 100 : 0}%`, backgroundColor: ACCENT }} />
             </div>
             {seciliNokta.satirlar.map((s) => <p key={s} style={{ color: TEXT_MUTED }}>{s}</p>)}
+            {(() => {
+              const r = limanRotasi.get(seciliNokta.ad);
+              if (!r) return null;
+              return r.temsili ? (
+                <p className="mt-1 pt-1 border-t" style={{ color: TEXT_MUTED, borderColor: "#2A3141" }}>Deniz rotası tanımlı değil (temsili hat)</p>
+              ) : (
+                <div className="mt-1 pt-1 border-t" style={{ borderColor: "#2A3141" }} data-ipucu-rota="">
+                  <p className="text-white">{r.hat.cikis.ad} → {seciliNokta.ad}: <b>≈ {(Math.round((r.nm ?? 0) / 10) * 10).toLocaleString("tr-TR")} deniz mili</b></p>
+                  {r.gecisler.length > 0 && <p className="whitespace-normal max-w-[240px]" style={{ color: TEXT_MUTED }}>{r.gecisler.join(" → ")}</p>}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -208,7 +242,8 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
       <div className="px-4 py-2 border-t text-[10px] flex flex-wrap gap-x-4 gap-y-1" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full border-2" style={{ borderColor: MARKA_TURUNCU }} /> Çıkış limanı</span>
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.35)", border: `1px solid ${ACCENT}` }} /> Varış limanı · büyüklük = konteyner</span>
-        <span>Hatlar temsilîdir, gerçek deniz rotası değildir</span>
+        <span>Rotalar ana deniz yolları ve boğazlar üzerinden yaklaşık hesaplanır; aktarma limanı ve armatörün güncel rota tercihi farklı olabilir</span>
+        {temsiliVar && <span>Kesik ince çizgi: deniz rotası tanımlı olmayan liman (temsili)</span>}
         {haritadaYok.length > 0 && <span data-haritada-yok="">Haritada konumu olmayan: {haritadaYok.join(", ")}</span>}
       </div>
     </Panel>

@@ -731,7 +731,6 @@ export default function AnalizPage() {
               baslik="Müşteri Dağılımı"
               olcuEtiketi={`${musteriSatirlari.length} müşteri · hacim payı`}
               satirlar={musteriSatirlari.map((m) => ({ anahtar: m.anahtar, ad: m.ad, deger: m.deger, pay: m.pay, alt: m.alt, ipucu: m.ipucu }))}
-              digerDeger={(pay) => tutarKisa(pay * toplamHacim)}
               altBilgi={<><span>Toplam {musteriSatirlari.length} müşteri</span><span className="text-white font-semibold">{tutarKisa(toplamHacim)}</span></>}
               data-musteri-dagilimi=""
             />

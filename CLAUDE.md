@@ -439,6 +439,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   çok hafif yeşil ton (`KART_ZEMINI`). Müşteri adları 2 satıra kadar. Test
   `analizpanel/test.py` 54 (1280/1366/1492/1527/1920/390; tablolarda yatay kaydırma yok,
   harita noktaları/hat/ipucu/etiket) + acente 11 + özet birim 11.
+- MÜŞTERİ DAĞILIMI SAYFALI (26.10.2026, kullanıcı: "Diğer (14) çirkin, bütün müşteriler
+  görünmeli; 2. sayfaya kart / dönme animasyonuyla geçilsin"): "Diğer" satırı KALDIRILDI —
+  geri eklenmez. `DagilimKarti` tüm müşterileri 6'lık sayfalarda (= kategorik renk sayısı),
+  sıra numarasıyla gösterir; renkler sayfadaki sıraya göre (sayfa içinde tekil). Pay şeridinde
+  TÜM müşteriler: o anki sayfanınkiler renkli, diğerleri soluk (#2A3343); bölüme tıklamak o
+  sayfaya gider. Alt satırda toplam + ‹ noktalar 1/n ›. Geçişte satırlar sırayla yukarıdan
+  çevrilerek gelir (`.dagilim-cevir`, globals.css); 8 sn'de bir kendiliğinden ilerler — fare
+  üstünde / odak içeride / "hareketi azalt" açıkken DURUR (azaltta animasyon da yok). Filtre
+  değişince 1. sayfaya döner. Teslim Şekli kartı zaten göstergeye taşındığı için `DagilimKarti`
+  yalnız müşteride. Test `analizpanel/test.py` 63 + `test_azalt.py` 3.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

@@ -7,11 +7,12 @@
  * Hesap YAPMAZ: veriyi app/analiz/page.tsx'teki mevcut hesaplar verir.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 /** Kategorik renkler (koyu tema, sabit sira; dataviz referans paleti). Siralama = renk. */
 export const KATEGORI_RENKLERI = ["#3987E5", "#D95926", "#199E70", "#C98500", "#D55181", "#9085E9"];
+/** Kategori disi (soluk) gri - Teslim Sekli gostergesinde 7. ve sonrasi icin. */
 export const DIGER_RENGI = "#4B5563";
 
 /** Kart zemini: OPAK (okunurluk kurali) + ustte cok hafif marka yesili tonu. */
@@ -240,44 +241,104 @@ export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi, ikon 
 // ------------------------------------------------------------- musteri dagilimi
 export type DagilimSatiri = { anahtar: string; ad: string; deger: string; pay: number; ipucu?: string; alt?: string };
 
+/** Sayfa basina satir (= kategorik renk sayisi: renkler sayfadaki SIRAYA gore, sayfa icinde tekil). */
+export const DAGILIM_SAYFA_BOYUTU = KATEGORI_RENKLERI.length;
+const OTOMATIK_GECIS_MS = 8000;
+const SOLUK_BOLUM = "#2A3343";
+
 /**
- * Pay seridi (yan yana bolumler, 2px bosluk) + lejant. Ilk {azami} satir kendi renginde,
- * kalani "Diger" (gri) olarak birlesir — renk siraya gore sabit, 7. renk uretilmez.
+ * Pay seridi + sayfali lejant (26.10.2026, kullanici: "Diger (14) cirkin, butun musteriler
+ * gorunmeli; 2. sayfaya kart / donme animasyonuyla gecilsin"). "Diger" YOK: tum satirlar
+ * {sayfaBoyutu}'lik sayfalarda, sira numarasiyla. Seritte TUM satirlar var; o anki sayfanin
+ * bolumleri renkli (lejanttaki noktayla ayni renk), digerleri soluk — renk, ekranda gorunen
+ * satiri isaretler (8. renk uretilmez). Seritte bir bolume tiklamak o satirin sayfasina gider.
+ * Gecis: satirlar yukaridan asagi sirayla cevrilerek gelir (globals.css .dagilim-cevir);
+ * birden fazla sayfa varsa 8 sn'de bir kendiliginden ilerler — fare ustundeyken / odak
+ * icerideyken / "hareketi azalt" acikken DURUR.
  */
-export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, altBilgi, azami = KATEGORI_RENKLERI.length, className = "", ...rest }: {
+export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, altBilgi, sayfaBoyutu = DAGILIM_SAYFA_BOYUTU, className = "", ...rest }: {
   baslik: string;
   ikon?: React.ReactNode;
   olcuEtiketi: string;
   satirlar: DagilimSatiri[];
-  /** "Diger" satirinin deger metni (pay toplamindan). */
-  digerDeger?: (pay: number, adet: number) => string;
-  /** Kartin en altinda (ayrac cizgili) toplam satiri. */
+  /** Kartin en altinda (ayrac cizgili) toplam bilgisi. */
   altBilgi?: React.ReactNode;
-  azami?: number;
+  sayfaBoyutu?: number;
   className?: string;
 } & React.HTMLAttributes<HTMLElement>) {
-  const ilk = satirlar.slice(0, azami);
-  const kalan = satirlar.slice(azami);
-  const kalanPay = kalan.reduce((t, s) => t + s.pay, 0);
-  const bolumler = [
-    ...ilk.map((s, i) => ({ ...s, renk: KATEGORI_RENKLERI[i] })),
-    ...(kalan.length > 0 ? [{ anahtar: "__diger", ad: `Diğer (${kalan.length})`, deger: digerDeger ? digerDeger(kalanPay, kalan.length) : "", pay: kalanPay, renk: DIGER_RENGI, ipucu: kalan.map((s) => s.ad).join("\n"), alt: undefined }] : []),
-  ];
+  const boyut = Math.max(1, Math.min(sayfaBoyutu, KATEGORI_RENKLERI.length));
+  const sayfaSayisi = Math.max(1, Math.ceil(satirlar.length / boyut));
+  const [sayfa, setSayfa] = useState(0);
+  const [duraklat, setDuraklat] = useState(false);
+  const [hareketAzalt, setHareketAzalt] = useState(false);
+  const [gecisNo, setGecisNo] = useState(0);
+
+  // Filtre degisip satir sayisi azalirsa ilk sayfaya don
+  useEffect(() => { setSayfa(0); }, [satirlar.length]);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const guncelle = () => setHareketAzalt(mq.matches);
+    guncelle();
+    mq.addEventListener?.("change", guncelle);
+    return () => mq.removeEventListener?.("change", guncelle);
+  }, []);
+  const git = (yeni: number) => {
+    setSayfa(((yeni % sayfaSayisi) + sayfaSayisi) % sayfaSayisi);
+    setGecisNo((n) => n + 1);
+  };
+  useEffect(() => {
+    if (sayfaSayisi < 2 || duraklat || hareketAzalt) return;
+    const t = window.setInterval(() => {
+      setSayfa((s) => (s + 1) % sayfaSayisi);
+      setGecisNo((n) => n + 1);
+    }, OTOMATIK_GECIS_MS);
+    return () => window.clearInterval(t);
+  }, [sayfaSayisi, duraklat, hareketAzalt]);
+
+  const aktif = Math.min(sayfa, sayfaSayisi - 1);
+  const bas = aktif * boyut;
+  const gorunen = satirlar.slice(bas, bas + boyut);
+  const renkOf = (i: number) => (i >= bas && i < bas + boyut ? KATEGORI_RENKLERI[i - bas] : SOLUK_BOLUM);
+
   return (
     <Panel baslik={baslik} ikon={ikon} sag={olcuEtiketi} className={className} govdeSinifi="px-4 py-3 flex flex-col" {...rest}>
-      {bolumler.length === 0 ? (
+      {satirlar.length === 0 ? (
         <p className="py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
       ) : (
-        <>
-          <div className="flex h-3 rounded-full overflow-hidden gap-[2px]" style={{ backgroundColor: ROW_HEADER_BG }} role="img" aria-label={`${baslik} payları`}>
-            {bolumler.filter((b) => b.pay > 0).map((b) => (
-              <div key={b.anahtar} title={`${b.ad}: ${yuzdeMetni(b.pay)}`} style={{ width: `${b.pay * 100}%`, backgroundColor: b.renk, minWidth: 3 }} />
+        <div
+          className="flex-1 flex flex-col"
+          onMouseEnter={() => setDuraklat(true)}
+          onMouseLeave={() => setDuraklat(false)}
+          onFocus={() => setDuraklat(true)}
+          onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDuraklat(false); }}
+        >
+          <div className="flex h-3 rounded-full overflow-hidden gap-[2px]" style={{ backgroundColor: ROW_HEADER_BG }} role="group" aria-label={`${baslik} payları`} data-pay-seridi="">
+            {satirlar.map((b, i) => b.pay > 0 && (
+              <button
+                key={b.anahtar}
+                type="button"
+                tabIndex={-1}
+                title={`${i + 1}. ${b.ad}: ${yuzdeMetni(b.pay)}`}
+                aria-label={`${b.ad}: ${yuzdeMetni(b.pay)}`}
+                onClick={() => git(Math.floor(i / boyut))}
+                className="h-full transition-colors duration-300"
+                style={{ width: `${b.pay * 100}%`, backgroundColor: renkOf(i), minWidth: 2, flexShrink: 1 }}
+              />
             ))}
           </div>
-          <ul className="mt-3 mb-3 space-y-0.5">
-            {bolumler.map((b) => (
-              <li key={b.anahtar} className="flex items-center gap-2 py-1 px-1 -mx-1 rounded hover:bg-white/[0.03]" title={b.ipucu} data-dagilim={b.ad}>
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: b.renk }} aria-hidden />
+
+          <ul key={`${aktif}-${gecisNo}`} className="mt-3 mb-3 space-y-0.5" aria-live="polite" data-dagilim-sayfa={aktif + 1}>
+            {gorunen.map((b, j) => (
+              <li
+                key={b.anahtar}
+                className={`flex items-center gap-2 py-1.5 min-h-[52px] px-1 -mx-1 rounded hover:bg-white/[0.03] ${hareketAzalt ? "" : "dagilim-cevir"}`}
+                style={hareketAzalt ? undefined : { animationDelay: `${j * 55}ms` }}
+                title={b.ipucu}
+                data-dagilim={b.ad}
+              >
+                <span className="text-[10px] font-bold tabular-nums w-4 text-right shrink-0" style={{ color: TEXT_MUTED }}>{bas + j + 1}</span>
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: KATEGORI_RENKLERI[j] }} aria-hidden />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs text-white line-clamp-2 break-words leading-snug">{b.ad}</span>
                   {b.alt && <span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{b.alt}</span>}
@@ -287,10 +348,23 @@ export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, digerDeger, 
               </li>
             ))}
           </ul>
-          {altBilgi && (
-            <p className="mt-auto pt-2 border-t text-[10px] flex justify-between gap-2" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }} data-alt-bilgi="">{altBilgi}</p>
-          )}
-        </>
+
+          <div className="mt-auto pt-2 border-t flex items-center justify-between gap-2 text-[10px]" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }}>
+            <div className="flex items-center gap-2 min-w-0" data-alt-bilgi="">{altBilgi}</div>
+            {sayfaSayisi > 1 && (
+              <nav className="flex items-center gap-1 shrink-0" aria-label={`${baslik} sayfaları`} data-dagilim-sayfalama="">
+                <button type="button" onClick={() => git(aktif - 1)} aria-label="Önceki sayfa" className="w-6 h-6 rounded-md border flex items-center justify-center hover:text-white hover:bg-white/[0.05] transition-colors" style={{ borderColor: CARD_BORDER }}>‹</button>
+                <span className="flex items-center gap-1 px-1" aria-hidden>
+                  {Array.from({ length: sayfaSayisi }, (_, i) => (
+                    <span key={i} className="h-1.5 rounded-full transition-all duration-300" style={{ width: i === aktif ? 14 : 6, backgroundColor: i === aktif ? ACCENT : "#3A4456" }} />
+                  ))}
+                </span>
+                <span className="tabular-nums text-white min-w-[28px] text-center" data-sayfa-no="">{aktif + 1}/{sayfaSayisi}</span>
+                <button type="button" onClick={() => git(aktif + 1)} aria-label="Sonraki sayfa" className="w-6 h-6 rounded-md border flex items-center justify-center hover:text-white hover:bg-white/[0.05] transition-colors" style={{ borderColor: CARD_BORDER }}>›</button>
+              </nav>
+            )}
+          </div>
+        </div>
       )}
     </Panel>
   );

@@ -13,7 +13,9 @@ import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
 import { Users, Package, Loader2, Ship, Globe2, BarChart2, X, Clock, Truck, BarChart3, Anchor, AlertTriangle } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
-import { kalemMiktari } from "@/lib/sayi-oku";
+import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
+import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
+import { acenteLimanNavlunlari, BELIRSIZ_LIMAN, type LimanNavlunu } from "@/lib/analiz-acente-navlun";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -138,6 +140,85 @@ function ListeKarti({ ikon, baslik, olcuEtiketi, satirlar, bosMetin = "Veri yok"
               </div>
               <HBar value={s.olcu} max={max} />
               <p className="text-[10px] mt-1 truncate" style={{ color: TEXT_MUTED }}>{s.alt}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Konteyner basi navlun: "$1.850", kurusluysa "$1.850,50". Gecersiz para biriminde duz yazi. */
+function navlunYazi(tutar: number, para: string): string {
+  try {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: para, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(tutar);
+  } catch {
+    return `${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}`;
+  }
+}
+
+type AcenteSatiri = ListeSatiri & { limanlar: LimanNavlunu[] };
+
+/**
+ * Acenteler karti (25.10.2026): ust kisim eskisiyle AYNI (konteyner · pay, cubuk,
+ * rezervasyon sayisi); altinda acentenin gittigi her liman icin konteyner basi navlun
+ * (son fiyat; degistiyse aralik), lokal masraf ve dosya/konteyner sayisi.
+ */
+function AcenteNavlunKarti({ satirlar }: { satirlar: AcenteSatiri[] }) {
+  const max = Math.max(...satirlar.map((s) => s.olcu), 0);
+  return (
+    <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-acente-karti="">
+      <div className="px-4 py-3 border-b flex items-center justify-between gap-2" style={{ borderColor: CARD_BORDER }}>
+        <div className="flex items-center gap-1.5" style={{ color: TEXT_MUTED }}><Ship size={12} /><span className="text-xs font-semibold text-white">Acenteler</span></div>
+        <span className="text-[10px] text-right" style={{ color: TEXT_MUTED }}>Konteyner · pay · navlun / kont.</span>
+      </div>
+      {satirlar.length === 0 ? (
+        <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
+      ) : (
+        <div className="divide-y divide-white/[0.04]">
+          {satirlar.map((s, i) => (
+            <div key={s.anahtar} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors" data-acente={s.ad}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[10px] font-bold w-3 shrink-0 tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                  <span className="text-xs text-white truncate">{s.ad}</span>
+                </div>
+                <span className="text-xs font-semibold text-white shrink-0 tabular-nums">
+                  {s.deger}
+                  {s.pay !== undefined && <span className="font-normal" style={{ color: TEXT_MUTED }}> · {yuzde(s.pay)}</span>}
+                </span>
+              </div>
+              <HBar value={s.olcu} max={max} />
+              <p className="text-[10px] mt-1 truncate" style={{ color: TEXT_MUTED }}>{s.alt}</p>
+              {s.limanlar.length > 0 && (
+                <ul className="mt-2 space-y-1.5 border-l pl-2.5 ml-1" style={{ borderColor: CARD_BORDER }} aria-label={`${s.ad} liman navlunları`}>
+                  {s.limanlar.map((l) => {
+                    const aralik = l.enAz !== null && l.enCok !== null && l.enAz !== l.enCok;
+                    const ayrinti = [
+                      `${l.dosya} dosya · ${l.konteyner} kont.`,
+                      aralik ? `${navlunYazi(l.enAz!, l.paraBirimi)}–${navlunYazi(l.enCok!, l.paraBirimi)}` : null,
+                      l.lokalSon !== null ? `lokal ${navlunYazi(l.lokalSon, l.paraBirimi)}` : null,
+                      l.son !== null && l.navlunsuz > 0 ? `${l.navlunsuz} dosyada navlun yok` : null,
+                    ].filter(Boolean).join(" · ");
+                    return (
+                      <li key={`${l.liman}|${l.paraBirimi}`} data-liman={l.liman}
+                        title={l.son !== null ? `${s.ad} → ${l.liman}\nSon navlun: ${navlunYazi(l.son, l.paraBirimi)} / konteyner (${l.sonDosyaNo})${l.ortalama !== null && aralik ? `\nOrtalama: ${navlunYazi(Math.round(l.ortalama * 100) / 100, l.paraBirimi)}` : ""}` : undefined}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className={`text-[11px] truncate ${l.liman === BELIRSIZ_LIMAN ? "italic" : "font-medium"}`} style={{ color: l.liman === BELIRSIZ_LIMAN ? TEXT_MUTED : "#CBD5E1" }}>{l.liman}</span>
+                          {l.son !== null ? (
+                            <span className="text-[11px] font-semibold text-white shrink-0 tabular-nums">
+                              {navlunYazi(l.son, l.paraBirimi)}<span className="font-normal" style={{ color: TEXT_MUTED }}> / kont.</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{l.aliciOder ? "Navlun alıcıya ait (FOB)" : "Navlun girilmemiş"}</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{ayrinti}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           ))}
         </div>
@@ -339,18 +420,30 @@ export default function AnalizPage() {
         ipucu: yazimIpucu(ad, v.yazimlar),
       })), [limanlar, tutarTam]);
 
-  const acenteSatirlari = useMemo<ListeSatiri[]>(() => {
+  const acenteSatirlari = useMemo<AcenteSatiri[]>(() => {
     const s: Record<string, { konteyner: number; adet: number }> = {};
+    const navlunGirdileri: Parameters<typeof acenteLimanNavlunlari>[0] = [];
     filtrelenmis.forEach((d) => d.rezervasyonlar.forEach((r) => {
       const a = r.acente_ismi?.trim(); if (!a) return;
       if (!s[a]) s[a] = { konteyner: 0, adet: 0 };
       s[a].konteyner += r.konteyner_adedi || 0; s[a].adet += 1;
+      // Navlun dosyada konteyner basi; acente rezervasyonda (25.10.2026)
+      const navlun = d.navlun_tutari === null || d.navlun_tutari === undefined ? null : sayiOku(d.navlun_tutari);
+      const lokal = d.lokal_masraf_tutari === null || d.lokal_masraf_tutari === undefined ? null : sayiOku(d.lokal_masraf_tutari);
+      navlunGirdileri.push({
+        acente: a, liman: analizLimani(d), paraBirimi: d.para_birimi || "USD",
+        navlun, lokal, konteyner: r.konteyner_adedi || 0,
+        tarih: r.gemi_kalkis_tarihi || sevkiyatTarihi(d), dosyaNo: d.dosya_no,
+        aliciOder: navlunAliciyaAitMi(d.teslim_sekli),
+      });
     }));
+    const navlunlar = acenteLimanNavlunlari(navlunGirdileri);
     const toplam = Object.values(s).reduce((t, v) => t + v.konteyner, 0);
     return Object.entries(s).sort((a, b) => b[1].konteyner - a[1].konteyner).slice(0, 8).map(([ad, v]) => ({
       anahtar: ad, ad, deger: `${v.konteyner} kont.`, olcu: v.konteyner,
       pay: toplam > 0 ? v.konteyner / toplam : 0,
       alt: `${v.adet} rezervasyon`,
+      limanlar: navlunlar.get(ad) || [],
     }));
   }, [filtrelenmis]);
 
@@ -584,7 +677,7 @@ export default function AnalizPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">
             <ListeKarti ikon={<Users size={12} />} baslik="Müşteriler" olcuEtiketi="Hacim · pay" satirlar={musteriSatirlari} />
             <ListeKarti ikon={<Globe2 size={12} />} baslik="Varış Limanları" olcuEtiketi="Konteyner · pay" satirlar={limanSatirlari} />
-            <ListeKarti ikon={<Ship size={12} />} baslik="Acenteler" olcuEtiketi="Konteyner · pay" satirlar={acenteSatirlari} />
+            <AcenteNavlunKarti satirlar={acenteSatirlari} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 items-start">

@@ -390,6 +390,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   fiyat ve transit süresinde yüzde yok. Tüm çubuklar tek renk (`ACCENT`); çift
   ölçekli grafik kullanılmaz (aylık grafik sadece hacim, konteyner alt yazıda).
 - Birden fazla para birimi varsa kur çevrimi yapılmadığı için sayfada uyarı çıkar.
+- ACENTE NAVLUN FİYATLARI (25.10.2026, kullanıcı: "acentelere verdiğimiz ücretler de görünsün;
+  limana göre fiyat farklı"): Acenteler kartı `AcenteNavlunKarti` — üst kısım eskisiyle aynı
+  (konteyner · pay · rezervasyon), altında acentenin gittiği HER liman: son navlun / kont.
+  (en son sevkiyat tarihli dosya; ipucunda dosya no + konteyner ağırlıklı ortalama), fiyat
+  değiştiyse aralık, lokal masraf, dosya · konteyner. Navlun girilmemişse "Navlun alıcıya ait
+  (FOB)" (`navlunAliciyaAitMi`) ya da "Navlun girilmemiş". Kaynak: navlun/lokal DOSYADA konteyner
+  başı (`navlun_tutari`, `lokal_masraf_tutari`), acente REZERVASYONDA; şema değişmedi. Hesap TEK
+  YER `lib/analiz-acente-navlun.ts` (`acenteLimanNavlunlari`, saf; liman `analizLimani` ile
+  birleştirilir, geçersiz liman "Liman belirtilmemiş" en altta, farklı para birimi ayrı satır).
+  Durum / yıl filtreleri uygulanır. Test scratchpad `acente/` birim 13 + Playwright 11.
 
 ## Evraklar listesi satır düzeni (02.10.2026)
 

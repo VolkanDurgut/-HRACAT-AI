@@ -1788,6 +1788,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   → konteyner eklendikten 1–2 dk sonra DBA yüklenir. 1.1.0+ görevde beklemedeki PDF'in
   yedek tekrarı 60 dk (eski görevde 10). Veritabanı değişikliği YOK.
   Görev güncelleme kantar PC'de `guncelle.ps1` (anahtar istemez).
+- ELLE TARTIM (26.10.2026, kullanıcı: "DBA tartımı yetkili kantarımızda unutuldu, liman
+  girişinde yapıldı, DBA'yı yükleyemiyoruz"; ilk vaka CXDU1012624 / IHR-2026-0103):
+  "Yüklendi" her yerde (44 yer) `dba_dosya_url` doluluğuna bağlı olduğu için elle kayıt da
+  "ELLE GİRİLEN TARTIM KAYDI — resmî DBA değildir" PDF'i üretip (`lib/elle-tartim-pdf.ts`,
+  jsPDF + Roboto) DBA yerine bağlar; aynı kolonlar (plaka, tare_kg, vgm_kg, dba_dosya_*,
+  dba_yukleme_tarihi, dba_kontrol_sonucu). `dba_belge_no` BOŞ (dba-otomatik doğrulaması
+  belge nosuz kaydı atlar); ayırt edici `dba_kontrol_sonucu.elle_giris = true` (konteyner
+  sekmesi + Kantar panelinde amber "Elle" rozeti). VGM boşsa net + dara (SOLAS metot 2,
+  vgm-pdf-builder ile aynı tanım). `tartim_tarih_saat` = çıkış zamanı, DBA biçiminde
+  ("DD.MM.YYYY HH:MM:SS") → rapordaki yüklendiği gün doğru. Saf doğrulama/kayıt
+  `lib/elle-tartim.ts`; yazım `useDbaUpload().elleTartimKaydet` (sadece DBA'sı boş
+  konteynere, `.is('dba_dosya_url', null)`); arayüz Konteynerler sekmesinde "Bekleniyor"
+  altındaki "Elle gir" → `components/elle-tartim-penceresi.tsx`. Geri alma = DBA'yı kaldır
+  (X; PDF de silinir). Veritabanı değişikliği YOK. Test scratchpad `elle/` (19 kontrol + PDF).
 - ELLE YÜKLEME KORUMASI (20.10.2026, `lib/hooks/use-dba-upload.ts`, tek kullanan Kantar
   Paneli): başlamadan güncel kayıt okunur (DBA doluysa yeşil "zaten yüklü" bilgisi, AI
   okuma / depo yükleme YOK), yazım `.is('dba_dosya_url', null)` koşullu; 0 satırsa

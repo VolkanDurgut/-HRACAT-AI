@@ -13,6 +13,8 @@ import { EditableCell } from "@/components/editable-cell";
 import FaturaTalimatiSection, { FaturaTalimatiSectionHandle } from "@/components/fatura-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kapUyumsuzlugu } from "@/lib/siparis-devam";
+import { ElleTartimPenceresi } from "@/components/elle-tartim-penceresi";
+import { elleTartimMi, type ElleTartimFormu } from "@/lib/elle-tartim";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -80,7 +82,19 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   };
 
   // DBA yukleme - ortak hook kullaniliyor
-  const { yukleniyor: dbaYukleniyor, hatalar: dbaHata, yukleDba, kaldirDba, inputRefs: dbaInputRefs } = useDbaUpload();
+  const { yukleniyor: dbaYukleniyor, hatalar: dbaHata, yukleDba, kaldirDba, elleTartimKaydet, inputRefs: dbaInputRefs } = useDbaUpload();
+  // DBA belgesi yuklenemeyen konteyner icin elle tartim (26.10.2026)
+  const [elleTartimHedef, setElleTartimHedef] = React.useState<Konteyner | null>(null);
+  const handleElleTartimKaydet = async (form: ElleTartimFormu): Promise<string | null> => {
+    if (!elleTartimHedef) return null;
+    const hata = await elleTartimKaydet(elleTartimHedef, form, dosya.dosya_no ?? null);
+    if (!hata) {
+      showToast(`${elleTartimHedef.konteyner_no} için tartım bilgileri elle kaydedildi.`, "success");
+      setElleTartimHedef(null);
+      onRefresh();
+    }
+    return hata;
+  };
   // Irsaliye yukleme - DBA'nin tersi yonunde: burada yuklenir, Kantar panelinde gorunur
   const { yukleniyor: irsaliyeYukleniyor, hatalar: irsaliyeHata, yukleIrsaliye, kaldirIrsaliye, inputRefs: irsaliyeInputRefs } = useIrsaliyeUpload();
   const { showToast } = useToast();
@@ -231,6 +245,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                   const markaListesi: string[] = markaListesiManuelSatir.length > 0 ? markaListesiManuelSatir : markaListesiUrunlerdenSatir;
                   const dbaVeri = k.dba_kontrol_sonucu as { uyusmazliklar?: string[] } | null;
                   const uyusmazlik = (dbaVeri?.uyusmazliklar?.length ?? 0) > 0;
+                  const elleKayit = elleTartimMi(k.dba_kontrol_sonucu);
                   return (
                     <tr key={k.id} className="group border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{i + 1}</td>
@@ -240,7 +255,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                           etiket="Konteyner no"
                           vurgulu
                           placeholder="ABCU1234567"
-                          kilitNedeni={k.dba_dosya_url ? "DBA belgesiyle doğrulandı. Numarayı değiştirmek için önce DBA'yı kaldırın." : null}
+                          kilitNedeni={k.dba_dosya_url ? (elleKayit ? "Elle tartım kaydı var. Numarayı değiştirmek için önce kaydı kaldırın." : "DBA belgesiyle doğrulandı. Numarayı değiştirmek için önce DBA'yı kaldırın.") : null}
                           onKopyala={() => handleKopyala(k.konteyner_no, "Konteyner no")}
                           onKaydet={(yeni) => handleKimlikDuzelt(k.id, "konteyner_no", yeni)}
                         />
@@ -294,7 +309,10 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                           <Loader2 size={16} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
                         ) : k.dba_dosya_url ? (
                           <div className="flex items-center justify-center gap-1.5">
-                            {uyusmazlik ? (
+                            {elleKayit ? (
+                              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded"
+                                title="DBA belgesi yerine tartım bilgileri elle girildi (resmî DBA değil)">Elle</span>
+                            ) : uyusmazlik ? (
                               <AlertTriangle size={14} className="text-amber-400" aria-label="Uyuşmazlık var" />
                             ) : (
                               <CheckCircle2 size={14} className="text-green-400" />
@@ -308,9 +326,16 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                             </button>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                            Bekleniyor
-                          </span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                              Bekleniyor
+                            </span>
+                            <button onClick={() => setElleTartimHedef(k)}
+                              className="inline-flex items-center gap-1 text-[10px] font-medium hover:text-white whitespace-nowrap" style={{ color: TEXT_MUTED }}
+                              title="DBA belgesi yüklenemiyorsa tartım bilgilerini elle girin">
+                              <Pencil size={10} /> Elle gir
+                            </button>
+                          </div>
                         )}
                         {dbaHata[k.id] && <p className="text-xs text-red-400 mt-0.5">{dbaHata[k.id]}</p>}
                       </td>
@@ -382,6 +407,15 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
             </table>
           </div>
         </div>
+      )}
+
+      {elleTartimHedef && (
+        <ElleTartimPenceresi
+          konteynerNo={elleTartimHedef.konteyner_no}
+          muhurNo={elleTartimHedef.muhur_no ?? null}
+          onKapat={() => setElleTartimHedef(null)}
+          onKaydet={handleElleTartimKaydet}
+        />
       )}
 
       <ConfirmDialog

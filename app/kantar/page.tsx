@@ -26,7 +26,7 @@ type KonteynerRow = {
   dba_dosya_url: string | null;
   dba_dosya_adi: string | null;
   dba_yukleme_tarihi: string | null;
-  dba_kontrol_sonucu: { uyusmazliklar?: string[]; kaynak?: string } | null;
+  dba_kontrol_sonucu: { uyusmazliklar?: string[]; kaynak?: string; elle_giris?: boolean } | null;
   dba_belge_no: string | null;
   irsaliye_dosya_url: string | null;
   irsaliye_dosya_adi: string | null;
@@ -580,9 +580,12 @@ export default function KantarPage() {
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <div className="flex items-center justify-center gap-2">
-                              <span title={uyusmazlik ? "Uyuşmazlık var" : k.dba_kontrol_sonucu?.kaynak === "otomatik" ? "Onaylı · kantar bilgisayarından otomatik yüklendi" : "Onaylı"}>
+                              <span title={uyusmazlik ? "Uyuşmazlık var" : k.dba_kontrol_sonucu?.elle_giris === true ? "Elle girilen tartım kaydı" : k.dba_kontrol_sonucu?.kaynak === "otomatik" ? "Onaylı · kantar bilgisayarından otomatik yüklendi" : "Onaylı"}>
                                 {uyusmazlik ? <AlertTriangle size={15} className="text-amber-400" /> : <CheckCircle2 size={15} className="text-emerald-400" />}
                               </span>
+                              {k.dba_kontrol_sonucu?.elle_giris === true && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/10 text-amber-400" title="DBA belgesi yerine tartım bilgileri elle girildi (resmî DBA değil)">Elle</span>
+                              )}
                               {k.dba_kontrol_sonucu?.kaynak === "otomatik" && (
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-sky-500/10 text-sky-400" title="Kantar bilgisayarından otomatik yüklendi">Oto</span>
                               )}

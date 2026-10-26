@@ -3,6 +3,7 @@ import { supabase, getGuvenliDosyaUrl, depoDosyalariniTopluSil, yazmaHatasi } fr
 import type { Konteyner, DbaKontrolSonucu } from '@/lib/supabase';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
+import { elleTartimKaydiOlustur, type ElleTartimFormu } from '@/lib/elle-tartim';
 
 type DbaYukleResult = {
   success: boolean;
@@ -24,6 +25,12 @@ type UseDbaUploadReturn = {
   hatalar: Record<string, string>;
   yukleDba: (konteyner: { id: string; dosya_id: string; konteyner_no: string }, file: File) => Promise<DbaYukleResult>;
   kaldirDba: (konteynerId: string, dbaDosyaUrl?: string | null) => Promise<void>;
+  /** DBA belgesi yuklenemediginde tartim bilgilerini elle kaydeder (hata metni ya da null). */
+  elleTartimKaydet: (
+    konteyner: { id: string; dosya_id: string; konteyner_no: string; muhur_no?: string | null },
+    form: ElleTartimFormu,
+    dosyaNo: string | null
+  ) => Promise<string | null>;
   inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
 };
 
@@ -214,5 +221,70 @@ export function useDbaUpload(): UseDbaUploadReturn {
     if (dbaDosyaUrl) await depoDosyalariniTopluSil([dbaDosyaUrl]); // storage'daki gercek dosya da temizlenir
   }, [showToast, companyId]);
 
-  return { yukleniyor, hatalar, yukleDba, kaldirDba, inputRefs };
+  /**
+   * ELLE TARTIM (26.10.2026): DBA belgesi yuklenemeyen (or. tartim liman girisinde
+   * yapilmis) konteyner icin bilgiler elle girilir. "ELLE GIRILEN TARTIM KAYDI"
+   * PDF'i uretilip DBA yerine baglanir, boylece rapor / dashboard / takip konteyneri
+   * yuklendi sayar. Ayni korumalar: sadece DBA'si BOS konteynere yazilir.
+   * dba_belge_no bos kalir; ayirt edici dba_kontrol_sonucu.elle_giris = true.
+   * Geri almak = DBA'yi kaldir (kaldirDba, PDF de silinir).
+   */
+  const elleTartimKaydet = useCallback(async (
+    konteyner: { id: string; dosya_id: string; konteyner_no: string; muhur_no?: string | null },
+    form: ElleTartimFormu,
+    dosyaNo: string | null
+  ): Promise<string | null> => {
+    if (!companyId) return 'Şirket bilgisi bulunamadı.';
+    let yuklenenYol: string | null = null;
+    try {
+      const { data: guncel, error: guncelHata } = await supabase
+        .from('konteynerler')
+        .select('dba_dosya_url, konteyner_no, muhur_no')
+        .eq('company_id', companyId)
+        .eq('id', konteyner.id)
+        .maybeSingle();
+      if (guncelHata) throw new Error(`Konteyner okunamadı: ${guncelHata.message}`);
+      if (!guncel) throw new Error('Konteyner bulunamadı veya bu işlem için yetkiniz yok.');
+      if (guncel.dba_dosya_url) throw new Error("Bu konteynerin DBA'sı zaten yüklü. Elle kayıt için önce mevcut DBA'yı kaldırın.");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const kayit = elleTartimKaydiOlustur(guncel.konteyner_no, form, user?.email ?? null);
+
+      const { elleTartimPdf } = await import('@/lib/elle-tartim-pdf'); // jsPDF sadece gerekince yuklenir
+      const pdf = elleTartimPdf(kayit, dosyaNo, guncel.muhur_no ?? konteyner.muhur_no ?? null);
+      const path = `dba/${konteyner.dosya_id}/${kayit.konteyner_no}_elle_${Date.now()}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from('konsimento-talimatlari')
+        .upload(path, pdf, { contentType: 'application/pdf' });
+      if (uploadError) throw new Error(`Kayıt belgesi yüklenemedi: ${uploadError.message}`);
+      yuklenenYol = path;
+      const dosyaUrl = await getGuvenliDosyaUrl('konsimento-talimatlari', path);
+
+      const { data: guncellenen, error: updateError } = await supabase
+        .from('konteynerler')
+        .update({
+          plaka: kayit.arac_plaka,
+          tare_kg: kayit.konteyner_dara_kg,
+          vgm_kg: kayit.dogrulanmis_brut_agirlik_kg,
+          dba_dosya_url: dosyaUrl,
+          dba_dosya_adi: `ELLE-TARTIM-${kayit.konteyner_no}.pdf`,
+          dba_yukleme_tarihi: new Date().toISOString(),
+          dba_belge_no: null,
+          dba_kontrol_sonucu: kayit,
+        })
+        .eq('company_id', companyId)
+        .eq('id', konteyner.id)
+        .is('dba_dosya_url', null)
+        .select('id');
+      const hata = yazmaHatasi(updateError, guncellenen);
+      if (hata) throw new Error(`Kaydedilemedi: ${hata}`);
+      yuklenenYol = null;
+      return null;
+    } catch (err) {
+      if (yuklenenYol) await supabase.storage.from('konsimento-talimatlari').remove([yuklenenYol]);
+      return err instanceof Error ? err.message : 'Hata oluştu.';
+    }
+  }, [companyId]);
+
+  return { yukleniyor, hatalar, yukleDba, kaldirDba, elleTartimKaydet, inputRefs };
 }

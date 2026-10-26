@@ -105,6 +105,10 @@ const YEDEKLENECEK_TABLOLAR = [
   // DBA otomatik yukleme - kantar cihazlari (anahtarin SADECE SHA-256 ozeti) ve belge kayitlari (20.10.2026)
   "kantar_cihazlari",
   "dba_otomatik_kayitlari",
+  // Satin alma talepleri (26.10.2026; departman token'lari dahil)
+  "satin_alma_departmanlari",
+  "satin_alma_listeleri",
+  "satin_alma_kalemleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

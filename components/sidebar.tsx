@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -37,6 +37,12 @@ const opsItems: MenuItem[] = [
 const icPiyasaItems: MenuItem[] = [
   // 22.10.2026: acilis sayfasi Is Emirleri (kullanici karari); tum /ic-piyasa alt sayfalarinda aktif
   { label: "İç Piyasa", href: "/ic-piyasa/is-emirleri", icon: <Wheat size={18} />, yetkiKey: "ic_piyasa" },
+];
+
+// Satin Alma (26.10.2026): departman ihtiyac listelerinin onayi. Ic Piyasa gibi
+// SADECE yetkisi olana gorunur.
+const sirketIciItems: MenuItem[] = [
+  { label: "Satın Alma", href: "/satin-alma", icon: <ShoppingCart size={18} />, yetkiKey: "satin_alma" },
 ];
 
 const ayarlarAltMenu = [
@@ -154,6 +160,13 @@ export default function Sidebar() {
           <>
             <Bolum baslik="Yurt İçi" />
             <div className="space-y-0.5">{icPiyasaItems.filter((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}</div>
+          </>
+        )}
+
+        {sirketIciItems.some((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]) && (
+          <>
+            <Bolum baslik="Şirket İçi" />
+            <div className="space-y-0.5">{sirketIciItems.filter((i) => yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}</div>
           </>
         )}
 

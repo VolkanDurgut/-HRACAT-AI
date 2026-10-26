@@ -57,9 +57,13 @@ tek fark 6. adımdaki zamanlanmış iş).
 ### 4) Edge function'lar ve gizli anahtarlar (~10 dk)
 ```
 supabase secrets set GEMINI_API_KEY=... RESEND_API_KEY=... GERI_BILDIRIM_ALICI=...
-supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder
+supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder ic-piyasa satin-alma
+supabase functions deploy dba-otomatik --no-verify-jwt   # yetki cihaz anahtariyla (x-cihaz-anahtari)
 # istege bagli: gunluk raporu sirket adreslerine gondermek icin (virgulle)
 supabase secrets set GUNLUK_RAPOR_ALICILARI=adres1@...,adres2@...
+# istege bagli: gece yedegi alicilari; satin alma talep / sonuc alicilari (virgulle)
+supabase secrets set YEDEK_ALICILARI=bbt@unex.com.tr,execution@unex.com.tr
+supabase secrets set SATIN_ALMA_ALICILARI=execution@unex.com.tr,bbt@unex.com.tr SATIN_ALMA_SONUC_ALICILARI=execution@unex.com.tr
 ```
 (Hepsi `verify_jwt` açık; varsayılan ayar budur. `depo-karantina` tek seferlik
 bir araçtı, yeni projeye kurulmaz.)

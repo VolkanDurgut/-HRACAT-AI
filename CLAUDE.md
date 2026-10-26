@@ -1816,6 +1816,49 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (pwsh 7, tr-TR kültürü). Windows'a özel kısımlar (DPAPI, Görev Zamanlayıcı, icacls) sadece
   ayrıştırıcıyla kontrol edildi; kurulum betiği her adımı doğrulayıp raporlar.
 
+## Satın Alma talepleri (26.10.2026)
+
+- Kullanıcı isteği: departmanlardaki yetkili arkadaşlar ihtiyaç listesi hazırlar, "gönder"
+  deyince execution@ + bbt@'ye mail gider; Burak Bey kalem bazında onaylar / reddeder,
+  sonuç execution@'ye gider. Kararlar (26.10.2026): departmana özel GİRİŞSİZ link, departman
+  ORTAK taslağı, sonuç sadece execution@'ye, kategorili genel satın alma.
+- Migration `20261026100000_satin_alma.sql` (ihracat / iç piyasa tablolarına DOKUNMAZ):
+  `satin_alma_departmanlari` (ad + 32 hex `token`, aktif), `satin_alma_listeleri`
+  (taslak → bekliyor → sonuclandi; departman başına TEK taslak, tekil kısmi indeks;
+  `liste_no` SA-YYYY-NNNN gönderimde `satin_alma_liste_sira` ile), `satin_alma_kalemleri`
+  (kategori / birim CHECK listeleri `_shared/satin-alma.ts` ile BİREBİR; karar kalem bazında).
+  Tablolar istemciye SADECE OKUNUR (`satin_alma` yetkisi + aynı şirket); yazmalar fonksiyonla.
+  Denetim tetikleyicisi 3 tabloda. Başlangıç: ekteki formdaki 5 departman + süper adminlere
+  (volkandurgut.tr@, bbt@) `satin_alma` yetkisi.
+- Girişsiz sayfa `/talep/[token]` (açık tema, `GenelSayfaCerceve satisSatiri={false}`, noindex):
+  ad soyad (localStorage `sa-talep-ad`), kalem ekle / sil (sadece açık taslaktan), "Listeyi
+  gönder" (onay kutusu), son 10 gönderilen liste + kalem kararları ve red nedenleri.
+  DB'ye doğrudan erişim YOK: edge function `satin-alma` (verify_jwt AÇIK, anon anahtarla)
+  service_role ile `sa_token_bilgi / sa_token_kalem_ekle / sa_token_kalem_sil /
+  sa_token_liste_gonder / sa_mail_sonuc` çağırır (anon/authenticated'a KAPALI).
+  Sınırlar: taslakta 100 kalem, departman başına 24 saatte 10 gönderim. Pasif departman /
+  yenilenmiş token → 404.
+- Uygulama içi `/satin-alma` (menüde "Şirket İçi › Satın Alma", sadece yetkiliye görünür;
+  yeni sayfa yetkisi `satin_alma`: auth-context, app-shell, yetki-utils, Yetkilendirme
+  sayfası): Onay bekleyen (her kalemde Onayla / Reddet + isteğe bağlı red nedeni, "Tümünü
+  onayla", not, hepsi seçilmeden kaydet kapalı, ConfirmDialog) · Sonuçlananlar (departman
+  filtresi, sonuç mailini tekrar gönder) · Departmanlar ve bağlantılar (ekle, yeniden
+  adlandır, aktif/pasif, bağlantı kopyala/aç, Yenile = yeni token). Maildeki
+  `/satin-alma?liste=<id>` ilgili listeyi açar. Karar SONRADAN DEĞİŞMEZ.
+- Karar: edge function `karar` (kullanıcının KENDİ JWT'siyle `sa_karar_ver`; yetki DB'de),
+  sonra sonuç maili. Mail gönderilemezse liste YİNE kaydedilir, `gonderim_maili` /
+  `sonuc_maili` = 'hata' olur; sayfada "tekrar gönder" (`mail_tekrar`, `sa_liste_mail_verisi`).
+- Alıcılar (kod varsayılanı, secret ile değişir): `SATIN_ALMA_ALICILARI` = execution@,
+  bbt@; `SATIN_ALMA_SONUC_ALICILARI` = execution@. Gönderen "Unex Gıda Satın Alma
+  <bildirim@ihracatasistanim.com>". Mail şablonları `supabase/functions/_shared/satin-alma.ts`
+  (saf; uygulama da aynı etiketleri kullanır).
+- Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR` + mail.ts "Satın alma" grubu + geri yükleme
+  betiği `TABLO_SIRASI`.
+- Testler (scratchpad `sa/`): yerel PG16 senaryo SQL (yetki, şirket izolasyonu, sınırlar,
+  token yenileme), edge function Node'da gerçek PG köprüsüyle (32 kontrol), Playwright e2e
+  (girişsiz sayfa masaüstü/mobil, ortak taslak iki cihaz, gönderim maili, karar, sonuç maili,
+  departman ekle / token yenile, yetkisiz yönlendirme, geçersiz bağlantı).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

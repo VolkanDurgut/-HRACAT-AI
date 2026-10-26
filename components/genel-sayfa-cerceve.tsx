@@ -18,7 +18,8 @@ export const GENEL = {
   turuncu: "#B5552B",
 };
 
-export function GenelSayfaCerceve({ ust, children }: { ust: string; children: React.ReactNode }) {
+/** satisSatiri=false: sirket ici sayfalarda (satin alma talebi) musteriye yonelik satis iletisim satiri gizlenir. */
+export function GenelSayfaCerceve({ ust, children, satisSatiri = true }: { ust: string; children: React.ReactNode; satisSatiri?: boolean }) {
   return (
     <div className="min-h-screen w-full" style={{ backgroundColor: GENEL.zemin, color: GENEL.metin }}>
       <header style={{ backgroundColor: GENEL.lacivert, borderBottom: `4px solid ${GENEL.seftali}` }}>
@@ -37,7 +38,7 @@ export function GenelSayfaCerceve({ ust, children }: { ust: string; children: Re
       <footer className="max-w-3xl mx-auto px-4 sm:px-6 pb-10 text-xs leading-relaxed" style={{ color: GENEL.soluk }}>
         <p className="font-semibold" style={{ color: GENEL.metin }}>Unex Gıda San. ve Tic. Ltd. Şti.</p>
         <p>İstiklal Mah. Cemal Ünlü Saraç Cad. No:20, Süleymanpaşa / Tekirdağ · www.unex.com.tr</p>
-        <p>Satış: Burak Tuncay · 0541 339 60 04</p>
+        {satisSatiri && <p>Satış: Burak Tuncay · 0541 339 60 04</p>}
       </footer>
     </div>
   );

@@ -23,6 +23,7 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/draft-onay": "draft_onay",
   "/ic-piyasa": "ic_piyasa",
   "/proformalar": "proformalar",
+  "/satin-alma": "satin_alma",
 };
 
 // "/ayarlar" (ve alt sayfaları, örn. /ayarlar/yetkilendirme) BİLEREK yukarıdaki

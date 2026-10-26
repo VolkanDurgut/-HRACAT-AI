@@ -53,6 +53,10 @@ const TABLO_SIRASI = [
   "dba_otomatik_kayitlari",
   "dosya_evraklari",
   "acente_teklifleri",
+  // Satin alma (26.10.2026): departman -> liste -> kalem (numara RPC'de verilir, tetikleyici yok)
+  "satin_alma_departmanlari",
+  "satin_alma_listeleri",
+  "satin_alma_kalemleri",
   "kullanici_rolleri",
   "kullanici_yetkileri",
   "destek_mesajlari",

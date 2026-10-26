@@ -62,6 +62,9 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ic_piyasa_ayarlari: { ad: "İç piyasa ayarları", grup: "İç piyasa" },
   kantar_cihazlari: { ad: "Kantar cihazları", grup: "Kantar ve DBA otomasyonu" },
   dba_otomatik_kayitlari: { ad: "Otomatik DBA kayıtları", grup: "Kantar ve DBA otomasyonu" },
+  satin_alma_departmanlari: { ad: "Departmanlar ve talep bağlantıları", grup: "Satın alma" },
+  satin_alma_listeleri: { ad: "İhtiyaç listeleri", grup: "Satın alma" },
+  satin_alma_kalemleri: { ad: "Liste kalemleri", grup: "Satın alma" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -70,7 +73,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ai_usage_logs: { ad: "Yapay zekâ kullanım kayıtları", grup: "Kullanıcılar ve sistem" },
   denetim_kayitlari: { ad: "Denetim kayıtları (değişiklik geçmişi)", grup: "Kullanıcılar ve sistem" },
 };
-const GRUP_SIRASI = ["İhracat operasyonu", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Kullanıcılar ve sistem", "Diğer"];
+const GRUP_SIRASI = ["İhracat operasyonu", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Satın alma", "Kullanıcılar ve sistem", "Diğer"];
 
 /**
  * Kaydi 0 olan tablonun NEDENI (26.10.2026 canli kontrol: kod + veritabani).
@@ -84,6 +87,8 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   banka_presetleri: { tur: "normal", metin: "Özel banka kartı kaydedilmedi; standart banka hesapları uygulamada tanımlı." },
   ihracat_musterileri: { tur: "normal", metin: "İsteğe bağlı müşteri kartı açılmadı; proforma bilgileri geçmiş dosyalardan geliyor." },
   proforma_ayarlari: { tur: "normal", metin: "Varsayılan proforma şablon metinleri kullanılıyor." },
+  satin_alma_listeleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
+  satin_alma_kalemleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
 };
 const BOS_ROZET: Record<"normal" | "kullanilmiyor" | "kullanilmadi" | "bilinmiyor", [string, string, string]> = {
   kullanilmiyor: ["#F1F5F9", "#475569", "Kullanılmıyor"],

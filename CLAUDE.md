@@ -726,6 +726,14 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `banka_presetleri`, `ihracat_musterileri`, `proforma_ayarlari` = boş olması normal
   (isteğe bağlı / varsayılan). Test scratchpad `yedekmail/` (esbuild + Deno/fetch taklidi:
   deneme, gerçek, uyarılı senaryo; 820/390 px görüntü).
+- TEST MAILI (26.10.2026, v16): gövde `{"test_maili": true}` → 20 saatlik tekrar koruması
+  ATLANIR, aynı alıcıya "[TEST] " konulu TAM mail (ek dahil, üstte kesik çizgili amber
+  "TEST GÖNDERİMİ" notu) gider; `yedek_kayitlari.durum='test'` yazılır (migration
+  `20261026031500_yedek_test_maili` CANLIDA UYGULANDI — check constraint'e 'test' eklendi).
+  'test' satırı gece yedeğinin tekrar korumasına SAYILMAZ (o sadece basarili/uyarili sayar).
+  Kötüye kullanım: son 24 saatte en fazla 3 test (`TEST_GUNLUK_SINIR`), aşılırsa HTTP 429.
+  Tetikleme: SQL `net.http_post` (Bearer `cron.job` 'gunluk-yedek-maili' komutundan alınır,
+  sohbette gösterilmez). İlk canlı test 26.10.2026 03:15 TR: 200, 1385 kayıt, 31/31.
   `denetim_kayitlari` sadece son 7 günüyle girer; `depositors` ve
   `contact_messages` bilerek hariç.
 - Tablolar 1000'erlik sayfalarla çekilir; okunamayan tablo mail konusunda

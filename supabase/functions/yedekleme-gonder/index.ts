@@ -44,6 +44,10 @@ import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //  - MAIL GORUNUMU (26.10.2026): gunluk raporla ayni kurumsal tasarim, tablolar
 //    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
 //    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
+//  - TEST MAILI (26.10.2026): govdede {"test_maili": true} -> 20 saatlik tekrar korumasi
+//    ATLANIR, ayni aliciya "[TEST]" konulu tam mail (ek dahil) gider, yedek_kayitlari'na
+//    durum='test' yazilir (gece yedeginin tekrar korumasina SAYILMAZ). Kotuye kullanim
+//    korumasi: son 24 saatte en fazla TEST_GUNLUK_SINIR test maili (migration 20261026031500).
 //  - KULLANICI LISTESI (05.10.2026): pakete "_kullanicilar" eklenir (kimlik,
 //    e-posta, tarihler; SIFRE YOK) - yeni projede ayni kimlikle yeniden
 //    olusturmak icin (docs/felaket-kurtarma.md).
@@ -113,6 +117,8 @@ const SAYFA_BOYUTU = 1000;
 const MAKS_EK_BAYT = 25 * 1024 * 1024;
 // Ayni gun icinde ikinci bir yedek maili gonderilmez.
 const TEKRAR_BEKLEME_SAAT = 20;
+// Test maili: son 24 saatte en fazla bu kadar (anon anahtarla cagrilabildigi icin).
+const TEST_GUNLUK_SINIR = 3;
 
 // Kapasite izleme (Free plan kotalari, supabase.com/pricing 05.10.2026).
 const DB_KOTA_BAYT = 500 * 1024 * 1024;
@@ -228,6 +234,14 @@ async function yakindaYedekGonderildiMi(): Promise<boolean> {
   return satirlar.length > 0;
 }
 
+/** Son 24 saatte gonderilen test maili sayisi (okunamazsa sinir dolu sayilir: test, yedek degil). */
+async function sonGunTestSayisi(): Promise<number> {
+  const esik = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/yedek_kayitlari?select=id&durum=eq.test&created_at=gte.${encodeURIComponent(esik)}`, { headers: servisBasliklari });
+  if (!res.ok) return TEST_GUNLUK_SINIR;
+  return ((await res.json()) as unknown[]).length;
+}
+
 async function calismayiKaydet(kayit: Record<string, unknown>): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/yedek_kayitlari`, {
     method: "POST",
@@ -296,9 +310,11 @@ function jsonCevap(veri: unknown, status = 200): Response {
 
 Deno.serve(async (req: Request) => {
   let deneme = false;
+  let testMaili = false;
   try {
     const govde = await req.json();
     deneme = govde?.deneme === true;
+    testMaili = !deneme && govde?.test_maili === true;
   } catch {
     // Govde yok / JSON degil -> normal (gercek) calisma
   }
@@ -306,7 +322,11 @@ Deno.serve(async (req: Request) => {
   try {
     if (!deneme) {
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY ortam değişkeni ayarlanmamış.");
-      if (await yakindaYedekGonderildiMi()) {
+      if (testMaili) {
+        if ((await sonGunTestSayisi()) >= TEST_GUNLUK_SINIR) {
+          return jsonCevap({ basarili: false, error: `Son 24 saatte en fazla ${TEST_GUNLUK_SINIR} test maili gönderilebilir.` }, 429);
+        }
+      } else if (await yakindaYedekGonderildiMi()) {
         return jsonCevap({ basarili: true, atlandi: true, neden: `Son ${TEKRAR_BEKLEME_SAAT} saatte zaten yedek gönderildi.` });
       }
     }
@@ -475,6 +495,7 @@ Deno.serve(async (req: Request) => {
       geriYukleme: geriYukleme ? { tablo_sayisi: geriYukleme.tablo_sayisi, birebir: geriYukleme.birebir, bag_sorunlari: geriYukleme.bag_sorunlari } : null,
       uyarilar,
       kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,
+      test: testMaili,
     };
     const html = yedekMailHtml(mailGirdisi);
 
@@ -484,7 +505,7 @@ Deno.serve(async (req: Request) => {
     const mailGovdesi: Record<string, unknown> = {
       from: "İhracat AI <bildirim@ihracatasistanim.com>",
       to: [YEDEK_ALICI],
-      subject: yedekMailKonusu(mailGirdisi),
+      subject: `${testMaili ? "[TEST] " : ""}${yedekMailKonusu(mailGirdisi)}`,
       html,
     };
     if (ekSigiyor) {
@@ -507,7 +528,7 @@ Deno.serve(async (req: Request) => {
     }
 
     await calismayiKaydet({
-      durum,
+      durum: testMaili ? "test" : durum,
       toplam_kayit: toplamKayit,
       tablo_sayisi: tabloSayilari.length,
       json_bayt: jsonBayt,
@@ -515,11 +536,11 @@ Deno.serve(async (req: Request) => {
       uyarilar,
     });
 
-    return jsonCevap(ozet);
+    return jsonCevap({ ...ozet, test: testMaili });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("Yedekleme hatasi:", message);
-    if (!deneme) await calismayiKaydet({ durum: "hatali", hata: message });
+    if (!deneme) await calismayiKaydet({ durum: "hatali", hata: testMaili ? `TEST MAILI: ${message}` : message });
     return jsonCevap({ basarili: false, error: message }, 500);
   }
 });

@@ -25,6 +25,8 @@ export type YedekMailGirdisi = {
   geriYukleme: { tablo_sayisi: number; birebir: number; bag_sorunlari: { bag: string; kirik: number }[] } | null;
   uyarilar: string[];
   kullaniciSayisi: number | null;
+  /** Elle istenen test gonderimi: ustte bilgi notu. */
+  test?: boolean;
 };
 
 const LACIVERT = "#283474";
@@ -197,6 +199,7 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Günlük Veri Yedeği</div></td>
     <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(g.tarih)}</div><div style="font-size:11px;color:#94A3B8">Otomatik yedek · ${esc(g.saat)}</div></td>
   </tr></table>
+  ${g.test ? `<div style="margin-top:14px;border:1px dashed #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST GÖNDERİMİ</b> · Bu mail elle istenen bir denemedir; içerik ve ekteki yedek gerçektir. Otomatik yedek her gece 03:00'te gönderilir.</div>` : ""}
   ${bant}
   ${kutular}
 

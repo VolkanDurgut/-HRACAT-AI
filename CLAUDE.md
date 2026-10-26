@@ -734,6 +734,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Kötüye kullanım: son 24 saatte en fazla 3 test (`TEST_GUNLUK_SINIR`), aşılırsa HTTP 429.
   Tetikleme: SQL `net.http_post` (Bearer `cron.job` 'gunluk-yedek-maili' komutundan alınır,
   sohbette gösterilmez). İlk canlı test 26.10.2026 03:15 TR: 200, 1385 kayıt, 31/31.
+- ALICILAR (26.10.2026, v17): gece yedeği secret `YEDEK_ALICILARI` (virgülle; geçersiz adres
+  atlanır, tekrar edilen tek sayılır) adreslerine gider; secret yoksa `GERI_BILDIRIM_ALICI`.
+  TEST maili HER ZAMAN `GERI_BILDIRIM_ALICI`'ya (mesensei282) gider, şirkete test düşmez;
+  test notunda "Gece yedeğinin alıcıları: …" yazar. `GERI_BILDIRIM_ALICI` DEĞİŞTİRİLMEZ
+  (Sorun Bildir mailleri de onu kullanır). Kullanıcı kararı: onaydan sonra
+  `YEDEK_ALICILARI` = bbt@unex.com.tr, execution@unex.com.tr.
   `denetim_kayitlari` sadece son 7 günüyle girer; `depositors` ve
   `contact_messages` bilerek hariç.
 - Tablolar 1000'erlik sayfalarla çekilir; okunamayan tablo mail konusunda

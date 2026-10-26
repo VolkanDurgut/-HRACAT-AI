@@ -5,7 +5,7 @@ import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 // GUNLUK VERI YEDEGI (yedekleme-gonder)
 // ============================================================================
 // Her gece 00:00 UTC (03:00 TR) pg_cron "gunluk-yedek-maili" isiyle tetiklenir
-// ve veritabaninin JSON yedegini mail eki olarak YEDEK_ALICI adresine gonderir.
+// ve veritabaninin JSON yedegini mail eki olarak YEDEK_ALICILARI adreslerine gonderir.
 //
 // v2 (01.10.2026) iyilestirmeleri:
 //  - SAYFALAMA: PostgREST tek istekte en fazla 1000 satir dondurur. Eskiden
@@ -45,7 +45,7 @@ import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
 //    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
 //  - TEST MAILI (26.10.2026): govdede {"test_maili": true} -> 20 saatlik tekrar korumasi
-//    ATLANIR, ayni aliciya "[TEST]" konulu tam mail (ek dahil) gider, yedek_kayitlari'na
+//    ATLANIR, KISISEL_ALICI'ya (sirket adreslerine DEGIL) "[TEST]" konulu tam mail (ek dahil) gider, yedek_kayitlari'na
 //    durum='test' yazilir (gece yedeginin tekrar korumasina SAYILMAZ). Kotuye kullanim
 //    korumasi: son 24 saatte en fazla TEST_GUNLUK_SINIR test maili (migration 20261026031500).
 //  - KULLANICI LISTESI (05.10.2026): pakete "_kullanicilar" eklenir (kimlik,
@@ -59,7 +59,16 @@ import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const YEDEK_ALICI = Deno.env.get("GERI_BILDIRIM_ALICI") || "volkandurgut.tr@gmail.com";
+// Kisisel adres: TEST maili HER ZAMAN buraya gider (sirket adreslerine test dusmez).
+const KISISEL_ALICI = Deno.env.get("GERI_BILDIRIM_ALICI") || "volkandurgut.tr@gmail.com";
+// Gece yedeginin alicilari (26.10.2026): secret YEDEK_ALICILARI (virgulle). Yoksa / gecerli
+// adres yoksa KISISEL_ALICI. GERI_BILDIRIM_ALICI'yi degistirmek Sorun Bildir maillerini de
+// tasirdi; o yuzden ayri secret.
+const EPOSTA_DESENI = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+const YEDEK_ALICILARI = (() => {
+  const liste = (Deno.env.get("YEDEK_ALICILARI") || "").split(",").map((a) => a.trim()).filter((a) => EPOSTA_DESENI.test(a));
+  return liste.length ? [...new Set(liste)] : [KISISEL_ALICI];
+})();
 
 // Tum satirlariyla yedeklenen tablolar.
 const YEDEKLENECEK_TABLOLAR = [
@@ -496,6 +505,7 @@ Deno.serve(async (req: Request) => {
       uyarilar,
       kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,
       test: testMaili,
+      gercekAlicilar: YEDEK_ALICILARI,
     };
     const html = yedekMailHtml(mailGirdisi);
 
@@ -504,7 +514,7 @@ Deno.serve(async (req: Request) => {
     // ---- Mail ----
     const mailGovdesi: Record<string, unknown> = {
       from: "İhracat AI <bildirim@ihracatasistanim.com>",
-      to: [YEDEK_ALICI],
+      to: testMaili ? [KISISEL_ALICI] : YEDEK_ALICILARI,
       subject: `${testMaili ? "[TEST] " : ""}${yedekMailKonusu(mailGirdisi)}`,
       html,
     };
@@ -536,7 +546,7 @@ Deno.serve(async (req: Request) => {
       uyarilar,
     });
 
-    return jsonCevap({ ...ozet, test: testMaili });
+    return jsonCevap({ ...ozet, test: testMaili, aliciSayisi: testMaili ? 1 : YEDEK_ALICILARI.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bilinmeyen hata";
     console.error("Yedekleme hatasi:", message);

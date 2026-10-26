@@ -738,8 +738,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   atlanır, tekrar edilen tek sayılır) adreslerine gider; secret yoksa `GERI_BILDIRIM_ALICI`.
   TEST maili HER ZAMAN `GERI_BILDIRIM_ALICI`'ya (mesensei282) gider, şirkete test düşmez;
   test notunda "Gece yedeğinin alıcıları: …" yazar. `GERI_BILDIRIM_ALICI` DEĞİŞTİRİLMEZ
-  (Sorun Bildir mailleri de onu kullanır). Kullanıcı kararı: onaydan sonra
-  `YEDEK_ALICILARI` = bbt@unex.com.tr, execution@unex.com.tr.
+  (Sorun Bildir mailleri de onu kullanır). Kullanıcı onayıyla (26.10.2026 03:34)
+  `YEDEK_ALICILARI` = bbt@unex.com.tr, execution@unex.com.tr panelden girildi; ilk gece
+  yedeği bu adreslere 27.10.2026 03:00.
   `denetim_kayitlari` sadece son 7 günüyle girer; `depositors` ve
   `contact_messages` bilerek hariç.
 - Tablolar 1000'erlik sayfalarla çekilir; okunamayan tablo mail konusunda

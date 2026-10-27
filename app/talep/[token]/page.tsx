@@ -133,8 +133,6 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const taslakKalemleri = bilgi.taslak?.kalemler ?? [];
   const taslakOzet = listeOzeti({ kalemler: taslakKalemleri });
   const sonGonderim = bilgi.gecmis[0];
-  const bekleyen = bilgi.gecmis.filter((l) => l.durum === "bekliyor").length;
-  const alicilar = bilgi.test ? "yalnızca test adresine (mesensei282@gmail.com)" : "satın alma birimine (execution@) ve Burak Bey'e (bbt@)";
   const alimlar = bilgi.onaylananlar ?? [];
 
   return (
@@ -163,12 +161,6 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
               {sonGonderim ? <span>{sonGonderim.liste_no} <span className="font-normal" style={{ color: B.soluk }}>· {saTarih(sonGonderim.gonderim_zamani).slice(0, 10)}</span></span> : <span style={{ color: B.soluk }} className="font-medium">—</span>}
             </BilgiAlani>
           </div>
-          <div className="px-4 sm:px-6 py-2.5 border-t text-xs leading-relaxed" style={{ borderColor: B.cizgiAcik, backgroundColor: B.baslikZemin, color: B.soluk }}>
-            Süreç: <b style={{ color: B.metin }}>1.</b> Departman kalemleri ekler ve formu gönderir
-            <span className="mx-1.5">→</span><b style={{ color: B.metin }}>2.</b> Satın alma onayı (kalem bazında onay / red)
-            <span className="mx-1.5">→</span><b style={{ color: B.metin }}>3.</b> Onaylı satın alma fişi departmana iletilir.
-            {bekleyen > 0 && <span className="block sm:inline sm:ml-2 font-semibold" style={{ color: B.turuncu }}>{bekleyen} form onay bekliyor.</span>}
-          </div>
         </Panel>
 
         {gonderimSonucu && (
@@ -178,7 +170,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
               <p className="font-semibold" style={{ color: B.yesil }}>{gonderimSonucu.liste_no} numaralı talep formu gönderildi.</p>
               <p className="mt-0.5" style={{ color: B.metin }}>
                 {gonderimSonucu.mail === "gonderildi"
-                  ? (gonderimSonucu.test ? "Test modu: e-posta yalnızca test adresine gönderildi." : "Satın alma birimine ve Burak Bey'e e-posta ile iletildi. Sonucu aşağıdaki “Gönderilen talep formları” tablosundan takip edebilirsiniz.")
+                  ? (gonderimSonucu.test ? "Test modu: e-posta yalnızca test adresine gönderildi." : "Form onaya iletildi. Sonucu aşağıdaki “Gönderilen talep formları” tablosundan takip edebilirsiniz.")
                   : "Form kaydedildi ve onay ekranında görünüyor; e-posta şu an gönderilemedi. Ayrıca bir işlem yapmanıza gerek yok."}
               </p>
             </div>
@@ -260,8 +252,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
           {taslakKalemleri.length > 0 && (
             <div className="px-4 sm:px-5 py-3.5 border-t" style={{ borderColor: B.cizgi }}>
               {!gonderOnay ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs" style={{ color: B.soluk }}>Form gönderildiğinde talep numarası verilir ve {alicilar} e-posta ile iletilir.</p>
+                <div className="flex justify-end">
                   <button onClick={() => { setListeHatasi(null); setGonderOnay(true); }} className={`${dugmeAna} w-full sm:w-auto`} style={{ backgroundColor: B.lacivert }}>
                     <Send size={14} /> Formu onaya gönder
                   </button>
@@ -270,7 +261,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                 <div className="border rounded-[4px] p-3.5 sm:p-4" style={{ borderColor: B.cizgi, backgroundColor: B.baslikZemin }}>
                   <p className="text-sm font-semibold">Talep formu onaya gönderilsin mi?</p>
                   <p className="text-[13px] mt-1" style={{ color: B.soluk }}>
-                    {taslakOzet.toplam} kalem {alicilar} iletilecek. Gönderilen forma kalem eklenemez ya da silinemez; yeni kalemler yeni bir forma girer.
+                    {taslakOzet.toplam} kalem satın alma onayına gönderilecek.{bilgi.test ? " (Test modu: e-posta yalnızca test adresine gider.)" : ""} Gönderilen forma kalem eklenemez ya da silinemez; yeni kalemler yeni bir forma girer.
                   </p>
                   <p className="text-[13px] mt-1.5">Gönderen: <b>{ad.trim() || "—"}</b></p>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">

@@ -1943,6 +1943,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     (kullanıcı onaylı UPDATE), edge `satin-alma` v3 (duman: bilgi 200, departman test=false,
     gönderilmiş form test=true).
 
+## Satın Alma — ad soyad zorunlu, canlıya geçiş (27.10.2026)
+
+- Kullanıcı: "Satın alma kısmını tam anlamıyla kontrol edelim, aktif hale getireceğiz, test
+  verilerini silelim. Her departman satın alma oluştururken isim belirtmeli; Volkan Durgut
+  olarak gelmemeli." Sebep: talep formu adı localStorage'da (`sa-talep-ad`) HATIRLIYORDU.
+- `/talep`: ad artık hatırlanmaz (eski anahtar ilk açılışta silinir); "Talep eden" her
+  oturumda yazılır; gönderim onayında ayrı "Gönderen (ad soyad)" alanı (bu oturumda yazılan
+  geçerli ad varsa onunla dolar, yoksa boş). `/cek`: "Teslim alan" hatırlanmaz (`sa-cek-ad`
+  silinir), "alındı" işaretlerken ad soyad ZORUNLU (geri alırken değil).
+- Kural (en az iki kelime, her biri ≥2 karakter, rakam/@ yok, boşluklar teke iner) TEK
+  tanım iki yerde birebir: `_shared/satin-alma.ts` `adSoyadGecerli/adSoyadDuzelt` ve
+  migration `20261027180000_satin_alma_ad_soyad.sql` `sa_ad_soyad_gecerli/duzelt`
+  (`sa_token_kalem_ekle`, `sa_token_liste_gonder`, `sa_cek_token_isaretle` sunucuda da
+  zorunlu tutar). Uygulama içi işaretleme (e-posta ile) değişmedi. Edge function değişmedi.
+- DİKKAT: `sa_yetki_kontrol` = `satin_alma` sayfa yetkisi → bu yetkisi olan HERKES karar
+  verebilir (27.10 canlı: bbt@, volkandurgut.tr@, operation@, ihracat@).
+
 ## Yazı animasyonu (27.10.2026)
 
 - Kullanıcı: Proforma Yükle karşılama mesajı "chatte yazıyor gibi" yazılsın; diğer sayfalarda

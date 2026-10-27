@@ -78,6 +78,14 @@ export type SaListe = {
   kalemler: SaKalem[];
 };
 
+/** Ad soyad (27.10.2026): bosluklar teke iner. Veritabanindaki sa_ad_soyad_duzelt ile AYNI. */
+export const adSoyadDuzelt = (s: string | null | undefined) => (s || "").replace(/\s+/g, " ").trim().slice(0, 80);
+/** En az iki kelime, her biri en az 2 karakter, rakam / @ yok (sa_ad_soyad_gecerli ile AYNI). */
+export const adSoyadGecerli = (s: string | null | undefined) => {
+  const t = adSoyadDuzelt(s);
+  return /^[^ ]{2,}( [^ ]{2,})+$/.test(t) && !/[0-9@]/.test(t);
+};
+
 /** 5 -> "5", 2.5 -> "2,5" */
 export function miktarYaz(m: number | string): string {
   const n = Number(m);

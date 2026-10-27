@@ -9,7 +9,7 @@ import {
 import { satinAlmaCagir, miktarOku } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
 import {
-  BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih,
+  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarYaz, saTarih,
   type Birim, type Kategori, type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -26,7 +26,9 @@ import {
 type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden" | "alindi" | "alinma_zamani"> & { liste_no: string; karar_zamani: string };
 type Bilgi = { departman: string; test?: boolean; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
 
-const AD_ANAHTAR = "sa-talep-ad";
+// 27.10.2026: ad tarayicida HATIRLANMAZ (kullanici: "her departman isim belirtmeli,
+// Volkan Durgut olarak gelmemeli"). Eski surumun kaydettigi deger ilk acilista silinir.
+const ESKI_AD_ANAHTARI = "sa-talep-ad";
 const ALIM_SAYFA = 15;
 
 type Form = { kategori: Kategori | ""; urun: string; miktar: string; birim: Birim; aciliyet: "normal" | "acil"; aciklama: string };
@@ -41,6 +43,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const [sayfaHatasi, setSayfaHatasi] = useState<string | null>(null);
 
   const [ad, setAd] = useState("");
+  const [gonderen, setGonderen] = useState("");
   const [form, setForm] = useState<Form>(BOS_FORM);
   const [formHatasi, setFormHatasi] = useState<string | null>(null);
   const [ekleniyor, setEkleniyor] = useState(false);
@@ -54,7 +57,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const [acikGecmis, setAcikGecmis] = useState<string | null>(null);
   const [alimSayisi, setAlimSayisi] = useState(ALIM_SAYFA);
 
-  useEffect(() => { try { setAd(window.localStorage.getItem(AD_ANAHTAR) || ""); } catch { /* yoksay */ } }, []);
+  useEffect(() => { try { window.localStorage.removeItem(ESKI_AD_ANAHTARI); } catch { /* yoksay */ } }, []);
 
   const getir = useCallback(async (sessiz = false) => {
     if (!tokenBicimiGecerli(params.token)) { setSayfaHatasi("Bağlantı geçersiz. Lütfen size iletilen bağlantıyı kullanın."); setYukleniyor(false); return; }
@@ -67,7 +70,6 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   }, [params.token]);
   useEffect(() => { getir(); }, [getir]);
 
-  const adKaydet = (deger: string) => { try { if (deger.trim()) window.localStorage.setItem(AD_ANAHTAR, deger.trim()); } catch { /* yoksay */ } };
   const alan = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   const ekle = async (e: React.FormEvent) => {
@@ -75,15 +77,14 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
     setFormHatasi(null);
     setGonderimSonucu(null);
     const miktar = miktarOku(form.miktar);
-    if (ad.trim().length < 2) return setFormHatasi("Talep eden kişinin adını ve soyadını yazın.");
+    if (!adSoyadGecerli(ad)) { document.getElementById("sa-ad")?.focus(); return setFormHatasi("Talep eden kişinin adını ve soyadını yazın (ör. Ayşe Yılmaz)."); }
     if (!form.kategori) return setFormHatasi("Kategori seçin.");
     if (form.urun.trim().length < 2) return setFormHatasi("Ürün / hizmet tanımını yazın.");
     if (miktar === null) return setFormHatasi("Miktarı sayı olarak yazın (ör. 5 ya da 2,5).");
     setEkleniyor(true);
-    adKaydet(ad);
     const r = await satinAlmaCagir<{ id: string }>({
       islem: "kalem_ekle", token: params.token,
-      kalem: { kategori: form.kategori, urun: form.urun.trim(), miktar, birim: form.birim, aciliyet: form.aciliyet, aciklama: form.aciklama.trim(), talep_eden: ad.trim() },
+      kalem: { kategori: form.kategori, urun: form.urun.trim(), miktar, birim: form.birim, aciliyet: form.aciliyet, aciklama: form.aciklama.trim(), talep_eden: adSoyadDuzelt(ad) },
     });
     setEkleniyor(false);
     if (!r.ok) { setFormHatasi(r.hata); return; }
@@ -105,10 +106,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
 
   const gonder = async () => {
     setListeHatasi(null);
-    if (ad.trim().length < 2) { setListeHatasi("Gönderen olarak adınızı ve soyadınızı “Talep eden” alanına yazın."); setGonderOnay(false); return; }
+    if (!adSoyadGecerli(gonderen)) { setListeHatasi("Formu gönderen kişinin adını ve soyadını yazın (ör. Ayşe Yılmaz)."); document.getElementById("sa-gonderen")?.focus(); return; }
     setGonderiliyor(true);
-    adKaydet(ad);
-    const r = await satinAlmaCagir<{ liste_no: string; mail: string; test?: boolean }>({ islem: "gonder", token: params.token, gonderen: ad.trim() });
+    const r = await satinAlmaCagir<{ liste_no: string; mail: string; test?: boolean }>({ islem: "gonder", token: params.token, gonderen: adSoyadDuzelt(gonderen) });
     setGonderiliyor(false);
     setGonderOnay(false);
     if (!r.ok) { setListeHatasi(r.hata); getir(true); return; }
@@ -184,7 +184,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
           <form onSubmit={ekle} noValidate className="px-4 sm:px-5 py-4 border-b" style={{ borderColor: B.cizgi, backgroundColor: "#FAFBFC" }}>
             <div className="grid grid-cols-2 sm:grid-cols-12 gap-x-3 gap-y-3">
               <Etiket metin="Talep eden (ad soyad)" htmlFor="sa-ad" className="col-span-2 sm:col-span-3">
-                <input id="sa-ad" value={ad} onChange={(e) => setAd(e.target.value)} onBlur={() => adKaydet(ad)} maxLength={80} autoComplete="name"
+                <input id="sa-ad" value={ad} onChange={(e) => setAd(e.target.value)} maxLength={80} autoComplete="off"
                   placeholder="Ad Soyad" className={girdiSinifi} style={girdiStil} />
               </Etiket>
               <Etiket metin="Kategori" htmlFor="sa-kategori" className="col-span-2 sm:col-span-3">
@@ -253,7 +253,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
             <div className="px-4 sm:px-5 py-3.5 border-t" style={{ borderColor: B.cizgi }}>
               {!gonderOnay ? (
                 <div className="flex justify-end">
-                  <button onClick={() => { setListeHatasi(null); setGonderOnay(true); }} className={`${dugmeAna} w-full sm:w-auto`} style={{ backgroundColor: B.lacivert }}>
+                  <button onClick={() => { setListeHatasi(null); setGonderen(adSoyadGecerli(ad) ? adSoyadDuzelt(ad) : ""); setGonderOnay(true); }} className={`${dugmeAna} w-full sm:w-auto`} style={{ backgroundColor: B.lacivert }}>
                     <Send size={14} /> Formu onaya gönder
                   </button>
                 </div>
@@ -263,7 +263,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                   <p className="text-[13px] mt-1" style={{ color: B.soluk }}>
                     {taslakOzet.toplam} kalem satın alma onayına gönderilecek.{bilgi.test ? " (Test modu: e-posta yalnızca test adresine gider.)" : ""} Gönderilen forma kalem eklenemez ya da silinemez; yeni kalemler yeni bir forma girer.
                   </p>
-                  <p className="text-[13px] mt-1.5">Gönderen: <b>{ad.trim() || "—"}</b></p>
+                  <label htmlFor="sa-gonderen" className="block text-[10.5px] font-semibold uppercase tracking-[0.07em] mt-3 mb-1" style={{ color: B.soluk }}>Gönderen (ad soyad)</label>
+                  <input id="sa-gonderen" value={gonderen} onChange={(e) => setGonderen(e.target.value)} maxLength={80} autoComplete="off"
+                    placeholder="Ad Soyad" className={`${girdiSinifi} sm:max-w-xs`} style={girdiStil} />
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <button onClick={() => setGonderOnay(false)} disabled={gonderiliyor} className={dugmeIkincil} style={{ borderColor: B.cizgi }}>Vazgeç</button>
                     <button onClick={gonder} disabled={gonderiliyor} className={dugmeAna} style={{ backgroundColor: B.lacivert }}>

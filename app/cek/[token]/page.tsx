@@ -7,7 +7,7 @@ import {
 } from "@/components/satin-alma-belge";
 import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
-import { BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih, type SaKalem, type SaListe } from "@/supabase/functions/_shared/satin-alma";
+import { BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarYaz, saTarih, type SaKalem, type SaListe } from "@/supabase/functions/_shared/satin-alma";
 
 /**
  * ONAYLI SATIN ALMA FISI (26.10.2026 "cek listesi"; kurumsal belge 27.10.2026) - girissiz.
@@ -18,7 +18,9 @@ import { BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih, type SaKalem, ty
  * olur (Satin Alma sayfasinda ve departmanin talep baglantisinda da gorunur).
  */
 
-const AD_ANAHTAR = "sa-cek-ad";
+// 27.10.2026: teslim alanin adi tarayicida HATIRLANMAZ; "alindi" isaretlerken ad soyad
+// zorunlu (sunucuda da). Eski surumun kaydettigi deger ilk acilista silinir.
+const ESKI_AD_ANAHTARI = "sa-cek-ad";
 
 export default function SatinAlmaFisi({ params }: { params: { token: string } }) {
   const [liste, setListe] = useState<SaListe | null>(null);
@@ -30,7 +32,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
   const [ad, setAd] = useState("");
   const [kopyalandi, setKopyalandi] = useState(false);
 
-  useEffect(() => { try { setAd(window.localStorage.getItem(AD_ANAHTAR) || ""); } catch { /* yoksay */ } }, []);
+  useEffect(() => { try { window.localStorage.removeItem(ESKI_AD_ANAHTARI); } catch { /* yoksay */ } }, []);
 
   const getir = useCallback(async (sessiz = false) => {
     if (!tokenBicimiGecerli(params.token)) { setHata("Bağlantı geçersiz. Lütfen e-postadaki düğmeyi kullanın."); setYukleniyor(false); return; }
@@ -44,9 +46,13 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
 
   const isaretle = async (k: SaKalem) => {
     setIslemHatasi(null);
+    if (!k.alindi && !adSoyadGecerli(ad)) {
+      setIslemHatasi("Teslim alındı olarak işaretlemek için üstteki “Teslim alan” alanına adınızı ve soyadınızı yazın.");
+      document.getElementById("sa-teslim-alan")?.focus();
+      return;
+    }
     setIsleniyor(k.id);
-    try { if (ad.trim()) window.localStorage.setItem(AD_ANAHTAR, ad.trim()); } catch { /* yoksay */ }
-    const r = await satinAlmaCagir<SaListe>({ islem: "cek_isaretle", token: params.token, kalem_id: k.id, alindi: !k.alindi, ad: ad.trim() });
+    const r = await satinAlmaCagir<SaListe>({ islem: "cek_isaretle", token: params.token, kalem_id: k.id, alindi: !k.alindi, ad: adSoyadDuzelt(ad) });
     setIsleniyor(null);
     if (!r.ok) { setIslemHatasi(r.hata); return; }
     setListe(r.veri);
@@ -89,7 +95,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
         </button>
         <label className="ml-auto w-full sm:w-60">
           <span className="block text-[10.5px] font-semibold uppercase tracking-[0.07em] mb-1" style={{ color: B.soluk }}>Teslim alan (işaretleyen)</span>
-          <input value={ad} onChange={(e) => setAd(e.target.value)} maxLength={80} placeholder="Ad Soyad" className={girdiSinifi} style={girdiStil} />
+          <input id="sa-teslim-alan" value={ad} onChange={(e) => setAd(e.target.value)} maxLength={80} placeholder="Ad Soyad" autoComplete="off" className={girdiSinifi} style={girdiStil} />
         </label>
       </div>
       {liste.test && <div className="mb-3 print:mb-2"><TestSeridi>Bu fiş test departmanına aittir; e-postaları yalnızca test adresine gönderilir.</TestSeridi></div>}

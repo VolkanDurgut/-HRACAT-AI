@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 // Departman satin alma talebi (26.10.2026): girissiz, departmana ozel kalici baglanti.
 // Arama motorlarina kapali.
 export const metadata: Metadata = {
-  title: "Satın Alma Talebi · Unex Gıda",
-  description: "Unex Gıda departman ihtiyaç listesi",
+  title: "Satın Alma Talep Formu · Unex Gıda",
+  description: "Unex Gıda departman satın alma talep formu",
   robots: { index: false, follow: false },
 };
 

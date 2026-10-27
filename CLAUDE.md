@@ -1880,6 +1880,32 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   token yenileme), edge function Node'da gerçek PG köprüsüyle (32 kontrol), Playwright e2e
   (girişsiz sayfa masaüstü/mobil, ortak taslak iki cihaz, gönderim maili, karar, sonuç maili,
   departman ekle / token yenile, yetkisiz yönlendirme, geçersiz bağlantı).
+- 27.10.2026 GÜNCELLEME (migration `20261027100000_satin_alma_test_sil.sql`):
+  - TEST DEPARTMANI: `satin_alma_departmanlari.test` (varsayılan false). Test departmanının
+    talep + sonuç + tekrar gönderim mailleri SADECE `SATIN_ALMA_TEST_ALICISI` (varsayılan
+    mesensei282@gmail.com) adresine gider, konu "[TEST] " ile başlar, mailde sarı test şeridi.
+    `sa_liste_json` ve `sa_token_bilgi` `test` döner; edge function yanıtlarında `test`.
+    Uygulamada Departmanlar tablosunda "E-posta: Gerçek / Test" anahtarı, listelerde TEST
+    rozeti; talep formu ve fişte "TEST MODU" şeridi. Kullanıcıya önerilen test yolu: ayrı bir
+    test departmanı ekle → Test yap → bağlantıdan form gönder → onayla → fişi aç → sil.
+  - `sa_departman_kaydet(p_id, p_ad, p_aktif, p_test default null)`: eski 3 parametreli sürüm
+    kaldırıldı (3 adlı parametreli çağrı yeni sürüme düşer, test değişmez).
+  - DEPARTMAN SİLME: `sa_departman_sil(p_id)` (yetki + şirket kontrollü) önce listeleri
+    (kalemler cascade) sonra departmanı KALICI siler, `{departman, liste, kalem}` döner.
+    Arayüzde çöp kutusu + ConfirmDialog (destructive) liste / kalem / bekleyen / aktif fiş
+    sayısını yazar ve "Pasif" önerir.
+  - KURUMSAL TASARIM (kullanıcı: "form görünüşünü beğenmedim, daha profesyonel b2b"):
+    `/talep` ve `/cek` artık `components/satin-alma-belge.tsx` (ince lacivert bant, 4px
+    köşe, tablo düzeni, nokta+metin durum etiketleri) kullanır; `GenelSayfaCerceve` diğer
+    girişsiz sayfalar için AYNEN duruyor. `/talep` = "Satın Alma Talep Formu" (belge başlığı,
+    tek satırlık kalem girişi, kalem tablosu / mobilde liste, "Formu onaya gönder", gönderilen
+    formlar ve onaylanan alımlar tabloları). `/cek` = "ONAYLI SATIN ALMA FİŞİ" A4 belge (fiş
+    no, bilgi tablosu, onaylanan kalemler + teslim alındı kutusu, reddedilenler, 3 imza
+    alanı; `@page A4`, yazdır / PDF tek sayfa). Mail metinleri "çek listesi" yerine "Onaylı
+    satın alma fişi"; uygulamada sekme "Onaylı fişler" + "Satın alma fişini aç" / "Fiş
+    bağlantısını kopyala" (Volkan fişi ilgili departmana iletir). DB adları (`cek_*`) aynı.
+  - Edge: Postgres'in İngilizce "permission denied for function" (42501) mesajı Türkçe
+    "Bu işlem için yetkiniz yok…" olarak döner.
 
 ## Genel çalışma prensibi
 

@@ -61,6 +61,8 @@ export type SaListe = {
   departman: string;
   departman_id?: string;
   sirket: string | null;
+  /** Test departmani: mailler SADECE test adresine gider, konu "[TEST] " ile baslar. */
+  test?: boolean;
   gonderen_ad: string | null;
   gonderim_zamani: string | null;
   karar_veren_email: string | null;
@@ -112,7 +114,10 @@ const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</
 const LACIVERT = "#1B2352";
 const SEFTALI = "#F4A07C";
 
-function cerceve(ust: string, baslik: string, govde: string): string {
+function cerceve(ust: string, baslik: string, govde: string, test = false): string {
+  const testSeridi = test
+    ? `<tr><td style="background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;padding:10px 28px;border-bottom:1px solid #FCD34D;">TEST · Bu e-posta test departmanından gönderildi. Gerçek alıcılara (execution@ / bbt@) gönderilmedi.</td></tr>`
+    : "";
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;background:#F3F2EE;font-family:Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F2EE;padding:24px 0;"><tr><td align="center">
@@ -123,6 +128,7 @@ function cerceve(ust: string, baslik: string, govde: string): string {
 <td style="vertical-align:middle;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">${kacis(ust)}</p>
 <p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">${kacis(baslik)}</p></td>
 </tr></table></td></tr>
+${testSeridi}
 <tr><td style="padding:24px 28px;">${govde}</td></tr>
 </table></td></tr></table></body></html>`;
 }
@@ -154,26 +160,28 @@ const dugme = (metin: string, adres: string) => `<p style="margin:8px 0 6px;"><a
 
 const altNot = (metin: string) => `<p style="margin:8px 0 0;color:#8B91A8;font-size:12px;line-height:1.5;">${kacis(metin)}</p>`;
 
+const testKonu = (l: SaListe, konu: string) => (l.test ? `[TEST] ${konu}` : konu);
+
 /** Departman listeyi gonderdi -> execution@ + bbt@ */
 export function gonderimMaili(l: SaListe): { konu: string; html: string } {
   const o = listeOzeti(l);
   const konu = `Satın alma talebi: ${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
-  const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;"><b>${kacis(l.departman)}</b> departmanı ihtiyaç listesini gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.</p>
-${bilgiTablosu([["Liste no", l.liste_no || "-"], ["Departman", l.departman], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", `${o.toplam}${o.acil ? ` (${o.acil} acil)` : ""}`]])}
+  const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;"><b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.</p>
+${bilgiTablosu([["Talep no", l.liste_no || "-"], ["Departman", l.departman], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", `${o.toplam}${o.acil ? ` (${o.acil} acil)` : ""}`]])}
 ${kalemTablosu(l.kalemler)}
-${dugme("Listeyi incele ve onayla", yonetimAdresi(l.id))}
-${altNot("Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Karar verildiğinde onaylanan kalemler satın almaya (execution) iletilir.")}`;
-  return { konu, html: cerceve("UNEX GIDA · SATIN ALMA", "Yeni ihtiyaç listesi", govde) };
+${dugme("Talebi incele ve karar ver", yonetimAdresi(l.id))}
+${altNot("Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Karar verildiğinde onaylı satın alma fişi execution@ adresine iletilir.")}`;
+  return { konu: testKonu(l, konu), html: cerceve("UNEX GIDA · SATIN ALMA", "Satın alma talep formu", govde, l.test) };
 }
 
-/** Burak Bey karar verdi -> execution@: departman etiketli, onaylanan kalemlerin CEK LISTESI.
- * execution@ bu maili ilgili departmana iletebilir (konu "[Departman] ..." ile baslar). */
+/** Burak Bey karar verdi -> execution@: departman etiketli ONAYLI SATIN ALMA FISI
+ * (veritabaninda "cek listesi"). execution@ fis baglantisini ilgili departmana iletir. */
 export function sonucMaili(l: SaListe): { konu: string; html: string } {
   const o = listeOzeti(l);
   const onaylar = l.kalemler.filter((k) => k.karar === "onaylandi");
   const redler = l.kalemler.filter((k) => k.karar === "reddedildi");
   const konu = o.onay
-    ? `[${l.departman}] Onaylı satın alma çek listesi · ${l.liste_no} (${o.onay} kalem${o.red ? `, ${o.red} reddedildi` : ""})`
+    ? `[${l.departman}] Onaylı satın alma fişi · ${l.liste_no} (${o.onay} kalem${o.red ? `, ${o.red} reddedildi` : ""})`
     : `[${l.departman}] Satın alma talebi reddedildi · ${l.liste_no}`;
   const bolum = (baslik: string, renk: string) => `<p style="margin:6px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${renk};border-left:4px solid ${SEFTALI};padding-left:8px;">${kacis(baslik)}</p>`;
   const kutu = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #283474;border-radius:3px;"></span>`;
@@ -181,14 +189,14 @@ export function sonucMaili(l: SaListe): { konu: string; html: string } {
 <tr>${th("✓")}${th("Ürün")}${th("Miktar", true)}${th("Aciliyet")}${th("Talep eden")}</tr>
 ${onaylar.map((k) => kalemSatiri(k, td(kutu, "width:22px;"), true)).join("")}</table>`;
   const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;">${o.onay
-    ? `<b>${kacis(l.departman)}</b> departmanının listesinde <b>${o.onay} kalem onaylandı</b>. Aşağıdaki çek listesi <b>aktiftir</b>; alınan kalemleri düğmedeki sayfadan işaretleyin. Bu e-postayı ilgili departmana iletebilirsiniz.`
-    : `<b>${kacis(l.departman)}</b> departmanının listesindeki kalemlerin hiçbiri onaylanmadı.`}</p>
-${bilgiTablosu([["Departman", l.departman], ["Liste no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay", saTarih(l.karar_zamani)], ...(o.onay ? [["Çek listesi", `Aktif · ${o.onay} kalem`] as [string, string]] : []), ...(l.karar_notu ? [["Not", l.karar_notu] as [string, string]] : [])])}
-${onaylar.length ? `${bolum(`Unex çek listesi · onaylanan kalemler (${onaylar.length})`, "#047857")}${cekTablosu}` : ""}
+    ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişi <b>aktiftir</b>; alınan kalemleri fiş sayfasından işaretleyin. Fiş bağlantısını ya da yazdırılmış fişi ilgili departmana iletebilirsiniz.`
+    : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`}</p>
+${bilgiTablosu([["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay", saTarih(l.karar_zamani)], ...(o.onay ? [["Fiş durumu", `Aktif · ${o.onay} kalem`] as [string, string]] : []), ...(l.karar_notu ? [["Not", l.karar_notu] as [string, string]] : [])])}
+${onaylar.length ? `${bolum(`Onaylanan kalemler (${onaylar.length})`, "#047857")}${cekTablosu}` : ""}
 ${redler.length ? `${bolum(`Reddedilen kalemler (${redler.length})`, "#B91C1C")}${kalemTablosu(redler, true)}` : ""}
-${o.onay && l.cek_token ? dugme("Çek listesini aç · alındı işaretle", cekAdresi(l.cek_token)) : dugme("Listeyi uygulamada aç", yonetimAdresi(l.id))}
+${o.onay && l.cek_token ? dugme("Satın alma fişini aç", cekAdresi(l.cek_token)) : dugme("Listeyi uygulamada aç", yonetimAdresi(l.id))}
 ${altNot(o.onay
-  ? "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Düğmedeki bağlantıyı açan herkes kalemleri “alındı” olarak işaretleyebilir; tüm kalemler alınınca çek listesi tamamlanır. Departman sonucu kendi talep bağlantısında da görür."
+  ? "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Fiş bağlantısını açan herkes kalemleri “alındı” olarak işaretleyebilir; tüm kalemler alınınca fiş tamamlanır. Departman sonucu kendi talep bağlantısında da görür."
   : "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Departman sonucu kendi talep bağlantısında görür.")}`;
-  return { konu, html: cerceve("UNEX GIDA · SATIN ALMA", o.onay ? "Onaylı çek listesi" : "Liste reddedildi", govde) };
+  return { konu: testKonu(l, konu), html: cerceve("UNEX GIDA · SATIN ALMA", o.onay ? "Onaylı satın alma fişi" : "Talep reddedildi", govde, l.test) };
 }

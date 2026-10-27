@@ -24,6 +24,9 @@ import { gonderimMaili, sonucMaili, type SaListe } from "../_shared/satin-alma.t
 // Alicilar secret ile degistirilebilir (virgulle):
 //   SATIN_ALMA_ALICILARI       (varsayilan execution@ + bbt@)
 //   SATIN_ALMA_SONUC_ALICILARI (varsayilan execution@)
+//   SATIN_ALMA_TEST_ALICISI    (varsayilan mesensei282@gmail.com)
+// TEST DEPARTMANI (27.10.2026): departmanin "test" bayragi aciksa o departmanin
+// talep ve sonuc mailleri SADECE test alicisina gider, konu "[TEST] " ile baslar.
 // Mail gonderilemezse liste YINE kaydedilir; durum "hata" olarak isaretlenir,
 // Satin Alma sayfasindan "Maili tekrar gonder" ile yeniden denenir.
 // ============================================================================
@@ -41,6 +44,7 @@ function alicilar(ad: string, varsayilan: string[]): string[] {
 }
 const GONDERIM_ALICILARI = alicilar("SATIN_ALMA_ALICILARI", ["execution@unex.com.tr", "bbt@unex.com.tr"]);
 const SONUC_ALICILARI = alicilar("SATIN_ALMA_SONUC_ALICILARI", ["execution@unex.com.tr"]);
+const TEST_ALICILARI = alicilar("SATIN_ALMA_TEST_ALICISI", ["mesensei282@gmail.com"]);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -72,7 +76,11 @@ async function rpc<T>(ad: string, govde: Record<string, unknown>, yetki: "servis
     let kod = "";
     try { const j = JSON.parse(metin); mesaj = j.message || metin; kod = j.code || ""; } catch { /* duz metin */ }
     // Veritabani fonksiyonlarinin Turkce mesajlari (raise exception) aynen iletilir
-    if (kod === "42501" || res.status === 401 || res.status === 403) throw new KullaniciHatasi(kod === "42501" ? mesaj : "Oturum doğrulanamadı. Sayfayı yenileyip tekrar deneyin.", 403);
+    if (kod === "42501" || res.status === 401 || res.status === 403) {
+      // Postgres'in Ingilizce "permission denied for function ..." mesaji kullaniciya Turkce
+      const turkce = kod === "42501" && !/^permission denied/i.test(mesaj) ? mesaj : kod === "42501" ? "Bu işlem için yetkiniz yok. Uygulamaya giriş yapıp tekrar deneyin." : "Oturum doğrulanamadı. Sayfayı yenileyip tekrar deneyin.";
+      throw new KullaniciHatasi(turkce, 403);
+    }
     if (kod === "P0002") throw new KullaniciHatasi(mesaj, 404);
     if (["23514", "23505", "22023", "22P02"].includes(kod) || res.status === 400 || res.status === 409) {
       throw new KullaniciHatasi(kod === "22P02" ? "Geçersiz istek." : mesaj, 400);
@@ -94,7 +102,7 @@ async function resendGonder(to: string[], konu: string, html: string): Promise<v
 
 /** Maili gonderir, sonucu listeye yazar. Hata FIRLATMAZ: liste zaten kaydedildi. */
 async function mailGonderVeKaydet(tur: "gonderim" | "sonuc", liste: SaListe): Promise<{ mail: "gonderildi" | "hata"; alicilar: string[] }> {
-  const to = tur === "gonderim" ? GONDERIM_ALICILARI : SONUC_ALICILARI;
+  const to = liste.test === true ? TEST_ALICILARI : tur === "gonderim" ? GONDERIM_ALICILARI : SONUC_ALICILARI;
   try {
     const { konu, html } = tur === "gonderim" ? gonderimMaili(liste) : sonucMaili(liste);
     await resendGonder(to, konu, html);
@@ -145,7 +153,7 @@ Deno.serve(async (req: Request) => {
       // gonder
       const liste = await rpc<SaListe>("sa_token_liste_gonder", { p_token: token, p_gonderen: metin(govde.gonderen, 80) });
       const sonuc = await mailGonderVeKaydet("gonderim", liste);
-      return json({ basarili: true, liste_no: liste.liste_no, mail: sonuc.mail });
+      return json({ basarili: true, liste_no: liste.liste_no, mail: sonuc.mail, test: liste.test === true });
     }
 
     // ---------------- Girissiz cek listesi ----------------
@@ -174,14 +182,14 @@ Deno.serve(async (req: Request) => {
         }));
         const liste = await rpc<SaListe>("sa_karar_ver", { p_liste_id: govde.liste_id, p_kararlar: kararlar, p_not: metin(govde.not, 500) || null }, yetki);
         const sonuc = await mailGonderVeKaydet("sonuc", liste);
-        return json({ basarili: true, mail: sonuc.mail, alicilar: sonuc.alicilar });
+        return json({ basarili: true, mail: sonuc.mail, alicilar: sonuc.alicilar, test: liste.test === true });
       }
       const tur = govde.tur === "sonuc" ? "sonuc" : govde.tur === "gonderim" ? "gonderim" : null;
       if (!tur) return json({ hata: "Geçersiz mail türü." }, 400);
       const liste = await rpc<SaListe>("sa_liste_mail_verisi", { p_liste_id: govde.liste_id }, yetki);
       if (tur === "sonuc" && liste.durum !== "sonuclandi") return json({ hata: "Bu liste için henüz karar verilmedi." }, 400);
       const sonuc = await mailGonderVeKaydet(tur, liste);
-      return json({ basarili: sonuc.mail === "gonderildi", mail: sonuc.mail, alicilar: sonuc.alicilar });
+      return json({ basarili: sonuc.mail === "gonderildi", mail: sonuc.mail, alicilar: sonuc.alicilar, test: liste.test === true });
     }
 
     return json({ hata: "Bilinmeyen işlem." }, 400);

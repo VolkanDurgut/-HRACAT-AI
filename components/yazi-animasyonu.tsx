@@ -14,15 +14,23 @@ import React, { useEffect, useRef, useState } from "react";
  * - Toplam sure sinirli (enUzunMs): uzun metin is akisini yavaslatmaz.
  * - Sadece ILK yazimda animasyon: yazim bittikten sonra metin degisirse (ornegin
  *   "0 dosya" -> "12 dosya" veri yuklenince) yeniden yazilmaz, aninda guncellenir.
+ * - Bicimli metin (27.10.2026): `metin` yerine `parcalar` verilirse kalin / renkli
+ *   parcalar korunarak yazilir (ornek: Satin Alma "Departmanlar" bilgi kutusu).
  */
+export type YaziParcasi = { metin: string; sinif?: string; stil?: React.CSSProperties };
+
 export function YaziAnimasyonu({
-  metin,
+  metin: duzMetin,
+  parcalar,
   harfMs = 14,
   enUzunMs = 1100,
   gecikmeMs = 0,
   onBitti,
 }: {
-  metin: string;
+  /** Duz metin (ya da `parcalar`). */
+  metin?: string;
+  /** Bicimli parcalar; verilirse `metin` yerine kullanilir. */
+  parcalar?: YaziParcasi[];
   /** Harf basina hedef sure (ms). */
   harfMs?: number;
   /** Tum metnin en fazla yazilma suresi (ms). */
@@ -31,6 +39,7 @@ export function YaziAnimasyonu({
   gecikmeMs?: number;
   onBitti?: () => void;
 }) {
+  const metin = parcalar ? parcalar.map((p) => p.metin).join("") : (duzMetin ?? "");
   const [n, setN] = useState(0);
   const [bitti, setBitti] = useState(false);
   const bittiRef = useRef(false);
@@ -63,15 +72,26 @@ export function YaziAnimasyonu({
     return () => { clearTimeout(basla); if (zamanlayici) clearInterval(zamanlayici); };
   }, [metin, harfMs, enUzunMs, gecikmeMs]);
 
-  const gorunen = bitti ? metin : metin.slice(0, n);
+  const sinir = bitti ? metin.length : n;
+  // Parcalari ilk `sinir` harfe kadar keser (bicim korunur)
+  const ciz = (limit: number) => {
+    if (!parcalar) return metin.slice(0, limit);
+    let kalan = limit;
+    return parcalar.map((p, i) => {
+      if (kalan <= 0) return null;
+      const parca = p.metin.slice(0, kalan);
+      kalan -= p.metin.length;
+      return p.sinif || p.stil ? <span key={i} className={p.sinif} style={p.stil}>{parca}</span> : <React.Fragment key={i}>{parca}</React.Fragment>;
+    });
+  };
   return (
     <span className="relative block">
       <span className="sr-only">{metin}</span>
       {/* Yer ayirici: tam metin, gorunmez (satir sayisi bastan sabit) */}
-      <span aria-hidden="true" className="invisible">{metin}</span>
+      <span aria-hidden="true" className="invisible">{ciz(metin.length)}</span>
       <span aria-hidden="true" className="absolute inset-0">
-        {gorunen}
-        {!bitti && <span className="yazi-imlec" />}
+        {ciz(sinir)}
+        {!bitti && n > 0 && <span className="yazi-imlec" />}
       </span>
     </span>
   );

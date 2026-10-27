@@ -1052,9 +1052,20 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   yetki/kilit davranışı DEĞİŞMEDİ. Test `sf/e2e7.py`.
 - Supabase Auth'ta "Allow new users to sign up" KAPALI (kullanıcı teyit etti,
   01.10.2026).
-- `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar;
-  bilerek değiştirilmedi (yabancı biri Unex şirketine değil boş bir şirkete
-  düşer). Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in
+- `handle_new_user` tetikleyicisi yeni kullanıcıya KENDİ izole şirketini açar
+  (yabancı biri Unex şirketine değil boş bir şirkete düşer). İSTİSNA (27.10.2026,
+  migration `20261027160000_yeni_kullanici_unex.sql`, kullanıcı: "yeni kullanıcı eklediği
+  gibi Yetkilendirme sayfasında görünsün, yetki ayarları yapılıp kaydedilebilir hazır
+  olsun"): `@unex.com.tr` adresleri eklendiği an Unex'e bağlanır, rol `uretim` (dosya
+  verisi GÖRMEZ), TÜM sayfa/sekme yetkileri KAPALI ("YETKİ BEKLİYOR" rozeti). Diğer
+  adresler eskisi gibi kendi boş şirketine düşer ve Yetkilendirme'de "Onay bekleyen
+  kullanıcılar" bölümünde çıkar; "Unex'e ekle" (rol seçilir, yetkiler kapalı başlar).
+  RPC'ler (`yetki_kullanici_listesi` rol + kayıt/son giriş, `yetki_bekleyen_kullanicilar`,
+  `yetki_kullanici_ekle`, `yetki_rol_ata` — kendi rolü değişmez) SADECE süper admin
+  (`yetki_super_admin_sirketi`, RLS ile aynı sabit liste). Sayfada Rol sütunu (Yönetici /
+  İhracat / Muhasebe dosyaları görür), değişmeyen satırda Kaydet kapalı, kullanıcı sütunu
+  yatay kaydırmada sabit. Canlıda operation@unex.com.tr (26.10, kendi şirketinde) bu
+  bölümden eklenir. Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in
   kotası 100000.
 - Veritabanındaki `depositors` ve `contact_messages` tabloları (ve
   `atomic_upsert_pending_depositor` fonksiyonu) kullanıcının BAŞKA bir

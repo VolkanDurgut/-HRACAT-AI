@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabase";
 import { satinAlmaCagir } from "@/lib/satin-alma/api";
+import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 import { ACCENT, CARD_BG, CARD_BORDER, PAGE_BG, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
   KATEGORILER, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi,
@@ -660,11 +661,22 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
 
   return (
     <div className="space-y-4">
-      <p className="text-sm rounded-xl border px-4 py-3" style={{ ...kartStil, color: TEXT_MUTED }}>
-        Her departmanın <b className="text-white">girişsiz, kalıcı</b> bir bağlantısı var. Bağlantıyı departmandaki yetkili arkadaşlara iletin;
-        ortak listeye kalem ekleyip gönderebilirler. Bağlantı başkasının eline geçtiyse <b className="text-white">Yenile</b> ile eskisini geçersiz kılın.
-        <span className="block mt-1.5"><b className="text-amber-400">Test</b> işaretli departmanın talep ve onay e-postaları execution@ / bbt@ yerine <b className="text-white">yalnızca {TEST_ALICISI}</b> adresine gider; konu “[TEST]” ile başlar.</span>
-      </p>
+      <div className="text-sm rounded-xl border px-4 py-3" style={{ ...kartStil, color: TEXT_MUTED }}>
+        {/* 27.10.2026: diger bilgi metinleri gibi yazi animasyonuyla (bicim korunur) */}
+        <YaziAnimasyonu harfMs={10} enUzunMs={1300} parcalar={[
+          { metin: "Her departmanın " }, { metin: "girişsiz, kalıcı", sinif: "font-bold text-white" },
+          { metin: " bir bağlantısı var. Bağlantıyı departmandaki yetkili arkadaşlara iletin; ortak listeye kalem ekleyip gönderebilirler. Bağlantı başkasının eline geçtiyse " },
+          { metin: "Yenile", sinif: "font-bold text-white" }, { metin: " ile eskisini geçersiz kılın." },
+        ]} />
+        <span className="block mt-1.5">
+          <YaziAnimasyonu harfMs={10} enUzunMs={1100} gecikmeMs={1300} parcalar={[
+            { metin: "Test", sinif: "font-bold text-amber-400" },
+            { metin: " işaretli departmanın talep ve onay e-postaları execution@ / bbt@ yerine " },
+            { metin: `yalnızca ${TEST_ALICISI}`, sinif: "font-bold text-white" },
+            { metin: " adresine gider; konu “[TEST]” ile başlar." },
+          ]} />
+        </span>
+      </div>
       <div className="rounded-xl border overflow-x-auto" style={kartStil}>
         <table className="min-w-full">
           <thead>

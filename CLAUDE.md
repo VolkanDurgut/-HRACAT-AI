@@ -1065,7 +1065,10 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (`yetki_super_admin_sirketi`, RLS ile aynı sabit liste). Sayfada Rol sütunu (Yönetici /
   İhracat / Muhasebe dosyaları görür), değişmeyen satırda Kaydet kapalı, kullanıcı sütunu
   yatay kaydırmada sabit. Canlıda operation@unex.com.tr (26.10, kendi şirketinde) bu
-  bölümden eklenir. Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in
+  bölümden eklenir.
+  CANLI (27.10.2026): migration `yeni_kullanici_unex` uygulandı; süper admin oturumuyla
+  doğrulama: liste 7 Unex kullanıcısı, onay bekleyen = operation@unex.com.tr;
+  `yetki_super_admin_sirketi` anon/authenticated'a kapalı, diğer 4 RPC sadece authenticated. Yeni şirketlerin `ai_document_limit` varsayılanı 0'dır; Unex'in
   kotası 100000.
 - Veritabanındaki `depositors` ve `contact_messages` tabloları (ve
   `atomic_upsert_pending_depositor` fonksiyonu) kullanıcının BAŞKA bir

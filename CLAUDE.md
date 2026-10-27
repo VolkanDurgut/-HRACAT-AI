@@ -1959,6 +1959,10 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   zorunlu tutar). Uygulama içi işaretleme (e-posta ile) değişmedi. Edge function değişmedi.
 - DİKKAT: `sa_yetki_kontrol` = `satin_alma` sayfa yetkisi → bu yetkisi olan HERKES karar
   verebilir (27.10 canlı: bbt@, volkandurgut.tr@, operation@, ihracat@).
+- CANLI (27.10.2026): migration `satin_alma_ad_soyad` uygulandı (3 token fonksiyonu yalnız
+  service_role; doğrulama: "Ayşe Yılmaz" geçerli, "Ayşe" geçersiz). Test verisi (SA-2026-0001
+  + Laboratuvar taslağı, hepsi "Volkan Durgut") silinmesi için kullanıcıya korumalı SQL
+  verildi (MCP üzerinden DELETE yapılmaz); SQL numaralandırmayı SA-…-0001'e sıfırlar.
 
 ## Yazı animasyonu (27.10.2026)
 

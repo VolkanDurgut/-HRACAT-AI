@@ -1963,6 +1963,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   service_role; doğrulama: "Ayşe Yılmaz" geçerli, "Ayşe" geçersiz). Test verisi (SA-2026-0001
   + Laboratuvar taslağı, hepsi "Volkan Durgut") silinmesi için kullanıcıya korumalı SQL
   verildi (MCP üzerinden DELETE yapılmaz); SQL numaralandırmayı SA-…-0001'e sıfırlar.
+  Kullanıcı SQL'i çalıştırdı: 0 liste / 0 kalem / 6 departman, sıradaki form SA-2026-0001.
+
+### Satın alma mail tasarımı v4 (27.10.2026)
+- Kullanıcı: "bu tasarımı beğenmedim. Liste büyük olursa her türlü sığıyor değil mi?"
+  ESKİ şablonda 100 kalemlik sonuç maili 102,3 KB idi → Gmail 102 KB'den sonra KIRPAR.
+- Yeni şablon (`_shared/satin-alma.ts` mail bölümü): /cek fişiyle aynı belge dili — lacivert
+  başlık (kutusuz logo, sağda belge adı + no), ince çizgili 2 sütun bilgi tablosu, düz kalem
+  tablosu (# | Ürün/hizmet + not | Kategori | Miktar | Öncelik | Talep eden), fişte ayrı
+  "Onaylanan" ve "Reddedilen (Red nedeni sütunu)" tabloları, 4px köşeli düğme + yedek bağlantı.
+- Boyut: hücre biçimleri `<style>` sınıflarında (her hücrede tekrar yok) + tablo nitelikleri
+  yedek. 100 kalem ≈ 26–27 KB (gönderim ve sonuç), 12 kalem ≈ 8 KB. Uzun ürün adları sarar;
+  390 px telefonda yatay taşma yok (`@media` dolguları küçültür).
+- Konu satırları, düğme metinleri, `/cek/<token>`, "ACİL", test şeridi DEĞİŞMEDİ.
+- CANLI: edge `satin-alma` v6 (yalnız şablon; veritabanı değişmedi). Yerel test: edge
+  harness 50/50, ölçüm `scratchpad/mail/olc.mjs N`.
 
 ## Yazı animasyonu (27.10.2026)
 

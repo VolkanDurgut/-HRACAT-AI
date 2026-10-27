@@ -115,58 +115,86 @@ export function listeOzeti(l: Pick<SaListe, "kalemler">) {
 }
 
 // ---------------------------------------------------------------------------
-// Mail
+// Mail (27.10.2026 kurumsal belge tasarimi)
 // ---------------------------------------------------------------------------
+// Kullanici: "bu tasarimi begenmedim; liste buyuk olursa her turlu sigiyor degil mi?"
+// - Belge dili: /cek A4 fisi ile ayni (ince cizgili bilgi tablosu, duz kalem tablosu,
+//   hap / renkli rozet yok, 4px koseli dugme).
+// - BOYUT: Gmail 102 KB'i gecen maili kirpar ("[Mesaj kirpildi]"). Eski sablonda 100
+//   kalemlik sonuc maili 102,3 KB idi. Hucre bicimleri <style> siniflarinda (her hucrede
+//   tekrar etmez) + tablo nitelikleri (cellpadding/border) yedek; 100 kalem ~27 KB.
+//   Uzun urun adlari kirilarak sarar (tablo 680 px'i asmaz).
 const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const LACIVERT = "#1B2352";
 const SEFTALI = "#F4A07C";
 
-function cerceve(ust: string, baslik: string, govde: string, test = false): string {
+const STIL = `body{margin:0;background:#EEF0F3;font-family:Arial,Helvetica,sans-serif;color:#161B2E}
+table{border-collapse:collapse}
+.k{background:#fff;border:1px solid #D5D9E0;border-radius:4px}
+.b td{padding:7px 10px;border:1px solid #D5D9E0;font-size:13px;vertical-align:top}
+.b td.e{background:#F5F6F8;color:#5B6275;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;width:22%}
+.t th{background:#F5F6F8;color:#1B2352;font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:7px 8px;border-bottom:1px solid #D5D9E0;white-space:nowrap}
+.t td{padding:7px 8px;border-bottom:1px solid #E6E8EC;font-size:12px;vertical-align:top;word-break:break-word}
+.t .r{text-align:right;white-space:nowrap}
+.t .s{color:#5B6275}
+.t .n{white-space:nowrap;word-break:normal}
+.a{display:block;color:#5B6275;font-size:11px;margin-top:2px}
+.acil{color:#B42318;font-weight:bold;font-size:10px;letter-spacing:.4px}
+.red{color:#B42318}
+.h{margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#1B2352}
+@media (max-width:600px){.g{padding:16px 12px 20px!important}.t th,.t td{padding:6px 4px!important}.t th{white-space:normal!important;letter-spacing:0!important}.b td{padding:6px!important}.b td.e{width:auto!important}.d{padding:8px 0!important}.ust{padding:12px!important}}`;
+
+function cerceve(belge: string, no: string, govde: string, test = false): string {
   const testSeridi = test
-    ? `<tr><td style="background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;padding:10px 28px;border-bottom:1px solid #FCD34D;">TEST · Bu e-posta test departmanından gönderildi. Gerçek alıcılara (execution@ / bbt@) gönderilmedi.</td></tr>`
+    ? `<tr><td style="background:#FFF8E6;color:#7A5200;font-size:12px;font-weight:bold;padding:9px 24px;border-bottom:1px solid #EBCB80;">TEST · Bu e-posta test departmanından gönderildi. Gerçek alıcılara (execution@ / bbt@) gönderilmedi.</td></tr>`
     : "";
-  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;background:#F3F2EE;font-family:Arial,Helvetica,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F2EE;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;border-radius:6px;overflow:hidden;">
-<tr><td style="background:${LACIVERT};padding:18px 28px;border-bottom:4px solid ${SEFTALI};">
-<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-right:16px;vertical-align:middle;"><img src="${SA_SITE}/images/logo.png" width="64" height="64" alt="Unex Gıda" style="display:block;border:0;"></td>
-<td style="vertical-align:middle;border-left:1px solid rgba(255,255,255,0.18);padding-left:16px;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">${kacis(ust)}</p>
-<p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">${kacis(baslik)}</p></td>
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>${STIL}</style></head>
+<body style="margin:0;background:#EEF0F3;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F3;"><tr><td class="d" align="center" style="padding:24px 8px;">
+<table role="presentation" class="k" width="720" cellpadding="0" cellspacing="0" style="max-width:720px;width:100%;background:#ffffff;border:1px solid #D5D9E0;">
+<tr><td class="ust" style="background:${LACIVERT};padding:14px 24px;border-bottom:3px solid ${SEFTALI};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td style="vertical-align:middle;width:56px;"><img src="${SA_SITE}/images/logo.png" width="52" height="52" alt="Unex Gıda" style="display:block;border:0;"></td>
+<td style="vertical-align:middle;padding-left:12px;color:#ffffff;font-size:13px;font-weight:bold;letter-spacing:1px;">UNEX GIDA<br><span style="color:#AEB4CC;font-size:11px;font-weight:normal;letter-spacing:.5px;">Satın Alma</span></td>
+<td align="right" style="vertical-align:middle;color:#ffffff;"><span style="font-size:15px;font-weight:bold;letter-spacing:1.5px;">${kacis(belge)}</span><br><span style="color:${SEFTALI};font-size:12px;font-family:Consolas,Menlo,monospace;font-weight:bold;">${kacis(no)}</span></td>
 </tr></table></td></tr>
 ${testSeridi}
-<tr><td style="padding:24px 28px;">${govde}</td></tr>
-</table></td></tr></table></body></html>`;
+<tr><td class="g" style="padding:22px 24px 26px;">${govde}</td></tr>
+</table>
+<p style="margin:12px 0 0;color:#8B91A8;font-size:11px;">Unex Gıda San. ve Tic. Ltd. Şti. · Süleymanpaşa / Tekirdağ · Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi.</p>
+</td></tr></table></body></html>`;
 }
 
-function bilgiTablosu(satirlar: [string, string][]): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">${satirlar
-    .map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#6B7290;font-size:13px;white-space:nowrap;vertical-align:top;">${kacis(k)}</td><td style="padding:4px 0;color:${LACIVERT};font-size:14px;font-weight:600;">${kacis(v)}</td></tr>`)
-    .join("")}</table>`;
+/** Iki sutunlu ince cizgili bilgi tablosu: [etiket, deger] ciftleri, satir basina 2 cift. */
+function bilgiTablosu(alanlar: [string, string][]): string {
+  const satirlar: string[] = [];
+  for (let i = 0; i < alanlar.length; i += 2) {
+    const [a, b] = [alanlar[i], alanlar[i + 1]];
+    satirlar.push(`<tr><td class="e">${kacis(a[0])}</td><td>${kacis(a[1])}</td>${b ? `<td class="e">${kacis(b[0])}</td><td>${kacis(b[1])}</td>` : `<td class="e"></td><td></td>`}</tr>`);
+  }
+  return `<table role="presentation" class="b" width="100%" cellpadding="7" border="1" style="border-collapse:collapse;border-color:#D5D9E0;">${satirlar.join("")}</table>`;
 }
 
-const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#ffffff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:8px;text-align:${sag ? "right" : "left"};">${t}</th>`;
-const td = (icerik: string, ek = "") => `<td style="padding:8px;border-bottom:1px solid #E3E1DA;font-size:13px;color:#1E293B;vertical-align:top;${ek}">${icerik}</td>`;
-const rozet = (metin: string, zemin: string, renk: string) => `<span style="display:inline-block;padding:1px 8px;border-radius:999px;background:${zemin};color:${renk};font-size:11px;font-weight:700;white-space:nowrap;">${kacis(metin)}</span>`;
+const urunHucresi = (k: SaKalem) => `<td>${kacis(k.urun)}${k.aciklama ? `<span class="a">${kacis(k.aciklama)}</span>` : ""}</td>`;
+const oncelik = (k: SaKalem) => (k.aciliyet === "acil" ? `<span class="acil">ACİL</span>` : `<span class="s">Normal</span>`);
 
-function kalemSatiri(k: SaKalem, ilkHucre: string, sonuc: boolean): string {
-  const urun = `<div style="color:#6B7290;font-size:11px;margin-bottom:1px;">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</div><b>${kacis(k.urun)}</b>${k.aciklama ? `<div style="color:#6B7290;font-size:12px;margin-top:2px;">${kacis(k.aciklama)}</div>` : ""}${sonuc && k.karar === "reddedildi" && k.red_nedeni ? `<div style="color:#B91C1C;font-size:12px;margin-top:2px;">Red nedeni: ${kacis(k.red_nedeni)}</div>` : ""}`;
-  const acil = k.aciliyet === "acil" ? rozet("ACİL", "#FEE2E2", "#B91C1C") : `<span style="color:#6B7290;font-size:12px;">Normal</span>`;
-  return `<tr>${ilkHucre}${td(urun)}${td(kacis(miktarBirim(k)), "text-align:right;white-space:nowrap;font-weight:700;")}${td(acil)}${td(kacis(k.talep_eden), "white-space:nowrap;")}</tr>`;
+/** Kalem tablosu. tur: talep (karar oncesi) | onay (onaylananlar) | red (reddedilenler). */
+function kalemTablosu(kalemler: SaKalem[], tur: "talep" | "onay" | "red"): string {
+  const bas = tur === "red"
+    ? `<th>#</th><th>Ürün / hizmet</th><th class="r">Miktar</th><th>Talep eden</th><th>Red nedeni</th>`
+    : `<th>#</th><th>Ürün / hizmet</th><th>Kategori</th><th class="r">Miktar</th><th>Öncelik</th><th>Talep eden</th>`;
+  const satirlar = kalemler.map((k, i) => tur === "red"
+    ? `<tr><td class="s n">${i + 1}</td>${urunHucresi(k)}<td class="r">${kacis(miktarBirim(k))}</td><td>${kacis(k.talep_eden)}</td><td class="red">${kacis(k.red_nedeni || "Belirtilmedi")}</td></tr>`
+    : `<tr><td class="s n">${i + 1}</td>${urunHucresi(k)}<td class="s">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</td><td class="r"><b>${kacis(miktarBirim(k))}</b></td><td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
+  return `<table role="presentation" class="t" width="100%" cellpadding="7" style="border-collapse:collapse;border:1px solid #D5D9E0;table-layout:auto;"><tr>${bas}</tr>\n${satirlar}</table>`;
 }
 
-function kalemTablosu(kalemler: SaKalem[], sonuc = false): string {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">
-<tr>${th("#")}${th("Ürün")}${th("Miktar", true)}${th("Aciliyet")}${th("Talep eden")}</tr>
-${kalemler.map((k, i) => kalemSatiri(k, td(String(i + 1), "color:#6B7290;"), sonuc)).join("")}</table>`;
-}
+const dugme = (metin: string, adres: string) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px;"><tr><td style="background:#283474;border-radius:4px;"><a href="${kacis(adres)}" style="display:inline-block;padding:11px 22px;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;">${kacis(metin)}</a></td></tr></table>
+<p style="margin:0;color:#8B91A8;font-size:11px;word-break:break-all;">Düğme çalışmazsa: ${kacis(adres)}</p>`;
 
-const dugme = (metin: string, adres: string) => `<p style="margin:8px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:4px;">${kacis(metin)}</a></p>
-<p style="margin:0 0 18px;color:#8B91A8;font-size:12px;">Düğme çalışmazsa: ${kacis(adres)}</p>`;
-
-const altNot = (metin: string) => `<p style="margin:8px 0 0;color:#8B91A8;font-size:12px;line-height:1.5;">${kacis(metin)}</p>`;
+const giris = (metin: string) => `<p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#161B2E;">${metin}</p>`;
+const baslik = (metin: string, renk = LACIVERT) => `<p class="h" style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${renk};">${kacis(metin)}</p>`;
 
 const testKonu = (l: SaListe, konu: string) => (l.test ? `[TEST] ${konu}` : konu);
 
@@ -174,12 +202,11 @@ const testKonu = (l: SaListe, konu: string) => (l.test ? `[TEST] ${konu}` : konu
 export function gonderimMaili(l: SaListe): { konu: string; html: string } {
   const o = listeOzeti(l);
   const konu = `Satın alma talebi: ${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
-  const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;"><b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.</p>
-${bilgiTablosu([["Talep no", l.liste_no || "-"], ["Departman", l.departman], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", `${o.toplam}${o.acil ? ` (${o.acil} acil)` : ""}`]])}
-${kalemTablosu(l.kalemler)}
-${dugme("Talebi incele ve karar ver", yonetimAdresi(l.id))}
-${altNot("Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Karar verildiğinde onaylı satın alma fişi execution@ adresine iletilir.")}`;
-  return { konu: testKonu(l, konu), html: cerceve("UNEX GIDA · SATIN ALMA", "Satın alma talep formu", govde, l.test) };
+  const govde = `${giris(`<b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.`)}
+${bilgiTablosu([["Departman", l.departman], ["Talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", String(o.toplam)], ["Acil kalem", o.acil ? String(o.acil) : "Yok"]])}
+${baslik(`Talep kalemleri (${o.toplam})`)}${kalemTablosu(l.kalemler, "talep")}
+${dugme("Talebi incele ve karar ver", yonetimAdresi(l.id))}`;
+  return { konu: testKonu(l, konu), html: cerceve("SATIN ALMA TALEP FORMU", l.liste_no || "", govde, l.test) };
 }
 
 /** Burak Bey karar verdi -> execution@: departman etiketli ONAYLI SATIN ALMA FISI
@@ -191,20 +218,15 @@ export function sonucMaili(l: SaListe): { konu: string; html: string } {
   const konu = o.onay
     ? `[${l.departman}] Onaylı satın alma fişi · ${l.liste_no} (${o.onay} kalem${o.red ? `, ${o.red} reddedildi` : ""})`
     : `[${l.departman}] Satın alma talebi reddedildi · ${l.liste_no}`;
-  const bolum = (baslik: string, renk: string) => `<p style="margin:6px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${renk};border-left:4px solid ${SEFTALI};padding-left:8px;">${kacis(baslik)}</p>`;
-  const kutu = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #283474;border-radius:3px;"></span>`;
-  const cekTablosu = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">
-<tr>${th("✓")}${th("Ürün")}${th("Miktar", true)}${th("Aciliyet")}${th("Talep eden")}</tr>
-${onaylar.map((k) => kalemSatiri(k, td(kutu, "width:22px;"), true)).join("")}</table>`;
-  const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;">${o.onay
-    ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişi <b>aktiftir</b>; alınan kalemleri fiş sayfasından işaretleyin. Fiş bağlantısını ya da yazdırılmış fişi ilgili departmana iletebilirsiniz.`
-    : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`}</p>
-${bilgiTablosu([["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay", saTarih(l.karar_zamani)], ...(o.onay ? [["Fiş durumu", `Aktif · ${o.onay} kalem`] as [string, string]] : []), ...(l.karar_notu ? [["Not", l.karar_notu] as [string, string]] : [])])}
-${onaylar.length ? `${bolum(`Onaylanan kalemler (${onaylar.length})`, "#047857")}${cekTablosu}` : ""}
-${redler.length ? `${bolum(`Reddedilen kalemler (${redler.length})`, "#B91C1C")}${kalemTablosu(redler, true)}` : ""}
-${o.onay && l.cek_token ? dugme("Satın alma fişini aç", cekAdresi(l.cek_token)) : dugme("Listeyi uygulamada aç", yonetimAdresi(l.id))}
-${altNot(o.onay
-  ? "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Fiş bağlantısını açan herkes kalemleri “alındı” olarak işaretleyebilir; tüm kalemler alınınca fiş tamamlanır. Departman sonucu kendi talep bağlantısında da görür."
-  : "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Departman sonucu kendi talep bağlantısında görür.")}`;
-  return { konu: testKonu(l, konu), html: cerceve("UNEX GIDA · SATIN ALMA", o.onay ? "Onaylı satın alma fişi" : "Talep reddedildi", govde, l.test) };
+  const alanlar: [string, string][] = [["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay tarihi", saTarih(l.karar_zamani)], ["Kalem durumu", `${o.onay} onaylı${o.red ? ` · ${o.red} reddedildi` : ""}`]];
+  const govde = `${giris(o.onay
+    ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişi aktiftir; alınan kalemler fiş sayfasından işaretlenir. Fiş bağlantısını ya da yazdırılmış fişi ilgili departmana iletebilirsiniz.`
+    : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`)}
+${bilgiTablosu(alanlar)}
+${l.karar_notu ? `<p style="margin:12px 0 0;padding:8px 12px;border-left:3px solid ${SEFTALI};background:#F5F6F8;font-size:13px;"><b style="color:#5B6275;">Onay notu:</b> ${kacis(l.karar_notu)}</p>` : ""}
+${onaylar.length ? `${baslik(`Onaylanan kalemler (${onaylar.length})`, "#17704A")}${kalemTablosu(onaylar, "onay")}` : ""}
+${redler.length ? `${baslik(`Reddedilen kalemler (${redler.length}) · satın alınmayacak`, "#B42318")}${kalemTablosu(redler, "red")}` : ""}
+${o.onay && l.cek_token ? dugme("Satın alma fişini aç", cekAdresi(l.cek_token)) : dugme("Talebi uygulamada aç", yonetimAdresi(l.id))}
+${o.onay ? `<p style="margin:10px 0 0;color:#8B91A8;font-size:11px;line-height:1.5;">Fiş bağlantısını açan kişi teslim aldığı kalemleri ad soyadıyla işaretler; tüm kalemler alınınca fiş tamamlanır. Departman sonucu kendi talep bağlantısında da görür.</p>` : ""}`;
+  return { konu: testKonu(l, konu), html: cerceve(o.onay ? "ONAYLI SATIN ALMA FİŞİ" : "SATIN ALMA TALEBİ · RED", l.liste_no || "", govde, l.test) };
 }

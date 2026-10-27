@@ -20,6 +20,7 @@ import { kullaniciHitabi } from "@/lib/kullanici-hitap";
 import { formatCurrency } from "@/lib/cutoff-utils";
 import { sayiOku } from "@/lib/sayi-oku";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 
 export type AsistanAsamasi = "okuma" | "liman" | "siparis" | "dosya";
 
@@ -84,6 +85,17 @@ export function ProformaAsistanYukleme({
   const hitap = kullaniciHitabi(user?.email, user?.user_metadata);
   const [surukleniyor, setSurukleniyor] = useState(false);
   const sayac = useRef(0); // ic ice ogelerde dragenter/leave titremesini onler
+  // Karsilama mesaji sohbet gibi: once "yaziyor" noktalari, sonra harf harf (27.10.2026).
+  // Yukleme alani bastan kullanilabilir; animasyon hicbir seyi bekletmez.
+  const [noktalar, setNoktalar] = useState(true);
+  const [yazildi, setYazildi] = useState(false);
+  useEffect(() => {
+    let azalt = false;
+    try { azalt = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* eski tarayici */ }
+    const t = setTimeout(() => setNoktalar(false), azalt ? 0 : 650);
+    return () => clearTimeout(t);
+  }, []);
+  const karsilama = `${hitap ? `Merhaba ${hitap}, ` : "Merhaba, "}proformayı buraya bırakın. Alıcı ve adres, ürün kalemleri, tutarlar, limanlar ve banka bilgilerini okuyup ihracat dosyasını sizin için hazırlayayım.`;
 
   const sec = () => document.getElementById("pdf-input")?.click();
 
@@ -93,12 +105,20 @@ export function ProformaAsistanYukleme({
 
       <div className="mt-4 rounded-2xl rounded-tl-md border px-4 py-3 text-sm leading-relaxed text-white/90"
         style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-        {hitap ? `Merhaba ${hitap}, ` : "Merhaba, "}
-        proformayı buraya bırakın. Alıcı ve adres, ürün kalemleri, tutarlar, limanlar ve banka
-        bilgilerini okuyup ihracat dosyasını sizin için hazırlayayım.
+        {noktalar ? (
+          <span className="relative block">
+            {/* Yer ayirici: mesaj yazilmaya baslayinca balon boyu degismesin */}
+            <span aria-hidden="true" className="invisible">{karsilama}</span>
+            <span className="absolute inset-0 flex items-start pt-1.5 gap-1" style={{ color: TEXT_MUTED }} aria-label="Asistan yazıyor">
+              <span className="yazi-nokta" /><span className="yazi-nokta" /><span className="yazi-nokta" />
+            </span>
+          </span>
+        ) : (
+          <YaziAnimasyonu metin={karsilama} harfMs={20} enUzunMs={2600} onBitti={() => setYazildi(true)} />
+        )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Okunan bilgiler">
+      <div className={`mt-3 flex flex-wrap gap-1.5 transition-opacity duration-500 ${yazildi ? "opacity-100" : "opacity-0"}`} aria-label="Okunan bilgiler">
         {YETENEKLER.map((y) => (
           <span key={y.metin} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium"
             style={{ borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.02)" }}>

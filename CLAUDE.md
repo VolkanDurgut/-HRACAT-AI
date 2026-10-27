@@ -1929,6 +1929,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     (kullanıcı onaylı UPDATE), edge `satin-alma` v3 (duman: bilgi 200, departman test=false,
     gönderilmiş form test=true).
 
+## Yazı animasyonu (27.10.2026)
+
+- Kullanıcı: Proforma Yükle karşılama mesajı "chatte yazıyor gibi" yazılsın; diğer sayfalarda
+  bilgilendirme metinleri de her açılışta yazı animasyonuyla gelsin.
+- `components/yazi-animasyonu.tsx` (`YaziAnimasyonu`): harf harf yazar, bitince imleç kaybolur;
+  tam metin görünmez kopya olarak yer ayırır (yer kayması YOK), ekran okuyucu için `sr-only`
+  tam metin, `prefers-reduced-motion` açıkken animasyonsuz; toplam süre sınırlı (`enUzunMs`);
+  yazım bittikten sonra metin değişirse (veri yüklenince sayı değişimi) yeniden yazmaz.
+  CSS: `globals.css` `.yazi-imlec`, `.yazi-nokta`.
+- `SayfaBasligi`: `aciklama` STRING ise animasyonlu (12 ms/harf, en fazla 0,9 sn); JSX
+  açıklamalar aynen. Tüm uygulama sayfa başlıkları bunu kullanır.
+- `ProformaAsistanYukleme`: karşılama balonu önce 0,65 sn "yazıyor" üç noktası, sonra
+  harf harf (20 ms/harf, en fazla 2,6 sn); yetenek etiketleri yazım bitince belirir. Yükleme
+  alanı baştan kullanılabilir (animasyon hiçbir şeyi bekletmez).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

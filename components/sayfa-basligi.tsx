@@ -1,5 +1,6 @@
 import React from "react";
 import { ACCENT, TEXT_MUTED } from "@/lib/theme";
+import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 
 /**
  * Tum sayfalarda TEK tip baslik (duzen standardi, 01.10.2026).
@@ -9,6 +10,8 @@ import { ACCENT, TEXT_MUTED } from "@/lib/theme";
  * farkli (ml-7 / ml-9 / mt-1). Artik:
  *   [ACCENT ikon 20px]  Baslik (text-xl bold beyaz)          [sag: aksiyonlar]
  *                       Aciklama (text-sm, soluk)
+ * 27.10.2026: metin (string) aciklama sayfa her acildiginda yazi animasyonuyla gelir
+ * (en fazla ~0,9 sn; yer kaymasi yok; "hareketi azalt" ayarinda aninda). JSX aciklama aynen.
  */
 export function SayfaBasligi({
   ikon,
@@ -29,7 +32,11 @@ export function SayfaBasligi({
         <span className="mt-[3px] shrink-0 inline-flex" style={{ color: ACCENT }}>{ikon}</span>
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-white leading-tight">{baslik}</h1>
-          {aciklama && <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>{aciklama}</p>}
+          {aciklama && (
+            <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
+              {typeof aciklama === "string" ? <YaziAnimasyonu metin={aciklama} harfMs={12} enUzunMs={900} /> : aciklama}
+            </p>
+          )}
         </div>
       </div>
       {sag && <div className="flex flex-wrap items-center gap-2">{sag}</div>}

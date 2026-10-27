@@ -1906,6 +1906,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
     bağlantısını kopyala" (Volkan fişi ilgili departmana iletir). DB adları (`cek_*`) aynı.
   - Edge: Postgres'in İngilizce "permission denied for function" (42501) mesajı Türkçe
     "Bu işlem için yetkiniz yok…" olarak döner.
+  - CANLI (27.10.2026): migration `satin_alma_test_sil` uygulandı (6 departman, test=false;
+    yeni RPC'ler anon'a kapalı, authenticated'a açık doğrulandı), edge `satin-alma` v2
+    (duman testi: bilgi 200 + `test` alanı, oturumsuz karar 403 Türkçe mesaj).
 
 ## Genel çalışma prensibi
 

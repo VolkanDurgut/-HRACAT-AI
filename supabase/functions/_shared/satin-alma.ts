@@ -121,11 +121,11 @@ function cerceve(ust: string, baslik: string, govde: string, test = false): stri
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;background:#F3F2EE;font-family:Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F2EE;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;">
-<tr><td style="background:${LACIVERT};padding:22px 28px;border-bottom:4px solid ${SEFTALI};">
+<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;border-radius:6px;overflow:hidden;">
+<tr><td style="background:${LACIVERT};padding:18px 28px;border-bottom:4px solid ${SEFTALI};">
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-right:14px;vertical-align:middle;"><img src="${SA_SITE}/images/logo.png" width="44" height="44" alt="Unex" style="display:block;background:#ffffff;border-radius:10px;padding:4px;"></td>
-<td style="vertical-align:middle;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">${kacis(ust)}</p>
+<td style="padding-right:16px;vertical-align:middle;"><img src="${SA_SITE}/images/logo.png" width="64" height="64" alt="Unex Gıda" style="display:block;border:0;"></td>
+<td style="vertical-align:middle;border-left:1px solid rgba(255,255,255,0.18);padding-left:16px;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">${kacis(ust)}</p>
 <p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">${kacis(baslik)}</p></td>
 </tr></table></td></tr>
 ${testSeridi}
@@ -155,7 +155,7 @@ function kalemTablosu(kalemler: SaKalem[], sonuc = false): string {
 ${kalemler.map((k, i) => kalemSatiri(k, td(String(i + 1), "color:#6B7290;"), sonuc)).join("")}</table>`;
 }
 
-const dugme = (metin: string, adres: string) => `<p style="margin:8px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:10px;">${kacis(metin)}</a></p>
+const dugme = (metin: string, adres: string) => `<p style="margin:8px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:4px;">${kacis(metin)}</a></p>
 <p style="margin:0 0 18px;color:#8B91A8;font-size:12px;">Düğme çalışmazsa: ${kacis(adres)}</p>`;
 
 const altNot = (metin: string) => `<p style="margin:8px 0 0;color:#8B91A8;font-size:12px;line-height:1.5;">${kacis(metin)}</p>`;

@@ -46,12 +46,14 @@ type Liste = SaListe & { departman_id: string; gonderim_maili_hata: string | nul
 type KararSecimi = { karar: "onaylandi" | "reddedildi"; red_nedeni: string };
 type Sekme = "bekleyen" | "cek" | "gecmis" | "departmanlar";
 
-const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad)";
+const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad)";
 
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
 const girdiStil = { borderColor: CARD_BORDER, backgroundColor: CARD_BG } as React.CSSProperties;
 const TEST_ALICISI = "mesensei282@gmail.com";
+/** Hizli red nedenleri (tek tik; istenirse elle yazilir). */
+const RED_NEDENLERI = ["Stokta var", "Bütçe dışı", "Gerekli değil", "Ertelendi"];
 
 function TestRozeti() {
   return <span className="ml-2 align-middle text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 tracking-wide" title={`Test departmanı: e-postalar yalnızca ${TEST_ALICISI} adresine gider`}>TEST</span>;
@@ -91,7 +93,8 @@ function SatinAlmaIcerik() {
       setListeler(((lRes.data || []) as unknown as ListeSatiri[]).map(({ satin_alma_kalemleri, ...l }) => ({
         ...l,
         departman: adlar.get(l.departman_id) || "-",
-        test: testler.has(l.departman_id),
+        // Gonderilmis formda FORMUN test bayragi (gonderim aninda yazilir); taslakta departmaninki
+        test: l.durum === "taslak" ? testler.has(l.departman_id) : l.test === true,
         sirket: null,
         kalemler: [...(satin_alma_kalemleri || [])].sort((a, b) => a.olusturma.localeCompare(b.olusturma) || a.id.localeCompare(b.id)),
       })));
@@ -210,6 +213,10 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
     setSecim((s) => ({ ...s, [id]: { karar, red_nedeni: s[id]?.red_nedeni || "" } }));
   const tumunu = (karar: KararSecimi["karar"]) =>
     setSecim(Object.fromEntries(liste.kalemler.map((k) => [k.id, { karar, red_nedeni: secim[k.id]?.red_nedeni || "" }])));
+  // Hizli akis: once reddedilecekler isaretlenir, sonra karar verilmemis tum kalemler tek tikla onaylanir
+  const kalanlariOnayla = () =>
+    setSecim((s) => ({ ...s, ...Object.fromEntries(liste.kalemler.filter((k) => !s[k.id]).map((k) => [k.id, { karar: "onaylandi" as const, red_nedeni: "" }])) }));
+  const nedenYaz = (id: string, red_nedeni: string) => setSecim((x) => ({ ...x, [id]: { karar: "reddedildi", red_nedeni } }));
 
   const kaydet = async () => {
     setHata(null);
@@ -247,7 +254,12 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
             {mailGonderiliyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Bildirim e-postası gitmedi · tekrar gönder
           </button>
         )}
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          {kalan > 0 && kalan < liste.kalemler.length && (
+            <button onClick={kalanlariOnayla} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+              <Check size={12} /> Kalanları onayla ({kalan})
+            </button>
+          )}
           <button onClick={() => tumunu("onaylandi")} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
             <Check size={12} /> Tümünü onayla
           </button>
@@ -259,32 +271,62 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
         </div>
       </header>
 
+      {liste.kalemler.length > 3 && Object.keys(secim).length === 0 && (
+        <p className="px-4 sm:px-5 py-2 text-xs border-b" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          Hızlı karar: yalnızca reddedeceğiniz kalemlerde <b className="text-white font-semibold">Reddet</b>&apos;e basın, sonra <b className="text-white font-semibold">Kalanları onayla</b> ile gerisini tek seferde onaylayın.
+        </p>
+      )}
+
+      {/* Kalem tablosu: tek satir = tek kalem */}
+      <div className="hidden sm:grid grid-cols-[28px_minmax(0,1fr)_120px_160px_176px] gap-x-3 px-4 sm:px-5 py-2 border-b text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.015)" }}>
+        <span className="text-right">#</span><span>Ürün / hizmet</span><span className="text-right">Miktar</span><span>Talep eden</span><span className="text-right">Karar</span>
+      </div>
       <ul className="divide-y" style={{ borderColor: CARD_BORDER }}>
         {liste.kalemler.map((k, i) => {
           const s = secim[k.id];
           return (
-            <li key={k.id} className="px-4 sm:px-5 py-3" style={{ borderColor: CARD_BORDER, backgroundColor: s?.karar === "reddedildi" ? "rgba(239,68,68,0.04)" : s?.karar === "onaylandi" ? "rgba(16,185,129,0.04)" : undefined }}>
-              <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                <span className="hidden sm:block w-6 shrink-0 text-xs pt-1 text-right" style={{ color: TEXT_MUTED }}>{i + 1}</span>
-                <KalemBilgisi k={k} />
-                <div className="flex gap-1.5 shrink-0" role="group" aria-label={`${k.urun} kararı`}>
-                  <button onClick={() => sec(k.id, "onaylandi")} aria-pressed={s?.karar === "onaylandi"}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
-                    style={s?.karar === "onaylandi" ? { backgroundColor: "rgba(16,185,129,0.18)", borderColor: "rgba(16,185,129,0.6)", color: "#34D399" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                    <CheckCircle2 size={13} /> Onayla
-                  </button>
-                  <button onClick={() => sec(k.id, "reddedildi")} aria-pressed={s?.karar === "reddedildi"}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors"
-                    style={s?.karar === "reddedildi" ? { backgroundColor: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.55)", color: "#F87171" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                    <XCircle size={13} /> Reddet
-                  </button>
+            <li key={k.id} className="px-4 sm:px-5 py-2" style={{ borderColor: CARD_BORDER, backgroundColor: s?.karar === "reddedildi" ? "rgba(239,68,68,0.05)" : s?.karar === "onaylandi" ? "rgba(16,185,129,0.04)" : undefined }}>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[28px_minmax(0,1fr)_120px_160px_176px] gap-x-3 gap-y-1 items-center">
+                <span className="hidden sm:block text-xs text-right tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</span>
+                <div className="min-w-0">
+                  <p className="text-sm text-white break-words leading-snug">
+                    <span className="font-semibold">{k.urun}</span>
+                    {k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}
+                  </p>
+                  <p className="text-[11px] leading-snug break-words" style={{ color: TEXT_MUTED }}>
+                    {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}
+                    <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {k.talep_eden}</span>
+                  </p>
+                </div>
+                <span className="hidden sm:block text-sm text-right font-semibold text-white whitespace-nowrap tabular-nums">{miktarBirim(k)}</span>
+                <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }} title={k.talep_eden}>{k.talep_eden}</span>
+                <div className="flex justify-end" role="group" aria-label={`${k.urun} kararı`}>
+                  <div className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
+                    <button onClick={() => sec(k.id, "onaylandi")} aria-pressed={s?.karar === "onaylandi"}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                      style={s?.karar === "onaylandi" ? { backgroundColor: "rgba(16,185,129,0.2)", color: "#34D399" } : { color: TEXT_MUTED }}>
+                      <CheckCircle2 size={13} /> Onayla
+                    </button>
+                    <button onClick={() => sec(k.id, "reddedildi")} aria-pressed={s?.karar === "reddedildi"}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border-l transition-colors"
+                      style={{ borderColor: CARD_BORDER, ...(s?.karar === "reddedildi" ? { backgroundColor: "rgba(239,68,68,0.18)", color: "#F87171" } : { color: TEXT_MUTED }) }}>
+                      <XCircle size={13} /> Reddet
+                    </button>
+                  </div>
                 </div>
               </div>
               {s?.karar === "reddedildi" && (
-                <div className="mt-2 sm:ml-9">
+                <div className="mt-1.5 sm:ml-[40px] flex flex-wrap items-center gap-1.5">
+                  {RED_NEDENLERI.map((n) => (
+                    <button key={n} onClick={() => nedenYaz(k.id, s.red_nedeni === n ? "" : n)} aria-pressed={s.red_nedeni === n}
+                      className="px-2 py-1 rounded-md border text-[11px] font-medium transition-colors"
+                      style={s.red_nedeni === n ? { borderColor: "rgba(239,68,68,0.55)", backgroundColor: "rgba(239,68,68,0.12)", color: "#F87171" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                      {n}
+                    </button>
+                  ))}
                   <input value={s.red_nedeni} maxLength={300} aria-label={`${k.urun} red nedeni`}
-                    onChange={(e) => setSecim((x) => ({ ...x, [k.id]: { karar: "reddedildi", red_nedeni: e.target.value } }))}
-                    placeholder="Red nedeni (isteğe bağlı) · ör. stokta var, bütçe dışı" className={girdiSinifi} style={girdiStil} />
+                    onChange={(e) => nedenYaz(k.id, e.target.value)}
+                    placeholder="ya da red nedenini yazın (isteğe bağlı)" className="flex-1 min-w-[200px] px-2.5 py-1 border rounded-md text-xs text-white focus:outline-none focus:ring-2 focus:ring-red-500/30" style={girdiStil} />
                 </div>
               )}
             </li>

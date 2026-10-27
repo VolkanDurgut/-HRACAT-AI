@@ -40,10 +40,9 @@ export function BelgeUstBandi({ modul }: { modul: string }) {
   return (
     <header className="print:hidden" style={{ backgroundColor: B.lacivert, borderBottom: `3px solid ${B.seftali}` }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 h-12 flex items-center gap-3">
-        <span className="bg-white rounded-[3px] p-0.5 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="Unex Gıda" width={28} height={28} className="w-7 h-7 object-contain" />
-        </span>
+        {/* Logo lacivert zeminde dogrudan (beyaz kutu yok) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/logo.png" alt="Unex Gıda" width={36} height={36} className="w-9 h-9 object-contain shrink-0" />
         <p className="text-sm text-white font-semibold tracking-wide truncate">UNEX GIDA <span className="font-normal opacity-60 mx-1.5">|</span> <span className="font-normal">{modul}</span></p>
         <span className="ml-auto text-[11px] uppercase tracking-[0.18em] hidden sm:block" style={{ color: "#AEB4CC" }}>Şirket içi</span>
       </div>

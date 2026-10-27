@@ -219,15 +219,17 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
           </>
         )}
 
-        {/* Imza alanlari */}
-        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 print:grid-cols-3 gap-4 break-inside-avoid">
-          <ImzaKutusu baslik="Talep eden" alt={`${liste.departman}${liste.gonderen_ad ? ` · ${liste.gonderen_ad}` : ""}`} />
-          <ImzaKutusu baslik="Onaylayan" alt={liste.karar_veren_email || "Satın alma onayı"} />
-          <ImzaKutusu baslik="Teslim alan" alt="Ad soyad · tarih" />
+        {/* Elektronik onay kaydi (islak imza gerekmez: onay sistemde verildi) */}
+        <div className="mt-7 border rounded-[2px] px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 break-inside-avoid" style={{ borderColor: B.cizgi, borderLeft: `3px solid ${B.yesil}` }}>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.08em]" style={{ color: B.yesil }}>
+            <Check size={13} strokeWidth={3} /> Elektronik onay
+          </span>
+          <span className="text-[12.5px]"><span style={{ color: B.soluk }}>Onaylayan: </span><b>{liste.karar_veren_email || "-"}</b></span>
+          <span className="text-[12.5px]"><span style={{ color: B.soluk }}>Tarih: </span><b>{saTarih(liste.karar_zamani)}</b></span>
         </div>
 
-        <p className="mt-6 pt-3 border-t text-[10.5px] leading-relaxed" style={{ borderColor: B.cizgi, color: B.soluk }}>
-          Bu fiş İhracat AI Satın Alma modülünde {saTarih(liste.karar_zamani)} tarihinde elektronik olarak onaylanmıştır.
+        <p className="mt-5 pt-3 border-t text-[10.5px] leading-relaxed" style={{ borderColor: B.cizgi, color: B.soluk }}>
+          Bu fiş İhracat AI Satın Alma modülünde elektronik olarak onaylanmıştır; ıslak imza gerektirmez.
           Fiş no {liste.liste_no}. Teslim durumları fiş bağlantısından güncel olarak izlenir.
         </p>
       </article>
@@ -241,15 +243,5 @@ function BilgiHucresi({ etiket, deger, vurgu = false }: { etiket: string; deger:
       <td className="px-3 py-2 w-[22%] align-top border-r text-[11px] font-semibold uppercase tracking-[0.05em]" style={{ backgroundColor: B.baslikZemin, color: B.soluk, borderColor: B.cizgi }}>{etiket}</td>
       <td className={`px-3 py-2 w-[28%] align-top border-r last:border-r-0 break-words ${vurgu ? "font-bold" : "font-medium"}`} style={{ borderColor: B.cizgi, color: vurgu ? B.lacivert : B.metin }}>{deger}</td>
     </>
-  );
-}
-
-function ImzaKutusu({ baslik, alt }: { baslik: string; alt: string }) {
-  return (
-    <div className="border rounded-[2px] px-3 pt-2 pb-2.5 flex flex-col" style={{ borderColor: B.cizgi }}>
-      <p className="text-[10.5px] font-bold uppercase tracking-[0.08em]" style={{ color: B.lacivert }}>{baslik}</p>
-      <div className="h-14" />
-      <div className="border-t pt-1 text-[11px] truncate" style={{ borderColor: B.cizgi, color: B.soluk }}>{alt}</div>
-    </div>
   );
 }

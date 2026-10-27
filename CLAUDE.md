@@ -1909,6 +1909,22 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   - CANLI (27.10.2026): migration `satin_alma_test_sil` uygulandı (6 departman, test=false;
     yeni RPC'ler anon'a kapalı, authenticated'a açık doğrulandı), edge `satin-alma` v2
     (duman testi: bilgi 200 + `test` alanı, oturumsuz karar 403 Türkçe mesaj).
+- 27.10.2026 (2) GÜNCELLEME (migration `20261027120000_satin_alma_liste_test.sql`):
+  - Test bayrağı FORMA yazılır: `satin_alma_listeleri.test` gönderimde (`sa_token_liste_gonder`)
+    departmanın o anki bayrağından kopyalanır, sonradan değişmez. `sa_liste_json.test` =
+    taslakta departmanın, gönderilmişte formun bayrağı. (Önceden departman "Gerçek"e dönünce
+    test formunun tekrar gönderimi gerçek alıcılara gidiyordu.) Canlıdaki test formu
+    SA-2026-0001 kullanıcı onayıyla test=true işaretlendi.
+  - Burak Bey onay ekranı (kullanıcı: "liste kalabalıksa zaman alır"): tek satır = tek kalem
+    sıkı tablo (# · ürün+kategori+açıklama · miktar · talep eden · Onayla|Reddet segmenti),
+    "Kalanları onayla (n)" (karar verilmemişleri onaylar; önce redler işaretlenir), hazır red
+    nedenleri (Stokta var · Bütçe dışı · Gerekli değil · Ertelendi; `RED_NEDENLERI`) + serbest
+    metin, >3 kalemde kısa "Hızlı karar" ipucu.
+  - Fiş: imza kutuları KALDIRILDI (kullanıcı: onay sistemde, ıslak imza gereksiz); yerine
+    "Elektronik onay · Onaylayan · Tarih" kaydı.
+  - Logo: satın alma maillerinde ve `/talep`·`/cek` üst bandında logonun arkasındaki BEYAZ
+    KUTU kaldırıldı (logo lacivert zeminde doğrudan, mailde 64px + ince ayırıcı çizgi); mail
+    kartı köşesi 6px, düğme 4px.
 
 ## Genel çalışma prensibi
 

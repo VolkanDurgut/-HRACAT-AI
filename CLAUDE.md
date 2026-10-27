@@ -1944,6 +1944,52 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   harf harf (20 ms/harf, en fazla 2,6 sn); yetenek etiketleri yazım bitince belirir. Yükleme
   alanı baştan kullanılabilir (animasyon hiçbir şeyi bekletmez).
 
+## Konşimento talimatı hatırlatması (27.10.2026)
+
+- Kullanıcı: "Bütün konteyner girildiğinde konşimento talimatı gönderilebilir anlamına geliyor."
+  Alıcı operation@unex.com.tr, CC bbt@ / execution@ / export@. Hatırlatma maili + talimatta
+  istenen dosya bilgileri (fatura talimatı gibi), personel excelden bilgi toplamasın. Örnekler:
+  AKKON (AKKIST26050686) Word formu, HAPAG/CRISA (37983286) PDF. Kararlar (AskUserQuestion):
+  OTOMATİK + elle tekrar; canlıya ilk geçiş TEST adresine.
+- Migration `20261027140000_konsimento_hatirlatma.sql`: tablo `konsimento_hatirlatmalari`
+  (dosya başına TEK satır; durum bekliyor/gonderiliyor/gonderildi/hata/atlandi; tetik
+  otomatik/elle; son gönderimin test/alıcı/cc; gönderim sayısı). Tetikleyiciler: konteyner
+  INSERT, konteynerin dosya_id değişimi, rezervasyon konteyner_adedi değişimi →
+  `kh_tamamlanma_kontrol`: rezervasyon adedi > 0, eklenen = adet, konşimento talimatı
+  YÜKLENMEMİŞ, BL no YOK, talimat cut-off / gemi kalkışı 3 günden eski DEĞİL → kuyruk
+  (`on conflict do nothing`: ikinci kez otomatik gitmez). Konteyner DÜZENLEMEK tetiklemez.
+  Tetikleyici ASLA hata fırlatmaz (warning; konteyner kaydı etkilenmez). Kuyruk RPC'leri
+  (`kh_kuyruk_al` kilitler + mail verisi, `kh_sonuc`, `kh_bekleyen_var`) SADECE service_role;
+  `kh_elle_iste` authenticated + dosya okuma politikasıyla aynı rol kuralı (admin / ihracat /
+  muhasebe / süper admin), tüm konteynerler şart, 2 dk tekrar koruması. Hata → 10 dk sonra,
+  en fazla 3 deneme. Otomatik satır işlenmeden talimat/BL girildiyse `atlandi`.
+- Edge function `konsimento-hatirlatma` (verify_jwt AÇIK): `isle` (cron, anon; yanıtta sadece
+  sayılar) ve `elle` (kullanıcı oturumu, hemen gönderir). Mail şablonu
+  `_shared/konsimento-hatirlatma.ts` (saf): rezervasyon (booking, acente, gemi/sefer, limanlar,
+  navlun PREPAID / FOB grubunda COLLECT), taraflar (shipper SABİT Unex bloğu + vergi no;
+  consignee = dosya.consignee yoksa proforma alıcısı + uyarı; notify = ham_veri.notify yoksa
+  "Alıcı ile aynı" + uyarı), mal tanımı TR/EN (BUĞDAY UNU / WHEAT FLOUR sabit, ambalaj
+  `ambalajTurkce`, net/brüt), GTİP 11010015 SABİT, kap adedi, konteyner tablosu + toplam,
+  dosya/proforma/lot/beyanname no, talimat cut-off (geçtiyse kırmızı), "Dosyayı uygulamada aç"
+  (`/dosya/<id>?tab=evraklar`). FİYAT YOK. Booking no gövdede (operasyon maili; günlük rapor
+  kuralı burada geçerli değil), konuda yok.
+- MOD: secret `KONSIMENTO_HATIRLATMA_CANLI=evet` DEĞİLSE mail SADECE
+  `KONSIMENTO_HATIRLATMA_TEST_ALICISI` (varsayılan mesensei282@gmail.com) adresine, "[TEST]"
+  konulu ve sarı şeritte canlı alıcılar yazılı gider. Alıcılar secret ile değişir:
+  `KONSIMENTO_HATIRLATMA_ALICI`, `KONSIMENTO_HATIRLATMA_CC` (varsayılanlar
+  `_shared/konsimento-hatirlatma-sabitler.ts`).
+- pg_cron `konsimento-hatirlatma` `*/2`: `net.http_post(...) where public.kh_bekleyen_var()`
+  → kuyruk boşken fonksiyon çağrılmaz. Komut `docs/felaket-kurtarma.md` adım 6.
+- Uygulama: `KonsimentoTalimatiSection` başlığının altında şerit (sadece kayıt varsa ya da tüm
+  konteynerler girilmiş ve talimat yüklenmemişse): hazırlanıyor / gönderildi (TEST rozeti, alıcı,
+  CC, kaçıncı gönderim) / hata / atlandı + "Hatırlatmayı gönder / Tekrar gönder / Tekrar dene"
+  (talimat yüklenince düğme gizli). Kuyruktayken 20 sn'de bir tazelenir.
+- Ortak kurallar TEK YERE taşındı: `_shared/ihracat-ortak.ts` (`navlunAliciyaAitMi`,
+  `ambalajTurkce`); `lib/teslim-sekli.ts` ve `lib/sigorta-talimati.ts` yeniden dışa aktarır
+  (davranış birebir aynı).
+- Gece yedeği: `konsimento_hatirlatmalari` BİLEREK yedekte değil (gönderim günlüğü; kaybı
+  veri kaybı değildir).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

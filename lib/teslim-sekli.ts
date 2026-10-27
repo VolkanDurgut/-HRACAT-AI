@@ -9,12 +9,9 @@
  * teslim_sekli serbest metin ("FOB", "FOB AMBARLI", "fob - Mersin" ...);
  * kelime olarak aranir, buyuk/kucuk harf fark etmez.
  */
-const NAVLUNU_ALICI_ODER = /\b(FOB|FCA|FAS|EXW)\b/;
-
-export function navlunAliciyaAitMi(teslimSekli: string | null | undefined): boolean {
-  if (!teslimSekli) return false;
-  return NAVLUNU_ALICI_ODER.test(teslimSekli.toLocaleUpperCase("en-US"));
-}
+// Kural 27.10.2026'dan beri TEK YERDE: edge function (konsimento hatirlatmasi) da kullanir.
+import { navlunAliciyaAitMi } from "@/supabase/functions/_shared/ihracat-ortak";
+export { navlunAliciyaAitMi };
 
 /**
  * Commercial Invoice "SHIPMENT TERMS" satirinda teslim seklinin YANINA

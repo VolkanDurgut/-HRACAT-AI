@@ -1,11 +1,12 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTimeTR, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
-  FileText, X, Upload, CheckCircle2, AlertTriangle, Loader2, RotateCcw
+  FileText, X, Upload, CheckCircle2, AlertTriangle, Loader2, RotateCcw, Mail, Clock
 } from "lucide-react";
+import { KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC } from "@/supabase/functions/_shared/konsimento-hatirlatma-sabitler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 
 type KontrolSonucu = {
@@ -15,6 +16,19 @@ type KontrolSonucu = {
   consignee?: string;
   notify?: string[];
   bl_no?: string;
+};
+
+// Konsimento talimati hatirlatmasi (27.10.2026): tum konteynerler girilince sistem
+// operation@'a (CC bbt@, execution@, export@) talimat bilgileriyle mail atar.
+type Hatirlatma = {
+  durum: "bekliyor" | "gonderiliyor" | "gonderildi" | "hata" | "atlandi";
+  tetik: "otomatik" | "elle";
+  test: boolean | null;
+  alicilar: string | null;
+  cc: string | null;
+  son_hata: string | null;
+  son_gonderim: string | null;
+  gonderim_sayisi: number;
 };
 
 type Props = {
@@ -48,6 +62,48 @@ export default function KonsimentoTalimatiSection({
   // eklenmis olmasi gerekir (eskisiyle BIREBIR AYNI esik, tasima sirasinda degistirilmedi).
   const rezervasyonKonteynerAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const konsimentoHazir = rezervasyonKonteynerAdedi > 0 && konteynerler.length === rezervasyonKonteynerAdedi;
+
+  // --- Hatirlatma maili durumu ---
+  const [hatirlatma, setHatirlatma] = useState<Hatirlatma | null>(null);
+  const [hatirlatmaGonderiliyor, setHatirlatmaGonderiliyor] = useState(false);
+  const hatirlatmaGetir = useCallback(async () => {
+    const { data } = await supabase.from("konsimento_hatirlatmalari")
+      .select("durum, tetik, test, alicilar, cc, son_hata, son_gonderim, gonderim_sayisi")
+      .eq("dosya_id", dosyaId).maybeSingle();
+    setHatirlatma((data as Hatirlatma | null) ?? null);
+  }, [dosyaId]);
+  // Konteyner sayisi degisince (son konteyner eklendi) durum tazelenir
+  useEffect(() => { hatirlatmaGetir(); }, [hatirlatmaGetir, konteynerler.length]);
+  // Kuyruktaysa (cron 2 dk'da bir gonderir) kisa araliklarla tazele
+  useEffect(() => {
+    if (hatirlatma?.durum !== "bekliyor" && hatirlatma?.durum !== "gonderiliyor") return;
+    const t = setInterval(hatirlatmaGetir, 20000);
+    return () => clearInterval(t);
+  }, [hatirlatma?.durum, hatirlatmaGetir]);
+
+  const hatirlatmaGonder = async () => {
+    setHatirlatmaGonderiliyor(true);
+    try {
+      const { data: oturum } = await supabase.auth.getSession();
+      const jeton = oturum?.session?.access_token;
+      if (!jeton) throw new Error("Oturum bulunamadı. Lütfen yeniden giriş yapın.");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/konsimento-hatirlatma`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ islem: "elle", dosya_id: dosyaId }),
+      });
+      const veri = await res.json().catch(() => ({}));
+      if (!res.ok && res.status !== 202) throw new Error(veri.hata || "Hatırlatma gönderilemedi.");
+      if (res.status === 202) showToast(veri.hata || "Hatırlatma kuyruğa alındı.", "success");
+      else if (veri.mail === "gonderildi") showToast(`Hatırlatma gönderildi: ${(veri.alicilar || []).join(", ")}${veri.cc?.length ? ` (CC ${veri.cc.join(", ")})` : ""}${veri.test ? " · TEST" : ""}`, "success");
+      else showToast("Hatırlatma gönderilemedi; birkaç dakika içinde otomatik tekrar denenecek.", "error");
+    } catch (e: any) {
+      showToast(e.message || "Hatırlatma gönderilemedi.", "error");
+    } finally {
+      setHatirlatmaGonderiliyor(false);
+      hatirlatmaGetir();
+    }
+  };
 
   const buildSistemVerisi = () => {
     const rez = rezervasyonlar[0];
@@ -189,6 +245,10 @@ export default function KonsimentoTalimatiSection({
         <FileText size={16} style={{ color: ACCENT }} />
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>Konşimento Talimatı</h3>
       </div>
+      {(hatirlatma || (konsimentoHazir && !konsimentoDosyaUrl)) && (
+        <HatirlatmaSeridi hatirlatma={hatirlatma} hazir={konsimentoHazir} talimatVar={!!konsimentoDosyaUrl}
+          gonderiliyor={hatirlatmaGonderiliyor} onGonder={hatirlatmaGonder} />
+      )}
       <div className="p-4">
         <input
           ref={fileInputRef}
@@ -282,6 +342,53 @@ export default function KonsimentoTalimatiSection({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Konsimento talimati hatirlatma maili durumu + elle (tekrar) gonderim. */
+function HatirlatmaSeridi({ hatirlatma, hazir, talimatVar, gonderiliyor, onGonder }: {
+  hatirlatma: Hatirlatma | null; hazir: boolean; talimatVar: boolean; gonderiliyor: boolean; onGonder: () => void;
+}) {
+  const h = hatirlatma;
+  const kuyrukta = h?.durum === "bekliyor" || h?.durum === "gonderiliyor";
+  let ikon: React.ReactNode = <Mail size={14} style={{ color: TEXT_MUTED }} />;
+  let metin: React.ReactNode;
+  if (h?.durum === "gonderildi") {
+    ikon = <CheckCircle2 size={14} className="text-emerald-400" />;
+    metin = (
+      <>
+        <span className="text-white font-medium">Hatırlatma gönderildi</span>
+        {h.test && <span className="ml-1.5 text-[10px] font-bold px-1 py-px rounded bg-amber-500/15 text-amber-400">TEST</span>}
+        <span> · {h.son_gonderim ? formatDateTimeTR(h.son_gonderim) : ""}{h.gonderim_sayisi > 1 ? ` · ${h.gonderim_sayisi}. gönderim` : ""}</span>
+        <span className="block text-[11px] mt-0.5">{h.alicilar}{h.cc ? ` · CC ${h.cc}` : ""}</span>
+      </>
+    );
+  } else if (kuyrukta) {
+    ikon = <Clock size={14} className="text-amber-400" />;
+    metin = <><span className="text-white font-medium">Hatırlatma hazırlanıyor</span> · birkaç dakika içinde {KH_VARSAYILAN_ALICI} adresine gönderilecek.</>;
+  } else if (h?.durum === "hata") {
+    ikon = <AlertTriangle size={14} className="text-red-400" />;
+    metin = <><span className="text-red-400 font-medium">Hatırlatma gönderilemedi</span>{h.son_hata ? ` · ${h.son_hata}` : ""}</>;
+  } else if (h?.durum === "atlandi") {
+    metin = <>Hatırlatma gönderilmedi: konşimento talimatı / BL zaten girilmişti.</>;
+  } else {
+    metin = <>Tüm konteynerler girildi. Hatırlatma henüz gönderilmedi.</>;
+  }
+  // Talimat yuklendikten sonra hatirlatmanin anlami yok -> dugme gizli (gecmis satiri kalir)
+  const dugmeGoster = hazir && !kuyrukta && !talimatVar;
+  return (
+    <div className="px-4 py-2.5 border-b flex flex-wrap items-center gap-x-3 gap-y-2" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+      <span className="shrink-0">{ikon}</span>
+      <p className="text-xs flex-1 min-w-[220px]" style={{ color: TEXT_MUTED }}>{metin}</p>
+      {dugmeGoster && (
+        <button onClick={onGonder} disabled={gonderiliyor}
+          title={`Alıcı ${KH_VARSAYILAN_ALICI} · CC ${KH_VARSAYILAN_CC.join(", ")}`}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 disabled:opacity-60 shrink-0" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          {gonderiliyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+          {h?.durum === "gonderildi" ? "Tekrar gönder" : h?.durum === "hata" ? "Tekrar dene" : "Hatırlatmayı gönder"}
+        </button>
+      )}
     </div>
   );
 }

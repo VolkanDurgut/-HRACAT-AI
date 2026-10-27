@@ -57,12 +57,14 @@ tek fark 6. adımdaki zamanlanmış iş).
 ### 4) Edge function'lar ve gizli anahtarlar (~10 dk)
 ```
 supabase secrets set GEMINI_API_KEY=... RESEND_API_KEY=... GERI_BILDIRIM_ALICI=...
-supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder ic-piyasa satin-alma
+supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder ic-piyasa satin-alma konsimento-hatirlatma
 supabase functions deploy dba-otomatik --no-verify-jwt   # yetki cihaz anahtariyla (x-cihaz-anahtari)
 # istege bagli: gunluk raporu sirket adreslerine gondermek icin (virgulle)
 supabase secrets set GUNLUK_RAPOR_ALICILARI=adres1@...,adres2@...
 # istege bagli: gece yedegi alicilari; satin alma talep / sonuc alicilari (virgulle)
-supabase secrets set YEDEK_ALICILARI=bbt@unex.com.tr,execution@unex.com.tr
+supabase secrets set YEDEK_ALICILARI=execution@unex.com.tr
+# konsimento talimati hatirlatmasi: "evet" degilse SADECE test adresine gider
+supabase secrets set KONSIMENTO_HATIRLATMA_CANLI=evet
 supabase secrets set SATIN_ALMA_ALICILARI=execution@unex.com.tr,bbt@unex.com.tr SATIN_ALMA_SONUC_ALICILARI=execution@unex.com.tr
 ```
 (Hepsi `verify_jwt` açık; varsayılan ayar budur. `depo-karantina` tek seferlik
@@ -122,6 +124,21 @@ select cron.schedule('gunluk-rapor-aksam', '0 14 * * *', $cmd$
     body := '{"slot":"aksam"}'::jsonb,
     timeout_milliseconds := 60000
   );
+$cmd$);
+```
+
+Konşimento talimatı hatırlatması (2 dakikada bir; kuyrukta iş yoksa fonksiyon ÇAĞRILMAZ).
+ÖNEMLİ: yedekten geri yükleme BİTTİKTEN SONRA kurun (geri yüklemede konteynerler yeniden
+eklenince tetikleyici eski dosyaları kuyruğa almaz — cut-off/kalkış 3 günden eskiyse atlar —
+ama yine de önce `select * from konsimento_hatirlatmalari where durum = 'bekliyor'` kontrol edin):
+```sql
+select cron.schedule('konsimento-hatirlatma', '*/2 * * * *', $cmd$
+  select net.http_post(
+    url := 'https://<YENI_REF>.supabase.co/functions/v1/konsimento-hatirlatma',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
+    body := '{"islem":"isle"}'::jsonb,
+    timeout_milliseconds := 30000
+  ) where public.kh_bekleyen_var();
 $cmd$);
 ```
 

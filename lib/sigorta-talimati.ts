@@ -27,6 +27,7 @@
  */
 
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { ambalajTurkce } from "@/supabase/functions/_shared/ihracat-ortak";
 
 export const SIGORTA_SABIT_GONDERICI = "UNEX GIDA SAN VE TİC LTD ŞTİ";
 export const SIGORTA_SABIT_MALIN_CINSI = "BUĞDAY UNU";
@@ -134,28 +135,8 @@ function konteynerTipi(tip: string | null | undefined): string {
   return t.replace(/^(\d+)([A-Z].*)$/, "$1 $2");
 }
 
-/**
- * Ingilizce ambalaj metnini sigorta talimatindaki Turkce kaliba cevirir:
- *   "2.500 PIECES OF 50 KG PP BAGS+KRAFT" -> "2.500 ADET 50 KG PP+KRAFT ÇUVAL"
- *   "7.000 PIECES OF IBRAHIM BRANDED 25 KG PP BAGS" -> "7.000 ADET IBRAHIM MARKALI 25 KG PP ÇUVAL"
- * Taninmayan kelimeler oldugu gibi kalir (pencerede duzeltilebilir).
- */
-export function ambalajTurkce(metin: string | null | undefined): string {
-  let s = (metin || "").trim().replace(/\s+/g, " ");
-  if (!s) return "";
-  s = s.toUpperCase();
-  s = s
-    .replace(/\bPIEC+ES?(\s+PIEC+ES?)*(\s+OF)?\b/g, "ADET")
-    .replace(/\bPP\s*BAGS?\s*\+\s*KRAFT\b/g, "PP+KRAFT ÇUVAL")
-    .replace(/\bPP\s*\+\s*KRAFT\s*BAGS?\b/g, "PP+KRAFT ÇUVAL")
-    .replace(/\bBAGS?\b/g, "ÇUVAL")
-    .replace(/\bBRANDED\b/g, "MARKALI")
-    .replace(/\bBRAND\b/g, "MARKA")
-    .replace(/\s+/g, " ")
-    .replace(/[.\s]+$/, "")
-    .trim();
-  return s;
-}
+// ambalajTurkce 27.10.2026'dan beri TEK YERDE (edge function konsimento hatirlatmasi da kullanir).
+export { ambalajTurkce };
 
 /** "5 X 20 DC KONTEYNER" (karisik tiplerde "3 X 20 DC + 2 X 40 HC KONTEYNER"). */
 function konteynerOzeti(konteynerler: Konteyner[], rezervasyonAdedi: number): string {

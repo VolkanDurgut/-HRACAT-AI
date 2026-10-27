@@ -42,7 +42,7 @@ export function aktifSlot(simdiMs: number): Slot | null {
  * Uygulamadaki SUPER_ADMIN_EMAILS (lib/auth-context.tsx) ve RLS politikalariyla
  * AYNI liste. Biri degisirse digerleri de BIRLIKTE guncellenir.
  */
-export const SUPER_ADMIN_EPOSTALARI = ["volkandurgut.tr@gmail.com", "bbt@unex.com.tr"];
+export const SUPER_ADMIN_EPOSTALARI = ["execution@unex.com.tr", "bbt@unex.com.tr"];
 
 /** Authorization basligindaki JWT'nin "role" alani (dogrulamaz; sadece on eleme). */
 export function jwtRolu(token: string | null): string | null {

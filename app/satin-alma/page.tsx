@@ -27,8 +27,9 @@ import {
  * "satin_alma" yetkili kullanici (Burak Bey) kalem bazinda onaylar / reddeder.
  * Karar kaydedilince onaylanan + reddedilen kalemler execution@'ye e-postayla
  * gider (edge function "satin-alma", islem "karar"). Karar SONRADAN DEGISMEZ.
- * Onaylanan kalem varsa AKTIF Unex cek listesi olusur (alindi isaretleri burada ya da
- * execution@ mailindeki /cek/[token] sayfasinda); onayli alimlar "Departman gecmisi"nde birikir.
+ * Onaylanan kalem varsa onayli satin alma fisi olusur (/cek/[token]); onayli alimlar
+ * "Departman gecmisi"nde birikir. 27.10.2026: teslim alindi isaretleme / "Tamamlandi"
+ * takibi KALDIRILDI (kullanici istegi); fis yalnizca onayli belgedir.
  * 27.10.2026: /cek/[token] "Onayli satin alma fisi" belgesi; "Onayli fisler" sekmesinden
  * fis acilir / baglantisi kopyalanip ilgili departmana iletilir. Departman "Test" bayragi:
  * o departmanin mailleri SADECE test adresine (mesensei282@) gider. Departman silinebilir
@@ -121,14 +122,7 @@ function SatinAlmaIcerik() {
     setTimeout(() => document.getElementById(`liste-${l.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }, [hedefListe, listeler, yukleniyor]);
 
-  const aktifCek = useMemo(() => sonuclananlar.filter((l) => l.cek_durumu === "aktif").length, [sonuclananlar]);
-
-  // Cek listesi kalemi: alindi isaretle / geri al (yetkili)
-  const cekIsaretle = async (k: SaKalem) => {
-    const { error } = await supabase.rpc("sa_cek_isaretle", { p_kalem_id: k.id, p_alindi: !k.alindi });
-    if (error) { showToast(error.message, "error"); return; }
-    getir(true);
-  };
+  const fisSayisi = useMemo(() => sonuclananlar.filter((l) => listeOzeti(l).onay > 0).length, [sonuclananlar]);
 
   const mailTekrar = async (l: Liste, tur: "gonderim" | "sonuc") => {
     const r = await satinAlmaCagir<{ mail: string; alicilar: string[] }>({ islem: "mail_tekrar", liste_id: l.id, tur }, true);
@@ -161,7 +155,7 @@ function SatinAlmaIcerik() {
       <div className="flex flex-wrap gap-1 p-1 rounded-xl border mb-5 w-fit max-w-full" style={kartStil} role="tablist">
         {([
           ["bekleyen", `Onay bekleyen (${bekleyenler.length})`],
-          ["cek", `Onaylı fişler${aktifCek ? ` (${aktifCek} aktif)` : ""}`],
+          ["cek", `Onaylı fişler${fisSayisi ? ` (${fisSayisi})` : ""}`],
           ["gecmis", "Departman geçmişi"],
           ["departmanlar", "Departmanlar ve bağlantılar"],
         ] as [Sekme, string][]).map(([k, etiket]) => (
@@ -182,7 +176,7 @@ function SatinAlmaIcerik() {
             ))}</div>
       )}
 
-      {sekme === "cek" && <CekListeleri listeler={sonuclananlar} departmanlar={departmanlar} hedef={hedefListe} onMailTekrar={mailTekrar} onIsaretle={cekIsaretle} />}
+      {sekme === "cek" && <CekListeleri listeler={sonuclananlar} departmanlar={departmanlar} hedef={hedefListe} onMailTekrar={mailTekrar} />}
 
       {sekme === "gecmis" && <DepartmanGecmisi listeler={sonuclananlar} departmanlar={departmanlar} />}
 
@@ -360,7 +354,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
         open={onay}
         onOpenChange={(a) => { if (!a) setOnay(false); }}
         title={`${liste.liste_no} kararı kaydedilsin mi?`}
-        description={`${onaySayisi} kalem onaylanacak, ${redSayisi} kalem reddedilecek.${onaySayisi ? " Onaylananlardan aktif bir satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} e-postayla gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
+        description={`${onaySayisi} kalem onaylanacak, ${redSayisi} kalem reddedilecek.${onaySayisi ? " Onaylananlardan satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} e-postayla gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
         confirmLabel="Evet, kaydet" cancelLabel="Vazgeç"
         onConfirm={kaydet} loading={kaydediliyor} loadingLabel="Kaydediliyor..."
       />
@@ -388,20 +382,17 @@ function KalemBilgisi({ k }: { k: SaKalem }) {
 function CekRozeti({ l }: { l: Liste }) {
   const o = listeOzeti(l);
   if (!o.onay) return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-red-500/10 text-red-400">Tamamı reddedildi</span>;
-  if (l.cek_durumu === "tamamlandi") return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-500/10 text-emerald-400">Tamamlandı</span>;
-  return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-amber-500/10 text-amber-400">Aktif · {o.alinan}/{o.onay} alındı</span>;
+  return <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-500/10 text-emerald-400">Onaylı · {o.onay}/{o.toplam} kalem</span>;
 }
 
-function CekListeleri({ listeler, departmanlar, hedef, onMailTekrar, onIsaretle }: {
+function CekListeleri({ listeler, departmanlar, hedef, onMailTekrar }: {
   listeler: Liste[]; departmanlar: Departman[]; hedef: string | null;
   onMailTekrar: (l: Liste, tur: "gonderim" | "sonuc") => Promise<void>;
-  onIsaretle: (k: SaKalem) => Promise<void>;
 }) {
   const [departman, setDepartman] = useState("");
-  const [durum, setDurum] = useState<"" | "aktif" | "tamamlandi" | "red">("");
+  const [durum, setDurum] = useState<"" | "onayli" | "red">("");
   const [acik, setAcik] = useState<string | null>(hedef);
   const [gonderiliyor, setGonderiliyor] = useState<string | null>(null);
-  const [isleniyor, setIsleniyor] = useState<string | null>(null);
   const { showToast } = useToast();
   const fisKopyala = async (l: Liste) => {
     if (!l.cek_token) return;
@@ -410,9 +401,9 @@ function CekListeleri({ listeler, departmanlar, hedef, onMailTekrar, onIsaretle 
   };
   const gorunen = listeler.filter((l) =>
     (!departman || l.departman_id === departman) &&
-    (!durum || (durum === "red" ? listeOzeti(l).onay === 0 : l.cek_durumu === durum)));
+    (!durum || (durum === "red" ? listeOzeti(l).onay === 0 : listeOzeti(l).onay > 0)));
 
-  if (listeler.length === 0) return <EmptyState icon={<CheckCircle2 size={40} />} title="Henüz onaylı fiş yok" description="Bir talebi onayladığınızda onaylanan kalemlerden aktif satın alma fişi oluşur." />;
+  if (listeler.length === 0) return <EmptyState icon={<CheckCircle2 size={40} />} title="Henüz onaylı fiş yok" description="Bir talebi onayladığınızda onaylanan kalemlerden satın alma fişi oluşur." />;
 
   return (
     <div className="space-y-3">
@@ -423,8 +414,7 @@ function CekListeleri({ listeler, departmanlar, hedef, onMailTekrar, onIsaretle 
         </select>
         <select aria-label="Durum" value={durum} onChange={(e) => setDurum(e.target.value as typeof durum)} className="px-3 py-1.5 border rounded-lg text-sm text-white" style={girdiStil}>
           <option value="">Tüm durumlar</option>
-          <option value="aktif">Aktif</option>
-          <option value="tamamlandi">Tamamlandı</option>
+          <option value="onayli">Onaylı fiş</option>
           <option value="red">Tamamı reddedildi</option>
         </select>
       </div>
@@ -451,20 +441,13 @@ function CekListeleri({ listeler, departmanlar, hedef, onMailTekrar, onIsaretle 
                     <ul className="divide-y rounded-lg border" style={{ borderColor: CARD_BORDER }}>
                       {l.kalemler.map((k) => (
                         <li key={k.id} className="px-3 py-2.5 flex items-start gap-3" style={{ borderColor: CARD_BORDER }}>
-                          {k.karar === "onaylandi" ? (
-                            <button role="checkbox" aria-checked={!!k.alindi} aria-label={`${k.urun} alındı`} disabled={isleniyor !== null}
-                              onClick={async () => { setIsleniyor(k.id); await onIsaretle(k); setIsleniyor(null); }}
-                              className="shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center disabled:opacity-60"
-                              style={k.alindi ? { backgroundColor: ACCENT, borderColor: ACCENT, color: "#fff" } : { borderColor: "#4A5262" }}>
-                              {isleniyor === k.id ? <Loader2 size={11} className="animate-spin" /> : k.alindi ? <Check size={13} /> : null}
-                            </button>
-                          ) : <XCircle size={18} className="shrink-0 mt-0.5 text-red-400" aria-label="Reddedildi" />}
+                          {k.karar === "onaylandi"
+                            ? <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-emerald-400" aria-label="Onaylandı" />
+                            : <XCircle size={18} className="shrink-0 mt-0.5 text-red-400" aria-label="Reddedildi" />}
                           <KalemBilgisi k={k} />
                           <div className="shrink-0 text-right">
                             {k.karar === "onaylandi"
-                              ? (k.alindi
-                                ? <><span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400"><CheckCircle2 size={13} /> Alındı</span><p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{saTarih(k.alinma_zamani)}{k.alan_ad ? ` · ${k.alan_ad}` : ""}</p></>
-                                : <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400"><Clock size={13} /> Alınacak</span>)
+                              ? <span className="text-xs font-semibold text-emerald-400">Onaylandı</span>
                               : <><span className="inline-flex items-center gap-1 text-xs font-semibold text-red-400">Reddedildi</span>{k.red_nedeni && <p className="text-xs mt-0.5 max-w-[220px]" style={{ color: TEXT_MUTED }}>{k.red_nedeni}</p>}</>}
                           </div>
                         </li>
@@ -535,7 +518,6 @@ function DepartmanGecmisi({ listeler, departmanlar }: { listeler: Liste[]; depar
         {departmanlar.map((d) => {
           const tum = gruplar.get(d.id) || [];
           const kalemler = tum.filter(uyar);
-          const alinan = tum.filter((k) => k.alindi).length;
           const listeSayisi = new Set(tum.map((k) => k.liste_id)).size;
           const acikMi = acik === d.id || (!!ara && kalemler.length > 0);
           return (
@@ -548,7 +530,6 @@ function DepartmanGecmisi({ listeler, departmanlar }: { listeler: Liste[]; depar
                     {tum.length ? `${tum.length} onaylı kalem · ${listeSayisi} liste · son onay ${saTarih(tum[0].karar_zamani)}` : "Henüz onaylı alım yok"}
                   </p>
                 </div>
-                {tum.length > 0 && <span className="text-xs font-semibold whitespace-nowrap"><span className="text-emerald-400">{alinan} alındı</span>{tum.length - alinan > 0 && <span className="text-amber-400"> · {tum.length - alinan} alınacak</span>}</span>}
                 {tum.length > 0 && <ChevronDown size={15} className={`shrink-0 transition-transform ${acikMi ? "rotate-180" : ""}`} style={{ color: TEXT_MUTED }} />}
               </button>
               {acikMi && kalemler.length > 0 && (
@@ -556,7 +537,7 @@ function DepartmanGecmisi({ listeler, departmanlar }: { listeler: Liste[]; depar
                   <table className="min-w-full">
                     <thead>
                       <tr style={{ backgroundColor: ROW_HEADER_BG }}>
-                        {["Onay", "Liste", "Ürün", "Miktar", "Talep eden", "Durum"].map((b, i) => (
+                        {["Onay", "Liste", "Ürün", "Miktar", "Talep eden"].map((b, i) => (
                           <th key={b} className={`px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${i === 3 ? "text-right" : "text-left"}`} style={{ color: TEXT_MUTED }}>{b}</th>
                         ))}
                       </tr>
@@ -572,11 +553,6 @@ function DepartmanGecmisi({ listeler, departmanlar }: { listeler: Liste[]; depar
                           </td>
                           <td className="px-4 py-2.5 text-sm text-right text-white font-semibold whitespace-nowrap">{miktarBirim(k)}</td>
                           <td className="px-4 py-2.5 text-sm whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.talep_eden}</td>
-                          <td className="px-4 py-2.5 text-xs whitespace-nowrap">
-                            {k.alindi
-                              ? <span className="text-emerald-400 font-semibold">Alındı · {saTarih(k.alinma_zamani).slice(0, 10)}</span>
-                              : <span className="text-amber-400 font-semibold">Alınacak</span>}
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -612,7 +588,7 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
       liste: ait.length,
       kalem: ait.reduce((t, l) => t + l.kalemler.length, 0),
       bekleyen: ait.filter((l) => l.durum === "bekliyor").length,
-      aktifFis: ait.filter((l) => l.cek_durumu === "aktif").length,
+      fis: ait.filter((l) => l.durum === "sonuclandi" && listeOzeti(l).onay > 0).length,
       gonderilen: ait.filter((l) => l.durum !== "taslak").length,
     };
   }, [silinecek, listeler]);
@@ -668,14 +644,6 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
           { metin: " bir bağlantısı var. Bağlantıyı departmandaki yetkili arkadaşlara iletin; ortak listeye kalem ekleyip gönderebilirler. Bağlantı başkasının eline geçtiyse " },
           { metin: "Yenile", sinif: "font-bold text-white" }, { metin: " ile eskisini geçersiz kılın." },
         ]} />
-        <span className="block mt-1.5">
-          <YaziAnimasyonu harfMs={10} enUzunMs={1100} gecikmeMs={1300} parcalar={[
-            { metin: "Test", sinif: "font-bold text-amber-400" },
-            { metin: " işaretli departmanın talep ve onay e-postaları execution@ / bbt@ yerine " },
-            { metin: `yalnızca ${TEST_ALICISI}`, sinif: "font-bold text-white" },
-            { metin: " adresine gider; konu “[TEST]” ile başlar." },
-          ]} />
-        </span>
       </div>
       <div className="rounded-xl border overflow-x-auto" style={kartStil}>
         <table className="min-w-full">
@@ -779,7 +747,7 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
         onOpenChange={(a) => { if (!a && !siliniyor) setSilinecek(null); }}
         title={`${silinecek?.ad || ""} departmanı silinsin mi?`}
         description={silinecekOzet && silinecekOzet.liste > 0
-          ? `Departmanla birlikte ${silinecekOzet.liste} liste ve ${silinecekOzet.kalem} kalem KALICI olarak silinir${silinecekOzet.gonderilen ? ` (${silinecekOzet.gonderilen} gönderilmiş liste${silinecekOzet.bekleyen ? `, ${silinecekOzet.bekleyen} onay bekleyen` : ""}${silinecekOzet.aktifFis ? `, ${silinecekOzet.aktifFis} aktif fiş` : ""})` : ""}. Departmanın talep bağlantısı ve fiş bağlantıları çalışmaz hale gelir. Bu işlem geri alınamaz. Geçmişi korumak istiyorsanız silmek yerine Pasif yapın.`
+          ? `Departmanla birlikte ${silinecekOzet.liste} liste ve ${silinecekOzet.kalem} kalem KALICI olarak silinir${silinecekOzet.gonderilen ? ` (${silinecekOzet.gonderilen} gönderilmiş liste${silinecekOzet.bekleyen ? `, ${silinecekOzet.bekleyen} onay bekleyen` : ""}${silinecekOzet.fis ? `, ${silinecekOzet.fis} onaylı fiş` : ""})` : ""}. Departmanın talep bağlantısı ve fiş bağlantıları çalışmaz hale gelir. Bu işlem geri alınamaz. Geçmişi korumak istiyorsanız silmek yerine Pasif yapın.`
           : "Departmanın talep bağlantısı çalışmaz hale gelir. Bu departmana ait liste yok. Bu işlem geri alınamaz."}
         confirmLabel="Evet, kalıcı sil" cancelLabel="Vazgeç" destructive
         onConfirm={sil} loading={siliniyor} loadingLabel="Siliniyor..."

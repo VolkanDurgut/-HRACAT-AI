@@ -10,9 +10,10 @@
  */
 const HITAPLAR: Record<string, string> = {
   "bbt@unex.com.tr": "Burak Bey",
-  "ihracat@unex.com.tr": "Harun Bey",
+  // 27.10.2026: giris e-postalari degisti (ihracat@ -> export@, volkandurgut.tr@gmail.com -> execution@)
+  "execution@unex.com.tr": "Volkan Bey",
+  "export@unex.com.tr": "Harun Bey",
   "lojistik@unex.com.tr": "Süleyman Bey",
-  "volkandurgut.tr@gmail.com": "Volkan Bey",
 };
 
 /** "Burak Bey" | null. Ileride user_metadata.hitap girilirse o da kullanilir. */

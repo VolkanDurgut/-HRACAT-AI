@@ -220,13 +220,13 @@ export function sonucMaili(l: SaListe): { konu: string; html: string } {
     : `[${l.departman}] Satın alma talebi reddedildi · ${l.liste_no}`;
   const alanlar: [string, string][] = [["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay tarihi", saTarih(l.karar_zamani)], ["Kalem durumu", `${o.onay} onaylı${o.red ? ` · ${o.red} reddedildi` : ""}`]];
   const govde = `${giris(o.onay
-    ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişi aktiftir; alınan kalemler fiş sayfasından işaretlenir. Fiş bağlantısını ya da yazdırılmış fişi ilgili departmana iletebilirsiniz.`
+    ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişini bağlantıyla ya da yazdırarak ilgili departmana iletebilirsiniz.`
     : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`)}
 ${bilgiTablosu(alanlar)}
 ${l.karar_notu ? `<p style="margin:12px 0 0;padding:8px 12px;border-left:3px solid ${SEFTALI};background:#F5F6F8;font-size:13px;"><b style="color:#5B6275;">Onay notu:</b> ${kacis(l.karar_notu)}</p>` : ""}
 ${onaylar.length ? `${baslik(`Onaylanan kalemler (${onaylar.length})`, "#17704A")}${kalemTablosu(onaylar, "onay")}` : ""}
 ${redler.length ? `${baslik(`Reddedilen kalemler (${redler.length}) · satın alınmayacak`, "#B42318")}${kalemTablosu(redler, "red")}` : ""}
 ${o.onay && l.cek_token ? dugme("Satın alma fişini aç", cekAdresi(l.cek_token)) : dugme("Talebi uygulamada aç", yonetimAdresi(l.id))}
-${o.onay ? `<p style="margin:10px 0 0;color:#8B91A8;font-size:11px;line-height:1.5;">Fiş bağlantısını açan kişi teslim aldığı kalemleri ad soyadıyla işaretler; tüm kalemler alınınca fiş tamamlanır. Departman sonucu kendi talep bağlantısında da görür.</p>` : ""}`;
+<p style="margin:10px 0 0;color:#8B91A8;font-size:11px;line-height:1.5;">Departman sonucu kendi talep bağlantısında da görür.</p>`;
   return { konu: testKonu(l, konu), html: cerceve(o.onay ? "ONAYLI SATIN ALMA FİŞİ" : "SATIN ALMA TALEBİ · RED", l.liste_no || "", govde, l.test) };
 }

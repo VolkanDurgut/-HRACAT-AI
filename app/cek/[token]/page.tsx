@@ -3,23 +3,25 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, Loader2, Printer, RefreshCw } from "lucide-react";
 import {
-  AcilEtiketi, B, BelgeSayfasi, DurumEtiketi, Panel, TestSeridi, dugmeIkincil, girdiSinifi, girdiStil, tdSinifi, thSinifi,
+  AcilEtiketi, B, BelgeSayfasi, DurumEtiketi, Panel, TestSeridi, dugmeIkincil, tdSinifi, thSinifi,
 } from "@/components/satin-alma-belge";
 import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
-import { BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarYaz, saTarih, type SaKalem, type SaListe } from "@/supabase/functions/_shared/satin-alma";
+import { BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih, type SaListe } from "@/supabase/functions/_shared/satin-alma";
 
 /**
  * ONAYLI SATIN ALMA FISI (26.10.2026 "cek listesi"; kurumsal belge 27.10.2026) - girissiz.
  * Burak Bey talebi onaylayinca olusur; execution@'ye giden "[Departman] Onayli satin
  * alma fisi" mailindeki dugme ve uygulamadaki "Onayli fisler" sekmesi buraya gelir.
  * Volkan fisi ilgili departmana iletir (baglanti ya da A4 yazdir / PDF).
- * Onaylanan kalemler teslim alindikca isaretlenir; hepsi alininca fis "Tamamlandi"
- * olur (Satin Alma sayfasinda ve departmanin talep baglantisinda da gorunur).
+ *
+ * 27.10.2026 (kullanici: "Teslim alinir kismi gerekli mi anlamadim, kaldiralim"):
+ * fis SADECE onayli belgedir; teslim alindi isaretleme / "Tamamlandi" takibi YOK.
+ * (Veritabanindaki alindi / cek_durumu alanlari ve sa_cek_*isaretle fonksiyonlari
+ * silinmedi, kullanilmiyor.)
  */
 
-// 27.10.2026: teslim alanin adi tarayicida HATIRLANMAZ; "alindi" isaretlerken ad soyad
-// zorunlu (sunucuda da). Eski surumun kaydettigi deger ilk acilista silinir.
+// Eski surumun tarayicida biraktigi "teslim alan" adi ilk acilista silinir.
 const ESKI_AD_ANAHTARI = "sa-cek-ad";
 
 export default function SatinAlmaFisi({ params }: { params: { token: string } }) {
@@ -28,8 +30,6 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
   const [yenileniyor, setYenileniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [islemHatasi, setIslemHatasi] = useState<string | null>(null);
-  const [isleniyor, setIsleniyor] = useState<string | null>(null);
-  const [ad, setAd] = useState("");
   const [kopyalandi, setKopyalandi] = useState(false);
 
   useEffect(() => { try { window.localStorage.removeItem(ESKI_AD_ANAHTARI); } catch { /* yoksay */ } }, []);
@@ -43,20 +43,6 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
     setYenileniyor(false);
   }, [params.token]);
   useEffect(() => { getir(); }, [getir]);
-
-  const isaretle = async (k: SaKalem) => {
-    setIslemHatasi(null);
-    if (!k.alindi && !adSoyadGecerli(ad)) {
-      setIslemHatasi("Teslim alındı olarak işaretlemek için üstteki “Teslim alan” alanına adınızı ve soyadınızı yazın.");
-      document.getElementById("sa-teslim-alan")?.focus();
-      return;
-    }
-    setIsleniyor(k.id);
-    const r = await satinAlmaCagir<SaListe>({ islem: "cek_isaretle", token: params.token, kalem_id: k.id, alindi: !k.alindi, ad: adSoyadDuzelt(ad) });
-    setIsleniyor(null);
-    if (!r.ok) { setIslemHatasi(r.hata); return; }
-    setListe(r.veri);
-  };
 
   const kopyala = async () => {
     try { await navigator.clipboard.writeText(window.location.href); setKopyalandi(true); setTimeout(() => setKopyalandi(false), 2500); }
@@ -77,7 +63,6 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
   const o = listeOzeti(liste);
   const onaylar = liste.kalemler.filter((k) => k.karar === "onaylandi");
   const redler = liste.kalemler.filter((k) => k.karar === "reddedildi");
-  const tamam = liste.cek_durumu === "tamamlandi";
 
   return (
     <BelgeSayfasi modul="Onaylı Satın Alma Fişi">
@@ -93,10 +78,6 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
         <button onClick={() => getir(true)} disabled={yenileniyor} className={dugmeIkincil} style={{ borderColor: B.cizgi }}>
           <RefreshCw size={14} className={yenileniyor ? "animate-spin" : ""} /> Yenile
         </button>
-        <label className="ml-auto w-full sm:w-60">
-          <span className="block text-[10.5px] font-semibold uppercase tracking-[0.07em] mb-1" style={{ color: B.soluk }}>Teslim alan (işaretleyen)</span>
-          <input id="sa-teslim-alan" value={ad} onChange={(e) => setAd(e.target.value)} maxLength={80} placeholder="Ad Soyad" autoComplete="off" className={girdiSinifi} style={girdiStil} />
-        </label>
       </div>
       {liste.test && <div className="mb-3 print:mb-2"><TestSeridi>Bu fiş test departmanına aittir; e-postaları yalnızca test adresine gönderilir.</TestSeridi></div>}
 
@@ -121,7 +102,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
               <tbody>
                 <tr><td className="pr-3 py-0.5" style={{ color: B.soluk }}>Fiş no</td><td className="font-mono font-bold">{liste.liste_no}</td></tr>
                 <tr><td className="pr-3 py-0.5" style={{ color: B.soluk }}>Onay tarihi</td><td className="font-semibold">{saTarih(liste.karar_zamani)}</td></tr>
-                <tr><td className="pr-3 py-0.5" style={{ color: B.soluk }}>Durum</td><td>{tamam ? <DurumEtiketi renk={B.yesil}>Tamamlandı</DurumEtiketi> : <DurumEtiketi renk={B.turuncu}>Aktif · {o.alinan}/{o.onay} teslim alındı</DurumEtiketi>}</td></tr>
+                <tr><td className="pr-3 py-0.5" style={{ color: B.soluk }}>Durum</td><td><DurumEtiketi renk={B.yesil}>Onaylı</DurumEtiketi></td></tr>
               </tbody>
             </table>
           </div>
@@ -139,8 +120,8 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
               <BilgiHucresi etiket="Onaylayan" deger={liste.karar_veren_email || "-"} />
             </tr>
             <tr>
-              <BilgiHucresi etiket="Kalem durumu" deger={`${o.onay} onaylı${o.red ? ` · ${o.red} reddedildi` : ""} · toplam ${o.toplam}`} />
-              <BilgiHucresi etiket={tamam ? "Tamamlanma" : "Teslim"} deger={tamam ? saTarih(liste.cek_tamamlanma) : `${o.alinan} / ${o.onay} kalem teslim alındı`} />
+              <BilgiHucresi etiket="Onaylanan kalem" deger={`${o.onay} / ${o.toplam}`} vurgu />
+              <BilgiHucresi etiket="Reddedilen kalem" deger={o.red ? String(o.red) : "Yok"} />
             </tr>
           </tbody>
         </table>
@@ -151,7 +132,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
         )}
 
         {/* Onaylanan kalemler */}
-        <h2 className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: B.lacivert }}>Onaylanan kalemler</h2>
+        <h2 className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: B.lacivert }}>Onaylanan kalemler ({onaylar.length})</h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] border" style={{ borderColor: B.cizgi }}>
             <thead>
@@ -162,12 +143,11 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
                 <th className={`${thSinifi} text-right`}>Miktar</th>
                 <th className={thSinifi}>Birim</th>
                 <th className={thSinifi}>Talep eden</th>
-                <th className={`${thSinifi} w-[150px]`}>Teslim alındı</th>
               </tr>
             </thead>
             <tbody>
               {onaylar.map((k, i) => (
-                <tr key={k.id} className="border-t" style={{ borderColor: B.cizgi, backgroundColor: k.alindi ? "#F7FAF8" : undefined }}>
+                <tr key={k.id} className="border-t break-inside-avoid" style={{ borderColor: B.cizgi }}>
                   <td className={`${tdSinifi} text-right tabular-nums`} style={{ color: B.soluk }}>{i + 1}</td>
                   <td className={tdSinifi}>
                     <span className="font-semibold break-words">{k.urun}</span> {k.aciliyet === "acil" && <AcilEtiketi />}
@@ -177,18 +157,6 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
                   <td className={`${tdSinifi} text-right tabular-nums font-bold whitespace-nowrap`}>{miktarYaz(k.miktar)}</td>
                   <td className={`${tdSinifi} whitespace-nowrap`}>{BIRIMLER[k.birim] ?? k.birim}</td>
                   <td className={`${tdSinifi} whitespace-nowrap`}>{k.talep_eden}</td>
-                  <td className={`${tdSinifi} py-2`}>
-                    <div className="flex items-start gap-2">
-                      <button onClick={() => isaretle(k)} disabled={isleniyor !== null} role="checkbox" aria-checked={!!k.alindi} aria-label={`${k.urun} teslim alındı`}
-                        className="shrink-0 w-[18px] h-[18px] mt-px rounded-[2px] border-[1.5px] flex items-center justify-center disabled:opacity-60 print:pointer-events-none"
-                        style={k.alindi ? { backgroundColor: B.yesil, borderColor: B.yesil, color: "#fff" } : { borderColor: B.lacivert2, backgroundColor: "#fff" }}>
-                        {isleniyor === k.id ? <Loader2 size={11} className="animate-spin" style={{ color: k.alindi ? "#fff" : B.lacivert2 }} /> : k.alindi ? <Check size={12} strokeWidth={3} /> : null}
-                      </button>
-                      {k.alindi
-                        ? <span className="text-[11px] leading-tight" style={{ color: B.yesil }}><b>{saTarih(k.alinma_zamani).slice(0, 10)}</b>{k.alan_ad ? <span className="block" style={{ color: B.soluk }}>{k.alan_ad}</span> : null}</span>
-                        : <span className="text-[11px] pt-px" style={{ color: B.soluk }}>Bekliyor</span>}
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -199,7 +167,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
         {/* Reddedilen kalemler */}
         {redler.length > 0 && (
           <>
-            <h2 className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: B.kirmizi }}>Reddedilen kalemler (satın alınmayacak)</h2>
+            <h2 className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: B.kirmizi }}>Reddedilen kalemler ({redler.length}) · satın alınmayacak</h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[600px] border" style={{ borderColor: B.cizgi }}>
                 <thead>
@@ -236,7 +204,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
 
         <p className="mt-5 pt-3 border-t text-[10.5px] leading-relaxed" style={{ borderColor: B.cizgi, color: B.soluk }}>
           Bu fiş İhracat AI Satın Alma modülünde elektronik olarak onaylanmıştır; ıslak imza gerektirmez.
-          Fiş no {liste.liste_no}. Teslim durumları fiş bağlantısından güncel olarak izlenir.
+          Fiş no {liste.liste_no}.
         </p>
       </article>
     </BelgeSayfasi>

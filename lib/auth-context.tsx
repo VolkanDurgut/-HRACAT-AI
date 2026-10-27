@@ -18,7 +18,7 @@ export type SayfaYetkileri = {
   draft_onay: boolean;
   ic_piyasa: boolean; // Ic Piyasa fiyat bilgilendirme formu (11.10.2026)
   proformalar: boolean; // Proforma olusturucu: musteri kartlari, urunler, sablon (17.10.2026)
-  proforma_imza: boolean; // "Onayla ve Imzala" - SADECE ihracat@ (Harun Bey); sayfa degil, islem yetkisi
+  proforma_imza: boolean; // "Onayla ve Imzala" - SADECE Harun Bey (export@; 27.10.2026'ya kadar ihracat@); sayfa degil, islem yetkisi
   satin_alma: boolean; // Satin alma talepleri: departman listelerini onaylama (26.10.2026)
 };
 
@@ -43,7 +43,9 @@ export type KullaniciYetkileri = {
 // listesiyle yapılır. Değiştirmek isterseniz sadece bu listeyi güncelleyin.
 // ----------------------------------------------------------------------------
 const SUPER_ADMIN_EMAILS = [
-  "volkandurgut.tr@gmail.com",
+  // Volkan Durgut: giris e-postasi 27.10.2026'da volkandurgut.tr@gmail.com ->
+  // execution@unex.com.tr oldu (migration 20261027200000_hesap_eposta_degisimi).
+  "execution@unex.com.tr",
   // Burak Tuncay: giris e-postasi 14.10.2026'da buraktuncay@ -> bbt@ oldu
   // (migration 20261014150000; RLS politikalarindaki liste ile AYNI olmali).
   // Ayni liste: supabase/functions/gunluk-rapor-gonder/yetki.ts (SUPER_ADMIN_EPOSTALARI).

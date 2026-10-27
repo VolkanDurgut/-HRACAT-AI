@@ -1733,6 +1733,26 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Sigorta metinleri, BL'de uyarı yok, hazır dosyada uyarı yok + Draft hizası, hareketi azalt,
   mobil 390), İhracatlar çekmecesi; e2e2/3/5/8 + proforma regresyon geçti.
 
+## Giriş e-postaları değişti (27.10.2026) — GÜNCEL HESAPLAR
+
+- `volkandurgut.tr@gmail.com` → `execution@unex.com.tr` (Volkan Durgut, id 6536cef7…,
+  admin + SÜPER ADMİN) ve `ihracat@unex.com.tr` → `export@unex.com.tr` (Harun Bey,
+  id 2cb21809…, rol ihracat, `proforma_imza`). Aynı kullanıcı / şifre / rol / yetkiler.
+  Migration `20261027200000_hesap_eposta_degisimi.sql` (tek transaction): auth.users +
+  auth.identities + kullanici_yetkileri.email; 3 RLS politikası; `yetki_super_admin_sirketi`
+  ve `kh_elle_iste` (canlı tanımdan yalnız e-posta değiştirilerek; izinler korunur);
+  sonda "eski adres kaldı mı" doğrulaması. CANLI uygulandı.
+- SÜPER ADMİN = `execution@unex.com.tr` + `bbt@unex.com.tr`. Aynı liste: RLS, 2 fonksiyon,
+  `lib/auth-context.tsx` SUPER_ADMIN_EMAILS, `gunluk-rapor-gonder/yetki.ts`
+  SUPER_ADMIN_EPOSTALARI. NOT: canlı `gunluk-rapor-gonder` henüz eski listeyle çalışıyor
+  (yeniden yüklenmedi); etkisiz, çünkü orada yetki "süper admin VEYA admin rolü" ve
+  execution@ admin. Bir sonraki deploy'da yeni liste gider.
+- Hitap (`lib/kullanici-hitap.ts`): execution@ "Volkan Bey", export@ "Harun Bey".
+- DEĞİŞMEDİ: geri bildirim / yedek kişisel alıcı varsayılanı (`GERI_BILDIRIM_ALICI`
+  yoksa volkandurgut.tr@gmail.com) — bu bir mail ALICISI, giriş hesabı değil.
+- `mudur@unex.com.tr` silinecek ("artık müdür yok"): iş kaydı yok (yalnız rol + yetki satırı).
+  MCP ile DELETE yapılmaz; kullanıcıya korumalı SQL verildi (iş kaydı varsa durur).
+
 ## Burak Tuncay giriş e-postası (14.10.2026)
 
 - `buraktuncay@unex.com.tr` → `bbt@unex.com.tr` (aynı kullanıcı id 3a9ff910…,
@@ -1978,6 +1998,19 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Konu satırları, düğme metinleri, `/cek/<token>`, "ACİL", test şeridi DEĞİŞMEDİ.
 - CANLI: edge `satin-alma` v6 (yalnız şablon; veritabanı değişmedi). Yerel test: edge
   harness 50/50, ölçüm `scratchpad/mail/olc.mjs N`.
+
+### Teslim takibi kaldırıldı (27.10.2026)
+- Kullanıcı: "Teslim alınır kısmı gerekli mi anlamadım. Bu kısmı kaldıralım."
+- Fiş artık YALNIZ onaylı belge: `/cek` teslim alan alanı + "Teslim alındı" sütunu /
+  kutuları yok, durum "Onaylı"; bilgi tablosunda "Onaylanan kalem" / "Reddedilen kalem".
+  `/satin-alma` "Onaylı fişler": işaretleme yok, rozet "Onaylı · n/m kalem", filtre
+  Onaylı fiş / Tamamı reddedildi; "Departman geçmişi"nde Durum sütunu yok. `/talep`
+  onaylanan alımlarda teslim durumu yok. Fiş mailinden işaretleme notu çıktı.
+- Veritabanı DEĞİŞMEDİ (alindi / cek_durumu sütunları, sa_cek_isaretle /
+  sa_cek_token_isaretle fonksiyonları ve edge "cek_isaretle" işlemi duruyor, arayüz
+  kullanmıyor). Edge `satin-alma` v7.
+- Departmanlar bilgi kutusundan "Test işaretli departmanın e-postaları…" cümlesi kaldırıldı
+  (Test düğmesinin title'ı açıklamayı taşımaya devam eder).
 
 ## Yazı animasyonu (27.10.2026)
 

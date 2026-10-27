@@ -23,7 +23,7 @@ import {
  * "satin-alma", lib/satin-alma/api.ts).
  */
 
-type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden" | "alindi" | "alinma_zamani"> & { liste_no: string; karar_zamani: string };
+type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden"> & { liste_no: string; karar_zamani: string };
 type Bilgi = { departman: string; test?: boolean; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
 
 // 27.10.2026: ad tarayicida HATIRLANMAZ (kullanici: "her departman isim belirtmeli,
@@ -339,9 +339,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
         {/* Onaylanan alimlar (departman gecmisi) */}
         {alimlar.length > 0 && (
           <Panel baslik="Onaylanan alımlar" govdeSinifi="p-0"
-            sag={<span className="text-xs" style={{ color: B.soluk }}>{alimlar.length} kalem · {alimlar.filter((a) => a.alindi).length} teslim alındı</span>}>
+            sag={<span className="text-xs" style={{ color: B.soluk }}>{alimlar.length} kalem</span>}>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px]">
+              <table className="w-full min-w-[560px]">
                 <thead>
                   <tr className="border-b" style={{ borderColor: B.cizgi, color: B.soluk }}>
                     <th className={thSinifi}>Onay</th>
@@ -349,7 +349,6 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                     <th className={thSinifi}>Ürün / hizmet</th>
                     <th className={`${thSinifi} text-right`}>Miktar</th>
                     <th className={thSinifi}>Talep eden</th>
-                    <th className={thSinifi}>Durum</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,7 +359,6 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                       <td className={tdSinifi}><span className="font-medium">{a.urun}</span><span className="block text-[11px]" style={{ color: B.soluk }}>{KATEGORILER[a.kategori] ?? a.kategori}</span></td>
                       <td className={`${tdSinifi} text-right whitespace-nowrap tabular-nums font-semibold`}>{miktarYaz(a.miktar)} <span className="font-normal" style={{ color: B.soluk }}>{BIRIMLER[a.birim] ?? a.birim}</span></td>
                       <td className={`${tdSinifi} whitespace-nowrap`}>{a.talep_eden}</td>
-                      <td className={tdSinifi}>{a.alindi ? <DurumEtiketi renk={B.yesil}>Teslim alındı</DurumEtiketi> : <DurumEtiketi renk={B.turuncu}>Alınacak</DurumEtiketi>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -453,7 +451,7 @@ function KalemTablosu({ kalemler, karar = false, sikistir = false, sonIslem }: {
 }
 
 function KalemKarari({ k }: { k: SaKalem }) {
-  if (k.karar === "onaylandi") return <DurumEtiketi renk={B.yesil}>{k.alindi ? "Teslim alındı" : "Onaylandı"}</DurumEtiketi>;
+  if (k.karar === "onaylandi") return <DurumEtiketi renk={B.yesil}>Onaylandı</DurumEtiketi>;
   if (k.karar === "reddedildi") return <DurumEtiketi renk={B.kirmizi}>Reddedildi</DurumEtiketi>;
   return <DurumEtiketi renk={B.turuncu}>Bekliyor</DurumEtiketi>;
 }
@@ -462,6 +460,5 @@ function FormDurumu({ l }: { l: SaListe }) {
   const o = listeOzeti(l);
   if (l.durum === "bekliyor") return <DurumEtiketi renk={B.turuncu}>Onay bekliyor</DurumEtiketi>;
   if (!o.onay) return <DurumEtiketi renk={B.kirmizi}>Reddedildi</DurumEtiketi>;
-  if (l.cek_durumu === "tamamlandi") return <DurumEtiketi renk={B.yesil}>Tamamlandı · tümü teslim alındı</DurumEtiketi>;
-  return <DurumEtiketi renk={B.yesil}>Onaylandı · {o.onay}/{o.toplam}{o.alinan ? ` · ${o.alinan} teslim alındı` : ""}</DurumEtiketi>;
+  return <DurumEtiketi renk={B.yesil}>Onaylandı · {o.onay}/{o.toplam}</DurumEtiketi>;
 }

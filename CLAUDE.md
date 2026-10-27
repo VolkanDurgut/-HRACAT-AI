@@ -1925,6 +1925,9 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   - Logo: satın alma maillerinde ve `/talep`·`/cek` üst bandında logonun arkasındaki BEYAZ
     KUTU kaldırıldı (logo lacivert zeminde doğrudan, mailde 64px + ince ayırıcı çizgi); mail
     kartı köşesi 6px, düğme 4px.
+  - CANLI (27.10.2026): migration `satin_alma_liste_test` uygulandı, SA-2026-0001 test=true
+    (kullanıcı onaylı UPDATE), edge `satin-alma` v3 (duman: bilgi 200, departman test=false,
+    gönderilmiş form test=true).
 
 ## Genel çalışma prensibi
 

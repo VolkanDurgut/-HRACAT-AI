@@ -19,7 +19,8 @@ import {
  * (edge function "satin-alma", lib/satin-alma/api.ts).
  */
 
-type Bilgi = { departman: string; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[] };
+type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden" | "alindi" | "alinma_zamani"> & { liste_no: string; karar_zamani: string };
+type Bilgi = { departman: string; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
 
 const AD_ANAHTAR = "sa-talep-ad";
 
@@ -47,6 +48,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [gonderimSonucu, setGonderimSonucu] = useState<{ liste_no: string; mail: string } | null>(null);
   const [acikGecmis, setAcikGecmis] = useState<string | null>(null);
+  const [alimlarAcik, setAlimlarAcik] = useState(false);
 
   useEffect(() => { try { setAd(window.localStorage.getItem(AD_ANAHTAR) || ""); } catch { /* yoksay */ } }, []);
 
@@ -281,6 +283,36 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
           )}
         </GenelKart>
 
+        {/* Departman gecmisi: onaylanan alimlar */}
+        {(bilgi.onaylananlar?.length ?? 0) > 0 && (
+          <GenelKart>
+            <button onClick={() => setAlimlarAcik(!alimlarAcik)} aria-expanded={alimlarAcik} className="w-full flex items-center justify-between gap-3 text-left">
+              <span className="min-w-0">
+                <span className="block text-base font-bold">Onaylanan alımlarımız</span>
+                <span className="block text-xs mt-0.5" style={{ color: GENEL.soluk }}>
+                  {bilgi.onaylananlar!.length} kalem · {bilgi.onaylananlar!.filter((a) => a.alindi).length} alındı
+                </span>
+              </span>
+              <ChevronDown size={16} className={`shrink-0 transition-transform ${alimlarAcik ? "rotate-180" : ""}`} style={{ color: GENEL.soluk }} />
+            </button>
+            {alimlarAcik && (
+              <ul className="mt-3 divide-y border-t" style={{ borderColor: GENEL.cizgi }}>
+                {bilgi.onaylananlar!.map((a) => (
+                  <li key={a.id} className="py-2.5 flex items-start gap-3 text-sm" style={{ borderColor: GENEL.cizgi }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold break-words">{a.urun} <span className="font-normal" style={{ color: GENEL.soluk }}>· {miktarBirim(a)}</span></p>
+                      <p className="text-xs" style={{ color: GENEL.soluk }}>{a.liste_no} · onay {saTarih(a.karar_zamani)} · {a.talep_eden}</p>
+                    </div>
+                    {a.alindi
+                      ? <span className="shrink-0 text-xs font-bold whitespace-nowrap" style={{ color: GENEL.yesil }}>Alındı</span>
+                      : <span className="shrink-0 text-xs font-bold whitespace-nowrap" style={{ color: GENEL.turuncu }}>Alınacak</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </GenelKart>
+        )}
+
         {/* Gonderilen listeler */}
         <GenelKart>
           <p className="text-base font-bold mb-3">Gönderilen listeler</p>
@@ -313,7 +345,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                           {l.kalemler.map((k) => (
                             <li key={k.id} className="py-2.5 flex items-start gap-3" style={{ borderColor: GENEL.cizgi }}>
                               <KalemOzeti k={k} />
-                              {l.durum === "sonuclandi" && <KararRozeti karar={k.karar} />}
+                              {l.durum === "sonuclandi" && <KararRozeti karar={k.karar} alindi={k.alindi} />}
                             </li>
                           ))}
                         </ul>
@@ -359,15 +391,19 @@ function DurumRozeti({ l }: { l: SaListe }) {
   if (l.durum === "bekliyor") {
     return <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full" style={{ backgroundColor: "#FDF1E7", color: GENEL.turuncu }}><Clock size={12} /> Onay bekliyor</span>;
   }
+  if (!o.onay) {
+    return <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: "#FDECEC", color: "#B42318" }}><XCircle size={12} /> Reddedildi</span>;
+  }
+  const tamam = l.cek_durumu === "tamamlandi";
   return (
     <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: "#E3F2EA", color: GENEL.yesil }}>
-      <CheckCircle2 size={12} /> {o.onay} onay{o.red ? ` · ${o.red} red` : ""}
+      <CheckCircle2 size={12} /> {tamam ? "Alındı" : `${o.onay} onay`}{o.red ? ` · ${o.red} red` : ""}{!tamam ? ` · ${o.alinan}/${o.onay} alındı` : ""}
     </span>
   );
 }
 
-function KararRozeti({ karar }: { karar: SaKalem["karar"] }) {
-  if (karar === "onaylandi") return <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold" style={{ color: GENEL.yesil }}><CheckCircle2 size={14} /> Onaylandı</span>;
+function KararRozeti({ karar, alindi }: { karar: SaKalem["karar"]; alindi?: boolean }) {
+  if (karar === "onaylandi") return <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: GENEL.yesil }}><CheckCircle2 size={14} /> {alindi ? "Alındı" : "Onaylandı"}</span>;
   if (karar === "reddedildi") return <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold" style={{ color: "#B42318" }}><XCircle size={14} /> Reddedildi</span>;
   return null;
 }

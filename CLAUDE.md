@@ -1844,10 +1844,26 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   onayla", not, hepsi seçilmeden kaydet kapalı, ConfirmDialog) · Sonuçlananlar (departman
   filtresi, sonuç mailini tekrar gönder) · Departmanlar ve bağlantılar (ekle, yeniden
   adlandır, aktif/pasif, bağlantı kopyala/aç, Yenile = yeni token). Maildeki
-  `/satin-alma?liste=<id>` ilgili listeyi açar. Karar SONRADAN DEĞİŞMEZ.
+  `/satin-alma?liste=<id>` ilgili listeyi açar. Karar SONRADAN DEĞİŞMEZ. (Sekmeler 26.10.2026
+  son hali: Onay bekleyen · Çek listeleri · Departman geçmişi · Departmanlar ve bağlantılar.)
 - Karar: edge function `karar` (kullanıcının KENDİ JWT'siyle `sa_karar_ver`; yetki DB'de),
   sonra sonuç maili. Mail gönderilemezse liste YİNE kaydedilir, `gonderim_maili` /
   `sonuc_maili` = 'hata' olur; sayfada "tekrar gönder" (`mail_tekrar`, `sa_liste_mail_verisi`).
+- UNEX ÇEK LİSTESİ (kullanıcı 26.10.2026: "onaylanan satın alım olduğunda aktif bir unex çeki
+  oluşmalı, execution@'ye onaylanmış çek liste ile gelmeli; ilgili departmanı etiketleyip
+  ileteceğim"; "çek" = kontrol listesi olarak yorumlandı): karar anında onaylanan kalem varsa
+  listede `cek_token` + `cek_durumu='aktif'` (tamamen reddedilende çek yok). execution@'ye
+  konu `[Departman] Onaylı satın alma çek listesi · SA-… (n kalem[, m reddedildi])` (iletme
+  için departman etiketi), gövdede kutucuklu tablo + reddedilenler + "Çek listesini aç"
+  düğmesi → girişsiz `/cek/[token]` (yazdırılabilir; alındı işaretle / geri al, ad isteğe
+  bağlı localStorage `sa-cek-ad`). Uygulamada "Çek listeleri" sekmesinden de işaretlenir
+  (`sa_cek_isaretle`, alan_ad = e-posta). Tüm onaylananlar alınınca `tamamlandi`; geri alınca
+  `aktif`. Kural tek yerde `sa_cek_uygula`; reddedilen kalem işaretlenemez (tablo kısıtı
+  `satin_alma_alindi_onayli`). `cek_token` departman sayfasına ASLA gitmez (`sa_liste_json`
+  içermez; sadece karar / mail verisinde).
+- DEPARTMAN GEÇMİŞİ: onaylanan tüm alımlar departmanın altında — uygulamada "Departman
+  geçmişi" sekmesi (departman başına akordeon, arama, alındı / alınacak), departman
+  bağlantısında "Onaylanan alımlarımız" (`sa_token_bilgi.onaylananlar`, en yeni 300 kalem).
 - Alıcılar (kod varsayılanı, secret ile değişir): `SATIN_ALMA_ALICILARI` = execution@,
   bbt@; `SATIN_ALMA_SONUC_ALICILARI` = execution@. Gönderen "Unex Gıda Satın Alma
   <bildirim@ihracatasistanim.com>". Mail şablonları `supabase/functions/_shared/satin-alma.ts`

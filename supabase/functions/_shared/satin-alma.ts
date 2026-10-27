@@ -9,6 +9,8 @@
 export const SA_SITE = "https://ihracatasistanim.com";
 export const talepAdresi = (token: string) => `${SA_SITE}/talep/${token}`;
 export const yonetimAdresi = (listeId: string) => `${SA_SITE}/satin-alma?liste=${listeId}`;
+/** Onaylanan kalemlerin girissiz "Unex cek listesi" sayfasi (execution@ isaretler). */
+export const cekAdresi = (token: string) => `${SA_SITE}/cek/${token}`;
 
 export const KATEGORILER = {
   kirtasiye: "Kırtasiye",
@@ -46,6 +48,10 @@ export type SaKalem = {
   karar: "bekliyor" | "onaylandi" | "reddedildi";
   red_nedeni: string | null;
   olusturma: string;
+  /** Cek listesi: onaylanan kalem alindi mi */
+  alindi?: boolean;
+  alinma_zamani?: string | null;
+  alan_ad?: string | null;
 };
 
 export type SaListe = {
@@ -62,6 +68,11 @@ export type SaListe = {
   karar_notu: string | null;
   gonderim_maili: "gonderildi" | "hata" | null;
   sonuc_maili: "gonderildi" | "hata" | null;
+  /** Onaylanan kalem varsa karar aninda 'aktif'; hepsi alininca 'tamamlandi'. */
+  cek_durumu?: "aktif" | "tamamlandi" | null;
+  cek_tamamlanma?: string | null;
+  /** SADECE karar / mail verisinde gelir (departman sayfasina ASLA). */
+  cek_token?: string | null;
   kalemler: SaKalem[];
 };
 
@@ -89,6 +100,7 @@ export function listeOzeti(l: Pick<SaListe, "kalemler">) {
     acil: k.filter((x) => x.aciliyet === "acil").length,
     onay: k.filter((x) => x.karar === "onaylandi").length,
     red: k.filter((x) => x.karar === "reddedildi").length,
+    alinan: k.filter((x) => x.karar === "onaylandi" && x.alindi).length,
   };
 }
 
@@ -125,16 +137,16 @@ const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:
 const td = (icerik: string, ek = "") => `<td style="padding:8px;border-bottom:1px solid #E3E1DA;font-size:13px;color:#1E293B;vertical-align:top;${ek}">${icerik}</td>`;
 const rozet = (metin: string, zemin: string, renk: string) => `<span style="display:inline-block;padding:1px 8px;border-radius:999px;background:${zemin};color:${renk};font-size:11px;font-weight:700;white-space:nowrap;">${kacis(metin)}</span>`;
 
-function kalemSatiri(k: SaKalem, i: number, sonuc: boolean): string {
+function kalemSatiri(k: SaKalem, ilkHucre: string, sonuc: boolean): string {
   const urun = `<div style="color:#6B7290;font-size:11px;margin-bottom:1px;">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</div><b>${kacis(k.urun)}</b>${k.aciklama ? `<div style="color:#6B7290;font-size:12px;margin-top:2px;">${kacis(k.aciklama)}</div>` : ""}${sonuc && k.karar === "reddedildi" && k.red_nedeni ? `<div style="color:#B91C1C;font-size:12px;margin-top:2px;">Red nedeni: ${kacis(k.red_nedeni)}</div>` : ""}`;
   const acil = k.aciliyet === "acil" ? rozet("ACİL", "#FEE2E2", "#B91C1C") : `<span style="color:#6B7290;font-size:12px;">Normal</span>`;
-  return `<tr>${td(String(i + 1), "color:#6B7290;")}${td(urun)}${td(kacis(miktarBirim(k)), "text-align:right;white-space:nowrap;font-weight:700;")}${td(acil)}${td(kacis(k.talep_eden), "white-space:nowrap;")}</tr>`;
+  return `<tr>${ilkHucre}${td(urun)}${td(kacis(miktarBirim(k)), "text-align:right;white-space:nowrap;font-weight:700;")}${td(acil)}${td(kacis(k.talep_eden), "white-space:nowrap;")}</tr>`;
 }
 
 function kalemTablosu(kalemler: SaKalem[], sonuc = false): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">
 <tr>${th("#")}${th("Ürün")}${th("Miktar", true)}${th("Aciliyet")}${th("Talep eden")}</tr>
-${kalemler.map((k, i) => kalemSatiri(k, i, sonuc)).join("")}</table>`;
+${kalemler.map((k, i) => kalemSatiri(k, td(String(i + 1), "color:#6B7290;"), sonuc)).join("")}</table>`;
 }
 
 const dugme = (metin: string, adres: string) => `<p style="margin:8px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:10px;">${kacis(metin)}</a></p>
@@ -154,20 +166,29 @@ ${altNot("Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderild
   return { konu, html: cerceve("UNEX GIDA · SATIN ALMA", "Yeni ihtiyaç listesi", govde) };
 }
 
-/** Burak Bey karar verdi -> execution@ */
+/** Burak Bey karar verdi -> execution@: departman etiketli, onaylanan kalemlerin CEK LISTESI.
+ * execution@ bu maili ilgili departmana iletebilir (konu "[Departman] ..." ile baslar). */
 export function sonucMaili(l: SaListe): { konu: string; html: string } {
   const o = listeOzeti(l);
   const onaylar = l.kalemler.filter((k) => k.karar === "onaylandi");
   const redler = l.kalemler.filter((k) => k.karar === "reddedildi");
-  const konu = `Satın alma onayı: ${l.departman} · ${l.liste_no} (${o.onay} onaylandı${o.red ? `, ${o.red} reddedildi` : ""})`;
+  const konu = o.onay
+    ? `[${l.departman}] Onaylı satın alma çek listesi · ${l.liste_no} (${o.onay} kalem${o.red ? `, ${o.red} reddedildi` : ""})`
+    : `[${l.departman}] Satın alma talebi reddedildi · ${l.liste_no}`;
   const bolum = (baslik: string, renk: string) => `<p style="margin:6px 0 8px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${renk};border-left:4px solid ${SEFTALI};padding-left:8px;">${kacis(baslik)}</p>`;
+  const kutu = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #283474;border-radius:3px;"></span>`;
+  const cekTablosu = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 18px;">
+<tr>${th("✓")}${th("Ürün")}${th("Miktar", true)}${th("Aciliyet")}${th("Talep eden")}</tr>
+${onaylar.map((k) => kalemSatiri(k, td(kutu, "width:22px;"), true)).join("")}</table>`;
   const govde = `<p style="margin:0 0 16px;color:${LACIVERT};font-size:15px;line-height:1.5;">${o.onay
-    ? `<b>${kacis(l.departman)}</b> departmanının listesinde <b>${o.onay} kalem onaylandı</b>; satın alma için aşağıdadır.`
+    ? `<b>${kacis(l.departman)}</b> departmanının listesinde <b>${o.onay} kalem onaylandı</b>. Aşağıdaki çek listesi <b>aktiftir</b>; alınan kalemleri düğmedeki sayfadan işaretleyin. Bu e-postayı ilgili departmana iletebilirsiniz.`
     : `<b>${kacis(l.departman)}</b> departmanının listesindeki kalemlerin hiçbiri onaylanmadı.`}</p>
-${bilgiTablosu([["Liste no", l.liste_no || "-"], ["Departman", l.departman], ["Gönderen", l.gonderen_ad || "-"], ["Karar veren", l.karar_veren_email || "-"], ["Karar", saTarih(l.karar_zamani)], ...(l.karar_notu ? [["Not", l.karar_notu] as [string, string]] : [])])}
-${onaylar.length ? `${bolum(`Onaylanan kalemler (${onaylar.length}) · satın alınacak`, "#047857")}${kalemTablosu(onaylar, true)}` : ""}
+${bilgiTablosu([["Departman", l.departman], ["Liste no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay", saTarih(l.karar_zamani)], ...(o.onay ? [["Çek listesi", `Aktif · ${o.onay} kalem`] as [string, string]] : []), ...(l.karar_notu ? [["Not", l.karar_notu] as [string, string]] : [])])}
+${onaylar.length ? `${bolum(`Unex çek listesi · onaylanan kalemler (${onaylar.length})`, "#047857")}${cekTablosu}` : ""}
 ${redler.length ? `${bolum(`Reddedilen kalemler (${redler.length})`, "#B91C1C")}${kalemTablosu(redler, true)}` : ""}
-${dugme("Listeyi uygulamada aç", yonetimAdresi(l.id))}
-${altNot("Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Departman sonucu kendi talep bağlantısında da görür.")}`;
-  return { konu, html: cerceve("UNEX GIDA · SATIN ALMA", o.onay ? "Satın alma onaylandı" : "Liste reddedildi", govde) };
+${o.onay && l.cek_token ? dugme("Çek listesini aç · alındı işaretle", cekAdresi(l.cek_token)) : dugme("Listeyi uygulamada aç", yonetimAdresi(l.id))}
+${altNot(o.onay
+  ? "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Düğmedeki bağlantıyı açan herkes kalemleri “alındı” olarak işaretleyebilir; tüm kalemler alınınca çek listesi tamamlanır. Departman sonucu kendi talep bağlantısında da görür."
+  : "Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi. Departman sonucu kendi talep bağlantısında görür.")}`;
+  return { konu, html: cerceve("UNEX GIDA · SATIN ALMA", o.onay ? "Onaylı çek listesi" : "Liste reddedildi", govde) };
 }

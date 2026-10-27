@@ -13,6 +13,12 @@
 --                            durum: taslak -> bekliyor -> sonuclandi
 -- satin_alma_kalemleri     : listedeki kalemler; karar kalem bazinda.
 --
+-- CEK LISTESI (kullanici 26.10.2026): onaylanan kalem varsa karar aninda listede
+-- AKTIF bir Unex cek listesi olusur (cek_token, cek_durumu='aktif'); execution@'ye
+-- departman etiketli mail gider. Maildeki girissiz /cek/[token] sayfasinda kalemler
+-- "alindi" isaretlenir; onaylananlarin hepsi alininca cek_durumu='tamamlandi'.
+-- Onayli alimlar departmanin altinda birikir (departman gecmisi).
+--
 -- YETKI MODELI
 --  - Girissiz departman sayfasi (/talep/[token]) veritabanina DOGRUDAN erismez:
 --    edge function "satin-alma" service_role ile SADECE sa_token_* fonksiyonlarini
@@ -57,6 +63,10 @@ create table if not exists public.satin_alma_listeleri (
   gonderim_maili_hata text,
   sonuc_maili text check (sonuc_maili is null or sonuc_maili in ('gonderildi', 'hata')),
   sonuc_maili_hata text,
+  -- Cek listesi (onaylanan kalemler): girissiz isaretleme baglantisi
+  cek_token text check (cek_token is null or cek_token ~ '^[0-9a-f]{32}$'),
+  cek_durumu text check (cek_durumu is null or cek_durumu in ('aktif', 'tamamlandi')),
+  cek_tamamlanma timestamptz,
   olusturma timestamptz not null default now(),
   guncelleme timestamptz not null default now(),
   constraint satin_alma_liste_tutarli check (
@@ -67,6 +77,7 @@ create table if not exists public.satin_alma_listeleri (
 create unique index if not exists uq_satin_alma_liste_no on public.satin_alma_listeleri (liste_no) where liste_no is not null;
 -- Departman basina TEK acik taslak (ortak liste)
 create unique index if not exists uq_satin_alma_tek_taslak on public.satin_alma_listeleri (departman_id) where durum = 'taslak';
+create unique index if not exists uq_satin_alma_cek_token on public.satin_alma_listeleri (cek_token) where cek_token is not null;
 create index if not exists ix_satin_alma_liste_durum on public.satin_alma_listeleri (company_id, durum, gonderim_zamani desc);
 
 create table if not exists public.satin_alma_kalemleri (
@@ -82,7 +93,12 @@ create table if not exists public.satin_alma_kalemleri (
   talep_eden text not null check (char_length(btrim(talep_eden)) between 2 and 80),
   karar text not null default 'bekliyor' check (karar in ('bekliyor', 'onaylandi', 'reddedildi')),
   red_nedeni text check (red_nedeni is null or char_length(red_nedeni) <= 300),
-  olusturma timestamptz not null default now()
+  -- Cek listesi: onaylanan kalem alindi mi
+  alindi boolean not null default false,
+  alinma_zamani timestamptz,
+  alan_ad text check (alan_ad is null or char_length(alan_ad) <= 80),
+  olusturma timestamptz not null default now(),
+  constraint satin_alma_alindi_onayli check (not alindi or karar = 'onaylandi')
 );
 create index if not exists ix_satin_alma_kalem_liste on public.satin_alma_kalemleri (liste_id, olusturma);
 
@@ -158,11 +174,13 @@ as $function$
     'gonderen_ad', l.gonderen_ad, 'gonderim_zamani', l.gonderim_zamani,
     'karar_veren_email', l.karar_veren_email, 'karar_zamani', l.karar_zamani, 'karar_notu', l.karar_notu,
     'gonderim_maili', l.gonderim_maili, 'sonuc_maili', l.sonuc_maili,
+    'cek_durumu', l.cek_durumu, 'cek_tamamlanma', l.cek_tamamlanma,
     'kalemler', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id', k.id, 'kategori', k.kategori, 'urun', k.urun, 'miktar', k.miktar, 'birim', k.birim,
         'aciliyet', k.aciliyet, 'aciklama', k.aciklama, 'talep_eden', k.talep_eden,
-        'karar', k.karar, 'red_nedeni', k.red_nedeni, 'olusturma', k.olusturma)
+        'karar', k.karar, 'red_nedeni', k.red_nedeni, 'olusturma', k.olusturma,
+        'alindi', k.alindi, 'alinma_zamani', k.alinma_zamani, 'alan_ad', k.alan_ad)
         order by k.olusturma, k.id)
       from public.satin_alma_kalemleri k where k.liste_id = l.id), '[]'::jsonb))
   from public.satin_alma_listeleri l
@@ -209,7 +227,17 @@ begin
       select jsonb_agg(public.sa_liste_json(x.id) order by x.gonderim_zamani desc)
       from (select l.id, l.gonderim_zamani from public.satin_alma_listeleri l
             where l.departman_id = d.id and l.durum <> 'taslak'
-            order by l.gonderim_zamani desc limit 10) x), '[]'::jsonb)
+            order by l.gonderim_zamani desc limit 10) x), '[]'::jsonb),
+    -- Departman gecmisi: onaylanan TUM alimlar (en yeni 300 kalem)
+    'onaylananlar', coalesce((
+      select jsonb_agg(y.j order by y.karar_zamani desc, y.olusturma)
+      from (select jsonb_build_object('id', k.id, 'liste_no', l.liste_no, 'karar_zamani', l.karar_zamani,
+                     'kategori', k.kategori, 'urun', k.urun, 'miktar', k.miktar, 'birim', k.birim, 'talep_eden', k.talep_eden,
+                     'alindi', k.alindi, 'alinma_zamani', k.alinma_zamani) as j, l.karar_zamani, k.olusturma
+            from public.satin_alma_kalemleri k
+            join public.satin_alma_listeleri l on l.id = k.liste_id
+            where l.departman_id = d.id and l.durum = 'sonuclandi' and k.karar = 'onaylandi'
+            order by l.karar_zamani desc, k.olusturma limit 300) y), '[]'::jsonb)
   );
 end; $function$;
 
@@ -425,12 +453,18 @@ begin
            red_nedeni = case when r ->> 'karar' = 'reddedildi' then nullif(btrim(coalesce(r ->> 'red_nedeni', '')), '') else null end
      where id = (r ->> 'id')::uuid and liste_id = p_liste_id;
   end loop;
+  -- Onaylanan kalem varsa AKTIF cek listesi (execution@ girissiz baglantiyla isaretler)
   update public.satin_alma_listeleri
      set durum = 'sonuclandi', karar_zamani = now(),
          karar_veren_email = lower(nullif(coalesce(auth.jwt() ->> 'email', ''), '')),
-         karar_notu = nullif(btrim(coalesce(p_not, '')), '')
+         karar_notu = nullif(btrim(coalesce(p_not, '')), ''),
+         cek_token = case when exists (select 1 from public.satin_alma_kalemleri k where k.liste_id = p_liste_id and k.karar = 'onaylandi')
+                          then replace(gen_random_uuid()::text, '-', '') end,
+         cek_durumu = case when exists (select 1 from public.satin_alma_kalemleri k where k.liste_id = p_liste_id and k.karar = 'onaylandi')
+                           then 'aktif' end
    where id = p_liste_id;
-  return public.sa_liste_json(p_liste_id);
+  return public.sa_liste_json(p_liste_id)
+    || jsonb_build_object('cek_token', (select l.cek_token from public.satin_alma_listeleri l where l.id = p_liste_id));
 end; $function$;
 
 -- Maili tekrar gondermek icin liste verisi (yetki kontrollu)
@@ -447,7 +481,90 @@ begin
   if not exists (select 1 from public.satin_alma_listeleri l where l.id = p_liste_id and l.company_id = v_sirket and l.durum <> 'taslak') then
     raise exception 'Liste bulunamadı.' using errcode = 'P0002';
   end if;
+  return public.sa_liste_json(p_liste_id)
+    || jsonb_build_object('cek_token', (select l.cek_token from public.satin_alma_listeleri l where l.id = p_liste_id));
+end; $function$;
+
+-- Cek listesi kalemini isaretler (ortak kural). Liste durumu kendiliginden guncellenir.
+create or replace function public.sa_cek_uygula(p_liste_id uuid, p_kalem_id uuid, p_alindi boolean, p_ad text)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+  v_cek text;
+  v_kalan int;
+begin
+  select l.cek_durumu into v_cek from public.satin_alma_listeleri l where l.id = p_liste_id for update;
+  if v_cek is null then
+    raise exception 'Bu liste için çek listesi yok.' using errcode = 'P0002';
+  end if;
+  update public.satin_alma_kalemleri
+     set alindi = coalesce(p_alindi, false),
+         alinma_zamani = case when coalesce(p_alindi, false) then now() end,
+         alan_ad = case when coalesce(p_alindi, false) then nullif(left(btrim(coalesce(p_ad, '')), 80), '') end
+   where id = p_kalem_id and liste_id = p_liste_id and karar = 'onaylandi';
+  if not found then
+    raise exception 'Kalem bulunamadı ya da onaylanmamış.' using errcode = 'P0002';
+  end if;
+  select count(*) into v_kalan from public.satin_alma_kalemleri k
+   where k.liste_id = p_liste_id and k.karar = 'onaylandi' and not k.alindi;
+  update public.satin_alma_listeleri
+     set cek_durumu = case when v_kalan = 0 then 'tamamlandi' else 'aktif' end,
+         cek_tamamlanma = case when v_kalan = 0 then coalesce(cek_tamamlanma, now()) end
+   where id = p_liste_id;
   return public.sa_liste_json(p_liste_id);
+end; $function$;
+
+-- Girissiz cek listesi sayfasi (/cek/[token]) - SADECE service_role
+create or replace function public.sa_cek_bilgi(p_token text)
+ returns jsonb
+ language sql
+ stable
+ security definer
+ set search_path to 'public'
+as $function$
+  select public.sa_liste_json(l.id)
+  from public.satin_alma_listeleri l
+  where p_token ~ '^[0-9a-f]{32}$' and l.cek_token = p_token and l.cek_durumu is not null
+  limit 1;
+$function$;
+
+create or replace function public.sa_cek_token_isaretle(p_token text, p_kalem_id uuid, p_alindi boolean, p_ad text)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+  v_liste uuid;
+begin
+  select l.id into v_liste from public.satin_alma_listeleri l
+   where p_token ~ '^[0-9a-f]{32}$' and l.cek_token = p_token and l.cek_durumu is not null;
+  if v_liste is null then
+    raise exception 'Bağlantı geçersiz.' using errcode = 'P0002';
+  end if;
+  return public.sa_cek_uygula(v_liste, p_kalem_id, p_alindi, p_ad);
+end; $function$;
+
+-- Uygulama icinden (yetkili) isaretleme
+create or replace function public.sa_cek_isaretle(p_kalem_id uuid, p_alindi boolean)
+ returns jsonb
+ language plpgsql
+ security definer
+ set search_path to 'public'
+as $function$
+declare
+  v_sirket uuid := public.sa_yetki_kontrol();
+  v_liste uuid;
+begin
+  select k.liste_id into v_liste from public.satin_alma_kalemleri k
+   where k.id = p_kalem_id and k.company_id = v_sirket;
+  if v_liste is null then
+    raise exception 'Kalem bulunamadı.' using errcode = 'P0002';
+  end if;
+  return public.sa_cek_uygula(v_liste, p_kalem_id, p_alindi, lower(nullif(coalesce(auth.jwt() ->> 'email', ''), '')));
 end; $function$;
 
 -- Departman ekle / guncelle (p_id null -> yeni)
@@ -519,12 +636,18 @@ revoke all on function public.sa_liste_mail_verisi(uuid) from public, anon;
 revoke all on function public.sa_departman_kaydet(uuid, text, boolean) from public, anon;
 revoke all on function public.sa_departman_token_yenile(uuid) from public, anon;
 revoke all on function public.satin_alma_guncelleme_zamani() from public, anon, authenticated;
+revoke all on function public.sa_cek_uygula(uuid, uuid, boolean, text) from public, anon, authenticated;
+revoke all on function public.sa_cek_bilgi(text) from public, anon, authenticated;
+revoke all on function public.sa_cek_token_isaretle(text, uuid, boolean, text) from public, anon, authenticated;
+revoke all on function public.sa_cek_isaretle(uuid, boolean) from public, anon;
 
 grant execute on function public.sa_token_bilgi(text), public.sa_token_kalem_ekle(text, jsonb),
   public.sa_token_kalem_sil(text, uuid), public.sa_token_liste_gonder(text, text),
-  public.sa_mail_sonuc(uuid, text, boolean, text) to service_role;
+  public.sa_mail_sonuc(uuid, text, boolean, text), public.sa_cek_bilgi(text),
+  public.sa_cek_token_isaretle(text, uuid, boolean, text) to service_role;
 grant execute on function public.sa_karar_ver(uuid, jsonb, text), public.sa_liste_mail_verisi(uuid),
-  public.sa_departman_kaydet(uuid, text, boolean), public.sa_departman_token_yenile(uuid) to authenticated;
+  public.sa_departman_kaydet(uuid, text, boolean), public.sa_departman_token_yenile(uuid),
+  public.sa_cek_isaretle(uuid, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 7) Baslangic verisi (Unex): ekteki formdaki 5 departman + super admin yetkisi

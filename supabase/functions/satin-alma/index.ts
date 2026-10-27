@@ -10,8 +10,12 @@ import { gonderimMaili, sonucMaili, type SaListe } from "../_shared/satin-alma.t
 //  - "kalem_ekle" : { token, kalem }      (taslak yoksa acilir)
 //  - "kalem_sil"  : { token, kalem_id }   (sadece acik taslaktan)
 //  - "gonder"     : { token, gonderen }   -> SA-YYYY-NNNN, execution@ + bbt@'ye mail
+// Girissiz Unex cek listesi sayfasi (/cek/[token]) - execution@'ye giden mailden:
+//  - "cek_bilgi"     : onaylanan kalemler + alindi durumlari
+//  - "cek_isaretle"  : { token, kalem_id, alindi, ad }
 // Uygulama ici (oturum JWT'si, "satin_alma" yetkisi DB'de kontrol edilir):
-//  - "karar"       : { liste_id, kararlar, not } -> sonuc maili execution@'ye
+//  - "karar"       : { liste_id, kararlar, not } -> onay varsa AKTIF cek listesi;
+//                    execution@'ye "[Departman] Onayli satin alma cek listesi" maili
 //  - "mail_tekrar" : { liste_id, tur: "gonderim" | "sonuc" }
 //
 // Veritabanina token islemlerinde SADECE service_role + sa_token_* / sa_mail_sonuc
@@ -142,6 +146,20 @@ Deno.serve(async (req: Request) => {
       const liste = await rpc<SaListe>("sa_token_liste_gonder", { p_token: token, p_gonderen: metin(govde.gonderen, 80) });
       const sonuc = await mailGonderVeKaydet("gonderim", liste);
       return json({ basarili: true, liste_no: liste.liste_no, mail: sonuc.mail });
+    }
+
+    // ---------------- Girissiz cek listesi ----------------
+    if (islem === "cek_bilgi" || islem === "cek_isaretle") {
+      if (!tokenGecerli(govde.token)) return json({ hata: "Bağlantı geçersiz." }, 404);
+      if (islem === "cek_bilgi") {
+        const veri = await rpc<SaListe | null>("sa_cek_bilgi", { p_token: govde.token });
+        return veri ? json(veri) : json({ hata: "Bağlantı geçersiz." }, 404);
+      }
+      if (!uuidGecerli(govde.kalem_id)) return json({ hata: "Geçersiz kalem." }, 400);
+      const veri = await rpc<SaListe>("sa_cek_token_isaretle", {
+        p_token: govde.token, p_kalem_id: govde.kalem_id, p_alindi: govde.alindi === true, p_ad: metin(govde.ad, 80) || null,
+      });
+      return json(veri);
     }
 
     // ---------------- Uygulama ici (oturum) ----------------

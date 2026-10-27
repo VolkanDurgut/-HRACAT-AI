@@ -1989,6 +1989,11 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (davranış birebir aynı).
 - Gece yedeği: `konsimento_hatirlatmalari` BİLEREK yedekte değil (gönderim günlüğü; kaybı
   veri kaybı değildir).
+- CANLI (27.10.2026): migration `konsimento_hatirlatma` uygulandı (7 fonksiyon; kuyruk
+  RPC'leri anon/authenticated'a KAPALI, `kh_elle_iste` sadece authenticated doğrulandı).
+  Edge `konsimento-hatirlatma` v1 (duman: `isle` 200 `{gonderilen:0}`, anonla `elle` 403).
+  pg_cron jobid 6 `konsimento-hatirlatma` `*/2` (anahtar `gunluk-yedek-maili` işinden).
+  MOD: TEST (secret `KONSIMENTO_HATIRLATMA_CANLI` girilmedi) → mailler mesensei282@.
 
 ## Genel çalışma prensibi
 

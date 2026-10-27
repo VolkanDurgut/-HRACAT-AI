@@ -1870,6 +1870,12 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (saf; uygulama da aynı etiketleri kullanır).
 - Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR` + mail.ts "Satın alma" grubu + geri yükleme
   betiği `TABLO_SIRASI`.
+- CANLI DURUM (27.10.2026 09:50 TR): migration `satin_alma` UYGULANDI (3 tablo, 16 fonksiyon,
+  5 departman, `satin_alma` yetkisi bbt@ + volkandurgut.tr@; RLS açık; token RPC'leri
+  anon/authenticated'a KAPALI doğrulandı). Edge function `satin-alma` v1 (canlı duman testi:
+  geçersiz token 404, gerçek departman 200, oturumsuz karar 403). `yedekleme-gonder` v19:
+  deneme 34 tablo, geri yükleme 32/32, uyarı yok. İlk deneme (26.10) onay penceresi
+  yanıtsız kalınca zaman aşımına uğramıştı; o sırada canlıya hiçbir şey yazılmadı.
 - Testler (scratchpad `sa/`): yerel PG16 senaryo SQL (yetki, şirket izolasyonu, sınırlar,
   token yenileme), edge function Node'da gerçek PG köprüsüyle (32 kontrol), Playwright e2e
   (girişsiz sayfa masaüstü/mobil, ortak taslak iki cihaz, gönderim maili, karar, sonuç maili,

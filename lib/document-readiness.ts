@@ -225,6 +225,11 @@ export function checkKaliteSertifikasiReadiness(
   } else {
     const eksikBrut = konteynerler.some((k) => !k.brut_agirlik_kg);
     if (eksikBrut) eksikler.push("Brüt Ağırlık (bir veya daha fazla konteynerde eksik)");
+    // 28.10.2026: "Weight as per B/L" konteyner brut toplamidir; rezervasyondaki tum
+    // konteynerler girilmeden belge eksik agirlikla olusmasin (dosya kapatma kurali gibi).
+    const rezAdet = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+    if (rezAdet > 0 && konteynerler.length < rezAdet) eksikler.push(`Konteyner girişi eksik (${konteynerler.length}/${rezAdet}) - B/L ağırlığı eksik hesaplanır`);
+    else if (rezAdet > 0 && konteynerler.length > rezAdet) eksikler.push(`Konteyner sayısı rezervasyondan fazla (${konteynerler.length}/${rezAdet}) - rezervasyon adedini kontrol edin`);
   }
 
   return { hazir: eksikler.length === 0, eksikler };

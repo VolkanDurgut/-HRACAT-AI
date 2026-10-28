@@ -133,7 +133,7 @@ export default function DraftOnayPage() {
 
     const dosyaIds = dosyaData.map((d) => d.id);
     const [rezRes, kontRes] = await Promise.all([
-      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId),
+      supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
       supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId),
     ]);
 

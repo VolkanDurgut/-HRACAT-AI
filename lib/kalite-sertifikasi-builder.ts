@@ -11,7 +11,10 @@
  * Vessel/Voyage  = rezervasyonlar[0].gemi_adi / sefer_no
  * B/L No         = dosya.bl_no
  * Weight as per B/L = konteynerler tablosundan brut agirlik toplami
- * Description of goods = dosya.urun_tanimi
+ * Description of goods = dosya.urun_tanimi; AYNI URUN TEK SEFER (28.10.2026,
+ *   lib/urun-tanimi.ts: proformada ayni urun iki satirsa belgede bir kez yazilir)
+ * Vessel/Voyage = rezervasyonlar[0]: dosya sayfasi rezervasyonlari olusturma
+ *   sirasiyla getirir (28.10.2026; once sirasizdi).
  * Production/Expiry Date = dosya.uretim_tarihi / dosya.son_kullanim_tarihi
  * Date of inspection = dosya.uretim_tarihi + 1 GUN (talep: 30.09.2026 -
  *   kullanicinin acik talimati: "Date of inspection her zaman Production
@@ -25,6 +28,7 @@
 import { Dosya, Rezervasyon, Konteyner, KaliteParametresi, KaliteSertifikasiAyari } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, IMZA_CIGDEM_KALITE, LOGO_UNEX } from "@/lib/imzalar";
+import { urunTanimiTekil } from "@/lib/urun-tanimi";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -277,7 +281,7 @@ export function buildKaliteSertifikasiHtml(
                              ? escapeHtml(formatDateTR(dosya.fatura_tarihi))
                              : safe(null),
     REPORT_NR:             safe(dosya.proforma_no),
-    DESCRIPTION_OF_GOODS:  safe(dosya.urun_tanimi),
+    DESCRIPTION_OF_GOODS:  safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri)),
     CONSIGNEE:             safe(dosya.consignee),
     NOTIFY:                escapeHtml(
                              (() => {

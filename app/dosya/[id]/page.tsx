@@ -79,7 +79,9 @@ function DosyaDetailContent() {
     if (!id || !user || !companyId) return; // companyId kontrolü eklendi
     const [dosyaRes, rezRes, kontRes] = await Promise.all([
       supabase.from("ihracat_dosyalari").select("*").eq("id", id).eq("company_id", companyId).single(),
-      supabase.from("rezervasyonlar").select("*").eq("dosya_id", id).eq("company_id", companyId),
+      // Sirali (28.10.2026): belgeler gemi/sefer/liman icin rezervasyonlar[0]'i kullanir;
+      // siralamasiz sorguda guncellenen satir sona kayabiliyordu.
+      supabase.from("rezervasyonlar").select("*").eq("dosya_id", id).eq("company_id", companyId).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
       supabase.from("konteynerler").select("*").eq("dosya_id", id).eq("company_id", companyId).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
     ]);
     if (dosyaRes.data) setDosya(dosyaRes.data);

@@ -2042,6 +2042,30 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Sonraki adım (konuşuldu, yapılmadı): ürün bazında birleşik onay + toplu satın alma listesi;
   ürün geçmişinde yanlış yazımları gizleme / birleştirme ekranı.
 
+## Quality belgesi kontrolleri (28.10.2026)
+
+- Kullanıcı: "Quality belgesi için gerekli kontrolleri sağlayalım… güncel sevkiyat bilgilerine
+  göre hazırlanması gerekiyor. Aynı üründen iki satır olduğunda tek ürün olarak geçsin."
+- `lib/urun-tanimi.ts` `urunTanimiTekil(urun_tanimi, ham_veri)`: urun_tanimi hâlâ otomatik
+  birleşimle (yeni-dosya: `description || urun_adi` + ", ") aynıysa proforma satır adları
+  tekilleştirilir (harf/boşluk/’ farkı yok; ilk yazım + sıra korunur). Elle değiştirilmiş
+  metne dokunulmaz (tek istisna: tamamen aynı parçalar "X, X"). Canlı: 33 dosyadan 5'inde
+  tekrar vardı (0072, 0075, 0081, 0102, 0103), beşi de otomatik. Veri DEĞİŞMEZ.
+  ŞİMDİLİK yalnız Quality "Description of goods" kullanır (CoO / Phyto / Health / PL
+  varsayılan ürün adı hâlâ ham urun_tanimi — kullanıcıya soruldu).
+- `checkKaliteSertifikasiReadiness`: konteyner sayısı rezervasyon adetleri toplamından az →
+  "Konteyner girişi eksik (x/y) - B/L ağırlığı eksik hesaplanır", fazla → "Konteyner sayısı
+  rezervasyondan fazla"; belge oluşmaz (Draft Onay paketinde "eklenmeyenler"e yazılır).
+  Rezervasyonda adet yoksa eski davranış.
+- `app/dosya/[id]` ve `app/draft-onay` rezervasyonları `olusturma_tarihi, id` sırasıyla
+  çeker (önce SIRASIZDI; tüm belgeler gemi/sefer/liman için `rezervasyonlar[0]` kullanır,
+  güncellenen satır sona kayabiliyordu). Canlıda şu an çok rezervasyonlu dosya yok.
+- AÇIK KONU (kullanıcıya soruldu, değiştirilmedi): "Date of inspection = Production Date + 1"
+  kuralı (30.09.2026 talimatı). Açık dosyalarda muayene tarihi konteyner girişinden ÖNCE
+  (0102: 16.10 vs 21.10; 0103: 21.10 vs 22-23.10; 0104: 21.10 vs 24-26.10) — belge metni
+  "numune yükleme sırasında alındı" diyor. Ayrıca 0103 varış limanı "TEMA PORT, BASIS".
+- Test: `scratchpad/qc/test.mjs` (17 vaka), `qc/uctan.mjs` (builder + hazırlık).
+
 ## Yazı animasyonu (27.10.2026)
 
 - Kullanıcı: Proforma Yükle karşılama mesajı "chatte yazıyor gibi" yazılsın; diğer sayfalarda

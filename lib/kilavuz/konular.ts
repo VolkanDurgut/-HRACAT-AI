@@ -15,6 +15,8 @@ import type { SayfaYetkileri } from "@/lib/auth-context";
 export type KilavuzAdimi = {
   /** Ekran goruntusundeki isaret noktasi (yoksa genel gorunum). */
   nokta?: string;
+  /** Bu adim konunun ekranindan farkli bir goruntu kullanir (ornek: Kantar DBA tablosu) */
+  ekran?: string;
   baslik: string;
   metin: string;
 };
@@ -117,11 +119,12 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
     hikaye: "Her konteyner kantardan geçiyor; DBA belgeleri sisteme kendiliğinden düşüyor.",
     renk: ["#F59E0B", "#7C2D12"], ekran: "kantar", adres: "/kantar", yetki: "kantar",
     adimlar: [
-      { baslik: "Kantar ekibinin ekranı", metin: "Açık dosyalarda yüklenecek bütün konteynerler tek listede. Müşteri adları gizli gösterilir." },
-      { nokta: "sekme", baslik: "İhracat · Yurt İçi", metin: "İhracat konteynerleri için DBA, iç piyasa araçları için irsaliye sekmesi." },
-      { nokta: "ara", baslik: "Hızlı arama", metin: "Konteyner no, mühür, plaka ya da dosya no ile anında bulun." },
-      { nokta: "sayac", baslik: "Bekleyen ve tamamlanan", metin: "DBA bekleyen ve tamamlanan konteyner sayıları; liste aynı ekranda iki bölüm halinde." },
-      { nokta: "yukle", baslik: "DBA yükle", metin: "Satırdaki DBA düğmesiyle belgeyi yükleyin; sistem PDF'teki konteyner no ve ağırlıkları kontrol eder." },
+      { baslik: "Kantar ekibinin ekranı", metin: "Açık dosyalarda yüklenecek bütün konteynerler tek ekranda. Müşteri adı görünmez, yalnızca müşteri kodu görünür." },
+      { nokta: "sekme", baslik: "İhracat · Yurt İçi", metin: "İhracat konteynerleri için DBA, iç piyasa araçları için irsaliye bölümü." },
+      { nokta: "ara", baslik: "Hızlı arama", metin: "Konteyner no, mühür, plaka, dosya no, çuval ya da müşteri kodu ile anında bulun." },
+      { nokta: "sevkiyat", baslik: "Sevkiyat durumu", metin: "Her açık sevkiyatta kaç konteynerin dolduğu: Dolu (yeşil), boş ekipman (turuncu), alınmamış (gri). Karta tıklayınca konteyner no, mühür no ve çuval listesi açılır." },
+      { nokta: "kod", baslik: "Müşteri kodu", metin: "Müşterinin adı yerine proformadaki kodu yazılır (CCS, CME…). Ad, kantar hesabına hiç gönderilmez." },
+      { nokta: "yukle", ekran: "kantar-dba", baslik: "DBA yükle", metin: "DBA Bekleyen listesinde satırdaki DBA düğmesiyle belgeyi yükleyin; sistem PDF'teki konteyner no ve ağırlıkları kontrol eder." },
     ],
   },
   {

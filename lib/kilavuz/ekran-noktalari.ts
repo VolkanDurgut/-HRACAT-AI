@@ -53,9 +53,14 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
   "kantar": {
     sekme: { x: 10, y: 9, w: 39.72, h: 6.06 },
     ara: { x: 10, y: 24, w: 79.72, h: 4.67 },
-    sayac: { x: 10, y: 30.44, w: 39.31, h: 9.56 },
-    satir: { x: 10.07, y: 49.39, w: 79.58, h: 6 },
-    yukle: { x: 82.99, y: 49.39, w: 6.67, h: 6 },
+    sayac: { x: 10, y: 30.44, w: 79.72, h: 9.56 },
+    sevkiyat: { x: 10, y: 46.06, w: 39.44, h: 17.69 },
+    kod: { x: 18.24, y: 47.94, w: 2.33, h: 2.33 },
+  },
+  "kantar-dba": {
+    satir: { x: 10.07, y: 31.53, w: 79.58, h: 6 },
+    musteri: { x: 52.29, y: 31.53, w: 9.5, h: 6 },
+    yukle: { x: 82.99, y: 31.53, w: 6.67, h: 6 },
   },
   "etd-eta": {
     sayac: { x: 18.33, y: 10.33, w: 26.11, h: 9.56 },

@@ -2201,6 +2201,42 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Test: `scratchpad/kl/e2e.mjs` (menü, kapak, geçiş fazları, kamera, 14 evren × tüm adımlar
   odak çerçevede, son ekran, ?k=, kaldığınız yer, mobil 390 + kaydırma, hareketi azalt, özet).
 
+## Kantar Paneli — Sevkiyat Durumu + müşteri kodu (28.10.2026)
+
+- Kullanıcı: "Kantar panelinde hangi sevkiyattan kaç tane dolu gözükebilmeli. Çuval isimleri,
+  konteyner no, mühür no, müşteri ismi (şifrelenecek, anlaşılabilir şekilde)." Gizleme biçimi
+  kullanıcı seçimi (AskUserQuestion): **proformadaki müşteri kodu** (CCS, CME, IKY, ARH).
+- GÜVENLİK DÜZELTMESİ: `kantar_dosya_listesi()` kantara TAM `alici_firma` döndürüyordu; gizleme
+  yalnız tarayıcıdaydı (geliştirici araçlarında tam ad görünürdü). Kantar rolü
+  `ihracat_dosyalari`nı doğrudan okuyamaz (RLS rol bazlı) → tek kaynak bu fonksiyondu.
+  Migration `20261028120000_kantar_musteri_kodu.sql` (SADECE fonksiyon; tablo/veri değişmez):
+  `kantar_musteri_kodu(proforma_no, alici_firma)` (ilk proforma "UNEX<KOD><rakam>" → KOD; yoksa
+  ünvanın baş harfleri — hukuki ekler ve tek harfler hariç, en fazla 4; yoksa "—"),
+  yeni `kantar_sevkiyat_listesi()` (alıcı adı YERİNE `musteri_kodu`), eski
+  `kantar_dosya_listesi()` imzası aynı ama `alici_firma` kolonu artık KOD döner. anon'a kapalı.
+  İstemci kopyası `lib/kantar-sevkiyat.ts musteriKodu` BİREBİR (yalnız migration öncesi yedek
+  yolda: yeni fonksiyon yoksa PGRST202 → eski fonksiyon + istemcide kod). Canlı 33 dosyanın
+  33'ünde proforma kodu çıktı.
+  CANLI (28.10.2026): migration uygulandı; kantar@ oturumuyla (rollback'li) doğrulama: yeni ve eski
+  fonksiyon açık 4 dosyada ARH / IKY / CME / CCS döner, `ihracat_dosyalari` doğrudan 0 satır; 3
+  fonksiyon anon'a kapalı.
+- Sevkiyat Durumu (`components/kantar-sevkiyat-durumu.tsx`, hesap `lib/kantar-sevkiyat.ts`
+  `sevkiyatOzetleri`, saf): her açık sevkiyat kartı = dosya no · müşteri kodu · çuval (konteyner
+  markaları "BRAND"sız, farklıysa "SAAD & ASLI"; yoksa dosya markası) · "Dolu x / y" + 3 renkli
+  çubuk (dolu yeşil · ekipmanı alınmış boş turuncu · alınmamış gri) · durum (Yükleniyor / Dolum
+  bekliyor / Başlamadı / Yükleme tamamlandı; sıra bu). y = max(rezervasyon konteyner_adedi
+  toplamı, eklenen) — günlük rapor / Ana Panel ile aynı. Rezervasyonsuz: "Rezervasyon
+  bekleniyor". Karta tıklayınca konteyner no · mühür · çuval · durum (boşlar önce). Arama
+  çuval ve müşteri kodunu da arar. "Gizle/Göster" (localStorage `kantar-sevkiyat-gizli`,
+  telefonda DBA listesine hızlı inmek için). DBA yükleme akışı DEĞİŞMEDİ; tablolardaki
+  Müşteri sütunu kodu gösterir. Rezervasyon sorgusuna `konteyner_adedi` eklendi (RLS zaten açık).
+- Kılavuz: Kantar evreni 2 ekran (`kantar`, `kantar-dba`; adım bazında `ekran` alanı,
+  `KilavuzAdimi.ekran`). Kılavuz çekim taklidi artık Realtime'ı da taklit eder ("Canlı" rozeti).
+- Test: yerel PG16 (migration 2 kez, kantar doğrudan okuyamaz, kod doğru, tam ad sızmaz, başka
+  şirket görünmez, anon reddedilir), birim `scratchpad/kantar/birim.ts` 21, Playwright
+  `kantar/e2e.mjs` (kartlar, liste, ad sızmıyor, arama, gizle/göster, migration öncesi yedek
+  yol, 390 px), kılavuz e2e + km e2e regresyon.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

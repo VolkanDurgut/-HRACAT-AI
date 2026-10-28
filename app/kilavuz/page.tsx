@@ -90,9 +90,10 @@ export default function KilavuzSayfasi() {
 
   // Komsu evrenlerin goruntulerini onceden indir (gecis aninda bos cerceve olmasin)
   useEffect(() => {
-    [sahne - 1, sahne + 1, sahne === KAPAK ? 0 : -9].forEach((i) => {
-      const e = KILAVUZ_KONULARI[i]?.ekran;
-      if (e) { const im = new Image(); im.src = `/kilavuz/${e}.webp`; }
+    [sahne - 1, sahne, sahne + 1, sahne === KAPAK ? 0 : -9].forEach((i) => {
+      const k = KILAVUZ_KONULARI[i];
+      if (!k) return;
+      Array.from(new Set([k.ekran, ...k.adimlar.map((x) => x.ekran)])).forEach((e) => { if (e) { const im = new Image(); im.src = `/kilavuz/${e}.webp`; } });
     });
   }, [sahne]);
 
@@ -238,7 +239,8 @@ function Evren({ konu, sira, adim, setAdim, ileri, geri, yetkili }: {
   ileri: () => void; geri: () => void; yetkili: boolean;
 }) {
   const a = konu.adimlar[adim];
-  const nokta = a?.nokta && konu.ekran ? EKRAN_NOKTALARI[konu.ekran]?.[a.nokta] : undefined;
+  const ekran = a?.ekran ?? konu.ekran;
+  const nokta = a?.nokta && ekran ? EKRAN_NOKTALARI[ekran]?.[a.nokta] : undefined;
   const sonAdim = adim === konu.adimlar.length - 1;
   const [r0, r1] = konu.renk;
 
@@ -304,9 +306,9 @@ function Evren({ konu, sira, adim, setAdim, ileri, geri, yetkili }: {
 
       {/* Ekran */}
       <div className="klv-yukari klv-g1 w-full min-w-0 md:max-h-full flex items-center">
-        {konu.ekran && (
+        {ekran && (
           <div className="w-full mx-auto" style={{ maxWidth: "min(100%, calc((100vh - 120px) * 1.6))" }}>
-            <EkranSahnesi ekran={konu.ekran} adres={konu.cubuk ?? konu.adres} nokta={nokta} renk={r0} numara={nokta ? adim + 1 : undefined} />
+            <EkranSahnesi ekran={ekran} adres={konu.cubuk ?? konu.adres} nokta={nokta} renk={r0} numara={nokta ? adim + 1 : undefined} />
             <p className="mt-2 text-center text-[10.5px]" style={{ color: "#5B6576" }}>Ekran görüntülerindeki firma, numara ve tutarlar örnektir.</p>
           </div>
         )}

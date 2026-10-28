@@ -11,6 +11,8 @@ import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
+import { KantarSevkiyatDurumu } from "@/components/kantar-sevkiyat-durumu";
+import { musteriKodu, sevkiyatOzetleri, type KantarDosya } from "@/lib/kantar-sevkiyat";
 
 type KonteynerRow = {
   id: string;
@@ -33,20 +35,9 @@ type KonteynerRow = {
   irsaliye_yukleme_tarihi: string | null;
   booking_no: string | null;
   marka: string | null;
-  maskeli_musteri: string;
+  /** 28.10.2026: musteri adi kantara GELMEZ; sunucu proforma kodunu verir (CCS, CME…). */
+  musteri_kodu: string;
 };
-
-/** Müşteri adını maskeler: her kelimenin ilk harfi görünür, gerisi yıldız. */
-function maskeleMusteri(isim: string | null | undefined): string {
-  if (!isim) return "-";
-  return isim
-    .split(" ")
-    .map((kelime) => {
-      if (kelime.length <= 1) return kelime;
-      return kelime[0] + "*".repeat(kelime.length - 1);
-    })
-    .join(" ");
-}
 
 export default function KantarPage() {
   const { user, companyId, yetkiler, loading: authLoading, signOut } = useAuth();
@@ -54,6 +45,9 @@ export default function KantarPage() {
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [arama, setArama] = useState("");
+  // Sevkiyat Durumu (28.10.2026): acik dosyalar + rezervasyondaki konteyner adedi
+  const [dosyalar, setDosyalar] = useState<KantarDosya[]>([]);
+  const [rezerveAdet, setRezerveAdet] = useState<Record<string, number>>({});
   const [secilenGun, setSecilenGun] = useState<string | null>(null);
   // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
   // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
@@ -92,17 +86,25 @@ export default function KantarPage() {
     // sayede konteynerler tablosunun tum tarihcesi degil, sadece guncel alt
     // kume cekilir. Sirket yillar boyunca veri biriktirdikce bu sayfa
     // yavaslamaz, cunku "acik dosya" sayisi dogasi geregi sinirlidir.
-    const { data: dosyaData, error: dosyaHata } = await supabase
-      .rpc("kantar_dosya_listesi")
+    // 28.10.2026: musteri adi yerine KOD donen fonksiyon (migration 20261028120000). Migration
+    // henuz uygulanmamissa (fonksiyon yok) eski fonksiyona dusulur ve kod istemcide uretilir.
+    let { data: dosyaData, error: dosyaHata } = await supabase
+      .rpc("kantar_sevkiyat_listesi")
       .or("durum.eq.Açık,durum.eq.Acik");
+    if (dosyaHata && (dosyaHata.code === "PGRST202" || dosyaHata.code === "42883")) {
+      const eski = await supabase.rpc("kantar_dosya_listesi").or("durum.eq.Açık,durum.eq.Acik");
+      dosyaHata = eski.error;
+      dosyaData = (eski.data || []).map((d: any) => ({ id: d.id, dosya_no: d.dosya_no, durum: d.durum, marka: d.marka, musteri_kodu: musteriKodu(null, d.alici_firma) }));
+    }
 
     if (eskiIstek()) return;
     if (dosyaHata) { okumaBasarisiz(); return; }
-    if (!dosyaData || dosyaData.length === 0) { setKonteynerler([]); setOkumaHatasi(false); setSonGuncelleme(new Date()); setLoading(false); return; }
+    const acikDosyalar: KantarDosya[] = (dosyaData || []).map((d: any) => ({ id: d.id, dosya_no: d.dosya_no, marka: d.marka, musteri_kodu: d.musteri_kodu || "—" }));
+    if (acikDosyalar.length === 0) { setDosyalar([]); setRezerveAdet({}); setKonteynerler([]); setOkumaHatasi(false); setSonGuncelleme(new Date()); setLoading(false); return; }
 
-    const dosyaIds = dosyaData.map((d: any) => d.id);
-    const dosyaMap: Record<string, { dosya_no: string; marka: string | null; alici_firma: string | null }> = {};
-    dosyaData.forEach((d: any) => { dosyaMap[d.id] = { dosya_no: d.dosya_no, marka: d.marka, alici_firma: d.alici_firma }; });
+    const dosyaIds = acikDosyalar.map((d) => d.id);
+    const dosyaMap: Record<string, { dosya_no: string; marka: string | null; musteri_kodu: string }> = {};
+    acikDosyalar.forEach((d) => { dosyaMap[d.id] = { dosya_no: d.dosya_no, marka: d.marka, musteri_kodu: d.musteri_kodu }; });
 
     // REZERVASYON BULMA - İYİLEŞTİRİLDİ
     // Konteynerin rezervasyon_id'si boş olsa bile, dosya üzerinden booking no bulur.
@@ -114,13 +116,17 @@ export default function KantarPage() {
         .in("dosya_id", dosyaIds),
       supabase
         .from("rezervasyonlar")
-        .select("id, booking_no, dosya_id")
+        .select("id, booking_no, dosya_id, konteyner_adedi")
         .eq("company_id", companyId)
         .in("dosya_id", dosyaIds),
     ]);
 
     if (eskiIstek()) return;
     if (kontHata || rezHata) { okumaBasarisiz(); return; }
+    const rezerve: Record<string, number> = {};
+    (rezData || []).forEach((r: any) => { rezerve[r.dosya_id] = (rezerve[r.dosya_id] || 0) + (Number(r.konteyner_adedi) || 0); });
+    setDosyalar(acikDosyalar);
+    setRezerveAdet(rezerve);
     if (!kontData || kontData.length === 0) { setKonteynerler([]); setOkumaHatasi(false); setSonGuncelleme(new Date()); setLoading(false); return; }
 
     const rezDosyaMap: Record<string, string> = {};
@@ -139,7 +145,7 @@ export default function KantarPage() {
         dosya_no: dosyaMap[k.dosya_id].dosya_no,
         marka: k.marka || dosyaMap[k.dosya_id].marka,
         booking_no: k.rezervasyon_id ? (rezIdMap[k.rezervasyon_id] || rezDosyaMap[k.dosya_id] || null) : (rezDosyaMap[k.dosya_id] || null),
-        maskeli_musteri: maskeleMusteri(dosyaMap[k.dosya_id].alici_firma),
+        musteri_kodu: dosyaMap[k.dosya_id].musteri_kodu,
       })) as KonteynerRow[];
 
     setKonteynerler(enriched);
@@ -223,7 +229,9 @@ export default function KantarPage() {
       (k.muhur_no || "").toLowerCase().includes(q) ||
       (k.plaka || "").toLowerCase().includes(q) ||
       k.dosya_no.toLowerCase().includes(q) ||
-      (k.booking_no || "").toLowerCase().includes(q)
+      (k.booking_no || "").toLowerCase().includes(q) ||
+      (k.marka || "").toLowerCase().includes(q) ||
+      k.musteri_kodu.toLowerCase().includes(q)
     );
   };
 
@@ -264,6 +272,8 @@ export default function KantarPage() {
   };
 
   const tamamlananlarFiltreli = gunFiltre(aramaFiltre(tamamlananlar));
+
+  const sevkiyatlar = sevkiyatOzetleri(dosyalar, konteynerler, rezerveAdet);
 
   // Bu sayfa kantar terminali icin BILEREK kenar cubugu (AppShell) olmadan
   // calisir; bu yuzden AppShell'in yaptigi oturum/yetki kapisi burada
@@ -399,7 +409,7 @@ export default function KantarPage() {
             type="text"
             value={arama}
             onChange={(e) => setArama(e.target.value)}
-            placeholder="Konteyner no, mühür no, plaka veya dosya no ile ara..."
+            placeholder="Konteyner, mühür, plaka, dosya no, çuval veya müşteri kodu ile ara..."
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
           />
@@ -423,6 +433,9 @@ export default function KantarPage() {
         {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
         <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
           
+          {/* Sevkiyat Durumu (28.10.2026): hangi sevkiyattan kac konteyner dolu */}
+          <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} />
+
           {/* Bekleyen DBA'lar - tek liste */}
           {bekleyenlerFiltreli.length > 0 && (
             <div className="space-y-3">
@@ -459,7 +472,7 @@ export default function KantarPage() {
                           <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
                           <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-white">{k.maskeli_musteri}</td>
+                        <td className="px-4 py-2.5 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
                         <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{k.booking_no || "-"}</td>
                         <td className="px-4 py-2.5 text-center">
                           {k.irsaliye_dosya_url ? (
@@ -562,7 +575,7 @@ export default function KantarPage() {
                             <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
                             <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-white">{k.maskeli_musteri}</td>
+                          <td className="px-4 py-2.5 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
                           <td className="px-4 py-2.5 text-right">
                             <div className="text-[10px]" style={{ color: TEXT_MUTED }}>Dara: {k.tare_kg ? `${k.tare_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
                             <div className="text-xs font-bold text-white mt-0.5">VGM: {k.vgm_kg ? `${k.vgm_kg.toLocaleString("tr-TR")} kg` : "-"}</div>

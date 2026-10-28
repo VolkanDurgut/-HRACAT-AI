@@ -159,8 +159,10 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
     adimlar: [
       { baslik: "Bütün yolculuklar", metin: "Tüm sevkiyatların kalkış (ETD) ve varış (ETA) tarihleri tek tabloda." },
       { nokta: "sayac", baslik: "Özet", metin: "Toplam sevkiyat, ETA girilmiş ve ETA eksik sayıları. Filtre düğmeleriyle eksikleri ayırın." },
+      { nokta: "odeme", baslik: "Ödeme bekleyen", metin: "Gemisi kalkmış, konşimentosu Telex / Seawaybill / Vesaik olmayan sevkiyatlar. Karta tıklayınca yalnız onlar listelenir." },
+      { nokta: "excel", baslik: "Excel'den güncelle", metin: "Haftalık ETD-ETA dosyasını seçin; Konşimento sütunu booking no ile eşleşir, önizlemeyi onaylayınca durumlar güncellenir." },
       { nokta: "ara", baslik: "Arama", metin: "Firma, booking, BL, gemi ya da liman ile arayın." },
-      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "Varışı yaklaşan sevkiyatlar renkli tarihle öne çıkar. ETA değişince buradan güncelleyin." },
+      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "ETA ve Konşimento durumu satırdan değiştirilir. “Hatırlat” 3 şablondan ödeme hatırlatma maili hazırlar; Outlook'ta gönderip “gönderildi” deyince satırda tarih ve sayı görünür." },
     ],
   },
   {

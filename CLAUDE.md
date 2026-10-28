@@ -2299,6 +2299,40 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Fumigation ve Quality'de kullanılır. Health'te ürün adı zaten sabit "WHEAT FLOUR".
   Commercial Invoice ürün satırları fiyat/ambalaj taşıdığı için AYRI kalır.
 
+## ETD/ETA — Konşimento (ödeme) durumu + ödeme hatırlatma maili (28.10.2026)
+
+- Kullanıcı: Harun Bey'in haftalık ETD-ETA Excel'inde KONŞİMENTO sütununda Telex / Seawaybill /
+  Vesaik olmayanlar = ödemesi alınmamış. Bunlara hatırlatma maili + gönderim takibi.
+- DB (migration `20261028140000_odeme_takibi.sql`, CANLIYA UYGULANDI 28.10.2026 — yalnız ek kolon
+  ve tablo, veri değişmedi): `rezervasyonlar.konsimento_durumu` (x | alindi | telex | seawaybill |
+  vesaik | kargo | kuehne | acente; null = girilmedi) + `_tarihi` + `_kaynak` (elle|excel).
+  `odeme_hatirlatmalari` değişmez kayıt (şablon, alıcı, CC, konu, gövde, gönderen, zaman; RLS
+  okuma = şirket + etd_eta yetkisi; doğrudan insert/update/delete YOK). Yazma YALNIZ fonksiyonlarla:
+  `odeme_konsimento_guncelle(rez, durum)`, `odeme_konsimento_toplu(jsonb ≤500, tek işlem)`,
+  `odeme_hatirlatma_kaydet(rez, sablon, alici, cc, konu, govde)` — hepsi etd_eta yetkisi + kendi
+  şirketi; anon yok. Yerel PG 16 senaryo testi (`odeme/pg/test.sql`).
+- Kural (`lib/odeme-takibi.ts`): ödeme alındı = telex/seawaybill/vesaik; "Ödeme Bekleyen" = ETD ≤
+  bugün ve ödeme alınmamış (boş dahil). Kargo/Kuehne/Acente kullanıcı kuralı gereği "bekliyor".
+- Şablonlar kullanıcının 3 metniyle BİREBİR (yalnız firma, adet × tip, booking dolar). Tip
+  konteynerlerden ("20DC" → "20 DC", karışık/yoksa "20 DC"). Şablon 3: ETA ≤ bugün "has arrived
+  at", değilse "is approaching". Konu "Payment Reminder – Booking No: …". Öneri: ETA geçmiş → 3,
+  daha önce hatırlatıldıysa → 2, yoksa 1.
+- Gönderim Outlook (mailto, CRLF) — ihracat müşterisine sistemden doğrudan mail ASKIDA kuralı
+  korunur. "Evet, gönderildi" → kayıt; "Hayır" → kayıt yok. Alıcıyla aynı adres CC'den düşer.
+  CC tarayıcıda hatırlanır ama YALNIZ @unex.com.tr adresleri (müşteri adresi başka müşteriye
+  taşınmasın). Alıcı varsayılanı `ham_veri.alici_email` (yoksa elle).
+- Excel'den güncelle (`lib/etd-excel.ts`, `components/etd-excel-aktar.tsx`): .xlsx/.xlsm
+  TARAYICIDA jszip+DOMParser ile okunur (makro çalışmaz, dosya yüklenmez). Yıl sayfaları eskiden
+  yeniye, sütunlar başlıktan; KONŞİMENTO sütunu olmayan sayfa (2023) sessizce atlanır. Booking no
+  (yoksa B/L) harf+rakam anahtarıyla eşleşir; Excel'de boş hücre sistem değerini SİLMEZ; tanınmayan
+  değer atlanır ve gösterilir. Önizlemede satır seçimi → toplu fonksiyon. 24.10 dosyasıyla: 33/33
+  eşleşti, 18 ödeme bekleyen; sistemde olmayan ESMAAGRIC 26CTA00192 bilgi olarak listelenir.
+- Sayfa: Konşimento açılır seçimi + Hatırlatma sütunu (son: "x gün önce · Ş2 · n kez"), "Ödeme
+  Bekleyen" kartı/filtresi, başlıkta "Excel'den güncelle". 2xl altında Acente ve B/L sütunları
+  gizli (1440'ta tablo sığsın; arama yine BL'de arar). Kolon yoksa (42703) sayfa eski hâliyle
+  çalışır. Testler: `odeme/e2e.mjs` 34/34 (mailto, kayıt parametreleri, CC kuralı, Excel önizleme,
+  geri uyum, mobil taşma yok). Kılavuz ETD bölümü 6 adım, ekran yeniden çekildi.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

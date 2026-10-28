@@ -65,8 +65,10 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
     yukle: { x: 82.99, y: 31.53, w: 6.67, h: 6 },
   },
   "etd-eta": {
-    sayac: { x: 18.33, y: 10.33, w: 26.11, h: 9.56 },
-    ara: { x: 18.33, y: 22.11, w: 63.13, h: 4.22 },
+    sayac: { x: 18.33, y: 10.33, w: 19.38, h: 9.56 },
+    odeme: { x: 78.96, y: 10.33, w: 19.38, h: 9.56 },
+    excel: { x: 87.71, y: 2.67, w: 10.63, h: 3.78 },
+    ara: { x: 18.33, y: 22.11, w: 53.26, h: 4.22 },
     tablo: { x: 18.4, y: 28.22, w: 79.86, h: 71.78 },
   },
   "draft-onay": {

@@ -135,14 +135,14 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { baslik: "Yükledikçe hazırlanır", metin: "Fatura, konşimento talimatı, Draft BL ve beyannameyi İhracat AI asistanına bırakın; ihracat evrakları kendiliğinden hazırlanır." },
       { nokta: "fatura", baslik: "Muhasebe · Fatura", metin: "Faturayı asistana bırakın: fatura no, tarih ve DİİB okunur, tutar, ağırlık ve konteynerler sistemle karşılaştırılır. Konteynerler eksikse alan kilitlidir ve nedeni yazar." },
       { nokta: "konsimento", baslik: "Konşimento talimatı", metin: "Consignee ve notify talimattan okunur; konteyner, mühür, ağırlık ve limanlar kontrol edilir. Talimat yüklenmeden evraklar tamamlanmaz." },
-      { nokta: "draftbl", ekran: "dosya-evrak-2", baslik: "Draft BL", metin: "Acenteden gelen taslak konşimentoyu bırakın; BL no okunur, bilgiler karşılaştırılır. Yüklenince dosya Draft Onay'a hazırlanır." },
+      { nokta: "draftbl", ekran: "dosya-evrak-2", baslik: "Draft BL", metin: "Acenteden gelen taslak konşimentoyu bırakın; BL no okunur, bilgiler karşılaştırılır. Yüklenince dosya İhracat Evrakları sayfasında müşteri onayına hazırlanır." },
       { nokta: "beyanname", ekran: "dosya-evrak-2", baslik: "Gümrük beyannamesi", metin: "Beyannameyi bırakın (PDF, JPG, PNG); dosyaya bağlanır ve beyanname cut-off sayacı durur." },
       { nokta: "evraklar", baslik: "İhracat evrakları", metin: "Commercial Invoice, Packing List, menşe, bitki sağlığı, sağlık ve kalite sertifikaları. Her biri Draft ve Orijinal olarak tek tıkla açılır; “Taslak Onay Paketi İndir” hepsini tek ZIP yapar." },
       { nokta: "uyari", baslik: "“Bekleniyor” uyarısı", metin: "Yanıp sönen kutu, evrakın oluşması için hangi bilginin beklendiğini söyler. Eksik tamamlanınca kendiliğinden kaybolur." },
     ],
   },
   {
-    id: "draft-onay", baslik: "Draft Onay", evren: "48 Saatlik Yörünge",
+    id: "draft-onay", baslik: "İhracat Evrakları", evren: "48 Saatlik Yörünge",
     hikaye: "Taslaklar müşteriye gitti. Saat işliyor: 48 saat.",
     renk: ["#34D399", "#065F46"], ekran: "draft-onay", adres: "/draft-onay", yetki: "draft_onay",
     adimlar: [

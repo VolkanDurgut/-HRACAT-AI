@@ -25,7 +25,8 @@ const mainItems: MenuItem[] = [
   // 25.10.2026: "Yeni Dosya Ac" -> "Proforma Yukle" (kullanici karari; adres ve yetki ayni)
   { label: "Proforma Yükle", href: "/yeni-dosya", icon: <FileUp size={18} />,        yetkiKey: "yeni_dosya" },
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
-  { label: "Draft Onay",    href: "/draft-onay",  icon: <FileCheck2 size={18} />,      yetkiKey: "draft_onay" },
+  // 28.10.2026: "Draft Onay" -> "İhracat Evrakları" (kullanici karari; adres ve yetki ayni)
+  { label: "İhracat Evrakları", href: "/draft-onay", icon: <FileCheck2 size={18} />, yetkiKey: "draft_onay" },
 ];
 
 const opsItems: MenuItem[] = [

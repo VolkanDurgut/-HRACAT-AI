@@ -4,7 +4,7 @@
 export type EkranNoktasi = { x: number; y: number; w: number; h: number };
 export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
   "panel": {
-    menu: { x: 0.9, y: 9.11, w: 15.42, h: 77.44 },
+    menu: { x: 0.9, y: 9.11, w: 15.42, h: 73.67 },
     kartlar: { x: 18.33, y: 10.33, w: 80, h: 13.39 },
     filtre: { x: 69.44, y: 2.67, w: 28.89, h: 3.33 },
     satir: { x: 18.4, y: 30.44, w: 79.86, h: 8.17 },
@@ -14,9 +14,9 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
   "proforma-olustur": {
     musteri: { x: 18.33, y: 10.56, w: 46.67, h: 55.89 },
     urunler: { x: 18.33, y: 68.22, w: 46.67, h: 31.78 },
+    onizleme: { x: 66.39, y: 10.56, w: 31.94, h: 81.22 },
     // odeme: ELLE (28.10.2026) - onizlemedeki PDF'in PACKAGING / SHIPMENT / PAYMENT TERMS satirlari
     odeme: { x: 67.4, y: 43.7, w: 24, h: 8.6 },
-    onizleme: { x: 66.39, y: 10.56, w: 31.94, h: 81.22 },
   },
   "proforma-yukle": {
     asistan: { x: 18.33, y: 10.78, w: 62.22, h: 57.61 },

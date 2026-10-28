@@ -2273,6 +2273,15 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Test: scratchpad `ea/e2e.mjs` (4 asistan, mesajlar, etiketler, yanlış tür, sürükle-bırak,
   işleniyor, hata akışı, kilitli, yüklü dosya, hareketi azalt, 390 px).
 
+## Menü: "Draft Onay" → "İhracat Evrakları" (28.10.2026)
+
+- Kullanıcı kararı. Menü etiketi, sayfa başlığı (`app/draft-onay/page.tsx`), Yetkilendirme
+  etiketi, üst uyarı bandındaki bağlantı ve kılavuz bölüm adı "İhracat Evrakları". ADRES
+  `/draft-onay` ve yetki anahtarı `draft_onay` DEĞİŞMEDİ (yer imleri / yetkiler bozulmasın).
+  Süreç adı olarak "Draft Onay 48s" (uyarı bandı) ve açıklamalardaki draft onay ifadeleri durur.
+  Dosya detayındaki "İhracat Evrakları" kartı aynı adı taşır (kılavuz çekiminde
+  `main h3` ile ayrılır). Kılavuz ekran görüntülerinin tamamı yeni menüyle yeniden çekildi.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

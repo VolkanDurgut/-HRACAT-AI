@@ -373,7 +373,7 @@ export default function CutoffUyarilari() {
                     className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                     style={{ backgroundColor: ACCENT }}
                   >
-                    {draft ? "Draft Onay" : "Dosya"} <ArrowRight size={12} />
+                    {draft ? "İhracat Evrakları" : "Dosya"} <ArrowRight size={12} />
                   </button>
                 </div>
               </li>

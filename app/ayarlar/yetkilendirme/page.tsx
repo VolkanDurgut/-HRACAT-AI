@@ -40,7 +40,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   etd_eta:    "ETD/ETA",
   kantar:     "Kantar Paneli",
   ayarlar:    "Ayarlar",
-  draft_onay: "Draft Onay",
+  draft_onay: "İhracat Evrakları",
   ic_piyasa:  "İç Piyasa",
   proformalar: "Proforma Oluştur",
   proforma_imza: "Proforma İmzalama (Onayla ve İmzala)",

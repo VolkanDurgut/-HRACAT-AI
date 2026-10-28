@@ -42,7 +42,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   ayarlar:    "Ayarlar",
   draft_onay: "Draft Onay",
   ic_piyasa:  "İç Piyasa",
-  proformalar: "Proformalar",
+  proformalar: "Proforma Oluştur",
   proforma_imza: "Proforma İmzalama (Onayla ve İmzala)",
   satin_alma: "Satın Alma (talep onayı)",
 };

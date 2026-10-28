@@ -2166,6 +2166,36 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   pg_cron jobid 6 `konsimento-hatirlatma` `*/2` (anahtar `gunluk-yedek-maili` işinden).
   MOD: TEST (secret `KONSIMENTO_HATIRLATMA_CANLI` girilmedi) → mailler mesensei282@.
 
+## Kullanım Kılavuzu `/kilavuz` + küçük revizeler (28.10.2026)
+
+- Kullanıcı: "UNEX GIDA - İHRACAT AI KULLANIM KILAVUZU… aynı arka plan ve tema, ekran
+  görüntüleri, animasyonlu anlatım… kamera hareketi ile farklı bir evrene geçer gibi; aynı
+  geçişler tüm sayfaların arasında; evrenden evrene, logo temalı; konulu olmalı."
+- Sayfa `app/kilavuz/page.tsx` (+ `layout.tsx` başlık/noindex). Oturum gerekir, sayfa yetkisi
+  GEREKMEZ; AppShell kullanmaz (Kantar gibi kendi kapısı). Menüde alt karttaki "Kullanım
+  Kılavuzu" (herkese). Kapak → 14 evren → son ekran. Konu / hikâye / adımlar TEK YER
+  `lib/kilavuz/konular.ts` (hikâye: kurgusal IHR-2026-0141 Nordline, 10 konteyner un,
+  Mersin → Tema). Evren geçişi: sahne büyüyüp kaybolur (geri: uzaklaşır), Unex logosu ortada
+  belirir, halka portal açılır, yeni evren dairesel açılır; yıldız alanı (`components/kilavuz/
+  yildiz-alani.tsx`, tuval) ışık çizgisine döner; evren rengi `@property --klv-a/b` ile süzülür.
+  Bölüm içinde `components/kilavuz/ekran-sahnesi.tsx` kamerası işaret noktasına yaklaşır
+  (1–2,1x), odak dışı kararır, numara nabız atar; adım metni `YaziAnimasyonu`. Klavye ← →,
+  telefonda kaydırma, `?k=<bolum>` / `?k=son`, localStorage `kilavuz-konum` ("kaldığınız
+  yerden"). "Hareketi azalt"ta portal/kamera/yıldız hareketi yok. Bulanıklık filtresi
+  BİLEREK yok (büyük katmanda yavaş + başsız Chromium'da bloklu görünüyordu).
+- EKRAN GÖRÜNTÜLERİ KURGUSAL veriyle (repo açık; gerçek müşteri/booking YOK):
+  `public/kilavuz/<ekran>.webp` (1920×1200, toplam ~1,1 MB) + işaret noktaları
+  `lib/kilavuz/ekran-noktalari.ts` (OTOMATİK, ekranın yüzdesi). Üretici scratchpad `kl/`:
+  `veri.mjs` (kurgusal veri), `mock.mjs` (Supabase taklidi + Inter yazı tipi), `cek.mjs`
+  (çekim + Playwright ile öğe kutuları → json), `isaret.py` (kontrol görseli). Bir sayfa
+  görünümü değişirse: build → `node cek.mjs ham noktalar.json` → webp + ts üretimi (bu oturumdaki
+  python betiği) → konular.ts'te `nokta` anahtarları aynı kalmalı.
+- Diğer: Kontrol Merkezi "Otomatik Özet" cümleleri sohbet gibi SIRAYLA yazılır (`OzetKarti`,
+  yer kayması yok, filtre değişince yeniden yazmaz). Menü "Proformalar" → "Proforma Oluştur"
+  (adres/yetki aynı; Yetkilendirme etiketi de).
+- Test: `scratchpad/kl/e2e.mjs` (menü, kapak, geçiş fazları, kamera, 14 evren × tüm adımlar
+  odak çerçevede, son ekran, ?k=, kaldığınız yer, mobil 390 + kaydırma, hareketi azalt, özet).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

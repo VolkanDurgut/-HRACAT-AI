@@ -9,6 +9,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 
 /** Kategorik renkler (koyu tema, sabit sira; dataviz referans paleti). Siralama = renk. */
 export const KATEGORI_RENKLERI = ["#3987E5", "#D95926", "#199E70", "#C98500", "#D55181", "#9085E9"];
@@ -371,7 +372,11 @@ export function DagilimKarti({ baslik, ikon, olcuEtiketi, satirlar, altBilgi, sa
 }
 
 // ---------------------------------------------------------------- otomatik ozet
+// 28.10.2026: cumleler sohbet gibi SIRAYLA yazilir (biri bitince digeri; YaziAnimasyonu).
+// Yer kaymasi yok: henuz sirasi gelmeyen cumle gorunmez kopya olarak yerini tutar.
+// Filtre degisince yazilmis cumleler yeniden yazilmaz (YaziAnimasyonu kurali), aninda guncellenir.
 export function OzetKarti({ cumleler, ikon }: { cumleler: string[]; ikon?: React.ReactNode }) {
+  const [sira, setSira] = useState(0);
   return (
     <Panel baslik="Otomatik Özet" ikon={ikon} sag="Seçili filtreye göre" govdeSinifi="px-4 py-3" data-otomatik-ozet="">
       {cumleler.length === 0 ? (
@@ -380,8 +385,12 @@ export function OzetKarti({ cumleler, ikon }: { cumleler: string[]; ikon?: React
         <ul className="space-y-2.5">
           {cumleler.map((c, i) => (
             <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: "#CBD5E1" }}>
-              <span className="mt-[7px] w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: ACCENT }} aria-hidden />
-              <span>{c}</span>
+              <span className="mt-[7px] w-1 h-1 rounded-full shrink-0 transition-opacity duration-300" style={{ backgroundColor: ACCENT, opacity: i <= sira ? 1 : 0 }} aria-hidden />
+              <span className="min-w-0 flex-1">
+                {i <= sira
+                  ? <YaziAnimasyonu metin={c} harfMs={16} enUzunMs={1400} gecikmeMs={i === 0 ? 250 : 120} onBitti={() => setSira((s) => Math.max(s, i + 1))} />
+                  : <span className="invisible">{c}</span>}
+              </span>
             </li>
           ))}
         </ul>

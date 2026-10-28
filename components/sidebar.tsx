@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -21,7 +21,7 @@ const mainItems: MenuItem[] = [
   { label: "Kontrol Merkezi", href: "/analiz", icon: <LayoutDashboard size={18} />, yetkiKey: "analiz" },
   { label: "Ana Panel",     href: "/panel",       icon: <FolderOpen size={18} />,      yetkiKey: "panel" },
   // Proforma olusturucu (17.10.2026): "Yeni Dosya Ac"in hemen ustunde (kullanici karari)
-  { label: "Proformalar",   href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
+  { label: "Proforma Oluştur", href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
   // 25.10.2026: "Yeni Dosya Ac" -> "Proforma Yukle" (kullanici karari; adres ve yetki ayni)
   { label: "Proforma Yükle", href: "/yeni-dosya", icon: <FileUp size={18} />,        yetkiKey: "yeni_dosya" },
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
@@ -215,6 +215,16 @@ export default function Sidebar() {
             <p className="text-xs leading-snug truncate min-w-0" style={{ color: TEXT_MUTED }} title={user.email}>{user.email}</p>
           </div>
         )}
+        {/* Kullanim Kilavuzu (28.10.2026): her kullaniciya acik (sayfa yetkisi gerekmez) */}
+        <Link
+          href="/kilavuz"
+          onClick={closeMobile}
+          className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-white/[0.06] hover:text-white transition-colors duration-150"
+          style={{ color: TEXT_MUTED }}
+        >
+          <BookOpen size={16} />
+          Kullanım Kılavuzu
+        </Link>
         <button
           onClick={() => { signOut(); closeMobile(); }}
           className="flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] font-medium hover:bg-red-500/10 hover:text-red-400 transition-colors duration-150"

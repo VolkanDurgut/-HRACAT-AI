@@ -2347,6 +2347,11 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   bekleyen, bu tur, ödemesi gelen, yeni bekleyen) + başlık altında "Son Excel: tarih · dosya ·
   kişi". "Gönderilen Mailler (n)" sekmesi: tarih, firma/dosya, booking, kaçıncı mesaj + metin,
   alıcı, gönderen, güncel ödeme durumu (arama burada da çalışır). `odeme/e2e.mjs` 51/51.
+- EKRANA SIĞMA + "X ne demek" (28.10.2026): tablo 9 sütun — B/L booking'in altında ("BL …", farklıysa),
+  acente gemi adının altında, dosya no firma adının altında; hücre dolgusu px-2; firma ≤148px, liman/gemi
+  ≤125px. 1280/1366/1440/1536/1600/1920 genişlikte yatay kaydırma YOK (`odeme/olc.mjs`). Filtrelerin
+  altında Konşimento açıklama şeridi (X = serbest bırakılmadı, Alındı ✓ = orijinal elimizde → ödeme
+  bekliyor; Telex/Seawaybill/Vesaik = ödeme alındı) + seçimin ipucunda `KONSIMENTO_ACIKLAMA`.
 
 ## Genel çalışma prensibi
 

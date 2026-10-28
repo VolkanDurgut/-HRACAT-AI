@@ -162,7 +162,7 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { nokta: "odeme", baslik: "Ödeme bekleyen", metin: "Gemisi kalkmış, konşimentosu Telex / Seawaybill / Vesaik olmayan sevkiyatlar. Karta tıklayınca yalnız onlar listelenir." },
       { nokta: "excel", baslik: "Excel'den güncelle", metin: "Haftalık ETD-ETA dosyasını seçin; Konşimento sütunu booking no ile eşleşir. Onaylanan her yükleme yeni hatırlatma turunu başlatır; ödemesi gelenler ve yeni bekleyenler özetlenir." },
       { nokta: "ara", baslik: "Arama", metin: "Firma, booking, BL, gemi ya da liman ile arayın." },
-      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "ETA ve Konşimento durumu satırdan değiştirilir. “Hatırlat” sıradaki mesajı (1. → 2. → 3. şablon) hazırlar; Outlook'ta gönderip “gönderildi” deyince satır “Bu tur gönderildi” olur. Tüm gönderimler “Gönderilen Mailler” sekmesinde." },
+      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "Konşimento: X = serbest bırakılmadı, Alındı ✓ = orijinal elimizde (ikisi de ödeme bekliyor); Telex / Seawaybill / Vesaik = ödeme alındı. ETA ve Konşimento satırdan değiştirilir. “Hatırlat” sıradaki mesajı (1. → 2. → 3. şablon) hazırlar; Outlook'ta gönderip “gönderildi” deyince satır “Bu tur gönderildi” olur. Tüm gönderimler “Gönderilen Mailler” sekmesinde." },
     ],
   },
   {

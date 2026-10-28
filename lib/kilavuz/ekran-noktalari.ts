@@ -69,7 +69,7 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
     odeme: { x: 78.96, y: 12.61, w: 19.38, h: 11.83 },
     excel: { x: 87.71, y: 2.67, w: 10.63, h: 3.78 },
     ara: { x: 18.33, y: 26.67, w: 43.06, h: 4.22 },
-    tablo: { x: 18.4, y: 32.78, w: 79.86, h: 67.22 },
+    tablo: { x: 18.4, y: 39.33, w: 79.86, h: 60.67 },
   },
   "draft-onay": {
     sekmeler: { x: 18.33, y: 14.33, w: 25.63, h: 5.11 },

@@ -12,7 +12,7 @@ import { Ship, Search, Loader2, AlertCircle, Bell, FileSpreadsheet, Wallet, Chec
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
-  KONSIMENTO_DURUMLARI, KONSIMENTO_ETIKETI, odemeAlindiMi, odemeBekliyorMu, konteynerTipiYazimi,
+  KONSIMENTO_DURUMLARI, KONSIMENTO_ETIKETI, KONSIMENTO_ACIKLAMA, konsimentoDurumuMu, odemeAlindiMi, odemeBekliyorMu, konteynerTipiYazimi,
   SABLON_BILGI, siradakiSablon, buTurGonderildiMi, type HatirlatmaSablonu,
 } from "@/lib/odeme-takibi";
 import { OdemeHatirlatmaPenceresi, type HatirlatmaKaydi } from "@/components/odeme-hatirlatma-penceresi";
@@ -503,6 +503,15 @@ export default function EtdEtaPage() {
         </div>
       </div>
 
+      {odemeDestek && etaFilter !== "gonderilen" && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]" style={{ color: TEXT_MUTED }} data-testid="konsimento-aciklama">
+          <span className="font-medium text-white">Konşimento sütunu (Excel ile aynı):</span>
+          <span className="inline-flex items-center gap-1.5"><span className="px-1.5 py-px rounded border text-amber-300 bg-amber-500/10 border-amber-500/25 font-medium">X</span> konşimento serbest bırakılmadı, ödeme bekleniyor</span>
+          <span className="inline-flex items-center gap-1.5"><span className="px-1.5 py-px rounded border text-amber-300 bg-amber-500/10 border-amber-500/25 font-medium">Alındı ✓</span> orijinal konşimento elimizde, ödeme bekleniyor</span>
+          <span className="inline-flex items-center gap-1.5"><span className="px-1.5 py-px rounded border text-emerald-300 bg-emerald-500/10 border-emerald-500/25 font-medium">Telex · Seawaybill · Vesaik</span> ödeme alındı, konşimento serbest</span>
+        </div>
+      )}
+
       {/* Tablo */}
       {!loading && etaFilter === "gonderilen" ? (
         <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="gonderilen-tablo">
@@ -511,7 +520,7 @@ export default function EtdEtaPage() {
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                   {["Tarih", "Firma", "Booking No", "Mesaj", "Alıcı", "Gönderen", "Ödeme durumu"].map((b) => (
-                    <th key={b} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
+                    <th key={b} className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
                   ))}
                 </tr>
               </thead>
@@ -523,18 +532,18 @@ export default function EtdEtaPage() {
                   const alindi = odemeAlindiMi(s?.konsimento_durumu);
                   return (
                     <tr key={h.id} className="border-b last:border-0 align-top hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
-                      <td className="px-3 py-2 whitespace-nowrap text-white tabular-nums">{tarihSaatTR(h.gonderim_zamani)}</td>
-                      <td className="px-3 py-2 font-medium text-white max-w-[200px] truncate" title={s?.alici_firma || undefined}>{s?.alici_firma || "—"}<span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }}>{s?.dosya_no}</span></td>
-                      <td className="px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s?.booking_no || "—"}</td>
-                      <td className="px-3 py-2 min-w-[220px]">
+                      <td className="px-2 py-2 whitespace-nowrap text-white tabular-nums">{tarihSaatTR(h.gonderim_zamani)}</td>
+                      <td className="px-2 py-2 font-medium text-white max-w-[200px] truncate" title={s?.alici_firma || undefined}>{s?.alici_firma || "—"}<span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }}>{s?.dosya_no}</span></td>
+                      <td className="px-2 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s?.booking_no || "—"}</td>
+                      <td className="px-2 py-2 min-w-[220px]">
                         <details>
                           <summary className="cursor-pointer text-white">{mesajSirasi[h.id] || "?"}. mesaj · <span style={{ color: TEXT_MUTED }}>{SABLON_BILGI[h.sablon as HatirlatmaSablonu]?.ad || `Şablon ${h.sablon}`}</span></summary>
                           <div className="mt-1.5 whitespace-pre-wrap font-mono text-[11px] leading-relaxed" style={{ color: TEXT_MUTED }}>{h.cc ? `CC: ${h.cc}\n` : ""}Konu: {h.konu}{"\n\n"}{h.govde}</div>
                         </details>
                       </td>
-                      <td className="px-3 py-2 max-w-[200px] truncate" style={{ color: TEXT_MUTED }} title={h.alici}>{h.alici}</td>
-                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{h.gonderen_eposta || "—"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-2 py-2 max-w-[200px] truncate" style={{ color: TEXT_MUTED }} title={h.alici}>{h.alici}</td>
+                      <td className="px-2 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{h.gonderen_eposta || "—"}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
                         {alindi ? <span className="text-[11px] text-emerald-400">Ödeme alındı</span> : <span className="text-[11px] text-amber-300">Bekliyor</span>}
                       </td>
                     </tr>
@@ -554,23 +563,21 @@ export default function EtdEtaPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Firma Adı</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
-                  <th className="hidden 2xl:table-cell text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Acente</th>
-                  <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
-                  <th className="hidden 2xl:table-cell text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>B/L No</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Adı</th>
-                  {odemeDestek && <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konşimento</th>}
-                  {odemeDestek && <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Hatırlatma</th>}
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Firma Adı</th>
+                  <th className="text-center px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Kont.</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Varış Limanı</th>
+                  <th lang="en" className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking / B/L</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETD</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>ETA</th>
+                  <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi / Acente</th>
+                  {odemeDestek && <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konşimento</th>}
+                  {odemeDestek && <th className="text-left px-2 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Hatırlatma</th>}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={odemeDestek ? 11 : 9} className="text-center py-10" style={{ color: TEXT_MUTED }}>Kayıt bulunamadı</td>
+                    <td colSpan={odemeDestek ? 9 : 7} className="text-center py-10" style={{ color: TEXT_MUTED }}>Kayıt bulunamadı</td>
                   </tr>
                 ) : filtered.map((s, idx) => {
                   const gun = s.eta ? kalanGun(s.eta) : null;
@@ -582,14 +589,18 @@ export default function EtdEtaPage() {
                       className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors animate-fade-up ${staggerClass} ${!s.eta ? "bg-red-500/[0.06]" : yaklasan ? "bg-amber-500/[0.06]" : ""}`}
                       style={{ borderColor: CARD_BORDER }}
                     >
-                      <td className="px-3 py-2 font-medium text-white max-w-[150px] truncate">{s.alici_firma || "—"}</td>
-                      <td className="px-3 py-2 text-center font-semibold" style={{ color: ACCENT }}>{s.konteyner_adedi}</td>
-                      <td className="px-3 py-2 whitespace-nowrap max-w-[140px] truncate" style={{ color: TEXT_MUTED }} title={s.varis_limani || undefined}>{s.varis_limani || "—"}</td>
-                      <td className="hidden 2xl:table-cell px-3 py-2 max-w-[100px] truncate" style={{ color: TEXT_MUTED }}>{s.acente_ismi || "—"}</td>
-                      <td className="px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.booking_no || "—"}</td>
-                      <td className="hidden 2xl:table-cell px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.bl_no || "—"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.etd ? formatDateTR(s.etd) : "—"}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">
+                      <td className="px-2 py-2 max-w-[148px]" title={s.alici_firma || undefined}>
+                        <span className="block font-medium text-white truncate">{s.alici_firma || "—"}</span>
+                        <span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{s.dosya_no}</span>
+                      </td>
+                      <td className="px-2 py-2 text-center font-semibold" style={{ color: ACCENT }}>{s.konteyner_adedi}</td>
+                      <td className="px-2 py-2 whitespace-nowrap max-w-[125px] truncate" style={{ color: TEXT_MUTED }} title={s.varis_limani || undefined}>{s.varis_limani || "—"}</td>
+                      <td className="px-2 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                        <span className="block">{s.booking_no || "—"}</span>
+                        {s.bl_no && s.bl_no !== s.booking_no && <span className="block text-[10px] opacity-80" title="B/L No">BL {s.bl_no}</span>}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.etd ? formatDateTR(s.etd) : "—"}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
                         {editingEta?.id === s.rezervasyon_id ? (
                           <div className="flex items-center gap-1">
                             <input
@@ -642,7 +653,10 @@ export default function EtdEtaPage() {
                           </p>
                         )}
                       </td>
-                      <td className="px-3 py-2 max-w-[140px] truncate" style={{ color: TEXT_MUTED }} title={s.gemi_adi || undefined}>{s.gemi_adi || "—"}</td>
+                      <td className="px-2 py-2 max-w-[125px]" style={{ color: TEXT_MUTED }} title={[s.gemi_adi, s.acente_ismi].filter(Boolean).join(" · ") || undefined}>
+                        <span className="block truncate">{s.gemi_adi || "—"}</span>
+                        {s.acente_ismi && <span className="block text-[10px] truncate opacity-80">{s.acente_ismi}</span>}
+                      </td>
                       {odemeDestek && (() => {
                         const alindi = odemeAlindiMi(s.konsimento_durumu);
                         const bekliyor = odemeBekliyorMu(s);
@@ -652,28 +666,30 @@ export default function EtdEtaPage() {
                         const turdaGitti = buTurGonderildi(s.rezervasyon_id);
                         return (
                           <>
-                            <td className="px-3 py-2 whitespace-nowrap">
+                            <td className="px-2 py-2 whitespace-nowrap">
                               <div className="relative inline-flex items-center">
                                 <select
                                   value={s.konsimento_durumu || ""}
                                   onChange={(e) => handleDurumKaydet(s.rezervasyon_id, e.target.value)}
                                   disabled={durumKaydediliyor === s.rezervasyon_id}
                                   aria-label={`${s.booking_no || s.dosya_no} konşimento durumu`}
-                                  title={s.konsimento_durumu_tarihi ? `${s.konsimento_durumu_kaynak === "excel" ? "Excel'den" : "Elle"} · ${new Date(s.konsimento_durumu_tarihi).toLocaleString("tr-TR")}` : "Girilmedi"}
+                                  title={konsimentoDurumuMu(s.konsimento_durumu)
+                                    ? `${KONSIMENTO_ACIKLAMA[s.konsimento_durumu]}${s.konsimento_durumu_tarihi ? `\n${s.konsimento_durumu_kaynak === "excel" ? "Excel'den" : "Elle"} · ${new Date(s.konsimento_durumu_tarihi).toLocaleString("tr-TR")}` : ""}`
+                                    : "Girilmedi"}
                                   className={`appearance-none rounded px-2 py-0.5 pr-5 text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-60 ${
                                     alindi ? "text-emerald-300 bg-emerald-500/10 border-emerald-500/25" : s.konsimento_durumu ? "text-amber-300 bg-amber-500/10 border-amber-500/25" : "border-transparent"
                                   }`}
                                   style={{ colorScheme: "dark", ...(s.konsimento_durumu ? {} : { color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.03)" }) }}
                                 >
                                   <option value="">—</option>
-                                  {KONSIMENTO_DURUMLARI.map((k) => <option key={k} value={k}>{KONSIMENTO_ETIKETI[k]}</option>)}
+                                  {KONSIMENTO_DURUMLARI.map((k) => <option key={k} value={k} title={KONSIMENTO_ACIKLAMA[k]}>{KONSIMENTO_ETIKETI[k]}</option>)}
                                 </select>
                                 {durumKaydediliyor === s.rezervasyon_id
                                   ? <Loader2 size={10} className="animate-spin absolute right-1.5 pointer-events-none" style={{ color: TEXT_MUTED }} />
                                   : <span className="absolute right-1.5 text-[8px] pointer-events-none" style={{ color: TEXT_MUTED }}>▼</span>}
                               </div>
                             </td>
-                            <td className="px-3 py-2 whitespace-nowrap">
+                            <td className="px-2 py-2 whitespace-nowrap">
                               {alindi ? (
                                 <span className="text-[11px] text-emerald-400">Ödeme alındı</span>
                               ) : bekliyor ? (

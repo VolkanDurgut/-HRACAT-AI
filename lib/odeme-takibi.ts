@@ -29,6 +29,18 @@ export const KONSIMENTO_ETIKETI: Record<KonsimentoDurumu, string> = {
   acente: "Acente",
 };
 
+/** Kisa anlam (ekranda aciklama / ipucu). Harun Bey'in Excel'indeki isaretlerle ayni. */
+export const KONSIMENTO_ACIKLAMA: Record<KonsimentoDurumu, string> = {
+  x: "Konşimento serbest bırakılmadı — ödeme bekleniyor",
+  alindi: "Orijinal konşimento elimizde — ödeme bekleniyor",
+  telex: "Telex release yapıldı — ödeme alındı",
+  seawaybill: "Seawaybill ile serbest — ödeme alındı",
+  vesaik: "Vesaik (orijinal evrak) müşteriye gönderildi — ödeme alındı",
+  kargo: "Kargoda — ödeme bekleniyor sayılır",
+  kuehne: "Kuehne üzerinden — ödeme bekleniyor sayılır",
+  acente: "Acentede — ödeme bekleniyor sayılır",
+};
+
 const ODEME_ALINDI: ReadonlySet<string> = new Set(["telex", "seawaybill", "vesaik"]);
 
 export function konsimentoDurumuMu(v: unknown): v is KonsimentoDurumu {

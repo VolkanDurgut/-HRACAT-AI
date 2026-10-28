@@ -8,15 +8,15 @@ import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
-import { Ship, Search, Loader2, AlertCircle, Bell, Mail, FileSpreadsheet, Wallet } from "lucide-react";
+import { Ship, Search, Loader2, AlertCircle, Bell, FileSpreadsheet, Wallet, CheckCircle2, X as Kapat, Send } from "lucide-react";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   KONSIMENTO_DURUMLARI, KONSIMENTO_ETIKETI, odemeAlindiMi, odemeBekliyorMu, konteynerTipiYazimi,
-  SABLON_BILGI, type HatirlatmaSablonu,
+  SABLON_BILGI, siradakiSablon, buTurGonderildiMi, type HatirlatmaSablonu,
 } from "@/lib/odeme-takibi";
 import { OdemeHatirlatmaPenceresi, type HatirlatmaKaydi } from "@/components/odeme-hatirlatma-penceresi";
-import { EtdExcelAktar } from "@/components/etd-excel-aktar";
+import { EtdExcelAktar, type ExcelYuklemeOzeti } from "@/components/etd-excel-aktar";
 
 type SevkiyatSatir = {
   rezervasyon_id: string;
@@ -41,7 +41,21 @@ type SevkiyatSatir = {
   konteyner_tipi: string;
 };
 
-type EtaFiltre = "hepsi" | "eksik" | "tamam" | "odeme";
+type EtaFiltre = "hepsi" | "eksik" | "tamam" | "odeme" | "gonderilen";
+
+/** Onaylanan Excel yuklemesi = hatirlatma turunun baslangici (28.10.2026) */
+type ExcelYukleme = {
+  id: string;
+  dosya_adi: string | null;
+  guncellenen: number;
+  ozet: Partial<ExcelYuklemeOzeti> | null;
+  yukleyen_eposta: string | null;
+  yukleme_zamani: string;
+};
+
+function tarihSaatTR(iso: string): string {
+  return new Date(iso).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
 
 /** Kolon henuz yoksa (migration uygulanmadan yayina cikma) sayfa eski haliyle calissin */
 function kolonYokHatasi(e: { code?: string; message?: string } | null): boolean {
@@ -75,6 +89,8 @@ export default function EtdEtaPage() {
   const [hatirlatmaAcik, setHatirlatmaAcik] = useState<SevkiyatSatir | null>(null);
   const [excelAcik, setExcelAcik] = useState(false);
   const [durumKaydediliyor, setDurumKaydediliyor] = useState<string | null>(null);
+  const [yuklemeler, setYuklemeler] = useState<ExcelYukleme[]>([]);
+  const [yuklemeSonucu, setYuklemeSonucu] = useState<ExcelYukleme | null>(null);
   const [editingEta, setEditingEta] = useState<{ id: string; value: string } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -100,7 +116,7 @@ export default function EtdEtaPage() {
     if (!rezData || rezData.length === 0) { setSatirlar([]); setLoading(false); return; } // Temiz sıfırlama eklendi
 
     const dosyaIds = Array.from(new Set(rezData.map((r: any) => r.dosya_id)));
-    const [{ data: dosyaData }, { data: kontData }, hatirlatmaSonucu] = await Promise.all([
+    const [{ data: dosyaData }, { data: kontData }, hatirlatmaSonucu, yuklemeSonuc] = await Promise.all([
       supabase
         .from("ihracat_dosyalari")
         .select("id, dosya_no, alici_firma, varis_limani, bl_no, alici_email:ham_veri->>alici_email")
@@ -119,8 +135,18 @@ export default function EtdEtaPage() {
             .order("gonderim_zamani", { ascending: false })
             .limit(2000)
         : Promise.resolve({ data: [] as HatirlatmaKaydi[], error: null }),
+      destek
+        ? supabase
+            .from("odeme_excel_yuklemeleri")
+            .select("id, dosya_adi, guncellenen, ozet, yukleyen_eposta, yukleme_zamani")
+            .eq("company_id", companyId)
+            .order("yukleme_zamani", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as ExcelYukleme[], error: null }),
     ]);
     setHatirlatmalar(((hatirlatmaSonucu as { data: HatirlatmaKaydi[] | null }).data) || []);
+    // Tablo yoksa (eski veritabani) tur bilgisi bos kalir; sayfa calismaya devam eder
+    setYuklemeler(((yuklemeSonuc as { data: ExcelYukleme[] | null }).data) || []);
 
     // Konteyner tipi: once rezervasyona bagli konteynerler, yoksa dosyanin tumu
     const tipRez: Record<string, string[]> = {};
@@ -226,11 +252,27 @@ export default function EtdEtaPage() {
     return null;
   };
 
-  const handleExcelUygula = async (satirlar: { id: string; durum: string }[]): Promise<string | null> => {
-    const { data, error } = await supabase.rpc("odeme_konsimento_toplu", { p_satirlar: satirlar });
-    if (error) return `Güncellenemedi: ${error.message}`;
+  // Excel yuklemesi: durumlar + yukleme kaydi TEK islemde (yeni hatirlatma turu baslar)
+  const handleExcelUygula = async (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string): Promise<string | null> => {
+    const { data, error } = await supabase.rpc("odeme_excel_yukleme_kaydet", { p_dosya_adi: dosyaAdi, p_satirlar: satirlar, p_ozet: ozet });
+    if (error) {
+      // Fonksiyon henuz yoksa (migration oncesi) yalniz durumlar guncellenir
+      if (error.code === "PGRST202" || error.code === "42883") {
+        if (satirlar.length === 0) return "Değişiklik yok.";
+        const eski = await supabase.rpc("odeme_konsimento_toplu", { p_satirlar: satirlar });
+        if (eski.error) return `Güncellenemedi: ${eski.error.message}`;
+        setExcelAcik(false);
+        showToast(`${satirlar.length} sevkiyatın konşimento durumu güncellendi.`, "success");
+        await fetchData();
+        return null;
+      }
+      return `Güncellenemedi: ${error.message}`;
+    }
+    const kayit = data as ExcelYukleme;
     setExcelAcik(false);
-    showToast(`${typeof data === "number" ? data : satirlar.length} sevkiyatın konşimento durumu güncellendi.`, "success");
+    setYuklemeSonucu(kayit);
+    setEtaFilter("odeme");
+    showToast(kayit.guncellenen > 0 ? `Excel yüklendi: ${kayit.guncellenen} sevkiyat güncellendi, yeni hatırlatma turu başladı.` : "Excel yüklendi: değişiklik yok, yeni hatırlatma turu başladı.", "success");
     await fetchData();
     return null;
   };
@@ -243,6 +285,31 @@ export default function EtdEtaPage() {
 
   const odemeBekleyenler = useMemo(() => satirlar.filter(s => odemeBekliyorMu(s)), [satirlar]);
   const bekleyenKonteyner = odemeBekleyenler.reduce((t, s) => t + (Number(s.konteyner_adedi) || 0), 0);
+
+  // Hatirlatma turu: son Excel yuklemesinden bu yana. Sira: 1. -> 2. -> 3. mesaj (sevkiyat bazinda)
+  const turBaslangici = yuklemeler[0]?.yukleme_zamani ?? null;
+  const buTurGonderildi = useCallback(
+    (rezId: string) => buTurGonderildiMi((hatirlatmaHaritasi[rezId] || []).map(h => h.gonderim_zamani), turBaslangici),
+    [hatirlatmaHaritasi, turBaslangici]);
+  const turdaBekleyenler = useMemo(() => odemeBekleyenler.filter(s => !buTurGonderildi(s.rezervasyon_id)), [odemeBekleyenler, buTurGonderildi]);
+
+  // Gonderilen mailler: her kaydin o sevkiyattaki kacinci mesaj oldugu (eskiden yeniye)
+  const mesajSirasi = useMemo(() => {
+    const m: Record<string, number> = {};
+    Object.values(hatirlatmaHaritasi).forEach(liste => {
+      [...liste].sort((a, b) => a.gonderim_zamani.localeCompare(b.gonderim_zamani)).forEach((h, i) => { m[h.id] = i + 1; });
+    });
+    return m;
+  }, [hatirlatmaHaritasi]);
+  const satirHaritasi = useMemo(() => Object.fromEntries(satirlar.map(s => [s.rezervasyon_id, s])), [satirlar]);
+  const gonderilenler = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return hatirlatmalar.filter(h => {
+      if (!term) return true;
+      const s = h.rezervasyon_id ? satirHaritasi[h.rezervasyon_id] : undefined;
+      return [s?.alici_firma, s?.booking_no, s?.dosya_no, h.alici, h.konu, h.gonderen_eposta].some(f => f?.toLowerCase().includes(term));
+    });
+  }, [hatirlatmalar, satirHaritasi, search]);
 
   // ETA'sı yaklaşan: bugün veya sonraki 7 gün içinde
   const yaklasanlar = useMemo(() =>
@@ -257,7 +324,11 @@ export default function EtdEtaPage() {
     let rows = satirlar;
     if (etaFilter === "eksik") rows = rows.filter(s => !s.eta);
     if (etaFilter === "tamam") rows = rows.filter(s => !!s.eta);
-    if (etaFilter === "odeme") rows = rows.filter(s => odemeBekliyorMu(s));
+    if (etaFilter === "odeme") {
+      // Bu turda henuz hatirlatilmayanlar uste, sonra en eski kalkis
+      rows = rows.filter(s => odemeBekliyorMu(s)).sort((a, b) =>
+        Number(buTurGonderildi(a.rezervasyon_id)) - Number(buTurGonderildi(b.rezervasyon_id)) || (a.etd || "").localeCompare(b.etd || ""));
+    }
     if (search.trim()) {
       const term = search.trim().toLowerCase();
       rows = rows.filter(s =>
@@ -266,7 +337,7 @@ export default function EtdEtaPage() {
       );
     }
     return rows;
-  }, [satirlar, search, etaFilter]);
+  }, [satirlar, search, etaFilter, buTurGonderildi]);
 
   const eksikEtaSayisi = satirlar.filter(s => !s.eta).length;
 
@@ -287,6 +358,45 @@ export default function EtdEtaPage() {
           </button>
         ) : undefined}
       />
+
+      {odemeDestek && !loading && (
+        <p className="-mt-3 mb-4 text-[11px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5" style={{ color: TEXT_MUTED }} data-testid="son-excel">
+          <FileSpreadsheet size={12} />
+          {yuklemeler[0] ? (
+            <>
+              Son Excel: <span className="text-white">{tarihSaatTR(yuklemeler[0].yukleme_zamani)}</span>
+              {yuklemeler[0].dosya_adi && <span>· {yuklemeler[0].dosya_adi}</span>}
+              {yuklemeler[0].yukleyen_eposta && <span>· {yuklemeler[0].yukleyen_eposta}</span>}
+              <span>· hatırlatma turu bu yüklemeyle başladı</span>
+            </>
+          ) : (
+            <>Henüz kayıtlı Excel yüklemesi yok. &quot;Excel&apos;den güncelle&quot; ile yükleyince hatırlatma turu başlar.</>
+          )}
+        </p>
+      )}
+
+      {yuklemeSonucu && (
+        <div className="mb-5 rounded-xl border px-4 py-3 animate-fade-up" role="status" data-testid="yukleme-sonucu"
+          style={{ backgroundColor: CARD_BG, borderColor: `${ACCENT}55` }}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 text-xs space-y-1">
+              <p className="text-sm font-semibold text-white flex items-center gap-1.5"><CheckCircle2 size={15} style={{ color: ACCENT }} /> Excel yüklendi{yuklemeSonucu.dosya_adi ? ` · ${yuklemeSonucu.dosya_adi}` : ""}</p>
+              <p style={{ color: TEXT_MUTED }}>
+                {yuklemeSonucu.guncellenen} sevkiyatın durumu güncellendi ·{" "}
+                <span className="text-amber-300 font-medium">{odemeBekleyenler.length} ödeme bekleyen</span> ·{" "}
+                <span className="text-white font-medium">bu tur hatırlatılacak: {turdaBekleyenler.length}</span>
+              </p>
+              {(yuklemeSonucu.ozet?.odemesiGelen?.length ?? 0) > 0 && (
+                <p className="text-emerald-300">Ödemesi gelen: {yuklemeSonucu.ozet!.odemesiGelen!.map(x => `${x.firma} (${x.booking})`).join(", ")}</p>
+              )}
+              {(yuklemeSonucu.ozet?.yeniBekleyen?.length ?? 0) > 0 && (
+                <p className="text-amber-300">Yeni ödeme bekleyen: {yuklemeSonucu.ozet!.yeniBekleyen!.map(x => `${x.firma} (${x.booking})`).join(", ")}</p>
+              )}
+            </div>
+            <button onClick={() => setYuklemeSonucu(null)} className="shrink-0 hover:text-white" style={{ color: TEXT_MUTED }} aria-label="Kapat"><Kapat size={15} /></button>
+          </div>
+        </div>
+      )}
 
       {/* ETA'sı Yaklaşan Sevkiyatlar */}
       {yaklasanlar.length > 0 && (
@@ -357,6 +467,11 @@ export default function EtdEtaPage() {
               {odemeBekleyenler.length}
               {odemeBekleyenler.length > 0 && <span className="text-xs font-medium ml-1.5" style={{ color: TEXT_MUTED }}>sevkiyat · {bekleyenKonteyner} kont.</span>}
             </p>
+            {odemeBekleyenler.length > 0 && (
+              <p className="text-[11px] mt-1" style={{ color: turdaBekleyenler.length > 0 ? "#FCD34D" : ACCENT }} data-testid="tur-bekleyen">
+                {turdaBekleyenler.length > 0 ? `Bu tur hatırlatılacak: ${turdaBekleyenler.length}` : "Bu tur hepsine hatırlatıldı ✓"}
+              </p>
+            )}
           </button>
         )}
       </div>
@@ -375,21 +490,61 @@ export default function EtdEtaPage() {
           />
         </div>
         <div className="flex rounded-lg border overflow-hidden text-xs font-medium overflow-x-auto shrink-0" style={{ borderColor: CARD_BORDER }}>
-          {((odemeDestek ? ["hepsi", "eksik", "tamam", "odeme"] : ["hepsi", "eksik", "tamam"]) as EtaFiltre[]).map((f) => (
+          {((odemeDestek ? ["hepsi", "eksik", "tamam", "odeme", "gonderilen"] : ["hepsi", "eksik", "tamam"]) as EtaFiltre[]).map((f) => (
             <button
               key={f}
               onClick={() => setEtaFilter(f)}
               className="px-3 py-2 transition-colors whitespace-nowrap"
               style={etaFilter === f ? { backgroundColor: ACCENT, color: "white" } : { backgroundColor: CARD_BG, color: TEXT_MUTED }}
             >
-              {f === "hepsi" ? "Hepsi" : f === "eksik" ? "ETA Eksik" : f === "tamam" ? "ETA Tamam" : `Ödeme Bekleyen (${odemeBekleyenler.length})`}
+              {f === "hepsi" ? "Hepsi" : f === "eksik" ? "ETA Eksik" : f === "tamam" ? "ETA Tamam" : f === "odeme" ? `Ödeme Bekleyen (${odemeBekleyenler.length})` : `Gönderilen Mailler (${hatirlatmalar.length})`}
             </button>
           ))}
         </div>
       </div>
 
       {/* Tablo */}
-      {loading ? (
+      {!loading && etaFilter === "gonderilen" ? (
+        <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="gonderilen-tablo">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  {["Tarih", "Firma", "Booking No", "Mesaj", "Alıcı", "Gönderen", "Ödeme durumu"].map((b) => (
+                    <th key={b} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {gonderilenler.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-10" style={{ color: TEXT_MUTED }}>Henüz gönderilmiş hatırlatma yok</td></tr>
+                ) : gonderilenler.map((h) => {
+                  const s = h.rezervasyon_id ? satirHaritasi[h.rezervasyon_id] : undefined;
+                  const alindi = odemeAlindiMi(s?.konsimento_durumu);
+                  return (
+                    <tr key={h.id} className="border-b last:border-0 align-top hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-3 py-2 whitespace-nowrap text-white tabular-nums">{tarihSaatTR(h.gonderim_zamani)}</td>
+                      <td className="px-3 py-2 font-medium text-white max-w-[200px] truncate" title={s?.alici_firma || undefined}>{s?.alici_firma || "—"}<span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }}>{s?.dosya_no}</span></td>
+                      <td className="px-3 py-2 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s?.booking_no || "—"}</td>
+                      <td className="px-3 py-2 min-w-[220px]">
+                        <details>
+                          <summary className="cursor-pointer text-white">{mesajSirasi[h.id] || "?"}. mesaj · <span style={{ color: TEXT_MUTED }}>{SABLON_BILGI[h.sablon as HatirlatmaSablonu]?.ad || `Şablon ${h.sablon}`}</span></summary>
+                          <div className="mt-1.5 whitespace-pre-wrap font-mono text-[11px] leading-relaxed" style={{ color: TEXT_MUTED }}>{h.cc ? `CC: ${h.cc}\n` : ""}Konu: {h.konu}{"\n\n"}{h.govde}</div>
+                        </details>
+                      </td>
+                      <td className="px-3 py-2 max-w-[200px] truncate" style={{ color: TEXT_MUTED }} title={h.alici}>{h.alici}</td>
+                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{h.gonderen_eposta || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {alindi ? <span className="text-[11px] text-emerald-400">Ödeme alındı</span> : <span className="text-[11px] text-amber-300">Bekliyor</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
         </div>
@@ -493,6 +648,8 @@ export default function EtdEtaPage() {
                         const bekliyor = odemeBekliyorMu(s);
                         const gecmis = hatirlatmaHaritasi[s.rezervasyon_id] || [];
                         const son = gecmis[0];
+                        const sira = siradakiSablon(gecmis.length);
+                        const turdaGitti = buTurGonderildi(s.rezervasyon_id);
                         return (
                           <>
                             <td className="px-3 py-2 whitespace-nowrap">
@@ -521,19 +678,30 @@ export default function EtdEtaPage() {
                                 <span className="text-[11px] text-emerald-400">Ödeme alındı</span>
                               ) : bekliyor ? (
                                 <div className="flex flex-col items-start gap-0.5">
-                                  <button
-                                    onClick={() => setHatirlatmaAcik(s)}
-                                    data-testid={`hatirlat-${s.booking_no}`}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 transition-colors"
-                                  >
-                                    <Mail size={11} /> Hatırlat
-                                  </button>
+                                  {turdaGitti ? (
+                                    <button
+                                      onClick={() => setHatirlatmaAcik(s)}
+                                      data-testid={`hatirlat-${s.booking_no}`}
+                                      title="Bu tur gönderildi. Tekrar göndermek için tıklayın."
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 transition-colors"
+                                    >
+                                      <CheckCircle2 size={11} /> Bu tur gönderildi
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => setHatirlatmaAcik(s)}
+                                      data-testid={`hatirlat-${s.booking_no}`}
+                                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 transition-colors"
+                                    >
+                                      <Send size={11} /> Hatırlat · {sira}. mesaj
+                                    </button>
+                                  )}
                                   {son ? (
                                     <span className="text-[10px] leading-tight" style={{ color: TEXT_MUTED }} title={`${son.alici} · ${SABLON_BILGI[son.sablon as HatirlatmaSablonu]?.ad || ""}`}>
-                                      <span className="text-white">{gunOnce(son.gonderim_zamani)}</span> · Ş{son.sablon} · {gecmis.length} kez
+                                      son: <span className="text-white">{gunOnce(son.gonderim_zamani)}</span> · {gecmis.length}. mesaj
                                     </span>
                                   ) : (
-                                    <span className="text-[10px]" style={{ color: TEXT_MUTED }}>gönderilmedi</span>
+                                    <span className="text-[10px]" style={{ color: TEXT_MUTED }}>henüz gönderilmedi</span>
                                   )}
                                 </div>
                               ) : (
@@ -556,6 +724,7 @@ export default function EtdEtaPage() {
         <OdemeHatirlatmaPenceresi
           sevkiyat={hatirlatmaAcik}
           gecmis={hatirlatmaHaritasi[hatirlatmaAcik.rezervasyon_id] || []}
+          siradaki={siradakiSablon((hatirlatmaHaritasi[hatirlatmaAcik.rezervasyon_id] || []).length)}
           onKapat={() => setHatirlatmaAcik(null)}
           onKaydet={(v) => handleHatirlatmaKaydet(hatirlatmaAcik, v)}
         />

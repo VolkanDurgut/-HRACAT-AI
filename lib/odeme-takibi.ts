@@ -208,3 +208,22 @@ export function mailtoAdresi(alicilar: string[], cc: string[], konu: string, gov
   ].filter(Boolean).join("&");
   return `mailto:${alicilar.map((a) => encodeURIComponent(a)).join(",")}?${q}`;
 }
+
+// ---------------------------------------------------------------------------
+// Sira ve tur (28.10.2026): "Ayni musteri tekrar listedeyse 2. mesaj; sira ile atilmali."
+// ---------------------------------------------------------------------------
+/** Sevkiyata gonderilmis hatirlatma sayisina gore SIRADAKI sablon: 0 -> 1, 1 -> 2, 2+ -> 3 */
+export function siradakiSablon(gonderilenSayisi: number): HatirlatmaSablonu {
+  return gonderilenSayisi <= 0 ? 1 : gonderilenSayisi === 1 ? 2 : 3;
+}
+
+/**
+ * Hatirlatma turu = son Excel yuklemesinden bu yana. Tur baslangici yoksa (hic yukleme
+ * kaydedilmemis) daha once hatirlatilan "gonderildi" sayilir.
+ */
+export function buTurGonderildiMi(gonderimZamanlari: string[], turBaslangici: string | null | undefined): boolean {
+  if (gonderimZamanlari.length === 0) return false;
+  if (!turBaslangici) return true;
+  const t = new Date(turBaslangici).getTime();
+  return gonderimZamanlari.some((z) => new Date(z).getTime() >= t);
+}

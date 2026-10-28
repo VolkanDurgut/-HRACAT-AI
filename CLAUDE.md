@@ -2332,6 +2332,21 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   gizli (1440'ta tablo sığsın; arama yine BL'de arar). Kolon yoksa (42703) sayfa eski hâliyle
   çalışır. Testler: `odeme/e2e.mjs` 34/34 (mailto, kayıt parametreleri, CC kuralı, Excel önizleme,
   geri uyum, mobil taşma yok). Kılavuz ETD bölümü 6 adım, ekran yeniden çekildi.
+- TUR + SIRA (28.10.2026 akşam, kullanıcı: "Excel her eklendiğinde ödeme alınması gerekenler
+  tespit edilmeli… aynı müşteri tekrar listedeyse 2. mesaj; sıra ile"). Migration
+  `20261028170000_odeme_excel_turu.sql` (CANLIYA UYGULANDI): `odeme_excel_yuklemeleri` (dosya adı,
+  güncellenen, özet jsonb, yükleyen, zaman; RLS okuma etd_eta; doğrudan yazma YOK) +
+  `odeme_excel_yukleme_kaydet(dosya, satirlar, ozet)` = durumlar (`odeme_konsimento_toplu` ile aynı
+  doğrulama) + kayıt TEK işlem; değişiklik yoksa da kaydedilir. EN SON yükleme = hatırlatma TURU
+  başlangıcı: ödeme bekleyen ve turdan sonra hatırlatma gitmemiş → "Bu tur hatırlatılacak" (kartta
+  sayı; filtrede bunlar üstte). Tur kaydı yoksa önceki herhangi bir hatırlatma "gönderildi" sayılır
+  (ilk canlı yükleme 28.10 bu tablo yokken yapıldı → kayıtsız). SIRA sevkiyat (booking) bazında:
+  0 gönderim → şablon 1, 1 → 2, 2+ → 3 (`siradakiSablon`); buton "Hatırlat · n. mesaj", pencerede
+  "Sıradaki" rozeti (ETA'ya göre öneri KALKTI; 3. şablon metni yine ETA'ya göre arrived/approaching).
+  Aynı müşterinin YENİ sevkiyatı 1'den başlar. Yükleme sonrası özet bandı (güncellenen, ödeme
+  bekleyen, bu tur, ödemesi gelen, yeni bekleyen) + başlık altında "Son Excel: tarih · dosya ·
+  kişi". "Gönderilen Mailler (n)" sekmesi: tarih, firma/dosya, booking, kaçıncı mesaj + metin,
+  alıcı, gönderen, güncel ödeme durumu (arama burada da çalışır). `odeme/e2e.mjs` 51/51.
 
 ## Genel çalışma prensibi
 

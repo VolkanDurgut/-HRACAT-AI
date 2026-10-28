@@ -14,6 +14,18 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 import { etdExceliOku, excelSistemleEslestir, type EslesmeSonucu, type SistemSevkiyati, type ExcelSatiri } from "@/lib/etd-excel";
 import { KONSIMENTO_ETIKETI, odemeAlindiMi, konsimentoDurumuMu } from "@/lib/odeme-takibi";
 
+/** Yukleme kaydina yazilan ozet (odeme_excel_yuklemeleri.ozet) */
+export type ExcelYuklemeOzeti = {
+  eslesen: number;
+  degisen: number;
+  ayni: number;
+  excelBos: number;
+  taninmayan: number;
+  sistemdeYok: number;
+  odemesiGelen: { firma: string; booking: string }[];
+  yeniBekleyen: { firma: string; booking: string }[];
+};
+
 function DurumRozeti({ durum }: { durum: string | null }) {
   if (!durum || !konsimentoDurumuMu(durum)) return <span className="text-[11px]" style={{ color: TEXT_MUTED }}>boş</span>;
   const alindi = odemeAlindiMi(durum);
@@ -29,8 +41,8 @@ export function EtdExcelAktar({
 }: {
   sistem: SistemSevkiyati[];
   onKapat: () => void;
-  /** Hata metni dondurur (null = basarili) */
-  onUygula: (satirlar: { id: string; durum: string }[]) => Promise<string | null>;
+  /** Durumlar + yukleme kaydi (yeni hatirlatma turu). Hata metni dondurur (null = basarili) */
+  onUygula: (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string) => Promise<string | null>;
 }) {
   const [okunuyor, setOkunuyor] = React.useState(false);
   const [hata, setHata] = React.useState<string | null>(null);
@@ -70,10 +82,22 @@ export function EtdExcelAktar({
 
   const uygula = async () => {
     if (!sonuc) return;
-    const satirlar = sonuc.degisecek.filter((d) => secili.has(d.rezervasyon_id)).map((d) => ({ id: d.rezervasyon_id, durum: d.yeni }));
-    if (satirlar.length === 0) return;
+    const secilen = sonuc.degisecek.filter((d) => secili.has(d.rezervasyon_id));
+    const satirlar = secilen.map((d) => ({ id: d.rezervasyon_id, durum: d.yeni }));
+    const kisa = (d: (typeof secilen)[number]) => ({ firma: d.firma.slice(0, 120), booking: d.booking.slice(0, 60) });
+    const ozet: ExcelYuklemeOzeti = {
+      eslesen: sonuc.eslesen,
+      degisen: secilen.length,
+      ayni: sonuc.ayni,
+      excelBos: sonuc.excelBos,
+      taninmayan: sonuc.taninmayan.length,
+      sistemdeYok: sonYilYok.length,
+      odemesiGelen: secilen.filter((d) => d.odemeDegisimi === "alindi").map(kisa),
+      // Daha once odemesi "alindi" ya da bos olan sevkiyat bu yuklemede bekleyen oldu
+      yeniBekleyen: secilen.filter((d) => !odemeAlindiMi(d.yeni) && (d.eski === null || odemeAlindiMi(d.eski))).map(kisa),
+    };
     setUygulaniyor(true); setHata(null);
-    const h = await onUygula(satirlar);
+    const h = await onUygula(satirlar, ozet, dosyaAdi || "");
     setUygulaniyor(false);
     if (h) setHata(h);
   };
@@ -87,7 +111,7 @@ export function EtdExcelAktar({
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
           <div>
             <p id="etd-excel-baslik" className="text-sm font-semibold text-white flex items-center gap-2"><FileSpreadsheet size={15} style={{ color: ACCENT }} /> Excel&apos;den konşimento / ödeme durumu</p>
-            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Haftalık ETD-ETA dosyasını seçin. Yalnızca &quot;KONŞİMENTO&quot; sütunu okunur; önizlemeyi onaylamadan hiçbir şey değişmez.</p>
+            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Haftalık ETD-ETA dosyasını seçin. Yalnızca &quot;KONŞİMENTO&quot; sütunu okunur; önizlemeyi onaylamadan hiçbir şey değişmez. Onaylanan her yükleme yeni hatırlatma turunu başlatır.</p>
           </div>
           <button onClick={onKapat} disabled={uygulaniyor} className="hover:text-white disabled:opacity-50" style={{ color: TEXT_MUTED }} aria-label="Kapat"><X size={16} /></button>
         </div>
@@ -135,7 +159,7 @@ export function EtdExcelAktar({
               )}
 
               {sonuc.degisecek.length === 0 ? (
-                <p className="text-sm text-white">Sistem Excel ile güncel; değişecek satır yok.</p>
+                <p className="text-sm text-white">Sistem Excel ile güncel; değişecek satır yok. Yüklemeyi kaydederek yeni hatırlatma turunu başlatabilirsiniz.</p>
               ) : (
                 <div className="rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
                   <div className="overflow-x-auto max-h-[45vh]">
@@ -192,10 +216,11 @@ export function EtdExcelAktar({
           <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
             <button type="button" onClick={onKapat} disabled={uygulaniyor} className="px-3 py-2 rounded-lg border text-xs font-medium hover:bg-white/[0.04] disabled:opacity-50"
               style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button>
-            {sonuc && sonuc.degisecek.length > 0 && (
-              <button type="button" onClick={uygula} disabled={uygulaniyor || secili.size === 0} data-testid="excel-uygula"
+            {sonuc && (
+              <button type="button" onClick={uygula} disabled={uygulaniyor} data-testid="excel-uygula"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-                {uygulaniyor && <Loader2 size={13} className="animate-spin" />} {secili.size} sevkiyatı güncelle
+                {uygulaniyor && <Loader2 size={13} className="animate-spin" />}
+                {secili.size > 0 ? `${secili.size} sevkiyatı güncelle ve yüklemeyi kaydet` : "Yüklemeyi kaydet (değişiklik yok)"}
               </button>
             )}
           </div>

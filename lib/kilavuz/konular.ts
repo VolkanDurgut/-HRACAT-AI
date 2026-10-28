@@ -160,9 +160,9 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { baslik: "Bütün yolculuklar", metin: "Tüm sevkiyatların kalkış (ETD) ve varış (ETA) tarihleri tek tabloda." },
       { nokta: "sayac", baslik: "Özet", metin: "Toplam sevkiyat, ETA girilmiş ve ETA eksik sayıları. Filtre düğmeleriyle eksikleri ayırın." },
       { nokta: "odeme", baslik: "Ödeme bekleyen", metin: "Gemisi kalkmış, konşimentosu Telex / Seawaybill / Vesaik olmayan sevkiyatlar. Karta tıklayınca yalnız onlar listelenir." },
-      { nokta: "excel", baslik: "Excel'den güncelle", metin: "Haftalık ETD-ETA dosyasını seçin; Konşimento sütunu booking no ile eşleşir, önizlemeyi onaylayınca durumlar güncellenir." },
+      { nokta: "excel", baslik: "Excel'den güncelle", metin: "Haftalık ETD-ETA dosyasını seçin; Konşimento sütunu booking no ile eşleşir. Onaylanan her yükleme yeni hatırlatma turunu başlatır; ödemesi gelenler ve yeni bekleyenler özetlenir." },
       { nokta: "ara", baslik: "Arama", metin: "Firma, booking, BL, gemi ya da liman ile arayın." },
-      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "ETA ve Konşimento durumu satırdan değiştirilir. “Hatırlat” 3 şablondan ödeme hatırlatma maili hazırlar; Outlook'ta gönderip “gönderildi” deyince satırda tarih ve sayı görünür." },
+      { nokta: "tablo", baslik: "Sevkiyat tablosu", metin: "ETA ve Konşimento durumu satırdan değiştirilir. “Hatırlat” sıradaki mesajı (1. → 2. → 3. şablon) hazırlar; Outlook'ta gönderip “gönderildi” deyince satır “Bu tur gönderildi” olur. Tüm gönderimler “Gönderilen Mailler” sekmesinde." },
     ],
   },
   {

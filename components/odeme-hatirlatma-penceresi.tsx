@@ -50,17 +50,18 @@ function tarihSaat(iso: string): string {
 }
 
 export function OdemeHatirlatmaPenceresi({
-  sevkiyat, gecmis, onKapat, onKaydet,
+  sevkiyat, gecmis, siradaki, onKapat, onKaydet,
 }: {
   sevkiyat: HatirlatmaSevkiyati;
   gecmis: HatirlatmaKaydi[];
+  /** Sira kurali (kullanici, 28.10.2026): 1. hatirlatma -> sablon 1, 2. -> 2, 3. ve sonrasi -> 3 */
+  siradaki: HatirlatmaSablonu;
   onKapat: () => void;
   /** Hata metni dondurur (null = basarili) */
   onKaydet: (v: { sablon: HatirlatmaSablonu; alici: string; cc: string; konu: string; govde: string }) => Promise<string | null>;
 }) {
   const bugun = bugunIso();
-  const varmis = !!sevkiyat.eta && sevkiyat.eta.slice(0, 10) <= bugun;
-  const onerilen: HatirlatmaSablonu = varmis ? 3 : gecmis.length > 0 ? 2 : 1;
+  const onerilen: HatirlatmaSablonu = siradaki;
   const veri = React.useMemo(() => ({
     firma: (sevkiyat.alici_firma || "").trim() || "Customer",
     konteynerAdedi: sevkiyat.konteyner_adedi,
@@ -155,7 +156,9 @@ export function OdemeHatirlatmaPenceresi({
         {asama === "duzenle" ? (
           <div className="px-5 py-4 space-y-4">
             <fieldset>
-              <legend className={etiket} style={{ color: TEXT_MUTED }}>Şablon</legend>
+              <legend className={etiket} style={{ color: TEXT_MUTED }}>
+                Şablon · bu sevkiyata {gecmis.length + 1}. hatırlatma{gecmis.length > 0 ? ` (önceki: ${gecmis.length})` : ""}
+              </legend>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {([1, 2, 3] as HatirlatmaSablonu[]).map((s) => {
                   const secili = sablon === s;
@@ -165,7 +168,7 @@ export function OdemeHatirlatmaPenceresi({
                       style={{ borderColor: secili ? ACCENT : CARD_BORDER, backgroundColor: secili ? `${ACCENT}14` : ROW_HEADER_BG }}>
                       <span className="flex items-center justify-between gap-2">
                         <span className="text-[13px] font-semibold text-white">{s}. {SABLON_BILGI[s].ad}</span>
-                        {s === onerilen && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${ACCENT}26`, color: ACCENT }}>Önerilen</span>}
+                        {s === onerilen && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${ACCENT}26`, color: ACCENT }}>Sıradaki</span>}
                       </span>
                       <span className="block text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{SABLON_BILGI[s].aciklama}</span>
                     </button>

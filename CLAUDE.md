@@ -2012,6 +2012,36 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Departmanlar bilgi kutusundan "Test işaretli departmanın e-postaları…" cümlesi kaldırıldı
   (Test düğmesinin title'ı açıklamayı taşımaya devam eder).
 
+### Mükerrer kontrolü + ürün geçmişi (28.10.2026)
+- Kullanıcı: "farklı departmanlarda aynı ürünler geliyor" → hata önleme 3 madde hemen;
+  katalog için: "Her manuel olarak yazılan ürün daha önceden sipariş verilen ürünler olarak
+  otomatik kayıt altına alınsın." (Ürün bazında birleşik onay / toplu alım listesi henüz YOK.)
+- Eşleştirme TEK tanım iki yerde birebir: `_shared/satin-alma.ts` `urunNorm` / `urunEslesme`
+  ve migration `20261028100000_satin_alma_mukerrer_urun_gecmisi.sql` `sa_urun_norm`
+  (Türkçe harf katlama ç→c ı/İ/I→i ş→s…, küçük harf, harf/rakam dışı → boşluk).
+  "ayni" = anahtar eşit; "benzer" = kısa adın TÜM kelimeleri uzun adda (tek kelimede ≥4 harf).
+  Canlı PG 17.6'da aynı sonuç doğrulandı.
+- Tablo `satin_alma_urunleri` (company_id + ad_norm tekil; ad = ilk yazım, kategori/birim =
+  son kullanılan, kullanim sayısı). Tetikleyici `satin_alma_urun_gecmisi`: form taslak →
+  bekliyor olunca kalemler eklenir (test formu HARİÇ; reddedilenler de dahil — "yazılan her
+  ürün"). İçe aktarma: canlıda 11 ürün. RLS: satin_alma yetkilisi okur; yazma yalnız tetikleyici.
+- `sa_token_kalem_ekle`: aynı formda aynı anahtar → 23505 "Bu ürün formda zaten var: X · 3 Adet
+  (Ad Soyad). Yeni satır yerine mevcut kalemin miktarını artırın." Yeni `sa_token_kalem_miktar`
+  (taslak kalemi; p_acil true ise acil yapar, normal'e çevirmez). Edge `satin-alma` v8:
+  işlemler `urunler`, `kalem_miktar`.
+- `/talep`: ürün alanı combobox — "Daha önce sipariş verilen ürünler" (yön tuşu/Enter/Esc;
+  seçince kategori + birim dolar, imleç miktara). Yazılan ürün için notlar: formda aynısı
+  (turuncu kutu + "Mevcut kalemi N Birim yap"; birim farklıysa açıklama; Kalem ekle eklemez),
+  formda benzeri, departmanın onay bekleyen formunda, son 30 günde departmana onaylanan.
+- `/satin-alma` karar kartı: kalem altında "Bu formda N kez geçiyor", "Başka departmanda da
+  onay bekliyor: Dep · ürün · miktar (SA-…)" (aynı formdakiler tek satırda; yalnız aynı test
+  durumundaki formlar), "Son 30 günde bu departmana onaylandı: … · tarih (SA-…)"; başlıkta
+  "N kalemde not". Hesap istemcide (`kalemNotlariHesapla`, yüklenen son 300 liste).
+- Yerel test: `scratchpad/sa/mukerrer.sql`, edge `test.mjs` A2 bölümü, `edge/e2e3.mjs`
+  (öneri, mükerrer, birleştirme, notlar, onay ekranı, 31 gün sınırı). e2e2 (50) da geçti.
+- Sonraki adım (konuşuldu, yapılmadı): ürün bazında birleşik onay + toplu satın alma listesi;
+  ürün geçmişinde yanlış yazımları gizleme / birleştirme ekranı.
+
 ## Yazı animasyonu (27.10.2026)
 
 - Kullanıcı: Proforma Yükle karşılama mesajı "chatte yazıyor gibi" yazılsın; diğer sayfalarda

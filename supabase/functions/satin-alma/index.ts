@@ -9,6 +9,8 @@ import { gonderimMaili, sonucMaili, type SaListe } from "../_shared/satin-alma.t
 //  - "bilgi"      : departman, acik taslak, son 10 gonderilen liste
 //  - "kalem_ekle" : { token, kalem }      (taslak yoksa acilir)
 //  - "kalem_sil"  : { token, kalem_id }   (sadece acik taslaktan)
+//  - "kalem_miktar": { token, kalem_id, miktar, acil? } (28.10.2026: mukerrer yerine miktar artir)
+//  - "urunler"    : daha once siparis verilen urunler (gonderilen formlardan; oneri listesi)
 //  - "gonder"     : { token, gonderen }   -> SA-YYYY-NNNN, execution@ + bbt@'ye mail
 // Girissiz Unex cek listesi sayfasi (/cek/[token]) - execution@'ye giden mailden:
 //  - "cek_bilgi"     : onaylanan kalemler + alindi durumlari
@@ -128,7 +130,7 @@ Deno.serve(async (req: Request) => {
   const islem = govde.islem;
   try {
     // ---------------- Girissiz departman sayfasi ----------------
-    if (islem === "bilgi" || islem === "kalem_ekle" || islem === "kalem_sil" || islem === "gonder") {
+    if (islem === "bilgi" || islem === "kalem_ekle" || islem === "kalem_sil" || islem === "kalem_miktar" || islem === "urunler" || islem === "gonder") {
       if (!tokenGecerli(govde.token)) return json({ hata: "Bağlantı geçersiz." }, 404);
       const token = govde.token;
       if (islem === "bilgi") {
@@ -144,6 +146,17 @@ Deno.serve(async (req: Request) => {
         };
         const id = await rpc<string>("sa_token_kalem_ekle", { p_token: token, p_kalem: kalem });
         return json({ basarili: true, id });
+      }
+      if (islem === "urunler") {
+        const urunler = await rpc<unknown[] | null>("sa_token_urunler", { p_token: token });
+        return urunler ? json({ urunler }) : json({ hata: "Bağlantı geçersiz ya da departman pasif." }, 404);
+      }
+      if (islem === "kalem_miktar") {
+        if (!uuidGecerli(govde.kalem_id)) return json({ hata: "Geçersiz kalem." }, 400);
+        const miktar = typeof govde.miktar === "number" && Number.isFinite(govde.miktar) ? govde.miktar : null;
+        if (miktar === null) return json({ hata: "Miktar geçersiz." }, 400);
+        await rpc("sa_token_kalem_miktar", { p_token: token, p_kalem_id: govde.kalem_id, p_miktar: miktar, p_acil: govde.acil === true });
+        return json({ basarili: true });
       }
       if (islem === "kalem_sil") {
         if (!uuidGecerli(govde.kalem_id)) return json({ hata: "Geçersiz kalem." }, 400);

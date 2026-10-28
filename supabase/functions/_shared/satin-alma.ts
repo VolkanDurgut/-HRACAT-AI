@@ -86,6 +86,34 @@ export const adSoyadGecerli = (s: string | null | undefined) => {
   return /^[^ ]{2,}( [^ ]{2,})+$/.test(t) && !/[0-9@]/.test(t);
 };
 
+// ---------------------------------------------------------------------------
+// Urun eslestirme (28.10.2026): mukerrer / diger departman / son 30 gun uyarilari
+// ---------------------------------------------------------------------------
+const TR_KATLA: Record<string, string> = {
+  Ç: "c", Ğ: "g", İ: "i", I: "i", Ö: "o", Ş: "s", Ü: "u", Â: "a", Î: "i", Û: "u",
+  ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", â: "a", î: "i", û: "u",
+};
+/** Karsilastirma anahtari: Turkce harfler katlanir, kucuk harf, harf/rakam disi bosluk.
+ * "ZIMBA TELİ" = "zımba teli" = "zimba teli". Veritabanindaki sa_urun_norm ile AYNI. */
+export function urunNorm(s: string | null | undefined): string {
+  return (s || "").replace(/[ÇĞİIÖŞÜÂÎÛçğıöşüâîû]/g, (c) => TR_KATLA[c]).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+/** "ayni": anahtar birebir ayni (sunucu ayni formda ikinci satiri reddeder).
+ * "benzer": kisa adin tum kelimeleri uzun adda var ("Klasör" ~ "Geniş mavi klasör");
+ * tek kelimelik kisa adlarda en az 4 harf (yanlis esleme olmasin: "A4", "çay" gibi). */
+export function urunEslesme(a: string | null | undefined, b: string | null | undefined): "ayni" | "benzer" | null {
+  const x = urunNorm(a), y = urunNorm(b);
+  if (!x || !y) return null;
+  if (x === y) return "ayni";
+  const [kisa, uzun] = x.length <= y.length ? [x, y] : [y, x];
+  const kelimeler = kisa.split(" ");
+  if (kelimeler.length === 1 && kelimeler[0].length < 4) return null;
+  const uzunKelimeler = new Set(uzun.split(" "));
+  return kelimeler.every((w) => uzunKelimeler.has(w)) ? "benzer" : null;
+}
+/** Daha once siparis verilen urun (gonderilen formlardan otomatik; sa_token_urunler). */
+export type SaUrun = { ad: string; kategori: Kategori; birim: Birim; kullanim: number };
+
 /** 5 -> "5", 2.5 -> "2,5" */
 export function miktarYaz(m: number | string): string {
   const n = Number(m);

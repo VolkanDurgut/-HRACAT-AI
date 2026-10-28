@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, History, Info, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import {
   AcilEtiketi, B, BelgeSayfasi, BilgiAlani, DurumEtiketi, Panel, TestSeridi,
   dugmeAna, dugmeIkincil, girdiSinifi, girdiStil, tdSinifi, thSinifi,
@@ -9,8 +9,8 @@ import {
 import { satinAlmaCagir, miktarOku } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
 import {
-  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarYaz, saTarih,
-  type Birim, type Kategori, type SaKalem, type SaListe,
+  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarBirim, miktarYaz, saTarih, urunEslesme, urunNorm,
+  type Birim, type Kategori, type SaKalem, type SaListe, type SaUrun,
 } from "@/supabase/functions/_shared/satin-alma";
 
 /**
@@ -21,6 +21,10 @@ import {
  * test adresine); Burak Bey kalem bazinda onaylar / reddeder, sonuc "Gonderilen
  * talep formlari"nda gorunur. Veritabanina dogrudan erisim YOK (edge function
  * "satin-alma", lib/satin-alma/api.ts).
+ * 28.10.2026: urun adi yazilirken "Daha once siparis verilen urunler" onerilir (secilince
+ * kategori + birim dolar); ayni formda ayni urun ikinci satir olarak eklenmez ("Mevcut
+ * kalemi X yap" ile miktar artirilir; sunucu da engeller); urun departmanin baska bir
+ * formunda onay bekliyorsa ya da son 30 gunde onaylandiysa bilgi notu gosterilir.
  */
 
 type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden"> & { liste_no: string; karar_zamani: string };
@@ -33,6 +37,31 @@ const ALIM_SAYFA = 15;
 
 type Form = { kategori: Kategori | ""; urun: string; miktar: string; birim: Birim; aciliyet: "normal" | "acil"; aciklama: string };
 const BOS_FORM: Form = { kategori: "", urun: "", miktar: "", birim: "adet", aciliyet: "normal", aciklama: "" };
+
+const OTUZ_GUN_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Yazilan urun icin form ici / gecmis kontrolu (urunEslesme: "ayni" ya da "benzer"). */
+type UrunKontrolu = {
+  mukerrer: SaKalem | null;
+  benzer: SaKalem[];
+  bekleyen: { liste_no: string | null; kalem: SaKalem }[];
+  onaylanan: OnayliAlim[];
+};
+function urunKontrolu(urun: string, bilgi: Bilgi | null): UrunKontrolu | null {
+  if (!bilgi || urunNorm(urun).length < 2) return null;
+  let mukerrer: SaKalem | null = null;
+  const benzer: SaKalem[] = [];
+  for (const k of bilgi.taslak?.kalemler ?? []) {
+    const e = urunEslesme(urun, k.urun);
+    if (e === "ayni" && !mukerrer) mukerrer = k;
+    else if (e) benzer.push(k);
+  }
+  const bekleyen = bilgi.gecmis.filter((l) => l.durum === "bekliyor")
+    .flatMap((l) => l.kalemler.filter((k) => urunEslesme(urun, k.urun)).map((kalem) => ({ liste_no: l.liste_no, kalem })));
+  const sinir = Date.now() - OTUZ_GUN_MS;
+  const onaylanan = (bilgi.onaylananlar ?? []).filter((a) => new Date(a.karar_zamani).getTime() >= sinir && urunEslesme(urun, a.urun));
+  return mukerrer || benzer.length || bekleyen.length || onaylanan.length ? { mukerrer, benzer, bekleyen, onaylanan } : null;
+}
 
 const bugun = () => new Date().toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -56,6 +85,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const [gonderimSonucu, setGonderimSonucu] = useState<{ liste_no: string; mail: string; test?: boolean } | null>(null);
   const [acikGecmis, setAcikGecmis] = useState<string | null>(null);
   const [alimSayisi, setAlimSayisi] = useState(ALIM_SAYFA);
+  const [urunler, setUrunler] = useState<SaUrun[]>([]);
+  const [birlesiyor, setBirlesiyor] = useState(false);
+  const [formBilgisi, setFormBilgisi] = useState<string | null>(null);
 
   useEffect(() => { try { window.localStorage.removeItem(ESKI_AD_ANAHTARI); } catch { /* yoksay */ } }, []);
 
@@ -70,13 +102,56 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   }, [params.token]);
   useEffect(() => { getir(); }, [getir]);
 
-  const alan = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+  // Daha once siparis verilen urunler (oneri listesi). Hata sessiz: form oneri olmadan da calisir.
+  const urunleriGetir = useCallback(async () => {
+    if (!tokenBicimiGecerli(params.token)) return;
+    const r = await satinAlmaCagir<{ urunler: SaUrun[] }>({ islem: "urunler", token: params.token });
+    if (r.ok && Array.isArray(r.veri.urunler)) setUrunler(r.veri.urunler);
+  }, [params.token]);
+  useEffect(() => { urunleriGetir(); }, [urunleriGetir]);
+
+  const kontrol = useMemo(() => urunKontrolu(form.urun, bilgi), [form.urun, bilgi]);
+
+  const alan = <K extends keyof Form>(k: K, v: Form[K]) => { setFormBilgisi(null); setForm((f) => ({ ...f, [k]: v })); };
+
+  // Oneriden secim: ad + kategori + birim dolar, imlec miktara gecer
+  const urunSec = (u: SaUrun) => {
+    setFormBilgisi(null);
+    setForm((f) => ({
+      ...f, urun: u.ad,
+      kategori: u.kategori in KATEGORILER ? u.kategori : f.kategori,
+      birim: u.birim in BIRIMLER ? u.birim : f.birim,
+    }));
+    setTimeout(() => document.getElementById("sa-miktar")?.focus(), 0);
+  };
+
+  // Mukerrer: yeni satir yerine mevcut kalemin miktari artirilir
+  const birlestir = async (mevcut: SaKalem, eklenecek: number) => {
+    setFormHatasi(null);
+    const toplam = Math.round((Number(mevcut.miktar) + eklenecek) * 100) / 100;
+    if (toplam > 1_000_000) { setFormHatasi("Toplam miktar çok büyük."); return; }
+    setBirlesiyor(true);
+    const r = await satinAlmaCagir({ islem: "kalem_miktar", token: params.token, kalem_id: mevcut.id, miktar: toplam, acil: form.aciliyet === "acil" });
+    setBirlesiyor(false);
+    if (!r.ok) { setFormHatasi(r.hata); getir(true); return; }
+    setForm((f) => ({ ...BOS_FORM, kategori: f.kategori, birim: f.birim }));
+    setFormBilgisi(`${mevcut.urun}: miktar ${miktarBirim({ miktar: toplam, birim: mevcut.birim })} olarak güncellendi.`);
+    getir(true);
+    setTimeout(() => document.getElementById("sa-urun")?.focus(), 0);
+  };
 
   const ekle = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormHatasi(null);
+    setFormBilgisi(null);
     setGonderimSonucu(null);
     const miktar = miktarOku(form.miktar);
+    // Ayni formda ayni urun: eklenmez, uyari kutusundaki "Mevcut kalemi ... yap" kullanilir
+    // (uyari kutusu zaten acik; dugme varsa odak oraya, yoksa miktar / birim alanina)
+    if (kontrol?.mukerrer) {
+      (document.getElementById("sa-birlestir") ?? document.getElementById(miktar === null ? "sa-miktar" : "sa-birim"))?.focus();
+      return;
+    }
     if (!adSoyadGecerli(ad)) { document.getElementById("sa-ad")?.focus(); return setFormHatasi("Talep eden kişinin adını ve soyadını yazın (ör. Ayşe Yılmaz)."); }
     if (!form.kategori) return setFormHatasi("Kategori seçin.");
     if (form.urun.trim().length < 2) return setFormHatasi("Ürün / hizmet tanımını yazın.");
@@ -114,6 +189,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
     if (!r.ok) { setListeHatasi(r.hata); getir(true); return; }
     setGonderimSonucu(r.veri);
     getir(true);
+    urunleriGetir();
   };
 
   if (yukleniyor) {
@@ -194,8 +270,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                 </select>
               </Etiket>
               <Etiket metin="Ürün / hizmet tanımı" htmlFor="sa-urun" className="col-span-2 sm:col-span-6">
-                <input id="sa-urun" value={form.urun} onChange={(e) => alan("urun", e.target.value)} maxLength={200}
-                  placeholder="Ör. A4 fotokopi kağıdı 80 gr" className={girdiSinifi} style={girdiStil} />
+                <UrunGirdisi deger={form.urun} onDegis={(v) => alan("urun", v)} onSec={urunSec} urunler={urunler} />
               </Etiket>
               <Etiket metin="Miktar" htmlFor="sa-miktar" className="col-span-1 sm:col-span-2">
                 <input id="sa-miktar" value={form.miktar} onChange={(e) => alan("miktar", e.target.value)} inputMode="decimal"
@@ -223,7 +298,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                 </button>
               </div>
             </div>
+            {kontrol && <KontrolNotlari kontrol={kontrol} miktar={miktarOku(form.miktar)} birim={form.birim} birlesiyor={birlesiyor} onBirlestir={birlestir} />}
             {formHatasi && <p className="mt-2.5 text-[13px] font-medium" role="alert" style={{ color: B.kirmizi }}>{formHatasi}</p>}
+            {formBilgisi && <p className="mt-2.5 text-[13px] font-medium flex items-center gap-1.5" role="status" style={{ color: B.yesil }}><CheckCircle2 size={14} /> {formBilgisi}</p>}
           </form>
 
           {/* Eklenen kalemler */}
@@ -375,6 +452,131 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
         )}
       </div>
     </BelgeSayfasi>
+  );
+}
+
+/**
+ * Urun adi girisi + "Daha once siparis verilen urunler" onerisi (28.10.2026).
+ * Erisilebilir combobox: yon tuslari / Enter / Esc; fareyle tiklama. Serbest yazim
+ * her zaman serbest (oneri zorunlu degil).
+ */
+function UrunGirdisi({ deger, onDegis, onSec, urunler }: {
+  deger: string; onDegis: (v: string) => void; onSec: (u: SaUrun) => void; urunler: SaUrun[];
+}) {
+  const [acik, setAcik] = useState(false);
+  const [etkin, setEtkin] = useState(-1);
+  const listeRef = useRef<HTMLUListElement>(null);
+  const anahtarli = useMemo(() => urunler.map((u) => ({ u, kelimeler: urunNorm(u.ad).split(" ") })), [urunler]);
+  const oneriler = useMemo(() => {
+    const q = urunNorm(deger);
+    if (q.length < 2) return [];
+    const parcalar = q.split(" ");
+    const uyan = anahtarli.filter((x) => parcalar.every((p) => x.kelimeler.some((w) => w.startsWith(p))));
+    // Adin basi eslesenler once; sonra kullanim sirasi (sunucudan gelen sira korunur)
+    const bas = uyan.filter((x) => urunNorm(x.u.ad).startsWith(q));
+    const diger = uyan.filter((x) => !urunNorm(x.u.ad).startsWith(q));
+    return [...bas, ...diger].slice(0, 8).map((x) => x.u);
+  }, [deger, anahtarli]);
+  const gorunur = acik && oneriler.length > 0;
+
+  const sec = (u: SaUrun) => { onSec(u); setAcik(false); setEtkin(-1); };
+  const tus = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!gorunur) { if (e.key === "ArrowDown" && oneriler.length) { setAcik(true); setEtkin(0); e.preventDefault(); } return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); setEtkin((i) => (i + 1) % oneriler.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setEtkin((i) => (i <= 0 ? oneriler.length - 1 : i - 1)); }
+    else if (e.key === "Enter" && etkin >= 0) { e.preventDefault(); sec(oneriler[etkin]); }
+    else if (e.key === "Escape") { setAcik(false); setEtkin(-1); }
+  };
+  useEffect(() => {
+    if (etkin >= 0) listeRef.current?.querySelector<HTMLElement>(`[data-i="${etkin}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [etkin]);
+
+  return (
+    <div className="relative">
+      <input id="sa-urun" value={deger} maxLength={200} autoComplete="off"
+        role="combobox" aria-expanded={gorunur} aria-controls="sa-urun-oneri" aria-autocomplete="list"
+        aria-activedescendant={gorunur && etkin >= 0 ? `sa-urun-oneri-${etkin}` : undefined}
+        onChange={(e) => { onDegis(e.target.value); setAcik(true); setEtkin(-1); }}
+        onFocus={() => setAcik(true)} onBlur={() => setTimeout(() => setAcik(false), 120)} onKeyDown={tus}
+        placeholder="Ör. A4 fotokopi kağıdı 80 gr" className={girdiSinifi} style={girdiStil} />
+      {gorunur && (
+        <div className="absolute z-20 left-0 right-0 top-full mt-1 border rounded-[3px] bg-white shadow-lg overflow-hidden" style={{ borderColor: B.cizgi }}>
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] flex items-center gap-1.5" style={{ color: B.soluk }}>
+            <History size={11} /> Daha önce sipariş verilen ürünler
+          </p>
+          <ul id="sa-urun-oneri" ref={listeRef} role="listbox" aria-label="Daha önce sipariş verilen ürünler" className="max-h-64 overflow-y-auto pb-1">
+            {oneriler.map((u, i) => (
+              <li key={u.ad} id={`sa-urun-oneri-${i}`} data-i={i} role="option" aria-selected={i === etkin}
+                onMouseDown={(e) => { e.preventDefault(); sec(u); }} onMouseEnter={() => setEtkin(i)}
+                className="px-3 py-1.5 cursor-pointer" style={i === etkin ? { backgroundColor: "#EEF1F8" } : undefined}>
+                <span className="block text-sm font-medium break-words" style={{ color: B.metin }}>{u.ad}</span>
+                <span className="block text-[11px]" style={{ color: B.soluk }}>
+                  {KATEGORILER[u.kategori] ?? u.kategori} · {BIRIMLER[u.birim] ?? u.birim} · {u.kullanim} kez talep edildi
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Yazilan urun icin uyari / bilgi notlari (mukerrer, onay bekleyen, son 30 gun). */
+function KontrolNotlari({ kontrol, miktar, birim, birlesiyor, onBirlestir }: {
+  kontrol: UrunKontrolu; miktar: number | null; birim: Birim; birlesiyor: boolean;
+  onBirlestir: (mevcut: SaKalem, eklenecek: number) => void;
+}) {
+  const m = kontrol.mukerrer;
+  const kalemMetni = (k: Pick<SaKalem, "urun" | "miktar" | "birim">) => `${k.urun} · ${miktarBirim(k)}`;
+  return (
+    <div className="mt-3 space-y-1.5" aria-live="polite">
+      {m && (
+        <div className="border-l-[3px] rounded-[3px] px-3 py-2.5 text-[13px]" style={{ borderColor: B.turuncu, backgroundColor: B.turuncuZemin }}>
+          <p className="font-semibold flex items-start gap-1.5" style={{ color: B.turuncu }}>
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" /> Bu ürün formda zaten var: {kalemMetni(m)} ({m.talep_eden})
+          </p>
+          <p className="mt-0.5 sm:ml-5" style={{ color: B.metin }}>Aynı ürün ikinci satır olarak eklenmez; mevcut kalemin miktarını artırın.</p>
+          <div className="mt-2 sm:ml-5">
+            {miktar === null ? (
+              <p className="text-xs" style={{ color: B.soluk }}>Eklemek istediğiniz miktarı yazın; mevcut kaleme eklenir.</p>
+            ) : m.birim !== birim ? (
+              <p className="text-xs" style={{ color: B.soluk }}>Birim farklı (mevcut kalem: {BIRIMLER[m.birim] ?? m.birim}). Birimi aynı seçin ya da mevcut kalemi silip toplam miktarla yeniden ekleyin.</p>
+            ) : (
+              <button id="sa-birlestir" type="button" onClick={() => onBirlestir(m, miktar)} disabled={birlesiyor}
+                className={`${dugmeAna} h-8 text-[13px]`} style={{ backgroundColor: B.turuncu }}>
+                {birlesiyor ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                Mevcut kalemi {miktarBirim({ miktar: Math.round((Number(m.miktar) + miktar) * 100) / 100, birim: m.birim })} yap
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {kontrol.benzer.slice(0, 2).map((k) => (
+        <BilgiNotu key={`b-${k.id}`} ikon={<Info size={13} />}>Formda benzer kalem var: <b>{kalemMetni(k)}</b> ({k.talep_eden})</BilgiNotu>
+      ))}
+      {kontrol.bekleyen.slice(0, 2).map((x) => (
+        <BilgiNotu key={`p-${x.kalem.id}`} ikon={<Info size={13} />}>
+          <b>{x.liste_no}</b> numaralı formunuzda onay bekliyor: <b>{kalemMetni(x.kalem)}</b>
+        </BilgiNotu>
+      ))}
+      {kontrol.onaylanan.slice(0, 2).map((a) => (
+        <BilgiNotu key={`o-${a.id}`} ikon={<History size={13} />}>
+          {saTarih(a.karar_zamani).slice(0, 10)} tarihinde departmanınıza onaylandı: <b>{kalemMetni(a)}</b> <span style={{ color: B.soluk }}>({a.liste_no})</span>
+        </BilgiNotu>
+      ))}
+      {(kontrol.benzer.length > 2 || kontrol.bekleyen.length > 2 || kontrol.onaylanan.length > 2) && (
+        <p className="text-xs pl-3" style={{ color: B.soluk }}>Ve {Math.max(0, kontrol.benzer.length - 2) + Math.max(0, kontrol.bekleyen.length - 2) + Math.max(0, kontrol.onaylanan.length - 2)} kayıt daha.</p>
+      )}
+    </div>
+  );
+}
+
+function BilgiNotu({ ikon, children }: { ikon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <p className="border-l-[3px] rounded-[3px] px-3 py-2 text-[13px] flex items-start gap-1.5 break-words" style={{ borderColor: B.lacivert2, backgroundColor: "#F1F3F9", color: B.metin }}>
+      <span className="shrink-0 mt-0.5" style={{ color: B.lacivert2 }}>{ikon}</span><span className="min-w-0">{children}</span>
+    </p>
   );
 }
 

@@ -3,7 +3,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Copy, ExternalLink, Inbox, Link2, Loader2, Mail,
+  AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Copy, ExternalLink, History, Inbox, Layers, Link2, Loader2, Mail,
   FileText, FlaskConical, Pencil, Plus, RefreshCw, RotateCcw, ShoppingCart, Trash2, X, XCircle,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
@@ -17,7 +17,7 @@ import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 import { ACCENT, CARD_BG, CARD_BORDER, PAGE_BG, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  KATEGORILER, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi,
+  KATEGORILER, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi, urunEslesme,
   type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -35,6 +35,9 @@ import {
  * o departmanin mailleri SADECE test adresine (mesensei282@) gider. Departman silinebilir
  * (sa_departman_sil: listeleri + kalemleriyle birlikte, kalici).
  * Tablolar istemciye SADECE okunur; yazmalar RPC / edge function ile.
+ * 28.10.2026 karar ekrani notlari (urunEslesme: ayni / benzer ad): kalem baska bir
+ * departmanin onay bekleyen formunda da varsa, son 30 gunde ayni departmana onaylandiysa
+ * ya da ayni formda birden fazla geciyorsa kalemin altinda gosterilir.
  */
 
 type Departman = { id: string; ad: string; token: string; aktif: boolean; test: boolean; sira: number };
@@ -47,6 +50,44 @@ type ListeSatiri = Omit<SaListe, "departman" | "sirket" | "kalemler"> & {
 type Liste = SaListe & { departman_id: string; gonderim_maili_hata: string | null; sonuc_maili_hata: string | null };
 type KararSecimi = { karar: "onaylandi" | "reddedildi"; red_nedeni: string };
 type Sekme = "bekleyen" | "cek" | "gecmis" | "departmanlar";
+/** Karar ekraninda kalem notlari (28.10.2026). */
+type KalemNotlari = {
+  formda: number; // ayni formda ayni urunun diger satir sayisi
+  digerleri: { departman: string; liste_no: string | null; kalem: SaKalem; benzer: boolean }[];
+  son30: { liste_no: string | null; tarih: string; kalem: SaKalem; benzer: boolean }[];
+};
+const OTUZ_GUN_MS = 30 * 24 * 60 * 60 * 1000;
+
+function kalemNotlariHesapla(bekleyenler: Liste[], sonuclananlar: Liste[]): Map<string, KalemNotlari> {
+  const sonuc = new Map<string, KalemNotlari>();
+  const sinir = Date.now() - OTUZ_GUN_MS;
+  const yakin = sonuclananlar.filter((o) => o.karar_zamani && new Date(o.karar_zamani).getTime() >= sinir);
+  for (const l of bekleyenler) {
+    for (const k of l.kalemler) {
+      const n: KalemNotlari = { formda: 0, digerleri: [], son30: [] };
+      n.formda = l.kalemler.filter((x) => x.id !== k.id && urunEslesme(x.urun, k.urun) === "ayni").length;
+      // Diger departmanlarin (ayni test durumundaki) onay bekleyen formlari
+      for (const o of bekleyenler) {
+        if (o.id === l.id || o.test !== l.test) continue;
+        for (const x of o.kalemler) {
+          const e = urunEslesme(k.urun, x.urun);
+          if (e) n.digerleri.push({ departman: o.departman, liste_no: o.liste_no, kalem: x, benzer: e === "benzer" });
+        }
+      }
+      // Son 30 gunde AYNI departmana onaylananlar
+      for (const o of yakin) {
+        if (o.departman_id !== l.departman_id) continue;
+        for (const x of o.kalemler) {
+          if (x.karar !== "onaylandi") continue;
+          const e = urunEslesme(k.urun, x.urun);
+          if (e) n.son30.push({ liste_no: o.liste_no, tarih: o.karar_zamani as string, kalem: x, benzer: e === "benzer" });
+        }
+      }
+      if (n.formda || n.digerleri.length || n.son30.length) sonuc.set(k.id, n);
+    }
+  }
+  return sonuc;
+}
 
 const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad)";
 
@@ -111,6 +152,7 @@ function SatinAlmaIcerik() {
   const bekleyenler = useMemo(() => listeler.filter((l) => l.durum === "bekliyor").sort((a, b) => (a.gonderim_zamani || "").localeCompare(b.gonderim_zamani || "")), [listeler]);
   const sonuclananlar = useMemo(() => listeler.filter((l) => l.durum === "sonuclandi"), [listeler]);
   const taslaklar = useMemo(() => new Map(listeler.filter((l) => l.durum === "taslak").map((l) => [l.departman_id, l])), [listeler]);
+  const kalemNotlari = useMemo(() => kalemNotlariHesapla(bekleyenler, sonuclananlar), [bekleyenler, sonuclananlar]);
 
   // Mail'deki "Listeyi incele" baglantisi: ?liste=<id> -> ilgili sekme + kaydir
   useEffect(() => {
@@ -171,7 +213,7 @@ function SatinAlmaIcerik() {
         bekleyenler.length === 0
           ? <EmptyState icon={<Inbox size={40} />} title="Onay bekleyen liste yok" description="Departmanlar listelerini gönderdiğinde burada görünür ve e-posta gelir." />
           : <div className="space-y-5">{bekleyenler.map((l) => (
-              <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar}
+              <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar} notlar={kalemNotlari}
                 onKaydedildi={(mesaj, tur) => { showToast(mesaj, tur); getir(true); }} />
             ))}</div>
       )}
@@ -188,8 +230,8 @@ function SatinAlmaIcerik() {
 // ---------------------------------------------------------------------------
 // Onay bekleyen liste: kalem bazinda karar
 // ---------------------------------------------------------------------------
-function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
-  liste: Liste; vurgulu: boolean;
+function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
+  liste: Liste; vurgulu: boolean; notlar: Map<string, KalemNotlari>;
   onKaydedildi: (mesaj: string, tur: "success" | "error") => void;
   onMailTekrar: (l: Liste, tur: "gonderim" | "sonuc") => Promise<void>;
 }) {
@@ -203,6 +245,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
   const onaySayisi = liste.kalemler.filter((k) => secim[k.id]?.karar === "onaylandi").length;
   const redSayisi = liste.kalemler.filter((k) => secim[k.id]?.karar === "reddedildi").length;
   const kalan = liste.kalemler.length - onaySayisi - redSayisi;
+  const notluKalem = liste.kalemler.filter((k) => notlar.has(k.id)).length;
 
   const sec = (id: string, karar: KararSecimi["karar"]) =>
     setSecim((s) => ({ ...s, [id]: { karar, red_nedeni: s[id]?.red_nedeni || "" } }));
@@ -240,6 +283,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
             {liste.gonderen_ad} · {saTarih(liste.gonderim_zamani)} · {o.toplam} kalem
             {o.acil > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">{o.acil} ACİL</span>}
+            {notluKalem > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400" title="Başka departmanda bekleyen, son 30 günde onaylanan ya da formda tekrar eden kalemler">{notluKalem} kalemde not</span>}
           </p>
         </div>
         {liste.gonderim_maili === "hata" && (
@@ -310,6 +354,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
                   </div>
                 </div>
               </div>
+              {notlar.has(k.id) && <KalemNotSatirlari n={notlar.get(k.id) as KalemNotlari} />}
               {s?.karar === "reddedildi" && (
                 <div className="mt-1.5 sm:ml-[40px] flex flex-wrap items-center gap-1.5">
                   {RED_NEDENLERI.map((n) => (
@@ -359,6 +404,38 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar }: {
         onConfirm={kaydet} loading={kaydediliyor} loadingLabel="Kaydediliyor..."
       />
     </section>
+  );
+}
+
+/** Karar ekrani kalem notlari: form ici tekrar, diger departman, son 30 gun. */
+function KalemNotSatirlari({ n }: { n: KalemNotlari }) {
+  // Ayni formdaki eslesmeler tek satirda (ornegin "Klasör · 3 Adet, klasör · 2 Adet")
+  const gruplar: { departman: string; liste_no: string | null; satirlar: KalemNotlari["digerleri"] }[] = [];
+  for (const d of n.digerleri) {
+    const g = gruplar.find((x) => x.liste_no === d.liste_no);
+    if (g) g.satirlar.push(d); else gruplar.push({ departman: d.departman, liste_no: d.liste_no, satirlar: [d] });
+  }
+  const kalem = (x: SaKalem, benzer: boolean) => <>{benzer && <span className="opacity-80">Benzer · </span>}<b className="font-semibold">{x.urun}</b> · {miktarBirim(x)}</>;
+  return (
+    <ul className="mt-1 sm:ml-[40px] space-y-0.5 text-[11.5px] leading-snug">
+      {n.formda > 0 && (
+        <li className="flex items-start gap-1.5 text-amber-400"><AlertTriangle size={12} className="shrink-0 mt-px" /> Bu formda {n.formda + 1} kez geçiyor; tek kalem olarak onaylamayı düşünün.</li>
+      )}
+      {gruplar.slice(0, 3).map((g) => (
+        <li key={`d-${g.liste_no}`} className="flex items-start gap-1.5 text-amber-300/90">
+          <Layers size={12} className="shrink-0 mt-px" />
+          <span className="min-w-0 break-words">Başka departmanda da onay bekliyor: <b className="font-semibold">{g.departman}</b> · {g.satirlar.map((d, i) => <React.Fragment key={d.kalem.id}>{i > 0 && ", "}{kalem(d.kalem, d.benzer)}</React.Fragment>)} <span style={{ color: TEXT_MUTED }}>({g.liste_no})</span></span>
+        </li>
+      ))}
+      {gruplar.length > 3 && <li className="pl-[18px]" style={{ color: TEXT_MUTED }}>ve {gruplar.length - 3} form daha</li>}
+      {n.son30.slice(0, 3).map((x) => (
+        <li key={`s-${x.kalem.id}`} className="flex items-start gap-1.5 text-sky-300/90">
+          <History size={12} className="shrink-0 mt-px" />
+          <span className="min-w-0 break-words">Son 30 günde bu departmana onaylandı: {kalem(x.kalem, x.benzer)} · {saTarih(x.tarih).slice(0, 10)} <span style={{ color: TEXT_MUTED }}>({x.liste_no})</span></span>
+        </li>
+      ))}
+      {n.son30.length > 3 && <li className="pl-[18px]" style={{ color: TEXT_MUTED }}>ve {n.son30.length - 3} onay daha</li>}
+    </ul>
   );
 }
 

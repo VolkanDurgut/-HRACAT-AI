@@ -79,7 +79,6 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     (idoc.head || idoc.documentElement).appendChild(uyumStili);
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const hedefEl = (idoc.querySelector(".sheet") as HTMLElement | null) || idoc.body;
 
     // ".print-hint" kutusu (tarayicida elle yazdirmadan once gosterilen
     // "Headers/footers kapatin" uyarisi) normalde sadece @media print ile
@@ -89,14 +88,41 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
     const ipucuKutusu = idoc.querySelector(".print-hint") as HTMLElement | null;
     if (ipucuKutusu) ipucuKutusu.style.display = "none";
 
-    const canvas = await html2canvas(hedefEl, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      windowWidth: 820,
-    });
+    // Belgenin kendi sayfa duzeni (28.10.2026, Packing List): tablo/ipucu stilleri yerlestikten
+    // SONRA yeniden olcsun (tek sayfa / sikistir / konteynerler 2. sayfada). Betigi olmayan
+    // belgelerde hicbir sey yapmaz.
+    try {
+      const duzen = (iframe.contentWindow as unknown as { __sayfaDuzeni?: () => unknown } | null)?.__sayfaDuzeni;
+      if (typeof duzen === "function") { duzen(); await new Promise((resolve) => setTimeout(resolve, 50)); }
+    } catch { /* belge betigi hata verirse eski davranis */ }
+
+    // Birden fazla GORUNUR .sheet varsa (Packing List eki) her biri ayri sayfa(lar)dan baslar.
+    // Tek .sheet'li belgelerde davranis birebir eskisi gibidir.
+    const sayfalar = (Array.from(idoc.querySelectorAll(".sheet")) as HTMLElement[])
+      .filter((el) => idoc.defaultView?.getComputedStyle(el).display !== "none");
+    const hedefler: HTMLElement[] = sayfalar.length ? sayfalar : [idoc.body];
 
     const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
+    for (let i = 0; i < hedefler.length; i++) {
+      const canvas = await html2canvas(hedefler[i], {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        windowWidth: 820,
+      });
+      if (i > 0) pdf.addPage();
+      canvasiSayfalaraEkle(pdf, canvas);
+    }
+
+    return pdf.output("blob");
+  } finally {
+    document.body.removeChild(iframe);
+  }
+}
+
+/** Bir canvas'i (tek .sheet) PDF'e ekler: sigiyorsa tek sayfa, %1'e kadar tasma oturtulur,
+ *  daha uzunsa dilimlenir. Cagri aninda PDF'in SON sayfasi bostur (ilk sayfa ya da addPage). */
+function canvasiSayfalaraEkle(pdf: jsPDF, canvas: HTMLCanvasElement) {
     const sayfaGenislikMm = 210;
     const sayfaYukseklikMm = 297;
     const goruntuYukseklikMm = (canvas.height * sayfaGenislikMm) / canvas.width;
@@ -136,9 +162,4 @@ export async function htmlToPdfBlob(html: string): Promise<Blob> {
         ilkSayfa = false;
       }
     }
-
-    return pdf.output("blob");
-  } finally {
-    document.body.removeChild(iframe);
-  }
 }

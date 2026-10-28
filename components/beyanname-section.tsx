@@ -4,8 +4,9 @@ import { supabase, Dosya, Rezervasyon, getGuvenliDosyaUrl, yazmaHatasi, eskiDepo
 import { formatDateTimeShortTR, formatCutoffTarih, formatCutoffSaat, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { FileSignature, Upload, Loader2, X, CheckCircle2, ExternalLink, RefreshCw, Clock } from "lucide-react";
+import { FileSignature, X, CheckCircle2, ExternalLink, RefreshCw, Clock, Archive, TimerOff } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { EvrakAsistanYukleme, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
 
 /**
  * GUMRUK BEYANNAMESI (16.10.2026, kullanici istegi).
@@ -45,7 +46,6 @@ export default function BeyannameSection({ dosya, rezervasyonlar, onRefresh, com
   const [yukleniyor, setYukleniyor] = useState(false);
   const [kaldiriliyor, setKaldiriliyor] = useState(false);
   const [kaldirOnay, setKaldirOnay] = useState(false);
-  const [surukleniyor, setSurukleniyor] = useState(false);
 
   const url = dosya.beyanname_dosya_url;
   // Cut-off bilgisi: en erken beyanname cut-off'u (birden fazla rezervasyon olabilir)
@@ -169,10 +169,7 @@ export default function BeyannameSection({ dosya, rezervasyonlar, onRefresh, com
         )}
 
         {yukleniyor ? (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-            <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
-            <span className="text-sm" style={{ color: TEXT_MUTED }}>Beyanname yükleniyor...</span>
-          </div>
+          <EvrakAsistanIsleniyor belge="Beyanname" durumYazisi="Beyanname yükleniyor" mesaj="Beyanname yükleniyor ve dosyaya bağlanıyor…" kontroller={["Dosya arşivi", "Beyanname cut-off"]} />
         ) : url ? (
           <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
             <FileSignature size={16} className="shrink-0" style={{ color: TEXT_MUTED }} />
@@ -213,21 +210,24 @@ export default function BeyannameSection({ dosya, rezervasyonlar, onRefresh, com
             </button>
           </div>
         ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={dosyaSec}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dosyaSec(); } }}
-            onDragOver={(e) => { e.preventDefault(); setSurukleniyor(true); }}
-            onDragLeave={() => setSurukleniyor(false)}
-            onDrop={(e) => { e.preventDefault(); setSurukleniyor(false); const f = e.dataTransfer.files?.[0]; if (f) handleYukle(f); }}
-            className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]"
-            style={{ borderColor: surukleniyor ? ACCENT : CARD_BORDER, backgroundColor: surukleniyor ? "rgba(255,255,255,0.03)" : undefined }}
-          >
-            <Upload size={28} style={{ color: TEXT_MUTED }} />
-            <span className="text-sm font-medium text-white">Beyanname dosyasını seçin</span>
-            <span className="text-xs" style={{ color: TEXT_MUTED }}>veya sürükleyip bırakın · PDF, JPG, PNG (en fazla 20 MB)</span>
-          </div>
+          // 28.10.2026: AI asistan gorunumu. Beyannamede AI okumasi YOK (yalnizca yukleme +
+          // cut-off sayacini durdurma) - mesaj bunu durustce soyler.
+          <EvrakAsistanYukleme
+            belge="Beyanname"
+            mesaj="Gümrük beyannamesini buraya bırakın. Dosyaya bağlayıp beyanname cut-off sayacını durdurayım; evraklarda beyanname tamamlandı olarak görünsün."
+            yetenekler={[
+              { ikon: <Archive size={11} />, metin: "Dosya arşivi" },
+              { ikon: <TimerOff size={11} />, metin: "Cut-off sayacı durur" },
+            ]}
+            accept="application/pdf,image/jpeg,image/png"
+            bicimNotu="PDF, JPG, PNG (en fazla 20 MB)"
+            kabul={(f) => ["application/pdf", "image/jpeg", "image/png"].includes(f.type) || /\.(pdf|jpe?g|png)$/i.test(f.name)}
+            kabulHatasi="Beyanname PDF, JPG ya da PNG olmalı."
+            onDosya={(f) => handleYukle(f)}
+            gecikmeMs={1000}
+            testId="beyanname-asistan"
+            hazirYazisi="Beyanname almaya hazır"
+          />
         )}
       </div>
     </div>

@@ -4,10 +4,22 @@ import { supabase, Rezervasyon, Konteyner, Dosya, getGuvenliDosyaUrl, yazmaHatas
 import { formatDateTimeTR, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import { useToast } from "@/lib/toast-context";
 import {
-  FileText, X, Upload, CheckCircle2, AlertTriangle, Loader2, RotateCcw, Mail, Clock
+  FileText, X, CheckCircle2, AlertTriangle, Loader2, RotateCcw, Mail, Clock
 } from "lucide-react";
 import { KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC } from "@/supabase/functions/_shared/konsimento-hatirlatma-sabitler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
+import { Users, Container, Anchor, Scale, Hash } from "lucide-react";
+
+// 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
+// Eski "surukleyip birakin" alani birakmayi aslinda desteklemiyordu - asistan alani destekler.
+const KONSIMENTO_YETENEKLERI = [
+  { ikon: <Users size={11} />, metin: "Consignee / notify" },
+  { ikon: <Container size={11} />, metin: "Konteyner ve mühür" },
+  { ikon: <Scale size={11} />, metin: "Ağırlık ve kap" },
+  { ikon: <Anchor size={11} />, metin: "Gemi ve limanlar" },
+  { ikon: <Hash size={11} />, metin: "BL no" },
+];
 
 type KontrolSonucu = {
   uyumlu: boolean;
@@ -270,28 +282,31 @@ export default function KonsimentoTalimatiSection({
         )}
 
         {!kontrolEdiliyor && !kontrolHata && !konsimentoHazir && !konsimentoDosyaUrl && (
-          <p className="text-xs" style={{ color: TEXT_MUTED }}>
-            Anlamlı bir kontrol için önce rezervasyondaki tüm konteynerlerin dosyaya eklenmiş olması gerekir.
-          </p>
+          <EvrakAsistanKilitli
+            belge="Konşimento talimatı"
+            mesaj="Anlamlı bir kontrol için önce rezervasyondaki tüm konteynerlerin dosyaya eklenmesi gerekiyor. Eklendiğinde talimatı buradan okuyacağım."
+            gecikmeMs={250}
+          />
         )}
 
         {!kontrolEdiliyor && !kontrolHata && konsimentoHazir && !konsimentoDosyaUrl && (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-xl border-2 border-dashed cursor-pointer transition-colors hover:bg-white/[0.03]"
-            style={{ borderColor: CARD_BORDER }}
-          >
-            <Upload size={28} style={{ color: TEXT_MUTED }} />
-            <span className="text-sm font-medium text-white">Konşimento talimatı PDF dosyasını seçin</span>
-            <span className="text-xs" style={{ color: TEXT_MUTED }}>veya sürükleyip bırakın</span>
-          </div>
+          <EvrakAsistanYukleme
+            belge="Konşimento talimatı"
+            mesaj="Konşimento talimatını buraya bırakın. Consignee ve notify bilgilerini okuyup konteyner, mühür, ağırlık ve limanları sistemle karşılaştırayım."
+            yetenekler={KONSIMENTO_YETENEKLERI}
+            accept=".pdf,application/pdf"
+            bicimNotu="PDF"
+            kabul={(f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)}
+            kabulHatasi="Lütfen PDF yükleyin."
+            onDosya={(f) => handleYukleVeKontrolEt(f)}
+            gecikmeMs={250}
+            testId="konsimento-asistan"
+          />
         )}
 
         {kontrolEdiliyor && (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-            <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
-            <span className="text-sm" style={{ color: TEXT_MUTED }}>Belge kontrol ediliyor, bu işlem birkaç saniye sürebilir</span>
-          </div>
+          <EvrakAsistanIsleniyor belge="Konşimento talimatı" mesaj="Talimat okunuyor ve sistemle karşılaştırılıyor… birkaç saniye sürebilir."
+            kontroller={["Consignee / notify", "Konteyner ve mühür", "Ağırlık ve kap", "Gemi ve limanlar"]} />
         )}
 
         {!kontrolEdiliyor && !kontrolHata && konsimentoDosyaUrl && (

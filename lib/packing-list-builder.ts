@@ -89,6 +89,53 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
   .signature-block { display: flex; justify-content: flex-start; margin: 24px 0 14px 0; margin-top: auto; }
   .stamp-slot img { max-width: 200px; max-height: 160px; object-fit: contain; }
   .footer-note { text-align: center; font-size: 8.5px; font-weight: bold; line-height: 1.5; border-top: 1px solid #DADADA; padding-top: 8px; margin-top: 10px; }
+  /* TEK SAYFA KURALI (28.10.2026, kullanici: "20 konteynerlik yuklemede packing 2 sayfa
+     cikiyor. Sigiyorsa sigdiralim, sigmiyorsa 'konteyner bilgileri ektedir' yazip butun
+     konteyner bilgilerini 2. sayfaya atalim"). Sayfa sonundaki betik (.sheet yuksekligini
+     olcer): 1) normal sigiyorsa dokunmaz, 2) sigmiyorsa .sik (bosluklar daralir, yazi
+     boyutu ayni), 3) sigmiyorsa .cok-sik (tablo yazisi 9px, logo/imza kucuk),
+     4) yine sigmiyorsa .ekli: 1. sayfada ozet satiri + TOPLAM, tum
+     konteyner satirlari 2. sayfada (Container Details). Gorsel boyutlari sabit
+     (width/height) -> olcum gorsel yuklenmesine bagli degil. */
+  /* 1. kademe: bosluklar daralir */
+  .sik .header, .cok-sik .header { margin-bottom: 8px; }
+  .sik .invoice-title, .cok-sik .invoice-title { margin-bottom: 8px; }
+  .sik .parties-block, .cok-sik .parties-block { margin-top: 8px; margin-bottom: 8px; }
+  .sik .party-row, .cok-sik .party-row { margin-bottom: 4px; }
+  .sik .kv-table, .cok-sik .kv-table { margin-bottom: 8px; }
+  .sik .kv-table td { padding: 3px 10px; }
+  .sik .items-table th { padding: 4px 6px; }
+  .sik .items-table td { padding: 3px 6px; }
+  .sik .signature-block, .cok-sik .signature-block { margin: 8px 0 4px 0; margin-top: auto; }
+  .sik .stamp-slot img { width: 160px; height: 105px; }
+  /* 2. kademe: tablo yazisi 9px, satirlar tek satira yakin; ust bilgi de sikisir */
+  .cok-sik .sheet:not(.sheet-ek) { font-size: 9.5px; line-height: 1.3; }
+  .cok-sik .logo-slot img { width: 80px; height: 80px; }
+  .cok-sik .logo-slot { margin-bottom: 4px; }
+  .cok-sik .kv-table td { padding: 2px 8px; }
+  .cok-sik .kv-table td.k { width: 160px; }
+  .cok-sik .items-table th { padding: 3px 4px; font-size: 8.5px; }
+  .cok-sik .items-table td { padding: 2px 4px; font-size: 9px; line-height: 1.25; }
+  .cok-sik .stamp-slot img { width: 130px; height: 85px; }
+  .cok-sik .footer-note { margin-top: 6px; padding-top: 5px; font-size: 8px; line-height: 1.4; }
+  /* Ek sayfa (konteyner listesi) her zaman sik tablo */
+  .sheet-ek .items-table th { padding: 4px 5px; font-size: 8.5px; }
+  .sheet-ek .items-table td { padding: 3px 5px; font-size: 9.5px; line-height: 1.3; }
+  .sheet-ek .stamp-slot img { width: 140px; height: 92px; }
+  .sheet-ek .signature-block { margin: 12px 0 6px 0; margin-top: auto; }
+  /* Ek sayfa da tasarsa (cok uzun liste) bir kademe daha sik */
+  .ek-sik .sheet-ek .items-table td { padding: 1px 4px; font-size: 8.5px; line-height: 1.2; }
+  .ek-sik .sheet-ek .items-table th { padding: 2px 4px; }
+  .ek-sik .sheet-ek .stamp-slot img { width: 110px; height: 72px; }
+  .ek-ozet { display: none; }
+  .ekli .ek-ozet { display: table-row; }
+  .ek-ozet td { text-align: center; font-weight: bold; letter-spacing: 0.3px; padding: 10px 8px; background: #FAFAFA; }
+  .ekli .kont-satir { display: none; }
+  .sheet-ek { display: none; }
+  .ekli .sheet-ek { display: flex; margin-top: 24px; }
+  .ek-baslik { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .ek-baslik .invoice-title { margin-bottom: 6px; }
+  .ek-alt { font-size: 9.5px; color: #555; }
   .print-hint { background: #FEF3C7; border: 1px solid #FDE68A; color: #92400E; padding: 10px 14px; font-size: 11px; margin-bottom: 16px; border-radius: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #FFFFFF; padding: 0; }
@@ -98,6 +145,7 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
        Sayfa ekrandaki genislikte dizilir ve orantili kucultulur (718/736):
        yazdirma ciktisi ekran ve uygulama PDF'iyle AYNI duzende olur. */
     .sheet { box-shadow: none; padding: 0; width: 736px; max-width: none; zoom: 0.9755; }
+    .ekli .sheet-ek { margin-top: 0; break-before: page; page-break-before: always; }
     .print-hint { display: none; }
   }
 </style>
@@ -122,7 +170,7 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
       </div>
       <div class="header-right">
         <div class="logo-slot">
-          <img src="__LOGO__" alt="Company Logo" onerror="this.style.display='none'">
+          <img src="__LOGO__" alt="Company Logo" width="100" height="100" onerror="this.style.display='none'">
         </div>
         <div class="buyer-box">
           <div class="name">__SATICI_FIRMA__</div>
@@ -163,7 +211,7 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
 
     <div class="signature-block">
       <div class="stamp-slot">
-        <img src="__IMZA_HARUN__" alt="Signature" onerror="this.style.display='none'">
+        <img src="__IMZA_HARUN__" alt="Signature" width="200" height="131" onerror="this.style.display='none'">
       </div>
     </div>
 
@@ -173,6 +221,89 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
       THE GOODS ARE OF TURKISH ORIGIN
     </div>
   </div>
+
+  <!-- 2. SAYFA: konteyner bilgileri eki (sadece .ekli kipinde gorunur) -->
+  <div class="sheet sheet-ek">
+    <div class="ek-baslik">
+      <div>
+        <div class="invoice-title">Packing List &ndash; Container Details</div>
+        <div class="meta-row"><div class="meta-label">Invoice No :</div><div class="meta-value">__INVOICE_NO__</div></div>
+        <div class="meta-row"><div class="meta-label">Invoice Date :</div><div class="meta-value">__INVOICE_DATE__</div></div>
+        <div class="meta-row"><div class="meta-label">Buyer :</div><div class="meta-value">__ALICI_FIRMA__</div></div>
+        <div class="meta-row"><div class="meta-label">Vessel :</div><div class="meta-value">__VESSEL_VOYAGE__</div></div>
+      </div>
+      <div class="ek-alt">Attachment to Packing List __INVOICE_NO__ &middot; Page 2</div>
+    </div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>SERIES</th>
+          <th style="text-align:left;">DESCRIPTION OF GOODS</th>
+          <th>BRAND</th>
+          <th>CONTAINER NO</th>
+          <th>SEAL NO</th>
+          <th>PIECES</th>
+          <th>NETT</th>
+          <th>GROSS</th>
+        </tr>
+      </thead>
+      <tbody>
+        __EK_SATIRLARI__
+      </tbody>
+    </table>
+    <div class="signature-block">
+      <div class="stamp-slot">
+        <img src="__IMZA_HARUN__" alt="Signature" width="200" height="131" onerror="this.style.display='none'">
+      </div>
+    </div>
+    <div class="footer-note">
+      THE GOODS ARE OF TURKISH ORIGIN
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    // Tek sayfa siniri: A4 orani 800px genislikte 1131px; yazdirmada (736px, zoom 0.9755,
+    // 277mm, ic bosluk yok) ~1129px. Pay birakilir. Kademeler: normal -> sik -> cok-sik -> ekli.
+    var SINIR = 1120;
+    function yukseklik(secici) {
+      var s = document.querySelector(secici || ".sheet");
+      if (!s) return 0;
+      var eski = s.style.minHeight;
+      s.style.minHeight = "0";
+      var h = s.scrollHeight;
+      s.style.minHeight = eski;
+      // Ekrandaki "yazdirmadan once" ipucu kutusu PDF'te ve yazdirmada GORUNMEZ: olcume katilmaz
+      var ipucu = s.querySelector(".print-hint");
+      if (ipucu && ipucu.offsetHeight) h -= ipucu.offsetHeight + 16;
+      return h;
+    }
+    function duzenle() {
+      var b = document.body;
+      b.classList.remove("sik", "cok-sik", "ekli", "ek-sik");
+      if (yukseklik() <= SINIR) return "normal";
+      b.classList.add("sik");
+      if (yukseklik() <= SINIR) return "sik";
+      b.classList.remove("sik");
+      b.classList.add("cok-sik");
+      if (yukseklik() <= SINIR) return "cok-sik";
+      b.classList.remove("cok-sik");
+      b.classList.add("ekli");
+      if (yukseklik(".sheet-ek") > SINIR) b.classList.add("ek-sik");
+      // DRAFT filigrani (varsa) ek sayfaya da
+      var f = document.querySelector(".sheet .draft-filigran-katmani");
+      var ek = document.querySelector(".sheet-ek");
+      if (f && ek && !ek.querySelector(".draft-filigran-katmani")) {
+        ek.style.position = "relative";
+        ek.insertBefore(f.cloneNode(true), ek.firstChild);
+      }
+      return "ekli";
+    }
+    window.__sayfaDuzeni = duzenle;
+    duzenle();
+    window.addEventListener("load", duzenle);
+  })();
+  </script>
 </body>
 </html>`;
 
@@ -217,7 +348,7 @@ function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { row
       totalGross += gross;
       const buKonteynerMarka = (k as any).marka ? escapeHtml(String((k as any).marka)) : varsayilanMarka;
       const buKonteynerUrunAdi = konteynerUrunAciklamasi((k as any).marka);
-      return `<tr>
+      return `<tr class="kont-satir">
         <td style="text-align:center;">${idx + 1}</td>
         <td>${buKonteynerUrunAdi}</td>
         <td style="text-align:center;">${buKonteynerMarka}</td>
@@ -296,7 +427,11 @@ export function buildPackingListHtml(
     <td class="num">${totalGross.toLocaleString("tr-TR")} KG</td>
   </tr>`;
 
-  html = html.replace("__KONTEYNER_SATIRLARI__", rows + "\n" + totalRow);
+  const adet = konteynerler?.length || 0;
+  const ekOzet = `<tr class="ek-ozet"><td colspan="8">CONTAINER DETAILS ARE ATTACHED &ndash; ${adet} CONTAINER${adet === 1 ? "" : "S"} (SEE PAGE 2)</td></tr>`;
+  html = html.replace("__KONTEYNER_SATIRLARI__", rows + "\n" + ekOzet + "\n" + totalRow);
+  // Ek sayfada satirlar her zaman gorunur (.kont-satir gizlemesi .sheet-ek icinde gecersiz)
+  html = html.replace("__EK_SATIRLARI__", rows.split('class="kont-satir"').join('class="ek-satir"') + "\n" + totalRow);
 
   return html;
 }

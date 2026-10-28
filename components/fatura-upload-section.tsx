@@ -3,9 +3,21 @@ import React, { useState } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
-  Upload, FileText, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Banknote, FileType2, ExternalLink
+  FileText, CheckCircle2, AlertTriangle, X, RotateCcw, Banknote, FileType2, ExternalLink
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
+import { Hash, CalendarDays, Coins, Scale, Container } from "lucide-react";
+
+// 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
+const FATURA_YETENEKLERI = [
+  { ikon: <Hash size={11} />, metin: "Fatura no" },
+  { ikon: <CalendarDays size={11} />, metin: "Fatura tarihi" },
+  { ikon: <FileText size={11} />, metin: "DİİB no" },
+  { ikon: <Coins size={11} />, metin: "Tutar ve para birimi" },
+  { ikon: <Scale size={11} />, metin: "Net / brüt ağırlık" },
+  { ikon: <Container size={11} />, metin: "Konteynerler" },
+];
 
 type FaturaKontrolSonucu = {
   uyumlu: boolean;
@@ -125,7 +137,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
   const handleFaturaSec = (file: File | null) => {
     if (!file) return;
-    if (file.type !== "application/pdf") return;
+    if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return;
     if (!konteynerlerTamam) return;
     handleFaturaYukle(file);
   };
@@ -173,26 +185,28 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
         {!dosya.fatura_dosya_url && !faturaYukleniyor && (
           konteynerlerTamam ? (
-            <label className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
-              <Upload size={18} style={{ color: TEXT_MUTED }} />
-              <span className="text-sm" style={{ color: TEXT_MUTED }}>Fatura PDF yükle</span>
-              <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handleFaturaSec(e.target.files?.[0] || null)} />
-            </label>
+            <EvrakAsistanYukleme
+              belge="Fatura"
+              mesaj="Faturayı buraya bırakın. Fatura no, tarih ve DİİB numarasını okuyup tutar, ağırlık ve konteynerleri sistemdeki bilgilerle karşılaştırayım."
+              yetenekler={FATURA_YETENEKLERI}
+              accept=".pdf,application/pdf"
+              bicimNotu="PDF"
+              kabul={(f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)}
+              kabulHatasi="Fatura PDF olmalı."
+              onDosya={(f) => handleFaturaSec(f)}
+              testId="fatura-asistan"
+            />
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-lg cursor-not-allowed" style={{ backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
-              <Upload size={18} />
-              <span className="text-sm">
-                Fatura yüklemeden önce tüm konteynerleri ekleyin ({eklenenKonteynerAdedi}/{rezervasyonKontAdedi || 0})
-              </span>
-            </div>
+            <EvrakAsistanKilitli
+              belge="Fatura"
+              mesaj={`Faturayı kontrol edebilmem için önce rezervasyondaki tüm konteynerler eklenmeli (${eklenenKonteynerAdedi}/${rezervasyonKontAdedi || 0}).`}
+            />
           )
         )}
 
         {faturaYukleniyor && (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-            <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
-            <span className="text-sm" style={{ color: TEXT_MUTED }}>Fatura okunuyor ve kontrol ediliyor...</span>
-          </div>
+          <EvrakAsistanIsleniyor belge="Fatura" mesaj="Fatura okunuyor ve sistemle karşılaştırılıyor…"
+            kontroller={["Fatura no / tarih", "DİİB", "Tutar", "Ağırlıklar", "Konteynerler"]} />
         )}
 
         {faturaHata && (

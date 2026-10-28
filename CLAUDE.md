@@ -2237,6 +2237,42 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `kantar/e2e.mjs` (kartlar, liste, ad sızmıyor, arama, gizle/göster, migration öncesi yedek
   yol, 390 px), kılavuz e2e + km e2e regresyon.
 
+## Packing List — tek sayfa / konteyner eki (28.10.2026)
+
+- Kullanıcı: "20 konteynerlik yüklemede packing 2 sayfa çıkıyor. Sığıyorsa sığdıralım, sığmıyorsa
+  'konteyner bilgileri ektedir' yazıp bütün konteyner bilgilerini 2. sayfaya atalım."
+- `lib/packing-list-builder.ts`: belgenin sonundaki küçük betik `.sheet` yüksekliğini ölçer
+  (ekrandaki "yazdırmadan önce" ipucu kutusu ölçüme KATILMAZ — PDF'te/yazdırmada görünmez) ve
+  kademe seçer: normal → `.sik` (boşluklar daralır) → `.cok-sik` (tablo 9px, logo/imza küçük)
+  → `.ekli` (1. sayfada "CONTAINER DETAILS ARE ATTACHED – n CONTAINERS (SEE PAGE 2)" + TOTAL;
+  2. sayfa `.sheet.sheet-ek` "Packing List – Container Details": Invoice No/Date, Buyer, Vessel,
+  tam tablo + toplam + imza; DRAFT filigranı varsa ek sayfaya da kopyalanır; ek sayfa da
+  taşarsa `.ek-sik`). Sınır 1120px (A4 800px'te 1131; yazdırmada ~1129). Logo / imza
+  `width/height` sabit → ölçüm görsel yüklenmesine bağlı değil. `window.__sayfaDuzeni()`.
+- `lib/html-to-pdf.ts`: yakalamadan önce `__sayfaDuzeni` varsa çağırır (tablo uyum stili
+  eklendikten SONRA); birden fazla GÖRÜNÜR `.sheet` varsa her biri yeni sayfadan başlar.
+  Tek `.sheet`li diğer evraklar (CI, CoO, Phyto, Health, QC, FC) BİREBİR eski davranış.
+- Ölçüm (Chromium, scratchpad `pl/test.mjs`, uygulama PDF'i + tarayıcı yazdırma): kısa
+  bilgilerle 20 konteyner `sik` 1 sayfa, 30'a kadar `cok-sik` 1 sayfa; uzun adres + iki ürün:
+  20 / 30 konteyner `cok-sik` 1 sayfa; 31+ → 2 sayfa (ek); 60'a kadar ek sayfa tek sayfa.
+
+## Sevkiyat Evrakları — AI asistan yükleme alanları (28.10.2026)
+
+- Kullanıcı: "Sevkiyat evrakları kısmındaki evrak yükleme alanları Proforma Yükleme tarzında; chat
+  animasyonu ve yapay zekâ enerjisi gibi."
+- `components/evrak-asistan.tsx` (SADECE görünüm): `EvrakAsistanYukleme` (İhracat AI satırı +
+  sohbet balonu: yazıyor noktaları → harf harf + okunacak bilgi etiketleri + sürükle-bırak /
+  klavye ile seçim + tür kontrolü), `EvrakAsistanKilitli` (ön koşul eksikse nedeni),
+  `EvrakAsistanIsleniyor` (GERÇEK geçen süre + kontrol edilen alanlar; sahte adım YOK).
+  CSS `globals.css` `.evrak-ai-*` (hareketi azaltta durur).
+- Kullananlar: Fatura (`fatura-upload-section`, kilit: konteynerler eksik), Konşimento talimatı
+  (kilit: konteynerler eksik; ESKİ alan "sürükleyip bırakın" diyordu ama bırakmayı
+  desteklemiyordu — düzeldi), Draft BL, Beyanname (AI okuması YOK → "Beyanname almaya hazır",
+  mesaj dürüst). Yükleme / AI kontrol / kayıt / depo temizliği / hata ve sonuç kartları
+  DEĞİŞMEDİ. Kılavuzda Sevkiyat Evrakları 2 ekran (`dosya-evrak`, `dosya-evrak-2`).
+- Test: scratchpad `ea/e2e.mjs` (4 asistan, mesajlar, etiketler, yanlış tür, sürükle-bırak,
+  işleniyor, hata akışı, kilitli, yüklü dosya, hareketi azalt, 390 px).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

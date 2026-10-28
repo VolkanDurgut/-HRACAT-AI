@@ -3,9 +3,20 @@ import React, { useState } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTimeTR, cutoffUyarilariniYenile } from "@/lib/cutoff-utils";
 import {
-  Upload, CheckCircle2, AlertTriangle, Loader2, X, RotateCcw, Ship, FileType2, ExternalLink
+  CheckCircle2, AlertTriangle, X, RotateCcw, Ship, FileType2, ExternalLink
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import { EvrakAsistanYukleme, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
+import { Hash, Users, Container, Anchor, Scale } from "lucide-react";
+
+// 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
+const DRAFT_BL_YETENEKLERI = [
+  { ikon: <Hash size={11} />, metin: "BL no" },
+  { ikon: <Users size={11} />, metin: "Consignee / notify" },
+  { ikon: <Container size={11} />, metin: "Konteyner ve mühür" },
+  { ikon: <Anchor size={11} />, metin: "Gemi ve limanlar" },
+  { ikon: <Scale size={11} />, metin: "Ağırlık ve kap" },
+];
 
 type DraftBlKontrolSonucu = {
   uyumlu: boolean;
@@ -168,7 +179,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
 
   const handleDosyaSec = (file: File | null) => {
     if (!file) return;
-    if (file.type !== "application/pdf") return;
+    if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) return;
     handleYukle(file);
   };
 
@@ -216,18 +227,23 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         </div>
 
         {!draftBlUrl && !yukleniyor && (
-          <label className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-dashed cursor-pointer hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER }}>
-            <Upload size={18} style={{ color: TEXT_MUTED }} />
-            <span className="text-sm" style={{ color: TEXT_MUTED }}>Draft BL PDF yükle</span>
-            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handleDosyaSec(e.target.files?.[0] || null)} />
-          </label>
+          <EvrakAsistanYukleme
+            belge="Draft BL"
+            mesaj="Acenteden gelen Draft BL'yi buraya bırakın. BL no, consignee ve notify bilgilerini okuyup konteyner, mühür, gemi ve ağırlıkları sistemle karşılaştırayım."
+            yetenekler={DRAFT_BL_YETENEKLERI}
+            accept=".pdf,application/pdf"
+            bicimNotu="PDF"
+            kabul={(f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name)}
+            kabulHatasi="Draft BL PDF olmalı."
+            onDosya={(f) => handleDosyaSec(f)}
+            gecikmeMs={500}
+            testId="draft-bl-asistan"
+          />
         )}
 
         {yukleniyor && (
-          <div className="flex items-center gap-2 px-3 py-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
-            <Loader2 size={18} className="animate-spin" style={{ color: TEXT_MUTED }} />
-            <span className="text-sm" style={{ color: TEXT_MUTED }}>Draft BL okunuyor ve kontrol ediliyor...</span>
-          </div>
+          <EvrakAsistanIsleniyor belge="Draft BL" mesaj="Draft BL okunuyor ve sistemle karşılaştırılıyor…"
+            kontroller={["BL no", "Consignee / notify", "Konteyner ve mühür", "Gemi ve limanlar", "Ağırlıklar"]} />
         )}
 
         {hata && (

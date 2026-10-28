@@ -43,12 +43,14 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
     butonlar: { x: 74.38, y: 7.56, w: 23.96, h: 3.33 },
   },
   "dosya-evrak": {
-    fatura: { x: 18.33, y: 18.11, w: 39.44, h: 17.67 },
-    konsimento: { x: 18.33, y: 37.56, w: 39.44, h: 13.22 },
-    draftbl: { x: 18.33, y: 52.56, w: 39.44, h: 18.11 },
-    beyanname: { x: 18.33, y: 72.44, w: 39.44, h: 27.56 },
-    evraklar: { x: 58.89, y: 18.11, w: 39.44, h: 63.49 },
+    fatura: { x: 19.51, y: 29, w: 37.08, h: 34.88 },
+    konsimento: { x: 19.51, y: 80.99, w: 37.08, h: 19.01 },
+    evraklar: { x: 58.89, y: 18.11, w: 39.44, h: 61.81 },
     uyari: { x: 77.22, y: 28.44, w: 16.39, h: 3.24 },
+  },
+  "dosya-evrak-2": {
+    draftbl: { x: 18.33, y: 5.86, w: 39.44, h: 47.65 },
+    beyanname: { x: 18.33, y: 55.29, w: 39.44, h: 44.71 },
   },
   "kantar": {
     sekme: { x: 10, y: 9, w: 39.72, h: 6.06 },

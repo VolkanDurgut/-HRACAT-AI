@@ -12,10 +12,11 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
     sorun: { x: 87.78, y: 91.78, w: 10.83, h: 6 },
   },
   "proforma-olustur": {
-    musteri: { x: 18.33, y: 10.33, w: 46.67, h: 13.44 },
-    urunler: { x: 18.33, y: 25.56, w: 46.67, h: 36.11 },
-    odeme: { x: 18.33, y: 63.44, w: 46.67, h: 36.56 },
-    onizleme: { x: 66.39, y: 10.33, w: 31.94, h: 81.22 },
+    musteri: { x: 18.33, y: 10.56, w: 46.67, h: 55.89 },
+    urunler: { x: 18.33, y: 68.22, w: 46.67, h: 31.78 },
+    // odeme: ELLE (28.10.2026) - onizlemedeki PDF'in PACKAGING / SHIPMENT / PAYMENT TERMS satirlari
+    odeme: { x: 67.4, y: 43.7, w: 24, h: 8.6 },
+    onizleme: { x: 66.39, y: 10.56, w: 31.94, h: 81.22 },
   },
   "proforma-yukle": {
     asistan: { x: 18.33, y: 10.78, w: 62.22, h: 57.61 },

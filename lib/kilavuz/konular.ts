@@ -62,8 +62,8 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { baslik: "Tek ekranda proforma", metin: "Müşteriye gidecek proformayı tek ekranda hazırlarsınız. Sağda, indireceğiniz PDF'in kendisi canlı olarak çizilir." },
       { nokta: "musteri", baslik: "1 · Müşteri", metin: "Listeden müşteriyi seçin ya da yeni ünvanı yazın. Son proformasındaki adres, ürünler, teslim, ödeme ve banka bilgileri kendiliğinden gelir." },
       { nokta: "urunler", baslik: "2 · Ürünler", metin: "Ürün, marka, ambalaj, miktar (MTS) ve fiyatı girin; tutar, FCL ve çuval sayısı otomatik hesaplanır. Yeni kalem için “Ürün satırı ekle”." },
-      { nokta: "odeme", baslik: "3 · Ödeme ve Sevkiyat", metin: "Teslim şekli, sevkiyat, ödeme metni, banka ve para birimi. Proforma no, tarih ve paketleme satırı otomatik oluşur; elle değiştirirseniz “Otomatik” ile geri alırsınız." },
-      { nokta: "onizleme", baslik: "Canlı önizleme", metin: "Her değişiklik önizlemeye anında yansır. Alttaki eksik listesi boşalınca “Taslak PDF İndir” ile dosyayı alın." },
+      { nokta: "odeme", baslik: "3 · Ödeme ve Sevkiyat", metin: "Teslim şekli, sevkiyat, ödeme metni, banka ve para birimi (formun altında). Önizlemede bu satırlara basılır. Proforma no, tarih ve paketleme otomatik oluşur; elle değiştirirseniz “Otomatik” ile geri alırsınız." },
+      { nokta: "onizleme", baslik: "Canlı önizleme", metin: "Sağdaki belge indireceğiniz PDF'in kendisidir; her değişiklik anında yansır (Sayfa 1-2-3). Alttaki eksik listesi boşalınca “Taslak PDF İndir” ile dosyayı alın." },
     ],
   },
   {

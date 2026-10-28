@@ -2190,6 +2190,11 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (çekim + Playwright ile öğe kutuları → json), `isaret.py` (kontrol görseli). Bir sayfa
   görünümü değişirse: build → `node cek.mjs ham noktalar.json` → webp + ts üretimi (bu oturumdaki
   python betiği) → konular.ts'te `nokta` anahtarları aynı kalmalı.
+  PROFORMA OLUŞTUR ekranı (28.10.2026, kullanıcı: "burada proforma gözükmeli"): çekimde kurgusal
+  müşteri seçilip form doldurulur (`once`); başsız Chromium PDF çizmediği için önizlemedeki
+  PDF'in KENDİSİ (blob) alınır, 1. sayfası `pdftoppm` ile aynı kutuya yerleştirilir
+  (`kl/pdf_yerlestir.py`; tek ekran: `node cek.mjs ham x.json proforma-olustur`). "odeme"
+  noktası ELLE (PDF'teki şartlar satırları; form uzadığı için kutusu ekran dışına düşüyor).
 - Diğer: Kontrol Merkezi "Otomatik Özet" cümleleri sohbet gibi SIRAYLA yazılır (`OzetKarti`,
   yer kayması yok, filtre değişince yeniden yazmaz). Menü "Proformalar" → "Proforma Oluştur"
   (adres/yetki aynı; Yetkilendirme etiketi de).

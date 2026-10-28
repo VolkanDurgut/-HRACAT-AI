@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { yedekMailHtml, yedekMailKonusu } from "./mail.ts";
+import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 
 // ============================================================================
 // GUNLUK VERI YEDEGI (yedekleme-gonder)
@@ -109,6 +109,8 @@ const YEDEKLENECEK_TABLOLAR = [
   "satin_alma_departmanlari",
   "satin_alma_listeleri",
   "satin_alma_kalemleri",
+  // Daha once siparis verilen urunler (28.10.2026; gonderilen formlardan otomatik)
+  "satin_alma_urunleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer
@@ -394,10 +396,17 @@ Deno.serve(async (req: Request) => {
       uyarilar.push(`Storage dosya listesi çıkarılamadı: ${e instanceof Error ? e.message : String(e)}`);
     }
     const bucketOzeti: Record<string, { dosya: number; bayt: number }> = {};
+    // Sevkiyat belgeleri kovasi: belge turu bazinda dokum (28.10.2026)
+    const belgeTurleri: Record<string, { dosya: number; bayt: number }> = {};
     for (const d of storageDosyalari) {
       const o = (bucketOzeti[d.bucket] ||= { dosya: 0, bayt: 0 });
       o.dosya += 1;
       o.bayt += d.bayt || 0;
+      if (d.bucket === "konsimento-talimatlari") {
+        const t = (belgeTurleri[sevkiyatBelgeTuru(d.yol)] ||= { dosya: 0, bayt: 0 });
+        t.dosya += 1;
+        t.bayt += d.bayt || 0;
+      }
     }
 
     // ---- Kapasite (DB + dosya deposu) ----
@@ -487,6 +496,7 @@ Deno.serve(async (req: Request) => {
       storageDosyaSayisi: storageDosyalari.length,
       tablolar: tabloSayilari,
       bucketlar: bucketOzeti,
+      belgeTurleri,
       kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
       kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,
       geriYukleme: geriYukleme ? { tablo_sayisi: geriYukleme.tablo_sayisi, birebir: geriYukleme.birebir, yuklenemeyen: geriYukleme.yuklenemeyen, bag_sorunlari: geriYukleme.bag_sorunlari } : null,
@@ -505,6 +515,7 @@ Deno.serve(async (req: Request) => {
       tablolar: tabloSayilari,
       kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
       bucketlar: bucketOzeti,
+      belgeTurleri,
       geriYukleme: geriYukleme ? { tablo_sayisi: geriYukleme.tablo_sayisi, birebir: geriYukleme.birebir, bag_sorunlari: geriYukleme.bag_sorunlari } : null,
       uyarilar,
       kullaniciSayisi: Array.isArray(kullanicilar) ? kullanicilar.length : null,

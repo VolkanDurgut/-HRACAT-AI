@@ -11,7 +11,7 @@ import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Loader2, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb } from "lucide-react";
+import { Users, Package, Loader2, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb, LayoutDashboard } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
@@ -661,8 +661,8 @@ export default function AnalizPage() {
       )}
 
       <SayfaBasligi
-        ikon={<BarChart3 size={20} />}
-        baslik="Analiz"
+        ikon={<LayoutDashboard size={20} />}
+        baslik="Kontrol Merkezi"
         aciklama={dosyalar.length > 0 ? `${filtrelenmis.length} dosya üzerinden hesaplanıyor` : "Sevkiyat özetleri"}
         sag={dosyalar.length > 0 ? <>
           <SecimGrubu etiket="Dosya durumu" secenekler={durumSecenekleri} deger={durumFiltre} onChange={setDurumFiltre} />

@@ -31,14 +31,14 @@ type KullaniciYetki = {
 };
 type Bekleyen = { user_id: string; email: string; olusturma: string | null; son_giris: string | null };
 
+// 28.10.2026: "dashboard" (eski Kontrol Merkezi) kaldirildi; Kontrol Merkezi = "analiz".
 const SAYFA_ETIKETLER: Record<string, string> = {
-  dashboard:  "Kontrol Merkezi",
+  analiz:     "Kontrol Merkezi",
   panel:      "Ana Panel",
   yeni_dosya: "Proforma Yükle (yeni dosya)",
   ihracatlar: "İhracatlar",
   etd_eta:    "ETD/ETA",
   kantar:     "Kantar Paneli",
-  analiz:     "Analiz",
   ayarlar:    "Ayarlar",
   draft_onay: "Draft Onay",
   ic_piyasa:  "İç Piyasa",

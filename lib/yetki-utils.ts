@@ -19,11 +19,12 @@
 export function ilkErisilebilirSayfa(sayfaYetkileri: Record<string, boolean> | undefined | null): string | null {
   if (!sayfaYetkileri) return null;
   const oncelikSirasi: { key: string; yol: string }[] = [
-    { key: "dashboard", yol: "/dashboard" },
+    // 28.10.2026: eski Kontrol Merkezi (/dashboard) kaldirildi; acilis Ana Panel
+    // (ozet kartlari orada). Yeni Kontrol Merkezi = /analiz.
     { key: "panel", yol: "/panel" },
+    { key: "analiz", yol: "/analiz" },
     { key: "kantar", yol: "/kantar" },
     { key: "ihracatlar", yol: "/ihracatlar" },
-    { key: "analiz", yol: "/analiz" },
     { key: "yeni_dosya", yol: "/yeni-dosya" },
     { key: "etd_eta", yol: "/etd-eta" },
     { key: "draft_onay", yol: "/draft-onay" },

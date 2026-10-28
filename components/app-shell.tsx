@@ -13,7 +13,6 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 
 const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYetkileri> = {
-  "/dashboard": "dashboard",
   "/panel": "panel",
   "/yeni-dosya": "yeni_dosya",
   "/ihracatlar": "ihracatlar",

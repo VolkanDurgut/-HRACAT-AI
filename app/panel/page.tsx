@@ -15,10 +15,16 @@ import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Trash2, ExternalLink, FolderX, Loader2, FileText, FolderOpen } from "lucide-react";
+import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
+
+// 28.10.2026: eski Kontrol Merkezi kaldirildi; 4 ozet karti buraya tasindi
+// (components/panel-ozet-kartlari.tsx). Kontrol Merkezi gibi sayfa gorunurken
+// dakikada bir + sekmeye donulunce kendiliginden yenilenir.
+const YENILEME_MS = 60_000;
 
 
 function PanelContent() {
@@ -31,6 +37,7 @@ function PanelContent() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>(initialFilter as FilterType);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
+  const [yenileme, setYenileme] = useState(0);
 
   const fetchDosyalar = useCallback(async () => {
     if (!user?.id || !companyId) return; // companyId kontrolü eklendi
@@ -67,10 +74,18 @@ function PanelContent() {
       konteynerler: kontMap[d.id] || [],
     }));
     setDosyalar(enriched);
+    setYenileme((n) => n + 1);
     setLoading(false);
   }, [user?.id, companyId]);
 
   useEffect(() => { fetchDosyalar(); }, [fetchDosyalar]);
+
+  useEffect(() => {
+    const yenile = () => { if (document.visibilityState === "visible") fetchDosyalar(); };
+    const zamanlayici = window.setInterval(yenile, YENILEME_MS);
+    document.addEventListener("visibilitychange", yenile);
+    return () => { window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
+  }, [fetchDosyalar]);
 
   useEffect(() => {
     // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
@@ -161,6 +176,8 @@ function PanelContent() {
         onConfirm={handleDelete}
         destructive
       />
+
+      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

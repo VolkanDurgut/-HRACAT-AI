@@ -2042,6 +2042,40 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Sonraki adım (konuşuldu, yapılmadı): ürün bazında birleşik onay + toplu satın alma listesi;
   ürün geçmişinde yanlış yazımları gizleme / birleştirme ekranı.
 
+## Kontrol Merkezi → Analiz, özet kartları Ana Panel'de (28.10.2026)
+
+- Kullanıcı: "Mevcut Kontrol Merkezi kaldırılmalı; Analiz sayfası Kontrol Merkezi olarak devam
+  etmeli; 4 kutu (Aktif Dosya / Bugün Yüklenen / Yüklenecek Konteyner / Cut-off Uyarısı) Ana
+  Panele taşınmalı; Aktif Dosya artık tıklanamaz."
+- `app/dashboard/page.tsx` SİLİNDİ. `next.config.js` redirect `/dashboard → /analiz` (yer imleri).
+  Menü: "Kontrol Merkezi" = `/analiz` (yetki `analiz`), en üstte; ayrı "Analiz" öğesi yok.
+  Analiz sayfa başlığı "Kontrol Merkezi" (LayoutDashboard ikonu).
+- `components/panel-ozet-kartlari.tsx` (`PanelOzetKartlari`): eski dashboard hesaplarıyla BİREBİR
+  (lib/dashboard-akis; bugün yüklenen = efektifTartimBilgisi, son 2 gün DBA, kapalı dosyalar
+  dahil). Ana Panel verisini kullanır; panel artık dakikada bir + sekmeye dönünce yenilenir.
+  Aktif Dosya kartı tıklanamaz (ipucu listesi durur). Cut-off satırları dosyaya bağlantı.
+- Açılış: `ilkErisilebilirSayfa` sırası panel, analiz, kantar, ihracatlar… (dashboard çıktı);
+  giriş sonrası ve logo bağlantısı da buna göre. `dashboard` yetki anahtarı DB'de durur ama
+  KULLANILMAZ; Yetkilendirme'de "analiz" = "Kontrol Merkezi" (ilk sütun), dashboard sütunu yok.
+  Canlı: dashboard ve analiz yetkisi herkes için aynıydı → erişim değişmedi.
+- Test: `scratchpad/km/e2e.mjs` (açılış, menü, 4 kart değerleri, tıklanamaz kart, /dashboard
+  yönlendirmesi, kantar kullanıcısı).
+
+## Sevkiyat belgeleri depoda ayrı mı? (28.10.2026)
+
+- Kullanıcı: "DBA, fatura, Draft BL, konşimento, beyanname, proforma — bunların hepsi
+  veritabanında neden ayrı tutulmuyor?" (yedek mailindeki tek satır).
+- CEVAP: ayrı tutuluyor. DB: `ihracat_dosyalari.{fatura,konsimento,draft_bl,beyanname,proforma}_
+  dosya_url/_adi/...`, `konteynerler.{dba,irsaliye}_dosya_url`. Depo: tek kova
+  "konsimento-talimatlari" (adı tarihsel; kayıtlı bağlantılar bu ada bağlı → TAŞINMAZ), her tür
+  kendi klasöründe: `dba/<dosya>/`, `fatura/<dosya>/`, `irsaliye/<dosya>/`, `<dosya>/draft-bl/`,
+  `<dosya>/beyanname/`, `<dosya>/proforma/`, kökte `<dosya>/<ad>` = konşimento talimatı.
+  28.10 canlı: DBA 223 (130,8 MB), Fatura 32, Draft BL 32, Konşimento 21, Proforma 13, Beyanname 8.
+- Yedek maili (`yedekleme-gonder` v22): `sevkiyatBelgeTuru(yol)` (mail.ts) ile kova altında tür
+  bazında döküm; `belgeTurleri` deneme yanıtında da döner. Ayrıca `satin_alma_urunleri` gece
+  yedeğine eklendi (geri yükleme testi tabloları otomatik tanır).
+- Test: `scratchpad/yd/test.mjs` (yol sınıflandırma + mail sırası/konumu).
+
 ## Quality belgesi kontrolleri (28.10.2026)
 
 - Kullanıcı: "Quality belgesi için gerekli kontrolleri sağlayalım… güncel sevkiyat bilgilerine

@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, BarChart3, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -15,7 +16,9 @@ type MenuItem = {
 };
 
 const mainItems: MenuItem[] = [
-  { label: "Kontrol Merkezi", href: "/dashboard",  icon: <LayoutDashboard size={18} />, yetkiKey: "dashboard" },
+  // 28.10.2026: eski Kontrol Merkezi (/dashboard) kaldirildi; Analiz sayfasi "Kontrol
+  // Merkezi" adiyla en uste geldi (adres ve yetki "analiz" ayni). 4 ozet karti Ana Panel'de.
+  { label: "Kontrol Merkezi", href: "/analiz", icon: <LayoutDashboard size={18} />, yetkiKey: "analiz" },
   { label: "Ana Panel",     href: "/panel",       icon: <FolderOpen size={18} />,      yetkiKey: "panel" },
   // Proforma olusturucu (17.10.2026): "Yeni Dosya Ac"in hemen ustunde (kullanici karari)
   { label: "Proformalar",   href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
@@ -28,7 +31,6 @@ const mainItems: MenuItem[] = [
 const opsItems: MenuItem[] = [
   { label: "ETD/ETA",       href: "/etd-eta", icon: <Ship size={18} />,      yetkiKey: "etd_eta" },
   { label: "Kantar Paneli", href: "/kantar",  icon: <Weight size={18} />,    yetkiKey: "kantar" },
-  { label: "Analiz",        href: "/analiz",  icon: <BarChart3 size={18} />, yetkiKey: "analiz" },
 ];
 
 // Ic Piyasa (11.10.2026): SADECE yetkisi olan kullaniciya gorunur (diger
@@ -82,7 +84,6 @@ export default function Sidebar() {
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
     if (href.startsWith("/ic-piyasa")) return pathname.startsWith("/ic-piyasa");
     return pathname.startsWith(href);
   };
@@ -140,7 +141,7 @@ export default function Sidebar() {
 
   const navContent = (
     <>
-      <Link href="/dashboard" onClick={closeMobile} className="mx-2 mt-2 px-3 py-3 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
+      <Link href={ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel"} onClick={closeMobile} className="mx-2 mt-2 px-3 py-3 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
         <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div className="min-w-0">
           {sirketAdi && <p className="text-[11px] font-medium leading-tight truncate" style={{ color: TEXT_MUTED }}>{sirketAdi}</p>}

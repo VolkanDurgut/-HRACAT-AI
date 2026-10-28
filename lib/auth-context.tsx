@@ -7,7 +7,7 @@ import { Session, User } from "@supabase/supabase-js";
 type Rol = "admin" | "ihracat" | "sevkiyat" | "muhasebe" | "kantar" | "uretim" | null;
 
 export type SayfaYetkileri = {
-  dashboard: boolean;
+  dashboard: boolean; // 28.10.2026: eski Kontrol Merkezi kaldirildi; KULLANILMIYOR (DB uyumu icin duruyor). Kontrol Merkezi = analiz
   panel: boolean;
   yeni_dosya: boolean;
   ihracatlar: boolean;

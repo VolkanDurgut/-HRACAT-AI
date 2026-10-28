@@ -4,6 +4,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
+  // 28.10.2026: eski Kontrol Merkezi (/dashboard) kaldirildi; yer imleri / eski
+  // baglantilar yeni Kontrol Merkezine (Analiz) gider. Yetki AppShell'de kontrol edilir.
+  async redirects() {
+    return [{ source: '/dashboard', destination: '/analiz', permanent: false }];
+  },
   async headers() {
     return [
       {

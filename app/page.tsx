@@ -34,9 +34,10 @@ export default function GirisSayfasi() {
 
   useEffect(() => {
     // Girisli kullanici, erisebildigi ILK sayfaya gider (ör. sadece kantar
-    // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /dashboard'a gider ve
+    // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /panel'e gider ve
     // orada AppShell "Erisim yetkiniz yok" ekranini gosterir - dongu olusmaz.
-    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/dashboard");
+    // (28.10.2026: eski Kontrol Merkezi /dashboard kaldirildi.)
+    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel");
   }, [user, loading, yetkiler, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -48,7 +49,7 @@ export default function GirisSayfasi() {
       setAuthError("Giriş bilgileri hatalı. Lütfen e-posta ve şifrenizi kontrol edin.");
       setIsProcessing(false);
     } else {
-      router.push("/dashboard");
+      router.push("/panel");
     }
   };
 

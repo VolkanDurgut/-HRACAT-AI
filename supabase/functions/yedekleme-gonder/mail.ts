@@ -22,6 +22,8 @@ export type YedekMailGirdisi = {
   tablolar: TabloSayisi[];
   kapasite: KapasiteGirdisi[];
   bucketlar: Record<string, { dosya: number; bayt: number }>;
+  /** "konsimento-talimatlari" kovasinin belge turu dokumu (28.10.2026; bkz. sevkiyatBelgeTuru). */
+  belgeTurleri?: Record<string, { dosya: number; bayt: number }>;
   geriYukleme: { tablo_sayisi: number; birebir: number; bag_sorunlari: { bag: string; kirik: number }[] } | null;
   uyarilar: string[];
   kullaniciSayisi: number | null;
@@ -65,6 +67,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   satin_alma_departmanlari: { ad: "Departmanlar ve talep bağlantıları", grup: "Satın alma" },
   satin_alma_listeleri: { ad: "İhtiyaç listeleri", grup: "Satın alma" },
   satin_alma_kalemleri: { ad: "Liste kalemleri", grup: "Satın alma" },
+  satin_alma_urunleri: { ad: "Daha önce sipariş verilen ürünler", grup: "Satın alma" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -104,11 +107,34 @@ const yuzde = (oran: number) => `%${(oran * 100).toLocaleString("tr-TR", { minim
 
 /** Depo bucket'larinin kullaniciya gorunen adi + icerigi. */
 export const BUCKET_BILGISI: Record<string, string> = {
-  "konsimento-talimatlari": "Sevkiyat belgeleri — DBA, fatura, Draft BL, konşimento, beyanname, proforma",
+  "konsimento-talimatlari": "Sevkiyat belgeleri (türüne göre ayrı klasörlerde)",
   evraklar: "Üretilen evrak arşivi — CI, PL, CoO, Phyto, Health…",
   "geri-bildirim-ekleri": "Sorun Bildir ekleri",
   "ic-piyasa-belgeler": "İç piyasa — irsaliye ve sipariş formları",
 };
+
+/**
+ * Sevkiyat belgeleri kovasi ("konsimento-talimatlari") icinde BELGE TURU (28.10.2026).
+ * Kullanici: "Bunlarin hepsi veritabaninda neden ayri tutulmuyor?" -> Ayri tutuluyor:
+ * veritabaninda her turun kendi alani var (ihracat_dosyalari.fatura_/konsimento_/
+ * draft_bl_/beyanname_/proforma_dosya_url; konteynerler.dba_/irsaliye_dosya_url),
+ * depoda her turun kendi klasoru var. Mail tek satir gosterdigi icin ayri degil sanildi;
+ * artik tur bazinda dokum verilir. Klasor yollari yukleyen kodla AYNI:
+ *   dba/<dosya>/…  fatura/<dosya>/…  irsaliye/<dosya>/…  <dosya>/draft-bl/…
+ *   <dosya>/beyanname/…  <dosya>/proforma/…  <dosya>/<dosya-adi> = konsimento talimati
+ * (Kova adi tarihsel; degistirilmez: kayitli baglantilar bu ada bagli.)
+ */
+export const SEVKIYAT_BELGE_SIRASI = ["DBA", "Fatura", "Draft BL", "Konşimento talimatı", "Beyanname", "Proforma", "İrsaliye", "Diğer"] as const;
+export function sevkiyatBelgeTuru(yol: string): (typeof SEVKIYAT_BELGE_SIRASI)[number] {
+  if (yol.startsWith("dba/")) return "DBA";
+  if (yol.startsWith("fatura/")) return "Fatura";
+  if (yol.startsWith("irsaliye/")) return "İrsaliye";
+  if (/^[^/]+\/draft-bl\//.test(yol)) return "Draft BL";
+  if (/^[^/]+\/beyanname\//.test(yol)) return "Beyanname";
+  if (/^[^/]+\/proforma\//.test(yol)) return "Proforma";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^/]+$/i.test(yol)) return "Konşimento talimatı";
+  return "Diğer";
+}
 
 const KAPASITE_RENK: Record<KapasiteGirdisi["durum"], string> = { normal: "#047857", uyari: "#B45309", kritik: "#B91C1C", olculemedi: "#64748B" };
 
@@ -186,8 +212,12 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
   const tabloBolumu = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Tablo")}${th("Kayıt", true)}${th("Durum")}</tr>${satirlar}</table>`;
 
   // --- Dosya deposu
+  // Sevkiyat belgeleri kovasinin altinda tur bazinda dokum (girintili, acik renk)
+  const turSatirlari = (b: string) => b !== "konsimento-talimatlari" || !g.belgeTurleri ? "" : SEVKIYAT_BELGE_SIRASI
+    .filter((t) => g.belgeTurleri![t]?.dosya)
+    .map((t) => `<tr><td style="padding:3px 8px 3px 22px;border-bottom:1px solid #F1F5F9;font-size:11px;color:#475569">↳ ${esc(t)}</td><td style="padding:3px 8px;border-bottom:1px solid #F1F5F9;font-size:11px;color:#475569;text-align:right;white-space:nowrap">${sayi(g.belgeTurleri![t].dosya)}</td><td style="padding:3px 8px;border-bottom:1px solid #F1F5F9;font-size:11px;color:#475569;text-align:right;white-space:nowrap">${mbYaz(g.belgeTurleri![t].bayt)}</td></tr>`).join("");
   const bucketSatirlari = Object.entries(g.bucketlar).sort((a, b) => b[1].bayt - a[1].bayt).map(([b, o], i) =>
-    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}"><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B">${esc(BUCKET_BILGISI[b] ?? b)}<div style="font-size:10px;color:#94A3B8;font-family:monospace;word-break:break-all">${esc(b)}</div></td><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;text-align:right;white-space:nowrap">${sayi(o.dosya)}</td><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;font-weight:bold;text-align:right;white-space:nowrap">${mbYaz(o.bayt)}</td></tr>`).join("");
+    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}"><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B">${esc(BUCKET_BILGISI[b] ?? b)}<div style="font-size:10px;color:#94A3B8;font-family:monospace;word-break:break-all">${esc(b)}</div></td><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;text-align:right;white-space:nowrap">${sayi(o.dosya)}</td><td style="padding:5px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;font-weight:bold;text-align:right;white-space:nowrap">${mbYaz(o.bayt)}</td></tr>${turSatirlari(b)}`).join("");
   const depoBolumu = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Klasör")}${th("Dosya", true)}${th("Boyut", true)}</tr>${bucketSatirlari || `<tr><td colspan="3" style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">Dosya listesi alınamadı.</td></tr>`}</table>
   <div style="margin-top:6px;font-size:11px;color:#64748B;line-height:1.5">PDF dosyalarının kendisi mail ekine sığmadığı için yedekte <b>yer almaz</b>; Supabase Storage'da durur. Yedekte bu dosyaların tam <b>listesi</b> (klasör, yol, boyut, tarih) vardır.</div>`;
 

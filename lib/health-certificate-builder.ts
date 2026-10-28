@@ -15,7 +15,7 @@
  *                         uretici hem ihracatci)
  * 5. Gideceği Ülke/Yer  = yukleme limanina gore bolge eslemesi - Phytosanitary
  *                         Certificate ile BIREBIR AYNI mantik/format
- * 6. Alıcının Adı/Adresi = dosya.consignee
+ * 6. Alıcının Adı/Adresi = dosya.consignee; TO ORDER ise NOTIFY (lib/tarim-alici.ts)
  * 7. Ürün Adı           = "BUĞDAY UNU" / "WHEAT FLOUR" (sabit - tum urunler bugday unu)
  * 8. Parti No           = dosya.lot_no
  * 9. Son Tüketim Tarihi = dosya.son_kullanim_tarihi
@@ -31,6 +31,7 @@
 import { noParcala } from "@/lib/coklu-no";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { HEALTH_BACKGROUND_BASE64 } from "@/lib/images/health-background-base64";
+import { tarimBelgesiAlicisi } from "@/lib/tarim-alici";
 
 /**
  * Uzun, tek bloktaki alici adres/iletisim metnini (adres + telefon + email
@@ -326,7 +327,8 @@ export function buildHealthCertificateHtml(
   // (ör. konteyner hic girilmemis), eski detayli ambalaj metnine geri duser.
   const disAmbalajYedek = dosya.detayli_ambalaj || dosya.ambalaj;
 
-  const consigneeSatirlari = dosya.consignee ? buildKisaAliciAdresi(dosya.consignee) : "";
+  const alici = tarimBelgesiAlicisi(dosya);
+  const consigneeSatirlari = alici ? buildKisaAliciAdresi(alici) : "";
   const consigneeFont = consigneeSatirlari ? hesaplaConsigneeFontBoyutu(consigneeSatirlari) : 10;
 
   const replacements: Record<string, string> = {

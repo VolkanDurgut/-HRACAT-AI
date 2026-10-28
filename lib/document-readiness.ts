@@ -1,4 +1,5 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import { tarimBelgesiAliciEksigi } from "@/lib/tarim-alici";
 
 export type ReadinessResult = {
   hazir: boolean;
@@ -76,7 +77,9 @@ export function checkCertificateOfOriginReadiness(
 ): ReadinessResult {
   const eksikler: string[] = [];
 
-  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
+  // 4-5-6: TO ORDER yerine NOTIFY yazilir (lib/tarim-alici.ts)
+  const aliciEksigi = tarimBelgesiAliciEksigi(dosya);
+  if (aliciEksigi) eksikler.push(aliciEksigi);
   if (!dosya.urun_tanimi) eksikler.push("Ürün Tanımı");
   if (!dosya.detayli_ambalaj && !dosya.ambalaj) eksikler.push("Ambalaj");
   if (!dosya.lot_no) eksikler.push("Lot No");
@@ -107,7 +110,9 @@ export function checkPhytosanitaryCertificateReadiness(
 ): ReadinessResult {
   const eksikler: string[] = [];
 
-  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
+  // 4-5-6: TO ORDER yerine NOTIFY yazilir (lib/tarim-alici.ts)
+  const aliciEksigi = tarimBelgesiAliciEksigi(dosya);
+  if (aliciEksigi) eksikler.push(aliciEksigi);
   if (!dosya.urun_tanimi) eksikler.push("Ürün Tanımı");
   if (!dosya.detayli_ambalaj && !dosya.ambalaj) eksikler.push("Ambalaj");
   if (!dosya.lot_no) eksikler.push("Lot No");
@@ -141,7 +146,9 @@ export function checkHealthCertificateReadiness(
 ): ReadinessResult {
   const eksikler: string[] = [];
 
-  if (!dosya.consignee) eksikler.push("Consignee (konşimento talimatı eklenmemiş)");
+  // 4-5-6: TO ORDER yerine NOTIFY yazilir (lib/tarim-alici.ts)
+  const aliciEksigi = tarimBelgesiAliciEksigi(dosya);
+  if (aliciEksigi) eksikler.push(aliciEksigi);
   if (!dosya.lot_no) eksikler.push("Lot No");
   if (!dosya.son_kullanim_tarihi) eksikler.push("Son Kullanım Tarihi");
   if (!dosya.ambalaj) eksikler.push("Ambalaj");

@@ -2282,6 +2282,23 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   Dosya detayındaki "İhracat Evrakları" kartı aynı adı taşır (kılavuz çekiminde
   `main h3` ile ayrılır). Kılavuz ekran görüntülerinin tamamı yeni menüyle yeniden çekildi.
 
+## Tarım il evrakları (4-5-6): TO ORDER yerine NOTIFY; ürün adı tek sefer (28.10.2026)
+
+- Kullanıcı kararı: Certificate of Origin (4), Phytosanitary (5), Health Certificate (6)
+  alıcı kutusuna "TO ORDER" YAZILMAZ. `lib/tarim-alici.ts` `tarimBelgesiAlicisi(dosya)`:
+  consignee gerçek firma ise aynen; "TO ORDER" / "To Order" / "TO THE ORDER OF …" ise
+  `ham_veri.notify` dizisinin İLK dolu kaydı ("SAME AS CONSIGNEE" atlanır; 2. notify genelde
+  acente / also notify, örn. 0091); notify yoksa alici_firma + alici_adresi; o da yoksa "-"
+  ve hazırlık kontrolü "Notify (consignee TO ORDER; notify bilgisi yok)" eksiği verir
+  (`tarimBelgesiAliciEksigi`, yalnız bu 3 belgenin kontrolünde). Health'teki iletişim
+  kısaltması (buildKisaAliciAdresi) seçilen metne uygulanır. VERİ DEĞİŞMEZ; Packing List,
+  Commercial Invoice, Draft BL, Fumigation, Quality konşimentodaki consignee'yi göstermeye
+  devam eder.
+- Ürün adı: aynı ürün (ör. 25 KG + 50 KG satırları) tek ad, farklı ürünler ayrı ayrı —
+  `urunTanimiTekil` artık CoO, Phytosanitary, Packing List (konteyner satırı varsayılanı),
+  Fumigation ve Quality'de kullanılır. Health'te ürün adı zaten sabit "WHEAT FLOUR".
+  Commercial Invoice ürün satırları fiyat/ambalaj taşıdığı için AYRI kalır.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

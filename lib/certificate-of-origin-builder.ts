@@ -16,10 +16,10 @@
  * olcum yapilarak (kenarliklarin tam koordinatlari tespit edilerek)
  * belirlenmis ve gorsel olarak dogrulanmistir.
  *
- * 2. Alıcı        = dosya.consignee
+ * 2. Alıcı        = dosya.consignee; TO ORDER ise NOTIFY (lib/tarim-alici.ts)
  * 3. Menşe Ülkesi = "Türkiye" - ZATEN gorselin icinde basili, ayrica yazilmaz
  * 4. Taşıma       = "BY VESSEL" (sabit)
- * 6. Esya tanimi  = dosya.urun_tanimi + ambalaj + NET/GROSS (konteyner toplami)
+ * 6. Esya tanimi  = dosya.urun_tanimi (ayni urun tek sefer, lib/urun-tanimi.ts) + ambalaj + NET/GROSS (konteyner toplami)
  *                   + LOT NR (dosya.lot_no) + REF NR (rezervasyon booking_no)
  * 7. Miktar       = Toplam GROSS agirlik (KGS)
  * 1. İhracatçı ve "1" sira no, gorselde zaten YOK/VAR - Ihracatci bos oldugu
@@ -28,6 +28,8 @@
 
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { COO_BACKGROUND_BASE64 } from "@/lib/images/coo-background-base64";
+import { tarimBelgesiAlicisi } from "@/lib/tarim-alici";
+import { urunTanimiTekil } from "@/lib/urun-tanimi";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -152,8 +154,8 @@ export function buildCertificateOfOriginHtml(
 
   const replacements: Record<string, string> = {
     CONSIGNOR:    escapeHtml(`${COMPANY_NAME}\n${COMPANY_ADDRESS}`),
-    CONSIGNEE:    safe(dosya.consignee),
-    URUN_TANIMI:  safe(dosya.urun_tanimi),
+    CONSIGNEE:    safe(tarimBelgesiAlicisi(dosya)),
+    URUN_TANIMI:  safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri)),
     AMBALAJ:      safe(dosya.detayli_ambalaj || dosya.ambalaj),
     NET:          buildNetAgirlikToplam(konteynerler),
     GROSS:        buildBrutAgirlikToplam(konteynerler),

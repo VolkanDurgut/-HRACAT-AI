@@ -1,6 +1,7 @@
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatDateTR, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
+import { urunTanimiTekil } from "@/lib/urun-tanimi";
 
 /** HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi). */
 function escapeHtml(value: string | null | undefined): string {
@@ -308,7 +309,8 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
 </html>`;
 
 function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { rows: string; totalPieces: number; totalNett: number; totalGross: number } {
-  const varsayilanUrunAdi = safe(dosya.urun_tanimi, "-");
+  // Ayni urun tek sefer (50 KG + 25 KG ayni urun -> tek ad; lib/urun-tanimi.ts)
+  const varsayilanUrunAdi = safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri), "-");
   const varsayilanMarka = safe(dosya.marka, "-");
   const urunler = (dosya.urun_detaylari as any[]) || [];
 

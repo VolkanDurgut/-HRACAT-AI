@@ -7,15 +7,21 @@
  * 7 px/karakter, 0,75 pt/px), satir yukseklikleri pt, kenar bosluklari
  * (sol 0,25 in, ust 0,75 in; ust/alt bilgi 0,3 in), dolgu tonlari (tema
  * beyazi -%5 / -%15 / -%25 / -%35 = F2F2F2 / D9D9D9 / BFBFBF / A6A6A6),
- * ince / kalin cizgiler, logo ve imza konumlari. Yazi tipi: Aptos Narrow
- * yerine Roboto Condensed (harf genislikleri neredeyse ayni).
+ * ince / kalin cizgiler, logo ve imza konumlari.
+ *
+ * 29.10.2026 - gercek proformayla (Excel cikisi "Ikyboat Proforma & Contract.pdf")
+ * olculerek esitlendi: sutunlar Excel'de karakter x 5,645 pt basiliyor (5,25 degil; tablo
+ * genisligi 486 pt), ince cizgi 0,96 pt, kalin 2,88 pt, urun satirlari tam genislik F2,
+ * tarih gg.aa.yyyy. Yazi tipi: Aptos Narrow yerine Sofia Sans Semi Condensed (OFL; olculen
+ * genislik farki ~%2, gorunus yakin), ust bilgi tarihi Calibri yerine Carlito (Calibri ile
+ * ayni olculer), alt bilgi Arial yerine Helvetica (Arial ile ayni olculer, PDF standart yazisi).
  *
  * Icerik hesaplanmaz: lib/proforma/belge.ts -> ProformaBelgesi cizilir.
  * Uzun metinde satir yuksekligi buyur (gerekirse yazi kuculur); sayfaya
  * sigmayan blok sonraki sayfaya gecer (sayfa numarasi "x/N" sonda yazilir).
  */
 import jsPDF from "jspdf";
-import { ROBOTO_CONDENSED_BOLD_BASE64, ROBOTO_CONDENSED_REGULAR_BASE64 } from "@/lib/fonts/roboto-condensed-base64";
+import { CARLITO_BOLD_BASE64, CARLITO_REGULAR_BASE64, SOFIA_SEMI_COND_BOLD_BASE64, SOFIA_SEMI_COND_REGULAR_BASE64 } from "@/lib/fonts/proforma-fontlari-base64";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 import { BANKA_PRESETLERI, SABIT_HESAP_ADI } from "@/lib/bankalar";
 import { SATICI } from "@/lib/proforma/sabitler";
@@ -29,7 +35,8 @@ const UST = 54; // 0,75 in
 const ALT_SINIR = SAYFA_Y - 54; // alt kenar 0,75 in
 const BASLIK_UST = 21.6; // ust bilgi 0,3 in
 const ALTBILGI_ALT = SAYFA_Y - 21.6; // alt bilgi 0,3 in
-const C = 5.25; // 1 karakter genisligi = 5,25 pt
+// 1 karakter genisligi: orijinal Excel cikisinda 5,645 pt (A..J = 486,1 pt olculdu; 86,1 karakter)
+const C = 5.645;
 
 const KOL1 = [8.78, 6.44, 8.11, 8.33, 8.78, 8.777, 10.44, 10.66, 8.78, 7.0].map((w) => w * C); // A..J
 const KOL2 = [8.78, 8.777, 12.44, 8.78, 8.777, 8.777, 8.777, 8.777, 8.777, 7.44, 8.78].map((w) => w * C); // A..K
@@ -41,8 +48,9 @@ const GRI_35: RGB = [166, 166, 166];
 const SIYAH: RGB = [0, 0, 0];
 const KOYU: RGB = [26, 26, 26];
 const KIRMIZI: RGB = [255, 0, 0];
-const INCE = 0.5;
-const KALIN = 1.5;
+// Orijinal Excel cikisinda ince cizgi 0,96 pt, kalin 2,88 pt (olculdu 29.10.2026)
+const INCE = 0.96;
+const KALIN = 2.88;
 const PAD = 2.25;
 
 type RGB = [number, number, number];
@@ -54,15 +62,23 @@ const LOGO_GORUNUR = { x: 29, y: 59, w: 342, h: 282 };
 const IMZA_ORAN = 209 / 320;
 
 // ------------------------------------------------------------ yardimcilar ---
+/** Standart (Helvetica) ve Carlito alt kumesi yalniz Latin-1'i basar; Turkce ozel harf (ş ğ ı İ)
+ *  iceren metinde govde yazisina (Sofia, Latin Ext-A) dusulur. */
+const latin1Mi = (metin: string) => !/[^\x20-\x7E\u00A0-\u00FF\u2018\u2019\u201C\u201D\u2013\u2014\u2026]/.test(metin);
 const kx = (kol: number[], i: number) => SOL + kol.slice(0, i).reduce((s, w) => s + w, 0);
 const kw = (kol: number[], i: number, j: number) => kol.slice(i, j + 1).reduce((s, w) => s + w, 0);
 
 function yeniBelge(): jsPDF {
   const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
-  doc.addFileToVFS("RobotoCondensed-Regular.ttf", ROBOTO_CONDENSED_REGULAR_BASE64);
-  doc.addFont("RobotoCondensed-Regular.ttf", "RC", "normal");
-  doc.addFileToVFS("RobotoCondensed-Bold.ttf", ROBOTO_CONDENSED_BOLD_BASE64);
-  doc.addFont("RobotoCondensed-Bold.ttf", "RC", "bold");
+  // "RC" adi korunur (govde yazisi); Sofia Sans Semi Condensed
+  doc.addFileToVFS("SofiaSansSemiCondensed-Regular.ttf", SOFIA_SEMI_COND_REGULAR_BASE64);
+  doc.addFont("SofiaSansSemiCondensed-Regular.ttf", "RC", "normal");
+  doc.addFileToVFS("SofiaSansSemiCondensed-Bold.ttf", SOFIA_SEMI_COND_BOLD_BASE64);
+  doc.addFont("SofiaSansSemiCondensed-Bold.ttf", "RC", "bold");
+  doc.addFileToVFS("Carlito-Regular.ttf", CARLITO_REGULAR_BASE64);
+  doc.addFont("Carlito-Regular.ttf", "CAL", "normal");
+  doc.addFileToVFS("Carlito-Bold.ttf", CARLITO_BOLD_BASE64);
+  doc.addFont("Carlito-Bold.ttf", "CAL", "bold");
   doc.setFont("RC", "normal");
   doc.setLineHeightFactor(1.15);
   return doc;
@@ -97,26 +113,25 @@ function cizgileriCiz(doc: jsPDF, liste: BekleyenCizgi[]) {
   liste.length = 0;
 }
 
-const satirAraligi = (boy: number) => boy * 1.17;
 
 /** Metni kutuya sar; sigmazsa yaziyi en fazla `enKucuk`e kadar kucult. */
-function sar(doc: jsPDF, metin: string, w: number, h: number, boy: number, kalin: boolean, enKucuk = boy) {
+function sar(doc: jsPDF, metin: string, w: number, h: number, boy: number, kalin: boolean, enKucuk = boy, carpan = 1.17) {
   let b = boy;
   for (;;) {
     font(doc, b, kalin);
     const satirlar: string[] = [];
     for (const parca of metin.split("\n")) satirlar.push(...(doc.splitTextToSize(parca, Math.max(10, w)) as string[]));
-    if (satirlar.length * satirAraligi(b) <= h + 0.5 || b <= enKucuk) return { satirlar, boy: b };
+    if (satirlar.length * b * carpan <= h + 0.5 || b <= enKucuk) return { satirlar, boy: b };
     b = Math.max(enKucuk, Math.round((b - 0.5) * 2) / 2);
   }
 }
 
 /** Gerekli yukseklik (sarilmis satir sayisi x satir araligi). */
-function yukseklik(doc: jsPDF, metin: string, w: number, boy: number, kalin: boolean) {
+function yukseklik(doc: jsPDF, metin: string, w: number, boy: number, kalin: boolean, carpan = 1.17) {
   font(doc, boy, kalin);
   let n = 0;
   for (const parca of metin.split("\n")) n += (doc.splitTextToSize(parca, Math.max(10, w)) as string[]).length;
-  return n * satirAraligi(boy);
+  return n * boy * carpan;
 }
 
 type HucreSecenek = {
@@ -128,15 +143,18 @@ type HucreSecenek = {
   renk?: RGB;
   dolgu?: RGB;
   alticizgi?: boolean;
+  /** Satir araligi carpani (varsayilan 1,17; Special Conditions'ta orijinaldeki gibi 1,38) */
+  satirCarpani?: number;
 };
 
 /** Excel hucresi gibi: dolgu + sarilmis metin, yatay / dikey hizali. */
 function hucre(doc: jsPDF, metin: string, x: number, y: number, w: number, h: number, o: HucreSecenek) {
   if (o.dolgu) dolgu(doc, x, y, w, h, o.dolgu);
   const icW = w - 2 * PAD;
-  const { satirlar, boy } = sar(doc, metin, icW, h - 2, o.boy, !!o.kalin, o.enKucuk ?? o.boy);
+  const carpan = o.satirCarpani ?? 1.17;
+  const { satirlar, boy } = sar(doc, metin, icW, h - 2, o.boy, !!o.kalin, o.enKucuk ?? o.boy, carpan);
   font(doc, boy, !!o.kalin, o.renk || SIYAH);
-  const ara = satirAraligi(boy);
+  const ara = boy * carpan;
   const blok = satirlar.length * ara;
   const dikey = o.dikey || "orta";
   let ty = dikey === "ust" ? y + 1.5 : dikey === "alt" ? y + h - blok - 1 : y + (h - blok) / 2;
@@ -150,7 +168,7 @@ function hucre(doc: jsPDF, metin: string, x: number, y: number, w: number, h: nu
       const sx = hiza === "left" ? tx : hiza === "right" ? tx - tw : tx - tw / 2;
       const by = ty + ara / 2 + boy * 0.35 + 1.2;
       doc.setDrawColor(...(o.renk || SIYAH));
-      doc.setLineWidth(0.6);
+      doc.setLineWidth(0.5);
       doc.line(sx, by, sx + tw, by);
     }
     ty += ara;
@@ -191,7 +209,12 @@ function ustBilgi(doc: jsPDF, b: ProformaBelgesi) {
   logoCiz(doc, SOL, BASLIK_UST, 72, 64.2);
   font(doc, 20, true);
   doc.text("SALES CONTRACT", SAYFA_G / 2, BASLIK_UST + 18, { align: "center" });
-  font(doc, 11, false);
+  // Orijinalde Calibri 11 -> Carlito (ayni olculer)
+  if (latin1Mi(`${b.ustBilgi.tarih}${b.ustBilgi.revizyon}`)) {
+    doc.setFont("CAL", "normal");
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+  } else font(doc, 11, false);
   const sag = SAYFA_G - SOL - 14;
   doc.text(`Date: ${b.ustBilgi.tarih}`, sag, BASLIK_UST + 10, { align: "right" });
   doc.text(`Revision nº: ${b.ustBilgi.revizyon}`, sag, BASLIK_UST + 23, { align: "right" });
@@ -202,12 +225,27 @@ function altBilgiler(doc: jsPDF, b: ProformaBelgesi) {
   for (let i = 1; i <= n; i++) {
     doc.setPage(i);
     if (i === 1) {
-      font(doc, 8, true);
+      // Orijinalde Arial Bold 8 -> Helvetica-Bold (Arial ile ayni olculer, PDF standart yazisi)
+      if (b.altBilgi.every(latin1Mi)) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(0, 0, 0);
+      } else font(doc, 8, true);
       const satirlar = b.altBilgi;
-      const ara = 9.6;
-      satirlar.forEach((s, k) => doc.text(s, SAYFA_G / 2, ALTBILGI_ALT - (satirlar.length - 1 - k) * ara, { align: "center", maxWidth: SAYFA_G - 2 * SOL - 70 }));
+      const ara = 10.5; // orijinalde satir araligi 10,5 pt
+      // Satir sigmazsa alt satira kirilip digerine binmesin: yazi kuculur (en az 6 pt)
+      const enGenis = SAYFA_G - 2 * SOL - 30;
+      satirlar.forEach((s, k) => {
+        let boy = 8;
+        doc.setFontSize(boy);
+        while (boy > 6 && doc.getTextWidth(s) > enGenis) { boy -= 0.25; doc.setFontSize(boy); }
+        doc.text(s, SAYFA_G / 2, ALTBILGI_ALT - (satirlar.length - 1 - k) * ara, { align: "center" });
+      });
     }
-    font(doc, 11, true);
+    // Orijinalde Calibri Bold 11 -> Carlito Bold
+    doc.setFont("CAL", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
     doc.text(`Page ${i}/${n}`, SAYFA_G - SOL, ALTBILGI_ALT, { align: "right" });
   }
 }
@@ -247,6 +285,16 @@ function bankaTablosu(doc: jsPDF, b: ProformaBelgesi, kol: number[], y: number, 
 
 function aliciMetni(b: ProformaBelgesi) {
   return [b.alici.unvan, b.alici.adres].filter(Boolean).join("\n");
+}
+
+/**
+ * "APPROVAL OF CUSTOMER" altindaki alici: orijinaldeki gibi unvan 11 pt kalin; adres altinda
+ * en fazla 2 satir (gerekirse 8,5 pt'ye kadar kuculur). Eskiden tum metin 28,8 pt'ye sigsin diye
+ * birlikte kuculuyor, unvan da okunmaz boyuta iniyordu.
+ */
+function onayAlicisi(doc: jsPDF, b: ProformaBelgesi, x: number, y: number, w: number) {
+  hucre(doc, b.alici.unvan, x, y, w, 14.4, { boy: 11, kalin: true, hiza: "center", enKucuk: 8.5 });
+  if (b.alici.adres) hucre(doc, b.alici.adres.replace(/\s*\n\s*/g, " "), x, y + 14.4, w, 24, { boy: 10, kalin: true, hiza: "center", dikey: "ust", enKucuk: 8.5 });
 }
 
 // ================================================================ SAYFA 1 ===
@@ -347,7 +395,8 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   const urunCizgileri: BekleyenCizgi[] = [];
   for (const k of b.kalemler) {
     const h = Math.max(tekH, yukseklik(doc, k.aciklama, w(0, 3) - 2 * PAD, ug, false) + 4);
-    hucre(doc, k.aciklama, x(0), y, w(0, 3), h, { boy: ug, hiza: "center", dolgu: GRI_05 });
+    dolgu(doc, x(0), y, TUM, h, GRI_05); // orijinalde urun satiri tam genislik F2
+    hucre(doc, k.aciklama, x(0), y, w(0, 3), h, { boy: ug, hiza: "center" });
     hucre(doc, k.ambalajKg > 0 ? `${genelSayiYaz(k.ambalajKg)} KG` : "", x(4), y, w(4, 5), h, { boy: ug, hiza: "center" });
     hucre(doc, paraYaz(k.mts), x(6), y, w(6, 6), h, { boy: ug, hiza: "center" });
     hucre(doc, paraYaz(k.fiyat), x(7), y, w(7, 7), h, { boy: ug, hiza: "center" });
@@ -384,7 +433,7 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   hucre(doc, "APPROVAL OF CUSTOMER", x(5), y, w(5, 9), 14.4, { boy: 11, kalin: true, hiza: "center", renk: KIRMIZI, alticizgi: true });
   y += 14.4;
   hucre(doc, SATICI.unvan, x(0), y, w(0, 4), 14.4, { boy: 11, kalin: true, hiza: "center" });
-  hucre(doc, aliciMetni(b), x(5), y, w(5, 9), 28.8, { boy: 11, kalin: true, hiza: "center", dikey: "ust", enKucuk: 8 });
+  onayAlicisi(doc, b, x(5), y, w(5, 9));
   y += 14.4;
   const imzaW = sik >= 2 ? 88 : 101.4;
   imzaCiz(doc, b, x(0) + 48, y + 1.8, imzaW);
@@ -483,6 +532,8 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   return ayniSayfa ? Math.max(y, imzaY + imzaH) : Infinity;
 }
 
+const OZEL_SART_CARPAN = 1.38;
+
 function sayfa3(doc: jsPDF, b: ProformaBelgesi) {
   const K = KOL2;
   const x = (i: number) => kx(K, i);
@@ -496,13 +547,14 @@ function sayfa3(doc: jsPDF, b: ProformaBelgesi) {
   y += 24.45;
   const genis = w(0, 10);
   for (const madde of b.ozelSartlar) {
-    const h = Math.max(14.4, yukseklik(doc, madde, genis - 2 * PAD, 10, false) + 5);
+    // Orijinalde paragraf ici satir araligi ~13,8 pt (10 pt yazi)
+    const h = Math.max(14.4, yukseklik(doc, madde, genis - 2 * PAD, 10, false, OZEL_SART_CARPAN) + 5);
     if (y + h > ALT_SINIR) {
       doc.addPage();
       ustBilgi(doc, b);
       y = BASLIK_UST + 64.2 + 10;
     }
-    hucre(doc, madde, x(0), y, genis, h, { boy: 10 });
+    hucre(doc, madde, x(0), y, genis, h, { boy: 10, satirCarpani: OZEL_SART_CARPAN });
     y += h;
   }
   y += 28.2 + 14.4; // 61-62
@@ -522,7 +574,7 @@ function sayfa3(doc: jsPDF, b: ProformaBelgesi) {
   hucre(doc, "APPROVAL OF CUSTOMER", x(5), y, w(5, 9), 15.6, { boy: 12, kalin: true, hiza: "center", renk: KIRMIZI, alticizgi: true });
   y += 15.6;
   hucre(doc, SATICI.unvan, x(0), y, w(0, 4), 14.4, { boy: 11, kalin: true, hiza: "center" });
-  hucre(doc, aliciMetni(b), x(5), y, w(5, 9), 28.8, { boy: 11, kalin: true, hiza: "center", dikey: "ust", enKucuk: 8 });
+  onayAlicisi(doc, b, x(5), y, w(5, 9));
   imzaCiz(doc, b, x(1) + 37.2, y + 13.2, 103.8);
 }
 
@@ -531,7 +583,7 @@ export function proformaPdf(b: ProformaBelgesi): jsPDF {
   const doc = yeniBelge();
   doc.setProperties({ title: `Proforma ${b.proformaNo}`, subject: "Proforma Invoice / Sales Contract", author: SATICI.unvan, creator: "İhracat AI" });
   // Once deneme cizimiyle en az sikistirma kademesi bulunur (bos belgeye ciz, olc)
-  const sinir = ALTBILGI_ALT - 8 - 9.6 * Math.max(0, b.altBilgi.length - 1) - 10;
+  const sinir = ALTBILGI_ALT - 8 - 10.5 * Math.max(0, b.altBilgi.length - 1) - 10;
   let s1 = 0;
   while (s1 < 2 && sayfa1(yeniBelge(), b, s1) > sinir) s1++;
   let s2 = 0;

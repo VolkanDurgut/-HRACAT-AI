@@ -44,8 +44,11 @@ import {
  *  2 Urunler  -> tutar, toplam, FCL, paketleme ve marka satiri otomatik
  *  3 Odeme ve Sevkiyat -> dolu gelir, kontrol edilir
  * Sagda CANLI ONIZLEME (indirilecek PDF'in kendisi). Bu teslimatta
- * veritabanina HICBIR SEY yazilmaz; kaydetme / liste / imza sonraki adim.
+ * veritabanina HICBIR SEY yazilmaz; kaydetme / liste sonraki adim.
+ * 29.10.2026 (kullanici): "PDF indir dediğimizde proforma Harun Bey'in imzası ile
+ * imzalanmış şekilde indirilmeli" -> onizleme ve indirme IMZALI (dosya adinda -TASLAK yok).
  */
+const IMZALI = true;
 
 const DOSYA_ALANLARI =
   "alici_firma, alici_adresi, ham_veri, varis_limani, teslim_sekli, banka, odeme_sekli, sevkiyat_evraklari, proforma_no, para_birimi, urun_detaylari, olusturma_tarihi";
@@ -188,7 +191,7 @@ export default function YeniProformaPage() {
     const z = window.setTimeout(async () => {
       try {
         const { proformaPdf } = await import("@/lib/proforma/pdf");
-        const belge = belgeOlustur(t, sablon, false);
+        const belge = belgeOlustur(t, sablon, IMZALI);
         const blob = proformaPdf(belge).output("blob");
         if (iptal) return;
         const url = URL.createObjectURL(blob);
@@ -209,9 +212,9 @@ export default function YeniProformaPage() {
     setIndiriliyor(true);
     try {
       const { proformaPdf, proformaDosyaAdi } = await import("@/lib/proforma/pdf");
-      const belge = belgeOlustur(t, sablon, false);
+      const belge = belgeOlustur(t, sablon, IMZALI);
       proformaPdf(belge).save(proformaDosyaAdi(belge));
-      showToast("Taslak PDF indirildi.", "success");
+      showToast("İmzalı proforma PDF indirildi.", "success");
     } catch (e) {
       showToast(`PDF oluşturulamadı: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
@@ -438,10 +441,10 @@ export default function YeniProformaPage() {
               ) : (
                 <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 size={14} /> Proforma hazır. Önizlemeyi kontrol edip indirin.</span>
               )}
-              <span className="block mt-0.5">Hazırlayan: {user?.email || "-"} · Taslak (imzasız)</span>
+              <span className="block mt-0.5">Hazırlayan: {user?.email || "-"} · Harun Bey imzalı</span>
             </div>
             <button onClick={indir} disabled={indiriliyor || eksik.length > 0} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-              {indiriliyor ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Taslak PDF İndir
+              {indiriliyor ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} PDF İndir
             </button>
           </div>
         </div>

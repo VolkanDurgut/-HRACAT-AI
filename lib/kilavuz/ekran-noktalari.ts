@@ -16,7 +16,7 @@ export const EKRAN_NOKTALARI: Record<string, Record<string, EkranNoktasi>> = {
     urunler: { x: 18.33, y: 68.22, w: 46.67, h: 31.78 },
     onizleme: { x: 66.39, y: 10.56, w: 31.94, h: 81.22 },
     // odeme: ELLE (28.10.2026) - onizlemedeki PDF'in PACKAGING / SHIPMENT / PAYMENT TERMS satirlari
-    odeme: { x: 67.4, y: 43.7, w: 24, h: 8.6 },
+    odeme: { x: 68, y: 43.9, w: 25, h: 8.6 },
   },
   "proforma-yukle": {
     asistan: { x: 18.33, y: 10.78, w: 62.22, h: 57.61 },

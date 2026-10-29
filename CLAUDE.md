@@ -2365,6 +2365,28 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   DEĞİŞMEDİ (önce/sonra piksel karşılaştırması: yalnız çizgi bölgeleri farklı, 3. sayfa birebir).
   Yeni dolgu + çizgi eklerken: ÖNCE dolgu, SONRA çizgi.
 
+## Proforma PDF — gerçek proformaya benzerlik + imzalı indirme (29.10.2026)
+
+- Kullanıcı gerçek Excel proformasını ("Ikyboat Proforma & Contract.pdf") ve paneldekini gönderdi:
+  "tasarım benzeme eksiklikleri, yazı fontu farklı; PDF indir dediğimizde Harun Bey'in imzası ile
+  imzalanmış inmeli". Orijinal pdfplumber ile ÖLÇÜLDÜ, `lib/proforma/pdf.ts` buna göre:
+  - Sütun: karakter × **5,645 pt** (eskiden 5,25 → tablo %7,5 dardı; A..J 486 pt, sayfa 2-3 509 pt).
+  - Çizgi: ince **0,96 pt**, kalın **2,88 pt** (eskiden 0,5 / 1,5). Ürün satırı tam genişlik F2.
+  - Tarih **gg.aa.yyyy** (`tarihYaz`, belge.ts; eski "bilinçli fark dd/mm/yyyy" KALKTI).
+  - Yazı: Aptos Narrow → **Sofia Sans Semi Condensed** (OFL; 11 aday ölçüldü, genişlik farkı ~%2,
+    görünüş en yakın); Calibri (sayfa 2-3 "Date / Revision", "Page x/N") → **Carlito** (Calibri ile
+    aynı ölçüler); Arial Bold alt bilgi → **Helvetica-Bold** (Arial ölçüleri, PDF standart yazısı;
+    metinde Latin-1 dışı Türkçe harf varsa gövde yazısına düşer, satır sığmazsa 6 pt'ye kadar
+    küçülür, alta kırılıp binmez). Fontlar `lib/fonts/proforma-fontlari-base64.ts` (fontsource
+    WOFF → fontTools birleştir/subset; Latin-1 + Latin Ext-A), lisans `lib/fonts/LISANSLAR-proforma.txt`.
+    Aptos/Calibri Microsoft fontu: AÇIK depoya KONMAZ. `roboto-condensed-base64.ts` silindi.
+  - Special Conditions satır aralığı 1,38 (orijinal ~13,8 pt). "APPROVAL OF CUSTOMER": ünvan 11 pt
+    kalın + adres altında en fazla 2 satır (`onayAlicisi`).
+- İMZA: `app/proformalar/page.tsx` `IMZALI = true` — önizleme ve "PDF İndir" Harun Bey imzalı
+  (dosya adı `UNEX….pdf`, -TASLAK yok; alt çubuk "Harun Bey imzalı"). `proforma_imza` yetkisi
+  bu akışta KULLANILMIYOR (kullanıcı kararı); kayıt/kilit/revizyon hâlâ sonraki adım.
+- Kılavuz proforma ekranı yeniden çekildi (odeme noktası ELLE: x 68, y 43,9, w 25, h 8,6).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

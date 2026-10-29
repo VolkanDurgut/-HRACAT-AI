@@ -131,10 +131,10 @@ export function isoGunEkle(iso: string, gun: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** "2026-10-17" -> "17/10/2026" (sablon: dd/mm/yyyy) */
+/** "2026-10-17" -> "17.10.2026" (gercek proformadaki bicim gg.aa.yyyy; 29.10.2026) */
 export const tarihYaz = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
 };
 
 /** UNEX + KOD + GGAAYY -> "UNEXCCS171026" */

@@ -1427,7 +1427,7 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   ölçüleri birebir (sütun karakter × 5,25 pt, satır pt, sol 0,25 in, üst 0,75 in,
   gri F2/D9/BF/A6, ince/kalın çizgi, logo / imza konumları). Yazı tipi Roboto
   Condensed (`lib/fonts/roboto-condensed-base64.ts`, OFL; Aptos Narrow ile harf
-  genişliği ~%0,4 fark). Sayfa 2'de her ürün kendi satırında ("1) …"). Sığmazsa
+  genişliği ~%0,4 fark). [29.10.2026: Sayfa 2 artık "1) …" listesi DEĞİL — bkz. aşağıda sozlesmeSatirlari.] Sığmazsa
   `sik` kademesi (boşluk daralır → yazı 1 pt küçülür); 4 ürün + uzun açıklama
   3 sayfada kalıyor (test edildi). Bilinçli farklar: tarihler her yerde
   dd/mm/yyyy (şablonda sayfa 2 mm-dd-yy idi), "10-Insurance" → "10.".
@@ -2386,6 +2386,13 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   (dosya adı `UNEX….pdf`, -TASLAK yok; alt çubuk "Harun Bey imzalı"). `proforma_imza` yetkisi
   bu akışta KULLANILMIYOR (kullanıcı kararı); kayıt/kilit/revizyon hâlâ sonraki adım.
 - Kılavuz proforma ekranı yeniden çekildi (odeme noktası ELLE: x 68, y 43,9, w 25, h 8,6).
+- Sales Contract (sayfa 2) satırları `sozlesmeSatirlari` (belge.ts, 29.10.2026 kullanıcı: "Quantity
+  1) 100 2) 25 niye; aynı ürün iki kere yazıyor"): QUANTITY = TOPLAM ("125 METRIC TONE"); COMMODITY =
+  aynı ürün TEK sefer, farklı ürünler " & "; UNIT PRICE = tek fiyat "410 USD PER TONE", tek ürün +
+  farklı fiyat "410 USD & 413 USD PER TONE" (orijinal biçim), farklı ürün + farklı fiyat her ürün kendi
+  satırında "ÜRÜN: 410 USD PER TONE". Kalem dökümü 1. sayfa tablosunda kalır.
+- Ödeme hatırlatma penceresindeki "imzanız Outlook'ta eklenir" notu YANLIŞTI (gövdeli mailto'ya
+  Outlook imza eklemez): "İleti > İmza ile ekleyin" olarak düzeltildi.
 
 ## Genel çalışma prensibi
 

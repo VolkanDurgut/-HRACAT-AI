@@ -25,7 +25,7 @@ import { CARLITO_BOLD_BASE64, CARLITO_REGULAR_BASE64, SOFIA_SEMI_COND_BOLD_BASE6
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 import { BANKA_PRESETLERI, SABIT_HESAP_ADI } from "@/lib/bankalar";
 import { SATICI } from "@/lib/proforma/sabitler";
-import { genelSayiYaz, paraSimgesi, paraYaz, type ProformaBelgesi } from "@/lib/proforma/belge";
+import { genelSayiYaz, paraSimgesi, paraYaz, sozlesmeSatirlari, type ProformaBelgesi } from "@/lib/proforma/belge";
 
 // ---------------------------------------------------------------- olculer ---
 const SAYFA_G = 595.28;
@@ -476,17 +476,17 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   y += blokH + (sik ? 6 : 15); // + 18
 
   // 19-29: sozlesme satirlari (her urun kendi satirinda)
-  const coklu = b.kalemler.length > 1;
-  const no = (i: number) => (coklu ? `${i + 1}) ` : "");
+  // Toplam miktar, urun tek sefer, fiyatlar orijinal bicimde (belge.ts sozlesmeSatirlari)
+  const oz = sozlesmeSatirlari(b.kalemler, b.paraBirimi, b.toplamMts);
   const alanlar: [string, string, number?][] = [
-    ["QUANTITY", b.kalemler.map((k, i) => `${no(i)}${genelSayiYaz(k.mts)} METRIC TONE`).join("\n")],
-    ["COMMODITY", b.kalemler.map((k, i) => `${no(i)}${k.aciklama}`).join("\n")],
+    ["QUANTITY", oz.miktar],
+    ["COMMODITY", oz.emtia],
     ["ORIGIN", "TURKISH"],
     ["PACKING", b.paketleme],
     ["BRAND & MARKING", b.markaSatiri],
     ["SHIPMENT", b.sevkiyat],
     ["PORT OF DESTINATION", b.teslimIfadesi, 9],
-    ["UNIT PRICE", b.kalemler.map((k, i) => `${no(i)}${genelSayiYaz(k.fiyat)} ${b.paraBirimi} PER TONE`).join("\n")],
+    ["UNIT PRICE", oz.birimFiyat],
     ["TOTAL CONT VALUE", tutarYaz(b.toplam, b)],
     ["PAYMENT", b.odeme],
   ];

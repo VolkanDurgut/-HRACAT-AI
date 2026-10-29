@@ -449,6 +449,39 @@ export type ProformaBelgesi = {
   imzali: boolean;
 };
 
+/**
+ * Sales Contract (sayfa 2) QUANTITY / COMMODITY / UNIT PRICE satirlari (29.10.2026, kullanici:
+ * "Quantity niye 1) 100 2) 25 yaziyor; ayni urun iki kere yaziyor"). Orijinal proformadaki gibi:
+ *  - QUANTITY: TOPLAM miktar ("125 METRIC TONE"); kalem dokumu 1. sayfa tablosunda zaten var.
+ *  - COMMODITY: ayni urun TEK sefer (buyuk/kucuk harf, bosluk farki yok sayilir); farkli urunler " & ".
+ *  - UNIT PRICE: tek fiyat -> "410 USD PER TONE"; tek urun + farkli fiyatlar -> "410 USD & 413 USD
+ *    PER TONE" (orijinal: "475 USD & 500 USD PER TONE"); farkli urun + farkli fiyat -> her urun kendi
+ *    satirinda "URUN: 410 USD PER TONE" (hangi fiyat hangi urun karismasin).
+ */
+export function sozlesmeSatirlari(kalemler: HesapliKalem[], paraBirimi: ParaBirimi, toplamMts: number) {
+  const anahtar = (s: string) => s.replace(/\s+/g, " ").trim().toUpperCase();
+  const urunler: string[] = [];
+  for (const k of kalemler) {
+    const a = k.aciklama.replace(/\s+/g, " ").trim();
+    if (a && !urunler.some((u) => anahtar(u) === anahtar(a))) urunler.push(a);
+  }
+  const fiyatlar: number[] = [];
+  for (const k of kalemler) if (!fiyatlar.some((f) => Math.abs(f - k.fiyat) < 0.0001)) fiyatlar.push(k.fiyat);
+  const fy = (n: number) => `${genelSayiYaz(n)} ${paraBirimi}`;
+  let birimFiyat: string;
+  if (fiyatlar.length <= 1) birimFiyat = `${fy(fiyatlar[0] ?? 0)} PER TONE`;
+  else if (urunler.length <= 1) birimFiyat = `${fiyatlar.map(fy).join(" & ")} PER TONE`;
+  else {
+    const satirlar: string[] = [];
+    for (const k of kalemler) {
+      const s = `${k.aciklama.replace(/\s+/g, " ").trim()}: ${fy(k.fiyat)} PER TONE`;
+      if (!satirlar.some((x) => anahtar(x) === anahtar(s))) satirlar.push(s);
+    }
+    birimFiyat = satirlar.join("\n");
+  }
+  return { miktar: `${genelSayiYaz(toplamMts)} METRIC TONE`, emtia: urunler.join(" & "), birimFiyat };
+}
+
 export type Eksik = { alan: string; mesaj: string };
 
 /** Indirmeden once eksikler (bos liste = hazir). */

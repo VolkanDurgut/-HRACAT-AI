@@ -204,7 +204,7 @@ export function OdemeHatirlatmaPenceresi({
               </div>
               <textarea id="oh-govde" value={govde} rows={12} onChange={(e) => { setGovde(e.target.value); setElleDegisti(true); }}
                 className={`${girdi} font-mono text-[12.5px] leading-relaxed resize-y`} style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} />
-              <p className="text-[11px] mt-1" style={{ color: TEXT_MUTED }}>İmzanız Outlook&apos;ta eklenir. Şablon değiştirilirse metin yeniden oluşturulur.</p>
+              <p className="text-[11px] mt-1" style={{ color: TEXT_MUTED }}>Outlook bu yolla açılan maile imzayı kendiliğinden eklemez; gerekirse Outlook&apos;ta İleti &gt; İmza ile ekleyin. Şablon değiştirilirse metin yeniden oluşturulur.</p>
             </div>
 
             {hata && <p className="text-xs text-red-400 flex items-center gap-1.5" role="alert"><AlertTriangle size={13} />{hata}</p>}

@@ -85,6 +85,18 @@ function cizgi(doc: jsPDF, x1: number, y1: number, x2: number, y2: number, kalin
   doc.line(x1, y1, x2, y2);
 }
 
+/**
+ * Cizgiler DOLGULARDAN SONRA cizilmeli (29.10.2026 duzeltmesi): bir satirin gri dolgusu
+ * ustundeki satirin alt cizgisinin yarisini (0,25 pt) ortuyordu; ince cizgi ekranda/baskida
+ * kayboluyordu (PACKAGING..PAYMENT etiket sutunu, urun tablosu, Sales Contract alanlari).
+ * Satir dongulerinde cizgi once biriktirilir, dongu bitince hepsi en ustte cizilir.
+ */
+type BekleyenCizgi = [number, number, number, number, number];
+function cizgileriCiz(doc: jsPDF, liste: BekleyenCizgi[]) {
+  for (const [x1, y1, x2, y2, k] of liste) cizgi(doc, x1, y1, x2, y2, k);
+  liste.length = 0;
+}
+
 const satirAraligi = (boy: number) => boy * 1.17;
 
 /** Metni kutuya sar; sigmazsa yaziyi en fazla `enKucuk`e kadar kucult. */
@@ -221,14 +233,15 @@ function bankaTablosu(doc: jsPDF, b: ProformaBelgesi, kol: number[], y: number, 
   const x = SOL;
   const etiketW = kw(kol, 0, 2);
   const tumW = kw(kol, 0, 9);
+  const cizgiler: BekleyenCizgi[] = [];
   for (const [et, deger] of bankaSatirlari(b)) {
     dolgu(doc, x, y, tumW, satirH, GRI_05);
     etiket(doc, et, x, y, etiketW, satirH, 9);
     hucre(doc, deger, x + etiketW, y, tumW - etiketW, satirH, { boy: 10, enKucuk: 8 });
-    cizgi(doc, x, y, x + tumW, y);
-    cizgi(doc, x, y + satirH, x + tumW, y + satirH);
+    cizgiler.push([x, y, x + tumW, y, INCE], [x, y + satirH, x + tumW, y + satirH, INCE]);
     y += satirH;
   }
+  cizgileriCiz(doc, cizgiler);
   return y;
 }
 
@@ -305,14 +318,15 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
     ["SHIPMENT METHOD", b.sevkiyat, sik ? 16 : 22.8],
     ["PAYMENT TERMS", b.odeme, sik ? 20 : 31.8],
   ];
-  cizgi(doc, x(0), y, x(0) + TUM, y, KALIN);
+  const kosulCizgileri: BekleyenCizgi[] = [[x(0), y, x(0) + TUM, y, KALIN]];
   satirlar.forEach(([et, deger, h0], i) => {
     const h = Math.max(h0, yukseklik(doc, deger, degerW, dg, false) + 4);
     etiket(doc, et, x(0), y, w(0, 2), h, 11, { dolgu: GRI_05 });
     hucre(doc, deger, x(3), y, w(3, 9), h, { boy: dg });
     y += h;
-    cizgi(doc, x(0), y, x(0) + TUM, y, i === satirlar.length - 1 ? KALIN : INCE);
+    kosulCizgileri.push([x(0), y, x(0) + TUM, y, i === satirlar.length - 1 ? KALIN : INCE]);
   });
+  cizgileriCiz(doc, kosulCizgileri);
   y += sik ? 5 : 10.8; // 26
 
   // 27: tablo basligi
@@ -330,6 +344,7 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   // 28: urunler (tek urunde 27 pt; coklu urunde satir basina en az 18 pt)
   const tekH = b.kalemler.length <= 1 ? 27 : sik ? 14.4 : 18;
   const ug = sik >= 2 ? 8 : 9;
+  const urunCizgileri: BekleyenCizgi[] = [];
   for (const k of b.kalemler) {
     const h = Math.max(tekH, yukseklik(doc, k.aciklama, w(0, 3) - 2 * PAD, ug, false) + 4);
     hucre(doc, k.aciklama, x(0), y, w(0, 3), h, { boy: ug, hiza: "center", dolgu: GRI_05 });
@@ -338,7 +353,7 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
     hucre(doc, paraYaz(k.fiyat), x(7), y, w(7, 7), h, { boy: ug, hiza: "center" });
     hucre(doc, tutarYaz(k.tutar, b), x(8), y, w(8, 9), h, { boy: ug, hiza: "center", dolgu: GRI_05 });
     y += h;
-    cizgi(doc, x(0), y, x(0) + TUM, y);
+    urunCizgileri.push([x(0), y, x(0) + TUM, y, INCE]);
   }
   // tablo cizgileri
   cizgi(doc, x(0), ust, x(0) + TUM, ust, KALIN);
@@ -354,11 +369,10 @@ function sayfa1(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   for (const [et, tutar, d] of toplamSatirlari) {
     hucre(doc, et, x(0), y, w(0, 7), 14.4, { boy: 11, kalin: true, hiza: "right", enKucuk: 8 });
     hucre(doc, tutarYaz(tutar, b), x(8), y, w(8, 9), 14.4, { boy: 9, hiza: "center", dolgu: d });
-    cizgi(doc, x(8), y, x(8), y + 14.4, KALIN);
-    cizgi(doc, x(10), y, x(10), y + 14.4);
-    cizgi(doc, x(8), y + 14.4, x(10), y + 14.4);
+    urunCizgileri.push([x(8), y, x(8), y + 14.4, KALIN], [x(10), y, x(10), y + 14.4, INCE], [x(8), y + 14.4, x(10), y + 14.4, INCE]);
     y += 14.4;
   }
+  cizgileriCiz(doc, urunCizgileri);
   y += sik ? 5 : 9.6; // 31
 
   // 32-38: banka
@@ -411,7 +425,6 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   hucre(doc, aliciMetni(b), x(0), y, w(0, 3), blokH, { boy: 10, kalin: true, dikey: "ust", enKucuk: 7.5 });
   hucre(doc, b.ilgiliKisi, x(5), y, w(5, 8), blokH, { boy: 9, kalin: true, dikey: "ust", enKucuk: 7 });
   y += blokH + (sik ? 6 : 15); // + 18
-  cizgi(doc, x(0), y, x(0) + TUM, y, KALIN);
 
   // 19-29: sozlesme satirlari (her urun kendi satirinda)
   const coklu = b.kalemler.length > 1;
@@ -430,6 +443,7 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
   ];
   const degerW = w(2, 9) - 2 * PAD;
   const ag = sik >= 2 ? 9 : 10;
+  const alanCizgileri: BekleyenCizgi[] = [[x(0), y, x(0) + TUM, y, KALIN]];
   alanlar.forEach(([et, deger, etBoy], i) => {
     const son = i === alanlar.length - 1;
     const h = Math.max(son ? (sik ? 22 : 34.8) : sik ? 15.5 : 19.8, yukseklik(doc, deger, degerW, ag, false) + (sik ? 4 : 6));
@@ -437,8 +451,9 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
     etiket(doc, et, x(0), y, w(0, 1), h, etBoy || 11);
     hucre(doc, deger, x(2), y, w(2, 9), h, { boy: ag });
     y += h;
-    cizgi(doc, x(0), y, x(0) + TUM, y, son ? KALIN : INCE);
+    alanCizgileri.push([x(0), y, x(0) + TUM, y, son ? KALIN : INCE]);
   });
+  cizgileriCiz(doc, alanCizgileri);
   y += sik ? 10 : 23.55;
 
   // 31: SHIPPING DOCUMENTS

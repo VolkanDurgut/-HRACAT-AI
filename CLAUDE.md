@@ -2353,6 +2353,18 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   altında Konşimento açıklama şeridi (X = serbest bırakılmadı, Alındı ✓ = orijinal elimizde → ödeme
   bekliyor; Telex/Seawaybill/Vesaik = ödeme alındı) + seçimin ipucunda `KONSIMENTO_ACIKLAMA`.
 
+## Proforma PDF — kaybolan çizgiler (29.10.2026)
+
+- Kullanıcı: "Proforma oluşturulduğunda form bilgilerinin arasındaki bazı çizgiler gözükmüyor."
+  Kök neden (`lib/proforma/pdf.ts`): satır döngülerinde ince (0,5 pt) ayırıcı çizgi çizildikten SONRA
+  bir sonraki satırın gri dolgusu çiziliyor ve çizginin alt yarısını örtüyordu → PACKAGING..PAYMENT
+  etiket sütunu, ürün tablosu (açıklama + toplam sütunları, toplam satırının üstü) ve Sales Contract
+  alanları (QUANTITY..PAYMENT, tam genişlik gri) arasında çizgi görünmüyordu.
+- Düzeltme: `BekleyenCizgi` + `cizgileriCiz()` — bu bloklarda çizgiler biriktirilir, dolgular bittikten
+  sonra en üstte çizilir (banka tablosu da aynı kurala alındı). Ölçüler, yazılar ve sayfa düzeni
+  DEĞİŞMEDİ (önce/sonra piksel karşılaştırması: yalnız çizgi bölgeleri farklı, 3. sayfa birebir).
+  Yeni dolgu + çizgi eklerken: ÖNCE dolgu, SONRA çizgi.
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

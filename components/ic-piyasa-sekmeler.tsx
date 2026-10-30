@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Users, ClipboardList, Bell } from "lucide-react";
+import { FileText, Users, ClipboardList, Bell, PackageOpen, Sheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -16,11 +16,15 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
  */
 // 22.10.2026: Is Emirleri ilk sekme ve menunun acilis sayfasi; Fiyat Formu sona alindi
 // (adresi /ic-piyasa olarak kaldi - yer imleri bozulmasin).
-const SEKMELER = [
-  { href: "/ic-piyasa/is-emirleri", etiket: "İş Emirleri", ikon: ClipboardList },
-  { href: "/ic-piyasa/bildirimler", etiket: "Bildirimler", ikon: Bell },
-  { href: "/ic-piyasa/musteriler", etiket: "Müşteriler", ikon: Users },
-  { href: "/ic-piyasa", etiket: "Fiyat Formu", ikon: FileText },
+// 30.10.2026: "Alış" (ayri "ic_alis" yetkisi) ve "Sipariş Raporu" (lojistigin satis + alis
+// Excel'i) eklendi. Sekme SADECE yetkisi olana gorunur.
+const SEKMELER: { href: string; etiket: string; ikon: typeof FileText; yetki: "ic_piyasa" | "ic_alis" }[] = [
+  { href: "/ic-piyasa/is-emirleri", etiket: "İş Emirleri", ikon: ClipboardList, yetki: "ic_piyasa" },
+  { href: "/ic-piyasa/alis", etiket: "Alış", ikon: PackageOpen, yetki: "ic_alis" },
+  { href: "/ic-piyasa/rapor", etiket: "Sipariş Raporu", ikon: Sheet, yetki: "ic_piyasa" },
+  { href: "/ic-piyasa/bildirimler", etiket: "Bildirimler", ikon: Bell, yetki: "ic_piyasa" },
+  { href: "/ic-piyasa/musteriler", etiket: "Müşteriler", ikon: Users, yetki: "ic_piyasa" },
+  { href: "/ic-piyasa", etiket: "Fiyat Formu", ikon: FileText, yetki: "ic_piyasa" },
 ];
 
 /** Sayfa verisi degisince (is emri acildi, mesaj isaretlendi) rozet hemen tazelensin. */
@@ -30,11 +34,12 @@ export function bildirimSayaciniYenile() {
 
 export function IcPiyasaSekmeler() {
   const pathname = usePathname() || "";
-  const { companyId } = useAuth();
+  const { companyId, yetkiler } = useAuth();
+  const satisYetkisi = !!yetkiler.sayfa_yetkileri.ic_piyasa;
   const [bekleyen, setBekleyen] = useState(0);
 
   useEffect(() => {
-    if (!companyId) return;
+    if (!companyId || !satisYetkisi) return;
     let iptal = false;
     const say = async () => {
       const { count } = await supabase.from("ic_bildirimler").select("id", { count: "exact", head: true })
@@ -46,11 +51,11 @@ export function IcPiyasaSekmeler() {
     const z = window.setInterval(() => { if (document.visibilityState === "visible") say(); }, 60_000);
     window.addEventListener("ic-bildirim-yenile", say);
     return () => { iptal = true; window.clearInterval(z); window.removeEventListener("ic-bildirim-yenile", say); };
-  }, [companyId, pathname]);
+  }, [companyId, pathname, satisYetkisi]);
 
   return (
     <nav className="mb-5 flex flex-wrap gap-1 rounded-xl border p-1 w-fit max-w-full" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label="İç Piyasa bölümleri">
-      {SEKMELER.map(({ href, etiket, ikon: Ikon }) => {
+      {SEKMELER.filter((x) => !!yetkiler.sayfa_yetkileri[x.yetki]).map(({ href, etiket, ikon: Ikon }) => {
         const aktif = href === "/ic-piyasa" ? pathname === "/ic-piyasa" : pathname.startsWith(href);
         const rozet = href === "/ic-piyasa/bildirimler" && bekleyen > 0;
         return (

@@ -111,6 +111,10 @@ const YEDEKLENECEK_TABLOLAR = [
   "satin_alma_kalemleri",
   // Daha once siparis verilen urunler (28.10.2026; gonderilen formlardan otomatik)
   "satin_alma_urunleri",
+  // Ic piyasa ALIS: tedarikciler, alis siparisleri, teslim alinan araclar (30.10.2026)
+  "ic_tedarikciler",
+  "ic_alis_siparisleri",
+  "ic_alis_teslimler",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

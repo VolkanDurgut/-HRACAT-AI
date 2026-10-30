@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { KantarYurtIci } from "@/components/kantar-yurt-ici";
+import { KantarGelenArac } from "@/components/kantar-gelen-arac";
 import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
@@ -639,8 +640,9 @@ export default function KantarPage() {
 
         {/* ===== SAG: YURT ICI (irsaliye) ===== */}
         <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-4 2xl:min-h-0 2xl:rounded-2xl 2xl:border 2xl:p-4 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={16} />} baslik="Yurt İçi · İrsaliye" aciklama="İç piyasa iş emirleri · araç başına irsaliye" />
-          <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} />
+          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={16} />} baslik="Yurt İçi · İrsaliye" aciklama="İç piyasa iş emirleri ve gelen araçlar (alış) · araç başına irsaliye" />
+          {/* 30.10.2026: Gelen Arac · Alis ayni sutunda, satis is emirlerinin altinda (migration yoksa gorunmez) */}
+          <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} altBolum={<KantarGelenArac yenileTetik={yurtIciYenile} />} />
         </section>
         </div>
       </div>

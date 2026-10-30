@@ -31,6 +31,7 @@ export function ilkErisilebilirSayfa(sayfaYetkileri: Record<string, boolean> | u
     { key: "ic_piyasa", yol: "/ic-piyasa/is-emirleri" },
     { key: "proformalar", yol: "/proformalar" },
     { key: "satin_alma", yol: "/satin-alma" },
+    { key: "ic_alis", yol: "/ic-piyasa/alis" },
   ];
   for (const { key, yol } of oncelikSirasi) {
     if (sayfaYetkileri[key]) return yol;

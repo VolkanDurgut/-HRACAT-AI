@@ -29,11 +29,13 @@ const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 
-export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
+export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, altBolum }: {
   /** Kantar Paneli ustundeki "Yenile" basilinca artar -> liste yenilenir. */
   yenileTetik?: number;
   /** Acik is emri sayisi (dar ekrandaki bolum dugmesi icin). */
   acikSayiBildir?: (sayi: number) => void;
+  /** Ayni kaydirma alaninin sonunda gosterilecek bolum (30.10.2026: Gelen Arac · Alis). */
+  altBolum?: React.ReactNode;
 } = {}) {
   const { companyId } = useAuth();
   const { showToast } = useToast();
@@ -310,6 +312,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
             </div>
           </div>
         )}
+        {altBolum}
       </div>
 
       {secili && (

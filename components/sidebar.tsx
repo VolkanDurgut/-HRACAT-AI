@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -40,6 +40,8 @@ const opsItems: MenuItem[] = [
 const icPiyasaItems: MenuItem[] = [
   // 22.10.2026: acilis sayfasi Is Emirleri (kullanici karari); tum /ic-piyasa alt sayfalarinda aktif
   { label: "İç Piyasa", href: "/ic-piyasa/is-emirleri", icon: <Wheat size={18} />, yetkiKey: "ic_piyasa" },
+  // 30.10.2026: alis siparisleri + tedarikciler; ayri yetki (alis fiyatlari)
+  { label: "İç Piyasa Alış", href: "/ic-piyasa/alis", icon: <PackageOpen size={18} />, yetkiKey: "ic_alis" },
 ];
 
 // Satin Alma (26.10.2026): departman ihtiyac listelerinin onayi. Ic Piyasa gibi
@@ -85,7 +87,9 @@ export default function Sidebar() {
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
   const isActive = (href: string) => {
-    if (href.startsWith("/ic-piyasa")) return pathname.startsWith("/ic-piyasa");
+    // Alis kendi menu ogesinde; "Ic Piyasa" alis sayfasinda aktif gorunmez (30.10.2026)
+    if (href === "/ic-piyasa/alis") return pathname.startsWith("/ic-piyasa/alis");
+    if (href.startsWith("/ic-piyasa")) return pathname.startsWith("/ic-piyasa") && !pathname.startsWith("/ic-piyasa/alis");
     return pathname.startsWith(href);
   };
 

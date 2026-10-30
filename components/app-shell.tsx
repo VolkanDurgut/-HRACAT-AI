@@ -20,6 +20,8 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/analiz": "analiz",
   "/kantar": "kantar",
   "/draft-onay": "draft_onay",
+  // 30.10.2026: Alis sayfasi ayri yetki; "/ic-piyasa"dan ONCE gelmeli (ilk eslesen kazanir)
+  "/ic-piyasa/alis": "ic_alis",
   "/ic-piyasa": "ic_piyasa",
   "/proformalar": "proformalar",
   "/satin-alma": "satin_alma",

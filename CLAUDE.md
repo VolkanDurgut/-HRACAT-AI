@@ -2394,6 +2394,73 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Ödeme hatırlatma penceresindeki "imzanız Outlook'ta eklenir" notu YANLIŞTI (gövdeli mailto'ya
   Outlook imza eklemez): "İleti > İmza ile ekleyin" olarak düzeltildi.
 
+## İç Piyasa — ALIŞ siparişleri, Gelen Araç, Sipariş Raporu (30.10.2026)
+
+- Kullanıcı: "İç piyasa kısmını artık bizimle eşitlemek istiyorum. Hem satış hem alış var." Kaynak:
+  lojistiğin günlük Excel'i (`27.10.2026_SİPARİŞ ALIM RAPORU.xlsx`, her gün bir sayfa, üstte SATIŞ altta
+  ALIŞ SİPARİŞ RAPORU, tamamlanan satır YEŞİL, sevk/teslim miktarı formülle "=87620+165940+…").
+  Gerçek Excel repoda YOK (müşteri/fiyat verisi; scratchpad `icpiyasa/in/`).
+- Kararlar (30.10.2026, AskUserQuestion): teslim alınan aracı KANTARCI girer; TMO'dan çekilip DOĞRUDAN
+  müşteriye giden araç TEK kayıtla iki tarafa sayılır; alış fiyatı/tedarikçi AYRI yetki `ic_alis`;
+  ilk teslimat = alış + rapor + (onaylı) ilk eşitleme. Tespit: 27.10'da Artı Grup satışı sevk 157.540 =
+  Pınarhisar TMO alışı teslim 157.540 → aynı araçlar iki tabloya ayrı ayrı yazılıyordu.
+- Migration `20261030100000_ic_alis.sql` (SADECE ekleme; satış/ihracat tablolarına DOKUNMAZ; KOD PUSH'UNDAN
+  ÖNCE canlıya uygulanmalı — yoksa Alış sayfası "okunamadı" der, Kantar'daki bölüm sessizce gizlenir):
+  `ic_tedarikciler` (ünvan tekil `upper(btrim)`; VKN tekil), `ic_alis_siparisleri` (AS-YYYY-NNNN, sayaç
+  `ic_alis_sira`, tetikleyici `ic_alis_hazirla` numaradan ÖNCE doğrular; miktar_kg, birim_fiyat 4 hane +
+  para_birimi TRY/USD/EUR, kdv, vade_gun, termin, teslim adresten|fabrika, depo, urun_kodu),
+  `ic_alis_teslimler` (her araç / parti; `gecmis` = sistem öncesi PARTİ: plaka boş olabilir ve 60 ton araç
+  sınırına tabi değil [Excel'de 105.740 tek terim], ≤5.000 ton; normal araç ≤60.000 kg; `sevk_id` UNIQUE →
+  `ic_sevkler` ON DELETE SET NULL; kayıt DEĞİŞMEZ — `ic_alis_teslim_koru`, yalnız FK'nin sevk_id'yi
+  NULL'lamasına izin verir). RLS: tablolar SADECE `ic_sayfa_yetkisi('ic_alis')` + şirket; teslim
+  INSERT/DELETE politikası YOK (yalnız fonksiyonlar).
+- Fonksiyonlar: `kantar_ic_alis_siparisleri()` / `kantar_ic_alis_son_teslimler(p_gun)` (kantar VEYA
+  ic_alis; FİYATSIZ; tedarikçi adı AÇIK — müşteri değil, araç hangi depodan geliyor bilinmeli),
+  `kantar_ic_alis_teslim_ekle(p_veri, p_kaydet)` (kuru kontrol/kayıt; plaka 12 saat kontrolü BOŞLUKSUZ
+  karşılaştırır; %5 aşım uyarısı; irsaliye no/ETTN alış tarafında tekil). DOĞRUDAN SEVK (`is_emri_id`
+  dolu): irsaliye PDF ZORUNLU ve SATIŞ klasöründe (`{şirket}/irsaliye/{is_emri_id}/…`); satış kaydı
+  mevcut `kantar_ic_sevk_ekle()` ile AÇILIR (aynı kurallar, aynı lojistik çıkış onayı/müşteri bildirimi
+  akışı), satış uyarıları "Satış: …" önekiyle birleşir, iki kayıt aynı işlemde bağlanır.
+  `ic_alis_gecmis_teslim_ekle(p_veri)` (yalnız ic_alis; tarih bugün/≤365 gün, TR 12:00),
+  `ic_alis_teslim_sil(p_id)` (dönen yol SONRA depodan silinir; doğrudan sevkte PDF satışa ait → null,
+  satış kaydı İş Emirleri'nden ayrıca silinir), `ic_alis_belge_okunabilir` (alış yetkilisi bağlı satış
+  irsaliyesini okuyabilsin). `ic_belge_silinebilir` GENİŞLETİLDİ (eski koşullar aynen + alış), depo
+  politikaları `ic_belge_insert/select` yeniden oluşturuldu (eski koşullar aynen + `alis/` klasörü).
+  Süper adminlere (execution@, bbt@) `ic_alis` yetkisi verilir.
+- Arayüz: menü "Yurt İçi › İç Piyasa Alış" (`/ic-piyasa/alis`; AppShell'de `/ic-piyasa/alis` →
+  `ic_alis` eşlemesi `/ic-piyasa`'dan ÖNCE; sidebar `isActive` İç Piyasa'yı alış sayfasında yakmaz).
+  `IcPiyasaSekmeler` artık yetkiye göre süzer: İş Emirleri · Alış (ic_alis) · Sipariş Raporu · Bildirimler
+  · Müşteriler · Fiyat Formu. Alış sayfası: 4 özet kutu (açık / teslim alınacak / bugün / kapatmaya
+  hazır = kalan ≤%1 veya ≤2 ton, `alisKapatmayaHazir`), tablo (sığma ölçüldü: 1366 ve 1440'ta yatay
+  kaydırma YOK — Araç sütunu ilerleme altına alındı), satır açılınca detay + teslimler + Düzenle /
+  Sistem öncesi teslim ekle (Excel formülünü yapıştır → satırlara aç, `formulTerimleri`) / Kapat / İptal /
+  Yeniden aç / Sil (teslimsiz). "Tedarikçiler" görünümü (ekle/düzenle/pasif/sil — siparişi olan silinmez).
+  Form `components/ic-alis-siparis-form.tsx` (aynı pencerede yeni tedarikçi; sipariş hata verirse kart
+  SEÇİLİ kalır, ikinci kart açılmaz). Kapatma ELLE (satış iş emri gibi), otomatik değil.
+- Kantar Paneli: `components/kantar-gelen-arac.tsx` Yurt İçi sütununda satış iş emirlerinin ALTINDA
+  (`KantarYurtIci altBolum` — aynı kaydırma alanı). "Araç Teslim Al": irsaliye PDF'i (okunur) veya
+  "İrsaliye yok, elle gir"; "Doğrudan müşteriye sevk" + iş emri seçimi (dosya değişince seçim korunur).
+  Fonksiyon yoksa/yetki yoksa bölüm HİÇ görünmez. Kantarcı fiyat görmez.
+- Sipariş Raporu `/ic-piyasa/rapor` (ic_piyasa; alış tablosu yalnız ic_alis): Excel'in iki tablosu,
+  aktif + "Tamamlanan: Bugün / 7 / 30 gün / Tümü" (varsayılan 7; kapanış zamanına göre), iptal girmez,
+  toplam tutar = SİPARİŞ × fiyat (Excel'deki gibi; araç hedefli iş emrinde sevk × fiyat), doğrudan
+  sevkli iş emri teslimi "TMO". Hesap SAF `lib/ic-piyasa/siparis-raporu.ts`; Excel çıktısı
+  `lib/ic-piyasa/siparis-raporu-xlsx.ts` + YENİ PAKETSİZ yazıcı `lib/xlsx-yaz.ts` (jszip; stil seti
+  sabit, yeşil FF92D050). Sona "SİSTEM NO" (IE/AS) sütunu eklendi. İndirme adı ASCII
+  `GG.AA.YYYY_SIPARIS_ALIM_RAPORU.xlsx` (Chromium Türkçe harfli `download` adını "download" yapıyordu).
+- Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR` + mail.ts adları; `yedekleme-gonder` migration'dan
+  SONRA yeniden DEPLOY edilmeli (yoksa yeni tablolar yedeğe girmez). Geri yükleme betiğinde hiçbir
+  `ic_*` tablosu yok (bilinen eksik, bkz. Parça 2).
+- Testler (scratchpad `alis/`): yerel PG16 tüm zincir (veriye bağlı 2 e-posta migration'ı atlanır,
+  `restore/db_kur3.sh`) + `test.sql` 40+ senaryo (numara/sayaç, yetki/izolasyon, kantar fiyatsız,
+  doğrudan sevk iki kayıt + bildirim, değişmezlik, FK, depo politikaları) + migration 2. kez; birim
+  `birim.ts` 40 (27.10 Excel rakamları birebir: 698.060 / 1.940 / 242.460 / 3.487.500; xlsx openpyxl
+  ile açılır); Playwright `e2e.mjs` 46 (alış akışı, formül, kantar irsaliyesiz + doğrudan sevk, rapor +
+  xlsx indirme, yetki süzme/yönlendirme, fonksiyon yokken gizli bölüm, 1366/1440 sığma, 390 mobil);
+  regresyon sf/e2e2/3/5/8 + kantar_irs geçti (e2e5 sekme sırası beklentisi güncellendi).
+- İLK EŞİTLEME (27.10 sayfası → canlı) GERÇEK VERİ: kullanıcı onayı olmadan YAPILMAZ. Satış tarafında
+  geçmiş araç PDF'siz eklenemez (`ic_gecmis_sevk_ekle` irsaliye zorunlu kuralı DEĞİŞMEDİ).
+
 ## Genel çalışma prensibi
 
 - Değişiklik küçük/nettse direkt yap, geniş kapsamlı/geri alınamaz bir şeyse

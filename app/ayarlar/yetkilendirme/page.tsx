@@ -45,6 +45,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   proformalar: "Proforma Oluştur",
   proforma_imza: "Proforma İmzalama (Onayla ve İmzala)",
   satin_alma: "Satın Alma (talep onayı)",
+  ic_alis:    "İç Piyasa Alış (tedarikçi ve alış fiyatları)",
 };
 
 const SEKME_ETIKETLER: Record<string, string> = {

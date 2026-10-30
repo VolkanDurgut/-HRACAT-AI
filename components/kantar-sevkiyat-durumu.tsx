@@ -41,9 +41,9 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
   const dolu = sevkiyatlar.reduce((t, s) => t + s.dolu, 0);
 
   return (
-    <div className="space-y-3" aria-labelledby="kantar-sevkiyat-durumu">
+    <div className="space-y-2" aria-labelledby="kantar-sevkiyat-durumu">
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <h2 id="kantar-sevkiyat-durumu" className="text-sm font-bold flex items-center gap-2 text-white">
+        <h2 id="kantar-sevkiyat-durumu" className="text-xs font-bold flex items-center gap-2 text-white">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: RENK.dolu }} /> Sevkiyat Durumu
           <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({sevkiyatlar.length} açık sevkiyat)</span>
         </h2>
@@ -64,7 +64,7 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
           Aramayla eşleşen sevkiyat yok.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
           {liste.map((s) => {
             const durum = DURUM_STIL[s.durum];
             const yuzde = (n: number) => (s.toplam > 0 ? (n / s.toplam) * 100 : 0);
@@ -78,7 +78,7 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
                   onClick={() => setAcik((a) => ({ ...a, [s.dosya_id]: !a[s.dosya_id] }))}
                   aria-expanded={acikMi}
                   aria-controls={`sevkiyat-${s.dosya_id}`}
-                  className="block w-full text-left p-4 hover:bg-white/[0.02] transition-colors"
+                  className="block w-full text-left px-3 py-2.5 hover:bg-white/[0.02] transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -99,21 +99,21 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
                   </div>
 
                   {s.toplam === 0 ? (
-                    <p className="mt-3 text-sm font-semibold" style={{ color: TEXT_MUTED }}>Rezervasyon bekleniyor</p>
+                    <p className="mt-2 text-xs font-semibold" style={{ color: TEXT_MUTED }}>Rezervasyon bekleniyor</p>
                   ) : (
-                  <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold" style={{ color: s.dolu > 0 ? RENK.dolu : "#E2E8F0" }}>{s.dolu}</span>
+                  <div className="mt-1.5 flex items-baseline gap-1.5">
+                    <span className="text-lg font-bold leading-none" style={{ color: s.dolu > 0 ? RENK.dolu : "#E2E8F0" }}>{s.dolu}</span>
                     <span className="text-sm font-semibold" style={{ color: TEXT_MUTED }}>/ {s.toplam}</span>
                     <span className="text-[11px] ml-1" style={{ color: TEXT_MUTED }}>konteyner dolu</span>
                   </div>
                   )}
 
-                  <div className="mt-2 h-2 rounded-full overflow-hidden flex" style={{ backgroundColor: RENK.alinmayan }}
+                  <div className="mt-1.5 h-1.5 rounded-full overflow-hidden flex" style={{ backgroundColor: RENK.alinmayan }}
                     role="img" aria-label={`${s.dolu} dolu, ${s.bos} boş ekipman, ${s.alinmayan} alınmamış`}>
                     {s.dolu > 0 && <span style={{ width: `${yuzde(s.dolu)}%`, backgroundColor: RENK.dolu }} />}
                     {s.bos > 0 && <span style={{ width: `${yuzde(s.bos)}%`, backgroundColor: RENK.bos, marginLeft: s.dolu > 0 ? 2 : 0 }} />}
                   </div>
-                  <div className="mt-2 flex items-center gap-3 flex-wrap text-[10.5px]" style={{ color: TEXT_MUTED }}>
+                  <div className="mt-1.5 flex items-center gap-x-3 gap-y-1 flex-wrap text-[10.5px]" style={{ color: TEXT_MUTED }}>
                     <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: RENK.dolu }} />Dolu {s.dolu}</span>
                     <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: RENK.bos }} />Boş ekipman {s.bos}</span>
                     <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm border" style={{ backgroundColor: RENK.alinmayan, borderColor: "#3A4357" }} />Alınmamış {s.alinmayan}</span>

@@ -101,12 +101,12 @@ export function KantarDbaOtomasyon({ yenileTetik = 0 }: { yenileTetik?: number }
 
   return (
     <div className="shrink-0 rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="dba-otomasyon">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>
-          <Cpu size={16} />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2">
+        <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>
+          <Cpu size={14} />
         </span>
         <div className="min-w-0 mr-auto">
-          <p className="text-sm font-bold text-white leading-tight">Otomatik DBA</p>
+          <p className="text-xs font-bold text-white leading-tight">Otomatik DBA</p>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
             Bugün: {tumuCanli
               ? <><span className="font-semibold text-white">{veri.bugun.yuklendi}</span> belge otomatik yüklendi</>

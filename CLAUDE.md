@@ -2460,6 +2460,57 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   regresyon sf/e2e2/3/5/8 + kantar_irs geçti (e2e5 sekme sırası beklentisi güncellendi).
 - İLK EŞİTLEME (27.10 sayfası → canlı) GERÇEK VERİ: kullanıcı onayı olmadan YAPILMAZ. Satış tarafında
   geçmiş araç PDF'siz eklenemez (`ic_gecmis_sevk_ekle` irsaliye zorunlu kuralı DEĞİŞMEDİ).
+- CANLI (30.10.2026): migration MCP ile İKİ PARÇADA uygulandı (`ic_alis_1_tablolar` sadece ekleme,
+  `ic_alis_2_depo_yetki` depo politikaları + revoke + yetki; tek parça denemesi 3 kez "Migration was
+  cancelled" döndü — onay penceresi). Sonuç repodaki dosyayla AYNI. `yedekleme-gonder` v23 (deneme 38
+  tablo, geri yükleme 36/36). İlk eşitleme (kullanıcı onaylı, 28.10 Excel'i): AS-2026-0001…0005
+  (Havsa 698.060 / Büyükevren 107.640 / Uzunköprü 245.540 kg PARTİ olarak `gecmis`; Pınarhisar
+  400 t araç araç irsaliyeyle), IE-2026-0004 Trakya ASA0006744, 0005/0006 Tarım Kredi (Balıkesir /
+  Alpullu, yeni kart "TARIM KREDİ YEM SAN. VE TİC. A.Ş."), 0007/0008 Artı Grup 300 t / 320 t (kart
+  e-faturadan: VKN 0850397225; DEPO TESLİM — araçları müşteri TMO'dan çeker). siparis_alindi mesajları
+  aynı işlemde "atlandi". NOT: `ic_is_emirleri.birim_fiyat` 2 hane → 17,7283 → 17,73 kaydedildi, tam
+  fiyat notta (4 haneye genişletme kullanıcı onayı bekliyor).
+- 30.10.2026 OLAY: lojistik geçmiş tarihli 16 aracı (Pınarhisar 10, Trakya 3, Tarım Kredi 3) Kantar'dan
+  NORMAL araç olarak girdi → 16 çıkış onayı e-postası gitti, hatırlatma/uyarı e-postaları başlayacaktı.
+  Düzeltme (SQL): irsaliye saatiyle `cikis_durumu='cikti'`, `cikis_isleyen='Sistem öncesi kayıt
+  (lojistik, 30.10)'` (müşteri mesajı ÜRETİLMEDİ; e-postadaki bağlantı "zaten işlendi" der). Pınarhisar
+  10 aracı yanlış iş emrine (IE-0008) girilmişti → IE-0007'ye taşındı (264.040 kg; bildirimlerin
+  is_emri_id'si de). PDF'ler depoda IE-0008 klasöründe kaldı (yol kayıtta doğru; taşımak gerekmez).
+  DERS: geçmiş araçlar Kantar'dan GİRİLMEZ ("Sistem öncesi araç ekle" / Claude'a irsaliye ile).
+
+## İç Piyasa — Kapanış raporu, kalan/eksik/fazla takibi, Kantar sadeleştirme (30.10.2026)
+
+- Kullanıcı (lojistikle görüşme sonrası): "Kantar panelinde iç piyasa kısmında kalan tonaj gözükecek;
+  sipariş tamamlandığında otomatik mail (test mesensei282@gmail.com, canlıda execution@, bbt@,
+  lojistik@); eksik / az kapanma takibi, kalan veya fazla giden; müşteriler şifreli gözükmesin; Kantar
+  paneli çok karışık, her şey çok büyük, tek ekranda yönetilebilir olmalı."
+- Migration `20261030180000_ic_kapanis_raporu_kantar.sql` (KOD PUSH'UNDAN ÖNCE — Bildirimler ayar
+  sorgusu `kapanis_eposta` okur): `ic_piyasa_ayarlari.kapanis_eposta` (virgülle ≤5, CHECK; Unex =
+  mesensei282@gmail.com), `ic_bildirimler.alici` + 'ekip', `ic_bildirim_is_emri` (gövde AYNEN +
+  'tamamlandi'ya HER geçişte `siparis_kapanis` e-postası: hedef = ilk adres, CC = diğerleri; satır
+  CC'si `ic_bildirim_eposta_al`'ın else dalıyla korunur; ayar boşsa rapor yok; iptalde yok),
+  `kantar_ic_is_emirleri` / `kantar_ic_son_sevkler` `musteri_maskeli` kolonu artık GERÇEK ad (kısa ad,
+  yoksa ünvan; imza aynı, DROP yok). Değerler dizisi sırası migration başlığında.
+- Hesap TEK YER `_shared/mesaj-sablonlari.ts`: `teslimFarki` (tonaj ±%1 = "Tam", araçta eşit sayı),
+  `kalanMetni`, `kapanisOzeti` (e-posta / Bildirimler satırları), `kapanisKonusu`. Edge function
+  `ic-piyasa` `epostaOlustur` → "Sipariş tamamlandı / eksik kapandı / fazla kapandı" (müşteriye GİTMEZ).
+- Bildirimler › Ayarlar: "Sipariş kapanış raporu · Alıcılar" (küçük harf, tekrarsız; boş = kapalı);
+  akışta alıcı "Ekip · rapor", detayda rapor satırları. Canlıya geçiş = bu alana execution@, bbt@,
+  lojistik@ yazmak (kod gerekmez).
+- İş Emirleri: Yükleme hücresinde `KalanRozet` (`components/ic-kalan-rozet.tsx`): açık → "Kalan / Fazla /
+  Hedef tamam", tamamlanan → "Kapanış: Tam / Eksik … / Fazla …"; filtre "Eksik / Fazla Kapanan".
+- Kantar Paneli: iki sütun artık xl (≥1280) itibariyla (1.2fr / 1fr), özet kartları → başlık sayaçları
+  (`Sayac`), Yurt İçi'nde SEKMELER "Satış · İş Emirleri (n)" / "Alış · Gelen Araç (n)" (seçim
+  localStorage `kantar-yurt-ici-sekme`; alış fonksiyonu yoksa sekme gizli). Kartlar yerine SIKI tablolar
+  (`table-fixed` + colgroup; iş emri · ürün · müşteri tek hücrede; ilerleme + kalan; küçük "Araç ekle" /
+  "Teslim al"). DBA bekleyen tablosunda müşteri kodu Dosya hücresine taşındı. Ölçüm: 1280/1366/1440/1920
+  tablolarda yatay kaydırma YOK, sütunlar ekrana sığar; 1100'de alt alta; 390 taşma yok.
+  `KantarYurtIci` `altBolum` prop'u KALDIRILDI. Doğrudan sevk açıklaması netleştirildi.
+- Testler (scratchpad `kapanis/`): `test.sql` (K1–K10: ayar boş, 3 alıcı CC, kuyruk CC korunur, araç
+  hedefli, iptal, CHECK'ler, kantar gerçek ad, anon kapalı) + migration 2. kez; `birim.ts` 26; edge
+  `edge/test.mjs` (eski A–F + G kapanış); Playwright `kantar.mjs` (4 genişlik + sekmeler + pencereler),
+  `ic.mjs` (rozetler, filtre, Bildirimler ayarı). Regresyon: alis/e2e.mjs (sekme + "Teslim al" için
+  güncellendi) 47, sf/e2e2/3/5/8, sf/kantar_irs ("Araç ekle"), kantar/e2e.mjs, km/e2e.mjs.
 
 ## Genel çalışma prensibi
 

@@ -284,7 +284,104 @@ export const BILDIRIM_ETIKET: Record<string, string> = {
   cikis_hatirlatma: "Çıkış hatırlatması",
   cikis_cevap_yok: "Çıkış cevabı gelmedi",
   cikis_bugun_degil: "Araç bugün çıkmayacak",
+  siparis_kapanis: "Sipariş kapanış raporu",
 };
+
+// ---------------------------------------------------------------------------
+// SIPARIS KAPANIS RAPORU / KALAN-EKSIK-FAZLA (30.10.2026) - TEK HESAP YERI.
+// Kullanici: "Bazi durumlarda eksik veya az kapanabilme durumu oluyor. Kalan
+// veya fazla giden takibi yapilabilmeli." Is Emirleri listesi, Kantar Paneli
+// ve kapanis e-postasi (edge function ic-piyasa) AYNI fonksiyonu kullanir.
+// Tolerans: tonaj hedefinde hedefin +-%1'i "tam"; arac hedefinde sayi esit.
+// ---------------------------------------------------------------------------
+
+export const KAPANIS_TOLERANS_ORAN = 0.01;
+
+export type TeslimFarki = {
+  sonuc: "tam" | "eksik" | "fazla";
+  /** Gerceklesen - hedef (kg ya da arac). Eksikte negatif. */
+  fark: number;
+  /** |fark| / hedef (hedef yoksa null) */
+  oran: number | null;
+  /** Ekran metni: "Eksik 12,5 ton (%4)", "Fazla 1 araç", "Tam" */
+  metin: string;
+  /** Kalan (eksikte |fark|, digerlerinde 0) */
+  kalan: number;
+};
+
+const sayiTR = (n: number, en = 3) => n.toLocaleString("tr-TR", { maximumFractionDigits: en });
+const tonMetni = (kg: number) => `${sayiTR(kg / 1000)} ton`;
+
+/** Hedef ile gerceklesen arasindaki fark (tonaj: kg; arac: adet). */
+export function teslimFarki(hedefTur: "kg" | "arac", hedef: number | null | undefined, gerceklesenKg: number, aracSayisi: number): TeslimFarki {
+  const h = Number(hedef || 0);
+  if (hedefTur === "arac") {
+    const fark = aracSayisi - h;
+    const sonuc = fark === 0 ? "tam" : fark < 0 ? "eksik" : "fazla";
+    return { sonuc, fark, oran: h > 0 ? Math.abs(fark) / h : null, kalan: Math.max(0, -fark), metin: sonuc === "tam" ? "Tam" : `${sonuc === "eksik" ? "Eksik" : "Fazla"} ${Math.abs(fark)} araç` };
+  }
+  const fark = Math.round((Number(gerceklesenKg) - h) * 100) / 100;
+  const oran = h > 0 ? Math.abs(fark) / h : null;
+  const tam = h > 0 ? Math.abs(fark) <= h * KAPANIS_TOLERANS_ORAN : fark === 0;
+  const sonuc = tam ? "tam" : fark < 0 ? "eksik" : "fazla";
+  const yuzde = oran !== null ? ` (%${sayiTR(oran * 100, 1)})` : "";
+  return { sonuc, fark, oran, kalan: Math.max(0, -fark), metin: sonuc === "tam" ? "Tam" : `${sonuc === "eksik" ? "Eksik" : "Fazla"} ${tonMetni(Math.abs(fark))}${yuzde}` };
+}
+
+/** Acik siparis icin kalan / fazla metni: "Kalan 35,96 ton", "Fazla 0,5 ton", "Kalan 2 araç", "Tamamlandı". */
+export function kalanMetni(hedefTur: "kg" | "arac", hedef: number | null | undefined, gerceklesenKg: number, aracSayisi: number): { metin: string; durum: "kalan" | "fazla" | "tamam" } {
+  const h = Number(hedef || 0);
+  if (hedefTur === "arac") {
+    const k = h - aracSayisi;
+    if (k > 0) return { metin: `Kalan ${k} araç`, durum: "kalan" };
+    if (k < 0) return { metin: `Fazla ${-k} araç`, durum: "fazla" };
+    return { metin: "Hedef tamam", durum: "tamam" };
+  }
+  const k = Math.round((h - Number(gerceklesenKg)) * 100) / 100;
+  if (k > 0) return { metin: `Kalan ${tonMetni(k)}`, durum: "kalan" };
+  if (k < 0) return { metin: `Fazla ${tonMetni(-k)}`, durum: "fazla" };
+  return { metin: "Hedef tamam", durum: "tamam" };
+}
+
+export type KapanisOzeti = {
+  isEmriNo: string; musteri: string; urun: string;
+  hedefTur: "kg" | "arac"; hedef: number; gerceklesenKg: number; aracSayisi: number;
+  kapatan: string; kapanis: string; siparisTarihi: string;
+  fark: TeslimFarki;
+  /** E-posta / ekran satirlari (sira sabit) */
+  satirlar: [string, string][];
+};
+
+/** ic_bildirimler.degerler (sablon "siparis_kapanis", migration 20261030180000) -> ozet. */
+export function kapanisOzeti(degerler: unknown[]): KapanisOzeti {
+  const d = (i: number) => String(degerler?.[i] ?? "").trim();
+  const hedefTur = d(3) === "arac" ? "arac" : "kg";
+  const hedef = Number(d(4)) || 0;
+  const gerceklesenKg = Number(d(5)) || 0;
+  const aracSayisi = Number(d(6)) || 0;
+  const fark = teslimFarki(hedefTur, hedef, gerceklesenKg, aracSayisi);
+  const kapanisTarih = d(8) ? new Date(d(8)) : null;
+  const kapanis = kapanisTarih && !Number.isNaN(kapanisTarih.getTime())
+    ? kapanisTarih.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "";
+  const siparisTarihi = /^\d{4}-\d{2}-\d{2}$/.test(d(9)) ? d(9).split("-").reverse().join(".") : "";
+  const kgMetni = (kg: number) => `${sayiTR(kg, 2)} kg`;
+  const satirlar: [string, string][] = [
+    ["Sipariş", `${d(0)} · ${d(1)}`],
+    ["Ürün", d(2)],
+    ...(siparisTarihi ? [["Sipariş tarihi", siparisTarihi] as [string, string]] : []),
+    ["Hedef", hedefTur === "kg" ? `${tonMetni(hedef)} (${kgMetni(hedef)})` : `${hedef} araç`],
+    ["Gerçekleşen", `${kgMetni(gerceklesenKg)} · ${aracSayisi} araç`],
+    ["Sonuç", fark.metin],
+    ...(kapanis ? [["Kapanış", `${kapanis}${d(7) ? ` · ${d(7)}` : ""}`] as [string, string]] : []),
+  ];
+  return { isEmriNo: d(0), musteri: d(1), urun: d(2), hedefTur, hedef, gerceklesenKg, aracSayisi, kapatan: d(7), kapanis, siparisTarihi, fark, satirlar };
+}
+
+/** Kapanis raporu e-posta konusu: "Sipariş kapandı: IE-2026-0007 · ARTI GRUP · Eksik 35,96 ton (%12)" */
+export function kapanisKonusu(o: KapanisOzeti): string {
+  return `Sipariş kapandı: ${o.isEmriNo} · ${o.musteri} · ${o.fark.metin}`;
+}
 
 /** Musteri takip ve lojistik cikis sayfalarinin adresleri. */
 export const SITE_ADRESI = "https://ihracatasistanim.com";

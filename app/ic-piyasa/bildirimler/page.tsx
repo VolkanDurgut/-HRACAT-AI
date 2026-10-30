@@ -13,7 +13,7 @@ import {
   Bell, Loader2, AlertCircle, MessageCircle, Copy, Check, SkipForward, Mail, Settings2, Save, RefreshCw, ExternalLink, AlertTriangle, Share2, Download, Search, ChevronDown, ChevronRight, Send, ShieldCheck, Paperclip,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
-import { BILDIRIM_ETIKET, elleGonderimMetni, musteriEpostaKonusu, musteriEpostaMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
+import { BILDIRIM_ETIKET, elleGonderimMetni, kapanisOzeti, musteriEpostaKonusu, musteriEpostaMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 
 /**
@@ -38,7 +38,7 @@ import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefo
  */
 
 type Satir = {
-  id: string; sablon: string; alici: "musteri" | "lojistik" | "yetkili"; kanal: "whatsapp" | "eposta";
+  id: string; sablon: string; alici: "musteri" | "lojistik" | "yetkili" | "ekip"; kanal: "whatsapp" | "eposta";
   hedef: string | null; alici_ad: string | null; degerler: string[]; dugme_eki: string | null;
   durum: "bekliyor" | "gonderiliyor" | "gonderildi" | "atlandi" | "hata"; hata: string | null; deneme: number;
   olusturma: string; islem_zamani: string | null; isleyen: string | null; cc: string[] | null;
@@ -48,7 +48,7 @@ type Satir = {
 
 /** "IRS2026000002468" / "59 AGD 271" -> dosya adina uygun */
 const dosyaAdi = (x: string) => x.replace(/[^A-Za-z0-9ÇĞİÖŞÜçğıöşü_-]+/g, "_").replace(/^_+|_+$/g, "") || "irsaliye";
-type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string };
+type Ayarlar = { lojistik_ad: string; lojistik_eposta: string; lojistik_telefon: string; yetkili_eposta: string; yetkili_cc: string; kapanis_eposta: string };
 type MusteriEpostaAyar = { gonderen: string; cc: string; aktif: boolean; aktifZaman: string | null };
 const ME_VARSAYILAN: MusteriEpostaAyar = { gonderen: "lojistik@unex.com.tr", cc: "bbt@unex.com.tr, execution@unex.com.tr, lojistik@unex.com.tr", aktif: false, aktifZaman: null };
 const EPOSTA_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,7 +90,7 @@ export default function BildirimlerPage() {
     } catch { setPaylasilabilir(false); }
   }, []);
 
-  const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "", yetkili_cc: "" });
+  const [ayar, setAyar] = useState<Ayarlar>({ lojistik_ad: "", lojistik_eposta: "", lojistik_telefon: "", yetkili_eposta: "", yetkili_cc: "", kapanis_eposta: "" });
   const [ayarVar, setAyarVar] = useState(false);
   // Musteri mesajlarindaki iletisim satiri: KAYITLI ayardan (formdaki kaydedilmemis degisiklik degil)
   const [iletisim, setIletisim] = useState<{ ad: string; telefon: string } | null>(null);
@@ -110,7 +110,7 @@ export default function BildirimlerPage() {
       supabase.from("ic_bildirimler")
         .select("id, sablon, alici, kanal, hedef, alici_ad, degerler, dugme_eki, durum, hata, deneme, olusturma, islem_zamani, isleyen, cc, ic_is_emirleri(is_emri_no, ic_musteriler(id, unvan, telefon, whatsapp_izin)), ic_sevkler(irsaliye_dosya_yolu, irsaliye_no, plaka)")
         .eq("company_id", companyId).order("olusturma", { ascending: false }).limit(300),
-      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc, musteri_eposta_gonderen, musteri_eposta_cc, musteri_eposta_aktif, musteri_eposta_aktif_zaman").eq("company_id", companyId).maybeSingle(),
+      supabase.from("ic_piyasa_ayarlari").select("lojistik_ad, lojistik_eposta, lojistik_telefon, yetkili_eposta, yetkili_cc, kapanis_eposta, musteri_eposta_gonderen, musteri_eposta_cc, musteri_eposta_aktif, musteri_eposta_aktif_zaman").eq("company_id", companyId).maybeSingle(),
     ]);
     if (bRes.error || aRes.error) { setOkumaHatasi((bRes.error || aRes.error)!.message); setYukleniyor(false); return; }
     setSatirlar((bRes.data || []) as unknown as Satir[]);
@@ -122,6 +122,7 @@ export default function BildirimlerPage() {
         lojistik_ad: aRes.data.lojistik_ad || "", lojistik_eposta: aRes.data.lojistik_eposta || "",
         lojistik_telefon: aRes.data.lojistik_telefon ? telefonYazi(aRes.data.lojistik_telefon) : "", yetkili_eposta: aRes.data.yetkili_eposta || "",
         yetkili_cc: (aRes.data.yetkili_cc || "").split(",").join(", "),
+        kapanis_eposta: (aRes.data.kapanis_eposta || "").split(",").filter(Boolean).join(", "),
       });
       const me: MusteriEpostaAyar = {
         gonderen: aRes.data.musteri_eposta_gonderen || "", cc: (aRes.data.musteri_eposta_cc || "").split(",").filter(Boolean).join(", "),
@@ -273,9 +274,14 @@ export default function BildirimlerPage() {
     if (ccListe.length && !yeEposta) { showToast("CC için önce uyarı alıcısını (yetkili e-posta) yazın.", "error"); return; }
     const tel = telefonNormallestir(ayar.lojistik_telefon);
     if (tel === undefined) { showToast("Lojistik telefon numarası geçersiz.", "error"); return; }
+    // Siparis kapanis raporu alicilari (30.10.2026): bos = rapor gitmez; en fazla 5
+    const kapanisListe = Array.from(new Set(ayar.kapanis_eposta.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)));
+    const kapanisHatali = kapanisListe.find((x) => !epostaRe.test(x));
+    if (kapanisHatali) { showToast(`Kapanış raporu adresi geçersiz: ${kapanisHatali}`, "error"); return; }
+    if (kapanisListe.length > 5) { showToast("Kapanış raporuna en fazla 5 adres yazılabilir.", "error"); return; }
     setAyarKaydediliyor(true);
     const { data, error } = await supabase.from("ic_piyasa_ayarlari")
-      .upsert({ company_id: companyId, lojistik_ad: ayar.lojistik_ad.trim() || null, lojistik_eposta: loEposta, lojistik_telefon: tel, yetkili_eposta: yeEposta || null, yetkili_cc: ccListe.length ? Array.from(new Set(ccListe)).join(",") : null }, { onConflict: "company_id" })
+      .upsert({ company_id: companyId, lojistik_ad: ayar.lojistik_ad.trim() || null, lojistik_eposta: loEposta, lojistik_telefon: tel, yetkili_eposta: yeEposta || null, yetkili_cc: ccListe.length ? Array.from(new Set(ccListe)).join(",") : null, kapanis_eposta: kapanisListe.length ? kapanisListe.join(",") : null }, { onConflict: "company_id" })
       .select("company_id");
     setAyarKaydediliyor(false);
     const hata = yazmaHatasi(error, data);
@@ -359,7 +365,9 @@ export default function BildirimlerPage() {
             <Alan etiket="Lojistik telefon"><input value={ayar.lojistik_telefon} onChange={(e) => setAyar({ ...ayar, lojistik_telefon: e.target.value })} inputMode="tel" placeholder="0553 268 91 01" className={inputSinif} style={inputStil} /></Alan>
             <Alan etiket="Uyarılar · Alıcı"><input value={ayar.yetkili_eposta} onChange={(e) => setAyar({ ...ayar, yetkili_eposta: e.target.value })} inputMode="email" placeholder="execution@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
             <Alan etiket="Uyarılar · CC (virgülle)"><input value={ayar.yetkili_cc} onChange={(e) => setAyar({ ...ayar, yetkili_cc: e.target.value })} inputMode="email" placeholder="bbt@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
+            <Alan etiket="Sipariş kapanış raporu · Alıcılar (virgülle, en fazla 5)"><input value={ayar.kapanis_eposta} onChange={(e) => setAyar({ ...ayar, kapanis_eposta: e.target.value })} inputMode="email" placeholder="execution@unex.com.tr, bbt@unex.com.tr, lojistik@unex.com.tr" aria-label="Sipariş kapanış raporu alıcıları" className={inputSinif} style={inputStil} /></Alan>
           </div>
+          <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }}>Kapanış raporu: iş emri &quot;Tamamlandı&quot; yapılınca hedef, gerçekleşen ve eksik / fazla miktarı bu adreslere otomatik gider. Boş bırakılırsa gönderilmez.</p>
           <div className="flex justify-end gap-2 mt-3">
             {ayarVar && <button onClick={() => setAyarAcik(false)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button>}
             <button onClick={ayarKaydet} disabled={ayarKaydediliyor} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
@@ -596,10 +604,11 @@ export default function BildirimlerPage() {
 /** Teslim edilemeyen e-posta (hata) ya da yeniden denenen e-posta */
 const sorunlu = (s: Satir) => s.durum === "hata" || (s.kanal === "eposta" && s.durum === "bekliyor" && s.deneme > 0);
 
-const ALICI_ETIKET: Record<Satir["alici"], string> = { musteri: "Müşteri", lojistik: "Lojistik", yetkili: "Yetkili" };
+const ALICI_ETIKET: Record<Satir["alici"], string> = { musteri: "Müşteri", lojistik: "Lojistik", yetkili: "Yetkili", ekip: "Ekip · rapor" };
 
 /** Sirket ici e-posta alanlari (edge function "ic-piyasa" epostaOlustur ile ayni sira) */
 function epostaAlanlari(s: Satir): [string, string][] {
+  if (s.sablon === "siparis_kapanis") return kapanisOzeti(s.degerler || []).satirlar;
   const d = (i: number) => String(s.degerler?.[i] ?? "").trim();
   const alanlar: [string, string][] = [["Plaka", d(0)], ["Sipariş", d(1)], ["Ürün", d(2)], ["Net miktar", d(3)]];
   if (d(4) && d(4) !== "-") alanlar.push([s.sablon === "cikis_bugun_degil" ? "Bildiren" : "Planlanan saat", d(4).replace(/\s*\(bağlantı\)\s*$/, "")]);

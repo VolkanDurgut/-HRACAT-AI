@@ -23,6 +23,8 @@ import {
 } from "@/lib/ic-piyasa/is-emri";
 import { fiyatYazi, kdvYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-piyasa/siparis-formu";
+import { teslimFarki } from "@/lib/ic-piyasa/mesaj-sablonlari";
+import { KalanRozet } from "@/components/ic-kalan-rozet";
 
 /**
  * Ic Piyasa - Is Emirleri (12.10.2026).
@@ -33,7 +35,8 @@ import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-p
  * okunur, is emri bu bilgilerle hazirlanir ve form is emrine eklenir.
  */
 
-type Filtre = "acik" | "tamamlandi" | "iptal" | "tumu";
+/** "fark": eksik ya da fazla KAPANAN (tamamlandi, hedeften +-%1 disinda) - 30.10.2026 */
+type Filtre = "acik" | "tamamlandi" | "fark" | "iptal" | "tumu";
 type EmirSatiri = IcIsEmri & { ic_musteriler: { unvan: string; kisa_ad: string | null } | null };
 
 const DURUM_RENK: Record<IsEmriDurum, string> = {
@@ -127,21 +130,29 @@ export default function IsEmirleriPage() {
     return m;
   }, [bildirimler]);
 
+  // Kapanis farki (eksik / fazla / tam) - hesap TEK YERDE: _shared/mesaj-sablonlari teslimFarki (e-posta ile ayni)
+  const farkVar = useCallback((e: EmirSatiri) => {
+    if (e.durum !== "tamamlandi") return false;
+    const ss = sevkMap.get(e.id) || [];
+    return teslimFarki(e.hedef_tur, e.hedef_tur === "kg" ? e.hedef_kg : e.hedef_arac, ss.reduce((t, s) => t + Number(s.net_kg), 0), ss.length).sonuc !== "tam";
+  }, [sevkMap]);
+
   const sayilar = useMemo(() => ({
     acik: emirler.filter((e) => e.durum === "acik").length,
     tamamlandi: emirler.filter((e) => e.durum === "tamamlandi").length,
+    fark: emirler.filter(farkVar).length,
     iptal: emirler.filter((e) => e.durum === "iptal").length,
     tumu: emirler.length,
-  }), [emirler]);
+  }), [emirler, farkVar]);
 
   const liste = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
     return emirler.filter((e) =>
-      (filtre === "tumu" || e.durum === filtre) &&
+      (filtre === "tumu" || (filtre === "fark" ? farkVar(e) : e.durum === filtre)) &&
       (!q || [e.is_emri_no, e.urun, e.ic_musteriler?.unvan, e.ic_musteriler?.kisa_ad, ...(sevkMap.get(e.id) || []).flatMap((s) => [s.plaka, s.irsaliye_no])]
         .some((v) => (v || "").toLocaleLowerCase("tr").includes(q)))
     );
-  }, [emirler, filtre, arama, sevkMap]);
+  }, [emirler, filtre, arama, sevkMap, farkVar]);
 
   // Bugun yuklenen (tum is emirleri)
   const bugunTR = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
@@ -276,10 +287,11 @@ export default function IsEmirleriPage() {
       <div className="rounded-xl border shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
           <div className="inline-flex flex-wrap rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-            {(["acik", "tamamlandi", "iptal", "tumu"] as Filtre[]).map((f) => (
+            {(["acik", "tamamlandi", "fark", "iptal", "tumu"] as Filtre[]).map((f) => (
               <button key={f} onClick={() => setFiltre(f)} className="px-3 py-1.5 rounded-md text-xs font-medium"
-                style={filtre === f ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>
-                {f === "tumu" ? "Tümü" : DURUM_ETIKET[f]} ({sayilar[f]})
+                title={f === "fark" ? "Tamamlanan ama hedeften eksik ya da fazla kapanan iş emirleri (±%1 dışı)" : undefined}
+                style={filtre === f ? { backgroundColor: ACCENT, color: "white" } : { color: f === "fark" && sayilar.fark ? "#FBBF24" : TEXT_MUTED }}>
+                {f === "tumu" ? "Tümü" : f === "fark" ? "Eksik / Fazla Kapanan" : DURUM_ETIKET[f]} ({sayilar[f]})
               </button>
             ))}
           </div>
@@ -350,6 +362,7 @@ export default function IsEmirleriPage() {
                           <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
                             <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
                           </div>
+                          <KalanRozet emir={e} kg={kg} arac={ss.length} />
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {ss.length === 0 ? <span className="text-xs" style={{ color: "#4A5262" }}>—</span> : (

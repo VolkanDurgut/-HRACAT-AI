@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { Loader2, Upload, X, FileText, AlertTriangle, CheckCircle2, Truck, RefreshCw, ScanText, PencilLine } from "lucide-react";
+import { KalanRozet } from "@/components/ic-kalan-rozet";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
   IC_BELGE_BUCKET, KantarIsEmri, KantarSonSevk, cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi,
@@ -18,7 +19,7 @@ const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F
 
 /**
  * Kantar Paneli > Yurt Ici (12.10.2026).
- * Kantarci acik is emirlerini (musteri MASKELI, FIYATSIZ) gorur; her arac
+ * Kantarci acik is emirlerini (FIYATSIZ; 30.10.2026'dan beri musteri ADI acik) gorur; her arac
  * icin irsaliye PDF'ini yukler. Plaka ve net kg irsaliyeden okunur, kantarci
  * kontrol edip onaylar; okunamazsa elle (BUYUK HARF) yazar.
  * Veri sadece SECURITY DEFINER fonksiyonlarla: kantar_ic_is_emirleri,
@@ -29,13 +30,11 @@ const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 
-export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, altBolum }: {
+export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
   /** Kantar Paneli ustundeki "Yenile" basilinca artar -> liste yenilenir. */
   yenileTetik?: number;
   /** Acik is emri sayisi (dar ekrandaki bolum dugmesi icin). */
   acikSayiBildir?: (sayi: number) => void;
-  /** Ayni kaydirma alaninin sonunda gosterilecek bolum (30.10.2026: Gelen Arac · Alis). */
-  altBolum?: React.ReactNode;
 } = {}) {
   const { companyId } = useAuth();
   const { showToast } = useToast();
@@ -200,121 +199,109 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, altBolum }: {
   };
 
   if (yukleniyor) {
-    return <div className="flex-1 flex items-center justify-center py-10" style={{ color: TEXT_MUTED }}><Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} /></div>;
+    return <div className="flex items-center justify-center py-10" style={{ color: TEXT_MUTED }}><Loader2 size={22} className="animate-spin" style={{ color: ACCENT }} /></div>;
   }
 
   const bugun = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
   const bugunkuler = sonSevkler.filter((s) => new Date(s.olusturma).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugun);
+  const th = "px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap";
 
+  // 30.10.2026 (kullanici: "Kantar paneli cok karisik, her sey cok buyuk; tek ekranda yonetilebilir
+  // olmali"): kartlar yerine SIKI TABLO, ozet kutulari tek satir, her satirda KALAN tonaj
+  // (KalanRozet, kapanis e-postasiyla ayni hesap) ve musteri ADI (sunucu artik maskelemiyor).
   return (
-    <>
+    <div className="space-y-4" data-testid="kantar-satis">
       {okumaHatasi && (
-        <div className="shrink-0 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm" style={{ borderColor: "#78350F", backgroundColor: "rgba(120,53,15,0.15)", color: "#FCD34D" }}>
+        <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: "#78350F", backgroundColor: "rgba(120,53,15,0.15)", color: "#FCD34D" }}>
           <span>Sunucuya ulaşılamadı; liste {sonGuncelleme ? sonGuncelleme.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "–"} itibarıyla.</span>
-          <button onClick={getir} className="inline-flex items-center gap-1 underline"><RefreshCw size={13} /> Yeniden dene</button>
+          <button onClick={getir} className="inline-flex items-center gap-1 underline"><RefreshCw size={12} /> Yeniden dene</button>
         </div>
       )}
 
-      <div className="shrink-0 grid grid-cols-2 gap-4">
-        <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Açık İş Emri</p>
-          <p className="text-2xl font-bold text-sky-400">{emirler.length}</p>
+      <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b" style={{ borderColor: CARD_BORDER }}>
+          <h3 className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Açık satış iş emirleri <span className="font-normal" style={{ color: TEXT_MUTED }}>({emirler.length})</span></h3>
+          <span className="text-[11px]" style={{ color: TEXT_MUTED }}>Bugün yüklenen: <span className="font-semibold text-emerald-400">{bugunkuler.length} araç</span> · {kgYazi(bugunkuler.reduce((t, s) => t + Number(s.net_kg), 0))}</span>
         </div>
-        <div className="rounded-xl border p-4 shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Bugün Yüklenen</p>
-          <p className="text-2xl font-bold text-emerald-400">{bugunkuler.length} <span className="text-sm font-medium" style={{ color: TEXT_MUTED }}>araç · {kgYazi(bugunkuler.reduce((t, s) => t + Number(s.net_kg), 0))}</span></p>
-        </div>
-      </div>
-
-      <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold flex items-center gap-2 text-white">
-            <span className="w-2 h-2 rounded-full bg-sky-500" /> Açık İş Emirleri
-            <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({emirler.length})</span>
-          </h2>
-          {emirler.length === 0 ? (
-            <div className="rounded-xl border p-10 text-center" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <Truck size={36} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
-              <p className="text-sm" style={{ color: TEXT_MUTED }}>Açık yurt içi iş emri yok.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-1 min-[1800px]:grid-cols-2 gap-3">
-              {emirler.map((e) => {
-                const oran = ilerlemeOrani(e, Number(e.yuklenen_kg), e.yuklenen_arac);
-                const tamam = hedefTamam(e, Number(e.yuklenen_kg), e.yuklenen_arac);
-                return (
-                  <div key={e.id} className="rounded-xl border p-4 flex flex-col gap-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold" style={{ color: TEXT_MUTED }}>{e.is_emri_no}</p>
-                        <p className="text-lg font-bold text-white leading-tight">{e.urun} <span className="text-sm font-medium" style={{ color: TEXT_MUTED }}>{e.ambalaj || ""}</span></p>
-                        <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{e.musteri_maskeli} · {e.teslim || "-"}</p>
-                      </div>
-                      <span className={`shrink-0 text-[11px] px-2 py-1 rounded-full font-semibold ${tamam ? "bg-emerald-500/15 text-emerald-400" : "bg-sky-500/15 text-sky-400"}`}>Hedef: {hedefYazi(e)}</span>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-white font-medium">{ilerlemeYazi(e, Number(e.yuklenen_kg), e.yuklenen_arac)}</span>
-                        {tamam && <span className="text-emerald-400">Hedefe ulaşıldı</span>}
-                      </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
-                      </div>
-                    </div>
-                    <button onClick={() => pencereAc(e)} className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
-                      <Upload size={16} /> Araç Yükle · İrsaliye Ekle
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {sonSevkler.length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold flex items-center gap-2 text-white">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> Son 3 Günde Yüklenen Araçlar
-              <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({sonSevkler.length})</span>
-            </h2>
-            <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                    <tr>
-                      {["Zaman", "Plaka", "Ürün / İş Emri", "Müşteri", "Net", "İrsaliye", "Çıkış"].map((b) => (
-                        <th key={b} className={`px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap ${b === "Net" ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>
-                      ))}
+        {emirler.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs" style={{ color: TEXT_MUTED }}><Truck size={20} className="mx-auto mb-1.5" style={{ color: CARD_BORDER }} />Açık yurt içi iş emri yok.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
+              <colgroup><col /><col className="w-[178px]" /><col className="w-[100px]" /></colgroup>
+              <thead style={{ backgroundColor: ROW_HEADER_BG }}>
+                <tr>
+                  {["İş emri · Müşteri · Ürün", "Yüklenen / Hedef", ""].map((b, i) => <th key={i} className={`${th} ${i === 2 ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {emirler.map((e) => {
+                  const kg = Number(e.yuklenen_kg);
+                  const oran = ilerlemeOrani(e, kg, e.yuklenen_arac);
+                  const tamam = hedefTamam(e, kg, e.yuklenen_arac);
+                  return (
+                    <tr key={e.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="kantar-is-emri">
+                      <td className="px-3 py-2">
+                        <p className="text-[11px] truncate"><span className="font-bold" style={{ color: ACCENT }}>{e.is_emri_no}</span> <span className="font-semibold text-white">· {e.urun}</span>{e.ambalaj ? <span style={{ color: TEXT_MUTED }}> · {e.ambalaj}</span> : null}</p>
+                        <p className="text-xs text-white truncate" title={e.musteri_maskeli}>{e.musteri_maskeli}</p>
+                        <p className="text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{e.teslim || "-"}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <p className="text-[11px] leading-snug text-white">{ilerlemeYazi(e, kg, e.yuklenen_arac)}</p>
+                        <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
+                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
+                        </div>
+                        <KalanRozet emir={e} kg={kg} arac={e.yuklenen_arac} sade />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => pencereAc(e)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-white hover:brightness-110 whitespace-nowrap" style={{ backgroundColor: ACCENT }} title={`${e.is_emri_no} için araç yükle (irsaliye ekle)`}>
+                          <Upload size={12} /> Araç ekle
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sonSevkler.map((s) => (
-                      <tr key={s.id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }}>
-                        <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.olusturma)}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold text-white whitespace-nowrap">{s.plaka}{s.dorse_plaka && <span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }}>{s.dorse_plaka}</span>}</td>
-                        <td className="px-4 py-2.5 text-xs text-white">{s.urun}<span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{s.is_emri_no}</span></td>
-                        <td className="px-4 py-2.5 text-xs text-white">{s.musteri_maskeli}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold text-white text-right whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
-                            <FileText size={11} /> {s.irsaliye_no || "Gör"}
-                          </button>
-                          {s.uyari_var && <AlertTriangle size={13} className="inline ml-2 text-amber-400" aria-label="Uyarı var" />}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-        {altBolum}
       </div>
 
+      {sonSevkler.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+          <h3 className="px-3 py-2 border-b text-xs font-bold text-white flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Son 3 günde yüklenen araçlar <span className="font-normal" style={{ color: TEXT_MUTED }}>({sonSevkler.length})</span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
+              <colgroup><col className="w-[104px]" /><col /><col className="w-[86px]" /><col className="w-[150px]" /></colgroup>
+              <thead style={{ backgroundColor: ROW_HEADER_BG }}>
+                <tr>
+                  {["Plaka · Zaman", "Müşteri · İş emri", "Net", "İrsaliye · Çıkış"].map((b) => (
+                    <th key={b} className={`${th} ${b === "Net" ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sonSevkler.map((s) => (
+                  <tr key={s.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
+                    <td className="px-3 py-1.5 whitespace-nowrap"><span className="block text-[11px] font-bold text-white">{s.plaka}</span><span className="block text-[10px]" style={{ color: TEXT_MUTED }} title={s.dorse_plaka ? `Dorse: ${s.dorse_plaka}` : undefined}>{tarihSaatYazi(s.olusturma).slice(0, 16)}</span></td>
+                    <td className="px-3 py-1.5 text-[11px] text-white"><span className="block truncate" title={s.musteri_maskeli}>{s.musteri_maskeli}</span><span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{s.is_emri_no} · {s.urun}</span></td>
+                    <td className="px-3 py-1.5 text-[11px] font-bold text-white text-right whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap">
+                      <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" title="İrsaliyeyi aç">
+                        <FileText size={10} /> {s.irsaliye_no || "Gör"}
+                      </button>
+                      {s.uyari_var && <AlertTriangle size={12} className="inline ml-1.5 text-amber-400" aria-label="Uyarı var" />}
+                      <span className={`block w-fit mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {secili && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="kantar-yukle-baslik">
           <div className="w-full max-w-lg rounded-2xl border shadow-2xl my-8" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
@@ -424,6 +411,6 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, altBolum }: {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

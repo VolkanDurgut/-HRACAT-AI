@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   BILDIRIM_ETIKET, SITE_ADRESI, cikisAdresi, takipAdresi,
   MUSTERI_EPOSTA_SABLONLARI, musteriEpostaHtml, musteriEpostaKonusu, musteriEpostaMetni, sablonBul,
+  kapanisKonusu, kapanisOzeti,
 } from "../_shared/mesaj-sablonlari.ts";
 
 // ============================================================================
@@ -163,6 +164,20 @@ ${btn}
 }
 
 function epostaOlustur(b: Bildirim): { konu: string; html: string } {
+  // 30.10.2026: siparis kapanis raporu (alici "ekip"; migration 20261030180000). Hesap _shared/kapanisOzeti.
+  if (b.sablon === "siparis_kapanis") {
+    const o = kapanisOzeti(b.degerler || []);
+    const giris = o.fark.sonuc === "tam"
+      ? "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefle uyumlu."
+      : o.fark.sonuc === "eksik"
+        ? "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefin ALTINDA; eksik kalan miktarı kontrol edin."
+        : "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefin ÜSTÜNDE; fazla giden miktarı kontrol edin.";
+    return {
+      konu: kapanisKonusu(o),
+      html: epostaHtml(o.fark.sonuc === "tam" ? "Sipariş tamamlandı" : o.fark.sonuc === "eksik" ? "Sipariş eksik kapandı" : "Sipariş fazla kapandı", giris, o.satirlar, null,
+        "Bu rapor İhracat AI › İç Piyasa tarafından otomatik gönderildi. Müşteriye bu e-posta gitmez. Alıcılar: İç Piyasa › Bildirimler › Ayarlar."),
+    };
+  }
   const [plaka, siparis, urun, net, saat] = b.degerler.map((d) => String(d ?? "-"));
   const satirlar: [string, string][] = [["Plaka", plaka], ["Sipariş", siparis], ["Ürün", urun], ["Net miktar", net]];
   const cikisDugme = b.dugme_eki ? { metin: "Çıkışı bildir", adres: cikisAdresi(b.dugme_eki) } : null;

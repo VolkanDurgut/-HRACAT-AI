@@ -59,10 +59,18 @@ export default function KantarPage() {
   const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
   const istekSira = useRef(0);
   // Tek ekran (12.10.2026, kullanici istegi): Ihracat (DBA) ve Yurt Ici
-  // (irsaliye) YAN YANA. Genis ekranda (2xl, >=1536px) iki sutun, her sutun
-  // kendi icinde kayar; dar ekranda (telefon/tablet) alt alta, tek kaydirma +
-  // ustte bolume atlama dugmeleri. Ihracat akisinin icerigi DEGISMEDI.
+  // (irsaliye) YAN YANA. 30.10.2026'dan beri xl (>=1280px) itibariyla iki sutun
+  // (eskiden 2xl), her sutun kendi icinde kayar; dar ekranda alt alta, tek
+  // kaydirma + ustte bolume atlama dugmeleri. Ozet kartlari -> baslik sayaclari.
   const [yurtIciAcik, setYurtIciAcik] = useState<number | null>(null);
+  // 30.10.2026 (kullanici: "Kantar paneli cok karisik, tek ekranda yonetilebilir; her sey cok buyuk"):
+  // Yurt Ici iki SEKME (Satis / Alis), iki sutun xl'den (1280px) itibaren yan yana, kartlar yerine
+  // siki tablolar. Alis sekmesi sadece fonksiyonlar varsa (alisAcik !== null) gorunur.
+  const [alisAcik, setAlisAcik] = useState<number | null>(null);
+  const [yiSekme, setYiSekme] = useState<"satis" | "alis">("satis");
+  useEffect(() => { try { if (window.localStorage.getItem("kantar-yurt-ici-sekme") === "alis") setYiSekme("alis"); } catch { /* depolama kapali */ } }, []);
+  const sekmeSec = (x: "satis" | "alis") => { setYiSekme(x); try { window.localStorage.setItem("kantar-yurt-ici-sekme", x); } catch { /* depolama kapali */ } };
+  const gorunenSekme = yiSekme === "alis" && alisAcik !== null ? "alis" : "satis";
   const [yurtIciYenile, setYurtIciYenile] = useState(0);
   // Otomatik DBA (20.10.2026): durum seridi; Yenile'de ve canli degisiklikte tazelenir
   const [dbaOtoYenile, setDbaOtoYenile] = useState(0);
@@ -332,18 +340,18 @@ export default function KantarPage() {
 
   return (
     // isolate: arka plan gorseli (-z) zeminin ustunde, icerigin altinda (22.10.2026)
-    <div className="relative isolate h-[100dvh] w-full flex flex-col p-4 md:p-6 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
+    <div className="relative isolate h-[100dvh] w-full flex flex-col p-3 md:p-4 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
       <ArkaPlanGorseli tur="uygulama" />
-      <div className="max-w-6xl 2xl:max-w-[1840px] mx-auto w-full flex flex-col h-full min-h-0 gap-4 2xl:gap-5">
+      <div className="max-w-6xl xl:max-w-[1840px] mx-auto w-full flex flex-col h-full min-h-0 gap-3">
 
         {/* Üst Başlık Sabit */}
         <div className="shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: ACCENT }}>
-              <Weight size={20} className="text-white" />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm" style={{ backgroundColor: ACCENT }}>
+              <Weight size={18} className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white leading-tight">Kantar Paneli</h1>
+              <h1 className="text-lg font-bold text-white leading-tight">Kantar Paneli</h1>
               <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>İhracat DBA ve yurt içi irsaliye yükleme</p>
             </div>
           </div>
@@ -385,24 +393,28 @@ export default function KantarPage() {
         </div>
 
         {/* Dar ekranda bolume atlama (genis ekranda iki sutun zaten yan yana) */}
-        <div className="shrink-0 grid grid-cols-2 gap-2 2xl:hidden">
-          {([["İhracat · DBA", bekleyenler.length, "DBA bekleyen", Ship, ihracatRef], ["Yurt İçi · İrsaliye", yurtIciAcik, "açık iş emri", Truck, yurtIciRef]] as const).map(([etiket, sayi, alt, Ikon, ref]) => (
+        <div className="shrink-0 grid grid-cols-2 gap-2 xl:hidden">
+          {([["İhracat · DBA", `${bekleyenler.length} DBA bekleyen`, Ship, ihracatRef], ["Yurt İçi · İrsaliye", `${yurtIciAcik ?? "–"} satış${alisAcik !== null ? ` · ${alisAcik} alış` : ""}`, Truck, yurtIciRef]] as const).map(([etiket, alt, Ikon, ref]) => (
             <button key={etiket} onClick={() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
               className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left hover:bg-white/5"
               style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <Ikon size={16} style={{ color: ACCENT }} className="shrink-0" />
               <span className="min-w-0">
                 <span className="block text-xs font-semibold text-white truncate">{etiket}</span>
-                <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{sayi ?? "–"} {alt}</span>
+                <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{alt}</span>
               </span>
             </button>
           ))}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto 2xl:overflow-hidden grid grid-cols-1 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-6 2xl:gap-5 pr-1 2xl:pr-0" style={{ scrollbarWidth: "thin" }}>
+        <div className="flex-1 min-h-0 overflow-y-auto xl:overflow-hidden grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:gap-4 pr-1 xl:pr-0" style={{ scrollbarWidth: "thin" }}>
         {/* ===== SOL: IHRACAT (DBA) - icerik degismedi ===== */}
-        <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-4 2xl:min-h-0 2xl:rounded-2xl 2xl:border 2xl:p-4 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-        <BolumBasligi id="kantar-ihracat" ikon={<Ship size={16} />} baslik="İhracat · DBA" aciklama="Konteyner tartımı · DBA belgesi" />
+        <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
+        <BolumBasligi id="kantar-ihracat" ikon={<Ship size={15} />} baslik="İhracat · DBA" aciklama="Konteyner tartımı · DBA belgesi"
+          sag={<>
+            <Sayac etiket="DBA bekleyen" deger={bekleyenler.length} renk="text-amber-400" />
+            <Sayac etiket="Tamamlanan" deger={tamamlananlar.length} renk="text-emerald-400" />
+          </>} />
         {/* Arama */}
         <div className="shrink-0 relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
@@ -411,36 +423,24 @@ export default function KantarPage() {
             value={arama}
             onChange={(e) => setArama(e.target.value)}
             placeholder="Konteyner, mühür, plaka, dosya no, çuval veya müşteri kodu ile ara..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
           />
-        </div>
-
-        {/* Özet Kartları Sabit */}
-        <div className="shrink-0 grid grid-cols-2 gap-4">
-          <div className="rounded-xl border p-4 shadow-sm animate-fade-up stagger-1" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>DBA Beklenen</p>
-            <p className="text-2xl font-bold text-amber-400">{bekleyenler.length}</p>
-          </div>
-          <div className="rounded-xl border p-4 shadow-sm animate-fade-up stagger-2" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Tamamlanan</p>
-            <p className="text-2xl font-bold text-emerald-400">{tamamlananlar.length}</p>
-          </div>
         </div>
 
         {/* Otomatik DBA durumu + elle kontrol gereken belgeler (cihaz tanimli degilse gorunmez) */}
         <KantarDbaOtomasyon yenileTetik={dbaOtoYenile} />
 
         {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
-        <div className="2xl:flex-1 2xl:overflow-y-auto 2xl:min-h-0 pb-4 2xl:pb-10 2xl:pr-2 space-y-6" style={{ scrollbarWidth: "thin" }}>
+        <div className="xl:flex-1 xl:overflow-y-auto xl:min-h-0 pb-4 xl:pb-6 xl:pr-1 space-y-4" style={{ scrollbarWidth: "thin" }}>
           
           {/* Sevkiyat Durumu (28.10.2026): hangi sevkiyattan kac konteyner dolu */}
           <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} />
 
           {/* Bekleyen DBA'lar - tek liste */}
           {bekleyenlerFiltreli.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold flex items-center gap-2 text-white">
+            <div className="space-y-2">
+              <h2 className="text-xs font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span> DBA Bekleyen İhracatlar
                 <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({bekleyenlerFiltreli.length})</span>
               </h2>
@@ -449,33 +449,31 @@ export default function KantarPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür / Plaka</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Çuval / Dosya</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Rez No</th>
-                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
-                      <th className="px-4 py-2.5 text-center w-24 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlem</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür / Plaka</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Çuval / Dosya · Müşteri</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Rez No</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
+                      <th className="px-2 py-2 text-center w-20 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlem</th>
                     </tr>
                   </thead>
                   <tbody>
                     {bekleyenlerFiltreli.map((k, idx) => (
                       <tr key={k.id} className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(idx + 1, 8)}`} style={{ borderColor: CARD_BORDER }}>
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2">
                           <div className="text-xs font-bold font-mono text-white">{k.konteyner_no}</div>
                           <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.tip}</div>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2">
                           <div className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{k.muhur_no || "-"}</div>
                           <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || "-"}</div>
                         </td>
-                        <td className="px-4 py-2.5">
-                          <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
-                          <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
+                        <td className="px-3 py-2">
+                          <div className="text-xs font-medium text-white truncate max-w-[150px]" title={k.marka || "-"}>{k.marka || "-"}</div>
+                          <div className="text-[10px] mt-0.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.dosya_no} · <span className="font-mono font-semibold tracking-wide text-white" title="Müşteri kodu (proformadaki)" data-testid="musteri-kodu">{k.musteri_kodu}</span></div>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
-                        <td className="px-4 py-2.5 text-xs" style={{ color: TEXT_MUTED }}>{k.booking_no || "-"}</td>
-                        <td className="px-4 py-2.5 text-center">
+                        <td className="px-3 py-2 text-xs" style={{ color: TEXT_MUTED }}>{k.booking_no || "-"}</td>
+                        <td className="px-3 py-2 text-center">
                           {k.irsaliye_dosya_url ? (
                             <a href={k.irsaliye_dosya_url} target="_blank" rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
@@ -486,7 +484,7 @@ export default function KantarPage() {
                             <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Yok</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-center">
+                        <td className="px-3 py-2 text-center">
                           {yukleniyor[k.id] ? (
                             <Loader2 size={14} className="animate-spin mx-auto" style={{ color: TEXT_MUTED }} />
                           ) : (
@@ -517,8 +515,8 @@ export default function KantarPage() {
 
           {/* Tamamlanan DBA'lar - tek liste */}
           {tamamlananlar.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold flex items-center gap-2 text-white">
+            <div className="space-y-2">
+              <h2 className="text-xs font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> DBA Tamamlanan Konteynerler
                 <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>({tamamlananlarFiltreli.length})</span>
               </h2>
@@ -555,12 +553,12 @@ export default function KantarPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="sticky top-0 backdrop-blur border-b z-10" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
-                      <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                      <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
-                      <th className="px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
-                      <th className="px-4 py-2.5 text-center w-16 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Dosya</th>
+                      <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
+                      <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Ağırlıklar</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İrsaliye</th>
+                      <th className="px-3 py-2 text-center w-16 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -568,20 +566,20 @@ export default function KantarPage() {
                       const uyusmazlik = (k.dba_kontrol_sonucu?.uyusmazliklar?.length ?? 0) > 0;
                       return (
                         <tr key={k.id} className={`border-b last:border-0 hover:bg-white/[0.03] transition-colors animate-fade-up stagger-${Math.min(idx + 1, 8)}`} style={{ borderColor: CARD_BORDER }}>
-                          <td className="px-4 py-2.5">
+                          <td className="px-3 py-2">
                             <div className="text-xs font-bold font-mono text-white">{k.konteyner_no}</div>
                             <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || "-"}</div>
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-3 py-2">
                             <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
                             <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
-                          <td className="px-4 py-2.5 text-right">
+                          <td className="px-3 py-2 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
+                          <td className="px-3 py-2 text-right">
                             <div className="text-[10px]" style={{ color: TEXT_MUTED }}>Dara: {k.tare_kg ? `${k.tare_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
                             <div className="text-xs font-bold text-white mt-0.5">VGM: {k.vgm_kg ? `${k.vgm_kg.toLocaleString("tr-TR")} kg` : "-"}</div>
                           </td>
-                          <td className="px-4 py-2.5 text-center">
+                          <td className="px-3 py-2 text-center">
                             {k.irsaliye_dosya_url ? (
                               <a href={k.irsaliye_dosya_url} target="_blank" rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors"
@@ -592,7 +590,7 @@ export default function KantarPage() {
                               <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Yok</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-center">
+                          <td className="px-3 py-2 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <span title={uyusmazlik ? "Uyuşmazlık var" : k.dba_kontrol_sonucu?.elle_giris === true ? "Elle girilen tartım kaydı" : k.dba_kontrol_sonucu?.kaynak === "otomatik" ? "Onaylı · kantar bilgisayarından otomatik yüklendi" : "Onaylı"}>
                                 {uyusmazlik ? <AlertTriangle size={15} className="text-amber-400" /> : <CheckCircle2 size={15} className="text-emerald-400" />}
@@ -638,11 +636,27 @@ export default function KantarPage() {
         </div>
         </section>
 
-        {/* ===== SAG: YURT ICI (irsaliye) ===== */}
-        <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-4 2xl:min-h-0 2xl:rounded-2xl 2xl:border 2xl:p-4 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={16} />} baslik="Yurt İçi · İrsaliye" aciklama="İç piyasa iş emirleri ve gelen araçlar (alış) · araç başına irsaliye" />
-          {/* 30.10.2026: Gelen Arac · Alis ayni sutunda, satis is emirlerinin altinda (migration yoksa gorunmez) */}
-          <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} altBolum={<KantarGelenArac yenileTetik={yurtIciYenile} />} />
+        {/* ===== SAG: YURT ICI (irsaliye) - Satis / Alis sekmeleri (30.10.2026) ===== */}
+        <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
+          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={15} />} baslik="Yurt İçi · İrsaliye" aciklama="Satış: müşteriye giden araç · Alış: depodan gelen araç" />
+          <div role="tablist" aria-label="Yurt içi bölümleri" className="shrink-0 self-start inline-flex rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+            {([["satis", "Satış · İş Emirleri", yurtIciAcik], ["alis", "Alış · Gelen Araç", alisAcik]] as const).map(([k, etiket, sayi]) => (k === "alis" && alisAcik === null) ? null : (
+              <button key={k} role="tab" aria-selected={gorunenSekme === k} aria-controls={`kantar-yi-${k}`} onClick={() => sekmeSec(k)}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
+                style={gorunenSekme === k ? { backgroundColor: k === "alis" ? "#F59E0B" : ACCENT, color: k === "alis" ? "#111" : "white" } : { color: TEXT_MUTED }}>
+                {etiket} <span className="font-normal opacity-80">({sayi ?? "–"})</span>
+              </button>
+            ))}
+          </div>
+          <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 pb-4 xl:pb-6" style={{ scrollbarWidth: "thin" }}>
+            <div id="kantar-yi-satis" role="tabpanel" hidden={gorunenSekme !== "satis"}>
+              <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} />
+            </div>
+            {/* Alis bileseni hep bagli kalir (sayiyi bildirir); fonksiyonlar yoksa kendisi hicbir sey cizmez */}
+            <div id="kantar-yi-alis" role="tabpanel" hidden={gorunenSekme !== "alis"}>
+              <KantarGelenArac yenileTetik={yurtIciYenile} acikSayiBildir={setAlisAcik} />
+            </div>
+          </div>
         </section>
         </div>
       </div>
@@ -650,15 +664,25 @@ export default function KantarPage() {
   );
 }
 
-/** Kantar Paneli bolum basligi (Ihracat / Yurt Ici). Dar ekranda kaydirirken ustte sabit kalir. */
-function BolumBasligi({ id, ikon, baslik, aciklama }: { id: string; ikon: React.ReactNode; baslik: string; aciklama: string }) {
+/** Kantar Paneli bolum basligi (Ihracat / Yurt Ici). Dar ekranda kaydirirken ustte sabit kalir. Sagda kucuk sayaclar. */
+function BolumBasligi({ id, ikon, baslik, aciklama, sag }: { id: string; ikon: React.ReactNode; baslik: string; aciklama: string; sag?: React.ReactNode }) {
   return (
-    <div className="shrink-0 sticky top-0 z-20 2xl:static flex items-center gap-2.5 py-2 2xl:py-0 -mt-1 2xl:mt-0 bg-[rgba(11,15,20,0.92)] 2xl:bg-transparent">
-      <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>{ikon}</span>
-      <div className="min-w-0">
-        <h2 id={id} className="text-base font-bold text-white leading-tight">{baslik}</h2>
-        <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{aciklama}</p>
+    <div className="shrink-0 sticky top-0 z-20 xl:static flex items-center gap-2.5 py-2 xl:py-0 -mt-1 xl:mt-0 bg-[rgba(11,15,20,0.92)] xl:bg-transparent">
+      <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>{ikon}</span>
+      <div className="min-w-0 mr-auto">
+        <h2 id={id} className="text-sm font-bold text-white leading-tight">{baslik}</h2>
+        <p className="text-[11px] truncate" style={{ color: TEXT_MUTED }}>{aciklama}</p>
       </div>
+      {sag && <div className="flex items-center gap-1.5 shrink-0">{sag}</div>}
     </div>
+  );
+}
+
+/** Basliktaki kucuk sayac: "DBA bekleyen 3" (eski buyuk ozet kartlarinin yerine, 30.10.2026) */
+function Sayac({ etiket, deger, renk }: { etiket: string; deger: number; renk: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 px-2 py-1 rounded-md border text-[11px] whitespace-nowrap" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}>
+      {etiket} <span className={`text-sm font-bold ${renk}`}>{deger}</span>
+    </span>
   );
 }

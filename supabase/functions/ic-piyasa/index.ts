@@ -2,8 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   BILDIRIM_ETIKET, SITE_ADRESI, cikisAdresi, takipAdresi,
   MUSTERI_EPOSTA_SABLONLARI, musteriEpostaHtml, musteriEpostaKonusu, musteriEpostaMetni, sablonBul,
-  kapanisKonusu, kapanisOzeti,
+  kapanisOzeti,
 } from "../_shared/mesaj-sablonlari.ts";
+import { kapanisRaporHtml, kapanisRaporKonusu, type KapanisAraci } from "../_shared/ic-kapanis-rapor.ts";
 
 // ============================================================================
 // IC PIYASA (ic-piyasa) - 12.10.2026
@@ -134,7 +135,7 @@ async function resendGonder(govde: Record<string, unknown>): Promise<void> {
 // ---------------------------------------------------------------------------
 // Sirket ici e-postalar (lojistik / yetkili)
 // ---------------------------------------------------------------------------
-type Bildirim = { id: string; sablon: string; alici: string; hedef: string; alici_ad: string | null; degerler: string[]; dugme_eki: string | null; cc?: string[] | null };
+type Bildirim = { id: string; sablon: string; alici: string; hedef: string; alici_ad: string | null; degerler: string[]; dugme_eki: string | null; cc?: string[] | null; is_emri_id?: string | null };
 
 const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -163,21 +164,43 @@ ${btn}
 </td></tr></table></td></tr></table></body></html>`;
 }
 
-function epostaOlustur(b: Bildirim): { konu: string; html: string } {
-  // 30.10.2026: siparis kapanis raporu (alici "ekip"; migration 20261030180000). Hesap _shared/kapanisOzeti.
-  if (b.sablon === "siparis_kapanis") {
-    const o = kapanisOzeti(b.degerler || []);
-    const giris = o.fark.sonuc === "tam"
-      ? "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefle uyumlu."
-      : o.fark.sonuc === "eksik"
-        ? "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefin ALTINDA; eksik kalan miktarı kontrol edin."
-        : "İş emri tamamlandı olarak kapatıldı. Gerçekleşen miktar hedefin ÜSTÜNDE; fazla giden miktarı kontrol edin.";
-    return {
-      konu: kapanisKonusu(o),
-      html: epostaHtml(o.fark.sonuc === "tam" ? "Sipariş tamamlandı" : o.fark.sonuc === "eksik" ? "Sipariş eksik kapandı" : "Sipariş fazla kapandı", giris, o.satirlar, null,
-        "Bu rapor İhracat AI › İç Piyasa tarafından otomatik gönderildi. Müşteriye bu e-posta gitmez. Alıcılar: İç Piyasa › Bildirimler › Ayarlar."),
-    };
+/** REST okuma (service role). Hata -> null (rapor araç listesi olmadan yine gider). */
+async function restOku<T>(yol: string): Promise<T[] | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${yol}`, { headers: servis });
+    if (!res.ok) return null;
+    return (await res.json()) as T[];
+  } catch {
+    return null;
   }
+}
+
+/**
+ * 30.10.2026 (2. surum): siparis kapanis raporu - gunluk rapor gorunumu (_shared/ic-kapanis-rapor.ts).
+ * Hesap kapanisOzeti (degerler, kapanis anindaki toplamlar); arac listesi kayittan okunur.
+ */
+async function kapanisEpostasi(b: Bildirim): Promise<{ konu: string; html: string }> {
+  const o = kapanisOzeti(b.degerler || []);
+  const kapanisIso = String((b.degerler || [])[8] || "") || new Date().toISOString();
+  let araclar: KapanisAraci[] = [];
+  let ek: { kisa_ad?: string | null; teslim?: string | null; teslim_adresi?: string | null; musteri_siparis_no?: string | null } = {};
+  if (b.is_emri_id && /^[0-9a-f-]{36}$/.test(b.is_emri_id)) {
+    const [s, e] = await Promise.all([
+      restOku<KapanisAraci>(`ic_sevkler?is_emri_id=eq.${b.is_emri_id}&select=plaka,dorse_plaka,net_kg,irsaliye_no,olusturma,gecmis&order=olusturma.asc`),
+      restOku<{ teslim: string | null; teslim_adresi: string | null; musteri_siparis_no: string | null; ic_musteriler: { kisa_ad: string | null } | null }>(
+        `ic_is_emirleri?id=eq.${b.is_emri_id}&select=teslim,teslim_adresi,musteri_siparis_no,ic_musteriler(kisa_ad)`),
+    ]);
+    araclar = (s || []).map((x) => ({ ...x, net_kg: Number(x.net_kg) }));
+    const r = e?.[0];
+    if (r) ek = { kisa_ad: r.ic_musteriler?.kisa_ad ?? null, teslim: r.teslim, teslim_adresi: r.teslim_adresi, musteri_siparis_no: r.musteri_siparis_no };
+  }
+  return {
+    konu: kapanisRaporKonusu(o, ek.kisa_ad),
+    html: kapanisRaporHtml(o, { kisaAd: ek.kisa_ad, teslim: ek.teslim, teslimAdresi: ek.teslim_adresi, musteriSiparisNo: ek.musteri_siparis_no, araclar }, kapanisIso),
+  };
+}
+
+function epostaOlustur(b: Bildirim): { konu: string; html: string } {
   const [plaka, siparis, urun, net, saat] = b.degerler.map((d) => String(d ?? "-"));
   const satirlar: [string, string][] = [["Plaka", plaka], ["Sipariş", siparis], ["Ürün", urun], ["Net miktar", net]];
   const cikisDugme = b.dugme_eki ? { metin: "Çıkışı bildir", adres: cikisAdresi(b.dugme_eki) } : null;
@@ -235,7 +258,7 @@ async function kuyruguIsle(): Promise<{ zamanlanan: number; gonderilen: number; 
         const e = await musteriEpostasi(b.sablon, (b.degerler || []).map((d) => String(d ?? "")), bilgi);
         await resendGonder({ ...e, to: [b.hedef], ...cc });
       } else {
-        const { konu, html } = epostaOlustur(b);
+        const { konu, html } = b.sablon === "siparis_kapanis" ? await kapanisEpostasi(b) : epostaOlustur(b);
         await resendGonder({ from: GONDEREN, to: [b.hedef], ...cc, subject: konu, html });
       }
       await rpc("ic_bildirim_eposta_sonuc", { p_id: b.id, p_basarili: true });

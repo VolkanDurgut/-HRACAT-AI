@@ -2511,6 +2511,26 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   `edge/test.mjs` (eski A–F + G kapanış); Playwright `kantar.mjs` (4 genişlik + sekmeler + pencereler),
   `ic.mjs` (rozetler, filtre, Bildirimler ayarı). Regresyon: alis/e2e.mjs (sekme + "Teslim al" için
   güncellendi) 47, sf/e2e2/3/5/8, sf/kantar_irs ("Araç ekle"), kantar/e2e.mjs, km/e2e.mjs.
+- KAPANIŞ E-POSTASI 2. SÜRÜM (30.10.2026 akşam, kullanıcı: "Gelen mail görünümü çok kötü. İhracat
+  günlük rapordaki gibi bir sistem yapmalıyız; sipariş aşımı panelde zaten tespit ediliyor"):
+  `supabase/functions/_shared/ic-kapanis-rapor.ts` (SAF, yalnız HTML/konu; hesap yine `kapanisOzeti`)
+  — günlük raporun dili: logo + "Unex Gıda İç Piyasa / Sipariş Kapanış Raporu" + sağda IE no ve kapanış
+  saati, 3 özet kutusu (Sipariş Hedefi · Gerçekleşen · Sonuç; renk tam yeşil / eksik amber / fazla
+  LACİVERT — aşım alarm gibi gösterilmez), tam değilse sakin bilgi kutusu, "Sipariş Bilgileri"
+  (müşteri kısa ad + ünvan, ürün, teslim, sipariş tarihi, kapanış · kapatan · süre gün), "Araç Bazında
+  Sevkiyat" (tarih, plaka/dorse, irsaliye no, net; sistem öncesi etiketli; toplam), yeşil "İş emirlerini
+  uygulamada aç". Konu: "İç Piyasa Kapanış Raporu — IE… · {kısa ad} | 264,04 / 300 ton · Eksik 35,96
+  ton (%12)". Edge `ic-piyasa` (canlı v10): `kapanisEpostasi` araçları + teslim/kısa adı service role
+  REST ile okur (is_emri_id UUID biçimi doğrulanır); okunamazsa rapor araç listesi olmadan YİNE gider.
+  `epostaOlustur`'dan eski kapanış dalı kaldırıldı; `kapanisKonusu` (eski) Next tarafında duruyor.
+  Deploy dosyaları ÜÇ: `index.ts`, `../_shared/ic-kapanis-rapor.ts`, `../_shared/mesaj-sablonlari.ts`.
+  DERS (v9): deploy içeriği elle kopyalanırken `MUSTERI_EPOSTA_SABLONLARI`'ndan bir öğe düştü → v10 ile
+  düzeltildi; HER DEPLOY SONRASI `get_edge_function` çıktısı repo dosyalarıyla birebir karşılaştırılır.
+  Test: `kapanis/edge/test.mjs` G bölümü (konu, kutular, araç tablosu, servis anahtarı, veri yokken
+  gönderim, geçersiz id sorgulanmaz). Görsel: `kap2/` (900/390).
+- 30.10 akşam: lojistiğin TOPLU girdiği 4 araç (IE-0007: 45 PA 4585, 03 AFU 638; IE-0008: 01 V 0138,
+  01 ASL 807) kullanıcı isteğiyle `cikti` + `cikis_isleyen='Toplu yükleme (lojistik, 30.10)'`
+  (müşteri mesajı ÜRETİLMEDİ). NOT: IE-0007 bununla 318.940 / 300.000 kg (hedef aşıldı).
 
 ## Genel çalışma prensibi
 

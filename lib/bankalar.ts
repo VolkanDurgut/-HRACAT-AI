@@ -37,8 +37,8 @@ export const BANKA_PRESETLERI: {
     goruntulenenAd: "Ziraat Bankası",
     banka: "T.C. ZIRAAT BANKASI",
     swift: "TCZBTR2A",
-    usd: { hesap_numarasi: "27 0897 5159 0150 06", iban: "TR82 0001 0027 0897 5159 0150 06" },
-    eur: { hesap_numarasi: "27 0897 5159 0150 07", iban: "TR55 0001 0027 0897 5159 0150 07" },
+    usd: { hesap_numarasi: "106-97515901-5020", iban: "TR 3400 0100 0106 9751 5901 5020" },
+    eur: { hesap_numarasi: "106-97515901-5021", iban: "TR 0700 0100 0106 9751 5901 5021" },
   },
 ];
 

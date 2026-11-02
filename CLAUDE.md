@@ -2042,6 +2042,35 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Sonraki adım (konuşuldu, yapılmadı): ürün bazında birleşik onay + toplu satın alma listesi;
   ürün geçmişinde yanlış yazımları gizleme / birleştirme ekranı.
 
+### Katalog, tedarikçi, toplu ekleme, haftalık liste (31.10.2026)
+- Kullanıcı: "Her hafta perşembe sipariş veriliyor (mutfak alışveriş listesi, Excel); Burak Bey
+  onayı gerekiyor" + "ÜRÜNLER HER SEFERİNDE KENDİNİ OTOMATİK KAYIT ETSİN… bir süre sonra
+  seçerek ilerleyebilmeliyiz."
+- Migration `20261031100000_satin_alma_katalog_haftalik.sql` (CANLIDA, adı
+  `satin_alma_katalog_haftalik`; repo dosyası canlı `schema_migrations.statements` metninden
+  birebir, md5 ee02bfd2…): birimler + gr / kova / bidon; `satin_alma_kalemleri.tedarikci`;
+  katalog (`satin_alma_urunleri`) + tedarikci / son_miktar; `sa_token_urunler` departmana özel
+  `dep_*` alanları; `sa_token_kalemler_ekle` (toplu, ≤100, formda olan atlanır, geçersiz satır
+  hepsini geri alır, `olusturma = clock_timestamp()` sıra korunur); departman `haftalik_gun`
+  (1=Pzt..7), `hatirlatma_eposta` (≤3), `son_hatirlatma`; `sa_departman_haftalik` (yetkili),
+  `sa_haftalik_hatirlatma_al / _sonuc` (service_role).
+- Edge `satin-alma` v9 (canlı = repo, birebir doğrulandı): `kalemler_ekle`, `haftalik_hatirlatma`
+  (pg_cron `satin-alma-haftalik` 06:00 UTC = 09:00 TR, MCP ile kuruldu, komut repoda YOK).
+  Haftalık departmanın onay e-postası konusu "Haftalık satın alma listesi: …"; onaylı fiş
+  e-postası ve `/cek` onaylananları TEDARİKÇİYE göre gruplar (ilk görünüş sırası,
+  belirtilmemiş en sonda, sıra no gruplar boyunca ardışık).
+- `/talep`: "Hızlı liste" — Katalogdan seç / Geçen listeyi kopyala (reddedilen seçili gelmez) /
+  Excel'den yükle (`lib/satin-alma/excel.ts`, jszip + düzenli ifade, YAPAY ZEKÂ YOK; sütunlar
+  başlık + İÇERİĞE göre: örnek dosyada 2. "Birim" sütunu ürün adı; "NOT: X" → açıklama;
+  bilinmeyen birim / okunamayan miktar turuncu işaretlenir, SESSİZCE ATLANMAZ). Panel
+  `components/satin-alma-toplu.tsx`; formda olan ürün "Formda var", tekrar "Listede tekrar".
+  Kalemde Tedarikçi alanı (datalist); öneride "son 8 Kova · 1 kez aldınız · CEM MARKET".
+- `/satin-alma` Departmanlar: "Haftalık liste" sütunu (gün + hatırlatma e-postası).
+- 02.11.2026 NOT: ilk teslimden önce çalışma ortamı sıfırlandı, commit'lenmemiş ekran kodu
+  kayboldu; migration + edge canlıdan birebir geri alındı, ekranlar yeniden yazıldı. Test:
+  Excel okuyucu birim testi + Playwright 46 kontrol (taklit edge, gerçek Excel 49 kalem).
+  DERS: her parça bitince HEMEN commit + bundle.
+
 ## Kontrol Merkezi → Analiz, özet kartları Ana Panel'de (28.10.2026)
 
 - Kullanıcı: "Mevcut Kontrol Merkezi kaldırılmalı; Analiz sayfası Kontrol Merkezi olarak devam

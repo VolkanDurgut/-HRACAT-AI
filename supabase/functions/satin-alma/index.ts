@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { gonderimMaili, sonucMaili, type SaListe } from "../_shared/satin-alma.ts";
+import { gonderimMaili, haftalikHatirlatmaMaili, sonucMaili, type HaftalikHatirlatma, type SaListe } from "../_shared/satin-alma.ts";
 
 // ============================================================================
 // SATIN ALMA (satin-alma) - 26.10.2026
@@ -12,6 +12,11 @@ import { gonderimMaili, sonucMaili, type SaListe } from "../_shared/satin-alma.t
 //  - "kalem_miktar": { token, kalem_id, miktar, acil? } (28.10.2026: mukerrer yerine miktar artir)
 //  - "urunler"    : daha once siparis verilen urunler (gonderilen formlardan; oneri listesi)
 //  - "gonder"     : { token, gonderen }   -> SA-YYYY-NNNN, execution@ + bbt@'ye mail
+//  - "kalemler_ekle": { token, kalemler[], talep_eden } (31.10.2026: Excel / gecen liste /
+//                   katalog secimi; formda olan urun atlanir, gecersiz satir hepsini geri alir)
+// Zamanlanmis (pg_cron, anon anahtar):
+//  - "haftalik_hatirlatma": bugun haftalik liste gunu olan ve bu hafta form gondermemis
+//                   departmanlarin hatirlatma adreslerine e-posta (gunde bir kez; DB isaretler)
 // Girissiz Unex cek listesi sayfasi (/cek/[token]) - execution@'ye giden mailden:
 //  - "cek_bilgi"     : onaylanan kalemler + alindi durumlari
 //  - "cek_isaretle"  : { token, kalem_id, alindi, ad }
@@ -130,7 +135,7 @@ Deno.serve(async (req: Request) => {
   const islem = govde.islem;
   try {
     // ---------------- Girissiz departman sayfasi ----------------
-    if (islem === "bilgi" || islem === "kalem_ekle" || islem === "kalem_sil" || islem === "kalem_miktar" || islem === "urunler" || islem === "gonder") {
+    if (islem === "bilgi" || islem === "kalem_ekle" || islem === "kalemler_ekle" || islem === "kalem_sil" || islem === "kalem_miktar" || islem === "urunler" || islem === "gonder") {
       if (!tokenGecerli(govde.token)) return json({ hata: "Bağlantı geçersiz." }, 404);
       const token = govde.token;
       if (islem === "bilgi") {
@@ -142,10 +147,25 @@ Deno.serve(async (req: Request) => {
         const kalem = {
           kategori: metin(k.kategori, 20), urun: metin(k.urun, 200), miktar: k.miktar,
           birim: metin(k.birim, 20), aciliyet: k.aciliyet === "acil" ? "acil" : "normal",
-          aciklama: metin(k.aciklama, 500), talep_eden: metin(k.talep_eden, 80),
+          aciklama: metin(k.aciklama, 500), talep_eden: metin(k.talep_eden, 80), tedarikci: metin(k.tedarikci, 80),
         };
         const id = await rpc<string>("sa_token_kalem_ekle", { p_token: token, p_kalem: kalem });
         return json({ basarili: true, id });
+      }
+      if (islem === "kalemler_ekle") {
+        if (!Array.isArray(govde.kalemler) || govde.kalemler.length === 0) return json({ hata: "Eklenecek kalem yok." }, 400);
+        if (govde.kalemler.length > 100) return json({ hata: "Tek seferde en fazla 100 kalem eklenebilir." }, 400);
+        const kalemler = (govde.kalemler as unknown[]).map((x) => {
+          const k = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+          return {
+            kategori: metin(k.kategori, 20), urun: metin(k.urun, 200), miktar: k.miktar,
+            birim: metin(k.birim, 20), aciliyet: k.aciliyet === "acil" ? "acil" : "normal",
+            aciklama: metin(k.aciklama, 500), tedarikci: metin(k.tedarikci, 80),
+          };
+        });
+        const sonuc = await rpc<{ eklenen: number; atlanan: { sira: number; urun: string; neden: string }[] }>(
+          "sa_token_kalemler_ekle", { p_token: token, p_kalemler: kalemler, p_talep_eden: metin(govde.talep_eden, 80) });
+        return json({ basarili: true, ...sonuc });
       }
       if (islem === "urunler") {
         const urunler = await rpc<unknown[] | null>("sa_token_urunler", { p_token: token });
@@ -167,6 +187,29 @@ Deno.serve(async (req: Request) => {
       const liste = await rpc<SaListe>("sa_token_liste_gonder", { p_token: token, p_gonderen: metin(govde.gonderen, 80) });
       const sonuc = await mailGonderVeKaydet("gonderim", liste);
       return json({ basarili: true, liste_no: liste.liste_no, mail: sonuc.mail, test: liste.test === true });
+    }
+
+    // ---------------- Zamanlanmis: haftalik liste hatirlatmasi ----------------
+    if (islem === "haftalik_hatirlatma") {
+      const liste = await rpc<(HaftalikHatirlatma & { id: string; alicilar: string[] })[]>("sa_haftalik_hatirlatma_al", {});
+      let gonderilen = 0;
+      let hatali = 0;
+      for (const h of liste || []) {
+        const to = h.test === true ? TEST_ALICILARI : (h.alicilar || []).filter((a) => EPOSTA.test(a));
+        let basarili = false;
+        try {
+          if (!to.length) throw new Error("Alıcı yok.");
+          const { konu, html } = haftalikHatirlatmaMaili(h);
+          await resendGonder(to, konu, html);
+          basarili = true;
+          gonderilen++;
+        } catch (e) {
+          hatali++;
+          console.error("haftalik hatirlatma:", h.departman, e instanceof Error ? e.message : e);
+        }
+        await rpc("sa_haftalik_hatirlatma_sonuc", { p_id: h.id, p_basarili: basarili }).catch(() => {});
+      }
+      return json({ basarili: true, departman: (liste || []).length, gonderilen, hatali });
     }
 
     // ---------------- Girissiz cek listesi ----------------

@@ -1,15 +1,20 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, History, Info, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, FileSpreadsheet, History, Info, ListChecks, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import {
   AcilEtiketi, B, BelgeSayfasi, BilgiAlani, DurumEtiketi, Panel, TestSeridi,
   dugmeAna, dugmeIkincil, girdiSinifi, girdiStil, tdSinifi, thSinifi,
 } from "@/components/satin-alma-belge";
 import { satinAlmaCagir, miktarOku } from "@/lib/satin-alma/api";
+import { excelDosyasiOku } from "@/lib/satin-alma/excel";
+import {
+  TopluEklemePaneli, TopluSonucNotu, excelSatirlari, katalogSatirlari, kopyaSatirlari,
+  type TopluKaynak, type TopluSatir, type TopluSonuc,
+} from "@/components/satin-alma-toplu";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
 import {
-  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarBirim, miktarYaz, saTarih, urunEslesme, urunNorm,
+  BIRIMLER, HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarBirim, miktarYaz, saTarih, urunEslesme, urunNorm,
   type Birim, type Kategori, type SaKalem, type SaListe, type SaUrun,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -25,18 +30,22 @@ import {
  * kategori + birim dolar); ayni formda ayni urun ikinci satir olarak eklenmez ("Mevcut
  * kalemi X yap" ile miktar artirilir; sunucu da engeller); urun departmanin baska bir
  * formunda onay bekliyorsa ya da son 30 gunde onaylandiysa bilgi notu gosterilir.
+ * 31.10.2026: HIZLI LISTE (Katalogdan sec / Gecen listeyi kopyala / Excel'den yukle;
+ * components/satin-alma-toplu.tsx), kalemde Tedarikci (ops.; fiste gruplama), oneride
+ * departmanin son miktari / birimi / tedarikcisi, basliklarda haftalik liste gunu.
  */
 
 type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden"> & { liste_no: string; karar_zamani: string };
-type Bilgi = { departman: string; test?: boolean; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
+type Bilgi = { departman: string; test?: boolean; haftalik_gun?: number | null; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
 
 // 27.10.2026: ad tarayicida HATIRLANMAZ (kullanici: "her departman isim belirtmeli,
 // Volkan Durgut olarak gelmemeli"). Eski surumun kaydettigi deger ilk acilista silinir.
 const ESKI_AD_ANAHTARI = "sa-talep-ad";
 const ALIM_SAYFA = 15;
 
-type Form = { kategori: Kategori | ""; urun: string; miktar: string; birim: Birim; aciliyet: "normal" | "acil"; aciklama: string };
-const BOS_FORM: Form = { kategori: "", urun: "", miktar: "", birim: "adet", aciliyet: "normal", aciklama: "" };
+type Form = { kategori: Kategori | ""; urun: string; miktar: string; birim: Birim; aciliyet: "normal" | "acil"; aciklama: string; tedarikci: string };
+const BOS_FORM: Form = { kategori: "", urun: "", miktar: "", birim: "adet", aciliyet: "normal", aciklama: "", tedarikci: "" };
+type TopluDurum = { kaynak: TopluKaynak; satirlar: TopluSatir[]; altBaslik?: string; uyarilar?: string[]; surum: number };
 
 const OTUZ_GUN_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -88,6 +97,12 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const [urunler, setUrunler] = useState<SaUrun[]>([]);
   const [birlesiyor, setBirlesiyor] = useState(false);
   const [formBilgisi, setFormBilgisi] = useState<string | null>(null);
+  const [toplu, setToplu] = useState<TopluDurum | null>(null);
+  const [topluEkleniyor, setTopluEkleniyor] = useState(false);
+  const [topluHata, setTopluHata] = useState<string | null>(null);
+  const [topluSonuc, setTopluSonuc] = useState<TopluSonuc | null>(null);
+  const [excelOkunuyor, setExcelOkunuyor] = useState(false);
+  const excelGirdi = useRef<HTMLInputElement>(null);
 
   useEffect(() => { try { window.localStorage.removeItem(ESKI_AD_ANAHTARI); } catch { /* yoksay */ } }, []);
 
@@ -117,10 +132,14 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   // Oneriden secim: ad + kategori + birim dolar, imlec miktara gecer
   const urunSec = (u: SaUrun) => {
     setFormBilgisi(null);
+    // 31.10.2026: departmanin son birimi / miktari (miktar bos ise) ve katalogdaki tedarikci
+    const birim = u.dep_son_birim && u.dep_son_birim in BIRIMLER ? u.dep_son_birim : u.birim;
     setForm((f) => ({
       ...f, urun: u.ad,
       kategori: u.kategori in KATEGORILER ? u.kategori : f.kategori,
-      birim: u.birim in BIRIMLER ? u.birim : f.birim,
+      birim: birim in BIRIMLER ? birim : f.birim,
+      miktar: f.miktar.trim() ? f.miktar : u.dep_son_miktar != null ? miktarYaz(u.dep_son_miktar) : f.miktar,
+      tedarikci: f.tedarikci.trim() ? f.tedarikci : u.tedarikci || "",
     }));
     setTimeout(() => document.getElementById("sa-miktar")?.focus(), 0);
   };
@@ -134,7 +153,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
     const r = await satinAlmaCagir({ islem: "kalem_miktar", token: params.token, kalem_id: mevcut.id, miktar: toplam, acil: form.aciliyet === "acil" });
     setBirlesiyor(false);
     if (!r.ok) { setFormHatasi(r.hata); getir(true); return; }
-    setForm((f) => ({ ...BOS_FORM, kategori: f.kategori, birim: f.birim }));
+    setForm((f) => ({ ...BOS_FORM, kategori: f.kategori, birim: f.birim, tedarikci: f.tedarikci }));
     setFormBilgisi(`${mevcut.urun}: miktar ${miktarBirim({ miktar: toplam, birim: mevcut.birim })} olarak güncellendi.`);
     getir(true);
     setTimeout(() => document.getElementById("sa-urun")?.focus(), 0);
@@ -159,14 +178,60 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
     setEkleniyor(true);
     const r = await satinAlmaCagir<{ id: string }>({
       islem: "kalem_ekle", token: params.token,
-      kalem: { kategori: form.kategori, urun: form.urun.trim(), miktar, birim: form.birim, aciliyet: form.aciliyet, aciklama: form.aciklama.trim(), talep_eden: adSoyadDuzelt(ad) },
+      kalem: { kategori: form.kategori, urun: form.urun.trim(), miktar, birim: form.birim, aciliyet: form.aciliyet, aciklama: form.aciklama.trim(), talep_eden: adSoyadDuzelt(ad), tedarikci: form.tedarikci.trim() },
     });
     setEkleniyor(false);
     if (!r.ok) { setFormHatasi(r.hata); return; }
-    // Kategori + birim ayni kalir (art arda benzer kalemler hizli girilsin)
-    setForm((f) => ({ ...BOS_FORM, kategori: f.kategori, birim: f.birim }));
+    // Kategori + birim + tedarikci ayni kalir (art arda benzer kalemler hizli girilsin)
+    setForm((f) => ({ ...BOS_FORM, kategori: f.kategori, birim: f.birim, tedarikci: f.tedarikci }));
     getir(true);
     setTimeout(() => document.getElementById("sa-urun")?.focus(), 0);
+  };
+
+  // ---------------- Hizli liste (toplu ekleme) ----------------
+  const topluAc = (kaynak: "katalog" | "kopya") => {
+    setTopluHata(null); setTopluSonuc(null); setFormHatasi(null);
+    if (kaynak === "katalog") {
+      setToplu({ kaynak, satirlar: katalogSatirlari(urunler), altBaslik: "Daha önce sipariş verilen ürünler", surum: Date.now() });
+      return;
+    }
+    const son = bilgi?.gecmis[0];
+    if (!son) return;
+    setToplu({ kaynak, satirlar: kopyaSatirlari(son.kalemler), altBaslik: `${son.liste_no} · ${saTarih(son.gonderim_zamani).slice(0, 10)}`, surum: Date.now() });
+  };
+  const excelSec = async (dosya: File | undefined) => {
+    if (excelGirdi.current) excelGirdi.current.value = "";
+    if (!dosya) return;
+    setTopluHata(null); setTopluSonuc(null); setFormHatasi(null);
+    setExcelOkunuyor(true);
+    try {
+      const s = await excelDosyasiOku(dosya);
+      if (!s.satirlar.length) { setFormHatasi(s.uyarilar[0] || "Excel'de kalem bulunamadı."); return; }
+      setToplu({ kaynak: "excel", satirlar: excelSatirlari(s.satirlar), altBaslik: `${dosya.name}${s.baslik ? ` · ${s.baslik}` : ""}`, uyarilar: s.uyarilar, surum: Date.now() });
+    } catch (e) {
+      setFormHatasi(e instanceof Error ? e.message : "Excel dosyası okunamadı.");
+    } finally {
+      setExcelOkunuyor(false);
+    }
+  };
+  const topluEkle = async (secilen: TopluSatir[]) => {
+    setTopluHata(null);
+    if (!adSoyadGecerli(ad)) {
+      setTopluHata("Önce yukarıdaki “Talep eden (ad soyad)” alanını doldurun; tüm kalemler bu adla eklenir.");
+      document.getElementById("sa-ad")?.focus();
+      return;
+    }
+    const kalemler = secilen.map((s) => ({
+      kategori: s.kategori, urun: s.urun.trim(), miktar: miktarOku(s.miktar), birim: s.birim,
+      aciliyet: s.aciliyet, aciklama: s.aciklama.trim(), tedarikci: s.tedarikci.trim(),
+    }));
+    setTopluEkleniyor(true);
+    const r = await satinAlmaCagir<TopluSonuc>({ islem: "kalemler_ekle", token: params.token, kalemler, talep_eden: adSoyadDuzelt(ad) });
+    setTopluEkleniyor(false);
+    if (!r.ok) { setTopluHata(r.hata); getir(true); return; }
+    setToplu(null);
+    setTopluSonuc({ eklenen: r.veri.eklenen, atlanan: r.veri.atlanan || [] });
+    getir(true);
   };
 
   const sil = async (id: string) => {
@@ -210,6 +275,8 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   const taslakOzet = listeOzeti({ kalemler: taslakKalemleri });
   const sonGonderim = bilgi.gecmis[0];
   const alimlar = bilgi.onaylananlar ?? [];
+  const tedarikciListesi = Array.from(new Set([...urunler.map((u) => u.tedarikci), ...taslakKalemleri.map((k) => k.tedarikci)]
+    .map((t) => (t || "").trim().toLocaleUpperCase("tr-TR")).filter(Boolean))).sort((a, b) => a.localeCompare(b, "tr"));
 
   return (
     <BelgeSayfasi modul="Satın Alma Talep Formu">
@@ -227,12 +294,15 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
               <RefreshCw size={14} className={yenileniyor ? "animate-spin" : ""} /> Yenile
             </button>
           </div>
-          <div className="px-4 sm:px-6 py-4 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
+          <div className={`px-4 sm:px-6 py-4 grid grid-cols-2 ${bilgi.haftalik_gun ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-x-6 gap-y-3`}>
             <BilgiAlani etiket="Talep eden departman">{bilgi.departman}</BilgiAlani>
             <BilgiAlani etiket="Form tarihi">{bugun()}</BilgiAlani>
             <BilgiAlani etiket="Form durumu">
               {taslakOzet.toplam ? <DurumEtiketi renk={B.turuncu}>Hazırlanıyor · {taslakOzet.toplam} kalem</DurumEtiketi> : <span style={{ color: B.soluk }} className="font-medium">Boş</span>}
             </BilgiAlani>
+            {bilgi.haftalik_gun ? (
+              <BilgiAlani etiket="Haftalık liste günü">{HAFTA_GUNLERI[bilgi.haftalik_gun] ?? "-"}</BilgiAlani>
+            ) : null}
             <BilgiAlani etiket="Son gönderim">
               {sonGonderim ? <span>{sonGonderim.liste_no} <span className="font-normal" style={{ color: B.soluk }}>· {saTarih(sonGonderim.gonderim_zamani).slice(0, 10)}</span></span> : <span style={{ color: B.soluk }} className="font-medium">—</span>}
             </BilgiAlani>
@@ -256,6 +326,32 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
         {/* Talep kalemleri */}
         <Panel baslik="Talep kalemleri" govdeSinifi="p-0"
           sag={<span className="text-xs" style={{ color: B.soluk }}>{taslakOzet.toplam} kalem{taslakOzet.acil ? <> · <b style={{ color: B.kirmizi }}>{taslakOzet.acil} acil</b></> : null}</span>}>
+          {/* Hizli liste (31.10.2026) */}
+          <div className="px-4 sm:px-5 py-2.5 border-b flex flex-wrap items-center gap-2" style={{ borderColor: B.cizgi }}>
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] mr-1" style={{ color: B.soluk }}>Hızlı liste</span>
+            <button type="button" onClick={() => topluAc("katalog")} disabled={!urunler.length} className={`${dugmeIkincil} h-8 text-[13px]`} style={{ borderColor: B.cizgi }}
+              title={urunler.length ? "Daha önce sipariş verilen ürünlerden seçerek ekleyin" : "Henüz kayıtlı ürün yok; gönderilen formlardaki ürünler otomatik kaydolur"} data-testid="katalog-ac">
+              <ListChecks size={14} /> Katalogdan seç{urunler.length ? ` (${urunler.length})` : ""}
+            </button>
+            {sonGonderim && (
+              <button type="button" onClick={() => topluAc("kopya")} className={`${dugmeIkincil} h-8 text-[13px]`} style={{ borderColor: B.cizgi }} data-testid="kopya-ac">
+                <Copy size={14} /> Geçen listeyi kopyala <span className="font-mono text-[11.5px]" style={{ color: B.soluk }}>{sonGonderim.liste_no}</span>
+              </button>
+            )}
+            <button type="button" onClick={() => excelGirdi.current?.click()} disabled={excelOkunuyor} className={`${dugmeIkincil} h-8 text-[13px]`} style={{ borderColor: B.cizgi }}
+              title="Alışveriş listesi Excel dosyası (.xlsx): Miktar, Birim, Ürün, Kategori, Tedarikçi">
+              {excelOkunuyor ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} {"Excel'den yükle"}
+            </button>
+            <input ref={excelGirdi} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
+              data-testid="excel-girdi" onChange={(e) => excelSec(e.target.files?.[0])} />
+          </div>
+          {toplu && (
+            <TopluEklemePaneli key={toplu.surum} kaynak={toplu.kaynak} altBaslik={toplu.altBaslik} ilkSatirlar={toplu.satirlar}
+              formdakiler={taslakKalemleri.map((k) => k.urun)} uyarilar={toplu.uyarilar} ekleniyor={topluEkleniyor} hata={topluHata}
+              onEkle={topluEkle} onKapat={() => { setToplu(null); setTopluHata(null); }} />
+          )}
+          {topluSonuc && !toplu && <TopluSonucNotu sonuc={topluSonuc} />}
+
           {/* Yeni kalem girisi */}
           <form onSubmit={ekle} noValidate className="px-4 sm:px-5 py-4 border-b" style={{ borderColor: B.cizgi, backgroundColor: "#FAFBFC" }}>
             <div className="grid grid-cols-2 sm:grid-cols-12 gap-x-3 gap-y-3">
@@ -288,7 +384,11 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                   <option value="acil">Acil</option>
                 </select>
               </Etiket>
-              <Etiket metin="Açıklama / kullanım amacı (isteğe bağlı)" htmlFor="sa-not" className="col-span-2 sm:col-span-4">
+              <Etiket metin="Tedarikçi (isteğe bağlı)" htmlFor="sa-tedarikci" className="col-span-2 sm:col-span-2">
+                <input id="sa-tedarikci" value={form.tedarikci} onChange={(e) => alan("tedarikci", e.target.value)} maxLength={80} list="sa-tedarikciler"
+                  placeholder="Ör. CEM MARKET" className={girdiSinifi} style={girdiStil} />
+              </Etiket>
+              <Etiket metin="Açıklama (isteğe bağlı)" htmlFor="sa-not" className="col-span-2 sm:col-span-2">
                 <input id="sa-not" value={form.aciklama} onChange={(e) => alan("aciklama", e.target.value)} maxLength={500}
                   placeholder="Marka, ölçü, renk, kullanım yeri" className={girdiSinifi} style={girdiStil} />
               </Etiket>
@@ -301,6 +401,9 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
             {kontrol && <KontrolNotlari kontrol={kontrol} miktar={miktarOku(form.miktar)} birim={form.birim} birlesiyor={birlesiyor} onBirlestir={birlestir} />}
             {formHatasi && <p className="mt-2.5 text-[13px] font-medium" role="alert" style={{ color: B.kirmizi }}>{formHatasi}</p>}
             {formBilgisi && <p className="mt-2.5 text-[13px] font-medium flex items-center gap-1.5" role="status" style={{ color: B.yesil }}><CheckCircle2 size={14} /> {formBilgisi}</p>}
+            <datalist id="sa-tedarikciler">
+              {tedarikciListesi.map((t) => <option key={t} value={t} />)}
+            </datalist>
           </form>
 
           {/* Eklenen kalemler */}
@@ -511,7 +614,7 @@ function UrunGirdisi({ deger, onDegis, onSec, urunler }: {
                 className="px-3 py-1.5 cursor-pointer" style={i === etkin ? { backgroundColor: "#EEF1F8" } : undefined}>
                 <span className="block text-sm font-medium break-words" style={{ color: B.metin }}>{u.ad}</span>
                 <span className="block text-[11px]" style={{ color: B.soluk }}>
-                  {KATEGORILER[u.kategori] ?? u.kategori} · {BIRIMLER[u.birim] ?? u.birim} · {u.kullanim} kez talep edildi
+                  {oneriAciklamasi(u)}
                 </span>
               </li>
             ))}
@@ -520,6 +623,20 @@ function UrunGirdisi({ deger, onDegis, onSec, urunler }: {
       )}
     </div>
   );
+}
+
+/** Oneri alt satiri: departman aldiysa "son 8 Kova · 3 kez aldiniz · CEM MARKET", yoksa genel. */
+function oneriAciklamasi(u: SaUrun): string {
+  const parcalar: string[] = [];
+  if (u.dep_kullanim) {
+    const b = (u.dep_son_birim || u.birim) as Birim;
+    if (u.dep_son_miktar != null) parcalar.push(`son ${miktarYaz(u.dep_son_miktar)} ${BIRIMLER[b] ?? b}`);
+    parcalar.push(`${u.dep_kullanim} kez aldınız`);
+  } else {
+    parcalar.push(KATEGORILER[u.kategori] ?? u.kategori, BIRIMLER[u.birim] ?? u.birim, `${u.kullanim} kez talep edildi`);
+  }
+  if (u.tedarikci) parcalar.push(u.tedarikci);
+  return parcalar.join(" · ");
 }
 
 /** Yazilan urun icin uyari / bilgi notlari (mukerrer, onay bekleyen, son 30 gun). */
@@ -618,6 +735,7 @@ function KalemTablosu({ kalemler, karar = false, sikistir = false, sonIslem }: {
                 <td className={tdSinifi}>
                   <span className="font-medium break-words">{k.urun}</span>
                   {k.aciklama && <span className="block text-xs mt-0.5 break-words" style={{ color: B.soluk }}>{k.aciklama}</span>}
+                  {k.tedarikci && <span className="block text-xs mt-0.5" style={{ color: B.soluk }}>Tedarikçi: {k.tedarikci}</span>}
                   {karar && k.karar === "reddedildi" && k.red_nedeni && <span className="block text-xs mt-0.5" style={{ color: B.kirmizi }}>Red nedeni: {k.red_nedeni}</span>}
                 </td>
                 <td className={`${tdSinifi} text-right tabular-nums font-semibold whitespace-nowrap`}>{miktarYaz(k.miktar)}</td>
@@ -641,6 +759,7 @@ function KalemTablosu({ kalemler, karar = false, sikistir = false, sonIslem }: {
                 <b className="tabular-nums" style={{ color: B.metin }}>{miktarYaz(k.miktar)} {BIRIMLER[k.birim] ?? k.birim}</b> · {KATEGORILER[k.kategori] ?? k.kategori} · {k.talep_eden}
               </p>
               {k.aciklama && <p className="text-xs mt-0.5 break-words" style={{ color: B.soluk }}>{k.aciklama}</p>}
+              {k.tedarikci && <p className="text-xs mt-0.5" style={{ color: B.soluk }}>Tedarikçi: {k.tedarikci}</p>}
               {karar && <div className="mt-1"><KalemKarari k={k} /></div>}
               {karar && k.karar === "reddedildi" && k.red_nedeni && <p className="text-xs mt-0.5" style={{ color: B.kirmizi }}>Red nedeni: {k.red_nedeni}</p>}
             </div>

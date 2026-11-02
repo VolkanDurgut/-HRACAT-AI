@@ -7,7 +7,9 @@ import {
 } from "@/components/satin-alma-belge";
 import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
-import { BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih, type SaListe } from "@/supabase/functions/_shared/satin-alma";
+import {
+  BIRIMLER, KATEGORILER, listeOzeti, miktarYaz, saTarih, tedarikciDuzelt, tedarikciGruplari, type SaListe,
+} from "@/supabase/functions/_shared/satin-alma";
 
 /**
  * ONAYLI SATIN ALMA FISI (26.10.2026 "cek listesi"; kurumsal belge 27.10.2026) - girissiz.
@@ -63,6 +65,12 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
   const o = listeOzeti(liste);
   const onaylar = liste.kalemler.filter((k) => k.karar === "onaylandi");
   const redler = liste.kalemler.filter((k) => k.karar === "reddedildi");
+  // 31.10.2026: tedarikci girilmisse alisveris sirasi icin tedarikci bazinda gruplanir
+  // (gruplar ilk gorunus sirasiyla; tedarikcisizler en sonda). Sira no gruplar boyunca ardisik.
+  const gruplu = onaylar.some((k) => tedarikciDuzelt(k.tedarikci));
+  const gruplar = gruplu ? tedarikciGruplari(onaylar) : [{ tedarikci: null, kalemler: onaylar }];
+  const sira = new Map<string, number>();
+  gruplar.flatMap((g) => g.kalemler).forEach((k, i) => sira.set(k.id, i + 1));
 
   return (
     <BelgeSayfasi modul="Onaylı Satın Alma Fişi">
@@ -146,9 +154,18 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
               </tr>
             </thead>
             <tbody>
-              {onaylar.map((k, i) => (
+              {gruplar.map((g) => (
+                <React.Fragment key={g.tedarikci ?? "-"}>
+                  {gruplu && (
+                    <tr className="border-t break-inside-avoid" style={{ borderColor: B.cizgi, backgroundColor: B.baslikZemin }}>
+                      <td colSpan={6} className="px-3 py-1.5 text-[11.5px] font-bold" data-testid="fis-tedarikci" style={{ color: B.lacivert }}>
+                        {g.tedarikci ?? "Tedarikçi belirtilmemiş"} <span className="font-normal" style={{ color: B.soluk }}>· {g.kalemler.length} kalem</span>
+                      </td>
+                    </tr>
+                  )}
+                  {g.kalemler.map((k) => (
                 <tr key={k.id} className="border-t break-inside-avoid" style={{ borderColor: B.cizgi }}>
-                  <td className={`${tdSinifi} text-right tabular-nums`} style={{ color: B.soluk }}>{i + 1}</td>
+                  <td className={`${tdSinifi} text-right tabular-nums`} style={{ color: B.soluk }}>{sira.get(k.id)}</td>
                   <td className={tdSinifi}>
                     <span className="font-semibold break-words">{k.urun}</span> {k.aciliyet === "acil" && <AcilEtiketi />}
                     {k.aciklama && <span className="block text-[11.5px] mt-0.5 break-words" style={{ color: B.soluk }}>{k.aciklama}</span>}
@@ -158,6 +175,8 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
                   <td className={`${tdSinifi} whitespace-nowrap`}>{BIRIMLER[k.birim] ?? k.birim}</td>
                   <td className={`${tdSinifi} whitespace-nowrap`}>{k.talep_eden}</td>
                 </tr>
+                  ))}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

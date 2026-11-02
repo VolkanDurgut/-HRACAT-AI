@@ -17,7 +17,7 @@ import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 import { ACCENT, CARD_BG, CARD_BORDER, PAGE_BG, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  KATEGORILER, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi, urunEslesme,
+  HAFTA_GUNLERI, KATEGORILER, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi, urunEslesme,
   type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -38,9 +38,12 @@ import {
  * 28.10.2026 karar ekrani notlari (urunEslesme: ayni / benzer ad): kalem baska bir
  * departmanin onay bekleyen formunda da varsa, son 30 gunde ayni departmana onaylandiysa
  * ya da ayni formda birden fazla geciyorsa kalemin altinda gosterilir.
+ * 31.10.2026: kalemde tedarikci; Departmanlar tablosunda "Haftalik liste" (gun + hatirlatma
+ * e-postasi, sa_departman_haftalik). O gun 09:00 TR liste gonderilmediyse pg_cron
+ * "satin-alma-haftalik" hatirlatma e-postasi gonderir.
  */
 
-type Departman = { id: string; ad: string; token: string; aktif: boolean; test: boolean; sira: number };
+type Departman = { id: string; ad: string; token: string; aktif: boolean; test: boolean; sira: number; haftalik_gun: number | null; hatirlatma_eposta: string | null };
 type ListeSatiri = Omit<SaListe, "departman" | "sirket" | "kalemler"> & {
   departman_id: string;
   gonderim_maili_hata: string | null;
@@ -89,7 +92,7 @@ function kalemNotlariHesapla(bekleyenler: Liste[], sonuclananlar: Liste[]): Map<
   return sonuc;
 }
 
-const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad)";
+const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad, tedarikci)";
 
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -122,7 +125,7 @@ function SatinAlmaIcerik() {
     if (!companyId) return;
     if (sessiz) setYenileniyor(true);
     const [dRes, lRes] = await Promise.all([
-      supabase.from("satin_alma_departmanlari").select("id, ad, token, aktif, test, sira").eq("company_id", companyId).order("sira").order("ad"),
+      supabase.from("satin_alma_departmanlari").select("id, ad, token, aktif, test, sira, haftalik_gun, hatirlatma_eposta").eq("company_id", companyId).order("sira").order("ad"),
       supabase.from("satin_alma_listeleri").select(LISTE_KOLONLARI).eq("company_id", companyId)
         .order("gonderim_zamani", { ascending: false, nullsFirst: true }).limit(300),
     ]);
@@ -333,7 +336,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
                     {k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}
                   </p>
                   <p className="text-[11px] leading-snug break-words" style={{ color: TEXT_MUTED }}>
-                    {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}
+                    {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}{k.tedarikci ? ` · Tedarikçi: ${k.tedarikci}` : ""}
                     <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {k.talep_eden}</span>
                   </p>
                 </div>
@@ -449,6 +452,7 @@ function KalemBilgisi({ k }: { k: SaKalem }) {
       </p>
       <p className="text-sm" style={{ color: TEXT_MUTED }}><span className="font-semibold text-white">{miktarBirim(k)}</span> · {k.talep_eden}</p>
       {k.aciklama && <p className="text-xs mt-0.5 break-words" style={{ color: TEXT_MUTED }}>{k.aciklama}</p>}
+      {k.tedarikci && <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Tedarikçi: {k.tedarikci}</p>}
     </div>
   );
 }
@@ -656,6 +660,19 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
   const [yenilenecek, setYenilenecek] = useState<Departman | null>(null);
   const [silinecek, setSilinecek] = useState<Departman | null>(null);
   const [siliniyor, setSiliniyor] = useState(false);
+  const [haftalik, setHaftalik] = useState<{ id: string; gun: string; eposta: string } | null>(null);
+
+  const haftalikKaydet = async (d: Departman) => {
+    if (!haftalik) return;
+    const gun = haftalik.gun ? Number(haftalik.gun) : null;
+    setIsleniyor(d.id);
+    const { error } = await supabase.rpc("sa_departman_haftalik", { p_id: d.id, p_gun: gun, p_eposta: gun ? haftalik.eposta.trim() || null : null });
+    setIsleniyor(null);
+    if (error) { showToast(error.message, "error"); return; }
+    showToast(gun ? `${d.ad}: haftalık liste günü ${HAFTA_GUNLERI[gun]}.` : `${d.ad}: haftalık liste kapatıldı.`, "success");
+    setHaftalik(null);
+    onDegisti();
+  };
 
   // Silme onayi: departmanla birlikte KALICI silinecek liste / kalem sayisi
   const silinecekOzet = useMemo(() => {
@@ -726,7 +743,7 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
         <table className="min-w-full">
           <thead>
             <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-              {["Departman", "Durum", "E-posta", "Hazırlanan liste", "Bağlantı", ""].map((b) => (
+              {["Departman", "Durum", "E-posta", "Haftalık liste", "Hazırlanan liste", "Bağlantı", ""].map((b) => (
                 <th key={b} className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
               ))}
             </tr>
@@ -771,6 +788,33 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
                       title={d.test ? "Gerçek alıcılara geçir (execution@ / bbt@)" : `Test yap: e-postalar yalnızca ${TEST_ALICISI} adresine gider`}>
                       {d.test ? <><FlaskConical size={11} /> Test</> : "Gerçek"}
                     </button>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {haftalik?.id === d.id ? (
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-[340px]">
+                        <select value={haftalik.gun} onChange={(e) => setHaftalik({ ...haftalik, gun: e.target.value })} aria-label="Haftalık liste günü"
+                          className="px-2 py-1 border rounded-md text-sm text-white" style={girdiStil}>
+                          <option value="">Yok</option>
+                          {Object.entries(HAFTA_GUNLERI).map(([g, ad]) => <option key={g} value={g}>{ad}</option>)}
+                        </select>
+                        <input value={haftalik.eposta} onChange={(e) => setHaftalik({ ...haftalik, eposta: e.target.value })} maxLength={240}
+                          placeholder="Hatırlatma e-postası (virgülle, en fazla 3)" aria-label="Hatırlatma e-postası" disabled={!haftalik.gun}
+                          className="px-2 py-1 border rounded-md text-sm text-white w-60 disabled:opacity-40" style={girdiStil} />
+                        <button aria-label="Kaydet" data-testid="haftalik-kaydet" disabled={isleniyor === d.id} onClick={() => haftalikKaydet(d)} className="p-1 text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                          {isleniyor === d.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                        </button>
+                        <button aria-label="Vazgeç" onClick={() => setHaftalik(null)} className="p-1 hover:text-white" style={{ color: TEXT_MUTED }}><X size={15} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setHaftalik({ id: d.id, gun: d.haftalik_gun ? String(d.haftalik_gun) : "", eposta: d.hatirlatma_eposta || "" })}
+                        data-testid="haftalik-dugme" className="text-left text-xs hover:text-white" style={{ color: TEXT_MUTED }}
+                        title="Haftalık liste günü: o gün 09:00'a kadar liste gönderilmediyse hatırlatma e-postası gider; onay e-postasının konusu “Haftalık satın alma listesi” olur.">
+                        {d.haftalik_gun ? (
+                          <span className="whitespace-nowrap"><b className="text-white">{HAFTA_GUNLERI[d.haftalik_gun]}</b>
+                            <span className="block text-[11px] max-w-[220px] truncate">{d.hatirlatma_eposta ? `Hatırlatma: ${d.hatirlatma_eposta.split(",").join(", ")}` : "Hatırlatma e-postası yok"}</span></span>
+                        ) : <span className="inline-flex items-center gap-1 whitespace-nowrap"><Clock size={12} /> Ayarla</span>}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm whitespace-nowrap" style={{ color: TEXT_MUTED }}>
                     {taslak ? <span className="inline-flex items-center gap-1"><Clock size={12} className="text-amber-400" /> {taslak.kalemler.length} kalem, gönderilmedi</span> : "—"}

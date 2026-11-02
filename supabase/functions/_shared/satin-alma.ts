@@ -29,9 +29,12 @@ export const BIRIMLER = {
   kutu: "Kutu",
   top: "Top",
   kg: "Kg",
+  gr: "Gr",
   litre: "Litre",
   metre: "Metre",
   takim: "Takım",
+  kova: "Kova",
+  bidon: "Bidon",
   diger: "Diğer",
 } as const;
 export type Birim = keyof typeof BIRIMLER;
@@ -52,6 +55,8 @@ export type SaKalem = {
   alindi?: boolean;
   alinma_zamani?: string | null;
   alan_ad?: string | null;
+  /** 31.10.2026: nereden alinacak (ops.); onayli fiste gruplama */
+  tedarikci?: string | null;
 };
 
 export type SaListe = {
@@ -63,6 +68,8 @@ export type SaListe = {
   sirket: string | null;
   /** Test departmani: mailler SADECE test adresine gider, konu "[TEST] " ile baslar. */
   test?: boolean;
+  /** 31.10.2026: departmanin haftalik liste gunu var (konu "Haftalık satın alma listesi"). */
+  haftalik?: boolean;
   gonderen_ad: string | null;
   gonderim_zamani: string | null;
   karar_veren_email: string | null;
@@ -111,8 +118,35 @@ export function urunEslesme(a: string | null | undefined, b: string | null | und
   const uzunKelimeler = new Set(uzun.split(" "));
   return kelimeler.every((w) => uzunKelimeler.has(w)) ? "benzer" : null;
 }
-/** Daha once siparis verilen urun (gonderilen formlardan otomatik; sa_token_urunler). */
-export type SaUrun = { ad: string; kategori: Kategori; birim: Birim; kullanim: number };
+/** Daha once siparis verilen urun (gonderilen formlardan otomatik; sa_token_urunler).
+ * 31.10.2026: katalog alanlari (tedarikci, son miktar) + departmana ozel ozet (dep_*). */
+export type SaUrun = {
+  ad: string; kategori: Kategori; birim: Birim; kullanim: number;
+  tedarikci?: string | null; son_miktar?: number | string | null;
+  dep_kullanim?: number; dep_son_miktar?: number | string | null; dep_son_birim?: Birim | null; dep_son?: string | null;
+};
+
+/** Haftalik liste gunleri (ISO: 1=Pazartesi). Veritabanindaki haftalik_gun ile ayni. */
+export const HAFTA_GUNLERI: Record<number, string> = { 1: "Pazartesi", 2: "Salı", 3: "Çarşamba", 4: "Perşembe", 5: "Cuma", 6: "Cumartesi", 7: "Pazar" };
+
+/** Tedarikci adi karsilastirma / gosterim: bosluklar teke, buyuk harf (TR). Bos -> null. */
+export function tedarikciDuzelt(s: string | null | undefined): string | null {
+  const t = (s || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return t ? t.toLocaleUpperCase("tr-TR") : null;
+}
+
+/** Kalemleri tedarikciye gore gruplar (girdi sirasi korunur; tedarikcisizler EN SONDA "Belirtilmemiş"). */
+export function tedarikciGruplari<T extends { tedarikci?: string | null }>(kalemler: T[]): { tedarikci: string | null; kalemler: T[] }[] {
+  const gruplar = new Map<string, { tedarikci: string | null; kalemler: T[] }>();
+  for (const k of kalemler) {
+    const t = tedarikciDuzelt(k.tedarikci);
+    const anahtar = t ?? "\u0000";
+    if (!gruplar.has(anahtar)) gruplar.set(anahtar, { tedarikci: t, kalemler: [] });
+    gruplar.get(anahtar)!.kalemler.push(k);
+  }
+  const liste = Array.from(gruplar.values());
+  return [...liste.filter((g) => g.tedarikci), ...liste.filter((g) => !g.tedarikci)];
+}
 
 /** 5 -> "5", 2.5 -> "2,5" */
 export function miktarYaz(m: number | string): string {
@@ -204,17 +238,17 @@ function bilgiTablosu(alanlar: [string, string][]): string {
   return `<table role="presentation" class="b" width="100%" cellpadding="7" border="1" style="border-collapse:collapse;border-color:#D5D9E0;">${satirlar.join("")}</table>`;
 }
 
-const urunHucresi = (k: SaKalem) => `<td>${kacis(k.urun)}${k.aciklama ? `<span class="a">${kacis(k.aciklama)}</span>` : ""}</td>`;
+const urunHucresi = (k: SaKalem, tedarikciGoster = true) => `<td>${kacis(k.urun)}${k.aciklama ? `<span class="a">${kacis(k.aciklama)}</span>` : ""}${tedarikciGoster && k.tedarikci ? `<span class="a">Tedarikçi: ${kacis(k.tedarikci)}</span>` : ""}</td>`;
 const oncelik = (k: SaKalem) => (k.aciliyet === "acil" ? `<span class="acil">ACİL</span>` : `<span class="s">Normal</span>`);
 
 /** Kalem tablosu. tur: talep (karar oncesi) | onay (onaylananlar) | red (reddedilenler). */
-function kalemTablosu(kalemler: SaKalem[], tur: "talep" | "onay" | "red"): string {
+function kalemTablosu(kalemler: SaKalem[], tur: "talep" | "onay" | "red", tedarikciGoster = true): string {
   const bas = tur === "red"
     ? `<th>#</th><th>Ürün / hizmet</th><th class="r">Miktar</th><th>Talep eden</th><th>Red nedeni</th>`
     : `<th>#</th><th>Ürün / hizmet</th><th>Kategori</th><th class="r">Miktar</th><th>Öncelik</th><th>Talep eden</th>`;
   const satirlar = kalemler.map((k, i) => tur === "red"
-    ? `<tr><td class="s n">${i + 1}</td>${urunHucresi(k)}<td class="r">${kacis(miktarBirim(k))}</td><td>${kacis(k.talep_eden)}</td><td class="red">${kacis(k.red_nedeni || "Belirtilmedi")}</td></tr>`
-    : `<tr><td class="s n">${i + 1}</td>${urunHucresi(k)}<td class="s">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</td><td class="r"><b>${kacis(miktarBirim(k))}</b></td><td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
+    ? `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, tedarikciGoster)}<td class="r">${kacis(miktarBirim(k))}</td><td>${kacis(k.talep_eden)}</td><td class="red">${kacis(k.red_nedeni || "Belirtilmedi")}</td></tr>`
+    : `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, tedarikciGoster)}<td class="s">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</td><td class="r"><b>${kacis(miktarBirim(k))}</b></td><td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
   return `<table role="presentation" class="t" width="100%" cellpadding="7" style="border-collapse:collapse;border:1px solid #D5D9E0;table-layout:auto;"><tr>${bas}</tr>\n${satirlar}</table>`;
 }
 
@@ -226,10 +260,18 @@ const baslik = (metin: string, renk = LACIVERT) => `<p class="h" style="margin:2
 
 const testKonu = (l: SaListe, konu: string) => (l.test ? `[TEST] ${konu}` : konu);
 
+/** Onaylanan kalemler: tedarikci girilmisse tedarikci bazinda (alisveris sirasi), yoksa tek tablo. */
+function onayliBolum(onaylar: SaKalem[]): string {
+  if (!onaylar.some((k) => tedarikciDuzelt(k.tedarikci))) return `${baslik(`Onaylanan kalemler (${onaylar.length})`, "#17704A")}${kalemTablosu(onaylar, "onay")}`;
+  return `${baslik(`Onaylanan kalemler (${onaylar.length}) · tedarikçiye göre`, "#17704A")}` + tedarikciGruplari(onaylar)
+    .map((g) => `<p style="margin:14px 0 6px;font-size:12px;font-weight:bold;color:#161B2E;">${kacis(g.tedarikci ?? "Tedarikçi belirtilmemiş")} <span style="color:#5B6275;font-weight:normal;">· ${g.kalemler.length} kalem</span></p>${kalemTablosu(g.kalemler, "onay", false)}`)
+    .join("\n");
+}
+
 /** Departman listeyi gonderdi -> execution@ + bbt@ */
 export function gonderimMaili(l: SaListe): { konu: string; html: string } {
   const o = listeOzeti(l);
-  const konu = `Satın alma talebi: ${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
+  const konu = `${l.haftalik ? "Haftalık satın alma listesi" : "Satın alma talebi"}: ${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
   const govde = `${giris(`<b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.`)}
 ${bilgiTablosu([["Departman", l.departman], ["Talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", String(o.toplam)], ["Acil kalem", o.acil ? String(o.acil) : "Yok"]])}
 ${baslik(`Talep kalemleri (${o.toplam})`)}${kalemTablosu(l.kalemler, "talep")}
@@ -252,9 +294,27 @@ export function sonucMaili(l: SaListe): { konu: string; html: string } {
     : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`)}
 ${bilgiTablosu(alanlar)}
 ${l.karar_notu ? `<p style="margin:12px 0 0;padding:8px 12px;border-left:3px solid ${SEFTALI};background:#F5F6F8;font-size:13px;"><b style="color:#5B6275;">Onay notu:</b> ${kacis(l.karar_notu)}</p>` : ""}
-${onaylar.length ? `${baslik(`Onaylanan kalemler (${onaylar.length})`, "#17704A")}${kalemTablosu(onaylar, "onay")}` : ""}
+${onaylar.length ? onayliBolum(onaylar) : ""}
 ${redler.length ? `${baslik(`Reddedilen kalemler (${redler.length}) · satın alınmayacak`, "#B42318")}${kalemTablosu(redler, "red")}` : ""}
 ${o.onay && l.cek_token ? dugme("Satın alma fişini aç", cekAdresi(l.cek_token)) : dugme("Talebi uygulamada aç", yonetimAdresi(l.id))}
 <p style="margin:10px 0 0;color:#8B91A8;font-size:11px;line-height:1.5;">Departman sonucu kendi talep bağlantısında da görür.</p>`;
   return { konu: testKonu(l, konu), html: cerceve(o.onay ? "ONAYLI SATIN ALMA FİŞİ" : "SATIN ALMA TALEBİ · RED", l.liste_no || "", govde, l.test) };
+}
+
+/** Haftalik liste hatirlatmasi (31.10.2026): departmanin liste gunu geldi, bu hafta liste gonderilmedi. */
+export type HaftalikHatirlatma = {
+  departman: string; token: string; test?: boolean; sirket?: string | null; taslak_kalem: number;
+  son_liste: { liste_no: string; gonderim_zamani: string; kalem: number } | null;
+};
+export function haftalikHatirlatmaMaili(h: HaftalikHatirlatma): { konu: string; html: string } {
+  const konu = `Hatırlatma: haftalık satın alma listesi · ${h.departman}`;
+  const alanlar: [string, string][] = [
+    ["Departman", h.departman], ["Bugün", saTarih(new Date().toISOString()).slice(0, 10)],
+    ["Hazırlanan form", h.taslak_kalem ? `${h.taslak_kalem} kalem, gönderilmedi` : "Boş"],
+    ["Son gönderilen", h.son_liste ? `${h.son_liste.liste_no} · ${saTarih(h.son_liste.gonderim_zamani).slice(0, 10)} · ${h.son_liste.kalem} kalem` : "-"],
+  ];
+  const govde = `${giris(`Bugün <b>${kacis(h.departman)}</b> departmanının haftalık satın alma listesi günü. Bu hafta henüz liste gönderilmedi.${h.taslak_kalem ? " Formda hazırlanmış kalemler var; kontrol edip onaya gönderebilirsiniz." : " Formda <b>Geçen listeyi kopyala</b> ya da <b>Excel'den yükle</b> ile hızlıca hazırlayabilirsiniz."}`)}
+${bilgiTablosu(alanlar)}
+${dugme("Satın alma formunu aç", talepAdresi(h.token))}`;
+  return { konu: h.test ? `[TEST] ${konu}` : konu, html: cerceve("HAFTALIK LİSTE HATIRLATMASI", h.departman, govde, h.test === true) };
 }

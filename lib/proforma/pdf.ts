@@ -255,16 +255,26 @@ const kutuTutarYaz = (n: number, b: ProformaBelgesi) => `${paraSimgesi(b.paraBir
 
 function bankaSatirlari(b: ProformaBelgesi): [string, string][] {
   const bk = BANKA_PRESETLERI.find((x) => x.anahtar === b.banka) || BANKA_PRESETLERI[0];
-  return [
-    ["ACCOUNT TITLE", SABIT_HESAP_ADI],
-    ["BANK NAME", bk.banka],
-    ["SWIFT CODE", bk.swift],
-    ["ACCOUNT NUMBER (USD)", bk.usd.hesap_numarasi],
-    ["IBAN NO (USD)", bk.usd.iban],
-    ["ACCOUNT NUMBER (EUR)", bk.eur.hesap_numarasi],
-    ["IBAN NO (EUR)", bk.eur.iban],
-  ];
+  
+  if (b.paraBirimi === "EUR") {
+    return [
+      ["ACCOUNT TITLE", SABIT_HESAP_ADI],
+      ["BANK NAME", bk.banka],
+      ["SWIFT CODE", bk.swift],
+      ["ACCOUNT NUMBER (EUR)", bk.eur.hesap_numarasi],
+      ["IBAN NO (EUR)", bk.eur.iban],
+    ];
+  } else {
+    return [
+      ["ACCOUNT TITLE", SABIT_HESAP_ADI],
+      ["BANK NAME", bk.banka],
+      ["SWIFT CODE", bk.swift],
+      ["ACCOUNT NUMBER (USD)", bk.usd.hesap_numarasi],
+      ["IBAN NO (USD)", bk.usd.iban],
+    ];
+  }
 }
+
 
 /** Banka tablosu (sayfa 1: A..J kolonu KOL1, sayfa 3: KOL2). */
 function bankaTablosu(doc: jsPDF, b: ProformaBelgesi, kol: number[], y: number, satirH = 14.4) {

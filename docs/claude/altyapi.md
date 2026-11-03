@@ -373,3 +373,17 @@
   (adres/yetki aynı; Yetkilendirme etiketi de).
 - Test: `scratchpad/kl/e2e.mjs` (menü, kapak, geçiş fazları, kamera, 14 evren × tüm adımlar
   odak çerçevede, son ekran, ?k=, kaldığınız yer, mobil 390 + kaydırma, hareketi azalt, özet).
+
+## Yetkilendirme sayfası — kart düzeni (03.11.2026)
+
+- Kullanıcı: "ekrana sığmıyor, bazı yetkileri vermek için sağa kaydırmak gerekiyor; mobilde çok
+  kötü, alt alta yetki gör düğmeleriyle sıralanmalı". 17 sütunluk tablo (min 1560 px) KALDIRILDI.
+- `app/ayarlar/yetkilendirme/page.tsx`: kullanıcı başına KART — üstte e-posta / rozetler, Rol,
+  "Sayfa x/13 · Sekme y/4" özeti, Geri al (yalnız değişiklik varsa) + Kaydet ("Kayıtlı").
+  Yetkiler `YETKI_GRUPLARI` ile kenar çubuğu bölümlerine göre (İhracat / Operasyon / Yurt İçi /
+  Şirket İçi / Yönetim / Dosya sekmeleri), her yetki tam satır tıklanan anahtar düğmesi
+  (`YetkiDugmesi`, role=switch, aria-label "e-posta · etiket" — eski tabloyla aynı).
+  Masaüstünde açık; mobilde (<640 px) kartlar alt alta, "Yetkileri gör / gizle" ile açılır.
+- YENİ SAYFA YETKİSİ eklenirken `SAYFA_ETIKETLER` + `YETKI_GRUPLARI` ikisine birden eklenir.
+- Kayıt mantığı (yetki_rol_ata + kullanici_yetkileri UPDATE + yazmaHatasi) DEĞİŞMEDİ.
+  Test: Playwright 38 (1280/1366/1536/1920 yatay taşma 0, 390 mobil, kaydet / geri al / rol).

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
-import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
 import { asciiYap, gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
@@ -65,8 +65,6 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     // CIF yazilmaz (PDF ile ayni kural: hesaplaFobFreightCifToplamlari).
     const fiyatlarFob = navlunAliciyaAitMi(dosya.teslim_sekli);
     const toplamFob = fiyatlarFob ? toplamCif : dusulecekVarMi ? toplamCif - toplamDusulecek : null;
-    const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
-    const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
     // Muhasebe talebi (14.10.2026): her urunden kac konteyner / kac MTS (PDF ile ayni hesap).
     const dagilim = urunKonteynerDagilimi(urunler as any[], konteynerler as any[]);
     const adetEki = (u: any, i: number) => {
@@ -82,12 +80,13 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       // fazla kalem olabilir - ayirt edilebilmesi icin ambalaj boyutu da yazilir.
       const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size;
       const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-      const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
+      // FOB: CIF birimi toplam FOB / toplam CIF oraninda (Logo ile ayni, 03.11.2026)
+      const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
       // Muhasebe talebi: birim fiyatlar KG basina, virgullu 3 ondalikli, para
       // birimi sembolsuz (orn. "0,460") - PDF versiyonuyla tutarli.
       const birim = dosya.para_birimi || "USD";
       if (fiyatlarFob) return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}${adetEki(u, i)}: FOB ${formatBirimFiyatKg(cifBirim)} ${birim}/KG`;
-      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}${adetEki(u, i)}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
+      return `  - ${ad}${ambalajBoyutu ? ` (${ambalajBoyutu})` : ""}${adetEki(u, i)}: CIF ${formatBirimFiyatKg(cifBirim)} ${birim}/KG${fobBirim !== null ? ` / FOB ${formatFobBirimFiyatKg(fobBirim)} ${birim}/KG` : ""}`;
     }).join("\n") + (dagilim.eslesmeyen > 0 ? `\n  ! ${dagilim.eslesmeyen} konteynerin markasi hicbir urunle eslesmedi - kontrol edin.` : "");
     const konteynerSatirlari = konteynerler.map((k, i) => {
       // Muhur/Tip/Marka/Kap/Net/Brut/VGM/Tartim Tarihi - sadece dolu olanlar yazilir.

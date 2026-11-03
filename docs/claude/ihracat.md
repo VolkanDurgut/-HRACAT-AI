@@ -915,3 +915,17 @@
   sekmesindeki indirme bağlantısıyla aynı URL). Elle tartım kaydında (`elleTartimMi`) yanında
   "Elle" etiketi; belge yoksa soluk "DBA yok". Kapalı karar "VGM Gönder" (mailto) ile
   KARIŞTIRILMAZ: bu yalnız belgeyi açar, mail göndermez.
+
+## Fatura talimatı — kalem FOB birimi ORANLA düşülür (03.11.2026)
+
+- Kullanıcı (IHR-2026-0110 faturası): "Neden kesilen faturada FOB birim uyuşmuyor… aynı oranda
+  düşmek gerekiyor sanırım." Logo faturada navlunu kalemlere FOB TUTARIYLA ORANTILI dağıtıyor
+  (satır başına oran 2.400 / 65.308,68 = %3,67486). Eskiden talimat kg başına EŞİT tutar
+  düşüp 3 ondalık yazıyordu (0,450 → 0,434; 0,470 → 0,454); Logo'da CIF birim 0,44994888 /
+  0,47068385, toplam 67.708,68 çıktı (0,32 USD sapma).
+- Artık `lib/cutoff-utils.ts → fobBirimFiyati`: FOB birim = CIF birim × (toplam FOB / toplam
+  CIF); gösterim `formatFobBirimFiyatKg` 8 ondalık (0,43404939). Logo'ya aynen girilince satır
+  tutarları 49.915,68 / 10.859,92 / 4.533,40 = 65.309,00, CIF birimler 0,450 / 0,470 tam.
+  Toplam FOB / CIF ve lokal masraf mantığı (net navlun = navlun − lokal) DEĞİŞMEDİ.
+  Kullanıldığı yer: talimat PDF'i, talimat mail metni, Ek Bilgiler kartı (üçü aynı fonksiyon).
+  CIF birim 3 ondalık kaldı. Test: /home/claude/test/fob/fob_test.ts (Logo taklidi).

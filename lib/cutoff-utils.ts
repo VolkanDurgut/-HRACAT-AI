@@ -221,6 +221,33 @@ export function formatCurrency(amount: number | null, currency: string | null): 
  * icindir - veritabanindaki MT bazli deger degismez, hicbir hesaplamada
  * kullanilmaz.
  */
+/**
+ * Kalem bazinda FOB birim fiyati (MT basina) - 03.11.2026.
+ * Muhasebe programi (Logo) faturada navlunu kalemlere FOB TUTARIYLA ORANTILI dagitir
+ * (IHR-2026-0110 faturasinda her satirda oran 2.400 / 65.308,68 = %3,67486). Eskiden
+ * talimat KG basina ESIT tutar dusuyordu (0,450 -> 0,434 / 0,470 -> 0,454); Logo bunu
+ * oranla geri dagitinca CIF birim 0,44994888 / 0,47068385 cikti, toplam 0,32 USD saptı.
+ * Dogrusu: her kalemin CIF birimi AYNI ORANDA dusulur: FOB = CIF x (toplam FOB / toplam CIF).
+ * Toplam FOB degismez; Logo navlunu oranla ekleyince CIF birimler tam tutar.
+ */
+export function fobBirimFiyati(cifBirimPerMt: number, toplamCif: number, toplamFob: number | null): number | null {
+  if (toplamFob === null || !(toplamCif > 0) || !Number.isFinite(cifBirimPerMt)) return null;
+  return cifBirimPerMt * (toplamFob / toplamCif);
+}
+
+/**
+ * FOB birim fiyat KG basina 8 ondalikli (orn. "0,43404939"). 3 ondalik yetmiyor: Logo'ya
+ * yuvarlanmis birim girilince satir toplamlari ve CIF birimler kayiyordu. 8 ondalikla
+ * satir toplamlari (kurus) toplam FOB'u tam verir. Sadece goruntuleme.
+ */
+export function formatFobBirimFiyatKg(tutarPerMt: number | null | undefined): string {
+  if (tutarPerMt === null || tutarPerMt === undefined || isNaN(tutarPerMt)) return "-";
+  return new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 8,
+    maximumFractionDigits: 8,
+  }).format(tutarPerMt / 1000);
+}
+
 export function formatBirimFiyatKg(tutarPerMt: number | null | undefined): string {
   if (tutarPerMt === null || tutarPerMt === undefined || isNaN(tutarPerMt)) return "-";
   return new Intl.NumberFormat("tr-TR", {

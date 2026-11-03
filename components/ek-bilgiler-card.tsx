@@ -5,11 +5,10 @@ import { useToast } from "@/lib/toast-context";
 import { CopyableField } from "@/components/copyable-field";
 import { CokluNoGirisi, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import { noParcala, noBirlestir } from "@/lib/coklu-no";
-import { formatDateTR, formatCurrency } from "@/lib/cutoff-utils";
+import { formatDateTR, formatCurrency, fobBirimFiyati } from "@/lib/cutoff-utils";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
-import { kalemMiktari } from "@/lib/sayi-oku";
 
 type Props = {
   dosya: Dosya;
@@ -34,8 +33,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   const lokalMasrafToplam = lokalMasrafBirimFiyati && konteynerAdedi > 0 ? parseFloat(lokalMasrafBirimFiyati) * konteynerAdedi : null;
   const navlunBekleniyor = !!(navlunBirimFiyati || lokalMasrafBirimFiyati) && konteynerAdedi === 0;
 
-  // Toplam miktar ve toplam CIF hesapla
-  const toplamMiktar = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
+  // Toplam CIF
   const toplamCif = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
 
   // Navlun + Lokal Masraf payi (MTS basina)
@@ -45,7 +43,6 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   ? navlunToplam
   : 0;
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
-  const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
   const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
 
   // FOB kusuratli mi kontrolu - kusuratsiz olmasi icin onerilen lokal masraf degeri
@@ -155,7 +152,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           {urunler.map((u: any, i: number) => {
             const ad = u.urun_adi || u.description || "Ürün";
             const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-            const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
+            const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
             return (
               <div key={i}>
                 <p className="text-sm font-medium text-white">{ad}</p>

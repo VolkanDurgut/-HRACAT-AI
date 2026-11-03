@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
-import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
+import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
@@ -163,8 +163,6 @@ function ciz(
   // IHR-2026-0084) bir daha yasanmayacak sekilde onler.
   const navlunBirim = dosya.navlun_tutari;
   const lokalMasrafBirim = dosya.lokal_masraf_tutari as number | null;
-  const navlunToplam = navlunBirim && rezervasyonKonteynerAdedi > 0 ? navlunBirim * rezervasyonKonteynerAdedi : null;
-  const lokalMasrafToplam = lokalMasrafBirim && rezervasyonKonteynerAdedi > 0 ? lokalMasrafBirim * rezervasyonKonteynerAdedi : null;
   const { toplamCif, netNavlunToplam, toplamFob, fiyatlarFob } = hesaplaFobFreightCifToplamlari(dosya, rezervasyonKonteynerAdedi);
   bolumTablosu("MALIYET VE BANKA BILGILERI", [
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
@@ -179,14 +177,8 @@ function ciz(
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---
   const urunler = (dosya.urun_detaylari as any[]) || [];
   const toplamMiktar = urunler.reduce((s, u) => s + kalemMiktari(u), 0);
-  // toplamCif/toplamFob yukarida hesaplaFobFreightCifToplamlari'ndan geldi -
-  // burada sadece TABLODAKI HER SATIRIN kendi FOB birim fiyatini bulmak icin
-  // ayni "dusulecek" mantigi tekrar kuruluyor (bu kisim urun bazli oldugu
-  // icin paylasilan fonksiyonun kapsami disinda kalir).
-  const toplamDusulecek =
-    navlunToplam !== null && lokalMasrafToplam !== null ? navlunToplam - lokalMasrafToplam : navlunToplam !== null ? navlunToplam : 0;
-  const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
-      const dusulecekPerMts = dusulecekVarMi && toplamMiktar > 0 ? toplamDusulecek / toplamMiktar : 0;
+  // Kalem FOB birimi: toplamCif/toplamFob yukarida hesaplaFobFreightCifToplamlari'ndan geldi;
+  // her kalemin CIF birimi AYNI ORANDA dusulur (fobBirimFiyati, 03.11.2026 - Logo ile ayni).
 
   // Muhasebe talebi (14.10.2026): hangi urunden kac konteyner yuklendi.
   const dagilim = urunKonteynerDagilimi(urunler, konteynerler as any[]);
@@ -206,11 +198,11 @@ function ciz(
     // FOB teslimde proforma fiyati FOB'dur: FOB sutununa yazilir, CIF bos kalir.
     if (fiyatlarFob) return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), "-", formatBirimFiyatKg(proformaBirim)];
     const cifBirim = proformaBirim;
-    const fobBirim = dusulecekVarMi ? cifBirim - dusulecekPerMts : null;
-    // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu 3 ondalikli
-    // ve para birimi sembolsuz gosterilir (orn. "0,460") - sistemde TON (MT)
-    // basina tutulan deger degismez, sadece bu tablodaki goruntuleme boyle.
-    return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), formatBirimFiyatKg(cifBirim), fobBirim !== null ? formatBirimFiyatKg(fobBirim) : "-"];
+    const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
+    // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu ve para birimi
+    // sembolsuz (CIF "0,450"; FOB 8 ondalik "0,43404939" - Logo'ya aynen girilir).
+    // Sistemde TON (MT) basina tutulan deger degismez, sadece goruntuleme boyle.
+    return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), formatBirimFiyatKg(cifBirim), fobBirim !== null ? formatFobBirimFiyatKg(fobBirim) : "-"];
   });
 
   if (urunRows.length > 0) {

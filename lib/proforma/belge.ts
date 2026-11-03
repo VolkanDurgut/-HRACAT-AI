@@ -32,6 +32,14 @@ export type KalemTaslak = { urun: string; marka: string; ambalajKg: string; mts:
 
 export const BOS_KALEM: KalemTaslak = { urun: "", marka: "", ambalajKg: "25", mts: "", fiyat: "" };
 
+/**
+ * Sales Contract (sayfa 2) ILAVE SATIR (03.11.2026, kullanici: "QUANTITY ... PAYMENT kismina ilave
+ * satir eklenebilmeli"). PAYMENT satirindan SONRA, ayni gri bicimde basilir.
+ * Baslik etiket sutununa sigmali (kaydirma yok, 7,5 pt'ye kadar kuculur) -> en fazla 24 karakter.
+ */
+export type EkSatir = { baslik: string; deger: string };
+export const EK_SATIR_SINIR = { adet: 6, baslik: 24, deger: 500 } as const;
+
 /** Ekranin tamami (formun durumu). */
 export type ProformaTaslak = {
   musteriAnahtari: string | null; // secilen listedeki musteri (unvan anahtari); null = yeni / elle
@@ -57,6 +65,8 @@ export type ProformaTaslak = {
   markaSatiri: string;
   markaElle: boolean;
   evraklar: string[];
+  /** Sayfa 2 ilave satirlar (03.11.2026). Eski kayitlarda yok -> taslakNormalle [] yapar. */
+  ekSatirlar: EkSatir[];
 };
 
 /** Musteri listesindeki bir secenek: secilince forma yazilacak her sey. */
@@ -373,7 +383,34 @@ export function bosTaslak(tarih = bugunISO()): ProformaTaslak {
     markaSatiri: "",
     markaElle: false,
     evraklar: [...VARSAYILAN_EVRAKLAR],
+    ekSatirlar: [],
   };
+}
+
+/**
+ * Kayitli (veritabanindan gelen) taslagi guncel bicime getirir (03.11.2026): eksik alan
+ * bostaslak degeriyle dolar, bilinmeyen alan atilir, diziler kopyalanir. Kayit bozuksa null.
+ */
+export function taslakNormalle(ham: unknown): ProformaTaslak | null {
+  if (!ham || typeof ham !== "object" || Array.isArray(ham)) return null;
+  const h = ham as Record<string, unknown>;
+  const bos = bosTaslak(typeof h.tarih === "string" && /^\d{4}-\d{2}-\d{2}$/.test(h.tarih) ? h.tarih : undefined);
+  const y = { ...bos } as Record<string, unknown>;
+  for (const k of Object.keys(bos) as (keyof ProformaTaslak)[]) {
+    const v = h[k];
+    const b = bos[k];
+    if (v === undefined || v === null) { if (k === "musteriAnahtari" || k === "banka") y[k] = v ?? b; continue; }
+    if (Array.isArray(b)) { if (Array.isArray(v)) y[k] = v; continue; }
+    if (typeof b === typeof v) y[k] = v;
+  }
+  const t = y as ProformaTaslak;
+  t.kalemler = (t.kalemler as unknown[]).filter((k) => k && typeof k === "object").map((k) => ({ ...BOS_KALEM, ...(k as KalemTaslak) }));
+  if (!t.kalemler.length) t.kalemler = [{ ...BOS_KALEM }];
+  t.evraklar = (t.evraklar as unknown[]).filter((e): e is string => typeof e === "string");
+  t.ekSatirlar = (t.ekSatirlar as unknown[]).filter((e) => e && typeof e === "object")
+    .map((e) => ({ baslik: String((e as EkSatir).baslik ?? ""), deger: String((e as EkSatir).deger ?? "") }))
+    .slice(0, EK_SATIR_SINIR.adet);
+  return t;
 }
 
 /** Musteri secilince: tum alanlar o musterinin son bilgileriyle dolar (tarih korunur). */
@@ -447,6 +484,8 @@ export type ProformaBelgesi = {
   altBilgi: string[];
   ustBilgi: { tarih: string; revizyon: string };
   imzali: boolean;
+  /** Sayfa 2 ilave satirlar (bos olanlar atilmis, buyuk harf). */
+  ekSatirlar: EkSatir[];
 };
 
 /**
@@ -502,6 +541,10 @@ export function eksikler(t: ProformaTaslak): Eksik[] {
   if (!t.odeme.trim()) e.push({ alan: "odeme", mesaj: "Ödeme (Payment Terms) boş" });
   if (!t.banka) e.push({ alan: "banka", mesaj: "Banka seçin" });
   if (String(t.ikinciTutar || "").trim() && !(sayiCoz(t.ikinciTutar) >= 0)) e.push({ alan: "ikinci", mesaj: "Ödeme kutusu tutarı sayı olmalı" });
+  const ek = t.ekSatirlar || [];
+  if (ek.some((x) => !!x.baslik.trim() !== !!x.deger.trim())) e.push({ alan: "ek", mesaj: "İlave satırda başlık ve değer birlikte yazılmalı" });
+  if (ek.some((x) => x.baslik.trim().length > EK_SATIR_SINIR.baslik)) e.push({ alan: "ek", mesaj: `İlave satır başlığı en fazla ${EK_SATIR_SINIR.baslik} karakter` });
+  if (ek.some((x) => x.deger.trim().length > EK_SATIR_SINIR.deger)) e.push({ alan: "ek", mesaj: `İlave satır değeri en fazla ${EK_SATIR_SINIR.deger} karakter` });
   return e;
 }
 
@@ -536,5 +579,9 @@ export function belgeOlustur(
     altBilgi: sablon.altBilgi,
     ustBilgi: sablon.ustBilgi,
     imzali,
+    ekSatirlar: (t.ekSatirlar || [])
+      .map((x) => ({ baslik: x.baslik.replace(/\s+/g, " ").trim().toUpperCase(), deger: x.deger.trim().toUpperCase() }))
+      .filter((x) => x.baslik && x.deger)
+      .slice(0, EK_SATIR_SINIR.adet),
   };
 }

@@ -499,13 +499,16 @@ function sayfa2(doc: jsPDF, b: ProformaBelgesi, sik = 0): number {
     ["UNIT PRICE", oz.birimFiyat],
     ["TOTAL CONT VALUE", tutarYaz(b.toplam, b)],
     ["PAYMENT", b.odeme],
+    // 03.11.2026: ilave satirlar PAYMENT'tan sonra (ayni bicim; kalin alt cizgi en sonda)
+    ...b.ekSatirlar.map((e): [string, string, number?] => [e.baslik, e.deger, e.baslik.length > 18 ? 9 : undefined]),
   ];
   const degerW = w(2, 9) - 2 * PAD;
   const ag = sik >= 2 ? 9 : 10;
   const alanCizgileri: BekleyenCizgi[] = [[x(0), y, x(0) + TUM, y, KALIN]];
+  const odemeSira = 9; // PAYMENT: sablondaki yuksek satir (ilave satir olsa da korunur)
   alanlar.forEach(([et, deger, etBoy], i) => {
     const son = i === alanlar.length - 1;
-    const h = Math.max(son ? (sik ? 22 : 34.8) : sik ? 15.5 : 19.8, yukseklik(doc, deger, degerW, ag, false) + (sik ? 4 : 6));
+    const h = Math.max(i === odemeSira ? (sik ? 22 : 34.8) : sik ? 15.5 : 19.8, yukseklik(doc, deger, degerW, ag, false) + (sik ? 4 : 6));
     dolgu(doc, x(0), y, TUM, h, GRI_15);
     etiket(doc, et, x(0), y, w(0, 1), h, etBoy || 11);
     hucre(doc, deger, x(2), y, w(2, 9), h, { boy: ag });

@@ -858,3 +858,30 @@
   açılmamış) + "Gizle / Göster". 1280–1920 px'te 5 sipariş ≈ 400 px; mobilde satır kart olur.
 - Hesap (`lib/siparis-takip.ts`), Tamamla onayı ve Siparişe Devam Et penceresi DEĞİŞMEDİ.
   Eski `SiparisTakipKarti` kaldırıldı (tek kullanan bu sayfaydı). Test: Playwright 24.
+
+## Proforma — kayıtlı proformalar + 2. sayfa ilave satır (03.11.2026)
+
+- Kullanıcı: "Hazırlanan proformalar kayıtlı kalmalı ve düzenlenebilmeli" + "2. sayfadaki QUANTITY …
+  PAYMENT kısmına ilave satır eklenebilmeli".
+- Migration `20261103100000_proforma_kayit.sql` (CANLIDA, adı `proforma_kayit`, md5 b02baf9e…):
+  `proformalar` — `taslak` jsonb = ekranın TAMAMI (`ProformaTaslak`), özet kolonlar (proforma_no
+  [şirket içinde TEKİL, büyük harf], alici_unvan, tarih, para_birimi, toplam, toplam_mts,
+  olusturan/guncelleyen_email). PDF dosyası SAKLANMAZ; her zaman taslaktan üretilir. RLS
+  ihracat_musterileri ile aynı (şirket + `proformalar` sayfa yetkisi), anon kapalı; updated_at +
+  denetim tetikleyicisi (silinen kaydın kopyası denetimde). Yerel PG: 2 kez çalıştırma + 9 senaryo.
+- Ekran (`app/proformalar/page.tsx`): "Kayıtlı Proformalar (n)" listesi (ara, Aç, Sil + onay),
+  "Yeni proforma", alt çubukta "Kaydet" ve "Kaydet ve PDF İndir" (indirilen her proforma kayıtlı
+  kalır; kayıt başarısızsa PDF İNMEZ; değişiklik yoksa yeniden yazmaz). Açılan kayıt "Proforma
+  Düzenle" başlığıyla aynı kayda yazılır; kaydedilmemiş değişiklik varken başka kayıt / yeni form →
+  onay penceresi. Kaydetmek için en az ünvan + proforma no (`kayitEksigi`); diğer eksikler yalnız
+  PDF'i engeller. Aynı no → "zaten kayıtlı" (23505). Saf kurallar `lib/proforma/kayitli.ts`.
+- Eski / bozuk taslak `taslakNormalle` (belge.ts) ile güncel biçime gelir (yeni alan eklenirse
+  bosTaslak'taki varsayılan dolar; ProformaTaslak'a alan eklerken bosTaslak'a da ekle).
+- İlave satır: `ProformaTaslak.ekSatirlar` / `ProformaBelgesi.ekSatirlar` ({baslik, deger}; en fazla
+  6, başlık ≤24 [etiket sütunu kaydırmaz, 7,5 pt'ye kadar küçülür], değer ≤500, büyük harf basılır,
+  yarım satır = eksik). PDF'te PAYMENT'tan SONRA aynı gri biçimde; PAYMENT kendi yüksek satırını
+  korur, kalın alt çizgi en sonda. İlave satır yokken PDF eskisiyle PİKSEL PİKSEL aynı (3 sayfa, AE 0).
+- Gece yedeği: `proformalar` → `YEDEKLENECEK_TABLOLAR` + mail.ts "Kayıtlı proformalar" + geri yükleme
+  betiği. `yedekleme-gonder` v24 (canlı = repo birebir; deneme: 39 tablo, geri yükleme 37/37, uyarı yok).
+- Test: birim (taslakNormalle, eksikler, kayitSatiri, hata mesajları), PDF karşılaştırma, Playwright 24.
+- Sonraki adım (konuşulmadı): Harun Bey "Onayla ve İmzala" kilidi / revizyon numarası.

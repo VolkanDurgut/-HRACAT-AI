@@ -44,6 +44,7 @@ const TABLO_SIRASI = [
   // proforma_ayarlari pakette "_proforma_ayarlari" (id'siz ayar) - gerekirse SQL ile elle.
   "ihracat_musterileri",
   "ihracat_urunleri",
+  "proformalar",
   "ihracat_dosyalari",
   "sevkiyatlar",
   "rezervasyonlar",

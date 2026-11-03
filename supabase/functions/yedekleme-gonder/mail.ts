@@ -55,6 +55,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ihracat_musterileri: { ad: "Proforma müşteri kartları", grup: "Proforma" },
   ihracat_urunleri: { ad: "Proforma ürün kütüphanesi", grup: "Proforma" },
   proforma_ayarlari: { ad: "Proforma şablon ayarları", grup: "Proforma" },
+  proformalar: { ad: "Kayıtlı proformalar", grup: "Proforma" },
   ic_fiyat_kalemleri: { ad: "Fiyat tablosu kalemleri", grup: "İç piyasa" },
   ic_fiyat_formlari: { ad: "Fiyat bilgilendirme formları", grup: "İç piyasa" },
   ic_musteriler: { ad: "İç piyasa müşterileri", grup: "İç piyasa" },

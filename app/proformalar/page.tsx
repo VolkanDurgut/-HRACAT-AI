@@ -8,7 +8,10 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { MetinListesiEditor } from "@/components/metin-listesi-editor";
-import { FileSignature, Plus, Trash2, Loader2, Download, Settings, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Eraser } from "lucide-react";
+import { FileSignature, Plus, Trash2, Loader2, Download, Settings, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { yazmaHatasi } from "@/lib/supabase";
+import { KAYIT_LISTE_KOLONLARI, kayitEksigi, kayitHataMesaji, kayitSatiri, kayitZamani, type ProformaKaydi } from "@/lib/proforma/kayitli";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { BANKA_PRESETLERI } from "@/lib/bankalar";
 import type { GecmisDosya } from "@/lib/proforma/gecmis";
@@ -16,6 +19,7 @@ import { proformaHataMesaji, kodTemizle, type IhracatMusteri, type IhracatUrun, 
 import { VARSAYILAN_ALT_BILGI, VARSAYILAN_EVRAKLAR, VARSAYILAN_OZEL_SARTLAR, VARSAYILAN_UST_BILGI, aliciKoduOner, sigortaEvrakiMi, sigortaSatictaMi } from "@/lib/proforma/sabitler";
 import {
   BOS_KALEM,
+  EK_SATIR_SINIR,
   FCL_MTS,
   IKINCI_KUTU_ETIKETLERI,
   belgeOlustur,
@@ -28,6 +32,7 @@ import {
   musteriUygula,
   otomatikAlanlar,
   paraSimgesi,
+  taslakNormalle,
   paraYaz,
   teslimSekliBul,
   toplamlar,
@@ -47,6 +52,10 @@ import {
  * veritabanina HICBIR SEY yazilmaz; kaydetme / liste sonraki adim.
  * 29.10.2026 (kullanici): "PDF indir dediğimizde proforma Harun Bey'in imzası ile
  * imzalanmış şekilde indirilmeli" -> onizleme ve indirme IMZALI (dosya adinda -TASLAK yok).
+ * 03.11.2026 (kullanici): "Hazirlanan proformalar kayitli kalmali ve duzenlenebilmeli" ->
+ * `proformalar` tablosu (taslak = ekranin tamami). "Kaydet" ve "Kaydet ve PDF Indir"
+ * (indirilen her proforma kayitli kalir); "Kayitli Proformalar" listesinden acilip ayni
+ * kayda duzenlenir; "Yeni proforma" bos form. Sayfa 2'ye ilave satir (ekSatirlar).
  */
 const IMZALI = true;
 
@@ -80,6 +89,16 @@ export default function YeniProformaPage() {
   const [degisti, setDegisti] = useState(false);
   const [ayrintiAcik, setAyrintiAcik] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
+  // Kayitli proformalar (03.11.2026)
+  const [kayitId, setKayitId] = useState<string | null>(null);
+  const [kayitBilgi, setKayitBilgi] = useState<ProformaKaydi | null>(null);
+  const [kayitlar, setKayitlar] = useState<ProformaKaydi[]>([]);
+  const [kayitHatasi, setKayitHatasi] = useState<string | null>(null);
+  const [listeAcik, setListeAcik] = useState(false);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [aciliyor, setAciliyor] = useState<string | null>(null);
+  const [onay, setOnay] = useState<{ tur: "ac"; kayit: ProformaKaydi } | { tur: "yeni" } | { tur: "sil"; kayit: ProformaKaydi } | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
 
   // ------------------------------------------------------------- veri ---
   const getir = useCallback(async () => {
@@ -116,6 +135,19 @@ export default function YeniProformaPage() {
     if (authLoading || !yetkili) return;
     getir();
   }, [authLoading, yetkili, getir]);
+
+  // Kayitli proformalar: AYRI okunur; okunamazsa form yine calisir (liste alaninda hata)
+  const kayitlariGetir = useCallback(async () => {
+    if (!companyId) return;
+    const { data, error } = await supabase.from("proformalar").select(KAYIT_LISTE_KOLONLARI).eq("company_id", companyId).order("updated_at", { ascending: false }).limit(500);
+    if (error) { setKayitHatasi(kayitHataMesaji(error, "")); return; }
+    setKayitHatasi(null);
+    setKayitlar((data || []) as ProformaKaydi[]);
+  }, [companyId]);
+  useEffect(() => {
+    if (authLoading || !yetkili) return;
+    kayitlariGetir();
+  }, [authLoading, yetkili, kayitlariGetir]);
 
   const secenekler = useMemo(() => musteriSecenekleri(kartlar, dosyalar), [kartlar, dosyalar]);
   const urunListesi = useMemo(() => urunOnerileri(urunler, dosyalar), [urunler, dosyalar]);
@@ -167,11 +199,76 @@ export default function YeniProformaPage() {
   const kalemEkle = () => guncelle((x) => ({ ...x, kalemler: [...x.kalemler, { ...BOS_KALEM, ambalajKg: x.kalemler[x.kalemler.length - 1]?.ambalajKg || "25" }] }));
   const kalemSil = (i: number) => guncelle((x) => ({ ...x, kalemler: x.kalemler.length > 1 ? x.kalemler.filter((_, j) => j !== i) : [{ ...BOS_KALEM }] }));
 
-  const temizle = () => {
+  const bosForm = () => {
     setKodElle(false);
     setDegisti(false);
+    setKayitId(null);
+    setKayitBilgi(null);
     setT({ ...bosTaslak(), evraklar: [...sablon.evraklar] });
   };
+  const yeniProforma = () => (degisti ? setOnay({ tur: "yeni" }) : bosForm());
+
+  // ----------------------------------------------------------- kayit ---
+  /** Kaydeder; basariliysa kayit id'si, degilse null (hata toast'la gosterilir). */
+  const kaydet = async (sessiz = false): Promise<string | null> => {
+    if (!companyId) return null;
+    const sorun = kayitEksigi(t);
+    if (sorun) { showToast(sorun, "error"); return null; }
+    setKaydediliyor(true);
+    const satir = kayitSatiri(t);
+    const eposta = user?.email || null;
+    const sorgu = kayitId
+      ? supabase.from("proformalar").update({ ...satir, guncelleyen_email: eposta }).eq("id", kayitId).eq("company_id", companyId)
+      : supabase.from("proformalar").insert({ ...satir, company_id: companyId, olusturan_email: eposta, guncelleyen_email: eposta });
+    const { data, error } = await sorgu.select(KAYIT_LISTE_KOLONLARI);
+    setKaydediliyor(false);
+    // 0 satir (RLS / silinmis kayit) da basarisiz sayilir (01.10.2026 kurali)
+    const hata = error ? kayitHataMesaji(error, satir.proforma_no) : yazmaHatasi(null, data);
+    if (hata) { showToast(`Kaydedilemedi: ${hata}`, "error"); return null; }
+    const kayit = (data as ProformaKaydi[])[0];
+    setKayitId(kayit.id);
+    setKayitBilgi(kayit);
+    setDegisti(false);
+    if (!sessiz) showToast(`${kayit.proforma_no} kaydedildi.`, "success");
+    kayitlariGetir();
+    return kayit.id;
+  };
+
+  const kaydiAc = async (k: ProformaKaydi) => {
+    setAciliyor(k.id);
+    const { data, error } = await supabase.from("proformalar").select(`${KAYIT_LISTE_KOLONLARI}, taslak`).eq("id", k.id).eq("company_id", companyId!).maybeSingle();
+    setAciliyor(null);
+    if (error || !data) { showToast(`Açılamadı: ${error ? kayitHataMesaji(error, k.proforma_no) : "kayıt bulunamadı (silinmiş olabilir)"}`, "error"); kayitlariGetir(); return; }
+    const taslak = taslakNormalle((data as { taslak: unknown }).taslak);
+    if (!taslak) { showToast("Kayıt okunamadı (bozuk taslak).", "error"); return; }
+    setKodElle(true);
+    setT(taslak);
+    setKayitId(k.id);
+    setKayitBilgi(data as ProformaKaydi);
+    setDegisti(false);
+    setListeAcik(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    showToast(`${k.proforma_no} açıldı; değişiklikler aynı kayda yazılır.`, "success");
+  };
+  const acIste = (k: ProformaKaydi) => (degisti ? setOnay({ tur: "ac", kayit: k }) : kaydiAc(k));
+
+  const sil = async (k: ProformaKaydi) => {
+    setSiliniyor(true);
+    const { data, error } = await supabase.from("proformalar").delete().eq("id", k.id).eq("company_id", companyId!).select("id");
+    setSiliniyor(false);
+    const hata = error ? kayitHataMesaji(error, k.proforma_no) : yazmaHatasi(null, data);
+    if (hata) { showToast(`Silinemedi: ${hata}`, "error"); return; }
+    showToast(`${k.proforma_no} silindi.`, "success");
+    setOnay(null);
+    if (kayitId === k.id) { setKayitId(null); setKayitBilgi(null); setDegisti(true); }
+    kayitlariGetir();
+  };
+
+  // Sayfa 2 ilave satirlar
+  const ekSatirDegis = (i: number, k: "baslik" | "deger", v: string) =>
+    guncelle((x) => ({ ...x, ekSatirlar: x.ekSatirlar.map((e, j) => (j === i ? { ...e, [k]: k === "baslik" ? v.toUpperCase().slice(0, EK_SATIR_SINIR.baslik) : v } : e)) }));
+  const ekSatirEkle = () => guncelle((x) => (x.ekSatirlar.length >= EK_SATIR_SINIR.adet ? x : { ...x, ekSatirlar: [...x.ekSatirlar, { baslik: "", deger: "" }] }));
+  const ekSatirSil = (i: number) => guncelle((x) => ({ ...x, ekSatirlar: x.ekSatirlar.filter((_, j) => j !== i) }));
 
   // ----------------------------------------------------------- hesap ---
   const hesapli = useMemo(() => kalemleriHesapla(t.kalemler), [t.kalemler]);
@@ -209,12 +306,17 @@ export default function YeniProformaPage() {
 
   const indir = async () => {
     if (eksik.length) { showToast(`Eksik: ${eksik[0].mesaj}`, "error"); return; }
+    // 03.11.2026: indirilen her proforma kayitli kalir (kayit olmazsa PDF inmez)
+    if (degisti || !kayitId) {
+      const id = await kaydet(true);
+      if (!id) return;
+    }
     setIndiriliyor(true);
     try {
       const { proformaPdf, proformaDosyaAdi } = await import("@/lib/proforma/pdf");
       const belge = belgeOlustur(t, sablon, IMZALI);
       proformaPdf(belge).save(proformaDosyaAdi(belge));
-      showToast("İmzalı proforma PDF indirildi.", "success");
+      showToast("Proforma kaydedildi ve imzalı PDF indirildi.", "success");
     } catch (e) {
       showToast(`PDF oluşturulamadı: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
@@ -235,17 +337,21 @@ export default function YeniProformaPage() {
     <AppShell>
       <SayfaBasligi
         ikon={<FileSignature size={20} />}
-        baslik="Yeni Proforma"
+        baslik={kayitId ? "Proforma Düzenle" : "Yeni Proforma"}
         aciklama={
           <>
             {t.proformaNo ? <>Proforma No <span className="font-mono font-semibold text-emerald-400">{t.proformaNo}</span> · </> : null}
-            Müşteriyi seçin, ürünleri girin, kontrol edip PDF&apos;i indirin.
+            {kayitId ? "Kayıtlı proforma açık; değişiklikler aynı kayda yazılır." : "Müşteriyi seçin, ürünleri girin, kontrol edip kaydedin ve PDF'i indirin."}
           </>
         }
         sag={
           <div className="flex flex-wrap gap-2">
-            <button onClick={temizle} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-              <Eraser size={14} /> Temizle
+            <button onClick={() => setListeAcik((a) => !a)} aria-expanded={listeAcik} data-testid="kayitli-ac"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: listeAcik ? ACCENT : CARD_BORDER, color: listeAcik ? "#E6F4EE" : TEXT_MUTED }}>
+              <FolderOpen size={14} /> Kayıtlı Proformalar{kayitlar.length ? ` (${kayitlar.length})` : ""}
+            </button>
+            <button onClick={yeniProforma} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <FilePlus2 size={14} /> Yeni proforma
             </button>
             <Link href="/proformalar/musteriler" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               <Settings size={14} /> Ayarlar
@@ -259,6 +365,11 @@ export default function YeniProformaPage() {
           <span className="flex items-center gap-2"><AlertCircle size={16} /> {okumaHatasi}</span>
           <button onClick={getir} className="underline">Yeniden dene</button>
         </div>
+      )}
+
+      {listeAcik && (
+        <KayitliProformalar kayitlar={kayitlar} hata={kayitHatasi} aktifId={kayitId} aciliyor={aciliyor}
+          onAc={acIste} onSil={(k) => setOnay({ tur: "sil", kayit: k })} onYenile={kayitlariGetir} onKapat={() => setListeAcik(false)} />
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
@@ -391,6 +502,33 @@ export default function YeniProformaPage() {
               </Alan>
             </div>
 
+            {/* Sayfa 2 ilave satirlar (03.11.2026) */}
+            <div className="mt-4 rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }} data-testid="ek-satirlar">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-white">Sözleşme sayfası ilave satırlar</span>
+                <span className="text-[11px]" style={{ color: TEXT_MUTED }}>2. sayfada PAYMENT satırından sonra basılır · en fazla {EK_SATIR_SINIR.adet}</span>
+              </div>
+              {t.ekSatirlar.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {t.ekSatirlar.map((e, i) => (
+                    <div key={i} className="grid gap-2 sm:grid-cols-[200px_1fr_auto] items-start">
+                      <input value={e.baslik} onChange={(ev) => ekSatirDegis(i, "baslik", ev.target.value)} maxLength={EK_SATIR_SINIR.baslik}
+                        placeholder="BAŞLIK (ör. INSPECTION)" aria-label={`${i + 1}. ilave satır başlığı`} className={inp} style={{ ...inpStil, backgroundColor: CARD_BG }} />
+                      <textarea value={e.deger} onChange={(ev) => ekSatirDegis(i, "deger", ev.target.value)} rows={1} maxLength={EK_SATIR_SINIR.deger}
+                        placeholder="Değer (ör. SGS AT LOADING PORT, COST BY BUYER)" aria-label={`${i + 1}. ilave satır değeri`} className={inp} style={{ ...inpStil, backgroundColor: CARD_BG }} />
+                      <button onClick={() => ekSatirSil(i)} aria-label={`${i + 1}. ilave satırı sil`} title="Satırı sil"
+                        className="justify-self-end inline-flex items-center gap-1 rounded px-2 py-2 text-xs text-red-400 hover:bg-red-500/10"><Trash2 size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {t.ekSatirlar.length < EK_SATIR_SINIR.adet && (
+                <button onClick={ekSatirEkle} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-emerald-400 hover:underline">
+                  <Plus size={14} /> İlave satır ekle
+                </button>
+              )}
+            </div>
+
             {/* Diger ayrintilar */}
             <button onClick={() => setAyrintiAcik((a) => !a)} className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400 hover:underline" aria-expanded={ayrintiAcik}>
               <ChevronDown size={15} className={`transition-transform ${ayrintiAcik ? "rotate-180" : ""}`} /> Diğer ayrıntılar
@@ -441,11 +579,22 @@ export default function YeniProformaPage() {
               ) : (
                 <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 size={14} /> Proforma hazır. Önizlemeyi kontrol edip indirin.</span>
               )}
-              <span className="block mt-0.5">Hazırlayan: {user?.email || "-"} · Harun Bey imzalı</span>
+              <span className="block mt-0.5" data-testid="kayit-durumu">
+                {kayitBilgi
+                  ? <>{degisti ? <b className="text-amber-400">Kaydedilmemiş değişiklik var</b> : <span className="text-emerald-400">Kayıtlı</span>} · son kayıt {kayitZamani(kayitBilgi.updated_at)}{kayitBilgi.guncelleyen_email ? ` · ${kayitBilgi.guncelleyen_email}` : ""}</>
+                  : <>Henüz kaydedilmedi · Hazırlayan: {user?.email || "-"}</>}
+                {" "}· Harun Bey imzalı
+              </span>
             </div>
-            <button onClick={indir} disabled={indiriliyor || eksik.length > 0} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-              {indiriliyor ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} PDF İndir
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => kaydet()} disabled={kaydediliyor || indiriliyor || (!!kayitId && !degisti)} data-testid="kaydet"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border text-sm font-semibold hover:bg-white/5 disabled:opacity-50" style={{ borderColor: ACCENT, color: "#E6F4EE" }}>
+                {kaydediliyor && !indiriliyor ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} {kayitId && !degisti ? "Kayıtlı" : "Kaydet"}
+              </button>
+              <button onClick={indir} disabled={indiriliyor || kaydediliyor || eksik.length > 0} data-testid="pdf-indir" className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+                {indiriliyor || kaydediliyor ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {degisti || !kayitId ? "Kaydet ve PDF İndir" : "PDF İndir"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -481,11 +630,92 @@ export default function YeniProformaPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={onay !== null}
+        onOpenChange={(a) => { if (!a && !siliniyor) setOnay(null); }}
+        title={onay?.tur === "sil" ? `${onay.kayit.proforma_no} silinsin mi?` : "Kaydedilmemiş değişiklikler var"}
+        description={onay?.tur === "sil"
+          ? `${onay.kayit.alici_unvan} için kayıtlı proforma silinir. Daha önce indirilen PDF'ler etkilenmez; silinen kaydın kopyası denetim kaydında kalır.`
+          : "Formdaki kaydedilmemiş değişiklikler kaybolacak. Devam etmeden önce kaydetmek isterseniz Vazgeç'e basın."}
+        confirmLabel={onay?.tur === "sil" ? "Evet, sil" : "Değişiklikleri bırak"}
+        cancelLabel="Vazgeç"
+        destructive={onay?.tur === "sil"}
+        loading={siliniyor}
+        loadingLabel="Siliniyor..."
+        onConfirm={() => {
+          if (!onay) return;
+          if (onay.tur === "sil") { sil(onay.kayit); return; }
+          const o = onay;
+          setOnay(null);
+          if (o.tur === "yeni") bosForm(); else kaydiAc(o.kayit);
+        }}
+      />
     </AppShell>
   );
 }
 
 // ------------------------------------------------------------ parcalar ---
+
+/** Kayitli proformalar listesi (03.11.2026): ara, ac (duzenle), sil. */
+function KayitliProformalar({ kayitlar, hata, aktifId, aciliyor, onAc, onSil, onYenile, onKapat }: {
+  kayitlar: ProformaKaydi[]; hata: string | null; aktifId: string | null; aciliyor: string | null;
+  onAc: (k: ProformaKaydi) => void; onSil: (k: ProformaKaydi) => void; onYenile: () => void; onKapat: () => void;
+}) {
+  const [arama, setArama] = useState("");
+  const q = arama.trim().toLocaleLowerCase("en-US");
+  const liste = kayitlar.filter((k) => !q || `${k.proforma_no} ${k.alici_unvan}`.toLocaleLowerCase("en-US").includes(q));
+  return (
+    <section className="mb-5 rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="kayitli-liste">
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
+        <FolderOpen size={16} style={{ color: ACCENT }} />
+        <h2 className="text-sm font-semibold text-white">Kayıtlı Proformalar</h2>
+        <span className="text-xs" style={{ color: TEXT_MUTED }}>{kayitlar.length} kayıt · açtığınız proforma düzenlenip aynı kayda yazılır</span>
+        <div className="relative ml-auto w-full sm:w-64">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
+          <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Proforma no veya müşteri" aria-label="Kayıtlı proforma ara" className={`${inp} pl-8 py-1.5`} style={inpStil} />
+        </div>
+        <button onClick={onKapat} className="px-2.5 py-1.5 rounded-lg border text-xs hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button>
+      </div>
+      {hata ? (
+        <p className="px-4 py-4 text-sm text-red-400 flex items-center gap-2"><AlertCircle size={15} /> {hata} <button onClick={onYenile} className="underline">Yeniden dene</button></p>
+      ) : liste.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-center" style={{ color: TEXT_MUTED }}>{kayitlar.length ? "Aramaya uyan proforma yok." : "Henüz kayıtlı proforma yok. Hazırladığınız proformayı Kaydet ile saklayın."}</p>
+      ) : (
+        <ul className="max-h-[420px] overflow-y-auto">
+          {liste.map((k) => {
+            const aktif = k.id === aktifId;
+            return (
+              <li key={k.id} data-testid="kayitli-satir" className="border-b last:border-0 px-4 py-2.5 flex flex-wrap md:flex-nowrap items-center gap-x-4 gap-y-1.5"
+                style={{ borderColor: CARD_BORDER, backgroundColor: aktif ? "rgba(16,185,129,0.07)" : undefined }}>
+                <div className="min-w-0 basis-full md:basis-auto md:w-[230px] md:shrink-0">
+                  <p className="font-mono text-sm font-semibold text-white break-all">{k.proforma_no}{aktif && <span className="ml-2 font-sans text-[10px] font-bold text-emerald-400">AÇIK</span>}</p>
+                  <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{k.tarih.split("-").reverse().join(".")}</p>
+                </div>
+                <p className="min-w-0 basis-full md:basis-0 md:flex-1 text-sm md:truncate break-words text-white" title={k.alici_unvan}>{k.alici_unvan}</p>
+                <p className="text-sm font-semibold text-white whitespace-nowrap tabular-nums md:w-[150px] md:text-right">
+                  {paraYaz(Number(k.toplam))} {k.para_birimi}
+                  <span className="block text-[11px] font-normal" style={{ color: TEXT_MUTED }}>{genelSayiYaz(Number(k.toplam_mts))} MTS</span>
+                </p>
+                <p className="text-[11px] md:w-[190px]" style={{ color: TEXT_MUTED }}>
+                  Son kayıt {kayitZamani(k.updated_at)}
+                  <span className="block truncate">{k.guncelleyen_email || k.olusturan_email || ""}</span>
+                </p>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <button onClick={() => onAc(k)} disabled={aciliyor === k.id || aktif} aria-label={`${k.proforma_no} aç`}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+                    {aciliyor === k.id ? <Loader2 size={12} className="animate-spin" /> : <Pencil size={12} />} {aktif ? "Açık" : "Aç"}
+                  </button>
+                  <button onClick={() => onSil(k)} aria-label={`${k.proforma_no} sil`} title="Kaydı sil" className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10"><Trash2 size={14} /></button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function Kutu({ no, baslik, sag, children }: { no: number; baslik: string; sag?: string; children: React.ReactNode }) {
   return (

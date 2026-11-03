@@ -223,3 +223,22 @@
   kayboldu; migration + edge canlıdan birebir geri alındı, ekranlar yeniden yazıldı. Test:
   Excel okuyucu birim testi + Playwright 46 kontrol (taklit edge, gerçek Excel 49 kalem).
   DERS: her parça bitince HEMEN commit + bundle.
+
+### Teslim takibi GERİ EKLENDİ (03.11.2026)
+- Kullanıcı: "Satın alma kısmında onayını aldığımız ürünlerin siparişlerini verdik. Ve geldi.
+  Şimdi teslim edeceğiz fakat nasıl izleyebiliriz?" 27.10 kapalı kararı açıkça soruldu →
+  "Evet, geri ekle"; işaretleyen: İKİSİ DE (satın alma + departman); aşama: YALNIZ teslim.
+- Veritabanı / edge DEĞİŞMEDİ (alindi / alinma_zamani / alan_ad, cek_durumu / cek_tamamlanma,
+  sa_cek_token_isaretle + edge "cek_isaretle" zaten canlıda). İşaretleme HER İKİ YERDEN fiş
+  token'ıyla edge "cek_isaretle": `alan_ad` = TESLİM ALANIN ad soyadı (zorunlu; sunucuda da
+  `sa_ad_soyad_gecerli`). `sa_cek_isaretle` (e-postayı yazar) arayüzde KULLANILMIYOR.
+- `/cek`: "Teslim" sütunu (kutu → tarih + ad, "Geri al" iki adımlı), araç çubuğunda "Teslim
+  alan (ad soyad)" + "Tümünü teslim aldım (n)"; Durum "Teslim bekliyor · a/b" / "Teslim
+  tamamlandı"; bilgi tablosunda Teslim + Bekleyen / Tamamlanma satırı. Ad HATIRLANMAZ.
+  Yazdırmada geri al gizli; A4 tek sayfa (test fişi 941/1032 px).
+- `/satin-alma` Onaylı fişler: rozet "Teslim bekliyor · a/b" / "Teslim tamamlandı", filtre
+  Teslim bekleyen / Teslim tamamlanan / Tamamı reddedildi, sekme "(n · m teslim bekliyor)".
+  Açılan fişte `TeslimPaneli`: teslim alan ad soyad + kalem "Teslim edildi" + "Tümünü teslim
+  edildi"; geri al ConfirmDialog. Departman geçmişinde "x teslim edildi · y bekliyor" + Teslim
+  sütunu. `/talep` onaylanan alımlarda Teslim sütunu, form durumu "Tamamlandı · tümü teslim".
+- Fiş mailinin metni DEĞİŞMEDİ (edge deploy yok). Test: e2e_teslim 24 + e2e 46.

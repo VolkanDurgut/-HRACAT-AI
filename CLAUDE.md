@@ -59,8 +59,8 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
 - ic-piyasa: fiyat formunda Ödeme sütunu, özel gün / bayram bandı, kaşe-imza alanı, başlıkta
   "İç Piyasa" yazısı, Fatura Talimatı görünümü; müşteri mesajlarında bağlantı / düğme;
   Kantar Paneli sekmeleri (tek ekran).
-- satin-alma: teslim alındı takibi, fişte ıslak imza kutuları, talep formunda adın
-  tarayıcıda hatırlanması.
+- satin-alma: fişte ıslak imza kutuları, talep formunda adın tarayıcıda hatırlanması.
+  (Teslim takibi 03.11.2026'da kullanıcı onayıyla GERİ EKLENDİ; kapalı karar değil.)
 
 ## Proje nedir
 

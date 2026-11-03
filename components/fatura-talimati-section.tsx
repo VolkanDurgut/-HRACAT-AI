@@ -11,13 +11,16 @@ import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-dagilimi";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ON_TALIMAT_ISARETI, type FaturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
 
 type Props = {
   dosyaId: string;
   dosya: Dosya;
   konteynerler: Konteyner[];
   rezervasyonlar: Rezervasyon[];
-  faturaTalimatiHazir: boolean;
+  /** 03.11.2026: tam | on (rezervasyon / konteyner kesinlesmeden) | yok */
+  durum: FaturaTalimatiDurumu;
   eklenenKonteynerAdedi: number;
   rezervasyonKonteynerAdedi: number;
   onRefresh: () => void;
@@ -28,9 +31,11 @@ export type FaturaTalimatiSectionHandle = { acFatura: () => void; indirFaturaTal
 
 const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(function FaturaTalimatiSection({
   dosyaId, dosya, konteynerler, rezervasyonlar,
-  faturaTalimatiHazir, rezervasyonKonteynerAdedi, onRefresh, companyId,
+  durum, rezervasyonKonteynerAdedi, onRefresh, companyId,
 }, ref) {
   const { showToast } = useToast();
+  const on = durum.tur === "on";
+  const [onayIslemi, setOnayIslemi] = useState<"ac" | "indir" | null>(null);
 
   const [showFaturaTalimati, setShowFaturaTalimati] = useState(false);
   const [to, setTo] = useState("");
@@ -40,7 +45,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
 
   const talimatGonderildi = !!dosya.fatura_talimati_gonderildi;
 
-  const buildKonu = () => [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani].filter(Boolean).join(" - ");
+  const buildKonu = () => [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani, on ? "ON TALIMAT" : null].filter(Boolean).join(" - ");
 
   const buildMetin = () => {
     const urunler = dosya.urun_detaylari || [];
@@ -181,13 +186,20 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       evrakTarihBilgileri ? `EVRAK VE TARIH BILGILERI\n${evrakTarihBilgileri}` : null,
     ].filter(Boolean).join("\n\n");
 
-    return `Sayin Ilgili,\n\nAsagida belirtilen ihracat dosyasina ait fatura tanzimi icin gerekli bilgiler tarafiniza iletilmistir. Bilgilerinize ve gereginin yapilmasini rica ederiz.\n\n${bolumler}\n\nBilgilerinize arz ederiz.\n\nSaygilarimizla,\nIhracat Departmani`;
+    const onNotu = on
+      ? `${ON_TALIMAT_ISARETI}\nRezervasyon ve konteyner bilgileri henuz kesinlesmemistir. Fatura asagidaki proforma bilgilerine gore kesilecektir; booking, konteyner ve agirlik bilgileri belirlenince ayrica bildirilecektir.\n\n`
+      : "";
+    return `${onNotu}Sayin Ilgili,\n\nAsagida belirtilen ihracat dosyasina ait fatura tanzimi icin gerekli bilgiler tarafiniza iletilmistir. Bilgilerinize ve gereginin yapilmasini rica ederiz.\n\n${bolumler}\n\nBilgilerinize arz ederiz.\n\nSaygilarimizla,\nIhracat Departmani`;
   };
 
-  const handleFaturaTalimatiAc = () => {
-    if (!faturaTalimatiHazir) return;
+  const handleFaturaTalimatiAc = (onaylandi = false) => {
+    if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
+    if (on && !onaylandi) { setOnayIslemi("ac"); return; }
     setKonu(buildKonu());
-    setMetin(dosya.fatura_talimati_metni || buildMetin());
+    // Kaydedilmis metin SADECE tam talimatta ve on talimat metni degilse kullanilir
+    // (on talimatlar kaydedilmez; eski bir on metin tam talimatta yeniden uretilir).
+    const kayitli = dosya.fatura_talimati_metni;
+    setMetin(!on && kayitli && !kayitli.includes(ON_TALIMAT_ISARETI) ? kayitli : buildMetin());
     setTo(""); setCc("");
     setShowFaturaTalimati(true);
   };
@@ -196,14 +208,22 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   // (her zaman gorunen ust bar butonu icin). PDF artik metin/konu'dan degil,
   // dogrudan guncel sistem verisinden (kart tasarimi) uretilir - boylece PDF
   // her zaman en guncel dosya/konteyner bilgisini yansitir.
-  const handleFaturaTalimatiIndir = () => {
-    if (!faturaTalimatiHazir) return;
-    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler);
+  const handleFaturaTalimatiIndir = (onaylandi = false) => {
+    if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
+    if (on && !onaylandi) { setOnayIslemi("indir"); return; }
+    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on);
   };
 
   const handleMailGonder = async () => {
     const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : "";
     window.open(`mailto:${to}?subject=${encodeURIComponent(konu)}${ccPart}&body=${encodeURIComponent(metin)}`);
+    // On talimat "gonderildi" olarak ISARETLENMEZ (konsimento beklentisi / kayitli metin
+    // tam talimata aittir); konteynerler girilince tam talimat ayrica gonderilir.
+    if (on) {
+      setShowFaturaTalimati(false);
+      showToast("Ön fatura talimatı maili açıldı. Konteynerler girilince tam talimatı ayrıca gönderin.", "success");
+      return;
+    }
     const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({
       fatura_talimati_gonderildi: true,
       fatura_talimati_metni: metin,
@@ -219,19 +239,33 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   };
 
   useImperativeHandle(ref, () => ({
-    acFatura: handleFaturaTalimatiAc,
-    indirFaturaTalimati: handleFaturaTalimatiIndir,
+    acFatura: () => handleFaturaTalimatiAc(),
+    indirFaturaTalimati: () => handleFaturaTalimatiIndir(),
   }));
 
   return (
     <>
+      <ConfirmDialog
+        open={onayIslemi !== null}
+        onOpenChange={(a) => { if (!a) setOnayIslemi(null); }}
+        title="Ön fatura talimatı hazırlansın mı?"
+        description={`Bu dosyada ${durum.tur === "on" ? durum.eksikler.join(", ").toLocaleLowerCase("tr-TR") : "bazı bilgiler eksik"}. Talimat proforma bilgileriyle hazırlanır ve üzerinde "ÖN TALİMAT" yazar; konteyner, booking ve ağırlık bilgileri sonradan bildirilir. Filistin (M24) gibi rezervasyondan önce fatura kesilmesi gereken durumlar için kullanın.`}
+        confirmLabel={onayIslemi === "indir" ? "Ön talimatı indir" : "Ön talimatı hazırla"}
+        cancelLabel="Vazgeç"
+        onConfirm={() => { const i = onayIslemi; setOnayIslemi(null); if (i === "indir") handleFaturaTalimatiIndir(true); else handleFaturaTalimatiAc(true); }}
+      />
       {showFaturaTalimati && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowFaturaTalimati(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-5 space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">Fatura Talimatı Maili</p>
+              <p className="text-sm font-bold text-white">{on ? "Ön Fatura Talimatı Maili" : "Fatura Talimatı Maili"}</p>
               <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
+            {on && (
+              <p className="text-xs rounded-lg border px-3 py-2 text-amber-300" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }} data-testid="on-talimat-notu">
+                Ön talimat: rezervasyon / konteyner bilgileri olmadan hazırlandı. Gönderildi olarak işaretlenmez; konteynerler girilince tam talimatı ayrıca gönderin.
+              </p>
+            )}
             <div>
               <p className="text-xs mb-1" style={{ color: TEXT_MUTED }}>TO (Alıcı)</p>
               <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="muhasebe@firma.com" type="email" className="w-full text-sm px-3 py-2 border rounded-lg text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
@@ -252,7 +286,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 <Mail size={14} /> Mail Uygulamasını Aç
               </button>
-              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
+              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
                 <Download size={14} /> Fatura Talimatı İndir
               </button>
               <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>İptal</button>

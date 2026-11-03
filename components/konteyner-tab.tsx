@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/lib/toast-context";
 import { EditableCell } from "@/components/editable-cell";
+import { faturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
 import FaturaTalimatiSection, { FaturaTalimatiSectionHandle } from "@/components/fatura-talimati-section";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kapUyumsuzlugu } from "@/lib/siparis-devam";
@@ -175,7 +176,8 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   // ---- Hesaplamalar ----
   const rezervasyonKonteynerAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const eklenenKonteynerAdedi = konteynerler.length;
-  const faturaTalimatiHazir = rezervasyonKonteynerAdedi > 0 && eklenenKonteynerAdedi === rezervasyonKonteynerAdedi;
+  // 03.11.2026: tam talimat (eskisi gibi) ya da ON talimat (rezervasyon / konteyner kesinlesmeden)
+  const faturaDurumu = faturaTalimatiDurumu(dosya.urun_detaylari as unknown[], rezervasyonlar, eklenenKonteynerAdedi);
   const dbaYuklenenSayisi = konteynerler.filter(k => k.dba_dosya_url).length;
 
   const toplamNet = konteynerler.reduce((s, k) => s + (k.net_agirlik_kg || 0), 0);
@@ -541,7 +543,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
         dosya={dosya}
         konteynerler={konteynerler}
         rezervasyonlar={rezervasyonlar}
-        faturaTalimatiHazir={faturaTalimatiHazir}
+        durum={faturaDurumu}
         eklenenKonteynerAdedi={eklenenKonteynerAdedi}
         rezervasyonKonteynerAdedi={rezervasyonKonteynerAdedi}
         onRefresh={onRefresh}

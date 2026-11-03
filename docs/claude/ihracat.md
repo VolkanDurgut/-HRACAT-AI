@@ -885,3 +885,22 @@
   betiği. `yedekleme-gonder` v24 (canlı = repo birebir; deneme: 39 tablo, geri yükleme 37/37, uyarı yok).
 - Test: birim (taslakNormalle, eksikler, kayitSatiri, hata mesajları), PDF karşılaştırma, Playwright 24.
 - Sonraki adım (konuşulmadı): Harun Bey "Onayla ve İmzala" kilidi / revizyon numarası.
+
+## Fatura talimatı — ÖN TALİMAT (rezervasyon / konteyner öncesi) (03.11.2026)
+
+- Kullanıcı (IHR-2026-0110, Filistin / Aşdod): karşı ülkenin ihracatçılar birliğinden M24 kodu
+  alınması için fatura, rezervasyon ve konteyner belli olmadan kesilmek zorunda; sistem rezervasyon +
+  tüm konteynerler girilmeden talimat hazırlatmıyordu.
+- Kural TEK YER `lib/fatura-talimati-durum.ts` (`faturaTalimatiDurumu`): "tam" = rezervasyondaki
+  konteyner adedinin hepsi eklendi (ESKİ kural, değişmedi); "on" = ürün kaleminde miktar var ama
+  rezervasyon / konteyner eksik (eksikler listesiyle); "yok" = ürün miktarı yok (düğmeler kapalı).
+- Ön talimatta düğmeler "Ön Fatura Talimatı" / "Ön Talimat İndir", önce ONAY penceresi (eksikler +
+  "Filistin (M24) gibi durumlar için"). PDF başlığı "FATURA TALIMATI (ON TALIMAT)" + turuncu not kutusu,
+  konu "… | ON TALIMAT", dosya adı `Fatura_Talimati_<no>-ON.pdf`; CIF'te navlun / konteyner yoksa FOB "-" +
+  dipnot. Mail metni "*** ON FATURA TALIMATI ***" ile başlar. Ön talimat DB'ye YAZILMAZ
+  (`fatura_talimati_gonderildi` / `_metni` değişmez → "konşimento bekleniyor" erken çıkmaz; kayıtlı ön
+  metin tam talimatta kullanılmaz, yeniden üretilir). Tam talimat PDF'i eskisiyle PİKSEL AYNI (AE 0).
+- AÇIK SORU (kullanıcıya soruldu): Aşdod'a giden Filistin sevkiyatında "Gideceği Ülke" ne yazılmalı?
+  `gidecegiUlke("ASHDOD PORT")` tanımıyor → satır basılmıyor; "Ticaret Yapılan Ülke" FİLİSTİN (adresten).
+  Karar gelmeden LIMAN_ULKE'ye ASHDOD EKLENMEDİ (İSRAİL yazdırmak süreci riske atabilir).
+- Test: durum birim 6, PDF karşılaştırma, Playwright 12 (onay / vazgeç / metin / -ON.pdf / DB'ye yazmama).

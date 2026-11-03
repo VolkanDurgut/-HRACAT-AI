@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/empty-state";
 import { DetailSkeleton } from "@/components/skeleton-loaders";
 import AppShell from "@/components/app-shell";
 import RezervasyonTab from "@/components/rezervasyon-tab";
+import { faturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
 import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
 import BankaBilgileriCard from "@/components/banka-bilgileri-card";
@@ -238,8 +239,10 @@ function DosyaDetailContent() {
             )}
             {gorunenSekme === "konteynerler" && (() => {
               const vgmHazir = konteynerler.length > 0 && konteynerler.every((k) => !!k.vgm_kg);
-              const rezKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
-              const faturaHazir = rezKontAdedi > 0 && konteynerler.length === rezKontAdedi;
+              // 03.11.2026: rezervasyon / konteyner tam degilse ON talimat (onayla); urun yoksa kapali
+              const faturaDurumu = faturaTalimatiDurumu(dosya.urun_detaylari as unknown[], rezervasyonlar, konteynerler.length);
+              const faturaHazir = faturaDurumu.tur !== "yok";
+              const faturaIpucu = faturaDurumu.tur === "on" ? `Ön talimat: ${faturaDurumu.eksikler.join(", ")}` : faturaDurumu.tur === "yok" ? faturaDurumu.neden : undefined;
               const btnClass = (aktif: boolean) =>
                 `px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   aktif ? "text-white hover:opacity-90 cursor-pointer" : "cursor-not-allowed opacity-50"
@@ -259,21 +262,22 @@ function DosyaDetailContent() {
                   <button
                     onClick={() => konteynerTabRef.current?.indirFaturaTalimati()}
                     disabled={!faturaHazir}
-                    title="Fatura talimatını PDF olarak indir"
+                    title={faturaIpucu || "Fatura talimatını PDF olarak indir"}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                       faturaHazir ? "hover:bg-white/5 cursor-pointer" : "cursor-not-allowed opacity-50"
                     }`}
                     style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
                   >
-                    Fatura Talimatı İndir
+                    {faturaDurumu.tur === "on" ? "Ön Talimat İndir" : "Fatura Talimatı İndir"}
                   </button>
                   <button
                     onClick={() => konteynerTabRef.current?.acFatura()}
                     disabled={!faturaHazir}
+                    title={faturaIpucu}
                     className={btnClass(faturaHazir)}
                     style={{ backgroundColor: ACCENT }}
                   >
-                    Fatura Talimatı
+                    {faturaDurumu.tur === "on" ? "Ön Fatura Talimatı" : "Fatura Talimatı"}
                   </button>
                 </div>
               );

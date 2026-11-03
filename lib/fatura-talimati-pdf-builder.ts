@@ -31,7 +31,8 @@ function ciz(
   dosya: Dosya,
   rezervasyonlar: Rezervasyon[],
   konteynerler: Konteyner[],
-  olcek: number
+  olcek: number,
+  on = false
 ): { doc: jsPDF; sayfaSayisi: number } {
   const doc = new jsPDF();
   doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_TR_BASE64);
@@ -58,7 +59,7 @@ function ciz(
   doc.setFont("Roboto", "bold");
   doc.setFontSize(15);
   doc.setTextColor(...LACIVERT);
-  doc.text("FATURA TALIMATI", marginX + 20, 17);
+  doc.text(on ? "FATURA TALIMATI (ON TALIMAT)" : "FATURA TALIMATI", marginX + 20, 17);
   doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GRI);
@@ -68,7 +69,7 @@ function ciz(
   doc.setLineWidth(0.6);
   doc.line(marginX, 29, pageWidth - marginX, 29);
 
-  const konu = [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani]
+  const konu = [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani, on ? "ON TALIMAT" : null]
     .filter(Boolean)
     .join("  |  ");
   doc.setFontSize(8.5 * olcek);
@@ -76,6 +77,23 @@ function ciz(
   doc.text(konu, marginX, 34);
 
   let y = 39;
+  // 03.11.2026: ON TALIMAT (rezervasyon / konteyner kesinlesmeden; or. Filistin M24). Tam
+  // talimatta bu kutu YOK (cizim eskisiyle birebir).
+  if (on) {
+    const kutuH = 11;
+    doc.setFillColor(255, 247, 230);
+    doc.setDrawColor(214, 140, 30);
+    doc.setLineWidth(0.4);
+    doc.rect(marginX, y - 1.5, contentWidth, kutuH, "FD");
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 80, 0);
+    doc.text("ON FATURA TALIMATI", marginX + 3, y + 3);
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(7.8);
+    doc.text("Rezervasyon ve konteyner bilgileri henuz kesinlesmedi. Booking, konteyner ve agirlik bilgileri belirlenince ayrica bildirilecektir.", marginX + 3, y + 7.3, { maxWidth: contentWidth - 6 });
+    y += kutuH + 2;
+  }
   const fontBoyu = 8 * olcek;
   const hucreDolgu = 1.3 * olcek;
   // Tablolar arasi bosluk ve autoTable'in "sayfa sonuna yaklasti" esigi
@@ -233,6 +251,7 @@ function ciz(
     const notlar: string[] = [];
     if (dagilim.satirlar.some((s) => s.tahmini)) notlar.push("* Konteyner markasi urunu ayirt etmiyor; konteyner adedi urun miktarina gore paylastirildi.");
     if (dagilim.eslesmeyen > 0) notlar.push(`! ${dagilim.eslesmeyen} konteynerin markasi hicbir urunle eslesmedi - konteyner markalarini kontrol edin.`);
+    if (on && !fiyatlarFob && toplamFob === null) notlar.push("FOB birim fiyat / toplam: konteyner adedi ve navlun kesinlesince hesaplanacaktir.");
     if (notlar.length) {
       doc.setFont("Roboto", "normal");
       doc.setFontSize(Math.max(6, fontBoyu - 1));
@@ -327,12 +346,17 @@ function ciz(
  * autoTable geri kalanini (basligi tekrarlayarak) 2. sayfaya tasar - bu,
  * kucultmenin durdugu NADIR bir emniyet supabidir, olagan davranis degildir.
  */
-export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[]): void {
+export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false): jsPDF {
   let olcek = 1.0;
-  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek);
+  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on);
   while (sonuc.sayfaSayisi > 1 && olcek > 0.5) {
     olcek = Math.round((olcek - 0.02) * 100) / 100;
-    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek);
+    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on);
   }
-  sonuc.doc.save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}.pdf`);
+  return sonuc.doc;
+}
+
+/** on = true: ON TALIMAT (rezervasyon / konteyner kesinlesmeden; dosya adinda "-ON"). */
+export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false): void {
+  faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
 }

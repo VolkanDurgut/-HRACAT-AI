@@ -387,3 +387,14 @@
 - YENİ SAYFA YETKİSİ eklenirken `SAYFA_ETIKETLER` + `YETKI_GRUPLARI` ikisine birden eklenir.
 - Kayıt mantığı (yetki_rol_ata + kullanici_yetkileri UPDATE + yazmaHatasi) DEĞİŞMEDİ.
   Test: Playwright 38 (1280/1366/1536/1920 yatay taşma 0, 390 mobil, kaydet / geri al / rol).
+
+## Kullanım Kılavuzu — sağdaki "Sonraki" göstergesi (03.11.2026)
+
+- Kullanıcı: "Kullanım kılavuzunda sağ kaydırınca sayfanın değişeceğini net bir şekilde ifade
+  edebilmeliyiz. Ekranın sağında temaya uygun büyük bir şekilde gözükmeli."
+- `app/kilavuz/page.tsx`: sağ kenarda sabit dikey panel (`data-testid kilavuz-sonraki`,
+  masaüstü 72px × ≤460px, telefon 40px). Evren renginde kenar / parıltı, 3 kayan ok (`klv-ok`,
+  "hareketi azalt"ta durur), dikey yazı: masaüstü "→ <sıradaki adım / evren>"
+  (`sonrakiBaslik`), telefon "Sağa kaydırın". Tıklayınca `ileri()`. Son ekranda YOK.
+  `main` sağdan `pr-12 md:pr-24` boşluk alır (panel içeriği / İleri düğmesini örtmez).
+  Kaydırma (touch) ve ← → davranışı DEĞİŞMEDİ. Test: e2e_kilavuz_vgm (1440/1366/390).

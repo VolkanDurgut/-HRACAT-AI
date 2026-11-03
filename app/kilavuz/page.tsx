@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ExternalLink, Loader2, RotateCcw, X, Compass, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink, Loader2, RotateCcw, X, Compass, Lock, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
@@ -41,6 +41,14 @@ const KONUM_ANAHTARI = "kilavuz-konum";
 type Gecis = { faz: "cikis" | "giris"; yon: 1 | -1 } | null;
 
 function iki(n: number) { return String(n).padStart(2, "0"); }
+
+/** Sagdaki gostergede yazan: ileri basilinca gelinecek yer (adim ya da evren). */
+function sonrakiBaslik(sahne: number, adim: number): string {
+  if (sahne === KAPAK) return KILAVUZ_KONULARI[0]?.baslik ?? "";
+  const k = KILAVUZ_KONULARI[sahne];
+  if (k && adim < k.adimlar.length - 1) return k.adimlar[adim + 1].baslik;
+  return sahne + 1 < N ? KILAVUZ_KONULARI[sahne + 1].baslik : "Yolculuğu tamamla";
+}
 
 export default function KilavuzSayfasi() {
   const { user, loading, yetkiler } = useAuth();
@@ -202,8 +210,8 @@ export default function KilavuzSayfasi() {
         <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${ilerleme * 100}%`, backgroundColor: renk[0] }} />
       </div>
 
-      {/* Sahne */}
-      <main className="absolute inset-x-0 top-16 bottom-0 overflow-y-auto overflow-x-hidden overscroll-contain">
+      {/* Sahne (sagdaki "Sonraki" paneline yer birakir) */}
+      <main className={`absolute inset-x-0 top-16 bottom-0 overflow-y-auto overflow-x-hidden overscroll-contain ${sahne === SON ? "" : "pr-12 md:pr-24"}`}>
         <div key={sahne} className={`klv-sahne min-h-full md:h-full ${sahneSinifi}`}>
           {sahne === KAPAK ? (
             <Kapak onBasla={() => evreneGit(0)} onGit={(i) => evreneGit(i)} kayitli={kayitli} />
@@ -215,6 +223,28 @@ export default function KilavuzSayfasi() {
           ) : null}
         </div>
       </main>
+
+      {/* Saga kaydirma gostergesi (03.11.2026). Kullanici: "sag kaydirinca sayfanin degisecegini net bir
+          sekilde ifade edebilmeliyiz. Ekranin saginda temaya uygun buyuk bir sekilde gozukmeli." */}
+      {sahne !== SON && (
+        <button type="button" onClick={ileri} disabled={!!gecis} data-testid="kilavuz-sonraki"
+          aria-label={`Sonraki: ${sonrakiBaslik(sahne, adim)}`} title="Sağa kaydırın ya da tıklayın"
+          className="klv-sonraki group fixed z-30 right-1.5 md:right-4 top-1/2 -translate-y-1/2 w-10 md:w-[72px] h-[46vh] md:h-[54vh] min-h-[220px] max-h-[460px] rounded-2xl md:rounded-[28px] border flex flex-col items-center justify-evenly md:justify-between py-4 md:py-6 transition-colors"
+          style={{ borderColor: `${renk[0]}66`, background: `linear-gradient(180deg, ${renk[0]}1f, rgba(12,16,23,0.78) 45%, ${renk[0]}24)`, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: `0 0 34px -10px ${renk[0]}, inset 0 0 0 1px rgba(255,255,255,0.03)` }}>
+          <span className="hidden md:block text-[10px] font-bold tracking-[0.18em] uppercase" style={{ color: renk[0] }}>
+            {sahne === KAPAK ? "Başla" : "Sonraki"}
+          </span>
+          <span className="flex flex-col items-center -space-y-3 md:-space-y-4" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <ChevronRight key={i} className={`klv-ok klv-ok-${i} w-7 h-7 md:w-11 md:h-11`} strokeWidth={2.6} style={{ color: renk[0] }} />
+            ))}
+          </span>
+          <span className="klv-dikey text-[11px] md:text-[12.5px] font-semibold tracking-[0.12em] whitespace-nowrap overflow-hidden text-ellipsis max-h-[38%]" style={{ color: "#E2E8F0" }}>
+            <span className="md:hidden">Sağa kaydırın</span>
+            <span className="hidden md:inline">→ &nbsp;{sonrakiBaslik(sahne, adim)}</span>
+          </span>
+        </button>
+      )}
 
       {/* Logo portali (bolum gecisi) */}
       {gecis && (
@@ -487,9 +517,17 @@ const STIL = `
 .klv-suzul { animation: klv-suzul 6s ease-in-out infinite; }
 @keyframes klv-suzul { 0%,100% { transform: translateY(-4px); } 50% { transform: translateY(6px); } }
 
+.klv-sonraki:hover { filter: brightness(1.15); }
+.klv-sonraki:disabled { cursor: default; }
+.klv-dikey { writing-mode: vertical-rl; text-overflow: ellipsis; }
+.klv-ok { animation: klv-ok 1.5s ease-in-out infinite; opacity: .25; }
+.klv-ok-1 { animation-delay: .18s; } .klv-ok-2 { animation-delay: .36s; }
+@keyframes klv-ok { 0%,100% { opacity: .22; transform: translateX(-3px); } 45% { opacity: 1; transform: translateX(4px); } }
+
 @media (prefers-reduced-motion: reduce) {
   .klv-kok { transition: none; }
   .klv-kamera, .klv-odak { transition: none; }
-  .klv-yukari, .klv-odak, .klv-nabiz::after, .klv-yorunge, .klv-suzul { animation: none; }
+  .klv-yukari, .klv-odak, .klv-nabiz::after, .klv-yorunge, .klv-suzul, .klv-ok { animation: none; }
+  .klv-ok { opacity: .85; }
 }
 `;

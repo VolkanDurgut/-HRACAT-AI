@@ -19,7 +19,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { siparisIlerlemesiHesapla, SiparisIlerlemesi, SiparisKalemDurumu } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
-import { SiparisTakipKarti } from "@/components/siparis-takip-karti";
+import { SiparisTakipListesi } from "@/components/siparis-takip-karti";
 import { SiparisDevamPenceresi, type DevamOnayi } from "@/components/siparis-devam-penceresi";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
@@ -395,22 +395,13 @@ export default function IhracatlarPage() {
       />
 
       {!siparisLoading && acikSiparisler.length > 0 && (
-        <div className="mb-8 space-y-3">
-          <div className="flex items-center gap-2">
-            <Package size={16} style={{ color: ACCENT }} />
-            <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Devam Eden Siparişler</h2>
-          </div>
-          {acikSiparisler.map((s, idx) => (
-            <SiparisTakipKarti
-              key={s.id}
-              siparis={s}
-              ilerleme={s.ilerleme}
-              sira={idx}
-              devamEdiyor={devamEdiyor === s.id}
-              onTamamla={() => setTamamlanacak(s)}
-              onDevamEt={() => handleSipariseDevamEt(s)}
-            />
-          ))}
+        <div className="mb-8">
+          <SiparisTakipListesi
+            siparisler={acikSiparisler}
+            devamEdiyorId={devamEdiyor}
+            onTamamla={(s) => setTamamlanacak(acikSiparisler.find((x) => x.id === s.id) || null)}
+            onDevamEt={(s) => { const x = acikSiparisler.find((y) => y.id === s.id); if (x) handleSipariseDevamEt(x); }}
+          />
         </div>
       )}
 

@@ -846,3 +846,15 @@
   satırında "ÜRÜN: 410 USD PER TONE". Kalem dökümü 1. sayfa tablosunda kalır.
 - Ödeme hatırlatma penceresindeki "imzanız Outlook'ta eklenir" notu YANLIŞTI (gövdeli mailto'ya
   Outlook imza eklemez): "İleti > İmza ile ekleyin" olarak düzeltildi.
+
+## İhracatlar — Devam Eden Siparişler kompakt liste (03.11.2026)
+
+- Kullanıcı: "siparişi kalan müşterilerin göründüğü alan çok yer kaplıyor". Eskiden her sipariş
+  ayrı kart + açık marka tablosuydu (5 siparişte ~1.500 px). Şimdi `SiparisTakipListesi`
+  (`components/siparis-takip-karti.tsx`): tek panel, sipariş başına TEK SATIR — Proforma /
+  müşteri · markalar + ilerleme (sevk / sipariş FCL) · Kalan FCL · Dosyası açılmamış FCL ·
+  Tamamla / Siparişe Devam Et. Marka bazlı tablo (fazla / eşleşmeyen uyarıları dahil) satıra
+  tıklayınca açılır; uyarı varsa satırda ⚠. Başlıkta toplam (sipariş sayısı, kalan, dosyası
+  açılmamış) + "Gizle / Göster". 1280–1920 px'te 5 sipariş ≈ 400 px; mobilde satır kart olur.
+- Hesap (`lib/siparis-takip.ts`), Tamamla onayı ve Siparişe Devam Et penceresi DEĞİŞMEDİ.
+  Eski `SiparisTakipKarti` kaldırıldı (tek kullanan bu sayfaydı). Test: Playwright 24.

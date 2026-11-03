@@ -12,7 +12,8 @@ import { CokluNoKisa, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
-import { Search, ExternalLink, Archive, X, Package, Loader2, Trash2, FileText } from "lucide-react";
+import { Search, ExternalLink, Archive, X, Package, Loader2, Trash2, FileText, Eye } from "lucide-react";
+import { elleTartimMi } from "@/lib/elle-tartim";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -625,6 +626,7 @@ export default function IhracatlarPage() {
                           <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Mühür</th>
                           <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Tip</th>
                           <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>VGM</th>
+                          <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>DBA</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -635,6 +637,25 @@ export default function IhracatlarPage() {
                             <td className="px-2 py-2 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
                             <td className="px-2 py-2 text-sm text-right font-medium" style={{ color: ACCENT }}>
                               {k.vgm_kg ? `${k.vgm_kg} KG` : "—"}
+                            </td>
+                            {/* VGM Gor (03.11.2026): konteynerin DBA belgesini (VGM tartim belgesi) yeni sekmede acar */}
+                            <td className="px-2 py-2 text-right whitespace-nowrap">
+                              {k.dba_dosya_url ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  {elleTartimMi(k.dba_kontrol_sonucu) && (
+                                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded"
+                                      title="DBA belgesi yerine tartım bilgileri elle girildi (resmî DBA değil)">Elle</span>
+                                  )}
+                                  <a href={k.dba_dosya_url} target="_blank" rel="noopener noreferrer" data-testid="vgm-gor"
+                                    title={`${k.konteyner_no} DBA belgesini aç`} aria-label={`${k.konteyner_no} için VGM gör`}
+                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border text-xs font-semibold transition-colors hover:bg-white/[0.06]"
+                                    style={{ borderColor: `${ACCENT}55`, color: ACCENT }}>
+                                    <Eye size={13} /> VGM Gör
+                                  </a>
+                                </span>
+                              ) : (
+                                <span className="text-xs" style={{ color: TEXT_MUTED }} title="Bu konteyner için DBA belgesi yüklenmemiş">DBA yok</span>
+                              )}
                             </td>
                           </tr>
                         ))}

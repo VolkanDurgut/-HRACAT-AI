@@ -904,3 +904,14 @@
   `gidecegiUlke("ASHDOD PORT")` tanımıyor → satır basılmıyor; "Ticaret Yapılan Ülke" FİLİSTİN (adresten).
   Karar gelmeden LIMAN_ULKE'ye ASHDOD EKLENMEDİ (İSRAİL yazdırmak süreci riske atabilir).
 - Test: durum birim 6, PDF karşılaştırma, Playwright 12 (onay / vazgeç / metin / -ON.pdf / DB'ye yazmama).
+
+## İhracatlar — kapalı dosya detayında "VGM Gör" (03.11.2026)
+
+- Kullanıcı: "İhracatlar sayfasında kapanan dosyalar arasından birine tıkladığında açılan bilgi
+  sayfasında konteynerler kısmında ilgili konteynere VGM gör butonu eklenmeli ve ilgili DBA'ya
+  yönlendirilmeli."
+- `app/ihracatlar/page.tsx` detay penceresi, Konteynerler tablosuna "DBA" sütunu: `dba_dosya_url`
+  varsa "VGM Gör" (`data-testid vgm-gor`, yeni sekmede o konteynerin DBA'sı; Konteynerler
+  sekmesindeki indirme bağlantısıyla aynı URL). Elle tartım kaydında (`elleTartimMi`) yanında
+  "Elle" etiketi; belge yoksa soluk "DBA yok". Kapalı karar "VGM Gönder" (mailto) ile
+  KARIŞTIRILMAZ: bu yalnız belgeyi açar, mail göndermez.

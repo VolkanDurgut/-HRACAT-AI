@@ -984,5 +984,10 @@
   (`yuklenenKgleri`, veri.ts, sayfalı), yoksa proforma. Faturası kesilmemiş kısmi yüklemede tutar yüklenen
   oranında. Kart ve tablo "yüklenen · proforma X" yazar. Fatura talimatında bölünme toplamı ürün miktarına
   eşit değilse bölünme YAZILMAZ ve talimat penceresinde kırmızı uyarı çıkar (`bolunmeUyumsuz`).
+- DÜZELTME (04.11 akşam): konteynerler sisteme parça parça girilirken (10 konteynerlik rezervasyonda 6'sı
+  girilmiş, hepsinin neti dolu) "tümü tartıldı" sanılıp eksik miktar yüklenen sayılıyordu → bölünmenin ikinci
+  parçası 100 MT eksik çıktı. Artık girilen konteyner sayısı rezervasyonlardaki `konteyner_adedi` toplamından
+  AZSA proforma miktarı kullanılır (`yuklenenHesapla`, hesap.ts SAF; rezervasyon okunamazsa proforma). Canlı
+  kontrol: yalnız o dosya etkilendi, faturası kesilmiş hiçbir dosyanın sonucu değişmedi; kayıtlı bölünme yoktu.
 - Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
   yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 22 + e2e_diib_dosya 25 + sıra birim testi.

@@ -146,6 +146,32 @@ export function dosyaTutar(d: Pick<DiibDosyasi, "toplam_tutar" | "urun_detaylari
 }
 
 /**
+ * Dosya basina yuklenen konteyner net toplami (yuklenenKgleri'nin SAF hesabi): TUM konteynerlerde
+ * net > 0 VE girilen konteyner sayisi rezervasyondaki konteyner adedinden az degilse toplam, degilse null.
+ * 04.11.2026: 10 konteynerlik rezervasyonda 6'si girilmisti; 6'sinin neti dolu oldugu icin
+ * 150 MT "yuklenen" sayildi ve iki DIIB'e bolunen miktarin ikinci parcasi 100 MT eksik cikti.
+ */
+export function yuklenenHesapla(
+  konteynerler: { dosya_id: string | null; net_agirlik_kg: number | string | null }[],
+  planlanan: Record<string, number>,
+): Record<string, number | null> {
+  const top: Record<string, { adet: number; dolu: number; kg: number }> = {};
+  for (const x of konteynerler) {
+    if (!x.dosya_id) continue;
+    const t = (top[x.dosya_id] ||= { adet: 0, dolu: 0, kg: 0 });
+    const n = Number(x.net_agirlik_kg);
+    t.adet++;
+    if (Number.isFinite(n) && n > 0) { t.dolu++; t.kg += n; }
+  }
+  const sonuc: Record<string, number | null> = {};
+  for (const [id, t] of Object.entries(top)) {
+    const eksikKonteyner = t.adet < (planlanan[id] || 0);
+    sonuc[id] = t.adet > 0 && t.dolu === t.adet && !eksikKonteyner ? Math.round(t.kg * 100) / 100 : null;
+  }
+  return sonuc;
+}
+
+/**
  * DIIB'e yazilan miktar (04.11.2026 duzeltme). Kullanici: "SAAD su an yukleniyor" - proforma 375 MT,
  * bu yuklemede 10 konteyner = 250.000 kg (kalan 5 konteyner sonraki haftada). Eskiden proforma
  * miktari sayiliyordu. Artik: konteynerlerin TAMAMINDA net agirlik girilmisse YUKLENEN net toplam

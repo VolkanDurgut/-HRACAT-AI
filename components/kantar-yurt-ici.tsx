@@ -11,6 +11,7 @@ import {
   IC_BELGE_BUCKET, KantarIsEmri, KantarSonSevk, cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi,
 } from "@/lib/ic-piyasa/is-emri";
 import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarken, trSayiOku, urunUyusuyor } from "@/lib/ic-piyasa/irsaliye-oku";
+import { elleTarihIso, okunamayanAlanlar, trTarihSaatGirdisi } from "@/lib/ic-piyasa/irsaliye-elle";
 
 /** Elle yazilan irsaliye no: okuyucuyla ayni kural (A-Z0-9, 3-20). */
 const IRSALIYE_NO_RE = /^[A-Z0-9]{3,20}$/;
@@ -85,12 +86,14 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
   const [net, setNet] = useState("");
   // Irsaliye no okunamadiysa (gorsel/taranmis PDF) kantarci elle yazar
   const [irsNoElle, setIrsNoElle] = useState("");
+  // Irsaliye tarihi okunamadiysa elle (04.11.2026; varsayilan simdi, Turkiye saati)
+  const [tarihElle, setTarihElle] = useState("");
   const [uyarilar, setUyarilar] = useState<string[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const kontrolSira = useRef(0);
 
   const pencereAc = (e: KantarIsEmri) => {
-    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setUyarilar(null); setHata(null);
+    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setTarihElle(""); setUyarilar(null); setHata(null);
   };
   const pencereKapat = () => { if (adim !== "kaydediliyor") setSecili(null); };
 
@@ -109,6 +112,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
     }
     setOkuma(o);
     setIrsNoElle("");
+    setTarihElle(o?.tarih ? "" : trTarihSaatGirdisi());
     setPlaka(o?.plaka || "");
     setDorse(o?.dorsePlaka || "");
     setNet(o?.netKg ? o.netKg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "");
@@ -128,7 +132,10 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
   const irsNoGecerli = !irsNoSon || IRSALIYE_NO_RE.test(irsNoSon);
   // e-Irsaliye dosyalari cogu zaman ETTN adini tasir (ör. 8BDBB562-....pdf)
   const ettnDosyaAdindan = dosya ? (dosya.name.match(ETTN_DOSYA_RE)?.[1]?.toUpperCase() || null) : null;
-  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000 && (irsNoOkundu || irsNoGecerli);
+  const elleTarih = okuma?.tarih ? { iso: null, hata: null } : elleTarihIso(tarihElle);
+  const eksikAlanlar = okunamayanAlanlar(okuma, !!ettnDosyaAdindan);
+  const kismenOkundu = !!okuma && (!!okuma.plaka || !!okuma.netKg);
+  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000 && (irsNoOkundu || irsNoGecerli) && !elleTarih.hata;
 
   const dosyaYolu = useRef<string>("");
   const veri = useCallback((yol: string) => ({
@@ -137,7 +144,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
     dorse_plaka: dorse ? plakaBicimle(dorse) : null,
     net_kg: netSayi,
     irsaliye_no: okuma?.irsaliyeNo || irsNoSon || null,
-    irsaliye_tarihi: okuma?.tarih || null,
+    irsaliye_tarihi: okuma?.tarih || elleTarih.iso || null,
     ettn: okuma?.ettn || ettnDosyaAdindan,
     sofor_ad: okuma?.soforAd || null,
     alici_vkn: okuma?.aliciVkn || null,
@@ -150,7 +157,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
       irsaliye_no: okuma.irsaliyeNo, tarih: okuma.tarih, plaka: okuma.plaka, dorse: okuma.dorsePlaka,
       net_kg: okuma.netKg, urun: okuma.urun, alici_unvan: okuma.aliciUnvan, kalemler: okuma.kalemler,
     } : null,
-  }), [secili, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, dosya, elleDuzeltildi, urunFarkli]);
+  }), [secili, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, dosya, elleDuzeltildi, urunFarkli, elleTarih.iso]);
 
   // Girdi degistikce sunucuda KURU kontrol (kaydetmeden uyarilari getirir)
   useEffect(() => {
@@ -332,15 +339,18 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
               {(adim === "kontrol" || adim === "kaydediliyor") && (
                 <>
                   <div className="rounded-lg border px-3 py-2.5 text-xs flex items-start gap-2" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                    {okuma && (okuma.plaka || okuma.netKg) ? <ScanText size={14} className="mt-0.5 text-emerald-400 shrink-0" /> : <PencilLine size={14} className="mt-0.5 text-amber-400 shrink-0" />}
+                    {kismenOkundu ? <ScanText size={14} className="mt-0.5 text-emerald-400 shrink-0" /> : <PencilLine size={14} className="mt-0.5 text-amber-400 shrink-0" />}
                     <div className="min-w-0">
                       <p className="text-white truncate">{dosya?.name}</p>
-                      {okuma && (okuma.plaka || okuma.netKg) ? (
+                      {kismenOkundu ? (
                         <p style={{ color: TEXT_MUTED }}>
-                          İrsaliyeden okundu{okuma.irsaliyeNo ? ` · ${okuma.irsaliyeNo}` : ""}{okuma.tarih ? ` · ${tarihSaatYazi(okuma.tarih)}` : ""}{okuma.urun ? ` · ${okuma.urun}` : ""}{okuma.soforAd ? ` · Şoför: ${okuma.soforAd}` : ""}
+                          İrsaliyeden okundu{okuma!.irsaliyeNo ? ` · ${okuma!.irsaliyeNo}` : ""}{okuma!.tarih ? ` · ${tarihSaatYazi(okuma!.tarih)}` : ""}{okuma!.urun ? ` · ${okuma!.urun}` : ""}{okuma!.soforAd ? ` · Şoför: ${okuma!.soforAd}` : ""}
                         </p>
                       ) : (
-                        <p className="text-amber-400">İrsaliye okunamadı (PDF metin değil, görüntü). Plaka, net ağırlık ve irsaliye no&apos;yu irsaliyeye bakarak yazın.</p>
+                        <p className="text-amber-400">İrsaliye okunamadı (PDF metin değil, görüntü / taranmış). Bilgileri irsaliyeye bakarak elle yazın.</p>
+                      )}
+                      {kismenOkundu && eksikAlanlar.length > 0 && (
+                        <p className="text-amber-400" data-testid="irsaliye-eksik-alan">Okunamadı: {eksikAlanlar.join(", ")} — irsaliyeye bakarak elle yazın.</p>
                       )}
                     </div>
                   </div>
@@ -368,6 +378,15 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
                           style={{ backgroundColor: "#0F131A", borderColor: irsNoGecerli ? CARD_BORDER : "#F87171" }} />
                         {!irsNoGecerli && <span className="block text-[11px] mt-1 text-red-400">Harf ve rakamlardan oluşan 3-20 karakter olmalı.</span>}
                         {ettnDosyaAdindan && <span className="block text-[11px] mt-1" style={{ color: TEXT_MUTED }}>ETTN dosya adından alındı.</span>}
+                      </label>
+                    )}
+                    {!okuma?.tarih && (
+                      <label className="block col-span-2">
+                        <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>İrsaliye tarihi ve saati (irsaliyenin üstünde yazar)</span>
+                        <input type="datetime-local" value={tarihElle} onChange={(ev) => setTarihElle(ev.target.value)} aria-label="İrsaliye tarihi"
+                          className="w-full px-3 py-2 rounded-lg border text-sm font-semibold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 [color-scheme:dark]"
+                          style={{ backgroundColor: "#0F131A", borderColor: elleTarih.hata ? "#F87171" : CARD_BORDER }} />
+                        {elleTarih.hata && <span className="block text-[11px] mt-1 text-red-400">{elleTarih.hata}</span>}
                       </label>
                     )}
                     <label className="block col-span-2">

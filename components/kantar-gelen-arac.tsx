@@ -8,6 +8,7 @@ import { Loader2, Upload, X, FileText, AlertTriangle, CheckCircle2, PackageOpen,
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { IC_BELGE_BUCKET, KantarIsEmri, hataMesaji, kgYazi, tarihSaatYazi, tonYazi } from "@/lib/ic-piyasa/is-emri";
 import { IrsaliyeOkuma, irsaliyePdfOku, plakaBicimle, plakaGecerli, plakaYazarken, trSayiOku, urunUyusuyor } from "@/lib/ic-piyasa/irsaliye-oku";
+import { elleTarihIso, okunamayanAlanlar, trTarihSaatGirdisi } from "@/lib/ic-piyasa/irsaliye-elle";
 import { KantarAlisSiparisi, KantarAlisTeslim, alisIlerleme, alisUrunYazi, gunTR, ALIS_TESLIM_ETIKET } from "@/lib/ic-piyasa/alis";
 import { kalanMetni } from "@/lib/ic-piyasa/mesaj-sablonlari";
 
@@ -79,6 +80,8 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
   const [dorse, setDorse] = useState("");
   const [net, setNet] = useState("");
   const [irsNoElle, setIrsNoElle] = useState("");
+  // Irsaliye tarihi okunamadiysa elle (04.11.2026; yalniz PDF yuklendiyse)
+  const [tarihElle, setTarihElle] = useState("");
   const [dogrudan, setDogrudan] = useState(false);
   const [emirId, setEmirId] = useState("");
   const [uyarilar, setUyarilar] = useState<string[] | null>(null);
@@ -87,7 +90,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
   const zamanDamgasi = useRef<number>(0);
 
   const pencereAc = (s: KantarAlisSiparisi) => {
-    setSecili(s); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle("");
+    setSecili(s); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setTarihElle("");
     setDogrudan(false); setEmirId(""); setUyarilar(null); setHata(null); zamanDamgasi.current = Date.now();
   };
   const pencereKapat = () => { if (adim !== "kaydediliyor") setSecili(null); };
@@ -102,12 +105,13 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
     try { o = await irsaliyePdfOku(f); } catch (err) { console.error("İrsaliye okunamadı:", err); o = null; }
     setOkuma(o);
     setIrsNoElle("");
+    setTarihElle(o?.tarih ? "" : trTarihSaatGirdisi());
     setPlaka(o?.plaka || "");
     setDorse(o?.dorsePlaka || "");
     setNet(o?.netKg ? o.netKg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }) : "");
     setAdim("kontrol");
   };
-  const irsaliyesizDevam = () => { setDosya(null); setOkuma(null); setAdim("kontrol"); };
+  const irsaliyesizDevam = () => { setDosya(null); setOkuma(null); setTarihElle(""); setAdim("kontrol"); };
 
   const netSayi = net.trim() ? trSayiOku(net.trim().replace(/\s/g, "")) : null;
   const plakaSon = plakaBicimle(plaka);
@@ -119,7 +123,10 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
   const irsNoGecerli = !irsNoSon || IRSALIYE_NO_RE.test(irsNoSon);
   const ettnDosyaAdindan = dosya ? (dosya.name.match(ETTN_DOSYA_RE)?.[1]?.toUpperCase() || null) : null;
   const dogrudanEksik = dogrudan && (!emirId || !dosya);
-  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000 && (irsNoOkundu || irsNoGecerli) && !dogrudanEksik;
+  const elleTarih = !dosya || okuma?.tarih ? { iso: null, hata: null } : elleTarihIso(tarihElle);
+  const eksikAlanlar = okunamayanAlanlar(okuma, !!ettnDosyaAdindan);
+  const kismenOkundu = !!dosya && !!okuma && (!!okuma.plaka || !!okuma.netKg);
+  const girdiGecerli = plakaGecerli(plakaSon) && netSayi !== null && netSayi > 0 && netSayi <= 60000 && (irsNoOkundu || irsNoGecerli) && !dogrudanEksik && !elleTarih.hata;
 
   const yol = useCallback(() => {
     if (!dosya || !companyId || !secili) return null;
@@ -135,7 +142,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
     dorse_plaka: dorse ? plakaBicimle(dorse) : null,
     net_kg: netSayi,
     irsaliye_no: okuma?.irsaliyeNo || irsNoSon || null,
-    irsaliye_tarihi: okuma?.tarih || null,
+    irsaliye_tarihi: okuma?.tarih || elleTarih.iso || null,
     ettn: okuma?.ettn || ettnDosyaAdindan,
     sofor_ad: okuma?.soforAd || null,
     alici_vkn: okuma?.aliciVkn || null,
@@ -148,7 +155,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
       irsaliye_no: okuma.irsaliyeNo, tarih: okuma.tarih, plaka: okuma.plaka, dorse: okuma.dorsePlaka,
       net_kg: okuma.netKg, urun: okuma.urun, alici_unvan: okuma.aliciUnvan, kalemler: okuma.kalemler,
     } : null,
-  }), [secili, dogrudan, emirId, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, yol, dosya, elleDuzeltildi, urunFarkli]);
+  }), [secili, dogrudan, emirId, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, yol, dosya, elleDuzeltildi, urunFarkli, elleTarih.iso]);
 
   // Girdi degistikce sunucuda KURU kontrol (kaydetmeden uyarilar)
   useEffect(() => {
@@ -317,15 +324,18 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
               {(adim === "kontrol" || adim === "kaydediliyor") && (
                 <>
                   <div className="rounded-lg border px-3 py-2.5 text-xs flex items-start gap-2" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-                    {dosya && okuma && (okuma.plaka || okuma.netKg) ? <ScanText size={14} className="mt-0.5 text-emerald-400 shrink-0" /> : <PencilLine size={14} className="mt-0.5 text-amber-400 shrink-0" />}
+                    {kismenOkundu ? <ScanText size={14} className="mt-0.5 text-emerald-400 shrink-0" /> : <PencilLine size={14} className="mt-0.5 text-amber-400 shrink-0" />}
                     <div className="min-w-0">
                       {dosya ? <p className="text-white truncate">{dosya.name}</p> : <p className="text-white">İrsaliyesiz giriş</p>}
-                      {dosya && okuma && (okuma.plaka || okuma.netKg) ? (
-                        <p style={{ color: TEXT_MUTED }}>İrsaliyeden okundu{okuma.irsaliyeNo ? ` · ${okuma.irsaliyeNo}` : ""}{okuma.urun ? ` · ${okuma.urun}` : ""}</p>
+                      {kismenOkundu ? (
+                        <p style={{ color: TEXT_MUTED }}>İrsaliyeden okundu{okuma!.irsaliyeNo ? ` · ${okuma!.irsaliyeNo}` : ""}{okuma!.tarih ? ` · ${tarihSaatYazi(okuma!.tarih)}` : ""}{okuma!.urun ? ` · ${okuma!.urun}` : ""}</p>
                       ) : dosya ? (
-                        <p className="text-amber-400">İrsaliye okunamadı (görüntü PDF). Plaka, net ağırlık ve irsaliye no&apos;yu elle yazın.</p>
+                        <p className="text-amber-400">İrsaliye okunamadı (PDF metin değil, görüntü / taranmış). Bilgileri irsaliyeye bakarak elle yazın.</p>
                       ) : (
                         <p style={{ color: TEXT_MUTED }}>Plaka ve kantar net ağırlığını yazın.</p>
+                      )}
+                      {kismenOkundu && eksikAlanlar.length > 0 && (
+                        <p className="text-amber-400" data-testid="irsaliye-eksik-alan">Okunamadı: {eksikAlanlar.join(", ")} — irsaliyeye bakarak elle yazın.</p>
                       )}
                     </div>
                   </div>
@@ -349,6 +359,15 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
                         <input value={irsNoElle} onChange={(ev) => setIrsNoElle(ev.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20))} placeholder="IRS2026000001234" aria-label="İrsaliye no"
                           className="w-full px-3 py-2 rounded-lg border text-sm font-semibold tracking-wide text-white uppercase placeholder:text-slate-600 placeholder:font-normal"
                           style={{ backgroundColor: "#0F131A", borderColor: irsNoGecerli ? CARD_BORDER : "#F87171" }} />
+                      </label>
+                    )}
+                    {dosya && !okuma?.tarih && (
+                      <label className="block col-span-2">
+                        <span className="block text-xs mb-1" style={{ color: TEXT_MUTED }}>İrsaliye tarihi ve saati</span>
+                        <input type="datetime-local" value={tarihElle} onChange={(ev) => setTarihElle(ev.target.value)} aria-label="İrsaliye tarihi"
+                          className="w-full px-3 py-2 rounded-lg border text-sm font-semibold text-white [color-scheme:dark]"
+                          style={{ backgroundColor: "#0F131A", borderColor: elleTarih.hata ? "#F87171" : CARD_BORDER }} />
+                        {elleTarih.hata && <span className="block text-[11px] mt-1 text-red-400">{elleTarih.hata}</span>}
                       </label>
                     )}
                     <label className="block col-span-2">

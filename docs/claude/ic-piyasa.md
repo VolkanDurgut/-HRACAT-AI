@@ -668,3 +668,17 @@
   kantar 73.960 / 300.000, %5 uyarısı devirle, kapanış 300.000 / müşteri mesajı 318.940, geri al, anon kapalı) +
   migration 2. kez; rapor birim 13 (TR gün sınırı, devir, doğrudan sevk, kapanan, boş gün, fiyatsız) + 900/390
   görsel; Playwright `e2e_icdevir.mjs` 14 (IC_TEST=1 mock).
+
+## İç Piyasa — İrsaliye okunamayınca elle giriş tamamlandı (04.11.2026)
+
+- Kullanıcı: "Bazen irsaliyeleri okumuyor (görsel PDF); öyle durumlar için manuel ekleme yapmalıyız." Plaka / net /
+  irsaliye no zaten elle yazılıyordu (22.10.2026). İki eksik kapatıldı (`lib/ic-piyasa/irsaliye-elle.ts`, SAF):
+  1) KISMEN okunan PDF'te (ör. plaka okundu, net okunamadı) ekran yeşil "İrsaliyeden okundu" diyordu → artık
+     "Okunamadı: net ağırlık, irsaliye tarihi — elle yazın" satırı (`okunamayanAlanlar`; ETTN dosya adındaysa
+     irsaliye no istenmez).
+  2) İrsaliye TARİHİ okunamazsa elle tarih + saat (varsayılan şimdi, Türkiye saati; gelecek > 10 dk ve 30 günden
+     eski reddedilir, `elleTarihIso` → `+03:00`). Boş bırakılırsa eski davranış (kayıt saati).
+- Kantar Yurt İçi (satış) ve Araç Teslim Al (alış, yalnız PDF yüklendiyse) aynı. RPC / veritabanı DEĞİŞMEDİ
+  (`irsaliye_tarihi` zaten `p_veri`'den okunuyordu). Görüntü PDF'ten metin okuma (OCR / yapay zekâ) bilinçli YOK.
+- Test: birim 10 (alanlar, tarih sınırları) + Playwright `e2e_irselle.mjs` 24 (1440 + 390; görüntü PDF, gelecek
+  tarih engeli, kaydet isteğinde elle tarih; IC_TEST=1 mock'a kantar RPC'leri eklendi).

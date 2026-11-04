@@ -3,7 +3,7 @@
  * RLS: "ihracatlar" yetkisi yoksa bos doner (kart gizlenir, talimat bolunmesiz kalir).
  */
 import { supabase } from "@/lib/supabase";
-import type { BekleyenSira, DiibBelgesi, DiibBolunmesi, DiibDosyasi, DiibKaydi } from "@/lib/diib/hesap";
+import { yuklenenHesapla, type BekleyenSira, type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi } from "@/lib/diib/hesap";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
 export const DIIB_DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, beyanname_dosya_url, alici_firma, urun_detaylari, toplam_tutar, para_birimi, diib_no";
@@ -13,6 +13,8 @@ export type DiibVerisi = { belgeler: DiibBelgesi[]; kayitlar: DiibKaydi[]; dosya
 /**
  * Dosya basina yuklenen konteyner net toplami: TUM konteynerlerde net > 0 ise toplam, degilse null
  * (eksik tartim -> proforma miktari kullanilir; bkz. diibMiktari).
+ * 04.11.2026: girilen konteyner sayisi rezervasyondaki konteyner adedinden AZSA yukleme bitmemis
+ * sayilir -> null (proforma miktari). Hesap: yuklenenHesapla (hesap.ts, saf).
  */
 export async function yuklenenKgleri(companyId: string): Promise<Record<string, number | null> | null> {
   // Sayfali (PostgREST tek istekte en fazla 1000 satir doner)
@@ -23,17 +25,17 @@ export async function yuklenenKgleri(companyId: string): Promise<Record<string, 
     satirlar.push(...(r.data as typeof satirlar));
     if (r.data.length < 1000) break;
   }
-  const top: Record<string, { adet: number; dolu: number; kg: number }> = {};
-  for (const x of satirlar) {
-    if (!x.dosya_id) continue;
-    const t = (top[x.dosya_id] ||= { adet: 0, dolu: 0, kg: 0 });
-    const n = Number(x.net_agirlik_kg);
-    t.adet++;
-    if (Number.isFinite(n) && n > 0) { t.dolu++; t.kg += n; }
+  // Rezervasyondaki konteyner adedi (dosya basina toplam). Okunamazsa null -> proforma miktari (guvenli taraf).
+  const planlanan: Record<string, number> = {};
+  for (let bas = 0; bas < 50000; bas += 1000) {
+    const r = await supabase.from("rezervasyonlar").select("id, dosya_id, konteyner_adedi").eq("company_id", companyId).order("id").range(bas, bas + 999);
+    if (r.error || !r.data) return null;
+    for (const x of r.data as { dosya_id: string | null; konteyner_adedi: number | null }[]) {
+      if (x.dosya_id && Number(x.konteyner_adedi) > 0) planlanan[x.dosya_id] = (planlanan[x.dosya_id] || 0) + Number(x.konteyner_adedi);
+    }
+    if (r.data.length < 1000) break;
   }
-  const sonuc: Record<string, number | null> = {};
-  for (const [id, t] of Object.entries(top)) sonuc[id] = t.adet > 0 && t.dolu === t.adet ? Math.round(t.kg * 100) / 100 : null;
-  return sonuc;
+  return yuklenenHesapla(satirlar, planlanan);
 }
 
 /** Dosyalara yuklenen kg'i ekler (okunamazsa dosyalar oldugu gibi: proforma miktari). */

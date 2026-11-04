@@ -991,3 +991,12 @@
   kontrol: yalnız o dosya etkilendi, faturası kesilmiş hiçbir dosyanın sonucu değişmedi; kayıtlı bölünme yoktu.
 - Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
   yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 22 + e2e_diib_dosya 25 + sıra birim testi.
+
+## Commercial Invoice ECTN — CIF dosyada sigorta girilmezse uyarı (04.11.2026)
+
+- Kullanıcı: "CIF yükleme, ECTN yapılacak; 'TOTAL CFR DJIBOUTI' neden CFR?" Etiket kuralı (30.09.2026, değişmedi):
+  INSURANCE girilmişse "TOTAL CIF <liman>", değilse "TOTAL CFR <liman>". Canlı: önceki 11 CIF + ECTN dosyasının
+  HEPSİNDE sigorta elle girilmiş (10×20DC'de 250 USD); bu dosyada girilmemişti → CFR yazdı. Kod hatası değil.
+- Eklenen: Evraklar'da ECTN kutusunun yanında amber "CIF · sigorta girilmedi → TOTAL CFR yazar" düğmesi
+  (`ectn-cif-sigorta-uyari`; CIF + ECTN + sigorta yok + etiket elle değil). Tıklayınca ECTN penceresi açılır.
+  Sigorta girilince FOB sigorta kadar azalır, satır TOTAL CIF olur, TOPLAM DEĞİŞMEZ. Evrak verisine dokunulmadı.

@@ -682,3 +682,15 @@
   (`irsaliye_tarihi` zaten `p_veri`'den okunuyordu). Görüntü PDF'ten metin okuma (OCR / yapay zekâ) bilinçli YOK.
 - Test: birim 10 (alanlar, tarih sınırları) + Playwright `e2e_irselle.mjs` 24 (1440 + 390; görüntü PDF, gelecek
   tarih engeli, kaydet isteğinde elle tarih; IC_TEST=1 mock'a kantar RPC'leri eklendi).
+
+## İç Piyasa — Günlük rapor günde 3 oturum + şirket alıcıları (04.11.2026 akşam)
+
+- Kullanıcı: "Alıcılar execution@ / bbt@ / lojistik@ olarak gitmeli. Bugün 17.15'te gitsin. Bundan sonraki
+  günlerde sabah öğle akşam." İhracat raporuyla aynı düzen, 15 dk sonra (aynı anda iki rapor gelmesin):
+  SABAH 09:15 = DÜNÜN raporu ("Dün Yüklenenler"), ÖĞLE 12:15 ve AKŞAM 17:15 = bugünün (o ana kadar).
+  `IC_RAPOR_SAATI` (`_shared/ic-gunluk-rapor.ts`) tek yer; konu "… İç Piyasa Raporu — 04.11.2026 Akşam | …".
+- Migration `20261104170000_ic_gunluk_rapor_oturum.sql` (CANLIDA): `ic_gunluk_rapor_gonderimleri.oturum`
+  (sabah/ogle/aksam, eski kayıt = aksam), tekrar koruması (şirket, gün, oturum); alıcılar Unex için 3 şirket
+  adresi; pg_cron `ic-gunluk-rapor-sabah/-ogle/-aksam` (06:15 / 09:15 / 14:15 UTC), eski tek iş kaldırıldı.
+  Anon pencere: oturum saatinden 5 dk önce – 60 dk sonra. `ic-gunluk-rapor` v2 deploy, repoyla birebir.
+- İlk gerçek gönderim 04.11.2026 17:15:05 (akşam oturumu, 3 alıcı). Saat değişikliği = sabit + 3 cron işi.

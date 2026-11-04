@@ -9,6 +9,8 @@
  * Yuklenen = arac toplami + siparisler arasi devir (is emirleri / kantar ile ayni kural).
  * Kalan / fazla / kapanis sonucu TEK YERDE: mesaj-sablonlari.ts (kalanMetni, teslimFarki).
  * FIYAT YOK (sirket ici ekip raporu; fiyat ayri yetki). Musteriye GITMEZ.
+ * 04.11.2026 aksam: gunde 3 kez (ihracat raporuyla ayni duzen, 15 dk sonra): SABAH 09:15 = DUNUN raporu,
+ * OGLE 12:15 ve AKSAM 17:15 = bugunun (o ana kadar). Kullanici: "Bundan sonraki gunlerde sabah ogle aksam".
  */
 import { kalanMetni, teslimFarki } from "./mesaj-sablonlari.ts";
 
@@ -131,11 +133,20 @@ export const tarihTR = (g: string) => `${g.slice(8, 10)}.${g.slice(5, 7)}.${g.sl
 const musteriAdi = (e: RaporIsEmri | null) => (e ? (e.musteri_kisa || "").trim() || e.musteri : "-");
 const urunAdi = (u: string, ambalaj?: string | null) => `${u}${ambalaj ? ` (${ambalaj})` : ""}`;
 
-export function icGunlukRaporKonusu(r: IcGunlukRapor, sirketAdi = "Unex Gıda"): string {
+export type IcRaporOturumu = "sabah" | "ogle" | "aksam";
+export const IC_RAPOR_OTURUMLARI: IcRaporOturumu[] = ["sabah", "ogle", "aksam"];
+/** Turkiye saati (saat, dakika). Ihracat raporu 09:00 / 12:00 / 17:00 -> ic piyasa 15 dk sonra. */
+export const IC_RAPOR_SAATI: Record<IcRaporOturumu, [number, number]> = { sabah: [9, 15], ogle: [12, 15], aksam: [17, 15] };
+const OTURUM_AD: Record<IcRaporOturumu, string> = { sabah: "Sabah", ogle: "Öğle", aksam: "Akşam" };
+export const icRaporSaatYazi = (o: IcRaporOturumu) => `${String(IC_RAPOR_SAATI[o][0]).padStart(2, "0")}:${String(IC_RAPOR_SAATI[o][1]).padStart(2, "0")}`;
+/** Sabah raporu DUNU anlatir ("Dün"); ogle / aksam bugunu. */
+const gunAdi = (o: IcRaporOturumu) => (o === "sabah" ? "Dün" : "Bugün");
+
+export function icGunlukRaporKonusu(r: IcGunlukRapor, sirketAdi = "Unex Gıda", oturum: IcRaporOturumu = "aksam"): string {
   const o = r.ozet;
   const parcalar = [`Yüklenen ${o.yuklenenArac} araç · ${ton(o.yuklenenKg)}`, `Gelen ${o.gelenArac} araç · ${ton(o.gelenKg)}`];
   if (o.kapanan) parcalar.push(`${o.kapanan} sipariş kapandı`);
-  return `${sirketAdi} İç Piyasa Günlük Rapor (${tarihTR(r.tarih)}) | ${parcalar.join(" | ")}`;
+  return `${sirketAdi} İç Piyasa Raporu — ${tarihTR(r.tarih)} ${oturum === "sabah" ? "(Dün)" : OTURUM_AD[oturum]} | ${parcalar.join(" | ")}`;
 }
 
 const CIKIS: Record<string, [string, string]> = {
@@ -143,7 +154,9 @@ const CIKIS: Record<string, [string, string]> = {
   bugun_degil: ["Bugün çıkmayacak", "#B45309"],
 };
 
-export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString()): string {
+export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString(), oturum: IcRaporOturumu = "aksam"): string {
+  const G = gunAdi(oturum);
+  const g = G === "Dün" ? "dün" : "bugün";
   const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold;white-space:nowrap">${t}</th>`;
   const td = (t: string, st = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;vertical-align:top;${st}">${t}</td>`;
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
@@ -157,8 +170,8 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
 
   // Ozet kutulari
   const kutular = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
-    ${kutu("Bugün Yüklenen", `${o.yuklenenArac} araç`, `${ton(o.yuklenenKg)} · satış`, "#047857")}${arasi}
-    ${kutu("Bugün Gelen", `${o.gelenArac} araç`, `${ton(o.gelenKg)} · alış`, LACIVERT)}${arasi}
+    ${kutu(`${G} Yüklenen`, `${o.yuklenenArac} araç`, `${ton(o.yuklenenKg)} · satış`, "#047857")}${arasi}
+    ${kutu(`${G} Gelen`, `${o.gelenArac} araç`, `${ton(o.gelenKg)} · alış`, LACIVERT)}${arasi}
     ${kutu("Açık Satış", `${o.acikSatis} sipariş`, `kalan ${ton(o.acikSatisKalanKg)}`, "#B45309")}${arasi}
     ${kutu("Açık Alış", `${o.acikAlis} sipariş`, `teslim alınacak ${ton(o.acikAlisKalanKg)}`, "#475569")}
   </tr></table>`;
@@ -170,13 +183,13 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(s.irsaliye_tarihi || s.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(musteriAdi(e))}</b><br><span style="color:#64748B;font-size:11px">${esc(e?.is_emri_no || "-")} · ${esc(e ? urunAdi(e.urun, e.ambalaj) : "-")}</span>`)}${td(`<b>${esc(s.plaka)}</b>${s.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(s.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(`<span style="font-family:monospace;font-size:11px">${esc(s.irsaliye_no || "-")}</span>`)}${td(durum, "font-size:11px;white-space:nowrap")}${td(sayi(n(s.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`;
   }).join("");
   const yTablo = tablo(`${th("Saat")}${th("Müşteri · Sipariş")}${th("Plaka")}${th("İrsaliye No")}${th("Durum")}${th("Net (kg)", true)}`,
-    r.yuklenen.length ? yRows + toplam(6, `TOPLAM — ${o.yuklenenArac} araç`, `${sayi(o.yuklenenKg)} kg`) : bos(6, "Bugün satış aracı yüklenmedi."));
+    r.yuklenen.length ? yRows + toplam(6, `TOPLAM — ${o.yuklenenArac} araç`, `${sayi(o.yuklenenKg)} kg`) : bos(6, `${G} satış aracı yüklenmedi.`));
 
   // Bugun gelenler (alis)
   const gRows = r.gelen.map(({ teslim: t, alis: a, dogrudanIsEmri }, i) =>
     `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(t.teslim_zamani || t.irsaliye_tarihi || t.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-")}</b><br><span style="color:#64748B;font-size:11px">${esc(a?.alis_no || "-")} · ${esc(a?.urun || "-")}${a?.depo ? ` · ${esc(a.depo)}` : ""}</span>${dogrudanIsEmri ? `<br><span style="color:#B45309;font-size:11px;font-weight:bold">Doğrudan müşteriye · ${esc(dogrudanIsEmri)}</span>` : ""}`)}${td(`<b>${esc(t.plaka || "-")}</b>${t.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(t.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(`<span style="font-family:monospace;font-size:11px">${esc(t.irsaliye_no || "-")}</span>`)}${td(sayi(n(t.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`).join("");
   const gTablo = tablo(`${th("Saat")}${th("Tedarikçi · Alış")}${th("Plaka")}${th("İrsaliye No")}${th("Net (kg)", true)}`,
-    r.gelen.length ? gRows + toplam(5, `TOPLAM — ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, "Bugün alış aracı gelmedi."));
+    r.gelen.length ? gRows + toplam(5, `TOPLAM — ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, `${G} alış aracı gelmedi.`));
 
   // Acik satis siparisleri
   const KALAN_RENK = { kalan: "#B45309", fazla: LACIVERT, tamam: "#047857" } as const;
@@ -184,7 +197,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     const e = x.emir;
     const hedef = e.hedef_tur === "kg" ? `${sayi(n(e.hedef_kg))} kg` : `${e.hedef_arac ?? 0} araç`;
     const devir = x.devirKg ? `<br><span style="color:#64748B;font-size:10px">devir ${x.devirKg > 0 ? "+" : "−"}${sayi(Math.abs(x.devirKg))} kg dahil</span>` : "";
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(e.is_emri_no)}</b>`, "white-space:nowrap")}${td(`${esc(musteriAdi(e))}<br><span style="color:#64748B;font-size:11px">${esc(urunAdi(e.urun, e.ambalaj))}${e.teslim ? ` · ${esc(e.teslim)}` : ""}</span>`)}${td(hedef, "text-align:right;white-space:nowrap")}${td(`${sayi(x.yuklenenKg)} kg${devir}`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} bugün)</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(`<span style="color:${KALAN_RENK[x.kalan.durum]};font-weight:bold">${esc(x.kalan.metin)}</span>`, "white-space:nowrap")}</tr>`;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(e.is_emri_no)}</b>`, "white-space:nowrap")}${td(`${esc(musteriAdi(e))}<br><span style="color:#64748B;font-size:11px">${esc(urunAdi(e.urun, e.ambalaj))}${e.teslim ? ` · ${esc(e.teslim)}` : ""}</span>`)}${td(hedef, "text-align:right;white-space:nowrap")}${td(`${sayi(x.yuklenenKg)} kg${devir}`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} ${g})</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(`<span style="color:${KALAN_RENK[x.kalan.durum]};font-weight:bold">${esc(x.kalan.metin)}</span>`, "white-space:nowrap")}</tr>`;
   }).join("");
   const sTablo = tablo(`${th("Sipariş")}${th("Müşteri · Ürün")}${th("Hedef", true)}${th("Yüklenen", true)}${th("Araç", true)}${th("Durum")}`,
     sRows || bos(6, "Açık satış siparişi yok."));
@@ -193,7 +206,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   const aRows = r.acikAlis.map((x, i) => {
     const a = x.alis;
     const kalan = x.kalanKg > 0 ? `<span style="color:#B45309;font-weight:bold">Kalan ${ton(x.kalanKg)}</span>` : x.kalanKg < 0 ? `<span style="color:${LACIVERT};font-weight:bold">Fazla ${ton(-x.kalanKg)}</span>` : `<span style="color:#047857;font-weight:bold">Tamam</span>`;
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(a.alis_no)}</b>`, "white-space:nowrap")}${td(`${esc((a.tedarikci_kisa || "").trim() || a.tedarikci)}<br><span style="color:#64748B;font-size:11px">${esc(a.urun)}${a.depo ? ` · ${esc(a.depo)}` : ""}</span>`)}${td(`${sayi(n(a.miktar_kg))} kg`, "text-align:right;white-space:nowrap")}${td(`${sayi(x.alinanKg)} kg`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} bugün)</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(kalan, "white-space:nowrap")}</tr>`;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(a.alis_no)}</b>`, "white-space:nowrap")}${td(`${esc((a.tedarikci_kisa || "").trim() || a.tedarikci)}<br><span style="color:#64748B;font-size:11px">${esc(a.urun)}${a.depo ? ` · ${esc(a.depo)}` : ""}</span>`)}${td(`${sayi(n(a.miktar_kg))} kg`, "text-align:right;white-space:nowrap")}${td(`${sayi(x.alinanKg)} kg`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} ${g})</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(kalan, "white-space:nowrap")}</tr>`;
   }).join("");
   const aTablo = tablo(`${th("Alış")}${th("Tedarikçi · Ürün")}${th("Sipariş", true)}${th("Teslim alınan", true)}${th("Araç", true)}${th("Durum")}`,
     aRows || bos(6, "Açık alış siparişi yok."));
@@ -206,7 +219,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(e.is_emri_no)}</b>`, "white-space:nowrap")}${td(`${esc(musteriAdi(e))}<br><span style="color:#64748B;font-size:11px">${esc(urunAdi(e.urun, e.ambalaj))}</span>`)}${td(hedef, "text-align:right;white-space:nowrap")}${td(`${sayi(x.yuklenenKg)} kg · ${x.arac} araç`, "text-align:right;white-space:nowrap")}${td(`<span style="color:${SONUC_RENK[x.sonuc]};font-weight:bold">${esc(x.metin)}</span>`, "white-space:nowrap")}</tr>`;
   }).join("");
   const kBolum = r.kapanan.length
-    ? bolum("Bugün Kapanan Siparişler", `${r.kapanan.length} sipariş`) + tablo(`${th("Sipariş")}${th("Müşteri · Ürün")}${th("Hedef", true)}${th("Gerçekleşen", true)}${th("Sonuç")}`, kRows)
+    ? bolum(`${G} Kapanan Siparişler`, `${r.kapanan.length} sipariş`) + tablo(`${th("Sipariş")}${th("Müşteri · Ürün")}${th("Hedef", true)}${th("Gerçekleşen", true)}${th("Sonuç")}`, kRows)
     : "";
 
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>İç Piyasa Günlük Rapor</title></head>
@@ -217,14 +230,14 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${IC_RAPOR_UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi)}" style="display:block;width:48px;height:48px;border:0"></td>
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi)} İç Piyasa</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Günlük Rapor · Yükleme ve Teslim Alma</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(tarihTR(r.tarih))}</div><div style="font-size:11px;color:#94A3B8">Oluşturma ${esc(saat(olusturmaIso))}</div></td>
+    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(tarihTR(r.tarih))}</div><div style="font-size:11px;color:#94A3B8">${OTURUM_AD[oturum]} raporu${oturum === "sabah" ? " (dün)" : ""} · ${esc(saat(olusturmaIso))}</div></td>
   </tr></table>
   ${kutular}
 
-  ${bolum("Bugün Yüklenenler — Satış", `${o.yuklenenArac} araç · ${ton(o.yuklenenKg)}`)}
+  ${bolum(`${G} Yüklenenler — Satış`, `${o.yuklenenArac} araç · ${ton(o.yuklenenKg)}`)}
   ${yTablo}
 
-  ${bolum("Bugün Gelenler — Alış", `${o.gelenArac} araç · ${ton(o.gelenKg)}`)}
+  ${bolum(`${G} Gelenler — Alış`, `${o.gelenArac} araç · ${ton(o.gelenKg)}`)}
   ${gTablo}
 
   ${kBolum}
@@ -238,7 +251,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenen miktar: araçların net toplamı + siparişler arası devir. Gün: satışta irsaliye saati, alışta teslim alma saati (Türkiye).<br>Her gün 19:00'da gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenen miktar: araçların net toplamı + siparişler arası devir. Gün: satışta irsaliye saati, alışta teslim alma saati (Türkiye).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

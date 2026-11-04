@@ -389,6 +389,9 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
     );
   };
 
+  // CIF dosya + ECTN + sigorta (INSURANCE) ve etiket elle girilmemis -> toplam satiri CFR cikar; uyar
+  const ectnCifSigortasiz = ectnBasvurusu && /\bCIF\b/i.test(String(dosya.teslim_sekli || "")) && ectnInsuranceOverride === null && !(ectnCfrEtiketOverride || "").trim();
+
   /** ECTN basvurusu isaretleme kutusu - sadece Commercial Invoice'in yaninda
    * gosterilir (talep: 28.09.2026). Isaretliyken yaninda cikan kalem ikonu,
    * ECTN satirlarinin degerlerini elle duzeltme modalini acar. */
@@ -406,6 +409,15 @@ export default function EvrakOlusturButtons({ dosya, rezervasyonlar, konteynerle
           title="ECTN tutarlarını (TOTAL FOB / FREIGHT / TOTAL CFR) elle düzenle"
         >
           <Pencil size={11} />
+        </button>
+      )}
+      {ectnCifSigortasiz && (
+        // 04.11.2026: CIF dosyada INSURANCE girilmezse toplam satiri "TOTAL CFR" yazar (FOB + FREIGHT).
+        // Onceki CIF + ECTN dosyalarinin hepsinde sigorta girilmisti; girilince "TOTAL CIF" olur.
+        <button type="button" onClick={() => setEctnModalAcik(true)} data-testid="ectn-cif-sigorta-uyari"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20"
+          title="CIF dosyada sigorta (INSURANCE) tutarı girilmedi; faturada toplam satırı TOTAL CFR yazar. Tıklayıp INSURANCE girin: satır TOTAL CIF olur, toplam değişmez.">
+          CIF · sigorta girilmedi → TOTAL CFR yazar
         </button>
       )}
     </div>

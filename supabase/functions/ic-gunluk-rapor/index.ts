@@ -1,28 +1,32 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
-  icGunlukRaporHesapla, icGunlukRaporHtml, icGunlukRaporKonusu, trBugun,
-  type RaporAlis, type RaporIsEmri, type RaporSevk, type RaporTeslim,
+  IC_RAPOR_OTURUMLARI, IC_RAPOR_SAATI, icGunlukRaporHesapla, icGunlukRaporHtml, icGunlukRaporKonusu, trBugun,
+  type IcRaporOturumu, type RaporAlis, type RaporIsEmri, type RaporSevk, type RaporTeslim,
 } from "../_shared/ic-gunluk-rapor.ts";
 
 // ============================================================================
 // GUNLUK IC PIYASA RAPORU MAILI (ic-gunluk-rapor) - 04.11.2026
 // ============================================================================
-// pg_cron "ic-gunluk-rapor" 16:00 UTC = 19:00 TR -> BUGUNUN raporu (yuklenen / gelen araclar,
+// pg_cron (asagida 04.11 aksam notu: gunde 3 oturum) -> raporu (yuklenen / gelen araclar,
 // acik satis + alis siparisleri, bugun kapanan siparisler). Hesap + HTML: _shared/ic-gunluk-rapor.ts.
 // Alicilar: ic_piyasa_ayarlari.gunluk_rapor_eposta (Bildirimler > Ayarlar; virgulle <= 5). Bos = gonderilmez.
 // Musteriye GITMEZ. Fiyat YOK.
 //
 // CAGRI YETKISI (gunluk-rapor-gonder ile ayni ilke):
-//  - Anon anahtar (pg_cron): SADECE TR 18:55-19:59 penceresinde, BUGUN icin; sirket basina gunde
-//    bir kez (ic_gunluk_rapor_gonderimleri benzersiz). Deneme / tarih secimi YOK (test: asagida).
+//  - Anon anahtar (pg_cron): SADECE oturum penceresinde (09:15 / 12:15 / 17:15 TR, -5 / +60 dk); sirket basina
+//    oturumda bir kez (ic_gunluk_rapor_gonderimleri benzersiz). Deneme / tarih secimi YOK (test: asagida).
 //    Yanitta sirket adi / ozet yok.
 //  - Yetkili kullanici (gecerli oturum + admin rolu / super admin), yalniz KENDI sirketi:
 //      {"deneme": true}  -> mail GITMEZ; konu + ozet + HTML doner (onizleme)
-//      {"test": true}    -> alicilara "[TEST]" konulu mail gider; test kaydi yazilir (19:00 otomatik
+//      {"test": true}    -> alicilara "[TEST]" konulu mail gider; test kaydi yazilir (zamanlanmis
 //                           raporu ENGELLEMEZ); sirket basina son 24 saatte en fazla 3 test.
 //  - Anon {"test": true}: yalniz ayarli alicilara, ayni 3/24 saat siniriyla (cron'daki anahtarla
 //    SQL'den elle test icin; adres secilemez).
 //      {"tarih": "YYYY-MM-DD"} (deneme / test ile) gecmis gun.
+// 04.11.2026 aksam - GUNDE 3 OTURUM (kullanici: "bundan sonraki gunlerde sabah ogle aksam"; ihracat
+// raporuyla ayni duzen, 15 dk sonra): pg_cron ic-gunluk-rapor-sabah / -ogle / -aksam (06:15 / 09:15 /
+// 14:15 UTC = 09:15 / 12:15 / 17:15 TR). SABAH = DUNUN raporu, OGLE / AKSAM = bugunun. Anon pencere: her
+// oturumun saatinden 5 dk once - 60 dk sonra; tekrar korumasi (sirket, gun, oturum).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -31,15 +35,21 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SAYFA = 1000;
 const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 
-/** pg_cron 16:00 UTC; pencere TR 18:55 - 19:59 */
-export const RAPOR_TR_SAATI = 19;
 const SUPER_ADMIN_EPOSTALARI = ["execution@unex.com.tr", "bbt@unex.com.tr"];
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
-function pencerede(simdiMs: number): boolean {
-  const tr = new Date(simdiMs + 3 * 60 * 60 * 1000);
-  const dk = tr.getUTCHours() * 60 + tr.getUTCMinutes();
-  return dk >= RAPOR_TR_SAATI * 60 - 5 && dk < RAPOR_TR_SAATI * 60 + 60;
+const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
+/** Zamanlanmis oturum penceresindeysek oturum, degilse null (saatten 5 dk once - 60 dk sonra). */
+function penceredekiOturum(simdiMs: number): IcRaporOturumu | null {
+  const dk = trDakika(simdiMs);
+  return IC_RAPOR_OTURUMLARI.find((o) => { const b = IC_RAPOR_SAATI[o][0] * 60 + IC_RAPOR_SAATI[o][1]; return dk >= b - 5 && dk < b + 60; }) ?? null;
+}
+/** Saate gore en yakin oturum (deneme / test icin): 11'den once sabah, 15'ten once ogle, sonra aksam. */
+const saateGoreOturum = (simdiMs: number): IcRaporOturumu => { const dk = trDakika(simdiMs); return dk < 11 * 60 ? "sabah" : dk < 15 * 60 ? "ogle" : "aksam"; };
+function gunEkle(gun: string, n: number): string {
+  const d = new Date(`${gun}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 async function tekrarla(istek: () => Promise<Response>): Promise<Response> {
@@ -154,16 +164,23 @@ function json(veri: unknown, status = 200): Response {
 
 Deno.serve(async (req: Request) => {
   try {
-    const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean; tarih?: string };
+    const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean; tarih?: string; oturum?: string };
     const yetkiliSirket = await yetkiliKullaniciSirketi(req);
     const yetkili = yetkiliSirket !== null;
+    const simdi = Date.now();
+    let oturum: IcRaporOturumu;
     if (!yetkili) {
-      if (govde.deneme || govde.tarih) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (govde.test !== true && !pencerede(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
+      if (govde.deneme || govde.tarih || govde.oturum) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
+      const p = penceredekiOturum(simdi);
+      if (govde.test !== true && !p) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
+      oturum = p ?? saateGoreOturum(simdi);
+    } else {
+      oturum = IC_RAPOR_OTURUMLARI.includes(govde.oturum as IcRaporOturumu) ? (govde.oturum as IcRaporOturumu) : (penceredekiOturum(simdi) ?? saateGoreOturum(simdi));
     }
     const deneme = yetkili && govde.deneme === true;
     const test = !deneme && govde.test === true;
-    const tarih = yetkili && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : trBugun();
+    // Sabah raporu DUNU anlatir
+    const tarih = yetkili && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : oturum === "sabah" ? gunEkle(trBugun(), -1) : trBugun();
 
     // Sirketler: alici tanimli olanlar (yetkili kullanicida yalniz kendi sirketi)
     const ayarlar = await hepsiniCek<{ company_id: string; gunluk_rapor_eposta: string | null }>(`ic_piyasa_ayarlari?select=company_id,gunluk_rapor_eposta&order=company_id`);
@@ -175,9 +192,9 @@ Deno.serve(async (req: Request) => {
       const sirketAdi = (sirketler.find((s) => s.id === h.company_id)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const alicilar = Array.from(new Set((h.gunluk_rapor_eposta || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)))).slice(0, 5);
       const rapor = await sirketRaporu(h.company_id, tarih);
-      const konu = `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi)}`;
-      const html = icGunlukRaporHtml(rapor, sirketAdi);
-      if (deneme) { sonuclar.push({ tarih, konu, alicilar, ozet: rapor.ozet, html }); continue; }
+      const konu = `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi, oturum)}`;
+      const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum);
+      if (deneme) { sonuclar.push({ tarih, oturum, konu, alicilar, ozet: rapor.ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
 
@@ -187,22 +204,22 @@ Deno.serve(async (req: Request) => {
         const t = await hepsiniCek<{ id: string }>(`ic_gunluk_rapor_gonderimleri?select=id&company_id=eq.${h.company_id}&test=is.true&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
         if (t.length >= 3) { sonuclar.push({ atlandi: "Son 24 saatte en fazla 3 test raporu gönderilebilir." }); continue; }
       }
-      // Tekrar korumasi (test haric): sirket + gun icin tek kayit
+      // Tekrar korumasi (test haric): sirket + gun + oturum icin tek kayit
       if (!test) {
         // Kismi benzersiz index (where not test) on_conflict ile hedeflenemez: once var mi bak, sonra ekle;
         // yaris durumunda index ikinci eklemeyi 409 ile reddeder -> atlanir.
-        const var_ = await hepsiniCek<{ id: string }>(`ic_gunluk_rapor_gonderimleri?select=id&company_id=eq.${h.company_id}&rapor_tarihi=eq.${tarih}&test=is.false&order=id`);
-        if (var_.length) { sonuclar.push({ atlandi: "Bugünün raporu zaten gönderilmiş." }); continue; }
+        const var_ = await hepsiniCek<{ id: string }>(`ic_gunluk_rapor_gonderimleri?select=id&company_id=eq.${h.company_id}&rapor_tarihi=eq.${tarih}&oturum=eq.${oturum}&test=is.false&order=id`);
+        if (var_.length) { sonuclar.push({ atlandi: "Bu oturumun raporu zaten gönderilmiş." }); continue; }
         const k = await fetch(`${SUPABASE_URL}/rest/v1/ic_gunluk_rapor_gonderimleri`, {
           method: "POST",
           headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ company_id: h.company_id, rapor_tarihi: tarih, durum: "gonderiliyor", test: false }),
+          body: JSON.stringify({ company_id: h.company_id, rapor_tarihi: tarih, oturum, durum: "gonderiliyor", test: false }),
         });
-        if (k.status === 409) { await k.body?.cancel(); sonuclar.push({ atlandi: "Bugünün raporu zaten gönderilmiş." }); continue; }
+        if (k.status === 409) { await k.body?.cancel(); sonuclar.push({ atlandi: "Bu oturumun raporu zaten gönderilmiş." }); continue; }
         if (!k.ok) throw new Error(`ic_gunluk_rapor_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);
         await k.body?.cancel();
       }
-      const filtre = `company_id=eq.${h.company_id}&rapor_tarihi=eq.${tarih}&test=is.false`;
+      const filtre = `company_id=eq.${h.company_id}&rapor_tarihi=eq.${tarih}&oturum=eq.${oturum}&test=is.false`;
       const mRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
@@ -217,12 +234,12 @@ Deno.serve(async (req: Request) => {
       await fetch(`${SUPABASE_URL}/rest/v1/ic_gunluk_rapor_gonderimleri${test ? "" : `?${filtre}`}`, {
         method: test ? "POST" : "PATCH",
         headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify(test ? { ...kayit, company_id: h.company_id, rapor_tarihi: tarih, test: true } : kayit),
+        body: JSON.stringify(test ? { ...kayit, company_id: h.company_id, rapor_tarihi: tarih, oturum, test: true } : kayit),
       });
-      sonuclar.push({ gonderildi: true, test, tarih, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? rapor.ozet : undefined });
+      sonuclar.push({ gonderildi: true, test, tarih, oturum, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? rapor.ozet : undefined });
     }
-    if (!yetkili) return json({ ok: true, test, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
-    return json({ ok: true, deneme, test, tarih, sonuclar });
+    if (!yetkili) return json({ ok: true, test, tarih, oturum, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
+    return json({ ok: true, deneme, test, tarih, oturum, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("ic-gunluk-rapor hata:", mesaj);

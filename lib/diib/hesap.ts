@@ -291,6 +291,56 @@ export function bolunmeOnerisi(kg: number, kendiDiib: DiibBelgesi | null, ozetle
   return { tur: "bolunmeli", parcalar, eksikKg: Math.max(0, ihtiyac) };
 }
 
+/** Faturasi kesilmemis yuklemenin sira bilgisi (rezervasyondan): DIIB beyannameye yazilir -> once beyan cut-off. */
+export type BekleyenSira = { beyanCutoff: string | null; etd: string | null };
+export type SiraliBekleyen = DiibSonucu["bekleyen"][number] & {
+  sira: BekleyenSira | null;
+  kayitli: DiibBolunmesi[];            // kaydedilmis bolunme (2+ parca) varsa
+  oneri: BolunmeOnerisi | null;        // kayitli varsa null
+  oncekiler: string[];                 // ayni DIIB'den once dusulen bekleyen dosya no'lari
+  kalanOnce: number | null;            // kendi DIIB'inin bu yuklemeden ONCEKI kalani (oncekiler dusulmus)
+};
+
+/**
+ * Bekleyen yuklemeleri SIRAYLA dagitir (04.11.2026; kullanici: "faturasi kesilmemis yuklemeler
+ * kisminda farkli gozukuyor"). Eskiden her yukleme ayni kalana gore ayri ayri hesaplaniyordu; iki
+ * yukleme ayni kalani paylasinca ikisi de "tek fatura" gorunebiliyordu. Simdi: beyan cut-off ->
+ * ETD -> dosya no sirasiyla; her yuklemenin payi (kayitli bolunme, tek fatura ya da bolunme
+ * onerisi) sonrakilerin kalanindan dusulur.
+ */
+export function siraliBekleyenler(sonuc: DiibSonucu, ozetler: DiibOzeti[], bolunmeler: DiibBolunmesi[], sira: Record<string, BekleyenSira>): SiraliBekleyen[] {
+  const anahtar = (d: DiibSonucu["bekleyen"][number]) => {
+    const s = sira[d.dosya.id];
+    return [s?.beyanCutoff || s?.etd || "9999", s?.etd || "9999", d.dosya.dosya_no || ""];
+  };
+  const dizi = [...sonuc.bekleyen].sort((a, b) => {
+    const x = anahtar(a), y = anahtar(b);
+    return x[0].localeCompare(y[0]) || x[1].localeCompare(y[1]) || x[2].localeCompare(y[2]);
+  });
+  const dus: Record<string, number> = {};
+  const oncekiDosya: Record<string, string[]> = {};
+  return dizi.map((b) => {
+    const kayitli = bolunmeler.filter((x) => x.dosya_id === b.dosya.id).sort((x, y) => x.sira - y.sira);
+    const oncekiler = b.diib ? [...(oncekiDosya[b.diib.id] || [])] : [];
+    const kalanOnce = b.diib ? yuvarla((ozetler.find((o) => o.belge.id === b.diib!.id)?.kalanKg ?? 0) - (dus[b.diib.id] || 0)) : null;
+    const ekle = (diibId: string, kg: number) => {
+      dus[diibId] = yuvarla((dus[diibId] || 0) + kg);
+      const no = b.dosya.dosya_no || "-";
+      const liste = (oncekiDosya[diibId] ||= []);
+      if (!liste.includes(no)) liste.push(no);
+    };
+    if (kayitli.length > 1) {
+      kayitli.forEach((p) => ekle(p.diib_id, sayiOku(p.miktar_kg)));
+      return { ...b, sira: sira[b.dosya.id] ?? null, kayitli, oneri: null, oncekiler, kalanOnce };
+    }
+    const ayarli = ozetler.map((o) => ({ ...o, kalanKg: yuvarla(o.kalanKg - (dus[o.belge.id] || 0)) }));
+    const oneri = bolunmeOnerisi(b.kg, b.diib, ayarli);
+    if (oneri.tur === "tek") ekle(oneri.diib.id, b.kg);
+    else if (oneri.tur === "bolunmeli") oneri.parcalar.forEach((p) => ekle(p.diib.id, p.kg));
+    return { ...b, sira: sira[b.dosya.id] ?? null, kayitli: [], oneri, oncekiler, kalanOnce };
+  });
+}
+
 /** Bolunen yuklemenin parca tutarlari (kg oraninda; son parca yuvarlama farkini alir -> toplam birebir). */
 export function parcaTutarlari(toplam: number, kgler: number[]): number[] {
   const kgT = kgler.reduce((a, b) => a + b, 0);

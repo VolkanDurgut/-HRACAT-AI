@@ -17,13 +17,14 @@ import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import { sayiOku } from "@/lib/sayi-oku";
+import { formatCutoffSaat, formatCutoffTarih } from "@/lib/cutoff-utils";
 import {
-  DIIB_ORAN, bolunmeOnerisi, diibAnahtari, kgOku, diibOzetleri, diibSatirlari, faturaNorm, kgYaz,
+  DIIB_ORAN, siraliBekleyenler, type BekleyenSira, diibAnahtari, kgOku, diibOzetleri, diibSatirlari, faturaNorm, kgYaz,
   type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi, type DiibOzeti, type DiibSatiri,
 } from "@/lib/diib/hesap";
 import { diibExcelOlustur } from "@/lib/diib/excel-yaz";
 import { beyannameNoOku } from "@/lib/beyanname-oku";
-import { DIIB_DOSYA_KOLONLARI } from "@/lib/diib/veri";
+import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir } from "@/lib/diib/veri";
 
 /**
  * DIIB TAKIBI (04.11.2026). Burak Bey'in "UNEX IHRACATLAR" Excel'inin IHRACAT kismi - SISTEM
@@ -406,49 +407,66 @@ function Uyarilar({ ozetler, sonuc, belgeler, onEslestir }: {
 // Bekleyen yuklemeler: faturasi kesilmemis acik dosyalar + bolunme ihtiyaci
 // ---------------------------------------------------------------------------
 function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<typeof diibSatirlari>; ozetler: DiibOzeti[]; bolunmeler: DiibBolunmesi[] }) {
+  const { companyId } = useAuth();
+  const [sira, setSira] = useState<Record<string, BekleyenSira>>({});
+  const idler = sonuc.bekleyen.map((x) => x.dosya.id).sort().join(",");
+  useEffect(() => {
+    if (!companyId || !idler) return;
+    let iptal = false;
+    bekleyenSiraGetir(companyId, idler.split(",")).then((x) => { if (!iptal) setSira(x); });
+    return () => { iptal = true; };
+  }, [companyId, idler]);
+  const sirali = useMemo(() => siraliBekleyenler(sonuc, ozetler, bolunmeler, sira), [sonuc, ozetler, bolunmeler, sira]);
   if (!sonuc.bekleyen.length) return null;
+  // Cut-off "UTC etiketli ama yerel" saklanir: metinden HAM okunur (lib/cutoff-utils; saat dilimi cevrilmez)
+  const tarihYaz = (t: string | null) => !t ? "-" : t.length === 10 ? formatCutoffTarih(t).slice(0, 5) : `${formatCutoffTarih(t).slice(0, 5)} ${formatCutoffSaat(t)}`;
   return (
     <section className="rounded-xl border overflow-hidden mb-5" style={kartStil} aria-label="Bekleyen yüklemeler">
-      <div className="px-4 sm:px-5 py-3 border-b flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderColor: CARD_BORDER }}>
+      <div className="px-4 sm:px-5 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
         <p className="text-sm font-semibold text-white">Faturası kesilmemiş yüklemeler ({sonuc.bekleyen.length})</p>
-        <p className="text-xs" style={{ color: TEXT_MUTED }}>Kalana sayılmaz; DİİB kalanı yetmeyen yükleme iki faturaya bölünmelidir.</p>
+        <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+          <b className="text-white">Sırayla</b> hesaplanır: beyan cut-off&apos;u önce olan yükleme DİİB kalanından önce düşer, sonraki onun kalanını görür. Kalan yetmeyen yükleme iki faturaya bölünür. Gerçekleşene sayılmaz.
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full" data-testid="bekleyen-tablo">
           <thead>
             <tr style={{ backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
+              <th className={`${thSinifi} text-left`}>Sıra</th>
               <th className={`${thSinifi} text-left`}>Dosya</th>
               <th className={`${thSinifi} text-left hidden md:table-cell`}>Alıcı</th>
+              <th className={`${thSinifi} text-left hidden lg:table-cell`}>Beyan C/O · ETD</th>
               <th className={`${thSinifi} text-right`}>Miktar (kg)</th>
               <th className={`${thSinifi} text-left hidden md:table-cell`}>DİİB</th>
               <th className={`${thSinifi} text-left`}>Fatura</th>
             </tr>
           </thead>
           <tbody>
-            {sonuc.bekleyen.map(({ dosya, kg, diib }) => {
-              const kayitli = bolunmeler.filter((b) => b.dosya_id === dosya.id).sort((a, b) => a.sira - b.sira);
-              const o = bolunmeOnerisi(kg, diib, ozetler);
-              return (
-                <tr key={dosya.id} className="border-t" style={{ borderColor: CARD_BORDER }} data-testid="bekleyen-satir">
-                  <td className="px-3 py-2.5 text-sm whitespace-nowrap"><Link href={`/dosya/${dosya.id}?tab=evraklar`} className="font-mono text-white hover:underline inline-flex items-center gap-1">{dosya.dosya_no} <ExternalLink size={11} style={{ color: TEXT_MUTED }} /></Link></td>
-                  <td className="px-3 py-2.5 text-sm max-w-[260px] truncate hidden md:table-cell" style={{ color: TEXT_MUTED }}>{dosya.alici_firma}</td>
-                  <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">{kgYaz(kg)}</td>
-                  <td className="px-3 py-2.5 text-xs font-mono whitespace-nowrap hidden md:table-cell" style={{ color: diib ? "#fff" : "#F87171" }}>{diib?.belge_no ?? "Bulunamadı"}</td>
-                  <td className="px-3 py-2.5 text-xs">
-                    {kayitli.length > 1 ? (
-                      <span className="inline-flex items-center gap-1 font-semibold text-sky-300"><Split size={12} /> {kayitli.length} fatura kaydedildi</span>
-                    ) : o.tur === "tek" ? (
-                      <span className="text-emerald-400 font-semibold">Tek fatura · kalan {kgYaz(o.kalanKg)} kg</span>
-                    ) : o.tur === "bolunmeli" ? (
-                      <span className="font-semibold text-amber-300" data-testid="bolunme-gerekir">
-                        <Split size={12} className="inline -mt-0.5" /> {o.parcalar.length} fatura: {o.parcalar.map((p) => `${kgYaz(p.kg)} kg (${p.diib.belge_no})`).join(" + ")}
-                        {o.eksikKg > 0 && <span className="text-red-400"> · {kgYaz(o.eksikKg)} kg için DİİB kalmadı</span>}
-                      </span>
-                    ) : <span className="text-red-400">{"Dosyanın DİİB alanı tanınmadı"}</span>}
-                  </td>
-                </tr>
-              );
-            })}
+            {sirali.map(({ dosya, kg, diib, sira: s, kayitli, oneri: o, oncekiler }, i) => (
+              <tr key={dosya.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="bekleyen-satir">
+                <td className="px-3 py-2.5 text-sm tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
+                <td className="px-3 py-2.5 text-sm whitespace-nowrap"><Link href={`/dosya/${dosya.id}?tab=evraklar`} className="font-mono text-white hover:underline inline-flex items-center gap-1">{dosya.dosya_no} <ExternalLink size={11} style={{ color: TEXT_MUTED }} /></Link></td>
+                <td className="px-3 py-2.5 text-sm max-w-[240px] truncate hidden md:table-cell" style={{ color: TEXT_MUTED }}>{dosya.alici_firma}</td>
+                <td className="px-3 py-2.5 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: TEXT_MUTED }}>{s ? `${tarihYaz(s.beyanCutoff)} · ${tarihYaz(s.etd)}` : "-"}</td>
+                <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">{kgYaz(kg)}</td>
+                <td className="px-3 py-2.5 text-xs font-mono whitespace-nowrap hidden md:table-cell" style={{ color: diib ? "#fff" : "#F87171" }}>{diib?.belge_no ?? "Bulunamadı"}</td>
+                <td className="px-3 py-2.5 text-xs min-w-[190px]">
+                  {kayitli.length > 1 ? (
+                    <span className="inline-flex items-center gap-1 font-semibold text-sky-300"><Split size={12} /> {kayitli.length} fatura kaydedildi</span>
+                  ) : o?.tur === "tek" ? (
+                    <span className="text-emerald-400 font-semibold">Tek fatura · bu yüklemeden önce kalan {kgYaz(o.kalanKg)} kg</span>
+                  ) : o?.tur === "bolunmeli" && o.parcalar.length === 1 && o.parcalar[0].diib.id !== diib?.id && o.eksikKg <= 0 ? (
+                    <span className="font-semibold text-amber-300" data-testid="diib-degismeli">Tek fatura · tamamı {o.parcalar[0].diib.belge_no} (dosyadaki DİİB No değişmeli)</span>
+                  ) : o?.tur === "bolunmeli" ? (
+                    <span className="font-semibold text-amber-300" data-testid="bolunme-gerekir">
+                      <Split size={12} className="inline -mt-0.5" /> {o.parcalar.length} fatura: {o.parcalar.map((p) => `${kgYaz(p.kg)} kg (${p.diib.belge_no})`).join(" + ")}
+                      {o.eksikKg > 0 && <span className="text-red-400"> · {kgYaz(o.eksikKg)} kg için DİİB kalmadı</span>}
+                    </span>
+                  ) : <span className="text-red-400">{"Dosyanın DİİB alanı tanınmadı"}</span>}
+                  {oncekiler.length > 0 && <span className="block mt-0.5 text-[11px]" style={{ color: TEXT_MUTED }}>Önce düşülen: {oncekiler.join(", ")}</span>}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

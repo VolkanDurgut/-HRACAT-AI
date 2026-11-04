@@ -9,8 +9,8 @@ import { useToast } from "@/lib/toast-context";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { sayiOku } from "@/lib/sayi-oku";
-import { bolunmeOnerisi, diibBul, diibOzetleri, diibSatirlari, dosyaKg, kgOku, kgYaz, type DiibBelgesi } from "@/lib/diib/hesap";
-import { DIIB_BOLUNME_OLAYI, diibVerisiGetir, type DiibVerisi } from "@/lib/diib/veri";
+import { bolunmeOnerisi, diibBul, diibOzetleri, diibSatirlari, dosyaKg, kgOku, kgYaz, siraliBekleyenler, type BekleyenSira, type DiibBelgesi } from "@/lib/diib/hesap";
+import { DIIB_BOLUNME_OLAYI, bekleyenSiraGetir, diibVerisiGetir, type DiibVerisi } from "@/lib/diib/veri";
 import type { Dosya } from "@/lib/supabase";
 
 /**
@@ -25,6 +25,7 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
   const { companyId, user, yetkiler } = useAuth();
   const { showToast } = useToast();
   const [veri, setVeri] = useState<DiibVerisi | null>(null);
+  const [sira, setSira] = useState<Record<string, BekleyenSira>>({});
   const [yukleniyor, setYukleniyor] = useState(true);
   const [taslak, setTaslak] = useState<Parca[] | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
@@ -33,7 +34,11 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
 
   const getir = useCallback(async () => {
     if (!companyId || !yetkili) { setYukleniyor(false); return; }
-    setVeri(await diibVerisiGetir(companyId));
+    const v = await diibVerisiGetir(companyId);
+    // Faturasi kesilmemis dosyalarin sirasi (beyan cut-off / ETD): ayni DIIB'i paylasan yuklemeler sirayla dusulur
+    const bekleyenIdler = v ? v.dosyalar.filter((d) => !d.fatura_no && d.durum !== "Kapalı" && d.durum !== "Kapali").map((d) => d.id) : [];
+    setSira(v ? await bekleyenSiraGetir(companyId, bekleyenIdler) : {});
+    setVeri(v);
     setYukleniyor(false);
   }, [companyId, yetkili]);
   useEffect(() => { getir(); }, [getir, dosya.fatura_no, dosya.diib_no]);
@@ -47,13 +52,17 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     // Bu dosyanin zaten sayilmis payi (faturasi kesilmisse) kalandan dusulmez
     const kendiPayi: Record<string, number> = {};
     sonuc.satirlar.filter((s) => s.dosyaId === dosya.id).forEach((s) => { kendiPayi[s.diibId] = (kendiPayi[s.diibId] || 0) + s.miktarKg; });
-    const oneri = bolunmeOnerisi(kg, kendi, ozetler, kendiPayi);
+    // Faturasi kesilmemis dosya: SIRALI dagilim (DIIB Takibi sayfasindaki tabloyla AYNI sonuc)
+    const siraliBu = !dosya.fatura_no ? siraliBekleyenler(sonuc, ozetler, veri.bolunmeler, sira).find((x) => x.dosya.id === dosya.id) : undefined;
+    const oneri = siraliBu?.oneri ?? bolunmeOnerisi(kg, kendi, ozetler, kendiPayi);
+    const oncekiler = siraliBu ? siraliBu.oncekiler : [];
+    const kalanOnce = siraliBu ? siraliBu.kalanOnce : null;
     const kayitli = veri.bolunmeler.filter((b) => b.dosya_id === dosya.id).sort((a, b) => a.sira - b.sira);
     const kalan = (b: DiibBelgesi | null) => b ? (ozetler.find((o) => o.belge.id === b.id)?.kalanKg ?? 0) + (kendiPayi[b.id] || 0) : 0;
     // Ayni DIIB'e yazilmis, faturasi henuz kesilmemis DIGER acik yuklemeler: hangisi once faturalanirsa kalan ondan duser
     const digerBekleyen = kendi ? sonuc.bekleyen.filter((x) => x.diib?.id === kendi.id && x.dosya.id !== dosya.id) : [];
-    return { kg, kendi, oneri, kayitli, kalan, digerBekleyen, belgeler: veri.belgeler };
-  }, [veri, dosya]);
+    return { kg, kendi, oneri, kayitli, kalan, digerBekleyen, oncekiler, kalanOnce, belgeler: veri.belgeler };
+  }, [veri, dosya, sira]);
 
   if (!yetkili || yukleniyor || !hesap) return null;
   const belgeNo = (id: string) => hesap.belgeler.find((b) => b.id === id)?.belge_no ?? "-";
@@ -111,7 +120,7 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     getir();
   };
 
-  const { kg, kendi, oneri, kayitli, digerBekleyen } = hesap;
+  const { kg, kendi, oneri, kayitli, digerBekleyen, oncekiler } = hesap;
   const taslakFormu = taslak ? (
             <div className="mt-2 space-y-2">
               {taslak.map((p, i) => (
@@ -149,20 +158,18 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
         Yükleme <b className="text-white">{kgYaz(kg)} kg</b>
         {kendi ? <> · DİİB <b className="text-white font-mono">{kendi.belge_no}</b> · kalan <b className="text-white">{kgYaz(Math.max(0, hesap.kalan(kendi)))} kg</b></> : null}
       </p>
-      {kendi && kayitli.length < 2 && !dosya.fatura_no && digerBekleyen.length > 0 && (() => {
-        const digerKg = digerBekleyen.reduce((t, x) => t + x.kg, 0);
-        const sonraKalan = Math.max(0, hesap.kalan(kendi)) - digerKg;
-        return (
-          <p className="mt-2 text-[11px] leading-relaxed text-amber-300 flex gap-1.5" data-testid="diib-diger-bekleyen">
-            <AlertTriangle size={12} className="shrink-0 mt-0.5" />
-            <span>
-              Bu DİİB&apos;e yazılmış, faturası henüz kesilmemiş başka yükleme var: {digerBekleyen.map((x) => `${x.dosya.dosya_no} (${kgYaz(x.kg)} kg)`).join(", ")}.
-              Kalan, faturası önce kesilen yüklemeden düşer. {digerBekleyen.length > 1 ? "Onlar" : "O"} önce kesilirse bu yükleme için kalan <b>{kgYaz(Math.max(0, sonraKalan))} kg</b> olur
-              {sonraKalan < kg ? "; bu durumda bu yükleme bölünmelidir" : ""}.
-            </span>
-          </p>
-        );
-      })()}
+      {kendi && kayitli.length < 2 && !dosya.fatura_no && digerBekleyen.length > 0 && (
+        <p className="mt-2 text-[11px] leading-relaxed text-amber-300 flex gap-1.5" data-testid="diib-diger-bekleyen">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+          <span>
+            Bu DİİB&apos;i faturası kesilmemiş başka yükleme de kullanıyor: {digerBekleyen.map((x) => `${x.dosya.dosya_no} (${kgYaz(x.kg)} kg)`).join(", ")}.{" "}
+            {oncekiler.length > 0
+              ? <>Beyan cut-off sırasına göre önce <b>{oncekiler.join(", ")}</b> düşüldü; aşağıdaki öneri bu yüklemeden önce kalan <b>{kgYaz(Math.max(0, hesap.kalanOnce ?? 0))} kg</b> ile hesaplandı.</>
+              : <>Beyan cut-off sırasına göre bu yükleme önce; ötekiler bundan sonra kalandan düşer.</>}
+            {" "}Sıra değişirse öneri de değişir.
+          </span>
+        </p>
+      )}
 
       {kayitli.length >= 2 ? (
         <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "rgba(56,189,248,0.35)", backgroundColor: "rgba(56,189,248,0.06)" }} data-testid="bolunme-kayitli">
@@ -193,6 +200,11 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
         </div>
       ) : oneri.tur === "diib_yok" ? (
         <p className="mt-3 text-xs text-amber-300 flex items-center gap-1.5"><AlertTriangle size={13} /> {"Dosyanın DİİB alanı tanınmadı (Ek Bilgiler > DİİB No'yu kontrol edin)."}</p>
+      ) : oneri.parcalar.length === 1 && oneri.parcalar[0].diib.id !== kendi?.id && oneri.eksikKg <= 0 ? (
+        <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "rgba(251,191,36,0.4)", backgroundColor: "rgba(245,158,11,0.07)" }} data-testid="bolunme-oneri">
+          <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5" data-testid="diib-degismeli"><AlertTriangle size={13} /> {kendi?.belge_no} bu yüklemeye kalmıyor: tamamı (tek fatura) <span className="font-mono">{oneri.parcalar[0].diib.belge_no}</span> DİİB&apos;ine yazılmalı.</p>
+          <p className="mt-1 text-[11px]" style={{ color: TEXT_MUTED }}>Bölünme gerekmez. Faturadan önce Ek Bilgiler &gt; DİİB No alanını <b className="text-white font-mono">{oneri.parcalar[0].diib.belge_tarihi ? `${oneri.parcalar[0].diib.belge_tarihi.split("-").reverse().join(".")} TARİH ` : ""}{oneri.parcalar[0].diib.belge_no}</b> olarak değiştirin (evraklarda bu yazar).</p>
+        </div>
       ) : (
         <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "rgba(251,191,36,0.4)", backgroundColor: "rgba(245,158,11,0.07)" }} data-testid="bolunme-oneri">
           <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5"><Split size={13} /> DİİB kalanı yetmiyor: yükleme {oneri.parcalar.length} faturaya bölünmeli</p>

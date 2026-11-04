@@ -970,5 +970,12 @@
 - Elle bölme (04.11): kalan yetse de "Yine de iki faturaya böl (elle)" (muhasebe/gümrük kaydı farklıysa).
   İki parçada birini yazınca diğeri yüklemenin kalanına tamamlanır. Aynı DİİB'e yazılmış, faturası
   kesilmemiş DİĞER açık yüklemeler kartta uyarı olarak yazar (kalan, önce faturalanandan düşer).
+- SIRALI bekleyen (04.11, kullanıcı: "faturası kesilmemiş yüklemeler kısmında farklı gözüküyor"): eskiden her
+  bekleyen yükleme AYNI kalana göre ayrı hesaplanıyordu (iki yükleme aynı kalanı paylaşınca ikisi de "tek fatura").
+  Artık `siraliBekleyenler` (hesap.ts): rezervasyon **beyan cut-off → ETD → dosya no** sırasıyla; öncekinin payı
+  (kayıtlı bölünme / tek fatura / öneri) sonrakinin kalanından düşer. DİİB sayfası tablosu ve dosya kartı AYNI
+  sonucu verir (`bekleyenSiraGetir`, veri.ts). Cut-off metinden HAM okunur (cutoff-utils). Kalanı biten DİİB'in
+  yüklemesi tamamen sonraki DİİB'e düşüyorsa "bölünme gerekmez, DİİB No değişmeli" yazar (1 parçalık bölünme
+  kaydedilmez).
 - Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
-  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 18 + e2e_diib_dosya 21.
+  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 22 + e2e_diib_dosya 24 + sıra birim testi.

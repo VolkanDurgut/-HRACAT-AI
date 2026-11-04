@@ -3,7 +3,7 @@
  * RLS: "ihracatlar" yetkisi yoksa bos doner (kart gizlenir, talimat bolunmesiz kalir).
  */
 import { supabase } from "@/lib/supabase";
-import type { DiibBelgesi, DiibBolunmesi, DiibDosyasi, DiibKaydi } from "@/lib/diib/hesap";
+import type { BekleyenSira, DiibBelgesi, DiibBolunmesi, DiibDosyasi, DiibKaydi } from "@/lib/diib/hesap";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
 export const DIIB_DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, beyanname_dosya_url, alici_firma, urun_detaylari, toplam_tutar, para_birimi, diib_no";
@@ -36,6 +36,23 @@ export async function dosyaBolunmesiGetir(companyId: string, dosyaId: string): P
     sira: Number(x.sira), belgeNo: belge.get(x.diib_id as string)?.belge_no ?? "-", belgeTarihi: belge.get(x.diib_id as string)?.belge_tarihi ?? null,
     kg: Number(x.miktar_kg), faturaNo: (x.fatura_no as string | null) ?? null,
   })).sort((a, c) => a.sira - c.sira);
+}
+
+/**
+ * Faturasi kesilmemis dosyalarin sira bilgisi (rezervasyon: beyan cut-off, gemi kalkis). Dosyanin birden
+ * fazla rezervasyonu varsa en erkeni. Okunamazsa bos -> sira dosya no'ya gore.
+ */
+export async function bekleyenSiraGetir(companyId: string, dosyaIdleri: string[]): Promise<Record<string, BekleyenSira>> {
+  if (!dosyaIdleri.length) return {};
+  const r = await supabase.from("rezervasyonlar").select("dosya_id, beyanname_cutoff, gemi_kalkis_tarihi").eq("company_id", companyId).in("dosya_id", dosyaIdleri);
+  if (r.error || !r.data) return {};
+  const sonuc: Record<string, BekleyenSira> = {};
+  for (const x of r.data as { dosya_id: string; beyanname_cutoff: string | null; gemi_kalkis_tarihi: string | null }[]) {
+    const eski = sonuc[x.dosya_id];
+    const enErken = (a: string | null | undefined, b: string | null) => (!a ? b : !b ? a : a < b ? a : b) ?? null;
+    sonuc[x.dosya_id] = { beyanCutoff: enErken(eski?.beyanCutoff, x.beyanname_cutoff), etd: enErken(eski?.etd, x.gemi_kalkis_tarihi) };
+  }
+  return sonuc;
 }
 
 /** Bolunme degisince ayni sayfadaki fatura talimati bolumu yeniden okusun. */

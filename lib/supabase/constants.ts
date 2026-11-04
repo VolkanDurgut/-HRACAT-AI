@@ -2,9 +2,16 @@ export const KONTEYNER_TIPLERI = ['20DC', '40DC', '40HC', '20RF', '40RF'] as con
 
 // Fatura Talimatindaki "Araci Banka" (04.11.2026): PROFORMADAKI banka (dosya.banka).
 // Kullanici: "Proforma da hangi banka varsa fatura talimatinda da o bankanin gecerli
-// olmasini istiyorum." 25.09.2026'daki sabit "DENIZBANK A.S." kurali bununla KALDIRILDI.
-// Dosyada banka yoksa satir yazilmaz (sessizce baska banka yazilmaz).
-export function faturaTalimatiBankasi(dosya: { banka?: string | null }): string | null {
+// olmasini istiyorum" + "Aslinda bundan sonraki yuklemeler icin gecerliydi." -> kural YALNIZ
+// 04.11.2026 ve sonrasinda acilan (proformasi yuklenen) dosyalar icin; daha eski dosyalarda
+// 25.09.2026'daki sabit "DENIZBANK A.S." aynen kalir. Yeni dosyada banka yoksa satir yazilmaz.
+export const FATURA_TALIMATI_SABIT_BANKA = 'DENIZBANK A.S.';
+export const PROFORMA_BANKASI_BASLANGIC = '2026-11-04'; // Europe/Istanbul gunu
+export function faturaTalimatiBankasi(dosya: { banka?: string | null; olusturma_tarihi?: string | null }): string | null {
+  const acilis = dosya.olusturma_tarihi
+    ? new Date(dosya.olusturma_tarihi).toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' })
+    : null;
+  if (!acilis || acilis < PROFORMA_BANKASI_BASLANGIC) return FATURA_TALIMATI_SABIT_BANKA;
   const b = (dosya.banka || '').replace(/\s+/g, ' ').trim();
   return b || null;
 }

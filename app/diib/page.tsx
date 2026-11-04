@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle, ClipboardCheck, ExternalLink, FileSpreadsheet, Loader2, Pencil, Plus, RefreshCw, Search, Split, Trash2, Upload, X,
+  AlertTriangle, ClipboardCheck, Download, ExternalLink, FileSearch, Loader2, Pencil, Plus, RefreshCw, Search, Split, Trash2, X,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -21,11 +21,15 @@ import {
   DIIB_ORAN, bolunmeOnerisi, diibAnahtari, kgOku, diibOzetleri, diibSatirlari, faturaNorm, kgYaz,
   type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi, type DiibOzeti, type DiibSatiri,
 } from "@/lib/diib/hesap";
-import { diibExcelCoz, tekrarsizSatirlar, type ExcelDiib } from "@/lib/diib/excel";
-import { xlsxSayfalari } from "@/lib/xlsx-oku";
+import { diibExcelOlustur } from "@/lib/diib/excel-yaz";
+import { beyannameNoOku } from "@/lib/beyanname-oku";
+import { DIIB_DOSYA_KOLONLARI } from "@/lib/diib/veri";
 
 /**
- * DIIB TAKIBI (04.11.2026). Burak Bey'in "UNEX IHRACATLAR" Excel'inin IHRACAT kismi.
+ * DIIB TAKIBI (04.11.2026). Burak Bey'in "UNEX IHRACATLAR" Excel'inin IHRACAT kismi - SISTEM
+ * KENDI VERISIYLE doldurur; Excel'den iceri hicbir sey ALINMAZ (kullanici karari). Excel'e
+ * AKTARMA ayni formu (GENEL TABLO + DIIB sayfalari) uretir. Beyanname no yuklenen beyanname
+ * PDF'inden okunur. Sistem oncesi faturalar icin DIIB basina tek "devir" (kg + tutar).
  * Genel tablo (her DIIB: taahhut / gerceklesen / kalan / hak edilen ithalat) + secili DIIB'in
  * fatura satirlari. Faturasi kesilen dosyalar KENDILIGINDEN satir olur (lib/diib/hesap.ts);
  * duzeltilen otomatik satir diib_ihracatlari'na "sistem" kaynagiyla yazilir. Bekleyen
@@ -33,7 +37,7 @@ import { xlsxSayfalari } from "@/lib/xlsx-oku";
  * Yetki: "ihracatlar". Ithalat kismi bilerek YOK (kullanici: sonra).
  */
 
-const DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, alici_firma, urun_detaylari, toplam_tutar, para_birimi, diib_no";
+const DOSYA_KOLONLARI = DIIB_DOSYA_KOLONLARI;
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
 const girdiStil = { borderColor: CARD_BORDER, backgroundColor: CARD_BG } as React.CSSProperties;
@@ -68,7 +72,8 @@ function DiibIcerik() {
   const [hata, setHata] = useState<string | null>(null);
   const [secili, setSecili] = useState<string | null>(null);
   const [arama, setArama] = useState("");
-  const [excelAcik, setExcelAcik] = useState(false);
+  const [aktariliyor, setAktariliyor] = useState(false);
+  const [beyanOkuma, setBeyanOkuma] = useState<{ yapilan: number; toplam: number } | null>(null);
   const [belgeFormu, setBelgeFormu] = useState<DiibBelgesi | "yeni" | null>(null);
   const [satirFormu, setSatirFormu] = useState<{ satir: DiibSatiri | null; diibId: string; dosya?: DiibDosyasi } | null>(null);
   const [silinecek, setSilinecek] = useState<DiibSatiri | null>(null);
@@ -108,11 +113,59 @@ function DiibIcerik() {
 
   const sonuc = useMemo(() => diibSatirlari(belgeler, kayitlar, dosyalar, bolunmeler), [belgeler, kayitlar, dosyalar, bolunmeler]);
   const ozetler = useMemo(() => diibOzetleri(belgeler, sonuc), [belgeler, sonuc]);
-  // Kullanimda = sirada kalani olan ilk aktif DIIB
-  const kullanimda = useMemo(() => ozetler.find((o) => o.belge.durum === "aktif" && o.kalanKg > 0)?.belge.id ?? null, [ozetler]);
+  // Kullanimda = EN SON kesilen faturanin yazildigi (kalani olan, aktif) DIIB; fatura yoksa siradaki ilk
+  const kullanimda = useMemo(() => {
+    const acik = new Set(ozetler.filter((o) => o.belge.durum === "aktif" && o.kalanKg > 0).map((o) => o.belge.id));
+    const son = [...sonuc.satirlar].filter((x) => x.faturaTarihi && acik.has(x.diibId)).sort((a, b) => (b.faturaTarihi || "").localeCompare(a.faturaTarihi || ""))[0];
+    return son?.diibId ?? ozetler.find((o) => acik.has(o.belge.id))?.belge.id ?? null;
+  }, [ozetler, sonuc]);
   useEffect(() => { if (!secili && ozetler.length) setSecili(kullanimda ?? ozetler[0].belge.id); }, [ozetler, kullanimda, secili]);
   const seciliOzet = ozetler.find((o) => o.belge.id === secili) ?? null;
   const email = user?.email?.toLowerCase() ?? null;
+
+  // Excel'e aktar: Burak Bey'in formu, tamamen sistem verisinden
+  const excelAktar = async () => {
+    setAktariliyor(true);
+    try {
+      const blob = await diibExcelOlustur(ozetler, sonuc.satirlar);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `DIIB_Takibi_${new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" })}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch { showToast("Excel dosyası hazırlanamadı.", "error"); }
+    setAktariliyor(false);
+  };
+
+  // Yuklenmis beyannamesi olup beyanname no'su bos dosyalar: numarayi PDF'ten oku, dosyaya yaz
+  const beyanBekleyen = useMemo(() => dosyalar.filter((d) => d.beyanname_dosya_url && !d.beyanname_no && faturaNorm(d.fatura_no)), [dosyalar]);
+  const beyannameNolariniOku = async () => {
+    if (!companyId || !beyanBekleyen.length) return;
+    let yazilan = 0, okunamayan = 0;
+    setBeyanOkuma({ yapilan: 0, toplam: beyanBekleyen.length });
+    for (let i = 0; i < beyanBekleyen.length; i++) {
+      const d = beyanBekleyen[i];
+      try {
+        // Kayitli adres uzun sureli imzali URL; depo yolu cikarilabilirse oturumla indirilir
+        const m = /\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/.exec(String(d.beyanname_dosya_url));
+        let veri: ArrayBuffer | null = null;
+        if (m) {
+          const dl = await supabase.storage.from(m[1]).download(decodeURIComponent(m[2]));
+          if (!dl.error && dl.data) veri = await dl.data.arrayBuffer();
+        }
+        if (!veri) { const r = await fetch(String(d.beyanname_dosya_url)); if (r.ok) veri = await r.arrayBuffer(); }
+        const no = veri ? await beyannameNoOku(veri) : null;
+        if (no) {
+          const u = await supabase.from("ihracat_dosyalari").update({ beyanname_no: no }).eq("id", d.id).eq("company_id", companyId).is("beyanname_no", null).select("id");
+          if (!yazmaHatasi(u.error, u.data)) yazilan++; else okunamayan++;
+        } else okunamayan++;
+      } catch { okunamayan++; }
+      setBeyanOkuma({ yapilan: i + 1, toplam: beyanBekleyen.length });
+    }
+    setBeyanOkuma(null);
+    showToast(`${yazilan} dosyanın beyanname numarası beyannameden okundu.${okunamayan ? ` ${okunamayan} beyanname okunamadı (Ek Bilgiler'den girin).` : ""}`, yazilan ? "success" : "error");
+    getir(true);
+  };
 
   const satirSil = async () => {
     if (!silinecek?.kayitId) return;
@@ -138,9 +191,11 @@ function DiibIcerik() {
         aciklama="Dahilde İşleme İzin Belgeleri: ihracat taahhüdü, gerçekleşen ve kalan. Faturası kesilen yüklemeler otomatik eklenir."
         sag={
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setExcelAcik(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}>
-              <FileSpreadsheet size={14} /> {"Excel'den yükle"}
-            </button>
+            {belgeler.length > 0 && (
+              <button onClick={excelAktar} disabled={aktariliyor} data-testid="excel-aktar" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5 disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}>
+                {aktariliyor ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {"Excel'e aktar"}
+              </button>
+            )}
             <button onClick={() => setBelgeFormu("yeni")} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
               <Plus size={14} /> Yeni DİİB
             </button>
@@ -154,10 +209,21 @@ function DiibIcerik() {
 
       {!hata && belgeler.length === 0 ? (
         <EmptyState icon={<ClipboardCheck size={40} />} title="Henüz DİİB yok"
-          description="Burak Bey'in DİİB Excel'ini yükleyin ya da yeni bir DİİB ekleyin. Sonrasında faturası kesilen yüklemeler kendiliğinden eklenir." />
+          description="DİİB belgesini ekleyin (no, tarih, ithalat izni). Faturası kesilen yüklemeler, dosyalardaki DİİB numarasıyla kendiliğinden eklenir; sistem öncesi ihracat DİİB'e bir kez devir olarak girilir." />
       ) : !hata && (
         <>
           <GenelTablo ozetler={ozetler} secili={secili} kullanimda={kullanimda} onSec={setSecili} />
+          {beyanBekleyen.length > 0 && (
+            <div className="mb-5 rounded-xl border px-4 sm:px-5 py-3 flex flex-wrap items-center gap-3" style={kartStil} data-testid="beyan-oku-bandi">
+              <FileSearch size={16} style={{ color: ACCENT }} />
+              <p className="text-sm flex-1 min-w-[220px]" style={{ color: "#CBD5E1" }}>
+                <b className="text-white">{beyanBekleyen.length}</b> dosyanın beyannamesi yüklü ama beyanname numarası boş. Numaralar yüklenen beyannamelerden okunabilir.
+              </p>
+              <button onClick={beyannameNolariniOku} disabled={!!beyanOkuma} data-testid="beyan-oku" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                {beyanOkuma ? <><Loader2 size={12} className="animate-spin" /> {beyanOkuma.yapilan}/{beyanOkuma.toplam}</> : <>Beyannamelerden oku</>}
+              </button>
+            </div>
+          )}
           <Uyarilar ozetler={ozetler} sonuc={sonuc} belgeler={belgeler}
             onEslestir={(dosya, diibId) => setSatirFormu({ satir: null, diibId, dosya })} />
           <BekleyenYuklemeler sonuc={sonuc} ozetler={ozetler} bolunmeler={bolunmeler} />
@@ -171,10 +237,6 @@ function DiibIcerik() {
         </>
       )}
 
-      {excelAcik && (
-        <ExcelPenceresi belgeler={belgeler} kayitlar={kayitlar} dosyalar={dosyalar} companyId={companyId!} email={email}
-          onKapat={() => setExcelAcik(false)} onBitti={(m) => { showToast(m, "success"); setExcelAcik(false); setSecili(null); getir(true); }} />
-      )}
       {belgeFormu && (
         <BelgePenceresi belge={belgeFormu === "yeni" ? null : belgeFormu} belgeler={belgeler} satirSayisi={belgeFormu === "yeni" ? 0 : sonuc.satirlar.filter((s) => s.diibId === (belgeFormu as DiibBelgesi).id && s.kayitId).length}
           companyId={companyId!} email={email} onKapat={() => setBelgeFormu(null)}
@@ -398,7 +460,6 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
 const KAYNAK: Record<DiibSatiri["kaynak"], { etiket: string; sinif: string; title: string }> = {
   otomatik: { etiket: "Otomatik", sinif: "bg-emerald-500/10 text-emerald-400", title: "Sistemdeki dosyadan otomatik" },
   sistem: { etiket: "Düzeltildi", sinif: "bg-sky-500/10 text-sky-300", title: "Dosyadan geldi, elle düzeltildi" },
-  excel: { etiket: "Excel", sinif: "bg-white/5 text-slate-300", title: "Burak Bey'in Excel'inden" },
   elle: { etiket: "Elle", sinif: "bg-amber-500/10 text-amber-300", title: "Elle eklendi" },
 };
 
@@ -413,7 +474,7 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
       <div className="px-4 sm:px-5 py-3 border-b flex flex-wrap items-center gap-3" style={{ borderColor: CARD_BORDER }}>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white"><span className="font-mono">{ozet.belge.belge_no}</span> · İhracat</p>
-          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{ozet.satirSayisi} fatura · taahhüt {kgYaz(ozet.taahhutKg)} kg · kalan <b className={ozet.kalanKg > 0 ? "text-amber-300" : "text-emerald-400"}>{kgYaz(Math.max(0, ozet.kalanKg))} kg</b>{ozet.belge.aciklama ? ` · ${ozet.belge.aciklama}` : ""}</p>
+          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>{ozet.satirSayisi} fatura{ozet.devirKg > 0 ? ` + devir ${kgYaz(ozet.devirKg)} kg` : ""} · taahhüt {kgYaz(ozet.taahhutKg)} kg · kalan <b className={ozet.kalanKg > 0 ? "text-amber-300" : "text-emerald-400"}>{kgYaz(Math.max(0, ozet.kalanKg))} kg</b>{ozet.belge.aciklama ? ` · ${ozet.belge.aciklama}` : ""}</p>
         </div>
         <div className="relative w-full sm:w-64">
           <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
@@ -422,7 +483,7 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
         <button onClick={onSatirEkle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}><Plus size={12} /> Satır ekle</button>
         <button onClick={onBelgeDuzenle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}><Pencil size={12} /> DİİB bilgileri</button>
       </div>
-      {gorunen.length === 0 ? <p className="text-sm py-8 text-center" style={{ color: TEXT_MUTED }}>{ara ? "Aramaya uyan satır yok." : "Bu DİİB'e henüz fatura yazılmamış."}</p> : (
+      {gorunen.length === 0 && !(ozet.devirKg > 0 && !ara) ? <p className="text-sm py-8 text-center" style={{ color: TEXT_MUTED }}>{ara ? "Aramaya uyan satır yok." : "Bu DİİB'e henüz fatura yazılmamış."}</p> : (
         <div className="overflow-x-auto">
           <table className="min-w-full" data-testid="diib-satirlar">
             <thead>
@@ -466,6 +527,15 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
               })}
             </tbody>
             <tfoot>
+              {ozet.devirKg > 0 && (
+                <tr className="border-t" style={{ borderColor: CARD_BORDER }} data-testid="diib-devir">
+                  <td colSpan={5} className="px-3 py-2 text-xs" style={{ color: TEXT_MUTED }}>Sistem öncesi ihracat (devir) · IHR-2026-0065&apos;ten önce kesilen faturalar</td>
+                  <td className="px-3 py-2 text-sm text-right tabular-nums text-white">{kgYaz(ozet.devirKg)}</td>
+                  <td className="px-3 py-2 text-sm text-right tabular-nums" style={{ color: TEXT_MUTED }}>{ozet.devirKg ? birimYaz(ozet.devirTutar / ozet.devirKg) : "-"}</td>
+                  <td className="px-3 py-2 text-sm text-right tabular-nums text-white">{paraYaz(ozet.devirTutar)}</td>
+                  <td colSpan={2} />
+                </tr>
+              )}
               <tr className="border-t" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
                 <td colSpan={5} className="px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Gerçekleşen ihracat</td>
                 <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white font-bold">{kgYaz(ozet.gerceklesenKg)}</td>
@@ -538,6 +608,7 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
     izin: belge ? String(sayiOku(belge.ithalat_izin_kg)) : "", taahhut: belge ? String(sayiOku(belge.ihracat_taahhut_kg)) : "",
     taahhutElle: !!belge, sira: String(belge?.kullanim_sirasi ?? Math.max(0, ...belgeler.map((b) => b.kullanim_sirasi)) + 1),
     durum: belge?.durum ?? "aktif", aciklama: belge?.aciklama ?? "",
+    devirKg: belge && sayiOku(belge.devir_kg) ? String(sayiOku(belge.devir_kg)) : "", devirTutar: belge && sayiOku(belge.devir_tutar) ? String(sayiOku(belge.devir_tutar)) : "",
   }));
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -552,9 +623,12 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
     if (belgeler.some((b) => b.anahtar === anahtar && b.id !== belge?.id)) { setHata("Bu DİİB zaten kayıtlı."); return; }
     if (!(izinKg > 0)) { setHata("İthalat izin miktarını (kg) girin."); return; }
     if (!(taahhut > 0)) { setHata("İhracat taahhüdü (kg) geçersiz."); return; }
+    const devirKg = kgOku(f.devirKg), devirTutar = sayiOku(f.devirTutar);
+    if (devirKg < 0 || devirTutar < 0) { setHata("Devir miktarı / tutarı eksi olamaz."); return; }
+    if (devirKg > taahhut) { setHata("Devir miktarı taahhütten büyük olamaz."); return; }
     const satir = {
       belge_no: f.belge_no.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR"), anahtar, belge_tarihi: f.belge_tarihi || null,
-      ithalat_izin_kg: izinKg, ihracat_taahhut_kg: taahhut, kullanim_sirasi: Math.max(0, Math.min(10000, Math.round(sayiOku(f.sira)))),
+      ithalat_izin_kg: izinKg, ihracat_taahhut_kg: taahhut, devir_kg: devirKg, devir_tutar: Math.round(devirTutar * 100) / 100, kullanim_sirasi: Math.max(0, Math.min(10000, Math.round(sayiOku(f.sira)))),
       durum: f.durum, aciklama: f.aciklama.trim() || null, guncelleyen_email: email,
     };
     setYukleniyor(true);
@@ -597,11 +671,19 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
           <select id="b-durum" value={f.durum} onChange={(e) => setF({ ...f, durum: e.target.value as "aktif" | "tamamlandi" })} className={girdiSinifi} style={girdiStil}>
             <option value="aktif">Aktif</option><option value="tamamlandi">Kapatıldı (kullanılmaz)</option>
           </select></div>
+        <div className="sm:col-span-2 rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+          <p className="text-xs font-semibold text-white">Sistem öncesi ihracat (devir)</p>
+          <p className="text-[11px] mt-0.5 mb-2" style={{ color: TEXT_MUTED }}>Sistemdeki ilk ihracat dosyası IHR-2026-0065 (02.09.2026). Bu DİİB&apos;e ondan önce kesilen faturaların toplamını bir kez girin; sonraki faturalar otomatik eklenir.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><Etiket htmlFor="b-devir-kg">Devir miktarı (kg)</Etiket><input id="b-devir-kg" inputMode="decimal" value={f.devirKg} onChange={(e) => setF({ ...f, devirKg: e.target.value })} placeholder="0" className={girdiSinifi} style={girdiStil} /></div>
+            <div><Etiket htmlFor="b-devir-tutar">Devir tutarı (USD)</Etiket><input id="b-devir-tutar" inputMode="decimal" value={f.devirTutar} onChange={(e) => setF({ ...f, devirTutar: e.target.value })} placeholder="0" className={girdiSinifi} style={girdiStil} /></div>
+          </div>
+        </div>
         <div className="sm:col-span-2"><Etiket htmlFor="b-aciklama">Açıklama</Etiket><input id="b-aciklama" value={f.aciklama} onChange={(e) => setF({ ...f, aciklama: e.target.value })} maxLength={500} className={girdiSinifi} style={girdiStil} /></div>
       </div>
       {hata && <p className="mt-3 text-sm text-red-400" role="alert">{hata}</p>}
       <ConfirmDialog open={silOnay} onOpenChange={(a) => { if (!a && !yukleniyor) setSilOnay(false); }} title={`${belge?.belge_no} silinsin mi?`}
-        description={`DİİB ile birlikte tabloya yazılmış ${satirSayisi} satır (Excel / elle / düzeltme) kalıcı olarak silinir. Sistemdeki dosyalar ve faturalar etkilenmez. Bu işlem geri alınamaz.`}
+        description={`DİİB ile birlikte elle eklenmiş / düzeltilmiş ${satirSayisi} satır ve devir bilgisi kalıcı olarak silinir. Sistemdeki dosyalar ve faturalar etkilenmez. Bu işlem geri alınamaz.`}
         confirmLabel="Evet, kalıcı sil" cancelLabel="Vazgeç" destructive onConfirm={sil} loading={yukleniyor} loadingLabel="Siliniyor..." />
     </Pencere>
   );
@@ -680,138 +762,6 @@ function SatirPenceresi({ satir, diibId, dosya, belgeler, companyId, email, onKa
         <div className="sm:col-span-2"><Etiket htmlFor="s-aciklama">Açıklama</Etiket><input id="s-aciklama" value={f.aciklama} onChange={(e) => setF({ ...f, aciklama: e.target.value })} maxLength={500} className={girdiSinifi} style={girdiStil} /></div>
       </div>
       {hata && <p className="mt-3 text-sm text-red-400" role="alert">{hata}</p>}
-    </Pencere>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Excel'den yukleme (Burak Bey'in DIIB Excel'i; ithalat kismi okunmaz)
-// ---------------------------------------------------------------------------
-type Onizleme = ExcelDiib & { sec: boolean; belgeNo: string; mevcut: DiibBelgesi | null; yeniSatir: number; atlanan: number };
-
-function ExcelPenceresi({ belgeler, kayitlar, dosyalar, companyId, email, onKapat, onBitti }: {
-  belgeler: DiibBelgesi[]; kayitlar: DiibKaydi[]; dosyalar: DiibDosyasi[]; companyId: string; email: string | null;
-  onKapat: () => void; onBitti: (m: string) => void;
-}) {
-  const [onizleme, setOnizleme] = useState<Onizleme[] | null>(null);
-  const [okunuyor, setOkunuyor] = useState(false);
-  const [aktariliyor, setAktariliyor] = useState(false);
-  const [hata, setHata] = useState<string | null>(null);
-  const [eskiYillar, setEskiYillar] = useState(false);
-  const dosyaRef = useRef<File | null>(null);
-  const kayitliFatura = useMemo(() => new Set(kayitlar.map((k) => faturaNorm(k.fatura_no)).filter(Boolean)), [kayitlar]);
-
-  const oku = async (dosya: File | null, eski = eskiYillar) => {
-    if (!dosya) return;
-    dosyaRef.current = dosya;
-    setHata(null); setOkunuyor(true);
-    try {
-      if (!/\.xlsx$/i.test(dosya.name)) throw new Error("Yalnızca .xlsx dosyası yüklenebilir.");
-      if (dosya.size > 15 * 1024 * 1024) throw new Error("Dosya 15 MB'dan büyük.");
-      const d = diibExcelCoz(await xlsxSayfalari(await dosya.arrayBuffer()), eski ? 2000 : 2026);
-      if (!d.length) throw new Error("Excel'de DİİB sayfası bulunamadı (sayfa adı örn. “2026 D1-04219” olmalı).");
-      // Kullanim sirasi onerisi: en yeni belge once (bugunku uygulama: 04219 kullanimda, sonra 02576)
-      setOnizleme(d.map((x) => {
-        const mevcut = belgeler.find((b) => b.anahtar === x.anahtar) ?? null;
-        const satirlar = tekrarsizSatirlar(x);
-        const yeni = satirlar.filter((s) => s.fatura_no ? !kayitliFatura.has(faturaNorm(s.fatura_no)) : !mevcut);
-        return { ...x, sec: true, belgeNo: mevcut?.belge_no ?? x.belge_no, mevcut, yeniSatir: yeni.length, atlanan: satirlar.length - yeni.length };
-      }));
-    } catch (e) { setHata((e as Error).message || "Excel okunamadı."); setOnizleme(null); }
-    setOkunuyor(false);
-  };
-
-  const aktar = async () => {
-    if (!onizleme) return;
-    const secilen = onizleme.filter((x) => x.sec);
-    for (const x of secilen) {
-      if (!diibAnahtari(x.belgeNo) || diibAnahtari(x.belgeNo) !== x.anahtar) { setHata(`${x.sayfa}: DİİB no sayfa adıyla uyuşmuyor (${x.belgeNo}).`); return; }
-      if (!x.mevcut && !x.ithalat_izin_kg) { setHata(`${x.sayfa}: ithalat izni okunamadı; önce DİİB'i elle ekleyin.`); return; }
-    }
-    setAktariliyor(true); setHata(null);
-    const dosyaFatura = new Map(dosyalar.filter((d) => d.fatura_no).map((d) => [faturaNorm(d.fatura_no), d.id]));
-    const yeniSira = [...secilen].filter((x) => !x.mevcut).sort((a, b) => (b.belge_tarihi || "").localeCompare(a.belge_tarihi || ""));
-    const enBuyuk = Math.max(0, ...belgeler.map((b) => b.kullanim_sirasi));
-    let belgeSayisi = 0, satirSayisi = 0;
-    try {
-      for (const x of secilen) {
-        let id = x.mevcut?.id;
-        if (!id) {
-          const r = await supabase.from("diib_belgeleri").insert({
-            company_id: companyId, belge_no: x.belgeNo.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR"), anahtar: x.anahtar, belge_tarihi: x.belge_tarihi,
-            ithalat_izin_kg: x.ithalat_izin_kg, ihracat_taahhut_kg: x.ihracat_taahhut_kg, kullanim_sirasi: enBuyuk + yeniSira.indexOf(x) + 1,
-            durum: "aktif", aciklama: `Excel'den yüklendi (${x.sayfa})`, olusturan_email: email,
-          }).select("id");
-          const sorun = yazmaHatasi(r.error, r.data);
-          if (sorun) throw new Error(`${x.belgeNo}: ${sorun}`);
-          id = (r.data![0] as { id: string }).id;
-          belgeSayisi++;
-        }
-        const satirlar = tekrarsizSatirlar(x).filter((s) => s.fatura_no ? !kayitliFatura.has(faturaNorm(s.fatura_no)) : !x.mevcut);
-        for (let i = 0; i < satirlar.length; i += 200) {
-          const parca = satirlar.slice(i, i + 200).map((s) => ({
-            company_id: companyId, diib_id: id, dosya_id: s.fatura_no ? dosyaFatura.get(faturaNorm(s.fatura_no)) ?? null : null,
-            fatura_no: s.fatura_no ? s.fatura_no.replace(/\s+/g, "").toUpperCase() : null, beyanname_no: s.beyanname_no ? s.beyanname_no.replace(/\s+/g, "").toUpperCase() : null,
-            fatura_tarihi: s.fatura_tarihi, cari: s.cari, stok_adi: s.stok_adi, miktar_kg: s.miktar_kg, birim_fiyat: s.birim_fiyat, tutar: s.tutar,
-            para_birimi: "USD", kaynak: "excel", aciklama: s.aciklama, olusturan_email: email,
-          }));
-          const r = await supabase.from("diib_ihracatlari").insert(parca).select("id");
-          const sorun = yazmaHatasi(r.error, r.data);
-          if (sorun) throw new Error(`${x.belgeNo} satırları: ${/duplicate|23505/.test(sorun) ? "aynı fatura no başka DİİB'de kayıtlı" : sorun}`);
-          satirSayisi += r.data!.length;
-        }
-      }
-      onBitti(`${belgeSayisi} DİİB ve ${satirSayisi} satır Excel'den alındı.`);
-    } catch (e) {
-      setHata(`${(e as Error).message}. Alınanlar kaydedildi; dosyayı yeniden yükleyince kalanlar eklenir (aynı faturalar tekrar alınmaz).`);
-    }
-    setAktariliyor(false);
-  };
-
-  return (
-    <Pencere baslik="DİİB Excel'inden yükle" genis kilit={aktariliyor} onKapat={onKapat}
-      alt="Her DİİB bir sayfa (örn. “2026 D1-04219”). Yalnız İHRACAT satırları alınır; İTHALAT kısmı okunmaz. Aynı fatura iki kez alınmaz."
-      altBar={<><IptalDugmesi onClick={onKapat} disabled={aktariliyor} />{onizleme && <KaydetDugmesi onClick={aktar} yukleniyor={aktariliyor} etiket="Seçilenleri içe aktar" testId="excel-aktar" />}</>}>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm cursor-pointer hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}>
-          {okunuyor ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} Excel dosyası seç (.xlsx)
-          <input type="file" accept=".xlsx" className="hidden" data-testid="excel-girdi" onChange={(e) => { oku(e.target.files?.[0] ?? null); e.target.value = ""; }} />
-        </label>
-        <label className="inline-flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }}>
-          <input type="checkbox" checked={eskiYillar} onChange={(e) => { setEskiYillar(e.target.checked); if (dosyaRef.current) oku(dosyaRef.current, e.target.checked); }} />
-          {"2026 öncesi (tamamlanmış) DİİB'leri de al"}
-        </label>
-      </div>
-      {hata && <p className="mb-3 text-sm text-red-400" role="alert">{hata}</p>}
-      {onizleme && (
-        <div className="space-y-3" data-testid="excel-onizleme">
-          {onizleme.map((x, i) => {
-            const s = tekrarsizSatirlar(x);
-            const kg = s.reduce((t, y) => t + y.miktar_kg, 0);
-            return (
-              <div key={x.anahtar} className="rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-testid="excel-diib">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-white">
-                    <input type="checkbox" checked={x.sec} onChange={(e) => setOnizleme(onizleme.map((y, j) => j === i ? { ...y, sec: e.target.checked } : y))} aria-label={`${x.sayfa} al`} />
-                    {x.sayfa}
-                  </label>
-                  <input value={x.belgeNo} disabled={!!x.mevcut} onChange={(e) => setOnizleme(onizleme.map((y, j) => j === i ? { ...y, belgeNo: e.target.value } : y))} aria-label={`${x.sayfa} DİİB no`}
-                    className="px-2 py-1 border rounded-md text-xs text-white font-mono w-40 disabled:opacity-60" style={girdiStil} />
-                  <span className="text-xs" style={{ color: TEXT_MUTED }}>{x.belge_tarihi ? formatDateTR(x.belge_tarihi) : "tarih yok"} · izin {x.ithalat_izin_kg ? kgYaz(x.ithalat_izin_kg) : "?"} kg · taahhüt {x.ihracat_taahhut_kg ? kgYaz(x.ihracat_taahhut_kg) : "?"} kg</span>
-                  <span className="text-xs text-white">{s.length} satır · {kgYaz(kg)} kg</span>
-                  {x.mevcut
-                    ? <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300">Kayıtlı · {x.yeniSatir} yeni satır eklenecek</span>
-                    : <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">Yeni DİİB</span>}
-                </div>
-                {x.uyarilar.length > 0 && <ul className="mt-2 text-[11.5px] text-amber-300 list-disc pl-5 space-y-0.5">{x.uyarilar.map((u, k) => <li key={k}>{u}</li>)}</ul>}
-              </div>
-            );
-          })}
-          <p className="text-[11.5px]" style={{ color: TEXT_MUTED }}>
-            DİİB numarasını sistemdeki yazımla (örn. D2) düzeltebilirsiniz. Excel&apos;de olan faturalar sistemdeki dosyalardan ayrıca sayılmaz; Excel&apos;de olmayan faturalı yüklemeler kendiliğinden eklenir.
-          </p>
-        </div>
-      )}
     </Pencere>
   );
 }

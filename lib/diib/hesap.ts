@@ -7,8 +7,10 @@
  *  - Kalan ihracat             = taahhut - gerceklesen
  *  - Hak edilen ithalat        = gerceklesen / 74 / 97 x 10000               (Excel: F/74/97*10000)
  *
- * Satir kaynaklari:
- *  1) diib_ihracatlari tablosu (Excel'den / elle / duzeltilmis sistem satiri) -> ESAS
+ * Satir kaynaklari (Excel'den iceri ALINMAZ; kullanici: "Sistem bunu kendi takip etmeli"):
+ *  0) DIIB'in "sistem oncesi" devri (devir_kg / devir_tutar): IHR-2026-0065'ten once kesilmis
+ *     faturalar sistemde yok; DIIB basina bir kez girilir, gerceklesene eklenir.
+ *  1) diib_ihracatlari tablosu (elle eklenen / duzeltilen satir) -> ESAS
  *  2) sistemdeki FATURASI KESILMIS dosyalar -> otomatik satir (kullanici: "otomatik eklensin").
  *     Ayni fatura no ya da ayni dosya tabloda varsa otomatik satir URETILMEZ (cift sayim yok).
  *     Dosya iki DIIB'e bolunduyse (diib_dosya_bolunmeleri) her parca ayri satir (ayri fatura).
@@ -26,6 +28,8 @@ export type DiibBelgesi = {
   belge_tarihi: string | null;
   ithalat_izin_kg: number | string;
   ihracat_taahhut_kg: number | string;
+  devir_kg?: number | string | null;
+  devir_tutar?: number | string | null;
   kullanim_sirasi: number;
   durum: "aktif" | "tamamlandi";
   aciklama: string | null;
@@ -44,7 +48,7 @@ export type DiibKaydi = {
   birim_fiyat: number | string | null;
   tutar: number | string;
   para_birimi: string;
-  kaynak: "excel" | "sistem" | "elle";
+  kaynak: "sistem" | "elle";
   aciklama: string | null;
 };
 
@@ -60,6 +64,7 @@ export type DiibDosyasi = {
   toplam_tutar: number | string | null;
   para_birimi: string | null;
   diib_no: string | null;
+  beyanname_dosya_url?: string | null;
 };
 
 export type DiibBolunmesi = { id: string; dosya_id: string; diib_id: string; sira: number; miktar_kg: number | string; fatura_no: string | null };
@@ -80,7 +85,7 @@ export type DiibSatiri = {
   birimFiyat: number | null;    // USD / KG
   tutar: number;
   paraBirimi: string;
-  kaynak: "excel" | "sistem" | "elle" | "otomatik";
+  kaynak: "sistem" | "elle" | "otomatik";
   bolunmeSira: number | null;   // bolunmus yuklemenin parcasi
 };
 
@@ -217,7 +222,9 @@ export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], do
 export type DiibOzeti = {
   belge: DiibBelgesi;
   taahhutKg: number;
-  gerceklesenKg: number;
+  devirKg: number;         // sistem oncesi (bir kez girilir)
+  devirTutar: number;
+  gerceklesenKg: number;   // devir + satirlar
   kalanKg: number;
   tutar: number;
   ortalamaFiyat: number | null;
@@ -231,11 +238,13 @@ export type DiibOzeti = {
 export function diibOzetleri(belgeler: DiibBelgesi[], sonuc: DiibSonucu): DiibOzeti[] {
   return [...belgeler].sort(diibSiralama).map((b) => {
     const s = sonuc.satirlar.filter((x) => x.diibId === b.id);
-    const kg = yuvarla(s.reduce((t, x) => t + x.miktarKg, 0));
-    const tutar = yuvarla(s.reduce((t, x) => t + x.tutar, 0));
+    const devirKg = sayiOku(b.devir_kg);
+    const devirTutar = sayiOku(b.devir_tutar);
+    const kg = yuvarla(devirKg + s.reduce((t, x) => t + x.miktarKg, 0));
+    const tutar = yuvarla(devirTutar + s.reduce((t, x) => t + x.tutar, 0));
     const taahhut = sayiOku(b.ihracat_taahhut_kg);
     return {
-      belge: b, taahhutKg: taahhut, gerceklesenKg: kg, kalanKg: yuvarla(taahhut - kg), tutar,
+      belge: b, taahhutKg: taahhut, devirKg, devirTutar, gerceklesenKg: kg, kalanKg: yuvarla(taahhut - kg), tutar,
       ortalamaFiyat: kg > 0 ? yuvarla(tutar / kg, 6) : null, hakEdilenIthalatKg: yuvarla(kg / 74 / 97 * 10000),
       yuzde: taahhut > 0 ? (kg / taahhut) * 100 : 0, satirSayisi: s.length,
       faturasizSatir: s.filter((x) => !faturaNorm(x.faturaNo)).length,

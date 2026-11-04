@@ -10,9 +10,11 @@
 --   diib_belgeleri         : belge no / tarih / ithalat izni (kg bugday) /
 --                            ihracat taahhudu (kg un = izin x 0,97 x 0,74,
 --                            Excel'deki formul; elle duzeltilebilir) / kullanim sirasi.
---   diib_ihracatlari       : DIIB'e yazilan ihracat satirlari (Excel'den, elle ya
---                            da sistemdeki dosyanin satiri duzeltildiginde). Sistemdeki
---                            faturasi kesilmis dosyalar KAYDA GEREK KALMADAN ekranda
+--                            devir_kg / devir_tutar: sistem ONCESI (IHR-2026-0065'ten
+--                            once) bu DIIB'e yazilmis ihracat - bir kez girilir.
+--   diib_ihracatlari       : YALNIZ elle eklenen ya da duzeltilen satirlar. Kullanici:
+--                            "Excelden iceriye alinmamali. Sistem bunu kendi takip etmeli."
+--                            Faturasi kesilmis dosyalar KAYDA GEREK KALMADAN ekranda
 --                            otomatik satir olur (lib/diib/hesap.ts); bu tabloda ayni
 --                            fatura no / dosya varsa tablodaki satir esas alinir.
 --   diib_dosya_bolunmeleri : bir yuklemenin iki DIIB'e (iki faturaya) bolunmesi
@@ -30,6 +32,8 @@ create table if not exists public.diib_belgeleri (
   belge_tarihi date,
   ithalat_izin_kg numeric(14, 2) not null,
   ihracat_taahhut_kg numeric(14, 2) not null,
+  devir_kg numeric(14, 2) not null default 0,
+  devir_tutar numeric(16, 2) not null default 0,
   kullanim_sirasi integer not null default 100,
   durum text not null default 'aktif',
   aciklama text,
@@ -41,6 +45,7 @@ create table if not exists public.diib_belgeleri (
   constraint diib_anahtar_check check (anahtar ~ '^[0-9]{4}-[0-9]{5}$'),
   constraint diib_miktar_check check (ithalat_izin_kg > 0 and ithalat_izin_kg <= 1000000000
     and ihracat_taahhut_kg > 0 and ihracat_taahhut_kg <= 1000000000),
+  constraint diib_devir_check check (devir_kg >= 0 and devir_kg <= 1000000000 and devir_tutar >= 0),
   constraint diib_sira_check check (kullanim_sirasi between 0 and 10000),
   constraint diib_durum_check check (durum in ('aktif', 'tamamlandi')),
   constraint diib_aciklama_check check (aciklama is null or char_length(aciklama) <= 500)
@@ -76,7 +81,7 @@ create table if not exists public.diib_ihracatlari (
   constraint diib_ihr_miktar_check check (miktar_kg > 0 and miktar_kg <= 100000000),
   constraint diib_ihr_tutar_check check (tutar >= 0 and (birim_fiyat is null or birim_fiyat >= 0)),
   constraint diib_ihr_para_check check (para_birimi in ('USD', 'EUR')),
-  constraint diib_ihr_kaynak_check check (kaynak in ('excel', 'sistem', 'elle')),
+  constraint diib_ihr_kaynak_check check (kaynak in ('sistem', 'elle')),
   constraint diib_ihr_aciklama_check check (aciklama is null or char_length(aciklama) <= 500),
   constraint diib_ihr_diib_fk foreign key (diib_id, company_id) references public.diib_belgeleri (id, company_id) on delete cascade
 );
@@ -105,7 +110,7 @@ create unique index if not exists diib_dosya_bolunmeleri_tekil on public.diib_do
 create unique index if not exists diib_dosya_bolunmeleri_sira on public.diib_dosya_bolunmeleri (dosya_id, sira);
 
 comment on table public.diib_belgeleri is 'DIIB belgeleri - ihracat taahhudu takibi (04.11.2026).';
-comment on table public.diib_ihracatlari is 'DIIB ihracat satirlari (Excel / elle / duzeltilmis sistem satiri). Faturali dosyalar ekranda otomatik satir olur (04.11.2026).';
+comment on table public.diib_ihracatlari is 'DIIB ihracat satirlari: yalniz elle eklenen / duzeltilen. Faturali dosyalar ekranda otomatik satir olur (04.11.2026).';
 comment on table public.diib_dosya_bolunmeleri is 'Yuklemenin DIIB''lere bolunmesi = ayri faturalar (04.11.2026).';
 
 -- ---- updated_at + denetim ----------------------------------------------------

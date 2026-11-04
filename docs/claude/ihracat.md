@@ -930,48 +930,43 @@
   Kullanıldığı yer: talimat PDF'i, talimat mail metni, Ek Bilgiler kartı (üçü aynı fonksiyon).
   CIF birim 3 ondalık kaldı. Test: /home/claude/test/fob/fob_test.ts (Logo taklidi).
 
-## Fatura talimatı — Aracı Banka = proformadaki banka (04.11.2026)
+## Fatura talimatı — Aracı Banka = proformadaki banka, YENİ dosyalarda (04.11.2026)
 
 - Kullanıcı: "Proforma da hangi banka varsa fatura talimatında da o bankanın geçerli olmasını
-  istiyorum." 25.09.2026'daki sabit `DENIZBANK A.S.` (FATURA_TALIMATI_SABIT_BANKA) KALDIRILDI.
-- `lib/supabase/constants.ts → faturaTalimatiBankasi(dosya)` = `dosya.banka` (boşluk düzeltilmiş);
-  boşsa satır yazılmaz. Talimat PDF'i + mail metni aynı fonksiyon. Proforma / CI'daki banka
-  seçimi DEĞİŞMEDİ. Canlı 04.11: 36 dosyanın hepsinde banka dolu (Denizbank 19, Ziraat 12,
-  Vakıfbank 5); kayıtlı talimat metinlerinde çakışan banka yok.
+  istiyorum" + "Aslında bundan sonraki yüklemeler için geçerliydi."
+- `lib/supabase/constants.ts → faturaTalimatiBankasi(dosya)`: dosya **04.11.2026 (TR saati) ve
+  sonrasında açıldıysa** `dosya.banka` (boşsa satır yazılmaz); daha eski dosyalarda 25.09.2026'daki
+  sabit `DENIZBANK A.S.` aynen. Talimat PDF'i + mail metni aynı fonksiyon. Proforma / CI'daki banka
+  seçimi DEĞİŞMEDİ.
 
-## DİİB Takibi `/diib` — ihracat kısmı + fatura bölünmesi (04.11.2026)
+## DİİB Takibi `/diib` — sistem kendi doldurur + fatura bölünmesi (04.11.2026)
 
-- Kullanıcı: Burak Bey'in "UNEX İHRACATLAR" Excel'i sistemde (yalnız İHRACAT; İTHALAT sonra);
-  "DİİB'in kalanı yetmezse tam kapatabilmek için 2 ayrı fatura" (CRISA: 79.100 kg 04219 +
-  170.900 kg 02576). Kararlar: başlangıç = Excel 2026 + sistemdeki eksikler; bölünme = uyarı +
-  2 faturalı talimat; kayda ekleme = otomatik; DİİB no yazımında **D2 doğru** (04219).
+- Kullanıcı: Burak Bey'in "UNEX İHRACATLAR" Excel'inin İHRACAT kısmı SİSTEMDE (İTHALAT sonra);
+  "Excelden içeriye alınmamalı. Sistem bunu kendi takip etmeli ve aynı formu doldurabilmeli."
+  (İlk sürümdeki Excel içe aktarma KALDIRILDI, kullanıcı itirazı — GERİ EKLENMEZ.) "DİİB'in
+  kalanı yetmezse tam kapatabilmek için 2 ayrı fatura". DİİB no yazımında **D2 doğru** (04219).
 - Migration `20261104100000_diib_takibi.sql` (yalnız ekleme): `diib_belgeleri` (belge_no,
-  anahtar "yyyy-nnnnn", izin kg, taahhüt kg = izin × 0,97 × 0,74, kullanım sırası, durum),
-  `diib_ihracatlari` (Excel / elle / "sistem" = düzeltilmiş dosya satırı; fatura no şirket içi
-  tekil), `diib_dosya_bolunmeleri` (dosya → DİİB parçaları, sıra, kg, fatura no). Bileşik FK
-  (diib_id, company_id). RLS şirket + **ihracatlar** yetkisi (yeni sayfa yetkisi YOK); denetim.
-- `lib/diib/hesap.ts` (saf): `diibAnahtari` / `diibBul` (dosyanın serbest DİİB metninden yıl+sıra;
-  yıl yoksa tek eşleşen sıra), faturası kesilmiş dosya → OTOMATİK satır (tabloda aynı fatura no /
-  dosya varsa üretilmez), bölünmüş dosya → parça başına satır; faturasız açık dosya → "bekleyen";
-  `bolunmeOnerisi` (kendi DİİB'i dolar, fazlası kullanım sırasındaki sonraki aktif DİİB'e);
-  `kgOku` (Türkçe binlik nokta, yalnız kg alanları). `lib/diib/excel.ts` + `lib/xlsx-oku.ts`
-  (çok sayfa): sayfa "yyyy Dd-nnnnn", ithalat izni = "ÖNGÖRÜLEN İTHALAT" F; taahhüt HER ZAMAN
-  formülle (01152 sayfasındaki öngörülen formülü kendine bağlı). Aynı fatura no iki kez: birebir
-  aynıysa tekrar atlanır, farklı yüklemeyse fatura no'suz + açıklamayla alınır (Excel 02576
-  satır 51: UNX…514 ESFIRA 25.245 kg).
-- Sayfa: genel tablo (masaüstü tablo, telefonda kart), uyarılar (fatura no'suz satırlar = olası
-  çift sayım; DİİB'i tanınmayan faturalı dosyalar → DİİB seçip ekle), faturası kesilmemiş
-  yüklemeler + bölünme ihtiyacı, seçili DİİB satırları (Excel sayfası gibi, dipte gerçekleşen /
-  öngörülen / kalan), satır düzelt (otomatik satır → "Düzeltildi"; silince yeniden otomatik),
-  Excel içe aktarma (önizleme, DİİB no düzeltme, tekrar yüklemede aynı fatura alınmaz; yeni
-  DİİB'ler en yeni önce kullanım sırası). Menü İHRACAT > "DİİB Takibi".
-- Dosya: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat Evrakları sekmeleri): kalan,
-  tek fatura / bölünmeli öneri → "Bölünmeyi hazırla" (kg'lar düzeltilebilir, toplam = yükleme)
-  → kaydet; parça fatura no'ları; kaldır (onaylı). Fatura talimatı (PDF + mail) bölünme varsa
-  "FATURA BOLUNMESI (n AYRI FATURA)" bölümü (`lib/diib/bolunme-talimat.ts`: kalemler sırayla,
-  tutarlar kuruşu kuruşuna, FOB CIF payı oranında) + Diib Bilgisi iki DİİB. Bölünmesiz talimat
-  ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
-- Gece yedeği: 3 tablo `yedekleme-gonder` listesine eklendi (deploy migration'dan SONRA).
-- 04.11 bulgular (kullanıcıya iletildi): Excel 04219'daki faturasız "OM 250.000 kg" satırı
-  UNX…693 ise çift sayım → gerçek kalan 329.100 (Burak Bey 79.100 diyor). Test: hesap (gerçek
-  Excel yerelde, repoda veri YOK), bölünme, kgOku, e2e_diib 29 + e2e_diib_dosya 16.
+  anahtar "yyyy-nnnnn", izin kg, taahhüt = izin × 0,97 × 0,74, **devir_kg / devir_tutar** =
+  sistem öncesi ihracat [ilk sistem dosyası IHR-2026-0065, 02.09.2026], kullanım sırası, durum),
+  `diib_ihracatlari` (YALNIZ elle / "sistem" = düzeltilmiş dosya satırı; fatura no tekil),
+  `diib_dosya_bolunmeleri`. Bileşik FK (diib_id, company_id). RLS şirket + **ihracatlar**.
+- Satırlar = faturası kesilmiş dosyalar (fatura no / tarih / alıcı / kg / birim / tutar dosyadan;
+  beyanname no dosyadan). `lib/diib/hesap.ts`: `diibBul` (dosyanın serbest DİİB metni → yıl+sıra),
+  otomatik satır, bölünmüş dosya parça başına, faturasız açık dosya "bekleyen", `bolunmeOnerisi`,
+  `kgOku` (Türkçe binlik nokta; yalnız kg alanları). Gerçekleşen = devir + satırlar.
+- Beyanname no: `lib/beyanname-oku.ts` (unpdf, YAPAY ZEKÂ YOK; "8 hane + EX + 8/9 hane", tek
+  belirgin numara yoksa null). `beyanname-section.tsx` yüklemede aynı kayıtla `beyanname_no`
+  yazar (okunamazsa alan değişmez). DİİB sayfasında "Beyannamelerden oku" (yüklü beyannamesi
+  olup numarası boş dosyalar; `beyanname_no is null` koşuluyla yazar).
+- "Excel'e aktar" (`lib/diib/excel-yaz.ts`, jszip): GENEL TABLO + her DİİB sayfası Burak Bey'in
+  biçiminde (devir satırı + GERÇEKLEŞEN / ÖNGÖRÜLEN / KALAN / HAK EDİLEN). İçeri ALMAZ.
+- "Kullanımda" = en son kesilen faturanın yazıldığı (kalanı olan) DİİB.
+- Dosya kartı + 2 faturalı talimat: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat
+  Evrakları), `lib/diib/bolunme-talimat.ts`; talimat PDF + mail "FATURA BOLUNMESI" bölümü; bölünmesiz
+  talimat ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
+- 04.11 sistem verisiyle 04219 (devir 1.025.000 = UNX559/563/572/576/588 + 0070 eklenince):
+  kalan **332.000 kg** → CRISA (0108, 250.000) TEK fatura. Burak Bey 79.100 diyordu: fark Excel'deki
+  faturasız "OM 250.000" satırı (sistemde karşılığı yok, UNX693 tekrarı olabilir) + ESFIRA UNX655
+  (sistem 249.550 / Excel 252.450 kg). Kullanıcıya iletildi.
+- Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
+  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 18 + e2e_diib_dosya 16.

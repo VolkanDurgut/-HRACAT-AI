@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FileSignature, X, CheckCircle2, ExternalLink, RefreshCw, Clock, Archive, TimerOff } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
+import { beyannameNoOku } from "@/lib/beyanname-oku";
 
 /**
  * GUMRUK BEYANNAMESI (16.10.2026, kullanici istegi).
@@ -20,6 +21,9 @@ import { EvrakAsistanYukleme, EvrakAsistanIsleniyor } from "@/components/evrak-a
  * Yukleme sirasi CLAUDE.md kurali: eski URL taze okunur -> yeni dosya yuklenir
  * -> kayit guncellenir ve kontrol edilir -> SADECE basariliysa eski dosya
  * depodan silinir; kayit yazilamazsa yeni dosya geri alinir (sahipsiz kalmaz).
+ * 04.11.2026 (DIIB takibi): PDF beyannameden BEYANNAME NO metinden okunur (yapay zeka yok,
+ * lib/beyanname-oku.ts) ve dosyanin beyanname_no alanina AYNI kayitla yazilir. Okunamazsa
+ * alan degismez (Ek Bilgiler'den elle girilir).
  */
 const DEPO = "konsimento-talimatlari";
 const KABUL_EDILEN = ["application/pdf", "image/jpeg", "image/png"];
@@ -68,6 +72,7 @@ export default function BeyannameSection({ dosya, rezervasyonlar, onRefresh, com
     setYukleniyor(true);
     let yuklenenYol: string | null = null;
     try {
+      const okunanNo = file.type === "application/pdf" ? await beyannameNoOku(await file.arrayBuffer()) : null;
       // Eski beyanname adresi TAZE okunur; okunamazsa hicbir sey silinmez
       const { data: onceki } = await supabase.from("ihracat_dosyalari")
         .select("beyanname_dosya_url").eq("id", dosya.id).eq("company_id", companyId).maybeSingle();
@@ -82,13 +87,17 @@ export default function BeyannameSection({ dosya, rezervasyonlar, onRefresh, com
         beyanname_dosya_url: dosyaUrl,
         beyanname_dosya_adi: file.name,
         beyanname_yukleme_tarihi: new Date().toISOString(),
+        ...(okunanNo ? { beyanname_no: okunanNo } : {}),
       }).eq("id", dosya.id).eq("company_id", companyId).select("id");
       const hata = yazmaHatasi(updateError, guncellenen);
       if (hata) throw new Error(`Kayıt güncellenemedi: ${hata}`);
       yuklenenYol = null; // kayit basarili - dosya artik dosyaya bagli
 
       await eskiDepoDosyasiniSil((onceki as { beyanname_dosya_url?: string | null } | null)?.beyanname_dosya_url, dosyaUrl);
-      showToast("Beyanname yüklendi. Beyanname cut-off sayacı durduruldu.", "success");
+      const noMesaji = okunanNo
+        ? ` Beyanname no: ${okunanNo}${dosya.beyanname_no && dosya.beyanname_no.replace(/\s+/g, "").toUpperCase() !== okunanNo ? ` (önceki: ${dosya.beyanname_no})` : ""}.`
+        : " Beyanname no belgeden okunamadı; Ek Bilgiler'den girin.";
+      showToast(`Beyanname yüklendi. Beyanname cut-off sayacı durduruldu.${noMesaji}`, "success");
       onRefresh();
       cutoffUyarilariniYenile();
     } catch (err: any) {

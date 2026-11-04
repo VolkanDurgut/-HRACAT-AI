@@ -1,0 +1,287 @@
+/**
+ * DIIB TAKIBI - saf hesap modulu (04.11.2026). React / Supabase importu yok (tsx ile test edilir).
+ *
+ * Kavramlar (Burak Bey'in Excel'iyle AYNI):
+ *  - Ihracat taahhudu (kg un)  = ithalat izni (kg bugday) x 97 x 74 / 10000   (Excel: F*97*74/10000)
+ *  - Gerceklesen ihracat       = DIIB'e yazilan faturalarin kg toplami
+ *  - Kalan ihracat             = taahhut - gerceklesen
+ *  - Hak edilen ithalat        = gerceklesen / 74 / 97 x 10000               (Excel: F/74/97*10000)
+ *
+ * Satir kaynaklari:
+ *  1) diib_ihracatlari tablosu (Excel'den / elle / duzeltilmis sistem satiri) -> ESAS
+ *  2) sistemdeki FATURASI KESILMIS dosyalar -> otomatik satir (kullanici: "otomatik eklensin").
+ *     Ayni fatura no ya da ayni dosya tabloda varsa otomatik satir URETILMEZ (cift sayim yok).
+ *     Dosya iki DIIB'e bolunduyse (diib_dosya_bolunmeleri) her parca ayri satir (ayri fatura).
+ *  3) Faturasi henuz kesilmemis ACIK dosyalar -> "bekleyen yukleme" (kalan hesabina girmez,
+ *     bolunme gerekip gerekmedigi buradan gorulur).
+ */
+import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
+
+export const DIIB_ORAN = 0.97 * 0.74; // 0,7178
+
+export type DiibBelgesi = {
+  id: string;
+  belge_no: string;
+  anahtar: string;
+  belge_tarihi: string | null;
+  ithalat_izin_kg: number | string;
+  ihracat_taahhut_kg: number | string;
+  kullanim_sirasi: number;
+  durum: "aktif" | "tamamlandi";
+  aciklama: string | null;
+};
+
+export type DiibKaydi = {
+  id: string;
+  diib_id: string;
+  dosya_id: string | null;
+  fatura_no: string | null;
+  beyanname_no: string | null;
+  fatura_tarihi: string | null;
+  cari: string;
+  stok_adi: string;
+  miktar_kg: number | string;
+  birim_fiyat: number | string | null;
+  tutar: number | string;
+  para_birimi: string;
+  kaynak: "excel" | "sistem" | "elle";
+  aciklama: string | null;
+};
+
+export type DiibDosyasi = {
+  id: string;
+  dosya_no: string | null;
+  durum: string | null;
+  fatura_no: string | null;
+  fatura_tarihi: string | null;
+  beyanname_no: string | null;
+  alici_firma: string | null;
+  urun_detaylari: unknown;
+  toplam_tutar: number | string | null;
+  para_birimi: string | null;
+  diib_no: string | null;
+};
+
+export type DiibBolunmesi = { id: string; dosya_id: string; diib_id: string; sira: number; miktar_kg: number | string; fatura_no: string | null };
+
+/** Ekranda gosterilen satir: tablodan ya da otomatik (dosyadan). */
+export type DiibSatiri = {
+  anahtar: string;              // React key
+  kayitId: string | null;       // diib_ihracatlari.id (otomatikte null)
+  diibId: string;
+  dosyaId: string | null;
+  dosyaNo: string | null;
+  faturaNo: string | null;
+  beyannameNo: string | null;
+  faturaTarihi: string | null;
+  cari: string;
+  stokAdi: string;
+  miktarKg: number;
+  birimFiyat: number | null;    // USD / KG
+  tutar: number;
+  paraBirimi: string;
+  kaynak: "excel" | "sistem" | "elle" | "otomatik";
+  bolunmeSira: number | null;   // bolunmus yuklemenin parcasi
+};
+
+const yuvarla = (n: number, b = 2) => { const k = 10 ** b; return Math.round((n + Number.EPSILON) * k) / k; };
+export const faturaNorm = (s: string | null | undefined) => (s || "").replace(/\s+/g, "").toUpperCase();
+
+/**
+ * DIIB anahtari: yil + 5 hane sira ("2026-04219").
+ * "2026/D2-04219", "2026 D1-04219", "19.08.2026 TARİH 2026-D2-04219", "DİİB NO: 2026/D2-04219".
+ * Yil bulunamazsa null (yalniz siraya gore eslestirme diibBul'da yapilir).
+ */
+export function diibAnahtari(metin: string | null | undefined): string | null {
+  const t = (metin || "").toLocaleUpperCase("tr-TR");
+  const m = /(20\d{2})\s*[/\- ]?\s*D\s*\d\s*[/\- ]?\s*(\d{4,6})\b/.exec(t);
+  if (!m) return null;
+  return `${m[1]}-${m[2].slice(-5).padStart(5, "0")}`;
+}
+/** Yalniz sira numarasi ("04219"): "D2-04219" gibi yil yazilmamis metinler icin. */
+function diibSirasi(metin: string | null | undefined): string | null {
+  const m = /D\s*\d\s*[/\- ]?\s*(\d{4,6})\b/i.exec(metin || "");
+  return m ? m[1].slice(-5).padStart(5, "0") : null;
+}
+
+/** Dosyanin DIIB alanindaki serbest metinden belgeyi bulur (yil+sira, yoksa TEK eslesen sira). */
+export function diibBul(metin: string | null | undefined, belgeler: DiibBelgesi[]): DiibBelgesi | null {
+  const a = diibAnahtari(metin);
+  if (a) return belgeler.find((b) => b.anahtar === a) ?? null;
+  const s = diibSirasi(metin);
+  if (!s) return null;
+  const adaylar = belgeler.filter((b) => b.anahtar.endsWith(`-${s}`));
+  return adaylar.length === 1 ? adaylar[0] : null;
+}
+
+/** Yuklemenin toplam kg'i (kalemler MTS -> kg). */
+export function dosyaKg(urunler: unknown): number {
+  const k = Array.isArray(urunler) ? urunler : [];
+  return yuvarla(k.reduce((s: number, u) => s + kalemMiktari(u as { miktar_mts?: unknown; quantity?: unknown }), 0) * 1000);
+}
+
+/** Yuklemenin tutari: dosyanin toplam tutari, yoksa kalem toplamlari (Excel'deki TUTARI ile ayni). */
+export function dosyaTutar(d: Pick<DiibDosyasi, "toplam_tutar" | "urun_detaylari">): number {
+  const t = sayiOku(d.toplam_tutar);
+  if (t > 0) return yuvarla(t);
+  const k = Array.isArray(d.urun_detaylari) ? d.urun_detaylari : [];
+  return yuvarla(k.reduce((s: number, u) => s + sayiOku((u as Record<string, unknown>)?.toplam_tutar_usd ?? (u as Record<string, unknown>)?.total_amount), 0));
+}
+
+/** "BUĞDAY UNU / 25 KG" ya da "BUĞDAY UNU / 25 KG-50 KG" (ambalaj boyutlarindan). */
+export function stokAdi(urunler: unknown): string {
+  const k = Array.isArray(urunler) ? urunler : [];
+  const boyutlar: string[] = [];
+  for (const u of k) {
+    const r = u as Record<string, unknown>;
+    const m = /(\d+(?:[.,]\d+)?)\s*KG/i.exec(String(r?.ambalaj_boyutu ?? r?.packaging_size ?? ""));
+    if (m) { const b = `${m[1].replace(".", ",")} KG`; if (!boyutlar.includes(b)) boyutlar.push(b); }
+  }
+  return boyutlar.length ? `BUĞDAY UNU / ${boyutlar.join("-")}` : "BUĞDAY UNU";
+}
+
+const kayitSatiri = (k: DiibKaydi, dosyaNo: string | null): DiibSatiri => ({
+  anahtar: `k-${k.id}`, kayitId: k.id, diibId: k.diib_id, dosyaId: k.dosya_id, dosyaNo,
+  faturaNo: k.fatura_no, beyannameNo: k.beyanname_no, faturaTarihi: k.fatura_tarihi, cari: k.cari, stokAdi: k.stok_adi,
+  miktarKg: sayiOku(k.miktar_kg), birimFiyat: k.birim_fiyat === null || k.birim_fiyat === "" ? null : sayiOku(k.birim_fiyat),
+  tutar: sayiOku(k.tutar), paraBirimi: k.para_birimi || "USD", kaynak: k.kaynak, bolunmeSira: null,
+});
+
+export type DiibSonucu = {
+  satirlar: DiibSatiri[];                    // tum DIIB satirlari (tablo + otomatik)
+  eslesmeyen: { dosya: DiibDosyasi; kg: number; tutar: number }[]; // faturali ama DIIB'i bulunamayan
+  bekleyen: { dosya: DiibDosyasi; kg: number; tutar: number; diib: DiibBelgesi | null }[]; // faturasiz acik dosyalar
+};
+
+/** Tablodaki kayitlar + sistemdeki dosyalar -> ekrandaki DIIB satirlari. */
+export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], dosyalar: DiibDosyasi[], bolunmeler: DiibBolunmesi[]): DiibSonucu {
+  const dosyaNo = new Map(dosyalar.map((d) => [d.id, d.dosya_no]));
+  const satirlar: DiibSatiri[] = kayitlar.map((k) => kayitSatiri(k, k.dosya_id ? dosyaNo.get(k.dosya_id) ?? null : null));
+  const kayitliFatura = new Set(kayitlar.map((k) => faturaNorm(k.fatura_no)).filter(Boolean));
+  const kayitliDosyaDiib = new Set(kayitlar.filter((k) => k.dosya_id).map((k) => `${k.dosya_id}|${k.diib_id}`));
+  const kayitliDosya = new Set(kayitlar.map((k) => k.dosya_id).filter(Boolean) as string[]);
+  const belgeId = new Set(belgeler.map((b) => b.id));
+  const eslesmeyen: DiibSonucu["eslesmeyen"] = [];
+  const bekleyen: DiibSonucu["bekleyen"] = [];
+
+  for (const d of dosyalar) {
+    const kg = dosyaKg(d.urun_detaylari);
+    const tutar = dosyaTutar(d);
+    if (kg <= 0) continue;
+    const parcalar = bolunmeler.filter((b) => b.dosya_id === d.id && belgeId.has(b.diib_id)).sort((a, b) => a.sira - b.sira);
+    if (!faturaNorm(d.fatura_no)) {
+      if (d.durum !== "Kapalı" && d.durum !== "Kapali") bekleyen.push({ dosya: d, kg, tutar, diib: diibBul(d.diib_no, belgeler) });
+      continue;
+    }
+    if (parcalar.length) {
+      let kalanTutar = tutar;
+      parcalar.forEach((p, i) => {
+        const pKg = sayiOku(p.miktar_kg);
+        const pFatura = p.fatura_no || (p.sira === 1 ? d.fatura_no : null);
+        const pTutar = i === parcalar.length - 1 ? yuvarla(kalanTutar) : yuvarla(tutar * pKg / kg);
+        kalanTutar -= pTutar;
+        if (kayitliDosyaDiib.has(`${d.id}|${p.diib_id}`) || (pFatura && kayitliFatura.has(faturaNorm(pFatura)))) return;
+        satirlar.push({
+          anahtar: `o-${d.id}-${p.sira}`, kayitId: null, diibId: p.diib_id, dosyaId: d.id, dosyaNo: d.dosya_no,
+          faturaNo: pFatura, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-",
+          stokAdi: stokAdi(d.urun_detaylari), miktarKg: pKg, birimFiyat: pKg ? yuvarla(pTutar / pKg, 6) : null, tutar: pTutar,
+          paraBirimi: d.para_birimi || "USD", kaynak: "otomatik", bolunmeSira: p.sira,
+        });
+      });
+      continue;
+    }
+    if (kayitliDosya.has(d.id) || kayitliFatura.has(faturaNorm(d.fatura_no))) continue;
+    const b = diibBul(d.diib_no, belgeler);
+    if (!b) { eslesmeyen.push({ dosya: d, kg, tutar }); continue; }
+    satirlar.push({
+      anahtar: `o-${d.id}`, kayitId: null, diibId: b.id, dosyaId: d.id, dosyaNo: d.dosya_no,
+      faturaNo: d.fatura_no, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-",
+      stokAdi: stokAdi(d.urun_detaylari), miktarKg: kg, birimFiyat: yuvarla(tutar / kg, 6), tutar,
+      paraBirimi: d.para_birimi || "USD", kaynak: "otomatik", bolunmeSira: null,
+    });
+  }
+  satirlar.sort((a, b) => (a.faturaTarihi || "9999").localeCompare(b.faturaTarihi || "9999") || (a.faturaNo || "").localeCompare(b.faturaNo || ""));
+  return { satirlar, eslesmeyen, bekleyen };
+}
+
+export type DiibOzeti = {
+  belge: DiibBelgesi;
+  taahhutKg: number;
+  gerceklesenKg: number;
+  kalanKg: number;
+  tutar: number;
+  ortalamaFiyat: number | null;
+  hakEdilenIthalatKg: number;
+  yuzde: number;           // 0..100+
+  satirSayisi: number;
+  faturasizSatir: number;  // fatura no bos satirlar (cift sayim olabilir)
+  bekleyenKg: number;      // faturasi kesilmemis acik dosyalar (bu DIIB'e yazilmis)
+};
+
+export function diibOzetleri(belgeler: DiibBelgesi[], sonuc: DiibSonucu): DiibOzeti[] {
+  return [...belgeler].sort(diibSiralama).map((b) => {
+    const s = sonuc.satirlar.filter((x) => x.diibId === b.id);
+    const kg = yuvarla(s.reduce((t, x) => t + x.miktarKg, 0));
+    const tutar = yuvarla(s.reduce((t, x) => t + x.tutar, 0));
+    const taahhut = sayiOku(b.ihracat_taahhut_kg);
+    return {
+      belge: b, taahhutKg: taahhut, gerceklesenKg: kg, kalanKg: yuvarla(taahhut - kg), tutar,
+      ortalamaFiyat: kg > 0 ? yuvarla(tutar / kg, 6) : null, hakEdilenIthalatKg: yuvarla(kg / 74 / 97 * 10000),
+      yuzde: taahhut > 0 ? (kg / taahhut) * 100 : 0, satirSayisi: s.length,
+      faturasizSatir: s.filter((x) => !faturaNorm(x.faturaNo)).length,
+      bekleyenKg: yuvarla(sonuc.bekleyen.filter((x) => x.diib?.id === b.id).reduce((t, x) => t + x.kg, 0)),
+    };
+  });
+}
+
+/** Kullanim sirasi, sonra belge tarihi. */
+export const diibSiralama = (a: DiibBelgesi, b: DiibBelgesi) =>
+  (a.kullanim_sirasi - b.kullanim_sirasi) || (a.belge_tarihi || "").localeCompare(b.belge_tarihi || "") || a.anahtar.localeCompare(b.anahtar);
+
+export type BolunmeParcasi = { diib: DiibBelgesi; kg: number };
+export type BolunmeOnerisi =
+  | { tur: "tek"; diib: DiibBelgesi; kalanKg: number }
+  | { tur: "bolunmeli"; parcalar: BolunmeParcasi[]; eksikKg: number }
+  | { tur: "diib_yok" };
+
+/**
+ * Yukleme (kg) icin DIIB dagilimi. Dosyanin kendi DIIB'i once dolar; kalan yetmezse fazla,
+ * kullanim sirasina gore kalani olan SONRAKI aktif DIIB'lere yazilir (her parca = ayri fatura).
+ * `haric`: bu dosyanin halihazirda sayilmis satirlari (fatura kesilmis dosyada kendi payi) kalandan duselmez.
+ */
+export function bolunmeOnerisi(kg: number, kendiDiib: DiibBelgesi | null, ozetler: DiibOzeti[], kendiPayi: Record<string, number> = {}): BolunmeOnerisi {
+  if (!kendiDiib) return { tur: "diib_yok" };
+  const kalan = (b: DiibBelgesi) => {
+    const o = ozetler.find((x) => x.belge.id === b.id);
+    return o ? yuvarla(o.kalanKg + (kendiPayi[b.id] || 0)) : 0;
+  };
+  const ilkKalan = kalan(kendiDiib);
+  if (kg <= ilkKalan + 0.005) return { tur: "tek", diib: kendiDiib, kalanKg: ilkKalan };
+  const parcalar: BolunmeParcasi[] = [];
+  let ihtiyac = yuvarla(kg);
+  if (ilkKalan > 0) { parcalar.push({ diib: kendiDiib, kg: ilkKalan }); ihtiyac = yuvarla(ihtiyac - ilkKalan); }
+  const sonrakiler = ozetler.map((o) => o.belge).filter((b) => b.id !== kendiDiib.id && b.durum === "aktif").sort(diibSiralama);
+  for (const b of sonrakiler) {
+    if (ihtiyac <= 0) break;
+    const k = kalan(b);
+    if (k <= 0) continue;
+    const al = Math.min(k, ihtiyac);
+    parcalar.push({ diib: b, kg: yuvarla(al) });
+    ihtiyac = yuvarla(ihtiyac - al);
+  }
+  return { tur: "bolunmeli", parcalar, eksikKg: Math.max(0, ihtiyac) };
+}
+
+/** Bolunen yuklemenin parca tutarlari (kg oraninda; son parca yuvarlama farkini alir -> toplam birebir). */
+export function parcaTutarlari(toplam: number, kgler: number[]): number[] {
+  const kgT = kgler.reduce((a, b) => a + b, 0);
+  let kalan = yuvarla(toplam);
+  return kgler.map((k, i) => {
+    if (i === kgler.length - 1) return yuvarla(kalan);
+    const t = kgT > 0 ? yuvarla(toplam * k / kgT) : 0;
+    kalan = yuvarla(kalan - t);
+    return t;
+  });
+}
+
+export const kgYaz = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });

@@ -16,6 +16,16 @@ export type FaturaParcasi = TalimatParcaGirdisi & { kalemler: FaturaKalemi[]; tu
 
 const yuvarla = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/** Bolunme parcalarinin toplami urun kalemlerinin toplamindan farkli mi (0,5 kg tolerans)? */
+export function bolunmeUyumsuz(urunKg: number, parcalar: { kg: number }[]): boolean {
+  if (parcalar.length < 2) return false;
+  return Math.abs(parcalar.reduce((t, p) => t + p.kg, 0) - urunKg) > 0.5;
+}
+/** Urun kalemlerinin toplam kg'i (talimat uyarisi icin). */
+export function urunToplamKg(urunler: unknown): number {
+  return Math.round((Array.isArray(urunler) ? urunler : []).reduce((t: number, u) => t + kalemMiktari(u as { miktar_mts?: unknown; quantity?: unknown }) * 1000, 0) * 100) / 100;
+}
+
 export function faturaBolunmesi(urunler: unknown, parcalar: TalimatParcaGirdisi[], toplamFob: number | null): FaturaParcasi[] {
   const sirali = [...parcalar].sort((a, b) => a.sira - b.sira);
   if (sirali.length < 2) return [];
@@ -26,6 +36,9 @@ export function faturaBolunmesi(urunler: unknown, parcalar: TalimatParcaGirdisi[
     const toplam = sayiOku(r.toplam_tutar_usd ?? r.total_amount) || yuvarla(kg / 1000 * birimMt);
     return { ad: String(r.urun_adi ?? r.description ?? "Urun"), ambalaj: (r.ambalaj_boyutu ?? r.packaging_size ?? null) as string | null, kg, birimKg: birimMt / 1000, toplam, kalanKg: kg, kalanTutar: toplam };
   }).filter((k) => k.kg > 0);
+  // Bolunme toplami urun miktarina esit degilse (orn. kismi yukleme: proforma 375 MT, yuklenen 250.000 kg)
+  // YANLIS fatura yazmamak icin bolunme uygulanmaz; arayuz uyarir (bolunmeUyumsuz).
+  if (bolunmeUyumsuz(kalemler.reduce((t, k) => t + k.kg, 0), sirali)) return [];
 
   const sonuc: FaturaParcasi[] = sirali.map((p) => ({ ...p, kalemler: [], tutar: 0, fobTutar: null }));
   let ki = 0;

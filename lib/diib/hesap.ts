@@ -65,6 +65,8 @@ export type DiibDosyasi = {
   para_birimi: string | null;
   diib_no: string | null;
   beyanname_dosya_url?: string | null;
+  /** Yuklenen konteynerlerin net toplami (TUM konteynerlerde net > 0 ise; yoksa null). veri.ts doldurur. */
+  yuklenenKg?: number | null;
 };
 
 export type DiibBolunmesi = { id: string; dosya_id: string; diib_id: string; sira: number; miktar_kg: number | string; fatura_no: string | null };
@@ -143,6 +145,24 @@ export function dosyaTutar(d: Pick<DiibDosyasi, "toplam_tutar" | "urun_detaylari
   return yuvarla(k.reduce((s: number, u) => s + sayiOku((u as Record<string, unknown>)?.toplam_tutar_usd ?? (u as Record<string, unknown>)?.total_amount), 0));
 }
 
+/**
+ * DIIB'e yazilan miktar (04.11.2026 duzeltme). Kullanici: "SAAD su an yukleniyor" - proforma 375 MT,
+ * bu yuklemede 10 konteyner = 250.000 kg (kalan 5 konteyner sonraki haftada). Eskiden proforma
+ * miktari sayiliyordu. Artik: konteynerlerin TAMAMINDA net agirlik girilmisse YUKLENEN net toplam
+ * (fatura / beyannamedeki miktar), yoksa proforma miktari. Tutar: faturasi kesilmisse dosya tutari
+ * (fatura); kesilmemis ve yuklenen proformadan farkliysa yuklenen orani kadar.
+ */
+export type DiibMiktari = { kg: number; tutar: number; proformaKg: number; kaynak: "konteyner" | "proforma" };
+export function diibMiktari(d: Pick<DiibDosyasi, "toplam_tutar" | "urun_detaylari" | "fatura_no" | "yuklenenKg">): DiibMiktari {
+  const proformaKg = dosyaKg(d.urun_detaylari);
+  const tutar = dosyaTutar(d);
+  const y = d.yuklenenKg ?? 0;
+  if (!(y > 0)) return { kg: proformaKg, tutar, proformaKg, kaynak: "proforma" };
+  const farkli = Math.abs(y - proformaKg) > 0.5;
+  const kesildi = !!faturaNorm(d.fatura_no);
+  return { kg: yuvarla(y), tutar: farkli && !kesildi && proformaKg > 0 ? yuvarla(tutar * y / proformaKg) : tutar, proformaKg, kaynak: "konteyner" };
+}
+
 /** "BUĞDAY UNU / 25 KG" ya da "BUĞDAY UNU / 25 KG-50 KG" (ambalaj boyutlarindan). */
 export function stokAdi(urunler: unknown): string {
   const k = Array.isArray(urunler) ? urunler : [];
@@ -165,7 +185,7 @@ const kayitSatiri = (k: DiibKaydi, dosyaNo: string | null): DiibSatiri => ({
 export type DiibSonucu = {
   satirlar: DiibSatiri[];                    // tum DIIB satirlari (tablo + otomatik)
   eslesmeyen: { dosya: DiibDosyasi; kg: number; tutar: number }[]; // faturali ama DIIB'i bulunamayan
-  bekleyen: { dosya: DiibDosyasi; kg: number; tutar: number; diib: DiibBelgesi | null }[]; // faturasiz acik dosyalar
+  bekleyen: { dosya: DiibDosyasi; kg: number; tutar: number; diib: DiibBelgesi | null; proformaKg: number }[]; // faturasiz acik dosyalar
 };
 
 /** Tablodaki kayitlar + sistemdeki dosyalar -> ekrandaki DIIB satirlari. */
@@ -180,12 +200,11 @@ export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], do
   const bekleyen: DiibSonucu["bekleyen"] = [];
 
   for (const d of dosyalar) {
-    const kg = dosyaKg(d.urun_detaylari);
-    const tutar = dosyaTutar(d);
+    const { kg, tutar } = diibMiktari(d);
     if (kg <= 0) continue;
     const parcalar = bolunmeler.filter((b) => b.dosya_id === d.id && belgeId.has(b.diib_id)).sort((a, b) => a.sira - b.sira);
     if (!faturaNorm(d.fatura_no)) {
-      if (d.durum !== "Kapalı" && d.durum !== "Kapali") bekleyen.push({ dosya: d, kg, tutar, diib: diibBul(d.diib_no, belgeler) });
+      if (d.durum !== "Kapalı" && d.durum !== "Kapali") bekleyen.push({ dosya: d, kg, tutar, diib: diibBul(d.diib_no, belgeler), proformaKg: dosyaKg(d.urun_detaylari) });
       continue;
     }
     if (parcalar.length) {
@@ -291,8 +310,8 @@ export function bolunmeOnerisi(kg: number, kendiDiib: DiibBelgesi | null, ozetle
   return { tur: "bolunmeli", parcalar, eksikKg: Math.max(0, ihtiyac) };
 }
 
-/** Faturasi kesilmemis yuklemenin sira bilgisi (rezervasyondan): DIIB beyannameye yazilir -> once beyan cut-off. */
-export type BekleyenSira = { beyanCutoff: string | null; etd: string | null };
+/** Faturasi kesilmemis yuklemenin sira bilgisi (rezervasyondan). Sira: talimat cut-off -> ETD (once yuklenen once faturalanir). */
+export type BekleyenSira = { talimatCutoff: string | null; beyanCutoff: string | null; etd: string | null };
 export type SiraliBekleyen = DiibSonucu["bekleyen"][number] & {
   sira: BekleyenSira | null;
   kayitli: DiibBolunmesi[];            // kaydedilmis bolunme (2+ parca) varsa
@@ -304,14 +323,15 @@ export type SiraliBekleyen = DiibSonucu["bekleyen"][number] & {
 /**
  * Bekleyen yuklemeleri SIRAYLA dagitir (04.11.2026; kullanici: "faturasi kesilmemis yuklemeler
  * kisminda farkli gozukuyor"). Eskiden her yukleme ayni kalana gore ayri ayri hesaplaniyordu; iki
- * yukleme ayni kalani paylasinca ikisi de "tek fatura" gorunebiliyordu. Simdi: beyan cut-off ->
- * ETD -> dosya no sirasiyla; her yuklemenin payi (kayitli bolunme, tek fatura ya da bolunme
- * onerisi) sonrakilerin kalanindan dusulur.
+ * yukleme ayni kalani paylasinca ikisi de "tek fatura" gorunebiliyordu. Simdi: talimat cut-off ->
+ * ETD -> dosya no sirasiyla (once yuklenen once faturalanir; ilk surumdeki beyan cut-off sirasi
+ * kullanici itiraziyla birakildi: "SAAD su an yukleniyor, faturasi daha once kesilecek"); her
+ * yuklemenin payi (kayitli bolunme, tek fatura ya da bolunme onerisi) sonrakilerin kalanindan dusulur.
  */
 export function siraliBekleyenler(sonuc: DiibSonucu, ozetler: DiibOzeti[], bolunmeler: DiibBolunmesi[], sira: Record<string, BekleyenSira>): SiraliBekleyen[] {
   const anahtar = (d: DiibSonucu["bekleyen"][number]) => {
     const s = sira[d.dosya.id];
-    return [s?.beyanCutoff || s?.etd || "9999", s?.etd || "9999", d.dosya.dosya_no || ""];
+    return [s?.talimatCutoff || s?.etd || "9999", s?.etd || "9999", d.dosya.dosya_no || ""];
   };
   const dizi = [...sonuc.bekleyen].sort((a, b) => {
     const x = anahtar(a), y = anahtar(b);

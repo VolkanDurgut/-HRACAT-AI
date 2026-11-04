@@ -13,7 +13,7 @@ import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-d
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ON_TALIMAT_ISARETI, type FaturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
-import { faturaBolunmesi, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
+import { bolunmeUyumsuz, faturaBolunmesi, urunToplamKg, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { DIIB_BOLUNME_OLAYI, dosyaBolunmesiGetir } from "@/lib/diib/veri";
 
 /** Mail metnindeki bolunme bolumunun basligi (kayitli metinde aranir). */
@@ -293,6 +293,11 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <p className="text-sm font-bold text-white">{on ? "Ön Fatura Talimatı Maili" : "Fatura Talimatı Maili"}</p>
               <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
+            {bolunmeUyumsuz(urunToplamKg(dosya.urun_detaylari), bolunme) && (
+              <p className="text-xs rounded-lg border px-3 py-2 text-red-300" style={{ borderColor: "rgba(239,68,68,0.4)", backgroundColor: "rgba(239,68,68,0.08)" }} data-testid="bolunme-uyumsuz">
+                DİİB fatura bölünmesi ({bolunme.reduce((t, p) => t + p.kg, 0).toLocaleString("tr-TR")} kg) ürün miktarıyla ({urunToplamKg(dosya.urun_detaylari).toLocaleString("tr-TR")} kg) aynı değil; bölünme talimata YAZILMADI. Önce Proforma sekmesinde ürün miktarını yüklenen miktara göre düzeltin.
+              </p>
+            )}
             {on && (
               <p className="text-xs rounded-lg border px-3 py-2 text-amber-300" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }} data-testid="on-talimat-notu">
                 Ön talimat: rezervasyon / konteyner bilgileri olmadan hazırlandı. Gönderildi olarak işaretlenmez; konteynerler girilince tam talimatı ayrıca gönderin.

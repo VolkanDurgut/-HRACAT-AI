@@ -964,18 +964,25 @@
 - Dosya kartı + 2 faturalı talimat: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat
   Evrakları), `lib/diib/bolunme-talimat.ts`; talimat PDF + mail "FATURA BOLUNMESI" bölümü; bölünmesiz
   talimat ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
-- 04.11 mutabakat (ayrıntı repoda YOK; repo herkese açık): Burak Bey'in Excel'indeki faturasız tek satır,
-  sistemde faturası kesilmiş bir yüklemenin tekrarıydı + bir faturada Excel kg'ı faturadan farklıydı.
-  Sistem hesabı esas; kalan farkı Burak Bey'le teyit edilir.
+- 04.11 mutabakat (ayrıntı repoda YOK; repo herkese açık): İLK analizim ("Excel'de bir yükleme iki kez
+  sayılmış") YANLIŞTI. Doğrusu: (1) kısmi yükleme — proforma 375 MT, bu yüklemede 10 konteyner 250.000 kg
+  (kalanı sonraki hafta); sistem proforma miktarını sayıyordu. (2) Bir faturada dosyanın ürün miktarı
+  konteyner netlerinden farklıydı; Burak Bey'in kg'ı konteyner netiyle aynı. İkisi düzeltilince sistem
+  Burak Bey'in bölünmesini birebir verdi. DERS: DİİB miktarı = yüklenen (konteyner net), proforma değil.
 - Elle bölme (04.11): kalan yetse de "Yine de iki faturaya böl (elle)" (muhasebe/gümrük kaydı farklıysa).
   İki parçada birini yazınca diğeri yüklemenin kalanına tamamlanır. Aynı DİİB'e yazılmış, faturası
   kesilmemiş DİĞER açık yüklemeler kartta uyarı olarak yazar (kalan, önce faturalanandan düşer).
 - SIRALI bekleyen (04.11, kullanıcı: "faturası kesilmemiş yüklemeler kısmında farklı gözüküyor"): eskiden her
   bekleyen yükleme AYNI kalana göre ayrı hesaplanıyordu (iki yükleme aynı kalanı paylaşınca ikisi de "tek fatura").
-  Artık `siraliBekleyenler` (hesap.ts): rezervasyon **beyan cut-off → ETD → dosya no** sırasıyla; öncekinin payı
+  Artık `siraliBekleyenler` (hesap.ts): rezervasyon **talimat cut-off → ETD → dosya no** sırasıyla (ilk sürümde
+  beyan cut-off idi; kullanıcı: "SAAD şu an yükleniyor, faturası daha önce kesilecek" → önce yüklenen önce); öncekinin payı
   (kayıtlı bölünme / tek fatura / öneri) sonrakinin kalanından düşer. DİİB sayfası tablosu ve dosya kartı AYNI
   sonucu verir (`bekleyenSiraGetir`, veri.ts). Cut-off metinden HAM okunur (cutoff-utils). Kalanı biten DİİB'in
   yüklemesi tamamen sonraki DİİB'e düşüyorsa "bölünme gerekmez, DİİB No değişmeli" yazar (1 parçalık bölünme
   kaydedilmez).
+- DİİB miktarı (`diibMiktari`, 04.11): dosyanın TÜM konteynerlerinde net ağırlık varsa YÜKLENEN net toplam
+  (`yuklenenKgleri`, veri.ts, sayfalı), yoksa proforma. Faturası kesilmemiş kısmi yüklemede tutar yüklenen
+  oranında. Kart ve tablo "yüklenen · proforma X" yazar. Fatura talimatında bölünme toplamı ürün miktarına
+  eşit değilse bölünme YAZILMAZ ve talimat penceresinde kırmızı uyarı çıkar (`bolunmeUyumsuz`).
 - Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
-  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 22 + e2e_diib_dosya 24 + sıra birim testi.
+  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 22 + e2e_diib_dosya 25 + sıra birim testi.

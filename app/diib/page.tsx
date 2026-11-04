@@ -24,7 +24,7 @@ import {
 } from "@/lib/diib/hesap";
 import { diibExcelOlustur } from "@/lib/diib/excel-yaz";
 import { beyannameNoOku } from "@/lib/beyanname-oku";
-import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir } from "@/lib/diib/veri";
+import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir, yuklenenEkle, yuklenenKgleri } from "@/lib/diib/veri";
 
 /**
  * DIIB TAKIBI (04.11.2026). Burak Bey'in "UNEX IHRACATLAR" Excel'inin IHRACAT kismi - SISTEM
@@ -93,11 +93,12 @@ function DiibIcerik() {
   const getir = useCallback(async (sessiz = false) => {
     if (!companyId) return;
     if (sessiz) setYenileniyor(true);
-    const [b, k, d, bo] = await Promise.all([
+    const [b, k, d, bo, yk] = await Promise.all([
       supabase.from("diib_belgeleri").select("*").eq("company_id", companyId).order("kullanim_sirasi").order("belge_tarihi"),
       supabase.from("diib_ihracatlari").select("*").eq("company_id", companyId).order("fatura_tarihi").limit(5000),
       supabase.from("ihracat_dosyalari").select(DOSYA_KOLONLARI).eq("company_id", companyId).limit(3000),
       supabase.from("diib_dosya_bolunmeleri").select("*").eq("company_id", companyId),
+      yuklenenKgleri(companyId),
     ]);
     const e = b.error || k.error || d.error || bo.error;
     if (e) {
@@ -105,7 +106,7 @@ function DiibIcerik() {
     } else {
       setBelgeler((b.data || []) as DiibBelgesi[]);
       setKayitlar((k.data || []) as DiibKaydi[]);
-      setDosyalar((d.data || []) as unknown as DiibDosyasi[]);
+      setDosyalar(yuklenenEkle((d.data || []) as unknown as DiibDosyasi[], yk));
       setBolunmeler((bo.data || []) as DiibBolunmesi[]);
       setHata(null);
     }
@@ -425,7 +426,7 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
       <div className="px-4 sm:px-5 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
         <p className="text-sm font-semibold text-white">Faturası kesilmemiş yüklemeler ({sonuc.bekleyen.length})</p>
         <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-          <b className="text-white">Sırayla</b> hesaplanır: beyan cut-off&apos;u önce olan yükleme DİİB kalanından önce düşer, sonraki onun kalanını görür. Kalan yetmeyen yükleme iki faturaya bölünür. Gerçekleşene sayılmaz.
+          <b className="text-white">Sırayla</b> hesaplanır: talimat cut-off&apos;u (yoksa ETD&apos;si) önce olan yükleme DİİB kalanından önce düşer, sonraki onun kalanını görür. Miktar: konteynerlerin net ağırlığı girilmişse yüklenen, yoksa proforma. Kalan yetmeyen yükleme iki faturaya bölünür. Gerçekleşene sayılmaz.
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -435,20 +436,23 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
               <th className={`${thSinifi} text-left`}>Sıra</th>
               <th className={`${thSinifi} text-left`}>Dosya</th>
               <th className={`${thSinifi} text-left hidden md:table-cell`}>Alıcı</th>
-              <th className={`${thSinifi} text-left hidden lg:table-cell`}>Beyan C/O · ETD</th>
+              <th className={`${thSinifi} text-left hidden lg:table-cell`}>Talimat C/O · ETD</th>
               <th className={`${thSinifi} text-right`}>Miktar (kg)</th>
               <th className={`${thSinifi} text-left hidden md:table-cell`}>DİİB</th>
               <th className={`${thSinifi} text-left`}>Fatura</th>
             </tr>
           </thead>
           <tbody>
-            {sirali.map(({ dosya, kg, diib, sira: s, kayitli, oneri: o, oncekiler }, i) => (
+            {sirali.map(({ dosya, kg, proformaKg, diib, sira: s, kayitli, oneri: o, oncekiler }, i) => (
               <tr key={dosya.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="bekleyen-satir">
                 <td className="px-3 py-2.5 text-sm tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                 <td className="px-3 py-2.5 text-sm whitespace-nowrap"><Link href={`/dosya/${dosya.id}?tab=evraklar`} className="font-mono text-white hover:underline inline-flex items-center gap-1">{dosya.dosya_no} <ExternalLink size={11} style={{ color: TEXT_MUTED }} /></Link></td>
                 <td className="px-3 py-2.5 text-sm max-w-[240px] truncate hidden md:table-cell" style={{ color: TEXT_MUTED }}>{dosya.alici_firma}</td>
-                <td className="px-3 py-2.5 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: TEXT_MUTED }}>{s ? `${tarihYaz(s.beyanCutoff)} · ${tarihYaz(s.etd)}` : "-"}</td>
-                <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">{kgYaz(kg)}</td>
+                <td className="px-3 py-2.5 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: TEXT_MUTED }}>{s ? `${tarihYaz(s.talimatCutoff)} · ${tarihYaz(s.etd)}` : "-"}</td>
+                <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">
+                  {kgYaz(kg)}
+                  {Math.abs(kg - proformaKg) > 0.5 && <span className="block text-[10px]" style={{ color: TEXT_MUTED }} data-testid="yuklenen-not">yüklenen · proforma {kgYaz(proformaKg)}</span>}
+                </td>
                 <td className="px-3 py-2.5 text-xs font-mono whitespace-nowrap hidden md:table-cell" style={{ color: diib ? "#fff" : "#F87171" }}>{diib?.belge_no ?? "Bulunamadı"}</td>
                 <td className="px-3 py-2.5 text-xs min-w-[190px]">
                   {kayitli.length > 1 ? (

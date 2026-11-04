@@ -9,7 +9,7 @@ import { useToast } from "@/lib/toast-context";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { sayiOku } from "@/lib/sayi-oku";
-import { bolunmeOnerisi, diibBul, diibOzetleri, diibSatirlari, dosyaKg, kgOku, kgYaz, siraliBekleyenler, type BekleyenSira, type DiibBelgesi } from "@/lib/diib/hesap";
+import { bolunmeOnerisi, diibBul, diibMiktari, diibOzetleri, diibSatirlari, kgOku, kgYaz, siraliBekleyenler, type BekleyenSira, type DiibBelgesi } from "@/lib/diib/hesap";
 import { DIIB_BOLUNME_OLAYI, bekleyenSiraGetir, diibVerisiGetir, type DiibVerisi } from "@/lib/diib/veri";
 import type { Dosya } from "@/lib/supabase";
 
@@ -47,7 +47,10 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     if (!veri || veri.belgeler.length === 0) return null;
     const sonuc = diibSatirlari(veri.belgeler, veri.kayitlar, veri.dosyalar, veri.bolunmeler);
     const ozetler = diibOzetleri(veri.belgeler, sonuc);
-    const kg = dosyaKg(dosya.urun_detaylari);
+    // DIIB Takibi ile AYNI miktar: konteyner netleri tamsa yuklenen, degilse proforma
+    const buDosya = veri.dosyalar.find((d) => d.id === dosya.id);
+    const miktar = diibMiktari({ ...dosya, yuklenenKg: buDosya?.yuklenenKg ?? null });
+    const kg = miktar.kg;
     const kendi = diibBul(dosya.diib_no, veri.belgeler);
     // Bu dosyanin zaten sayilmis payi (faturasi kesilmisse) kalandan dusulmez
     const kendiPayi: Record<string, number> = {};
@@ -61,7 +64,7 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     const kalan = (b: DiibBelgesi | null) => b ? (ozetler.find((o) => o.belge.id === b.id)?.kalanKg ?? 0) + (kendiPayi[b.id] || 0) : 0;
     // Ayni DIIB'e yazilmis, faturasi henuz kesilmemis DIGER acik yuklemeler: hangisi once faturalanirsa kalan ondan duser
     const digerBekleyen = kendi ? sonuc.bekleyen.filter((x) => x.diib?.id === kendi.id && x.dosya.id !== dosya.id) : [];
-    return { kg, kendi, oneri, kayitli, kalan, digerBekleyen, oncekiler, kalanOnce, belgeler: veri.belgeler };
+    return { kg, kendi, oneri, kayitli, kalan, digerBekleyen, oncekiler, kalanOnce, miktar, belgeler: veri.belgeler };
   }, [veri, dosya, sira]);
 
   if (!yetkili || yukleniyor || !hesap) return null;
@@ -158,14 +161,20 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
         Yükleme <b className="text-white">{kgYaz(kg)} kg</b>
         {kendi ? <> · DİİB <b className="text-white font-mono">{kendi.belge_no}</b> · kalan <b className="text-white">{kgYaz(Math.max(0, hesap.kalan(kendi)))} kg</b></> : null}
       </p>
+      {Math.abs(hesap.miktar.kg - hesap.miktar.proformaKg) > 0.5 && (
+        <p className="mt-2 text-[11px] leading-relaxed flex gap-1.5" style={{ color: TEXT_MUTED }} data-testid="diib-yuklenen">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-300" />
+          <span>DİİB, konteynerlerin net ağırlığına göre <b className="text-white">{kgYaz(hesap.miktar.kg)} kg</b> ile hesaplandı (proforma {kgYaz(hesap.miktar.proformaKg)} kg). Fatura talimatındaki ürün miktarının yüklenenle aynı olduğunu kontrol edin.</span>
+        </p>
+      )}
       {kendi && kayitli.length < 2 && !dosya.fatura_no && digerBekleyen.length > 0 && (
         <p className="mt-2 text-[11px] leading-relaxed text-amber-300 flex gap-1.5" data-testid="diib-diger-bekleyen">
           <AlertTriangle size={12} className="shrink-0 mt-0.5" />
           <span>
             Bu DİİB&apos;i faturası kesilmemiş başka yükleme de kullanıyor: {digerBekleyen.map((x) => `${x.dosya.dosya_no} (${kgYaz(x.kg)} kg)`).join(", ")}.{" "}
             {oncekiler.length > 0
-              ? <>Beyan cut-off sırasına göre önce <b>{oncekiler.join(", ")}</b> düşüldü; aşağıdaki öneri bu yüklemeden önce kalan <b>{kgYaz(Math.max(0, hesap.kalanOnce ?? 0))} kg</b> ile hesaplandı.</>
-              : <>Beyan cut-off sırasına göre bu yükleme önce; ötekiler bundan sonra kalandan düşer.</>}
+              ? <>Yükleme sırasına göre (talimat cut-off / ETD) önce <b>{oncekiler.join(", ")}</b> düşüldü; aşağıdaki öneri bu yüklemeden önce kalan <b>{kgYaz(Math.max(0, hesap.kalanOnce ?? 0))} kg</b> ile hesaplandı.</>
+              : <>Yükleme sırasına göre (talimat cut-off / ETD) bu yükleme önce; ötekiler bundan sonra kalandan düşer.</>}
             {" "}Sıra değişirse öneri de değişir.
           </span>
         </p>

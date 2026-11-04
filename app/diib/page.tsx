@@ -46,6 +46,8 @@ const gtTh = "px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide wh
 const gtTd = "px-2.5 py-2.5 text-[13px] tabular-nums whitespace-nowrap";
 const birimYaz = (n: number | null) => n === null ? "-" : n.toLocaleString("tr-TR", { minimumFractionDigits: 3, maximumFractionDigits: 5 });
 const paraYaz = (n: number, pb = "USD") => formatCurrency(n, pb);
+/** Un ihracati ort. birim fiyat makul araligi (USD/kg); disinda devir tutari yanlis yazilmis demektir (04.11: 460,12 girildi). */
+const devirBirimMakul = (b: number) => b >= 0.1 && b <= 2;
 
 type Durum = { etiket: string; sinif: string };
 function diibDurumu(o: DiibOzeti, kullanimdaId: string | null): Durum {
@@ -623,9 +625,10 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
     if (belgeler.some((b) => b.anahtar === anahtar && b.id !== belge?.id)) { setHata("Bu DİİB zaten kayıtlı."); return; }
     if (!(izinKg > 0)) { setHata("İthalat izin miktarını (kg) girin."); return; }
     if (!(taahhut > 0)) { setHata("İhracat taahhüdü (kg) geçersiz."); return; }
-    const devirKg = kgOku(f.devirKg), devirTutar = sayiOku(f.devirTutar);
+    const devirKg = kgOku(f.devirKg), devirTutar = kgOku(f.devirTutar); // tutarda da Turkce binlik nokta ("460.124" = 460124)
     if (devirKg < 0 || devirTutar < 0) { setHata("Devir miktarı / tutarı eksi olamaz."); return; }
     if (devirKg > taahhut) { setHata("Devir miktarı taahhütten büyük olamaz."); return; }
+    if (devirKg > 0 && devirTutar > 0 && !devirBirimMakul(devirTutar / devirKg)) { setHata(`Devir ortalama birim fiyatı ${birimYaz(devirTutar / devirKg)} USD/kg çıkıyor; tutarı kontrol edin (binlik için nokta: 460.124).`); return; }
     const satir = {
       belge_no: f.belge_no.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR"), anahtar, belge_tarihi: f.belge_tarihi || null,
       ithalat_izin_kg: izinKg, ihracat_taahhut_kg: taahhut, devir_kg: devirKg, devir_tutar: Math.round(devirTutar * 100) / 100, kullanim_sirasi: Math.max(0, Math.min(10000, Math.round(sayiOku(f.sira)))),
@@ -678,6 +681,14 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
             <div><Etiket htmlFor="b-devir-kg">Devir miktarı (kg)</Etiket><input id="b-devir-kg" inputMode="decimal" value={f.devirKg} onChange={(e) => setF({ ...f, devirKg: e.target.value })} placeholder="0" className={girdiSinifi} style={girdiStil} /></div>
             <div><Etiket htmlFor="b-devir-tutar">Devir tutarı (USD)</Etiket><input id="b-devir-tutar" inputMode="decimal" value={f.devirTutar} onChange={(e) => setF({ ...f, devirTutar: e.target.value })} placeholder="0" className={girdiSinifi} style={girdiStil} /></div>
           </div>
+          {(f.devirKg.trim() || f.devirTutar.trim()) && (() => {
+            const dk = kgOku(f.devirKg), dt = kgOku(f.devirTutar), b = dk > 0 && dt > 0 ? dt / dk : null;
+            return (
+              <p className={`text-[11px] mt-2 ${b !== null && !devirBirimMakul(b) ? "text-red-400" : ""}`} style={b !== null && !devirBirimMakul(b) ? undefined : { color: TEXT_MUTED }} data-testid="devir-okunan">
+                Okunan: <b className="text-white">{kgYaz(dk)} kg</b> · <b className="text-white">{paraYaz(dt)}</b>{b !== null ? <> · ort. birim <b className="text-white">{birimYaz(b)}</b> USD/kg</> : null}
+              </p>
+            );
+          })()}
         </div>
         <div className="sm:col-span-2"><Etiket htmlFor="b-aciklama">Açıklama</Etiket><input id="b-aciklama" value={f.aciklama} onChange={(e) => setF({ ...f, aciklama: e.target.value })} maxLength={500} className={girdiSinifi} style={girdiStil} /></div>
       </div>
@@ -717,7 +728,7 @@ function SatirPenceresi({ satir, diibId, dosya, belgeler, companyId, email, onKa
     setHata(null);
     if (!(miktar > 0)) { setHata("Miktarı (kg) girin."); return; }
     if (!f.cari.trim()) { setHata("Cari ismini girin."); return; }
-    const tutar = f.tutar.trim() ? sayiOku(f.tutar) : tutarHesap ?? 0;
+    const tutar = f.tutar.trim() ? kgOku(f.tutar) : tutarHesap ?? 0;
     const kayit = {
       diib_id: f.diib_id, fatura_no: f.fatura_no.replace(/\s+/g, "").toUpperCase() || null, beyanname_no: f.beyanname_no.replace(/\s+/g, "").toUpperCase() || null,
       fatura_tarihi: f.fatura_tarihi || null, cari: f.cari.replace(/\s+/g, " ").trim(), stok_adi: f.stok_adi.replace(/\s+/g, " ").trim() || "BUĞDAY UNU",
@@ -757,7 +768,7 @@ function SatirPenceresi({ satir, diibId, dosya, belgeler, companyId, email, onKa
             <input id="s-tutar" inputMode="decimal" value={f.tutar} onChange={(e) => setF({ ...f, tutar: e.target.value })} placeholder={tutarHesap !== null ? String(tutarHesap) : ""} className={girdiSinifi} style={girdiStil} />
             <select aria-label="Para birimi" value={f.para_birimi} onChange={(e) => setF({ ...f, para_birimi: e.target.value })} className="px-2 border rounded-lg text-sm text-white" style={girdiStil}><option>USD</option><option>EUR</option></select>
           </div>
-          {tutarHesap !== null && f.tutar.trim() && Math.abs(tutarHesap - sayiOku(f.tutar)) > 1 && <p className="text-[11px] mt-1 text-amber-300">Miktar × birim = {kgYaz(tutarHesap)}; girilen tutardan farklı.</p>}
+          {tutarHesap !== null && f.tutar.trim() && Math.abs(tutarHesap - kgOku(f.tutar)) > 1 && <p className="text-[11px] mt-1 text-amber-300">Miktar × birim = {kgYaz(tutarHesap)}; girilen tutardan farklı.</p>}
         </div>
         <div className="sm:col-span-2"><Etiket htmlFor="s-aciklama">Açıklama</Etiket><input id="s-aciklama" value={f.aciklama} onChange={(e) => setF({ ...f, aciklama: e.target.value })} maxLength={500} className={girdiSinifi} style={girdiStil} /></div>
       </div>

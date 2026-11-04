@@ -398,3 +398,9 @@
   (`sonrakiBaslik`), telefon "Sağa kaydırın". Tıklayınca `ileri()`. Son ekranda YOK.
   `main` sağdan `pr-12 md:pr-24` boşluk alır (panel içeriği / İleri düğmesini örtmez).
   Kaydırma (touch) ve ← → davranışı DEĞİŞMEDİ. Test: e2e_kilavuz_vgm (1440/1366/390).
+
+## Gece yedeği — DİİB tabloları (04.11.2026)
+
+- `yedekleme-gonder` YEDEKLENECEK_TABLOLAR'a `diib_belgeleri`, `diib_ihracatlari`,
+  `diib_dosya_bolunmeleri` eklendi (sıra: belgeler önce; FK). Edge deploy migration canlıya
+  uygulandıktan SONRA yapılır (tablo yokken yedek hata verir).

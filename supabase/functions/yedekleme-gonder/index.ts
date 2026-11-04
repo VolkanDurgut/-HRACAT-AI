@@ -117,6 +117,10 @@ const YEDEKLENECEK_TABLOLAR = [
   "ic_tedarikciler",
   "ic_alis_siparisleri",
   "ic_alis_teslimler",
+  // DIIB takibi: belgeler, ihracat satirlari, fatura bolunmeleri (04.11.2026)
+  "diib_belgeleri",
+  "diib_ihracatlari",
+  "diib_dosya_bolunmeleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

@@ -938,3 +938,40 @@
   boşsa satır yazılmaz. Talimat PDF'i + mail metni aynı fonksiyon. Proforma / CI'daki banka
   seçimi DEĞİŞMEDİ. Canlı 04.11: 36 dosyanın hepsinde banka dolu (Denizbank 19, Ziraat 12,
   Vakıfbank 5); kayıtlı talimat metinlerinde çakışan banka yok.
+
+## DİİB Takibi `/diib` — ihracat kısmı + fatura bölünmesi (04.11.2026)
+
+- Kullanıcı: Burak Bey'in "UNEX İHRACATLAR" Excel'i sistemde (yalnız İHRACAT; İTHALAT sonra);
+  "DİİB'in kalanı yetmezse tam kapatabilmek için 2 ayrı fatura" (CRISA: 79.100 kg 04219 +
+  170.900 kg 02576). Kararlar: başlangıç = Excel 2026 + sistemdeki eksikler; bölünme = uyarı +
+  2 faturalı talimat; kayda ekleme = otomatik; DİİB no yazımında **D2 doğru** (04219).
+- Migration `20261104100000_diib_takibi.sql` (yalnız ekleme): `diib_belgeleri` (belge_no,
+  anahtar "yyyy-nnnnn", izin kg, taahhüt kg = izin × 0,97 × 0,74, kullanım sırası, durum),
+  `diib_ihracatlari` (Excel / elle / "sistem" = düzeltilmiş dosya satırı; fatura no şirket içi
+  tekil), `diib_dosya_bolunmeleri` (dosya → DİİB parçaları, sıra, kg, fatura no). Bileşik FK
+  (diib_id, company_id). RLS şirket + **ihracatlar** yetkisi (yeni sayfa yetkisi YOK); denetim.
+- `lib/diib/hesap.ts` (saf): `diibAnahtari` / `diibBul` (dosyanın serbest DİİB metninden yıl+sıra;
+  yıl yoksa tek eşleşen sıra), faturası kesilmiş dosya → OTOMATİK satır (tabloda aynı fatura no /
+  dosya varsa üretilmez), bölünmüş dosya → parça başına satır; faturasız açık dosya → "bekleyen";
+  `bolunmeOnerisi` (kendi DİİB'i dolar, fazlası kullanım sırasındaki sonraki aktif DİİB'e);
+  `kgOku` (Türkçe binlik nokta, yalnız kg alanları). `lib/diib/excel.ts` + `lib/xlsx-oku.ts`
+  (çok sayfa): sayfa "yyyy Dd-nnnnn", ithalat izni = "ÖNGÖRÜLEN İTHALAT" F; taahhüt HER ZAMAN
+  formülle (01152 sayfasındaki öngörülen formülü kendine bağlı). Aynı fatura no iki kez: birebir
+  aynıysa tekrar atlanır, farklı yüklemeyse fatura no'suz + açıklamayla alınır (Excel 02576
+  satır 51: UNX…514 ESFIRA 25.245 kg).
+- Sayfa: genel tablo (masaüstü tablo, telefonda kart), uyarılar (fatura no'suz satırlar = olası
+  çift sayım; DİİB'i tanınmayan faturalı dosyalar → DİİB seçip ekle), faturası kesilmemiş
+  yüklemeler + bölünme ihtiyacı, seçili DİİB satırları (Excel sayfası gibi, dipte gerçekleşen /
+  öngörülen / kalan), satır düzelt (otomatik satır → "Düzeltildi"; silince yeniden otomatik),
+  Excel içe aktarma (önizleme, DİİB no düzeltme, tekrar yüklemede aynı fatura alınmaz; yeni
+  DİİB'ler en yeni önce kullanım sırası). Menü İHRACAT > "DİİB Takibi".
+- Dosya: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat Evrakları sekmeleri): kalan,
+  tek fatura / bölünmeli öneri → "Bölünmeyi hazırla" (kg'lar düzeltilebilir, toplam = yükleme)
+  → kaydet; parça fatura no'ları; kaldır (onaylı). Fatura talimatı (PDF + mail) bölünme varsa
+  "FATURA BOLUNMESI (n AYRI FATURA)" bölümü (`lib/diib/bolunme-talimat.ts`: kalemler sırayla,
+  tutarlar kuruşu kuruşuna, FOB CIF payı oranında) + Diib Bilgisi iki DİİB. Bölünmesiz talimat
+  ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
+- Gece yedeği: 3 tablo `yedekleme-gonder` listesine eklendi (deploy migration'dan SONRA).
+- 04.11 bulgular (kullanıcıya iletildi): Excel 04219'daki faturasız "OM 250.000 kg" satırı
+  UNX…693 ise çift sayım → gerçek kalan 329.100 (Burak Bey 79.100 diyor). Test: hesap (gerçek
+  Excel yerelde, repoda veri YOK), bölünme, kgOku, e2e_diib 29 + e2e_diib_dosya 16.

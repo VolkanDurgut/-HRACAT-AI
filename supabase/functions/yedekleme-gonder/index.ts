@@ -121,6 +121,8 @@ const YEDEKLENECEK_TABLOLAR = [
   "diib_belgeleri",
   "diib_ihracatlari",
   "diib_dosya_bolunmeleri",
+  // Ic piyasa siparisler arasi tonaj devri (04.11.2026)
+  "ic_is_emri_devirleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

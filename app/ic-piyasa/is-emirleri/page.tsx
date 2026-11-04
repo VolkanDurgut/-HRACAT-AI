@@ -14,17 +14,18 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcGecmisSevkPenceresi, GecmisSevkEmri } from "@/components/ic-gecmis-sevk-penceresi";
 import {
   ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History, ArrowRightLeft,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
-  DURUM_ETIKET, IC_BELGE_BUCKET, IcIsEmri, IcMusteri, IcSevk, IsEmriDurum,
-  cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi, tlYazi, tutarHesapla,
+  DURUM_ETIKET, IC_BELGE_BUCKET, IcDevir, IcIsEmri, IcMusteri, IcSevk, IsEmriDurum,
+  cikisEtiketi, hataMesaji, hedefTamam, hedefYazi, ilerlemeOrani, ilerlemeYazi, kgYazi, tarihSaatYazi, tlYazi, tutarHesapla, yuklenenKg,
 } from "@/lib/ic-piyasa/is-emri";
 import { fiyatYazi, kdvYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-piyasa/siparis-formu";
 import { teslimFarki } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { KalanRozet } from "@/components/ic-kalan-rozet";
+import { IcDevirPenceresi } from "@/components/ic-devir-penceresi";
 
 /**
  * Ic Piyasa - Is Emirleri (12.10.2026).
@@ -73,6 +74,10 @@ export default function IsEmirleriPage() {
   // Sistem oncesi (gecmis) arac ekleme penceresi
   const [gecmisEmir, setGecmisEmir] = useState<GecmisSevkEmri | null>(null);
   const [isleniyor, setIsleniyor] = useState(false);
+  // Siparisler arasi tonaj devri (04.11.2026)
+  const [devirler, setDevirler] = useState<IcDevir[]>([]);
+  const [devirKaynak, setDevirKaynak] = useState<EmirSatiri | null>(null);
+  const [geriAlinacak, setGeriAlinacak] = useState<IcDevir | null>(null);
 
   const getir = useCallback(async () => {
     if (!companyId) return;
@@ -90,8 +95,12 @@ export default function IsEmirleriPage() {
       s = (sRes.data || []) as IcSevk[];
       const bRes = await supabase.from("ic_bildirimler").select("is_emri_id, sablon, durum, kanal, alici").eq("company_id", companyId).in("is_emri_id", e.map((x) => x.id));
       setBildirimler(bRes.error ? [] : ((bRes.data || []) as { is_emri_id: string; sablon: string; durum: string; kanal: string; alici: string }[]));
+      // Devir kayitlari (okunamazsa liste bos; miktar yine is emrindeki devir_kg'den gelir)
+      const dRes = await supabase.from("ic_is_emri_devirleri").select("id, kaynak_id, hedef_id, miktar_kg, aciklama, olusturan_email, olusturma, geri_alindi").eq("company_id", companyId).is("geri_alindi", null).order("olusturma");
+      setDevirler(dRes.error ? [] : ((dRes.data || []) as IcDevir[]));
     } else {
       setBildirimler([]);
+      setDevirler([]);
     }
     setEmirler(e);
     setSevkler(s);
@@ -134,7 +143,7 @@ export default function IsEmirleriPage() {
   const farkVar = useCallback((e: EmirSatiri) => {
     if (e.durum !== "tamamlandi") return false;
     const ss = sevkMap.get(e.id) || [];
-    return teslimFarki(e.hedef_tur, e.hedef_tur === "kg" ? e.hedef_kg : e.hedef_arac, ss.reduce((t, s) => t + Number(s.net_kg), 0), ss.length).sonuc !== "tam";
+    return teslimFarki(e.hedef_tur, e.hedef_tur === "kg" ? e.hedef_kg : e.hedef_arac, yuklenenKg(e, ss), ss.length).sonuc !== "tam";
   }, [sevkMap]);
 
   const sayilar = useMemo(() => ({
@@ -280,7 +289,7 @@ export default function IsEmirleriPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <Ozet baslik="Açık İş Emri" deger={String(sayilar.acik)} renk="text-sky-400" />
         <Ozet baslik="Bugün Yüklenen" deger={`${bugunSevkler.length} araç`} alt={kgYazi(bugunSevkler.reduce((t, s) => t + Number(s.net_kg), 0))} renk="text-white" />
-        <Ozet baslik="Açık Emirlerde Yüklenen" deger={kgYazi(sevkler.filter((s) => emirler.find((e) => e.id === s.is_emri_id)?.durum === "acik").reduce((t, s) => t + Number(s.net_kg), 0))} renk="text-white" />
+        <Ozet baslik="Açık Emirlerde Yüklenen" deger={kgYazi(emirler.filter((e) => e.durum === "acik").reduce((t, e) => t + yuklenenKg(e, sevkMap.get(e.id) || []), 0))} renk="text-white" />
         <Ozet baslik="Kontrol Bekleyen Uyarı" deger={String(uyariliSayi)} renk={uyariliSayi ? "text-amber-400" : "text-emerald-400"} />
       </div>
 
@@ -319,7 +328,10 @@ export default function IsEmirleriPage() {
               <tbody>
                 {liste.map((e) => {
                   const ss = sevkMap.get(e.id) || [];
-                  const kg = ss.reduce((t, s) => t + Number(s.net_kg), 0);
+                  const kg = yuklenenKg(e, ss); // arac toplami + devir (04.11.2026)
+                  const devirKg = Number(e.devir_kg || 0);
+                  const fazlaKg = e.hedef_tur === "kg" && e.hedef_kg !== null ? Math.round((kg - Number(e.hedef_kg)) * 100) / 100 : 0;
+                  const buDevirler = devirler.filter((d) => d.kaynak_id === e.id || d.hedef_id === e.id);
                   const oran = ilerlemeOrani(e, kg, ss.length);
                   const tamam = hedefTamam(e, kg, ss.length);
                   const acik = acikDetay === e.id;
@@ -363,6 +375,12 @@ export default function IsEmirleriPage() {
                             <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
                           </div>
                           <KalanRozet emir={e} kg={kg} arac={ss.length} />
+                          {devirKg !== 0 && (
+                            <p className="mt-0.5 text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }} data-testid="devir-not">
+                              <ArrowRightLeft size={10} className="inline -mt-0.5" /> Devir {devirKg > 0 ? "+" : "−"}{kgYazi(Math.abs(devirKg))}
+                              {" · "}araçlar {kgYazi(Math.round((kg - devirKg) * 100) / 100)}
+                            </p>
+                          )}
                         </td>
                         <td className="px-3 py-3 align-top whitespace-nowrap">
                           {ss.length === 0 ? <span className="text-xs" style={{ color: "#4A5262" }}>—</span> : (
@@ -508,7 +526,28 @@ export default function IsEmirleriPage() {
                               </div>
                             )}
 
+                            {buDevirler.length > 0 && (
+                              <div className="mt-3 rounded-lg border p-3 text-xs" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }} data-testid="devir-listesi">
+                                <p className="text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1" style={{ color: TEXT_MUTED }}><ArrowRightLeft size={11} /> Tonaj devri</p>
+                                {buDevirler.map((d) => {
+                                  const giden = d.kaynak_id === e.id;
+                                  const karsi = emirler.find((x) => x.id === (giden ? d.hedef_id : d.kaynak_id));
+                                  return (
+                                    <div key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1">
+                                      <span className={`font-semibold ${giden ? "text-amber-300" : "text-emerald-400"}`}>{giden ? "−" : "+"}{kgYazi(Number(d.miktar_kg))}</span>
+                                      <span className="text-white">{giden ? "→" : "←"} {karsi?.is_emri_no || "başka sipariş"}</span>
+                                      <span style={{ color: TEXT_MUTED }}>{tarihSaatYazi(d.olusturma)}{d.olusturan_email ? ` · ${d.olusturan_email}` : ""}{d.aciklama ? ` · ${d.aciklama}` : ""}</span>
+                                      <button onClick={() => setGeriAlinacak(d)} className="ml-auto text-[11px] hover:text-red-400" style={{ color: TEXT_MUTED }}>Geri al</button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap gap-2 mt-3">
+                              {fazlaKg > 0.005 && e.durum !== "iptal" && (
+                                <Eylem onClick={() => setDevirKaynak(e)} ikon={<ArrowRightLeft size={13} />}>Fazlayı aktar ({kgYazi(fazlaKg)})</Eylem>
+                              )}
                               {e.durum === "acik" && (
                                 <>
                                   <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
@@ -581,6 +620,41 @@ export default function IsEmirleriPage() {
         destructive={durumIslem?.hedef === "sil" || durumIslem?.hedef === "tamamen_sil" || durumIslem?.hedef === "iptal"}
         loading={isleniyor}
         onConfirm={durumUygula}
+      />
+      {devirKaynak && (() => {
+        const ss = sevkMap.get(devirKaynak.id) || [];
+        const fazla = Math.round((yuklenenKg(devirKaynak, ss) - Number(devirKaynak.hedef_kg || 0)) * 100) / 100;
+        const urun = devirKaynak.urun.trim().toLocaleLowerCase("tr");
+        const adaylar = emirler
+          .filter((x) => x.id !== devirKaynak.id && x.durum === "acik" && x.hedef_tur === "kg" && x.musteri_id === devirKaynak.musteri_id && x.urun.trim().toLocaleLowerCase("tr") === urun)
+          .map((x) => ({ id: x.id, is_emri_no: x.is_emri_no, hedefKg: Number(x.hedef_kg || 0), yuklenenKg: yuklenenKg(x, sevkMap.get(x.id) || []) }));
+        return (
+          <IcDevirPenceresi
+            kaynak={{ id: devirKaynak.id, is_emri_no: devirKaynak.is_emri_no, musteri: devirKaynak.ic_musteriler?.kisa_ad || devirKaynak.ic_musteriler?.unvan || "-", urun: devirKaynak.urun, fazlaKg: fazla }}
+            adaylar={adaylar}
+            onKapat={() => setDevirKaynak(null)}
+            onKaydedildi={() => { setDevirKaynak(null); getir(); }} />
+        );
+      })()}
+      <ConfirmDialog
+        open={!!geriAlinacak}
+        onOpenChange={(o) => !o && setGeriAlinacak(null)}
+        title="Devir geri alınsın mı?"
+        description={geriAlinacak ? `${kgYazi(Number(geriAlinacak.miktar_kg))} ${emirler.find((x) => x.id === geriAlinacak.kaynak_id)?.is_emri_no || ""} → ${emirler.find((x) => x.id === geriAlinacak.hedef_id)?.is_emri_no || ""} devri geri alınır; miktar kaynak siparişe döner.` : ""}
+        confirmLabel="Geri al"
+        cancelLabel="Vazgeç"
+        destructive
+        loading={isleniyor}
+        onConfirm={async () => {
+          if (!geriAlinacak) return;
+          setIsleniyor(true);
+          const { error } = await supabase.rpc("ic_is_emri_devir_geri_al", { p_id: geriAlinacak.id });
+          setIsleniyor(false);
+          if (error) { showToast(hataMesaji(error), "error"); return; }
+          showToast("Devir geri alındı.", "success");
+          setGeriAlinacak(null);
+          getir();
+        }}
       />
       <ConfirmDialog
         open={!!silinecekSevk}

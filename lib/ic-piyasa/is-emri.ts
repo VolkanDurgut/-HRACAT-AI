@@ -57,7 +57,30 @@ export type IcIsEmri = {
   urun_ozellikleri: unknown;
   siparis_formu_yolu: string | null;
   siparis_formu_adi: string | null;
+  /** Siparisler arasi tonaj devri, net kg (+ gelen, - giden). Migration 20261104150000. */
+  devir_kg?: number | string | null;
 };
+
+/** Siparisler arasi tonaj devri kaydi (ic_is_emri_devirleri; 04.11.2026). */
+export type IcDevir = {
+  id: string;
+  kaynak_id: string;
+  hedef_id: string;
+  miktar_kg: number | string;
+  aciklama: string | null;
+  olusturan_email: string | null;
+  olusturma: string;
+  geri_alindi: string | null;
+};
+
+/**
+ * Siparisin YUKLENEN miktari = arac net toplami + devir (04.11.2026). Kullanici: "IE-0007'deki
+ * fazla 18.940 IE-0008'e aktarilmali" - arac/irsaliye bolunmez, devir kaydi sayilir.
+ * Kantar (kantar_ic_is_emirleri), kapanis raporu ve gunluk raporla AYNI kural.
+ */
+export function yuklenenKg(emir: { devir_kg?: number | string | null }, sevkler: { net_kg: number | string }[]): number {
+  return Math.round((sevkler.reduce((t, s) => t + Number(s.net_kg || 0), 0) + Number(emir.devir_kg || 0)) * 100) / 100;
+}
 
 export type CikisDurumu = "bekliyor" | "planlandi" | "cikti" | "bugun_degil";
 
@@ -226,6 +249,7 @@ export function hataMesaji(e: unknown): string {
   if (/ic_musteriler_telefon_check/i.test(m)) return "Telefon numarası geçersiz.";
   if (/ic_is_emirleri_musteri_id_fkey/i.test(m)) return "Bu müşteriye ait iş emri var; müşteri silinemez. Pasife alabilirsiniz.";
   if (/ic_sevkler_is_emri_id_fkey/i.test(m)) return "Bu iş emrine sevk girilmiş; silinemez. İptal edebilirsiniz.";
+  if (/ic_is_emri_devirleri_(kaynak|hedef)_id_fkey/i.test(m)) return "Bu iş emrinde tonaj devri var; önce devri geri alın.";
   if (/Failed to fetch|NetworkError/i.test(m)) return "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.";
   return m;
 }

@@ -631,3 +631,40 @@
 - 30.10 akşam: lojistiğin TOPLU girdiği 4 araç (IE-0007: 45 PA 4585, 03 AFU 638; IE-0008: 01 V 0138,
   01 ASL 807) kullanıcı isteğiyle `cikti` + `cikis_isleyen='Toplu yükleme (lojistik, 30.10)'`
   (müşteri mesajı ÜRETİLMEDİ). NOT: IE-0007 bununla 318.940 / 300.000 kg (hedef aşıldı).
+
+## İç Piyasa — Siparişler arası tonaj devri + Günlük İç Piyasa Raporu (04.11.2026)
+
+- Kullanıcı: "IE-2026-0007 … 318.940 / 300.000 kg · Fazla 18,94 ton. Buradaki fazlalık olan 18.940 bu dosyaya
+  aktarılmalı: IE-2026-0008 … 55.020 / 320.000 kg." Araç / irsaliye BÖLÜNMEZ (tek irsaliye) → araç taşınmaz,
+  DEVİR kaydı: `ic_is_emirleri.devir_kg` (net; + gelen, − giden) + `ic_is_emri_devirleri` (kayıt, geri alınabilir,
+  denetimli). **Yüklenen = araç net toplamı + devir_kg** — İş Emirleri (`yuklenenKg`, lib/ic-piyasa/is-emri.ts),
+  Kantar (`kantar_ic_is_emirleri`), Sipariş Raporu, müşteri detayı, Kantar %5 aşım uyarısı
+  (`kantar_ic_sevk_ekle`), kapanış değerleri ve günlük rapor AYNI kural. Müşteri takip sayfası ve müşteriye
+  "sipariş tamamlandı" mesajı GERÇEK araç toplamını gösterir (devir iç muhasebe).
+- Migration `20261104150000_ic_devir_gunluk_rapor.sql` (yalnız ekleme; KOD PUSH'UNDAN ÖNCE): `devir_kg` kolonu +
+  `ic_devir_koru` tetikleyicisi (doğrudan değiştirme ENGELLİ; yalnız fonksiyonlar `ic.devir_izin` ile),
+  `ic_is_emri_devir_ekle(kaynak, hedef, kg, açıklama)` (aynı şirket + aynı müşteri + aynı ürün, ikisi de tonaj
+  hedefli, hedef AÇIK, kaynak iptal değil, miktar ≤ kaynağın FAZLASI), `ic_is_emri_devir_geri_al(id)`.
+  RLS: kayıt tablosu SELECT (şirket + ic_piyasa); yazma politikası YOK. `kantar_ic_sevk_ekle` ve
+  `ic_bildirim_is_emri` gövdeleri canlıdaki halinden DESENLE yamalandı (`regexp_replace`, tam bir eşleşme
+  yoksa HATA; 2. kez çalışınca atlar) — tüm gövde kopyalanmadı (CRLF'li canlı gövde korunur).
+- Arayüz: İş Emirleri satırında "Devir ±x kg · araçlar y kg" notu; detayda "Tonaj devri" listesi + "Geri al";
+  fazlası olan siparişte "Fazlayı aktar (x kg)" → `components/ic-devir-penceresi.tsx` (adaylar: aynı müşteri,
+  aynı ürün, açık, tonaj hedefli). Devirli iş emri silinemez ("önce devri geri alın").
+- GÜNLÜK İÇ PİYASA RAPORU: edge function `ic-gunluk-rapor` (hesap + HTML SAF `_shared/ic-gunluk-rapor.ts`):
+  özet kutuları (Bugün Yüklenen · Bugün Gelen · Açık Satış kalan · Açık Alış kalan), Bugün Yüklenenler — Satış
+  (saat = irsaliye, müşteri · IE · ürün, plaka/dorse, irsaliye no, çıkış durumu, net), Bugün Gelenler — Alış
+  (doğrudan müşteriye sevk etiketli), Bugün Kapanan Siparişler (Tam/Eksik/Fazla — kapanış e-postasının yerine),
+  Açık Satış (hedef, yüklenen [devir dahil notu], araç, +bugün, kalan/fazla), Açık Alış. FİYAT YOK. Gün = TR.
+  pg_cron `ic-gunluk-rapor` 16:00 UTC (19:00 TR; komut `gunluk-rapor-aksam`tan türetilir, anahtar repoda YOK).
+  Anon: yalnız 18:55–19:59 penceresi, şirket+gün tek (`ic_gunluk_rapor_gonderimleri`, kısmi benzersiz
+  `where not test`); `{"test":true}` (anon veya yetkili) ayarlı alıcılara "[TEST]" gönderir, 24 saatte ≤3, 19:00'u
+  ENGELLEMEZ; `{"deneme":true}` yalnız yetkili (HTML döner). Alıcılar `ic_piyasa_ayarlari.gunluk_rapor_eposta`
+  (Bildirimler › Ayarlar "Günlük iç piyasa raporu"; Unex başlangıç mesensei282@gmail.com).
+- KAPANIŞ E-POSTASI KAPATILDI (kullanıcı: "fazlalık maili kötü, kaldırabiliriz"): `kapanis_eposta` = null
+  (tetikleyici ayar boşsa üretmez; Ayarlar'daki alan günlük rapor alanıyla değiştirildi). Kod/şablon duruyor.
+- Gece yedeği: `ic_is_emri_devirleri` eklendi (mail.ts adı). `ic_gunluk_rapor_gonderimleri` iz kaydı, yedekte yok.
+- Test (scratchpad `icdevir/`, `icrapor/`): yerel PG senaryo T1–T26 (koruma, yetki, şirket izolasyonu, kurallar,
+  kantar 73.960 / 300.000, %5 uyarısı devirle, kapanış 300.000 / müşteri mesajı 318.940, geri al, anon kapalı) +
+  migration 2. kez; rapor birim 13 (TR gün sınırı, devir, doğrudan sevk, kapanan, boş gün, fiyatsız) + 900/390
+  görsel; Playwright `e2e_icdevir.mjs` 14 (IC_TEST=1 mock).

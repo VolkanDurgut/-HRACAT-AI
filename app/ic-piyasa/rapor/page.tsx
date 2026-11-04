@@ -53,12 +53,13 @@ export default function SiparisRaporuPage() {
     setHata(null);
     // ---- Satis ----
     const eRes = await supabase.from("ic_is_emirleri")
-      .select("id, is_emri_no, durum, kapanis_zamani, olusturma, siparis_tarihi, musteri_siparis_no, urun, ambalaj, hedef_tur, hedef_kg, hedef_arac, birim_fiyat, vade_gun, teslim, teslim_suresi_gun, ic_musteriler(unvan)")
+      .select("id, is_emri_no, durum, kapanis_zamani, olusturma, siparis_tarihi, musteri_siparis_no, urun, ambalaj, hedef_tur, hedef_kg, hedef_arac, birim_fiyat, vade_gun, teslim, teslim_suresi_gun, devir_kg, ic_musteriler(unvan)")
       .eq("company_id", companyId).neq("durum", "iptal").order("olusturma").limit(1000);
     if (eRes.error) { setHata(eRes.error.message); setYukleniyor(false); return; }
     type E = Omit<RaporSatisGirdi, "musteri" | "sevk_kg" | "sevk_arac" | "dogrudan"> & { ic_musteriler: { unvan: string } | null };
     const emirler = (eRes.data || []) as unknown as E[];
-    const sevkKg = new Map<string, number>(); const sevkArac = new Map<string, number>(); const sevkEmri = new Map<string, string>();
+    // Yuklenen = arac toplami + siparisler arasi devir (04.11.2026; is emirleri / kantar ile ayni)
+    const sevkKg = new Map<string, number>(emirler.map((e) => [e.id, Number((e as { devir_kg?: number | string | null }).devir_kg || 0)])); const sevkArac = new Map<string, number>(); const sevkEmri = new Map<string, string>();
     if (emirler.length) {
       const sRes = await supabase.from("ic_sevkler").select("id, is_emri_id, net_kg").eq("company_id", companyId).in("is_emri_id", emirler.map((e) => e.id));
       if (sRes.error) { setHata(sRes.error.message); setYukleniyor(false); return; }

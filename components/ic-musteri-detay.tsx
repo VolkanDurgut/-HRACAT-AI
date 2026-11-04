@@ -31,6 +31,7 @@ type Sevk = {
 
 type Emir = {
   id: string;
+  devir_kg?: number | string | null;
   is_emri_no: string;
   urun: string;
   hedef_tur: HedefTur;
@@ -68,7 +69,7 @@ export function IcMusteriDetay({
     setHata(null);
     const { data, error } = await supabase
       .from("ic_is_emirleri")
-      .select("id, is_emri_no, urun, hedef_tur, hedef_kg, hedef_arac, durum, siparis_tarihi, olusturma, siparis_formu_yolu, ic_sevkler(id, plaka, net_kg, irsaliye_no, irsaliye_dosya_yolu, olusturma, cikis_durumu, cikis_planlanan, cikis_zamani, gecmis)")
+      .select("id, is_emri_no, urun, hedef_tur, hedef_kg, hedef_arac, durum, siparis_tarihi, olusturma, siparis_formu_yolu, devir_kg, ic_sevkler(id, plaka, net_kg, irsaliye_no, irsaliye_dosya_yolu, olusturma, cikis_durumu, cikis_planlanan, cikis_zamani, gecmis)")
       .eq("company_id", companyId)
       .eq("musteri_id", musteri.id)
       .order("olusturma", { ascending: false })
@@ -169,7 +170,7 @@ export function IcMusteriDetay({
                   <div className="rounded-xl border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
                     {emirler.map((e, i) => {
                       const sv = e.ic_sevkler || [];
-                      const kg = sv.reduce((t, s) => t + Number(s.net_kg || 0), 0);
+                      const kg = sv.reduce((t, s) => t + Number(s.net_kg || 0), 0) + Number(e.devir_kg || 0); // + devir (04.11.2026)
                       const oran = Math.min(1, ilerlemeOrani(e, kg, sv.length));
                       const tamam = hedefTamam(e, kg, sv.length);
                       return (

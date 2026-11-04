@@ -68,6 +68,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ic_alis_siparisleri: { ad: "Alış siparişleri", grup: "İç piyasa" },
   ic_alis_teslimler: { ad: "Teslim alınan araçlar (alış)", grup: "İç piyasa" },
   ic_bildirimler: { ad: "Bildirimler (WhatsApp / e-posta)", grup: "İç piyasa" },
+  ic_is_emri_devirleri: { ad: "Siparişler arası tonaj devri", grup: "İç piyasa" },
   ic_piyasa_ayarlari: { ad: "İç piyasa ayarları", grup: "İç piyasa" },
   kantar_cihazlari: { ad: "Kantar cihazları", grup: "Kantar ve DBA otomasyonu" },
   dba_otomatik_kayitlari: { ad: "Otomatik DBA kayıtları", grup: "Kantar ve DBA otomasyonu" },
@@ -100,6 +101,7 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   diib_belgeleri: { tur: "kullanilmadi", metin: "DİİB Takibi yeni (04.11.2026); ilk DİİB eklenince dolar." },
   diib_ihracatlari: { tur: "normal", metin: "DİİB satırları faturası kesilen dosyalardan otomatik gelir; burada yalnız elle eklenen / düzeltilen satırlar tutulur." },
   diib_dosya_bolunmeleri: { tur: "normal", metin: "Yalnız DİİB kalanı yetmeyen bir yükleme iki faturaya bölününce dolar." },
+  ic_is_emri_devirleri: { tur: "normal", metin: "Yalnız bir siparişin fazlası başka siparişe aktarılınca dolar." },
   satin_alma_listeleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
   satin_alma_kalemleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
 };

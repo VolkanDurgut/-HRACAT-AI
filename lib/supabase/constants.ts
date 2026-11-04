@@ -1,11 +1,13 @@
 export const KONTEYNER_TIPLERI = ['20DC', '40DC', '40HC', '20RF', '40RF'] as const;
 
-// Fatura Talimatinda gosterilen "Araci Banka" HER ZAMAN bu sabit deger olacak
-// (talep: 25.09.2026) - dosyanin kendi `banka` alanina DOKUNULMAZ, o alan
-// proformada/Commercial Invoice'ta hangi banka gosterilecegini secmek icin
-// serbest kalmaya devam eder. Bu sabit SADECE Fatura Talimati PDF'i ve
-// e-posta metninde kullanilir.
-export const FATURA_TALIMATI_SABIT_BANKA = 'DENIZBANK A.S.';
+// Fatura Talimatindaki "Araci Banka" (04.11.2026): PROFORMADAKI banka (dosya.banka).
+// Kullanici: "Proforma da hangi banka varsa fatura talimatinda da o bankanin gecerli
+// olmasini istiyorum." 25.09.2026'daki sabit "DENIZBANK A.S." kurali bununla KALDIRILDI.
+// Dosyada banka yoksa satir yazilmaz (sessizce baska banka yazilmaz).
+export function faturaTalimatiBankasi(dosya: { banka?: string | null }): string | null {
+  const b = (dosya.banka || '').replace(/\s+/g, ' ').trim();
+  return b || null;
+}
 
 export const MTS_PER_KONTEYNER = 25;
 

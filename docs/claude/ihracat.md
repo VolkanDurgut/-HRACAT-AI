@@ -929,3 +929,12 @@
   Toplam FOB / CIF ve lokal masraf mantığı (net navlun = navlun − lokal) DEĞİŞMEDİ.
   Kullanıldığı yer: talimat PDF'i, talimat mail metni, Ek Bilgiler kartı (üçü aynı fonksiyon).
   CIF birim 3 ondalık kaldı. Test: /home/claude/test/fob/fob_test.ts (Logo taklidi).
+
+## Fatura talimatı — Aracı Banka = proformadaki banka (04.11.2026)
+
+- Kullanıcı: "Proforma da hangi banka varsa fatura talimatında da o bankanın geçerli olmasını
+  istiyorum." 25.09.2026'daki sabit `DENIZBANK A.S.` (FATURA_TALIMATI_SABIT_BANKA) KALDIRILDI.
+- `lib/supabase/constants.ts → faturaTalimatiBankasi(dosya)` = `dosya.banka` (boşluk düzeltilmiş);
+  boşsa satır yazılmaz. Talimat PDF'i + mail metni aynı fonksiyon. Proforma / CI'daki banka
+  seçimi DEĞİŞMEDİ. Canlı 04.11: 36 dosyanın hepsinde banka dolu (Denizbank 19, Ziraat 12,
+  Vakıfbank 5); kayıtlı talimat metinlerinde çakışan banka yok.

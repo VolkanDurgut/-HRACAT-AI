@@ -5,7 +5,7 @@ import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
-import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
+import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
 
@@ -168,10 +168,8 @@ function ciz(
     ["Navlun (Konteyner Basina)", navlunBirim != null ? formatCurrency(navlunBirim, dosya.para_birimi) : null],
     ["Toplam Navlun Fiyati", netNavlunToplam !== null ? formatCurrency(netNavlunToplam, dosya.para_birimi) : null],
     ["Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null],
-    // Talep: Fatura Talimatinda Araci Banka HER ZAMAN sabit (dosya.banka
-    // DEGIL) - proformada/Commercial Invoice'ta gosterilen banka bundan
-    // etkilenmez, o alan bagimsiz kalir.
-    ["Araci Banka", FATURA_TALIMATI_SABIT_BANKA],
+    // 04.11.2026: Araci Banka = proformadaki banka (dosya.banka; bkz. faturaTalimatiBankasi)
+    ["Araci Banka", faturaTalimatiBankasi(dosya)],
   ]);
 
   // --- Urun ve Fiyat tablosu (CIF/FOB) ---

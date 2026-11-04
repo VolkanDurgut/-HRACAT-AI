@@ -7,7 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
-import { FATURA_TALIMATI_SABIT_BANKA } from "@/lib/supabase/constants";
+import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-dagilimi";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
@@ -152,9 +152,8 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Toplam Navlun Fiyati", navlunToplam !== null ? formatCurrency(navlunToplam, dosya.para_birimi) : null),
       satir("Lokal Masraflar (Konteyner Basina)", lokalMasrafBirim != null ? formatCurrency(lokalMasrafBirim, dosya.para_birimi) : null),
       satir("All in Navlun Fiyati (Konteyner Basina)", allInNavlun !== null ? formatCurrency(allInNavlun, dosya.para_birimi) : null),
-      // Talep (25.09.2026): Fatura Talimatinda Araci Banka HER ZAMAN sabit
-      // deger - dosya.banka'ya (proformada secilebilen alan) DOKUNULMAZ.
-      satir("Araci Banka", FATURA_TALIMATI_SABIT_BANKA),
+      // 04.11.2026: Araci Banka = proformadaki banka (dosya.banka)
+      satir("Araci Banka", faturaTalimatiBankasi(dosya)),
     ].filter(Boolean).join("\n");
 
     const toplamFobStr = toplamFob !== null ? formatCurrency(toplamFob, dosya.para_birimi) : null;

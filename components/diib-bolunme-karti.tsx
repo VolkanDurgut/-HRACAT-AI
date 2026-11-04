@@ -50,7 +50,9 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     const oneri = bolunmeOnerisi(kg, kendi, ozetler, kendiPayi);
     const kayitli = veri.bolunmeler.filter((b) => b.dosya_id === dosya.id).sort((a, b) => a.sira - b.sira);
     const kalan = (b: DiibBelgesi | null) => b ? (ozetler.find((o) => o.belge.id === b.id)?.kalanKg ?? 0) + (kendiPayi[b.id] || 0) : 0;
-    return { kg, kendi, oneri, kayitli, kalan, belgeler: veri.belgeler };
+    // Ayni DIIB'e yazilmis, faturasi henuz kesilmemis DIGER acik yuklemeler: hangisi once faturalanirsa kalan ondan duser
+    const digerBekleyen = kendi ? sonuc.bekleyen.filter((x) => x.diib?.id === kendi.id && x.dosya.id !== dosya.id) : [];
+    return { kg, kendi, oneri, kayitli, kalan, digerBekleyen, belgeler: veri.belgeler };
   }, [veri, dosya]);
 
   if (!yetkili || yukleniyor || !hesap) return null;
@@ -59,6 +61,15 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
   const taslakBaslat = () => {
     if (hesap.oneri.tur !== "bolunmeli") return;
     setTaslak(hesap.oneri.parcalar.map((p, i) => ({ diibId: p.diib.id, kg: String(p.kg), faturaNo: i === 0 ? (dosya.fatura_no || "") : "" })));
+  };
+  // Elle bolme (kalan yetse de): ornegin muhasebe/gumruk DIIB kayitlari sistemden farkliysa. 1. fatura kendi DIIB'i, 2. fatura sonraki aktif DIIB.
+  const elleTaslakBaslat = () => {
+    if (!hesap.kendi) return;
+    const kendiId = hesap.kendi.id;
+    const sonraki = [...hesap.belgeler].filter((b) => b.id !== kendiId && b.durum === "aktif").sort((a, b) => a.kullanim_sirasi - b.kullanim_sirasi)[0]
+      ?? hesap.belgeler.find((b) => b.id !== kendiId);
+    if (!sonraki) { showToast("Bölmek için DİİB Takibi'nde ikinci bir DİİB olmalı.", "error"); return; }
+    setTaslak([{ diibId: kendiId, kg: "", faturaNo: dosya.fatura_no || "" }, { diibId: sonraki.id, kg: "", faturaNo: "" }]);
   };
   const kaydet = async () => {
     if (!taslak || !companyId) return;
@@ -100,7 +111,33 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     getir();
   };
 
-  const { kg, kendi, oneri, kayitli } = hesap;
+  const { kg, kendi, oneri, kayitli, digerBekleyen } = hesap;
+  const taslakFormu = taslak ? (
+            <div className="mt-2 space-y-2">
+              {taslak.map((p, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-semibold text-white w-14">{i + 1}. fatura</span>
+                  <select aria-label={`${i + 1}. fatura DİİB`} value={p.diibId} onChange={(e) => setTaslak(taslak.map((x, j) => j === i ? { ...x, diibId: e.target.value } : x))} className="px-2 py-1 border rounded-md text-xs text-white font-mono" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                    {hesap.belgeler.map((b) => <option key={b.id} value={b.id}>{b.belge_no}</option>)}
+                  </select>
+                  <input aria-label={`${i + 1}. fatura kg`} inputMode="decimal" value={p.kg} onChange={(e) => {
+                    const v = e.target.value;
+                    // Iki parcada birini yazinca digeri yuklemenin kalanina tamamlanir (elle duzeltilebilir)
+                    const diger = taslak.length === 2 && kgOku(v) > 0 && kgOku(v) < kg ? kgYaz(Math.round((kg - kgOku(v)) * 100) / 100) : null;
+                    setTaslak(taslak.map((x, j) => j === i ? { ...x, kg: v } : diger !== null && taslak.length === 2 ? { ...x, kg: diger } : x));
+                  }} className="w-28 px-2 py-1 border rounded-md text-xs text-white text-right" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} />
+                  <span style={{ color: TEXT_MUTED }}>kg</span>
+                </div>
+              ))}
+              <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Toplam {kgYaz(taslak.reduce((t, p) => t + kgOku(p.kg), 0))} / {kgYaz(kg)} kg. Kaydedince fatura talimatında ayrı faturalar yazılır, DİİB takibinde iki satır olur.</p>
+              <div className="flex gap-2">
+                <button onClick={kaydet} disabled={kaydediliyor} data-testid="bolunme-kaydet" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+                  {kaydediliyor && <Loader2 size={12} className="animate-spin" />} Bölünmeyi kaydet
+                </button>
+                <button onClick={() => setTaslak(null)} className="px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
+              </div>
+            </div>
+  ) : null;
   return (
     <section className="rounded-xl border p-4 sm:p-5" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="diib-karti">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -112,6 +149,20 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
         Yükleme <b className="text-white">{kgYaz(kg)} kg</b>
         {kendi ? <> · DİİB <b className="text-white font-mono">{kendi.belge_no}</b> · kalan <b className="text-white">{kgYaz(Math.max(0, hesap.kalan(kendi)))} kg</b></> : null}
       </p>
+      {kendi && kayitli.length < 2 && !dosya.fatura_no && digerBekleyen.length > 0 && (() => {
+        const digerKg = digerBekleyen.reduce((t, x) => t + x.kg, 0);
+        const sonraKalan = Math.max(0, hesap.kalan(kendi)) - digerKg;
+        return (
+          <p className="mt-2 text-[11px] leading-relaxed text-amber-300 flex gap-1.5" data-testid="diib-diger-bekleyen">
+            <AlertTriangle size={12} className="shrink-0 mt-0.5" />
+            <span>
+              Bu DİİB&apos;e yazılmış, faturası henüz kesilmemiş başka yükleme var: {digerBekleyen.map((x) => `${x.dosya.dosya_no} (${kgYaz(x.kg)} kg)`).join(", ")}.
+              Kalan, faturası önce kesilen yüklemeden düşer. {digerBekleyen.length > 1 ? "Onlar" : "O"} önce kesilirse bu yükleme için kalan <b>{kgYaz(Math.max(0, sonraKalan))} kg</b> olur
+              {sonraKalan < kg ? "; bu durumda bu yükleme bölünmelidir" : ""}.
+            </span>
+          </p>
+        );
+      })()}
 
       {kayitli.length >= 2 ? (
         <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "rgba(56,189,248,0.35)", backgroundColor: "rgba(56,189,248,0.06)" }} data-testid="bolunme-kayitli">
@@ -130,7 +181,16 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
           <button onClick={() => setKaldirOnay(true)} className="mt-2 inline-flex items-center gap-1 text-[11px] hover:text-red-400" style={{ color: TEXT_MUTED }}><Trash2 size={11} /> Bölünmeyi kaldır</button>
         </div>
       ) : oneri.tur === "tek" ? (
-        <p className="mt-3 text-xs font-semibold text-emerald-400 flex items-center gap-1.5" data-testid="bolunme-tek"><CheckCircle2 size={13} /> Tek fatura yeterli.</p>
+        <div className="mt-3">
+          <p className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5" data-testid="bolunme-tek"><CheckCircle2 size={13} /> Tek fatura yeterli.</p>
+          {!taslak ? (
+            <button onClick={elleTaslakBaslat} data-testid="bolunme-elle" className="mt-2 inline-flex items-center gap-1 text-[11px] hover:text-white" style={{ color: TEXT_MUTED }}>
+              <Split size={11} /> Yine de iki faturaya böl (elle)
+            </button>
+          ) : (
+            <div className="mt-2 rounded-lg border p-3" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>{taslakFormu}</div>
+          )}
+        </div>
       ) : oneri.tur === "diib_yok" ? (
         <p className="mt-3 text-xs text-amber-300 flex items-center gap-1.5"><AlertTriangle size={13} /> {"Dosyanın DİİB alanı tanınmadı (Ek Bilgiler > DİİB No'yu kontrol edin)."}</p>
       ) : (
@@ -146,27 +206,7 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
                 <Split size={12} /> Bölünmeyi hazırla
               </button>
             </>
-          ) : (
-            <div className="mt-2 space-y-2">
-              {taslak.map((p, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="font-semibold text-white w-14">{i + 1}. fatura</span>
-                  <select aria-label={`${i + 1}. fatura DİİB`} value={p.diibId} onChange={(e) => setTaslak(taslak.map((x, j) => j === i ? { ...x, diibId: e.target.value } : x))} className="px-2 py-1 border rounded-md text-xs text-white font-mono" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                    {hesap.belgeler.map((b) => <option key={b.id} value={b.id}>{b.belge_no}</option>)}
-                  </select>
-                  <input aria-label={`${i + 1}. fatura kg`} inputMode="decimal" value={p.kg} onChange={(e) => setTaslak(taslak.map((x, j) => j === i ? { ...x, kg: e.target.value } : x))} className="w-28 px-2 py-1 border rounded-md text-xs text-white text-right" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} />
-                  <span style={{ color: TEXT_MUTED }}>kg</span>
-                </div>
-              ))}
-              <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Toplam {kgYaz(taslak.reduce((t, p) => t + kgOku(p.kg), 0))} / {kgYaz(kg)} kg. Kaydedince fatura talimatında ayrı faturalar yazılır, DİİB takibinde iki satır olur.</p>
-              <div className="flex gap-2">
-                <button onClick={kaydet} disabled={kaydediliyor} data-testid="bolunme-kaydet" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
-                  {kaydediliyor && <Loader2 size={12} className="animate-spin" />} Bölünmeyi kaydet
-                </button>
-                <button onClick={() => setTaslak(null)} className="px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
-              </div>
-            </div>
-          )}
+          ) : taslakFormu}
         </div>
       )}
       <ConfirmDialog open={kaldirOnay} onOpenChange={(a) => { if (!a && !kaydediliyor) setKaldirOnay(false); }} title="Fatura bölünmesi kaldırılsın mı?"

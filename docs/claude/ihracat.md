@@ -964,9 +964,11 @@
 - Dosya kartı + 2 faturalı talimat: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat
   Evrakları), `lib/diib/bolunme-talimat.ts`; talimat PDF + mail "FATURA BOLUNMESI" bölümü; bölünmesiz
   talimat ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
-- 04.11 sistem verisiyle 04219 (devir 1.025.000 = UNX559/563/572/576/588 + 0070 eklenince):
-  kalan **332.000 kg** → CRISA (0108, 250.000) TEK fatura. Burak Bey 79.100 diyordu: fark Excel'deki
-  faturasız "OM 250.000" satırı (sistemde karşılığı yok, UNX693 tekrarı olabilir) + ESFIRA UNX655
-  (sistem 249.550 / Excel 252.450 kg). Kullanıcıya iletildi.
+- 04.11 mutabakat (ayrıntı repoda YOK; repo herkese açık): Burak Bey'in Excel'indeki faturasız tek satır,
+  sistemde faturası kesilmiş bir yüklemenin tekrarıydı + bir faturada Excel kg'ı faturadan farklıydı.
+  Sistem hesabı esas; kalan farkı Burak Bey'le teyit edilir.
+- Elle bölme (04.11): kalan yetse de "Yine de iki faturaya böl (elle)" (muhasebe/gümrük kaydı farklıysa).
+  İki parçada birini yazınca diğeri yüklemenin kalanına tamamlanır. Aynı DİİB'e yazılmış, faturası
+  kesilmemiş DİĞER açık yüklemeler kartta uyarı olarak yazar (kalan, önce faturalanandan düşer).
 - Test: hesap (canlı dosya özetleri yerelde), bölünme, kgOku, beyanname okuma (gerçek 2 beyanname
-  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 18 + e2e_diib_dosya 16.
+  yerelde; repoda veri YOK), Excel yazma (openpyxl ile okundu), e2e_diib 18 + e2e_diib_dosya 21.

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
 import { asciiYap, gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
@@ -13,6 +13,11 @@ import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-d
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ON_TALIMAT_ISARETI, type FaturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
+import { faturaBolunmesi, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
+import { DIIB_BOLUNME_OLAYI, dosyaBolunmesiGetir } from "@/lib/diib/veri";
+
+/** Mail metnindeki bolunme bolumunun basligi (kayitli metinde aranir). */
+const BOLUNME_BASLIGI = "FATURA BOLUNMESI";
 
 type Props = {
   dosyaId: string;
@@ -45,9 +50,24 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
 
   const talimatGonderildi = !!dosya.fatura_talimati_gonderildi;
 
+  // 04.11.2026: DIIB bolunmesi (iki fatura) - dosyanin DIIB kartinda kaydedilir
+  const [bolunme, setBolunme] = useState<TalimatParcaGirdisi[]>([]);
+  const bolunmeGetir = useCallback(async () => {
+    if (!companyId || !dosya.id) return [] as TalimatParcaGirdisi[];
+    const b = await dosyaBolunmesiGetir(companyId, dosya.id);
+    setBolunme(b);
+    return b;
+  }, [companyId, dosya.id]);
+  useEffect(() => {
+    bolunmeGetir();
+    const dinle = () => { bolunmeGetir(); };
+    window.addEventListener(DIIB_BOLUNME_OLAYI, dinle);
+    return () => window.removeEventListener(DIIB_BOLUNME_OLAYI, dinle);
+  }, [bolunmeGetir]);
+
   const buildKonu = () => [dosya.dosya_no, dosya.alici_firma, rezervasyonKonteynerAdedi ? `${rezervasyonKonteynerAdedi}x` : null, dosya.varis_limani, on ? "ON TALIMAT" : null].filter(Boolean).join(" - ");
 
-  const buildMetin = () => {
+  const buildMetin = (parcaGirdi: TalimatParcaGirdisi[] = bolunme) => {
     const urunler = dosya.urun_detaylari || [];
     const rez = rezervasyonlar[0];
     const toplamCif = urunler.reduce((s: number, u: any) => s + parseFloat(String(u.toplam_tutar_usd || u.total_amount || 0)), 0);
@@ -163,10 +183,20 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Toplam FOB", toplamFobStr),
     ].filter(Boolean).join("\n");
 
+    // 04.11.2026: DIIB kalani yetmeyen yukleme -> ayri faturalar (PDF ile ayni hesap)
+    const pb = dosya.para_birimi || "USD";
+    const parcalar = faturaBolunmesi(urunler, parcaGirdi, fiyatlarFob ? toplamCif : toplamFob);
+    const bolunmeBilgileri = parcalar.length >= 2 ? parcalar.map((p) => [
+      `  ${p.sira}. FATURA${p.faturaNo ? ` (${p.faturaNo})` : ""} - DIIB ${p.belgeNo}: ${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG, ${fiyatlarFob ? "FOB" : "CIF"} ${formatCurrency(p.tutar, pb)}${p.fobTutar !== null && !fiyatlarFob ? `, FOB ${formatCurrency(p.fobTutar, pb)}` : ""}`,
+      ...p.kalemler.map((k) => `     - ${k.ad}${k.ambalaj ? ` (${k.ambalaj})` : ""}: ${k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG x ${formatBirimFiyatKg(k.birimKg * 1000)} ${pb}/KG = ${formatCurrency(k.tutar, pb)}`),
+    ].join("\n")).join("\n") : null;
+
     const evrakTarihBilgileri = [
       satir("Beyanname No", dosya.beyanname_no),
       satir("BL No", dosya.bl_no),
-      satir("Diib Bilgisi", formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)),
+      satir("Diib Bilgisi", parcalar.length >= 2
+        ? parcalar.map((p) => `${p.sira}. fatura: ${p.belgeNo} (${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG)`).join(" / ")
+        : formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)),
       satir("Uretim Tarihi", dosya.uretim_tarihi ? formatDateTR(dosya.uretim_tarihi) : null),
       satir("Son Kullanim Tarihi", dosya.son_kullanim_tarihi ? formatDateTR(dosya.son_kullanim_tarihi) : null),
     ].filter(Boolean).join("\n");
@@ -180,6 +210,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       lojistikBilgileri ? `LOJISTIK BILGILERI\n${lojistikBilgileri}` : null,
       maliyetBilgileri ? `MALIYET VE BANKA BILGILERI\n${maliyetBilgileri}` : null,
       `URUN VE FIYAT BILGILERI\n${urunFiyatBilgileri}`,
+      bolunmeBilgileri ? `${BOLUNME_BASLIGI} (${parcalar.length} AYRI FATURA - HER FATURA AYRI DIIB'E)\n${bolunmeBilgileri}` : null,
       `KONTEYNER BILGILERI (${konteynerler.length} adet)\n${konteynerSatirlari || "  -"}${konteynerToplamSatiri}`,
       evrakTarihBilgileri ? `EVRAK VE TARIH BILGILERI\n${evrakTarihBilgileri}` : null,
     ].filter(Boolean).join("\n\n");
@@ -190,14 +221,17 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     return `${onNotu}Sayin Ilgili,\n\nAsagida belirtilen ihracat dosyasina ait fatura tanzimi icin gerekli bilgiler tarafiniza iletilmistir. Bilgilerinize ve gereginin yapilmasini rica ederiz.\n\n${bolumler}\n\nBilgilerinize arz ederiz.\n\nSaygilarimizla,\nIhracat Departmani`;
   };
 
-  const handleFaturaTalimatiAc = (onaylandi = false) => {
+  const handleFaturaTalimatiAc = async (onaylandi = false) => {
     if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
     if (on && !onaylandi) { setOnayIslemi("ac"); return; }
+    const guncelBolunme = await bolunmeGetir();
     setKonu(buildKonu());
     // Kaydedilmis metin SADECE tam talimatta ve on talimat metni degilse kullanilir
     // (on talimatlar kaydedilmez; eski bir on metin tam talimatta yeniden uretilir).
+    // 04.11.2026: bolunme varsa ve kayitli metinde bolunme bolumu yoksa metin yeniden uretilir.
     const kayitli = dosya.fatura_talimati_metni;
-    setMetin(!on && kayitli && !kayitli.includes(ON_TALIMAT_ISARETI) ? kayitli : buildMetin());
+    const bolunmeEksik = guncelBolunme.length >= 2 && !!kayitli && !kayitli.includes(BOLUNME_BASLIGI);
+    setMetin(!on && kayitli && !kayitli.includes(ON_TALIMAT_ISARETI) && !bolunmeEksik ? kayitli : buildMetin(guncelBolunme));
     setTo(""); setCc("");
     setShowFaturaTalimati(true);
   };
@@ -206,10 +240,10 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   // (her zaman gorunen ust bar butonu icin). PDF artik metin/konu'dan degil,
   // dogrudan guncel sistem verisinden (kart tasarimi) uretilir - boylece PDF
   // her zaman en guncel dosya/konteyner bilgisini yansitir.
-  const handleFaturaTalimatiIndir = (onaylandi = false) => {
+  const handleFaturaTalimatiIndir = async (onaylandi = false) => {
     if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
     if (on && !onaylandi) { setOnayIslemi("indir"); return; }
-    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on);
+    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir());
   };
 
   const handleMailGonder = async () => {
@@ -284,7 +318,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 <Mail size={14} /> Mail Uygulamasını Aç
               </button>
-              <button onClick={() => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
+              <button onClick={async () => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir())} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
                 <Download size={14} /> Fatura Talimatı İndir
               </button>
               <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>İptal</button>

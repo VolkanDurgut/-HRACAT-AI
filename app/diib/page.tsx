@@ -18,7 +18,7 @@ import { formatCurrency, formatDateTR } from "@/lib/cutoff-utils";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import { sayiOku } from "@/lib/sayi-oku";
 import {
-  DIIB_ORAN, bolunmeOnerisi, diibAnahtari, diibOzetleri, diibSatirlari, faturaNorm, kgYaz,
+  DIIB_ORAN, bolunmeOnerisi, diibAnahtari, kgOku, diibOzetleri, diibSatirlari, faturaNorm, kgYaz,
   type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi, type DiibOzeti, type DiibSatiri,
 } from "@/lib/diib/hesap";
 import { diibExcelCoz, tekrarsizSatirlar, type ExcelDiib } from "@/lib/diib/excel";
@@ -542,8 +542,8 @@ function BelgePenceresi({ belge, belgeler, satirSayisi, companyId, email, onKapa
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [silOnay, setSilOnay] = useState(false);
-  const izinKg = sayiOku(f.izin);
-  const taahhut = f.taahhutElle ? sayiOku(f.taahhut) : Math.round(izinKg * DIIB_ORAN * 100) / 100;
+  const izinKg = kgOku(f.izin);
+  const taahhut = f.taahhutElle ? kgOku(f.taahhut) : Math.round(izinKg * DIIB_ORAN * 100) / 100;
 
   const kaydet = async () => {
     setHata(null);
@@ -627,7 +627,7 @@ function SatirPenceresi({ satir, diibId, dosya, belgeler, companyId, email, onKa
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const otomatik = !!ilk && !ilk.kayitId;
-  const miktar = sayiOku(f.miktar);
+  const miktar = kgOku(f.miktar);
   const birim = f.birim.trim() ? sayiOku(f.birim) : null;
   const tutarHesap = birim !== null && miktar > 0 ? Math.round(birim * miktar * 100) / 100 : null;
 

@@ -6,6 +6,7 @@ import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
+import { faturaBolunmesi, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
 
@@ -32,7 +33,8 @@ function ciz(
   rezervasyonlar: Rezervasyon[],
   konteynerler: Konteyner[],
   olcek: number,
-  on = false
+  on = false,
+  bolunme: TalimatParcaGirdisi[] = []
 ): { doc: jsPDF; sayfaSayisi: number } {
   const doc = new jsPDF();
   doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_TR_BASE64);
@@ -254,6 +256,39 @@ function ciz(
     }
   }
 
+  // --- FATURA BOLUNMESI (04.11.2026): DIIB kalani yetmeyen yukleme = ayri faturalar ---
+  const parcalar = faturaBolunmesi(urunler, bolunme, fiyatlarFob ? toplamCif : toplamFob);
+  if (parcalar.length >= 2) {
+    const pb = dosya.para_birimi || "USD";
+    const govde: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
+    parcalar.forEach((p) => {
+      p.kalemler.forEach((k, i) => govde.push([
+        i === 0 ? `${p.sira}. FATURA` : "", i === 0 ? p.belgeNo : "", k.ad, k.ambalaj || "-",
+        k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }), formatBirimFiyatKg(k.birimKg * 1000), formatCurrency(k.tutar, pb),
+      ]));
+      govde.push([
+        { content: `${p.sira}. fatura toplami${p.faturaNo ? ` (${p.faturaNo})` : ""}`, colSpan: 4, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
+        { content: `${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG`, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
+        { content: p.fobTutar !== null && !fiyatlarFob ? `FOB ${formatCurrency(p.fobTutar, pb)}` : "", styles: { fillColor: [244, 246, 250] } },
+        { content: `${fiyatlarFob ? "FOB" : "CIF"} ${formatCurrency(p.tutar, pb)}`, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
+      ]);
+    });
+    autoTable(doc, {
+      startY: y,
+      head: [
+        [{ content: `FATURA BOLUNMESI (${parcalar.length} AYRI FATURA - HER FATURA AYRI DIIB'E)`, colSpan: 7 }],
+        ["Fatura", "DIIB", "Urun", "Ambalaj", "Miktar (KG)", `Birim (${pb}/KG)`, "Tutar"].map((b, i) => ({ content: b, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal", halign: i >= 4 ? "right" : "left" } })),
+      ],
+      body: govde,
+      theme: "grid",
+      styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu },
+      columnStyles: { 0: { cellWidth: 20, fontStyle: "bold" }, 1: { cellWidth: 26 }, 4: { halign: "right", cellWidth: 24 }, 5: { halign: "right", cellWidth: 26 }, 6: { halign: "right", cellWidth: 30 } },
+      headStyles: { fillColor: [180, 110, 20], textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
+      margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
+    });
+    y = (doc as any).lastAutoTable.finalY + tablolarArasiBosluk;
+  }
+
   // --- Konteyner tablosu (gercek sutunlu tablo + TOPLAM satiri) ---
   if (konteynerler.length > 0) {
     // toplamNetKg/toplamBrutKg yukarida, fonksiyonun basinda hesaplandi
@@ -307,7 +342,9 @@ function ciz(
   bolumTablosu("EVRAK VE TARIH BILGILERI", [
     ["Beyanname No", dosya.beyanname_no],
     ["BL No", dosya.bl_no],
-    ["Diib Bilgisi", formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)],
+    ["Diib Bilgisi", parcalar.length >= 2
+      ? parcalar.map((p) => `${p.sira}. fatura: ${p.belgeNo} (${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG)`).join("  /  ")
+      : formatDiibBilgisi(dosya.diib_no, dosya.diib_tarihi)],
     ["Uretim Tarihi", dosya.uretim_tarihi ? formatDateTR(dosya.uretim_tarihi) : null],
     ["Son Kullanim Tarihi", dosya.son_kullanim_tarihi ? formatDateTR(dosya.son_kullanim_tarihi) : null],
   ]);
@@ -336,17 +373,17 @@ function ciz(
  * autoTable geri kalanini (basligi tekrarlayarak) 2. sayfaya tasar - bu,
  * kucultmenin durdugu NADIR bir emniyet supabidir, olagan davranis degildir.
  */
-export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false): jsPDF {
+export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): jsPDF {
   let olcek = 1.0;
-  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on);
+  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme);
   while (sonuc.sayfaSayisi > 1 && olcek > 0.5) {
     olcek = Math.round((olcek - 0.02) * 100) / 100;
-    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on);
+    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme);
   }
   return sonuc.doc;
 }
 
 /** on = true: ON TALIMAT (rezervasyon / konteyner kesinlesmeden; dosya adinda "-ON"). */
-export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false): void {
-  faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
+export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): void {
+  faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on, bolunme).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
 }

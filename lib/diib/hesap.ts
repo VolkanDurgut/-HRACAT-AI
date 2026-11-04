@@ -84,6 +84,16 @@ export type DiibSatiri = {
   bolunmeSira: number | null;   // bolunmus yuklemenin parcasi
 };
 
+/**
+ * Kg / miktar girisi: Turkce binlik nokta tanir ("170.900" -> 170900, "7.178.000,5" -> 7178000,5).
+ * Yalniz MIKTAR alanlarinda kullanilir (birim fiyat "0.475" bu kalipla eslesmez: ilk hane 0).
+ */
+export function kgOku(deger: unknown): number {
+  const t = String(deger ?? "").trim().replace(/\s+/g, "");
+  if (/^[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(t)) return sayiOku(t.replace(/\./g, "").replace(",", "."));
+  return sayiOku(t);
+}
+
 const yuvarla = (n: number, b = 2) => { const k = 10 ** b; return Math.round((n + Number.EPSILON) * k) / k; };
 export const faturaNorm = (s: string | null | undefined) => (s || "").replace(/\s+/g, "").toUpperCase();
 

@@ -14,6 +14,7 @@ import RezervasyonTab from "@/components/rezervasyon-tab";
 import { faturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
 import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
+import DiibBolunmeKarti from "@/components/diib-bolunme-karti";
 import BankaBilgileriCard from "@/components/banka-bilgileri-card";
 import ProformaCard from "@/components/proforma-card";
 import TaraflarCard from "@/components/taraflar-card";
@@ -345,7 +346,9 @@ function DosyaDetailContent() {
               </div>
               <BankaBilgileriCard dosya={dosya} onRefresh={fetchData} companyId={companyId} />
             </div>
-          <div className="animate-fade-up" style={{ animationDelay: "0.4s" }}>
+          <div className="animate-fade-up space-y-4" style={{ animationDelay: "0.4s" }}>
+            {/* 04.11.2026: DIIB kalani + gerekirse iki faturaya bolunme (DIIB Takibi) */}
+            <DiibBolunmeKarti dosya={dosya} />
             <EkBilgilerCard dosya={dosya} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
           </div>
         </div>
@@ -354,6 +357,7 @@ function DosyaDetailContent() {
       {gorunenSekme === "evraklar" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
+            <DiibBolunmeKarti dosya={dosya} />
             <FaturaUploadSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <KonsimentoTalimatiSection dosyaId={dosya.id} dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />
             <DraftBlSection dosya={dosya} konteynerler={konteynerler} rezervasyonlar={rezervasyonlar} onRefresh={fetchData} companyId={companyId} />

@@ -16,6 +16,8 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/panel": "panel",
   "/yeni-dosya": "yeni_dosya",
   "/ihracatlar": "ihracatlar",
+  // 04.11.2026: DIIB Takibi ihracat verisi; ayri yetki yok, "ihracatlar" ile ayni
+  "/diib": "ihracatlar",
   "/etd-eta": "etd_eta",
   "/analiz": "analiz",
   "/kantar": "kantar",

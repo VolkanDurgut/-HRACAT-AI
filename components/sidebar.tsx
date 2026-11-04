@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -27,6 +27,8 @@ const mainItems: MenuItem[] = [
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
   // 28.10.2026: "Draft Onay" -> "İhracat Evrakları" (kullanici karari; adres ve yetki ayni)
   { label: "İhracat Evrakları", href: "/draft-onay", icon: <FileCheck2 size={18} />, yetkiKey: "draft_onay" },
+  // 04.11.2026: DIIB (Dahilde Isleme Izin Belgesi) ihracat taahhudu takibi; yetki "ihracatlar"
+  { label: "DİİB Takibi", href: "/diib", icon: <ClipboardCheck size={18} />, yetkiKey: "ihracatlar" },
 ];
 
 const opsItems: MenuItem[] = [

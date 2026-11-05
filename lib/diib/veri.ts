@@ -3,7 +3,7 @@
  * RLS: "ihracatlar" yetkisi yoksa bos doner (kart gizlenir, talimat bolunmesiz kalir).
  */
 import { supabase } from "@/lib/supabase";
-import { yuklenenHesapla, type BekleyenSira, type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi } from "@/lib/diib/hesap";
+import { diibAlanMetni, diibOzetleri, diibSatirlari, guncelDiib, siraliBekleyenler, yuklenenHesapla, type BekleyenSira, type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi } from "@/lib/diib/hesap";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
 export const DIIB_DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, beyanname_dosya_url, alici_firma, urun_detaylari, toplam_tutar, para_birimi, diib_no";
@@ -91,3 +91,23 @@ export async function bekleyenSiraGetir(companyId: string, dosyaIdleri: string[]
 
 /** Bolunme degisince ayni sayfadaki fatura talimati bolumu yeniden okusun. */
 export const DIIB_BOLUNME_OLAYI = "diib-bolunme-degisti";
+
+/**
+ * Yeni dosyanin DIIB No alani (05.11.2026; Ayarlar > Ihracat Ayarlari'ndaki sabit deger KALDIRILDI):
+ * DIIB Takibi'nden guncel DIIB ("19.08.2026 TARİH 2026-D2-04219"). Okunamazsa / DIIB yoksa / hepsi
+ * dolmussa null (dosya acilir, DIIB No Ek Bilgiler'den girilir).
+ */
+export async function guncelDiibNoGetir(companyId: string): Promise<string | null> {
+  try {
+    const v = await diibVerisiGetir(companyId);
+    if (!v || !v.belgeler.length) return null;
+    const sonuc = diibSatirlari(v.belgeler, v.kayitlar, v.dosyalar, v.bolunmeler);
+    const ozetler = diibOzetleri(v.belgeler, sonuc);
+    const bekleyenIdler = v.dosyalar.filter((d) => !d.fatura_no && d.durum !== "Kapalı" && d.durum !== "Kapali").map((d) => d.id);
+    const sira = await bekleyenSiraGetir(companyId, bekleyenIdler);
+    const b = guncelDiib(ozetler, siraliBekleyenler(sonuc, ozetler, v.bolunmeler, sira));
+    return b ? diibAlanMetni(b) : null;
+  } catch {
+    return null;
+  }
+}

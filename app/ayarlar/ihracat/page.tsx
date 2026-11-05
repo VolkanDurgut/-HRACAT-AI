@@ -1,110 +1,15 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { supabase, yazmaHatasi } from "@/lib/supabase";
-import { useToast } from "@/lib/toast-context";
-import { SayfaBasligi } from "@/components/sayfa-basligi";
-import AppShell from "@/components/app-shell";
+// 05.11.2026: "Ihracat Ayarlari" (Varsayilan DIIB No) KALDIRILDI. Kullanici: "DIIB takibini ekledigimize
+// gore Ayarlar kismindaki DIIB numarasi kaldirilmali; her ihracat dosyasinda guncel DIIB otomatik
+// doldurulmali." Yeni dosyanin DIIB No'su artik DIIB Takibi'nden (lib/diib/veri.ts guncelDiibNoGetir).
+// Eski baglantilar / yer imleri bozulmasin diye sayfa DIIB Takibi'ne yonlendirir.
+// companies.varsayilan_diib_no kolonu veritabaninda duruyor (okunmuyor; veri silinmedi).
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FileCog, Loader2, Save } from "lucide-react";
-import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 
 export default function IhracatAyarlariPage() {
-  const { companyId, isSuperAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { showToast } = useToast();
-
-  const [varsayilanDiibNo, setVarsayilanDiibNo] = useState("");
-  const [kayitliDeger, setKayitliDeger] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  // AppShell zaten /ayarlar/* icin isSuperAdmin kontrolu yapip yonlendiriyor;
-  // buradaki kontrol ikinci bir güvenlik katmanı (defense-in-depth) - bkz.
-  // app/ayarlar/yetkilendirme/page.tsx'teki ayni desen.
-  useEffect(() => {
-    if (!authLoading && !isSuperAdmin) router.replace("/panel");
-  }, [authLoading, isSuperAdmin, router]);
-
-  const fetchAyar = useCallback(async () => {
-    if (!companyId) return;
-    const { data } = await supabase
-      .from("companies")
-      .select("varsayilan_diib_no")
-      .eq("id", companyId)
-      .single();
-    const deger = (data as any)?.varsayilan_diib_no || "";
-    setVarsayilanDiibNo(deger);
-    setKayitliDeger(deger);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { fetchAyar(); }, [fetchAyar]);
-
-  const handleSave = async () => {
-    if (!companyId) return;
-    setSaving(true);
-    const { data, error } = await supabase
-      .from("companies")
-      .update({ varsayilan_diib_no: varsayilanDiibNo || null })
-      .eq("id", companyId)
-      .select("id");
-    setSaving(false);
-    const hata = yazmaHatasi(error, data);
-    if (hata) {
-      showToast(`Kaydedilemedi: ${hata}`, "error");
-      return;
-    }
-    setKayitliDeger(varsayilanDiibNo);
-    showToast("Varsayılan DİİB No kaydedildi.", "success");
-  };
-
-  const degisiklikVarMi = varsayilanDiibNo !== (kayitliDeger || "");
-
-  if (loading) return (
-    <AppShell>
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
-      </div>
-    </AppShell>
-  );
-
-  return (
-    <AppShell>
-      <SayfaBasligi
-        ikon={<FileCog size={20} />}
-        baslik="İhracat Ayarları"
-        aciklama="Yeni dosyalarda kullanılacak şirket geneli varsayılanlar"
-      />
-
-      <div className="rounded-xl border shadow-sm p-5 max-w-xl animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-        <label className="block text-sm font-semibold mb-1 text-white">Varsayılan DİİB No</label>
-        <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>
-          Bu alana girdiğiniz değer, bundan sonra <b>Proforma Yükle</b> ile açılan her
-          dosyanın DİİB No alanına otomatik olarak yazılır. Dahilde işleme rejimi
-          limiti dolup DİİB No değiştiğinde buradan güncelleyin — siz burayı tekrar
-          değiştirene kadar yeni açılan tüm dosyalarda aynı değer kullanılır.
-          Zaten açık olan dosyaları etkilemez; onlar Ek Bilgiler kartından ayrı ayrı
-          güncellenebilir.
-        </p>
-        <input
-          value={varsayilanDiibNo}
-          onChange={(e) => setVarsayilanDiibNo(e.target.value)}
-          placeholder="2026-D2-04219  19.08.2026"
-          className="w-full px-3 py-2 border rounded-lg text-sm text-white"
-          style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
-        />
-        <button
-          onClick={handleSave}
-          disabled={saving || !degisiklikVarMi}
-          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 hover:opacity-90"
-          style={{ backgroundColor: ACCENT, color: "white" }}
-        >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          Kaydet
-        </button>
-      </div>
-    </AppShell>
-  );
+  useEffect(() => { router.replace("/diib"); }, [router]);
+  return null;
 }

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, FileCog, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -54,7 +54,6 @@ const sirketIciItems: MenuItem[] = [
 
 const ayarlarAltMenu = [
   { label: "Yetkilendirme", href: "/ayarlar/yetkilendirme", icon: <ShieldCheck size={15} /> },
-  { label: "İhracat Ayarları", href: "/ayarlar/ihracat", icon: <FileCog size={15} /> },
 ];
 
 const NAVY = "#10B981";

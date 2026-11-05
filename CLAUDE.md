@@ -52,7 +52,9 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
 - altyapi: kayıt formu, "Şifremi unuttum" / `/sifre-yenile`, `/checkout` + iyzico; uygulama
   arka planı aç/kapa anahtarı.
 - ihracat: Evraklar listesindeki kopyala ikonları; "Taslakları Müşteriye Gönder" kutusu;
-  "VGM Gönder" (mailto); Yük Sigortası mail bölümü; Proforma "Geçmişten Aktar". Müşteriye
+  "VGM Gönder" (mailto); Yük Sigortası mail bölümü; Proforma "Geçmişten Aktar". Ayarlar > "İhracat
+  Ayarları" (Varsayılan DİİB No; 05.11.2026 — DİİB No artık DİİB Takibi'nden); konşimento hatırlatma
+  mailinde talimat alanları (05.11.2026 — mail yalnız hatırlatma). Müşteriye
   sistemden otomatik e-posta (draft onay vb.) ASKIDA.
 - analiz-rapor: Müşteri Dağılımı'nda "Diğer (n)" satırı; günlük rapor mailinde "Kısa Özet"
   listesi, "her gün … gönderilir" alt notu ve özet kutularının eski alt satırları.

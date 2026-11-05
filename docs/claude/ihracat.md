@@ -1000,3 +1000,27 @@
 - Eklenen: Evraklar'da ECTN kutusunun yanında amber "CIF · sigorta girilmedi → TOTAL CFR yazar" düğmesi
   (`ectn-cif-sigorta-uyari`; CIF + ECTN + sigorta yok + etiket elle değil). Tıklayınca ECTN penceresi açılır.
   Sigorta girilince FOB sigorta kadar azalır, satır TOTAL CIF olur, TOPLAM DEĞİŞMEZ. Evrak verisine dokunulmadı.
+
+## DİİB — güncel DİİB otomatik, Ayarlar kaldırıldı, beyanname numaraları, sade konşimento hatırlatması (05.11.2026)
+
+- Beyanname no: kullanıcı onayıyla (Excel "ÜNEX İHRACATLAR 10.01.2026", yalnız beyanname no) faturası kesilmiş ve
+  beyanname no'su BOŞ 24 dosyaya (IHR-2026-0065…0094; UNX601–689) fatura no eşleşmesiyle yazıldı; dolu alanların
+  üzerine yazılmadı, 18 karakter biçim kontrolü, işlem "24 değilse geri al" korumalı. Excel'deki diğer 175 fatura
+  sistemde ya dolu ya yok. Excel'de bir çakışma (UNX…514 iki farklı numara) ve bir hatalı numara (UNX…564, 19 hane)
+  vardı; ikisi de sistemdeki dosyalarla eşleşmediği için kullanılmadı.
+- Beyanname okuma (değişmedi): Evraklar'da beyanname PDF'i yüklenince numara metinden okunur (`lib/beyanname-oku.ts`,
+  yapay zekâ yok; `\d{8}EX\d{8}`, tek ve belirgin değilse yazmaz) ve dosyaya yazılır. DİİB Takibi'ndeki
+  "Beyannamelerden oku" düğmesi YALNIZ beyannamesi yüklü + numarası boş + faturalı dosya varsa çıkar (toplu okuma).
+  Görüntü (taranmış) PDF'te okunamaz → Ek Bilgiler'den elle.
+- GÜNCEL DİİB: yeni dosya (Proforma Yükle) DİİB No'su `guncelDiibNoGetir` (lib/diib/veri.ts) → `guncelDiib`
+  (hesap.ts SAF): kullanım sırasına göre İLK aktif DİİB'den, faturalı satırlar + bekleyen yüklemelerin payı
+  (kayıtlı bölünme / tek / öneri; `siraliBekleyenler`) düşüldükten sonra kalanı > 0 olan. Metin
+  `diibAlanMetni`: "14.05.2026 TARİH 2026-D1-02576" (mevcut dosyalardaki biçim; `diibAnahtari` geri okur).
+  Okunamazsa / hepsi dolmuşsa boş (Ek Bilgiler'den). Canlı kontrol: CRISA bölünmesi kayıtlıyken 04219 kalanı 0 →
+  güncel = 02576. Ayarlar > İhracat Ayarları sayfası KALDIRILDI (`/ayarlar/ihracat` → `/diib` yönlendirir; menüden
+  çıktı). `companies.varsayilan_diib_no` kolonu duruyor, OKUNMUYOR (veri silinmedi).
+- Konşimento hatırlatması: kullanıcı "sadece hatırlatma geçmeli, dosya bilgisi vermemeli" → `khMail` yalnız
+  dosya no + alıcı + konteyner sayısı + talimat cut-off + "Dosyayı uygulamada aç". Rezervasyon / taraflar / mal /
+  konteyner / proforma-lot-beyanname blokları kaldırıldı (`khOzet` duruyor). Konu "Hatırlatma: konşimento talimatı
+  gönderilebilir · <dosya> · <alıcı>". `konsimento-hatirlatma` v2 deploy. Mod hâlâ TEST (secret
+  `KONSIMENTO_HATIRLATMA_CANLI` yok → yalnız test adresine).

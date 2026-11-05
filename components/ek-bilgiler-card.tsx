@@ -82,8 +82,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     son_kullanim_tarihi: dosya.son_kullanim_tarihi || "",
     // DIIB No normalde sadece fatura yuklenip AI ile okundugunda dolar (bkz.
     // fatura-upload-section.tsx) - ama Fatura Talimati faturadan ONCE
-    // gonderildigi icin o an henuz bilinmeyebilir. Yeni dosyalarda Ayarlar >
-    // Ihracat Ayarlari'ndaki varsayilan deger otomatik atanir (bkz.
+    // gonderildigi icin o an henuz bilinmeyebilir. Yeni dosyalarda DIIB Takibi'ndeki
+    // guncel DIIB otomatik atanir (05.11.2026; eskiden Ayarlar > Ihracat Ayarlari) (bkz.
     // app/yeni-dosya/page.tsx); DIIB limiti dolup degistiginde burada elle de
     // guncellenebilir olmasi gerekiyor. Tarih artik ayri bir alan degil - bu
     // kutuya elle, DIIB No ile birlikte yaziliyor (26.09.2026 talebi).
@@ -317,8 +317,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB No</label>
           {/* Muhasebe talebi (26.09.2026): ayri bir "DIIB Tarihi" alanina gerek
               yok - tarih zaten bu kutuya elle DIIB No ile birlikte yapistiriliyor
-              ve formatDiibBilgisi() bunu oldugu gibi gosteriyor. Yeni dosyalarda
-              varsayilan deger Ayarlar > Ihracat Ayarlari sayfasindan gelir. */}
+              ve formatDiibBilgisi() bunu oldugu gibi gosteriyor. Deger
+              yeni dosyada DIIB Takibi'ndeki guncel DIIB'den gelir (05.11.2026). */}
           <input value={form.diib_no} onChange={(e) => update("diib_no", e.target.value)} placeholder="2026-D2-04219  19.08.2026" className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div>

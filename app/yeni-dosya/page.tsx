@@ -17,6 +17,7 @@ import { kalemMiktari } from "@/lib/sayi-oku";
 import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
+import { guncelDiibNoGetir } from "@/lib/diib/veri";
 
 // 25.10.2026: sayfa "Proforma Yukle" (AI asistan gorunumu); adres ve yetki anahtari (yeni_dosya) degismedi.
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -63,15 +64,6 @@ export default function YeniDosyaPage() {
   const [gonderilmisMts, setGonderilmisMts] = useState<number>(0);
   const [yeniSiparisMts, setYeniSiparisMts] = useState<string>("");
 
-  // Ayarlar > Ihracat Ayarlari'nda tanimli varsayilan DIIB No - yeni acilan
-  // her dosyaya baslangic degeri olarak atanir (talep: 26.09.2026). Sadece
-  // OKUMA yapar, o sayfadaki degeri degistirmez.
-  const [varsayilanDiibNo, setVarsayilanDiibNo] = useState<string | null>(null);
-  useEffect(() => {
-    if (!companyId) return;
-    supabase.from("companies").select("varsayilan_diib_no").eq("id", companyId).single()
-      .then(({ data }) => setVarsayilanDiibNo((data as any)?.varsayilan_diib_no || null));
-  }, [companyId]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -235,6 +227,10 @@ export default function YeniDosyaPage() {
     if (!user) return;
     setLoading(true);
     try {
+      // 05.11.2026: DIIB No, DIIB Takibi'ndeki GUNCEL DIIB'den (kalanı olan ilk aktif DIIB; faturasi
+      // kesilmemis yuklemelerin payi dusulmus). Ayarlar > Ihracat Ayarlari'ndaki sabit deger kaldirildi.
+      // Okunamazsa bos; dosya yine acilir, Ek Bilgiler'den girilir.
+      const guncelDiibNo = companyId ? await guncelDiibNoGetir(companyId) : null;
       const { data, error: dbError } = await supabase
         .from("ihracat_dosyalari")
         .insert({
@@ -263,10 +259,8 @@ export default function YeniDosyaPage() {
           swift: extracted.swift || null,
           hesap_numarasi: extracted.hesap_numarasi || null,
           iban: extracted.iban || null,
-          // Ayarlar > Ihracat Ayarlari'ndaki sabit deger - dosya bazinda Ek
-          // Bilgiler'den sonradan degistirilebilir, burasi sadece baslangic
-          // degeridir (talep: 26.09.2026).
-          diib_no: varsayilanDiibNo,
+          // DIIB Takibi'ndeki guncel DIIB (05.11.2026); Ek Bilgiler'den degistirilebilir.
+          diib_no: guncelDiibNo,
           ham_veri: extracted as unknown as Record<string, unknown>,
           urun_detaylari: extracted.urun_detaylari || [],
           sevkiyat_evraklari: extracted.sevkiyat_evraklari?.length ? extracted.sevkiyat_evraklari : SEVKIYAT_EVRAKLARI,

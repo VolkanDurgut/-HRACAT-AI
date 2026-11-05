@@ -387,6 +387,32 @@ export function siraliBekleyenler(sonuc: DiibSonucu, ozetler: DiibOzeti[], bolun
   });
 }
 
+/**
+ * GUNCEL DIIB (05.11.2026). Kullanici: "Ayarlar'daki DIIB numarasi kaldirilmali; her ihracat dosyasinda
+ * guncel DIIB otomatik doldurulmali." Kullanim sirasina gore ILK aktif DIIB'den, faturasi kesilmis
+ * satirlar VE faturasi kesilmemis bekleyen yuklemelerin paylari (siraliBekleyenler: kayitli bolunme /
+ * tek / bolunme onerisi) dusuldukten sonra kalani olan. Hepsi dolmussa null (DIIB Takibi'ne yeni DIIB).
+ */
+export function guncelDiib(ozetler: DiibOzeti[], sirali: SiraliBekleyen[]): DiibBelgesi | null {
+  const dus: Record<string, number> = {};
+  const ekle = (id: string, kg: number) => { dus[id] = yuvarla((dus[id] || 0) + kg); };
+  for (const b of sirali) {
+    if (b.kayitli.length > 1) b.kayitli.forEach((p) => ekle(p.diib_id, sayiOku(p.miktar_kg)));
+    else if (b.oneri?.tur === "tek") ekle(b.oneri.diib.id, b.kg);
+    else if (b.oneri?.tur === "bolunmeli") b.oneri.parcalar.forEach((p) => ekle(p.diib.id, p.kg));
+  }
+  const aday = ozetler.map((o) => o.belge).filter((b) => b.durum === "aktif").sort(diibSiralama)
+    .find((b) => yuvarla((ozetler.find((o) => o.belge.id === b.id)?.kalanKg ?? 0) - (dus[b.id] || 0)) > 0.005);
+  return aday ?? null;
+}
+
+/** Dosyanin DIIB No alanina yazilan metin (mevcut dosyalardaki bicim): "19.08.2026 TARİH 2026-D2-04219". */
+export function diibAlanMetni(b: Pick<DiibBelgesi, "belge_no" | "belge_tarihi">): string {
+  const no = String(b.belge_no || "").trim().replace(/\s*\/\s*/g, "-");
+  const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(b.belge_tarihi || "");
+  return t ? `${t[3]}.${t[2]}.${t[1]} TARİH ${no}` : no;
+}
+
 /** Bolunen yuklemenin parca tutarlari (kg oraninda; son parca yuvarlama farkini alir -> toplam birebir). */
 export function parcaTutarlari(toplam: number, kgler: number[]): number[] {
   const kgT = kgler.reduce((a, b) => a + b, 0);

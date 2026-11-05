@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Split, Trash2 } f
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { supabase, yazmaHatasi } from "@/lib/supabase";
+import { supabase, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { sayiOku } from "@/lib/sayi-oku";
 import { bolunmeOnerisi, diibBul, diibMiktari, diibOzetleri, diibSatirlari, kgOku, kgYaz, siraliBekleyenler, type BekleyenSira, type DiibBelgesi } from "@/lib/diib/hesap";
@@ -113,10 +113,15 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
   };
   const kaldir = async () => {
     setKaydediliyor(true);
-    const r = await supabase.from("diib_dosya_bolunmeleri").delete().eq("dosya_id", dosya.id).eq("company_id", companyId!).select("id");
+    const r = await supabase.from("diib_dosya_bolunmeleri").delete().eq("dosya_id", dosya.id).eq("company_id", companyId!).select("id, fatura_dosya_url");
     setKaydediliyor(false);
     const sorun = yazmaHatasi(r.error, r.data);
     if (sorun) { showToast(`Kaldırılamadı: ${sorun}`, "error"); return; }
+    // 05.11.2026: parcalara yuklenen fatura PDF'leri depoda sahipsiz kalmasin; 1. fatura dosyanin
+    // faturasi olarak kalir (dosyaya da yazilmisti), digerleri silinir.
+    for (const x of (r.data || []) as { fatura_dosya_url: string | null }[]) {
+      if (x.fatura_dosya_url && x.fatura_dosya_url !== dosya.fatura_dosya_url) await eskiDepoDosyasiniSil(x.fatura_dosya_url);
+    }
     setKaldirOnay(false);
     showToast("Bölünme kaldırıldı; yükleme tek fatura sayılır.", "success");
     window.dispatchEvent(new Event(DIIB_BOLUNME_OLAYI));

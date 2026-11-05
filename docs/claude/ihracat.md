@@ -659,6 +659,8 @@
   Edge `konsimento-hatirlatma` v1 (duman: `isle` 200 `{gonderilen:0}`, anonla `elle` 403).
   pg_cron jobid 6 `konsimento-hatirlatma` `*/2` (anahtar `gunluk-yedek-maili` işinden).
   MOD: TEST (secret `KONSIMENTO_HATIRLATMA_CANLI` girilmedi) → mailler mesensei282@.
+  05.11.2026 CANLI: kullanıcı onayıyla secret girildi (alıcı operation@, CC execution@ / bbt@ / export@ —
+  varsayılanlar; ayrı ALICI/CC secret'ı yok).
 
 ## Kantar Paneli — Sevkiyat Durumu + müşteri kodu (28.10.2026)
 
@@ -1034,3 +1036,27 @@
   konteyner / proforma-lot-beyanname blokları kaldırıldı (`khOzet` duruyor). Konu "Hatırlatma: konşimento talimatı
   gönderilebilir · <dosya> · <alıcı>". `konsimento-hatirlatma` v2 deploy. Mod hâlâ TEST (secret
   `KONSIMENTO_HATIRLATMA_CANLI` yok → yalnız test adresine).
+
+## Fatura — yapay zekâsız okuma, DİİB'e bölünmüş yüklemede 2 fatura, Ana Panel evrak durumu (05.11.2026)
+
+- Kullanıcı: "Fatura yüklemede yapay zekâ çalışıyor; masrafsız ve doğru okutamaz mıyız?" Unex
+  e-Faturaları metin katmanlı ve etiketleri sabit → `lib/fatura-oku.ts` (`faturaMetniOku`,
+  `faturaKarsilastir`, `pdfMetni` = unpdf). Okunan: fatura no / tarih, DİİB (`DD.MM.YYYY / YYYY /D1-NNNNN`,
+  `DD.MM.YYYY TARİH YYYY-D2-NNNNN`, tarihsiz), ödenecek + mal toplamı, NET / BRÜT / KAP ADEDİ, konteyner
+  noları. Kontrol: konteyner (fazlası her zaman, eksiği tek faturada), net/brüt (50 kg ya da %0,2 pay),
+  kap (birebir), tutar (ödenecek ya da mal toplamı, 2 birim pay), para birimi; bölünmüş faturada DİİB.
+  Satıcı unvanı / DİİB yazım biçimi KARŞILAŞTIRILMAZ (yapay zekânın yanlış alarmlarıydı).
+  Fatura no OKUNAMAZSA eski `fatura-kontrol` (Gemini) yedek; sonuçta `kaynak: "metin" | "yapay_zeka"`,
+  ekranda "Metinden okundu · ücretsiz" rozeti. Edge function DEĞİŞMEDİ.
+- 2 fatura (kullanıcı: "DİİB dağılımında 2 fatura yüklemek durumundayız"): migration
+  `20261105140000_diib_bolunme_fatura_belgesi` → `diib_dosya_bolunmeleri.fatura_tarihi / fatura_dosya_url /
+  fatura_dosya_adi / fatura_yukleme_tarihi / fatura_kontrol_sonucu`. Bölünme (2+ parça) varsa Muhasebe
+  kartı parça başına yükleme alanı gösterir; beklenen = parçanın kg / tutar (`faturaBolunmesi`) / kap-brüt
+  (`parcaAgirliklari`) / DİİB'i. Parçanın fatura no'su parçaya yazılır (DİİB Takibi bunu kullanır).
+  1. parça ayrıca `ihracat_dosyalari.fatura_*`'ya yansır (panel, raporlar); bölünmüşte dosyanın DİİB No'su
+  DEĞİŞMEZ. Bölünme kaldırılınca 2+. parça PDF'leri depodan silinir; dosya silinince parça PDF'leri de
+  (`dosyaninStorageUrlleriniTopla`).
+- Ana Panel: her dosyanın altında "EVRAKLAR" satırı — sıra Konşimento Talimatı · Fatura · Draft BL ·
+  Beyanname; yüklenen yeşil ve tıklanınca açılır, eksik kesik çerçeveli; sonda "Eksik: …". Bölünmüşte
+  "Fatura 1/2". Test: scratchpad `e2e_fatura_parca.mjs` (FATURA_TEST=1), `fatura/test.mts` (gerçek iki
+  e-Fatura metniyle; örnekler repoda YOK).

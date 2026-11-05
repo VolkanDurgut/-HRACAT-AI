@@ -94,10 +94,12 @@ export async function eskiDepoDosyasiniSil(eskiUrl: string | null | undefined, y
  * kayıt silinemezse dosya kayıtta duruyor ama PDF'leri kaybolmuş oluyordu.
  */
 export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: string): Promise<(string | null | undefined)[]> {
-  const [{ data: dosya }, { data: evraklar }, { data: konteynerler }] = await Promise.all([
+  const [{ data: dosya }, { data: evraklar }, { data: konteynerler }, { data: parcalar }] = await Promise.all([
     supabase.from('ihracat_dosyalari').select('fatura_dosya_url, konsimento_dosya_url, draft_bl_dosya_url, proforma_dosya_url, beyanname_dosya_url').eq('id', dosyaId).eq('company_id', companyId).maybeSingle(),
     supabase.from('dosya_evraklari').select('dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
     supabase.from('konteynerler').select('dba_dosya_url, irsaliye_dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
+    // 05.11.2026: DIIB bolunmesindeki parca faturalari (okunamazsa bos; 1. parca dosyadakiyle ayni olabilir)
+    supabase.from('diib_dosya_bolunmeleri').select('fatura_dosya_url').eq('dosya_id', dosyaId).eq('company_id', companyId),
   ]);
 
   return [
@@ -109,5 +111,6 @@ export async function dosyaninStorageUrlleriniTopla(dosyaId: string, companyId: 
     ...((evraklar as any[]) || []).map((e) => e.dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.dba_dosya_url),
     ...((konteynerler as any[]) || []).map((k) => k.irsaliye_dosya_url),
+    ...((parcalar as any[]) || []).map((p) => p.fatura_dosya_url).filter((u: string | null) => u && u !== dosya?.fatura_dosya_url),
   ];
 }

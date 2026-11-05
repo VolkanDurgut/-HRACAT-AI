@@ -14,12 +14,65 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, Loader2, FileText, FolderOpen } from "lucide-react";
+import { Trash2, ExternalLink, FolderX, Loader2, FileText, FolderOpen, CheckCircle2, CircleDashed } from "lucide-react";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
-type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
+type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
+type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
+
+/**
+ * Evrak durumu (05.11.2026, kullanici: "hangi evraklar eksik ana panelde gorebilmeliyim";
+ * sira: konsimento talimati - fatura - draft BL - beyanname). Yuklenen evrak tiklaninca acilir.
+ * DIIB'e bolunmus yuklemede fatura "1/2" gibi parca sayisiyla (diib_dosya_bolunmeleri).
+ */
+function evrakDurumlari(d: DosyaWithRelations) {
+  const parca = d.faturaParcalari.length >= 2 ? d.faturaParcalari : null;
+  const faturaYuklu = parca ? parca.filter((p) => !!p.fatura_dosya_url).length : d.fatura_dosya_url ? 1 : 0;
+  const faturaToplam = parca ? parca.length : 1;
+  return [
+    { ad: "Konşimento Talimatı", kisa: "Konşimento T.", url: d.konsimento_dosya_url, tamam: !!d.konsimento_dosya_url, ek: null as string | null },
+    { ad: "Fatura", kisa: "Fatura", url: d.fatura_dosya_url || parca?.find((p) => p.fatura_dosya_url)?.fatura_dosya_url || null, tamam: faturaYuklu >= faturaToplam, ek: parca ? `${faturaYuklu}/${faturaToplam}` : null },
+    { ad: "Draft BL", kisa: "Draft BL", url: d.draft_bl_dosya_url, tamam: !!d.draft_bl_dosya_url, ek: null },
+    { ad: "Beyanname", kisa: "Beyanname", url: d.beyanname_dosya_url, tamam: !!d.beyanname_dosya_url, ek: null },
+  ];
+}
+
+function EvrakDurumu({ dosya }: { dosya: DosyaWithRelations }) {
+  const evraklar = evrakDurumlari(dosya);
+  const eksik = evraklar.filter((e) => !e.tamam).map((e) => (e.ek ? `${e.ad} (${e.ek})` : e.ad));
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap mt-1.5" data-testid="evrak-durumu">
+      <span className="text-[10px] font-semibold uppercase tracking-wide mr-0.5" style={{ color: TEXT_MUTED }}>Evraklar</span>
+      {evraklar.map((e) => {
+        const ic = (
+          <>
+            {e.tamam ? <CheckCircle2 size={11} /> : <CircleDashed size={11} />}
+            {e.ad}{e.ek ? ` ${e.ek}` : ""}
+          </>
+        );
+        const sinif = "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border";
+        return e.url ? (
+          <a key={e.ad} href={e.url} target="_blank" rel="noopener noreferrer" data-evrak={e.ad} data-tamam={e.tamam ? "evet" : "hayir"}
+            title={e.tamam ? `${e.ad} yüklendi - belgeyi aç` : `${e.ad}: ${e.ek} yüklendi - yüklenen belgeyi aç`}
+            className={`${sinif} hover:opacity-90 transition-opacity`}
+            style={e.tamam ? { borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" } : { borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.08)", color: "#FCD34D" }}>
+            {ic}
+          </a>
+        ) : (
+          <span key={e.ad} data-evrak={e.ad} data-tamam="hayir" title={`${e.ad} henüz yüklenmedi`} className={sinif}
+            style={{ borderColor: CARD_BORDER, borderStyle: "dashed", color: TEXT_MUTED }}>
+            {ic}
+          </span>
+        );
+      })}
+      <span className="text-[10px] ml-1" style={{ color: eksik.length ? "#FCD34D" : "#6EE7B7" }} data-testid="evrak-eksik">
+        {eksik.length ? `Eksik: ${eksik.join(", ")}` : "Tüm evraklar yüklendi"}
+      </span>
+    </div>
+  );
+}
 
 // 28.10.2026: eski Kontrol Merkezi kaldirildi; 4 ozet karti buraya tasindi
 // (components/panel-ozet-kartlari.tsx). Kontrol Merkezi gibi sayfa gorunurken
@@ -52,10 +105,16 @@ function PanelContent() {
     if (!dosyaData) { setDosyalar([]); setLoading(false); return; }
 
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
-    const [rezRes, kontRes] = await Promise.all([
+    const [rezRes, kontRes, parcaRes] = await Promise.all([
       supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
       supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId), // Şirket filtresi eklendi
+      // DIIB'e bolunmus yuklemelerin parca faturalari (yetki yoksa / hata -> bos: tek fatura sayilir)
+      supabase.from("diib_dosya_bolunmeleri").select("dosya_id, sira, fatura_dosya_url").in("dosya_id", dosyaIds).eq("company_id", companyId),
     ]);
+    const parcaMap: Record<string, FaturaParcasi[]> = {};
+    if (!parcaRes.error) ((parcaRes.data || []) as (FaturaParcasi & { dosya_id: string })[]).forEach((p) => {
+      (parcaMap[p.dosya_id] ||= []).push({ sira: p.sira, fatura_dosya_url: p.fatura_dosya_url });
+    });
 
     const rezMap: Record<string, Rezervasyon[]> = {};
     (rezRes.data || []).forEach((r: Rezervasyon) => {
@@ -72,6 +131,7 @@ function PanelContent() {
       ...d,
       rezervasyonlar: rezMap[d.id] || [],
       konteynerler: kontMap[d.id] || [],
+      faturaParcalari: (parcaMap[d.id] || []).sort((a, b) => a.sira - b.sira),
     }));
     setDosyalar(enriched);
     setYenileme((n) => n + 1);
@@ -329,6 +389,7 @@ function PanelContent() {
                             {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}
                           </span>
                         </div>
+                        <EvrakDurumu dosya={dosya} />
                       </td>
                     </tr>
                   </React.Fragment>

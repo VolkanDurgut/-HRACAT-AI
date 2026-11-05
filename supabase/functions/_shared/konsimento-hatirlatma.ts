@@ -47,11 +47,19 @@ const sayi = (n: number, ondalik = 0) => n.toLocaleString("tr-TR", { minimumFrac
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const benzersiz = (d: (string | null | undefined)[]) => [...new Set(d.map((x) => (x || "").trim()).filter(Boolean))];
 
-function trTarihSaat(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+/**
+ * Cut-off (talimat_cutoff) YEREL saattir ama UTC etiketiyle saklanir (lib/cutoff-utils.ts
+ * formatCutoffSaat ile ayni kural). Saat dilimi cevrilmeden HAM okunur: "...T10:00:00Z" -> "05.11.2026 10:00".
+ * 05.11.2026 duzeltme: onceki toLocaleString(Europe/Istanbul) +3 saat gosteriyordu (10:00 -> 13:00).
+ */
+function cutoffYazi(ham: string | null | undefined): string {
+  const m = (ham || "").match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}` : "";
+}
+/** Ham yerel cut-off'un gercek ani: UTC etiketli deger - 3 saat (Turkiye UTC+3, yaz saati yok). */
+function cutoffAni(ham: string): number {
+  const t = new Date(ham).getTime();
+  return Number.isNaN(t) ? NaN : t - 3 * 3600_000;
 }
 
 /** Mail ve uygulama ayni hesabi kullanir. */
@@ -88,7 +96,7 @@ export function khMail(v: KhVeri, secenek: { test: boolean; gercekAlici: string;
   const kont = v.konteynerler || [];
   const cutoffler = rez.map((r) => r.talimat_cutoff).filter(Boolean) as string[];
   const enYakinCutoff = cutoffler.sort()[0] || null;
-  const cutoffGecti = enYakinCutoff ? new Date(enYakinCutoff).getTime() < Date.now() : false;
+  const cutoffGecti = enYakinCutoff ? cutoffAni(enYakinCutoff) < Date.now() : false;
 
   const konu = `${secenek.test ? "[TEST] " : ""}Hatırlatma: konşimento talimatı gönderilebilir · ${v.dosya_no || "-"} · ${v.alici_firma || "-"}`;
 
@@ -98,7 +106,7 @@ export function khMail(v: KhVeri, secenek: { test: boolean; gercekAlici: string;
 
   const giris = `<p style="margin:0 0 14px;color:${LACIVERT};font-size:15px;line-height:1.55;"><b>${kacis(v.dosya_no)}</b>${v.alici_firma ? ` · ${kacis(v.alici_firma)}` : ""} dosyasının tüm konteynerleri sisteme girildi (<b>${kont.length}/${o.rezAdedi}</b>). Konşimento talimatını acenteye iletebilirsiniz.</p>`
     + (enYakinCutoff
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 6px;"><tr><td style="padding:9px 14px;border:1px solid ${cutoffGecti ? "#FCA5A5" : "#FCD34D"};background:${cutoffGecti ? "#FEF2F2" : "#FFFBEB"};border-radius:4px;font-size:13px;color:${cutoffGecti ? "#B91C1C" : "#92400E"};"><b>Talimat son tarihi (cut-off):</b> ${kacis(trTarihSaat(enYakinCutoff))}${cutoffGecti ? " · <b>SÜRE GEÇTİ</b>" : ""}</td></tr></table>`
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 6px;"><tr><td style="padding:9px 14px;border:1px solid ${cutoffGecti ? "#FCA5A5" : "#FCD34D"};background:${cutoffGecti ? "#FEF2F2" : "#FFFBEB"};border-radius:4px;font-size:13px;color:${cutoffGecti ? "#B91C1C" : "#92400E"};"><b>Talimat son tarihi (cut-off):</b> ${kacis(cutoffYazi(enYakinCutoff))}${cutoffGecti ? " · <b>SÜRE GEÇTİ</b>" : ""}</td></tr></table>`
       : "");
 
   const adres = `${KH_SITE}/dosya/${v.dosya_id}?tab=evraklar`;

@@ -379,7 +379,7 @@
 - Kullanıcı: "ekrana sığmıyor, bazı yetkileri vermek için sağa kaydırmak gerekiyor; mobilde çok
   kötü, alt alta yetki gör düğmeleriyle sıralanmalı". 17 sütunluk tablo (min 1560 px) KALDIRILDI.
 - `app/ayarlar/yetkilendirme/page.tsx`: kullanıcı başına KART — üstte e-posta / rozetler, Rol,
-  "Sayfa x/13 · Sekme y/4" özeti, Geri al (yalnız değişiklik varsa) + Kaydet ("Kayıtlı").
+  "Sayfa x/12 · Sekme y/4" (05.11; önce 13) özeti, Geri al (yalnız değişiklik varsa) + Kaydet ("Kayıtlı").
   Yetkiler `YETKI_GRUPLARI` ile kenar çubuğu bölümlerine göre (İhracat / Operasyon / Yurt İçi /
   Şirket İçi / Yönetim / Dosya sekmeleri), her yetki tam satır tıklanan anahtar düğmesi
   (`YetkiDugmesi`, role=switch, aria-label "e-posta · etiket" — eski tabloyla aynı).
@@ -387,6 +387,12 @@
 - YENİ SAYFA YETKİSİ eklenirken `SAYFA_ETIKETLER` + `YETKI_GRUPLARI` ikisine birden eklenir.
 - Kayıt mantığı (yetki_rol_ata + kullanici_yetkileri UPDATE + yazmaHatasi) DEĞİŞMEDİ.
   Test: Playwright 38 (1280/1366/1536/1920 yatay taşma 0, 390 mobil, kaydet / geri al / rol).
+- 05.11.2026 güncelleme (kullanıcı: "yeni eklenen şeyler göz önünde bulundurularak"): her
+  düğmenin altında `ACIKLAMALAR` kısa satırı (İhracatlar = dosyalar + DİİB Takibi; Kantar =
+  DBA + yurt içi satış/gelen araç; İç Piyasa = iş emirleri, rapor, bildirimler, müşteriler,
+  fiyat formu; Konteynerler sekmesi = fatura / konşimento talimatı…). Etkisiz "Ayarlar" düğmesi
+  ve "Yönetim" grubu KALDIRILDI (sayfa 12); kaydederken DB'deki `ayarlar` değeri aynen korunur.
+  YENİ ÖZELLİK mevcut bir yetkiyle açılıyorsa `ACIKLAMALAR` satırı güncellenir.
 
 ## Kullanım Kılavuzu — sağdaki "Sonraki" göstergesi (03.11.2026)
 

@@ -6,7 +6,8 @@ import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
-import { faturaBolunmesi, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
+import { bayrakPng } from "@/lib/bayraklar";
+import { faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
 
@@ -34,7 +35,8 @@ function ciz(
   konteynerler: Konteyner[],
   olcek: number,
   on = false,
-  bolunme: TalimatParcaGirdisi[] = []
+  bolunme: TalimatParcaGirdisi[] = [],
+  bayrak: string | null = null
 ): { doc: jsPDF; sayfaSayisi: number } {
   const doc = new jsPDF();
   doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_TR_BASE64);
@@ -108,12 +110,30 @@ function ciz(
   const tabloAltMargin = Math.max(3, 10 * olcek);
 
   // --- Etiket:Deger bolumu (2 kolonlu, basligi renkli bir kart) ---
-  const bolumTablosu = (baslik: string, satirlar: Satir[]) => {
+  // 05.11.2026: bayrakSatiri verilirse o satirin deger hucresinin basina ulke bayragi (PNG) cizilir.
+  const bayrakG = 4.5 * olcek, bayrakY = 3 * olcek, bayrakBosluk = 1.6 * olcek;
+  const bolumTablosu = (baslik: string, satirlar: Satir[], bayrakSatiri: string | null = null) => {
     const rows = satirlar.filter(
       (r): r is [string, string | number] => r[1] !== null && r[1] !== undefined && r[1] !== "" && r[1] !== "-"
     );
     if (rows.length === 0) return;
+    const bayrakli = (row: { raw: unknown }) => !!bayrak && !!bayrakSatiri && Array.isArray(row.raw) && row.raw[0] === bayrakSatiri;
     autoTable(doc, {
+      didParseCell: (d) => {
+        if (d.section === "body" && d.column.index === 1 && bayrakli(d.row)) {
+          const pad = d.cell.styles.cellPadding as number;
+          d.cell.styles.cellPadding = { top: pad, right: pad, bottom: pad, left: pad + bayrakG + bayrakBosluk };
+        }
+      },
+      didDrawCell: (d) => {
+        if (d.section === "body" && d.column.index === 1 && bayrakli(d.row) && bayrak) {
+          try {
+            doc.addImage(bayrak, "PNG", d.cell.x + hucreDolgu, d.cell.y + (d.cell.height - bayrakY) / 2, bayrakG, bayrakY);
+            doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.1);
+            doc.rect(d.cell.x + hucreDolgu, d.cell.y + (d.cell.height - bayrakY) / 2, bayrakG, bayrakY);
+          } catch { /* bayrak cizilemezse belge bayraksiz kalir */ }
+        }
+      },
       startY: y,
       head: [[{ content: baslik, colSpan: 2 }]],
       body: rows.map(([label, deger]) => [label, String(deger)]),
@@ -156,7 +176,7 @@ function ciz(
     ["Acente", rez?.acente_ismi],
     ["Booking No", rez?.booking_no ? rez.booking_no.trim() : null],
     ["Beyanname Teslim Suresi", beyannameSuresi],
-  ]);
+  ], "Ticaret Yapilan Ulke");
 
   // Navlun/Lokal Masraf birim-toplam ve CIF/FOB toplamlari - TEK DOGRU KAYNAK:
   // hesaplaFobFreightCifToplamlari (bkz. lib/cutoff-utils.ts). Commercial
@@ -260,29 +280,45 @@ function ciz(
   const parcalar = faturaBolunmesi(urunler, bolunme, fiyatlarFob ? toplamCif : toplamFob);
   if (parcalar.length >= 2) {
     const pb = dosya.para_birimi || "USD";
+    // 05.11.2026 (kullanici: "neden sadece CIF birim fiyat yer aliyor?"): CIF fiyatli dosyada her kalemde
+    // FOB birim fiyat da yazar - URUN VE FIYAT BILGILERI tablosuyla AYNI hesap (fobBirimFiyati) ve bicim.
+    // Fiyatlar zaten FOB ise tek birim sutunu (FOB) kalir.
+    const fobSutunu = !fiyatlarFob;
     const govde: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
-    parcalar.forEach((p) => {
-      p.kalemler.forEach((k, i) => govde.push([
-        i === 0 ? `${p.sira}. FATURA` : "", i === 0 ? p.belgeNo : "", k.ad, k.ambalaj || "-",
-        k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }), formatBirimFiyatKg(k.birimKg * 1000), formatCurrency(k.tutar, pb),
-      ]));
+    // 05.11.2026: her faturanin kap / net / brut'u (konteyner brut/net oraniyla; toplam birebir)
+    const agirliklar = parcaAgirliklari(parcalar, toplamNetKg, toplamBrutKg);
+    parcalar.forEach((p, pi) => {
+      p.kalemler.forEach((k, i) => {
+        const fobBirim = fobSutunu ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob) : null;
+        govde.push([
+          i === 0 ? `${p.sira}. FATURA` : "", i === 0 ? p.belgeNo : "", k.ad, k.ambalaj || "-",
+          k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }), formatBirimFiyatKg(k.birimKg * 1000),
+          ...(fobSutunu ? [fobBirim !== null ? formatFobBirimFiyatKg(fobBirim) : "-"] : []),
+          formatCurrency(k.tutar, pb),
+        ]);
+      });
       govde.push([
-        { content: `${p.sira}. fatura toplami${p.faturaNo ? ` (${p.faturaNo})` : ""}`, colSpan: 4, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
+        { content: `${p.sira}. fatura toplami${p.faturaNo ? ` (${p.faturaNo})` : ""}\n${parcaAgirlikMetni(agirliklar[pi])}`, colSpan: 4, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
         { content: `${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG`, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
-        { content: p.fobTutar !== null && !fiyatlarFob ? `FOB ${formatCurrency(p.fobTutar, pb)}` : "", styles: { fillColor: [244, 246, 250] } },
+        { content: p.fobTutar !== null && fobSutunu ? `FOB ${formatCurrency(p.fobTutar, pb)}` : "", colSpan: fobSutunu ? 2 : 1, styles: { fillColor: [244, 246, 250], halign: "right" } },
         { content: `${fiyatlarFob ? "FOB" : "CIF"} ${formatCurrency(p.tutar, pb)}`, styles: { fontStyle: "bold", fillColor: [244, 246, 250] } },
       ]);
     });
+    const basliklar = fobSutunu
+      ? ["Fatura", "DIIB", "Urun", "Ambalaj", "Miktar (KG)", `CIF Birim (${pb}/KG)`, `FOB Birim (${pb}/KG)`, "Tutar (CIF)"]
+      : ["Fatura", "DIIB", "Urun", "Ambalaj", "Miktar (KG)", `FOB Birim (${pb}/KG)`, "Tutar (FOB)"];
     autoTable(doc, {
       startY: y,
       head: [
-        [{ content: `FATURA BOLUNMESI (${parcalar.length} AYRI FATURA - HER FATURA AYRI DIIB'E)`, colSpan: 7 }],
-        ["Fatura", "DIIB", "Urun", "Ambalaj", "Miktar (KG)", `Birim (${pb}/KG)`, "Tutar"].map((b, i) => ({ content: b, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal", halign: i >= 4 ? "right" : "left" } })),
+        [{ content: `FATURA BOLUNMESI (${parcalar.length} AYRI FATURA - HER FATURA AYRI DIIB'E)`, colSpan: basliklar.length }],
+        basliklar.map((b, i) => ({ content: b, styles: { fillColor: [235, 235, 235], textColor: [30, 30, 30], fontStyle: "normal", halign: i >= 4 ? "right" : "left" } })),
       ],
       body: govde,
       theme: "grid",
       styles: { font: "Roboto", fontSize: fontBoyu, cellPadding: hucreDolgu },
-      columnStyles: { 0: { cellWidth: 20, fontStyle: "bold" }, 1: { cellWidth: 26 }, 4: { halign: "right", cellWidth: 24 }, 5: { halign: "right", cellWidth: 26 }, 6: { halign: "right", cellWidth: 30 } },
+      columnStyles: fobSutunu
+        ? { 0: { cellWidth: 18, fontStyle: "bold" }, 1: { cellWidth: 24 }, 4: { halign: "right", cellWidth: 20 }, 5: { halign: "right", cellWidth: 21 }, 6: { halign: "right", cellWidth: 24 }, 7: { halign: "right", cellWidth: 26 } }
+        : { 0: { cellWidth: 20, fontStyle: "bold" }, 1: { cellWidth: 26 }, 4: { halign: "right", cellWidth: 24 }, 5: { halign: "right", cellWidth: 26 }, 6: { halign: "right", cellWidth: 30 } },
       headStyles: { fillColor: [180, 110, 20], textColor: 255, fontStyle: "bold", fontSize: fontBoyu + 0.5 },
       margin: { left: marginX, right: marginX, bottom: tabloAltMargin },
     });
@@ -373,17 +409,22 @@ function ciz(
  * autoTable geri kalanini (basligi tekrarlayarak) 2. sayfaya tasar - bu,
  * kucultmenin durdugu NADIR bir emniyet supabidir, olagan davranis degildir.
  */
-export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): jsPDF {
+export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = [], bayrak: string | null = null): jsPDF {
   let olcek = 1.0;
-  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme);
+  let sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme, bayrak);
   while (sonuc.sayfaSayisi > 1 && olcek > 0.5) {
     olcek = Math.round((olcek - 0.02) * 100) / 100;
-    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme);
+    sonuc = ciz(dosya, rezervasyonlar, konteynerler, olcek, on, bolunme, bayrak);
   }
   return sonuc.doc;
 }
 
-/** on = true: ON TALIMAT (rezervasyon / konteyner kesinlesmeden; dosya adinda "-ON"). */
-export function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): void {
-  faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on, bolunme).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
+/**
+ * on = true: ON TALIMAT (rezervasyon / konteyner kesinlesmeden; dosya adinda "-ON").
+ * 05.11.2026: ticaret yapilan ulkenin bayragi tarayicida PNG'ye cevrilip PDF'e eklenir (bayrakPng);
+ * cevrilemezse PDF bayraksiz uretilir.
+ */
+export async function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): Promise<void> {
+  const bayrak = await bayrakPng(ticaretYapilanUlke(dosya.alici_adresi));
+  faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on, bolunme, bayrak).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
 }

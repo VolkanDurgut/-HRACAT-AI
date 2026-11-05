@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { MetinListesiEditor } from "@/components/metin-listesi-editor";
-import { FileSignature, Plus, Trash2, Loader2, Download, Settings, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil } from "lucide-react";
+import { FileSignature, Plus, Trash2, Loader2, Download, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { yazmaHatasi } from "@/lib/supabase";
 import { KAYIT_LISTE_KOLONLARI, kayitEksigi, kayitHataMesaji, kayitSatiri, kayitZamani, type ProformaKaydi } from "@/lib/proforma/kayitli";
@@ -353,9 +352,6 @@ export default function YeniProformaPage() {
             <button onClick={yeniProforma} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               <FilePlus2 size={14} /> Yeni proforma
             </button>
-            <Link href="/proformalar/musteriler" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-              <Settings size={14} /> Ayarlar
-            </Link>
           </div>
         }
       />

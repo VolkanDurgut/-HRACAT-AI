@@ -13,7 +13,8 @@ import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-d
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ON_TALIMAT_ISARETI, type FaturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
-import { bolunmeUyumsuz, faturaBolunmesi, urunToplamKg, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
+import { UlkeBayrak } from "@/components/ulke-bayrak";
+import { bolunmeUyumsuz, faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, urunToplamKg, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { DIIB_BOLUNME_OLAYI, dosyaBolunmesiGetir } from "@/lib/diib/veri";
 
 /** Mail metnindeki bolunme bolumunun basligi (kayitli metinde aranir). */
@@ -186,9 +187,16 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     // 04.11.2026: DIIB kalani yetmeyen yukleme -> ayri faturalar (PDF ile ayni hesap)
     const pb = dosya.para_birimi || "USD";
     const parcalar = faturaBolunmesi(urunler, parcaGirdi, fiyatlarFob ? toplamCif : toplamFob);
-    const bolunmeBilgileri = parcalar.length >= 2 ? parcalar.map((p) => [
+    // 05.11.2026: her faturanin kap / net / brut'u (PDF ile ayni hesap: parcaAgirliklari)
+    const agirliklar = parcaAgirliklari(parcalar, toplamNet, toplamBrut);
+    const bolunmeBilgileri = parcalar.length >= 2 ? parcalar.map((p, pi) => [
       `  ${p.sira}. FATURA${p.faturaNo ? ` (${p.faturaNo})` : ""} - DIIB ${p.belgeNo}: ${p.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG, ${fiyatlarFob ? "FOB" : "CIF"} ${formatCurrency(p.tutar, pb)}${p.fobTutar !== null && !fiyatlarFob ? `, FOB ${formatCurrency(p.fobTutar, pb)}` : ""}`,
-      ...p.kalemler.map((k) => `     - ${k.ad}${k.ambalaj ? ` (${k.ambalaj})` : ""}: ${k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG x ${formatBirimFiyatKg(k.birimKg * 1000)} ${pb}/KG = ${formatCurrency(k.tutar, pb)}`),
+      `     ${parcaAgirlikMetni(agirliklar[pi], true)}`,
+      // 05.11.2026: CIF fiyatli dosyada FOB birim fiyat da (PDF ile ayni hesap: fobBirimFiyati)
+      ...p.kalemler.map((k) => {
+        const fobBirim = !fiyatlarFob ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob) : null;
+        return `     - ${k.ad}${k.ambalaj ? ` (${k.ambalaj})` : ""}: ${k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG x ${fiyatlarFob ? "FOB " : "CIF "}${formatBirimFiyatKg(k.birimKg * 1000)} ${pb}/KG = ${formatCurrency(k.tutar, pb)}${fobBirim !== null ? ` (FOB birim ${formatFobBirimFiyatKg(fobBirim)} ${pb}/KG)` : ""}`;
+      }),
     ].join("\n")).join("\n") : null;
 
     const evrakTarihBilgileri = [
@@ -243,7 +251,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   const handleFaturaTalimatiIndir = async (onaylandi = false) => {
     if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
     if (on && !onaylandi) { setOnayIslemi("indir"); return; }
-    indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir());
+    await indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir());
   };
 
   const handleMailGonder = async () => {
@@ -293,6 +301,13 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <p className="text-sm font-bold text-white">{on ? "Ön Fatura Talimatı Maili" : "Fatura Talimatı Maili"}</p>
               <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
+            {/* 05.11.2026: ticaret yapilan ulke + bayrak (PDF ile ayni kaynak: alici adresi) */}
+            <p className="flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }} data-testid="talimat-ticaret-ulkesi">
+              Ticaret yapılan ülke:
+              {ticaretYapilanUlke(dosya.alici_adresi)
+                ? <span className="inline-flex items-center gap-1.5 font-semibold text-white"><UlkeBayrak ulke={ticaretYapilanUlke(dosya.alici_adresi)} yukseklik={13} />{ticaretYapilanUlke(dosya.alici_adresi)}</span>
+                : <span className="text-amber-300">belirlenemedi (alıcı adresini kontrol edin)</span>}
+            </p>
             {bolunmeUyumsuz(urunToplamKg(dosya.urun_detaylari), bolunme) && (
               <p className="text-xs rounded-lg border px-3 py-2 text-red-300" style={{ borderColor: "rgba(239,68,68,0.4)", backgroundColor: "rgba(239,68,68,0.08)" }} data-testid="bolunme-uyumsuz">
                 DİİB fatura bölünmesi ({bolunme.reduce((t, p) => t + p.kg, 0).toLocaleString("tr-TR")} kg) ürün miktarıyla ({urunToplamKg(dosya.urun_detaylari).toLocaleString("tr-TR")} kg) aynı değil; bölünme talimata YAZILMADI. Önce Proforma sekmesinde ürün miktarını yüklenen miktara göre düzeltin.

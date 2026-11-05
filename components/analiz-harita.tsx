@@ -10,12 +10,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { KARA_YOLU, SINIR_YOLU } from "@/lib/dunya-haritasi";
-import { haritaKirpmasi, hatYolu, izdusum, limanKoordinati, type CikisMerkezi } from "@/lib/liman-koordinat";
+import { haritaKirpmasi, hatYolu, izdusum, limanKonumu, type CikisMerkezi, type LimanKonumu } from "@/lib/liman-koordinat";
 import { denizRotasi, rotaYolu } from "@/lib/deniz-rotasi";
 import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { Panel } from "@/components/analiz-paneli";
 
-export type HaritaLimani = { ad: string; konteyner: number; dosya: number; satirlar: string[] };
+/** ulke: liman listede yoksa ulkenin ana limanina yaklasik konum icin (05.11.2026). */
+export type HaritaLimani = { ad: string; konteyner: number; dosya: number; satirlar: string[]; ulke?: string | null };
 export type HaritaHatti = { cikis: CikisMerkezi; liman: string; konteyner: number };
 
 const MARKA_TURUNCU = "#F4A07C";
@@ -61,14 +62,21 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
     return () => ro.disconnect();
   }, []);
 
+  // Konum: listede birebir / ad icinde bilinen liman / ulkenin ana limani (yaklasik) - 05.11.2026
+  const konumlar = useMemo(() => {
+    const m = new Map<string, LimanKonumu>();
+    limanlar.forEach((l) => { const k = limanKonumu(l.ad, l.ulke); if (k) m.set(l.ad, k); });
+    return m;
+  }, [limanlar]);
   const cizilenler = useMemo(
     () => limanlar
-      .map((l) => ({ ...l, k: limanKoordinati(l.ad) }))
-      .filter((l): l is HaritaLimani & { k: [number, number] } => l.k !== null && l.konteyner >= 0)
+      .map((l) => { const kn = konumlar.get(l.ad); return { ...l, k: kn?.k ?? null, yaklasik: !!kn?.yaklasik, vekil: kn?.yaklasik ? kn.anahtar : null }; })
+      .filter((l): l is HaritaLimani & { k: [number, number]; yaklasik: boolean; vekil: string | null } => l.k !== null && l.konteyner >= 0)
       .sort((a, b) => b.konteyner - a.konteyner),
-    [limanlar]
+    [limanlar, konumlar]
   );
-  const haritadaYok = limanlar.filter((l) => !limanKoordinati(l.ad)).map((l) => l.ad);
+  const haritadaYok = limanlar.filter((l) => !konumlar.has(l.ad)).map((l) => l.ad);
+  const yaklasikVar = cizilenler.some((l) => l.yaklasik);
   const cikislar = useMemo(() => {
     const m = new Map<string, CikisMerkezi>();
     hatlar.forEach((h) => m.set(h.cikis.ad, h.cikis));
@@ -77,13 +85,14 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
 
   // Her hat icin deniz rotasi (yoksa temsili egri); liman basina en kisa rota ipucunda gosterilir.
   const rotalar = useMemo(() => hatlar.map((h) => {
-    const k = limanKoordinati(h.liman);
-    if (!k) return null;
-    const r = denizRotasi(h.cikis.ad, [h.cikis.enlem, h.cikis.boylam], h.liman, k);
+    const kn = konumlar.get(h.liman);
+    if (!kn) return null;
+    const k = kn.k;
+    const r = denizRotasi(h.cikis.ad, [h.cikis.enlem, h.cikis.boylam], kn.anahtar, k);
     return r
       ? { hat: h, d: rotaYolu(r.noktalar), nm: r.nm, gecisler: r.gecisler, noktalar: r.noktalar, temsili: false }
       : { hat: h, d: hatYolu(izdusum(h.cikis.enlem, h.cikis.boylam), izdusum(k[0], k[1])), nm: null, gecisler: [] as string[], noktalar: [] as [number, number][], temsili: true };
-  }).filter((x): x is NonNullable<typeof x> => x !== null), [hatlar]);
+  }).filter((x): x is NonNullable<typeof x> => x !== null), [hatlar, konumlar]);
   const limanRotasi = useMemo(() => {
     const m = new Map<string, (typeof rotalar)[number]>();
     rotalar.forEach((r) => { const o = m.get(r.hat.liman); if (!o || r.hat.konteyner > o.hat.konteyner) m.set(r.hat.liman, r); });
@@ -183,12 +192,13 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
               <button
                 type="button"
                 className="absolute rounded-full transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                style={{ left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, backgroundColor: aktif ? "rgba(16,185,129,0.45)" : "rgba(16,185,129,0.22)", border: `1.5px solid ${ACCENT}`, boxShadow: aktif ? "0 0 0 6px rgba(16,185,129,0.15)" : "0 0 10px rgba(16,185,129,0.35)" }}
+                style={{ left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, backgroundColor: aktif ? "rgba(16,185,129,0.45)" : "rgba(16,185,129,0.22)", border: `1.5px ${n.yaklasik ? "dashed" : "solid"} ${ACCENT}`, boxShadow: aktif ? "0 0 0 6px rgba(16,185,129,0.15)" : "0 0 10px rgba(16,185,129,0.35)" }}
                 onMouseEnter={() => setSecili(n.ad)}
                 onFocus={() => setSecili(n.ad)}
                 onBlur={() => setSecili(null)}
-                aria-label={`${n.ad}: ${n.konteyner} konteyner, ${n.dosya} dosya`}
+                aria-label={`${n.ad}: ${n.konteyner} konteyner, ${n.dosya} dosya${n.yaklasik ? " (yaklaşık konum)" : ""}`}
                 data-liman-noktasi={n.ad}
+                data-yaklasik={n.yaklasik ? "" : undefined}
               >
                 <span className="absolute left-1/2 top-1/2 w-1.5 h-1.5 -ml-[3px] -mt-[3px] rounded-full" style={{ backgroundColor: "#D1FAE5" }} />
               </button>
@@ -215,6 +225,7 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
             data-harita-ipucu=""
           >
             <p className="text-xs font-semibold text-white">{seciliNokta.ad}</p>
+            {seciliNokta.yaklasik && <p className="text-amber-300" data-ipucu-yaklasik="">Yaklaşık konum: {seciliNokta.ulke} · {seciliNokta.vekil} limanı esas alındı</p>}
             <p className="text-white mt-0.5"><b>{seciliNokta.konteyner.toLocaleString("tr-TR")}</b> konteyner · {seciliNokta.dosya} dosya</p>
             <div className="w-full h-1 rounded-full mt-1.5 mb-1" style={{ backgroundColor: CARD_BORDER }}>
               <div className="h-1 rounded-full" style={{ width: `${toplamK > 0 ? (seciliNokta.konteyner / toplamK) * 100 : 0}%`, backgroundColor: ACCENT }} />
@@ -244,6 +255,7 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.35)", border: `1px solid ${ACCENT}` }} /> Varış limanı · büyüklük = konteyner</span>
         <span>Rotalar ana deniz yolları ve boğazlar üzerinden yaklaşık hesaplanır; aktarma limanı ve armatörün güncel rota tercihi farklı olabilir</span>
         {temsiliVar && <span>Kesik ince çizgi: deniz rotası tanımlı olmayan liman (temsili)</span>}
+        {yaklasikVar && <span className="inline-flex items-center gap-1.5" data-yaklasik-not=""><span className="w-2.5 h-2.5 rounded-full border border-dashed" style={{ borderColor: ACCENT }} /> Kesik çerçeve: liman listede yok, ülkenin ana limanı esas alındı (yaklaşık konum)</span>}
         {haritadaYok.length > 0 && <span data-haritada-yok="">Haritada konumu olmayan: {haritadaYok.join(", ")}</span>}
       </div>
     </Panel>

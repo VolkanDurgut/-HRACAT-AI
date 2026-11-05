@@ -18,6 +18,7 @@
  *     bolunme gerekip gerekmedigi buradan gorulur).
  */
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
+import { ticaretYapilanUlke } from "@/lib/ulke-bul";
 
 export const DIIB_ORAN = 0.97 * 0.74; // 0,7178
 
@@ -60,6 +61,8 @@ export type DiibDosyasi = {
   fatura_tarihi: string | null;
   beyanname_no: string | null;
   alici_firma: string | null;
+  /** Proformadaki alici adresi: "ticaret yapilan ulke" (bayrak) buradan bulunur (05.11.2026). */
+  alici_adresi?: string | null;
   urun_detaylari: unknown;
   toplam_tutar: number | string | null;
   para_birimi: string | null;
@@ -82,6 +85,8 @@ export type DiibSatiri = {
   beyannameNo: string | null;
   faturaTarihi: string | null;
   cari: string;
+  /** Ticaret yapilan ulke (alici adresinden; lib/ulke-bul.ts). Bilinmiyorsa null. 05.11.2026 */
+  ulke: string | null;
   stokAdi: string;
   miktarKg: number;
   birimFiyat: number | null;    // USD / KG
@@ -201,9 +206,9 @@ export function stokAdi(urunler: unknown): string {
   return boyutlar.length ? `BUĞDAY UNU / ${boyutlar.join("-")}` : "BUĞDAY UNU";
 }
 
-const kayitSatiri = (k: DiibKaydi, dosyaNo: string | null): DiibSatiri => ({
+const kayitSatiri = (k: DiibKaydi, dosyaNo: string | null, ulke: string | null): DiibSatiri => ({
   anahtar: `k-${k.id}`, kayitId: k.id, diibId: k.diib_id, dosyaId: k.dosya_id, dosyaNo,
-  faturaNo: k.fatura_no, beyannameNo: k.beyanname_no, faturaTarihi: k.fatura_tarihi, cari: k.cari, stokAdi: k.stok_adi,
+  faturaNo: k.fatura_no, beyannameNo: k.beyanname_no, faturaTarihi: k.fatura_tarihi, cari: k.cari, ulke, stokAdi: k.stok_adi,
   miktarKg: sayiOku(k.miktar_kg), birimFiyat: k.birim_fiyat === null || k.birim_fiyat === "" ? null : sayiOku(k.birim_fiyat),
   tutar: sayiOku(k.tutar), paraBirimi: k.para_birimi || "USD", kaynak: k.kaynak, bolunmeSira: null,
 });
@@ -217,7 +222,8 @@ export type DiibSonucu = {
 /** Tablodaki kayitlar + sistemdeki dosyalar -> ekrandaki DIIB satirlari. */
 export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], dosyalar: DiibDosyasi[], bolunmeler: DiibBolunmesi[]): DiibSonucu {
   const dosyaNo = new Map(dosyalar.map((d) => [d.id, d.dosya_no]));
-  const satirlar: DiibSatiri[] = kayitlar.map((k) => kayitSatiri(k, k.dosya_id ? dosyaNo.get(k.dosya_id) ?? null : null));
+  const dosyaUlke = new Map(dosyalar.map((d) => [d.id, ticaretYapilanUlke(d.alici_adresi)]));
+  const satirlar: DiibSatiri[] = kayitlar.map((k) => kayitSatiri(k, k.dosya_id ? dosyaNo.get(k.dosya_id) ?? null : null, k.dosya_id ? dosyaUlke.get(k.dosya_id) ?? null : null));
   const kayitliFatura = new Set(kayitlar.map((k) => faturaNorm(k.fatura_no)).filter(Boolean));
   const kayitliDosyaDiib = new Set(kayitlar.filter((k) => k.dosya_id).map((k) => `${k.dosya_id}|${k.diib_id}`));
   const kayitliDosya = new Set(kayitlar.map((k) => k.dosya_id).filter(Boolean) as string[]);
@@ -243,7 +249,7 @@ export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], do
         if (kayitliDosyaDiib.has(`${d.id}|${p.diib_id}`) || (pFatura && kayitliFatura.has(faturaNorm(pFatura)))) return;
         satirlar.push({
           anahtar: `o-${d.id}-${p.sira}`, kayitId: null, diibId: p.diib_id, dosyaId: d.id, dosyaNo: d.dosya_no,
-          faturaNo: pFatura, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-",
+          faturaNo: pFatura, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-", ulke: dosyaUlke.get(d.id) ?? null,
           stokAdi: stokAdi(d.urun_detaylari), miktarKg: pKg, birimFiyat: pKg ? yuvarla(pTutar / pKg, 6) : null, tutar: pTutar,
           paraBirimi: d.para_birimi || "USD", kaynak: "otomatik", bolunmeSira: p.sira,
         });
@@ -255,7 +261,7 @@ export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], do
     if (!b) { eslesmeyen.push({ dosya: d, kg, tutar }); continue; }
     satirlar.push({
       anahtar: `o-${d.id}`, kayitId: null, diibId: b.id, dosyaId: d.id, dosyaNo: d.dosya_no,
-      faturaNo: d.fatura_no, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-",
+      faturaNo: d.fatura_no, beyannameNo: d.beyanname_no, faturaTarihi: d.fatura_tarihi, cari: d.alici_firma || "-", ulke: dosyaUlke.get(d.id) ?? null,
       stokAdi: stokAdi(d.urun_detaylari), miktarKg: kg, birimFiyat: yuvarla(tutar / kg, 6), tutar,
       paraBirimi: d.para_birimi || "USD", kaynak: "otomatik", bolunmeSira: null,
     });

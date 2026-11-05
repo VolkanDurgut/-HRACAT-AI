@@ -82,6 +82,10 @@
   açılır; yazım AYNEN korunur (büyük harfe çevrilmez, sadece kırpılır).
   Doğrulama Lojistik kartıyla aynı (`varisLimaniSorunu`: boş / yükleme
   limanıyla aynı / Türkiye limanı olamaz). Rezervasyon kartında da görünür.
+- 05.11.2026 BAYRAK: "Ticaret Yapilan Ulke" satırında ülke bayrağı (PDF: `bayrakPng` canvas ile
+  PNG, satır başına; modal: `UlkeBayrak`). DİİB Takibi'nde "Cari · Ülke" ve bekleyen yüklemeler
+  "Alıcı · Ülke" sütunlarında bayrak. Bayraklar `lib/bayraklar.ts` (country-flag-icons 1.6.20, MIT,
+  gömülü SVG; yeni paket yok). Ülke bulunamazsa bayrak çizilmez.
 - Fatura talimatı (PDF + mail) "Ulke" satırı ikiye ayrıldı:
   "Gidecegi Ulke" = varış limanının ülkesi, "Ticaret Yapilan Ulke" = proformadaki
   BUYER'ın (`alici_adresi`) ülkesi. Ayrı ülke alanı yok; serbest metinden
@@ -407,9 +411,11 @@
 - Bu teslimatta veritabanına HİÇBİR ŞEY YAZILMAZ (kaydetme / proforma listesi /
   Harun Bey "Onayla ve İmzala" sonraki teslimat; imzalı PDF kayıtsız kalmasın).
   İndirilen dosya `UNEX…-TASLAK.pdf` (imzasız).
-- Ayarlar (sağ üst "Ayarlar", `components/proforma-sekmeler.tsx`):
-  `/proformalar/musteriler` (Müşteri Kartları, isteğe bağlı), `/proformalar/urunler`,
-  `/proformalar/sablon`. Kart varsa bilgiler karttan, ürünler son dosyadan gelir.
+- Proforma "Ayarlar" KALDIRILDI (05.11.2026, kullanıcı kararı): sağ üst buton ve
+  `components/proforma-sekmeler.tsx` silindi; `/proformalar/musteriler`, `/urunler`, `/sablon`
+  sadece `/proformalar`'a yönlendirir. Tablolar (ihracat_musterileri / ihracat_urunleri /
+  proforma_ayarlari) boş ve DB'de duruyor; `/proformalar` okumaya devam eder (boş → varsayılan
+  şablon, bilgiler geçmiş dosyadan). Şablon metni değişikliği artık kod (lib/proforma) üzerinden.
 - Kurallar TEK YERDE `lib/proforma/belge.ts` (saf): `sayiCoz` ("252,45",
   "50.000"), proforma no UNEX+KOD+GGAAYY, geçerlilik tarih+4, paketleme
   "15.000 PIECES OF 25 KG PP BAGS (ASLI BRAND) // …", marka satırı "ASLI BRAND &
@@ -964,6 +970,10 @@
 - Dosya kartı + 2 faturalı talimat: `components/diib-bolunme-karti.tsx` (Proforma + Sevkiyat
   Evrakları), `lib/diib/bolunme-talimat.ts`; talimat PDF + mail "FATURA BOLUNMESI" bölümü; bölünmesiz
   talimat ESKİSİYLE AYNI. Sevkiyat evraklarına (CI vb.) DOKUNULMADI.
+- 05.11.2026 "dağılımlı fatura için kap, net ve brüt": her "N. fatura toplami" satırının altında
+  `Kap … · Net … KG · Brüt … KG` (`parcaAgirliklari` / `parcaAgirlikMetni`): kap = net ÷ ambalaj kg,
+  brüt = net × (toplam brüt ÷ toplam net), son parça kalanı alır (toplamlar konteyner tablosuyla aynı).
+  PDF ve mail metninde (ASCII) aynı.
 - 04.11 mutabakat (ayrıntı repoda YOK; repo herkese açık): İLK analizim ("Excel'de bir yükleme iki kez
   sayılmış") YANLIŞTI. Doğrusu: (1) kısmi yükleme — proforma 375 MT, bu yüklemede 10 konteyner 250.000 kg
   (kalanı sonraki hafta); sistem proforma miktarını sayıyordu. (2) Bir faturada dosyanın ürün miktarı

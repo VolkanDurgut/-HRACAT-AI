@@ -24,6 +24,8 @@ import {
 } from "@/lib/diib/hesap";
 import { diibExcelOlustur } from "@/lib/diib/excel-yaz";
 import { beyannameNoOku } from "@/lib/beyanname-oku";
+import { UlkeBayrak } from "@/components/ulke-bayrak";
+import { ticaretYapilanUlke } from "@/lib/ulke-bul";
 import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir, yuklenenEkle, yuklenenKgleri } from "@/lib/diib/veri";
 
 /**
@@ -435,7 +437,7 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
             <tr style={{ backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
               <th className={`${thSinifi} text-left`}>Sıra</th>
               <th className={`${thSinifi} text-left`}>Dosya</th>
-              <th className={`${thSinifi} text-left hidden md:table-cell`}>Alıcı</th>
+              <th className={`${thSinifi} text-left hidden md:table-cell`}>Alıcı · Ülke</th>
               <th className={`${thSinifi} text-left hidden lg:table-cell`}>Talimat C/O · ETD</th>
               <th className={`${thSinifi} text-right`}>Miktar (kg)</th>
               <th className={`${thSinifi} text-left hidden md:table-cell`}>DİİB</th>
@@ -447,7 +449,7 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
               <tr key={dosya.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="bekleyen-satir">
                 <td className="px-3 py-2.5 text-sm tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                 <td className="px-3 py-2.5 text-sm whitespace-nowrap"><Link href={`/dosya/${dosya.id}?tab=evraklar`} className="font-mono text-white hover:underline inline-flex items-center gap-1">{dosya.dosya_no} <ExternalLink size={11} style={{ color: TEXT_MUTED }} /></Link></td>
-                <td className="px-3 py-2.5 text-sm max-w-[240px] truncate hidden md:table-cell" style={{ color: TEXT_MUTED }}>{dosya.alici_firma}</td>
+                <td className="px-3 py-2.5 text-sm max-w-[260px] hidden md:table-cell" style={{ color: TEXT_MUTED }} title={dosya.alici_firma || ""}><span className="flex items-center gap-1.5 min-w-0"><UlkeBayrak ulke={ticaretYapilanUlke(dosya.alici_adresi)} /><span className="truncate">{dosya.alici_firma}</span></span></td>
                 <td className="px-3 py-2.5 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: TEXT_MUTED }}>{s ? `${tarihYaz(s.talimatCutoff)} · ${tarihYaz(s.etd)}` : "-"}</td>
                 <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">
                   {kgYaz(kg)}
@@ -515,7 +517,7 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
                 <th className={`${thSinifi} text-left`}>Fatura No</th>
                 <th className={`${thSinifi} text-left`}>Beyanname No</th>
                 <th className={`${thSinifi} text-left`}>Fatura Tarihi</th>
-                <th className={`${thSinifi} text-left`}>Cari</th>
+                <th className={`${thSinifi} text-left`}>Cari · Ülke</th>
                 <th className={`${thSinifi} text-left`}>Stok Adı</th>
                 <th className={`${thSinifi} text-right`}>Miktar (kg)</th>
                 <th className={`${thSinifi} text-right`}>Birim Fiyat</th>
@@ -533,7 +535,7 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
                     <td className="px-3 py-2 text-xs font-mono whitespace-nowrap text-white">{s.faturaNo || <span className="text-amber-300 font-sans font-semibold">Fatura no yok</span>}{s.bolunmeSira ? <span className="ml-1 text-[10px] text-sky-300 font-sans">({s.bolunmeSira}. fatura)</span> : null}</td>
                     <td className="px-3 py-2 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.beyannameNo || "-"}</td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.faturaTarihi ? formatDateTR(s.faturaTarihi) : "-"}</td>
-                    <td className="px-3 py-2 text-sm text-white max-w-[220px] truncate" title={s.cari}>{s.cari}</td>
+                    <td className="px-3 py-2 text-sm text-white max-w-[240px]" title={s.ulke ? `${s.cari} · ${s.ulke}` : s.cari}><span className="flex items-center gap-1.5 min-w-0"><UlkeBayrak ulke={s.ulke} /><span className="truncate">{s.cari}</span></span></td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.stokAdi}</td>
                     <td className="px-3 py-2 text-sm text-right tabular-nums whitespace-nowrap text-white font-semibold">{kgYaz(s.miktarKg)}</td>
                     <td className="px-3 py-2 text-sm text-right tabular-nums whitespace-nowrap" style={{ color: TEXT_MUTED }}>{birimYaz(s.birimFiyat)}</td>

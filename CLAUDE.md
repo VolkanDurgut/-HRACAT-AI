@@ -54,8 +54,11 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
 - ihracat: Evraklar listesindeki kopyala ikonları; "Taslakları Müşteriye Gönder" kutusu;
   "VGM Gönder" (mailto); Yük Sigortası mail bölümü; Proforma "Geçmişten Aktar". Ayarlar > "İhracat
   Ayarları" (Varsayılan DİİB No; 05.11.2026 — DİİB No artık DİİB Takibi'nden); konşimento hatırlatma
-  mailinde talimat alanları (05.11.2026 — mail yalnız hatırlatma). Müşteriye
+  mailinde talimat alanları (05.11.2026 — mail yalnız hatırlatma); Proforma Oluştur "Ayarlar"
+  (Müşteri Kartları / Ürünler / Şablon Metinleri, 05.11.2026 — tablolar boş, DB'de duruyor). Müşteriye
   sistemden otomatik e-posta (draft onay vb.) ASKIDA.
+- yetki: Yetkilendirme'deki "Ayarlar" düğmesi (05.11.2026 — etkisizdi; erişim süper admin
+  listesiyle, DB değeri korunur).
 - analiz-rapor: Müşteri Dağılımı'nda "Diğer (n)" satırı; günlük rapor mailinde "Kısa Özet"
   listesi, "her gün … gönderilir" alt notu ve özet kutularının eski alt satırları.
 - ic-piyasa: fiyat formunda Ödeme sütunu, özel gün / bayram bandı, kaşe-imza alanı, başlıkta

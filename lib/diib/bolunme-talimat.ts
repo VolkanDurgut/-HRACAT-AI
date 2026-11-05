@@ -69,3 +69,57 @@ export function faturaBolunmesi(urunler: unknown, parcalar: TalimatParcaGirdisi[
   }
   return sonuc;
 }
+
+// ---------------------------------------------------------------------------
+// FATURA BASINA KAP / NET / BRUT (05.11.2026). Kullanici: "Bu dagilimli fatura icin kap, net ve
+// brut bilgilerini de eklemeliyiz." (ornek: 1. fatura 1.582 kap / 79.100 net / 79.258,20 brut;
+// 2. fatura 3.418 kap / 170.900 net / 171.241,80 brut.)
+// - Kap: her kalemin kg'i / ambalaj kg'i ("50 KG" -> 50). Ambalaj okunamayan kalem varsa kap yazilmaz.
+// - Brut: konteynerlerin brut / net ORANI (ornek 250.500 / 250.000 = 1,002 -> cuval basina 50,1 kg);
+//   son fatura kalani alir -> faturalarin brut toplami konteyner brut toplamina BIREBIR esit.
+//   Konteyner net / brut yoksa brut yazilmaz (tahmin yok).
+// ---------------------------------------------------------------------------
+
+export type ParcaAgirligi = { kap: number | null; net: number; brut: number | null };
+
+/** "50 KG", "25kg", "50 KG PP BAGS" -> 50; okunamazsa null. */
+export function ambalajKg(ambalaj: string | null | undefined): number | null {
+  const m = /(\d+(?:[.,]\d+)?)\s*KG/i.exec(String(ambalaj ?? ""));
+  if (!m) return null;
+  const n = Number(m[1].replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function parcaAgirliklari(parcalar: Pick<FaturaParcasi, "kg" | "kalemler">[], toplamNetKg: number, toplamBrutKg: number): ParcaAgirligi[] {
+  const oran = toplamNetKg > 0 && toplamBrutKg >= toplamNetKg ? toplamBrutKg / toplamNetKg : null;
+  const parcaNetToplam = parcalar.reduce((t, p) => t + p.kg, 0);
+  // Faturalar konteynerlerin tamamini kapsiyorsa son fatura kalan brutu alir (toplam birebir)
+  const tamKapsam = oran !== null && Math.abs(parcaNetToplam - toplamNetKg) < 0.5;
+  let kalanBrut = toplamBrutKg;
+  return parcalar.map((p, i) => {
+    let kap: number | null = 0;
+    for (const k of p.kalemler) {
+      const a = ambalajKg(k.ambalaj);
+      if (a === null || kap === null) { kap = null; continue; }
+      kap += k.kg / a;
+    }
+    if (kap !== null) kap = Math.abs(kap - Math.round(kap)) < 0.001 ? Math.round(kap) : Math.round(kap * 100) / 100;
+    let brut: number | null = null;
+    if (oran !== null) {
+      brut = tamKapsam && i === parcalar.length - 1 ? yuvarla(kalanBrut) : yuvarla(p.kg * oran);
+      kalanBrut = yuvarla(kalanBrut - brut);
+    }
+    return { kap, net: p.kg, brut };
+  });
+}
+
+/** "Kap 1.582 · Net 79.100 KG · Brüt 79.258,20 KG" (bilinmeyen alan yazilmaz). */
+export function parcaAgirlikMetni(a: ParcaAgirligi, ascii = false): string {
+  // Kesirli ise iki hane ("79.258,20"), tam sayi ise hanesiz ("1.582")
+  const s = (n: number) => n.toLocaleString("tr-TR", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
+  return [
+    a.kap !== null ? `Kap ${s(a.kap)}` : null,
+    `Net ${s(a.net)} KG`,
+    a.brut !== null ? `${ascii ? "Brut" : "Brüt"} ${s(a.brut)} KG` : null,
+  ].filter(Boolean).join(" · ");
+}

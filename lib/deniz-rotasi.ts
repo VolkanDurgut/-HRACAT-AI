@@ -10,8 +10,9 @@
  *
  * DOGRULAMA: scratchpad `harita/rota_test.ts` her cikis x her liman icin rota
  * bulundugunu ve kenarlarin Natural Earth 1:50m karasina GIRMEDIGINI (bogaz / kanal
- * kenarlari haric) her degisiklikte denetler. Yeni liman: LIMAN_KOORDINAT'a koordinat,
- * LIMAN_GIRISI'ne baglandigi deniz dugumu; gerekirse yeni dugum + kenar, sonra test.
+ * kenarlari haric) her degisiklikte denetler. Yeni liman: LIMAN_KOORDINAT'a koordinat yeter;
+ * LIMAN_GIRISI'nde yoksa en yakin deniz dugumune (<= 450 nm) baglanir (05.11.2026).
+ * Ozel giris gerekiyorsa LIMAN_GIRISI'ne eklenir.
  * Saf TypeScript, import yok.
  */
 
@@ -148,7 +149,19 @@ export const LIMAN_GIRISI: Record<string, string> = {
   BATUMI: "BATUM_OFF", POTI: "BATUM_OFF", ROTTERDAM: "ROTTERDAM_OFF", HAMBURG: "HAMBURG_OFF", SINGAPORE: "SINGAPUR_OFF",
   "PORT KLANG": "PORT_KLANG_OFF", JAKARTA: "CAKARTA_OFF", MANILA: "MANILA_OFF", "HO CHI MINH": "HOCIMIN_OFF",
   MARIEL: "MARIEL_OFF", HAVANA: "HAVANA_OFF", "SANTIAGO DE CUBA": "SANTIAGO_OFF", VERACRUZ: "VERAKRUZ_OFF",
+  // 05.11.2026: en yakin dugum karadan gecerdi / uzak kalirdi -> elle baglanan yeni limanlar
+  ASHDOD: "LEVANT", HAMAD: "KORFEZ_O", DOHA: "KORFEZ_O", "NHAVA SHEVA": "LAKADIV", MUMBAI: "LAKADIV",
+  CHENNAI: "SRI_LANKA_D", MAHAJANGA: "MOZAMBIK_KAN", AGADIR: "KANARYA", SFAX: "MALTA_K", SOUSSE: "MALTA_K",
 };
+
+/**
+ * Deniz agi bu limanlara ulasmiyor (en yakin dugumden duz hat karadan gecer): rota
+ * UYDURULMAZ, harita temsili kesik hat cizer. Ag genisletilince buradan cikarilir.
+ */
+export const ROTASIZ_LIMANLAR = new Set<string>([
+  "GIOIA TAURO", "TRIESTE", "KOPER", "VENICE", "LAEM CHABANG", "BANGKOK", "SIHANOUKVILLE", "DA NANG", "YANGON",
+  "SANTO DOMINGO", "HAINA", "RIO HAINA", "CAUCEDO", "PORT AU PRINCE", "KINGSTON", "GDANSK", "BILBAO",
+]);
 
 /** Cikis merkezi adi (lib/liman-koordinat.ts CIKISLAR) -> deniz dugumu. */
 export const CIKIS_GIRISI: Record<string, string> = {
@@ -214,6 +227,23 @@ export function enKisaYol(bas: string, son: string): string[] | null {
   return yol;
 }
 
+/** Aga bagli dugumler arasinda limana en yakini (deniz mili); fallback icin ust sinir. */
+const EN_YAKIN_DUGUM_NM = 450;
+
+/**
+ * LIMAN_GIRISI'nde olmayan (yeni eklenen) liman icin en yakin deniz dugumu (05.11.2026).
+ * Uzak (> 450 nm) ise null: rota uydurulmaz, harita temsili hat cizer.
+ */
+export function enYakinDugum(liman: Nokta, sinirNm = EN_YAKIN_DUGUM_NM): string | null {
+  const g = ag();
+  let enIyi: string | null = null, enAz = Infinity;
+  g.forEach((_, d) => {
+    const nm = mesafeNm(DENIZ_DUGUMLERI[d], liman);
+    if (nm < enAz) { enAz = nm; enIyi = d; }
+  });
+  return enAz <= sinirNm ? enIyi : null;
+}
+
 export type DenizRotasi = { noktalar: Nokta[]; nm: number; gecisler: string[] };
 
 /**
@@ -221,7 +251,8 @@ export type DenizRotasi = { noktalar: Nokta[]; nm: number; gecisler: string[] };
  * ag -> liman dugumu -> liman. Liman / cikis aga bagli degilse null (haritada cizilmez).
  */
 export function denizRotasi(cikisAdi: string, cikis: Nokta, limanAnahtari: string, liman: Nokta): DenizRotasi | null {
-  const bas = CIKIS_GIRISI[cikisAdi], son = LIMAN_GIRISI[limanAnahtari];
+  if (ROTASIZ_LIMANLAR.has(limanAnahtari)) return null;
+  const bas = CIKIS_GIRISI[cikisAdi], son = LIMAN_GIRISI[limanAnahtari] ?? enYakinDugum(liman);
   if (!bas || !son) return null;
   const yol = enKisaYol(bas, son);
   if (!yol) return null;

@@ -64,8 +64,11 @@
   büyüklüğü konteyner (karekök ölçek), üzerine gelince/odakta ayrıntı (konteyner, dosya,
   hacim, $/MTS, teslim), etiketler çakışmayacak şekilde yerleşir (sığmayan gizlenir).
   Koordinat tablosu `lib/liman-koordinat.ts` (`limanAnahtari` anahtarlarıyla; listede
-  olmayan liman ÇİZİLMEZ, kart altında "Haritada konumu olmayan: …" — yeni liman buraya
-  eklenir). Dünya haritası `lib/dunya-haritasi.ts` = Natural Earth 110m önceden SVG yoluna
+  05.11.2026 "havuza yeni eklenen limanlar otomatik görünmeli": liste ~200 limana çıktı
+  (ASHDOD dahil); `limanKonumu(anahtar, ulke)` sırası: birebir → ad içinde bilinen liman
+  ("NHAVA SHEVA JNPT") → ülkenin ana limanı `ULKE_ANA_LIMAN` (ülke: varış limanı metninden,
+  yoksa alıcı adresinden; nokta KESİK çerçeveli, ipucunda "Yaklaşık konum"). Hiçbiri yoksa
+  kart altında "Haritada konumu olmayan: …"). Dünya haritası `lib/dunya-haritasi.ts` = Natural Earth 110m önceden SVG yoluna
   çevrildi (YENİ PAKET YOK; üretici scratchpad `harita/gen.mjs`). Kart zemini opak + üstte
   çok hafif yeşil ton (`KART_ZEMINI`). Müşteri adları 2 satıra kadar. Test
   `analizpanel/test.py` 54 (1280/1366/1492/1527/1920/390; tablolarda yatay kaydırma yok,
@@ -90,6 +93,10 @@
   Ümit Burnu tercihi vb. farklı olabilir; harita altında yazar). İpucu: "İstanbul → DJIBOUTI:
   ≈ 2.170 deniz mili · Çanakkale Boğazı → Süveyş Kanalı → Bab-el Mandeb" (kart sol üstte
   sabit, rotayı kapatmaz). Ağa bağlı olmayan liman → eski temsilî eğri (ince kesik) + not.
+  05.11.2026: `LIMAN_GIRISI`'nde olmayan liman en yakın deniz düğümüne (≤ 450 nm,
+  `enYakinDugum`) bağlanır; en yakın düğümden düz hat karadan geçecek limanlar
+  `ROTASIZ_LIMANLAR` (temsilî hat). Yeni 05.11 limanları rota_test'ten GEÇİRİLMEDİ (scratchpad
+  bu oturumda yok) — elle gözden geçirildi; ilk fırsatta testte doğrulanmalı.
   YENİ LİMAN: `LIMAN_KOORDINAT` + `LIMAN_GIRISI` (bağlı deniz düğümü), gerekirse düğüm/kenar;
   SONRA MUTLAKA scratchpad `harita/rota_test.ts` (Natural Earth 1:50m: hiçbir düğüm/kenar/
   yumuşatılmış köşe karaya girmez — boğaz/kanal kenarları `dar: true` ile muaf; her çıkış ×

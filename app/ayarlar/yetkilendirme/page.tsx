@@ -44,13 +44,36 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   ihracatlar: "İhracatlar",
   etd_eta:    "ETD/ETA",
   kantar:     "Kantar Paneli",
-  ayarlar:    "Ayarlar",
   draft_onay: "İhracat Evrakları",
   ic_piyasa:  "İç Piyasa",
   proformalar: "Proforma Oluştur",
   proforma_imza: "Proforma İmzalama (Onayla ve İmzala)",
   satin_alma: "Satın Alma (talep onayı)",
   ic_alis:    "İç Piyasa Alış (tedarikçi ve alış fiyatları)",
+};
+
+/**
+ * Dugmenin altindaki kisa aciklama: yetkinin hangi sayfa / sekme / ozellikleri actigi (05.11.2026,
+ * kullanici: "yeni eklenen seyler goz onunde bulundurularak yetkilendirme guncel olmali").
+ * Yeni bir alt sayfa ayni anahtarla aciliyorsa (or. DIIB Takibi -> ihracatlar) buraya yazilir.
+ */
+const ACIKLAMALAR: Record<string, string> = {
+  analiz:        "Göstergeler, sevkiyat haritası, liman / acente analizleri",
+  panel:         "Dosya listesi ve günlük iş takibi",
+  proformalar:   "Proforma hazırlama ve PDF",
+  proforma_imza: "Hazırlanan proformayı onaylayıp imzalama",
+  yeni_dosya:    "Proforma PDF'inden yeni ihracat dosyası açma",
+  ihracatlar:    "İhracat dosyaları + DİİB Takibi (beyanname no, DİİB bölünmesi)",
+  draft_onay:    "Draft BL ve sevkiyat evrakı onayları",
+  etd_eta:       "Gemi ETD / ETA ve cut-off takibi",
+  kantar:        "İhracat DBA + yurt içi irsaliye: satış iş emirleri ve gelen araç (alış) sekmesi",
+  ic_piyasa:     "İş emirleri, sipariş raporu, bildirimler, müşteriler, fiyat formu",
+  ic_alis:       "Alış siparişleri, tedarikçiler ve alış fiyatları",
+  satin_alma:    "Departman ihtiyaç listelerinin onayı",
+  proforma:      "Dosyada proforma bilgileri",
+  evraklar:      "Fatura, çeki listesi, menşe vb. sevkiyat evrakları",
+  rezervasyon:   "Booking, gemi ve cut-off bilgileri",
+  konteynerler:  "Konteyner / kg girişi, fatura ve konşimento talimatı",
 };
 
 const SEKME_ETIKETLER: Record<string, string> = {
@@ -77,7 +100,6 @@ const YETKI_GRUPLARI: { baslik: string; tip: "sayfa" | "sekme"; anahtarlar: stri
   { baslik: "Operasyon", tip: "sayfa", anahtarlar: ["etd_eta", "kantar"] },
   { baslik: "Yurt İçi", tip: "sayfa", anahtarlar: ["ic_piyasa", "ic_alis"] },
   { baslik: "Şirket İçi", tip: "sayfa", anahtarlar: ["satin_alma"] },
-  { baslik: "Yönetim", tip: "sayfa", anahtarlar: ["ayarlar"] },
   { baslik: "Dosya sekmeleri", tip: "sekme", anahtarlar: ["proforma", "evraklar", "rezervasyon", "konteynerler"] },
 ];
 
@@ -86,12 +108,15 @@ const yetkiVarMi = (k: Pick<KullaniciYetki, "sayfa_yetkileri">) => Object.values
 const imza = (k: KullaniciYetki) => JSON.stringify([k.rol, Object.keys(SAYFA_ETIKETLER).map((x) => !!k.sayfa_yetkileri[x]), Object.keys(SEKME_ETIKETLER).map((x) => !!k.sekme_yetkileri[x])]);
 
 /** Yetki dugmesi: etiket + anahtar; tum alan tiklanir (genis dokunma alani). */
-function YetkiDugmesi({ value, onChange, etiket, ariaEtiket }: { value: boolean; onChange: (v: boolean) => void; etiket: string; ariaEtiket: string }) {
+function YetkiDugmesi({ value, onChange, etiket, ariaEtiket, aciklama }: { value: boolean; onChange: (v: boolean) => void; etiket: string; ariaEtiket: string; aciklama?: string }) {
   return (
     <button type="button" role="switch" aria-checked={value} aria-label={ariaEtiket} onClick={() => onChange(!value)}
       className="w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-xs transition-colors hover:bg-white/[0.04]"
       style={{ borderColor: value ? "rgba(16,185,129,0.45)" : CARD_BORDER, backgroundColor: value ? "rgba(16,185,129,0.08)" : "transparent", color: value ? "#E6F4EE" : TEXT_MUTED }}>
-      <span className="min-w-0 break-words leading-snug">{etiket}</span>
+      <span className="min-w-0 break-words leading-snug">
+        {etiket}
+        {aciklama && <span className="block text-[10px] mt-0.5 leading-snug" style={{ color: TEXT_MUTED }} data-yetki-aciklama="">{aciklama}</span>}
+      </span>
       <span className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors" style={{ backgroundColor: value ? ACCENT : CARD_BORDER }} aria-hidden>
         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${value ? "translate-x-4" : "translate-x-1"}`} />
       </span>
@@ -184,7 +209,9 @@ export default function YetkilendirmePage() {
       if (error) { showToast(`Rol kaydedilemedi: ${error.message}`, "error"); setSaving(null); return; }
     }
     // Tum anahtarlar acikca yazilir (eksik anahtar = kapali)
-    const sayfa = Object.fromEntries(Object.keys(SAYFA_ETIKETLER).map((x) => [x, !!k.sayfa_yetkileri[x]]));
+    const sayfa: Record<string, boolean> = Object.fromEntries(Object.keys(SAYFA_ETIKETLER).map((x) => [x, !!k.sayfa_yetkileri[x]]));
+    // 05.11.2026: "ayarlar" dugmesi kaldirildi (erisim super admin listesiyle); DB'deki deger aynen korunur
+    if (k.sayfa_yetkileri && "ayarlar" in k.sayfa_yetkileri) sayfa.ayarlar = !!k.sayfa_yetkileri.ayarlar;
     const sekme = Object.fromEntries(Object.keys(SEKME_ETIKETLER).map((x) => [x, !!k.sekme_yetkileri[x]]));
     const { data, error } = await supabase
       .from("kullanici_yetkileri")
@@ -233,7 +260,7 @@ export default function YetkilendirmePage() {
       <SayfaBasligi
         ikon={<ShieldCheck size={20} />}
         baslik="Yetkilendirme"
-        aciklama="Kullanıcıların rolü, görebileceği sayfalar ve dosya sekmeleri. @unex.com.tr adresiyle eklenen kullanıcılar burada yetkileri kapalı olarak hazır görünür."
+        aciklama="Kullanıcıların rolü, görebileceği sayfalar ve dosya sekmeleri. @unex.com.tr adresiyle eklenen kullanıcılar burada yetkileri kapalı olarak hazır görünür. Yetkilendirme sayfası yalnızca süper admin hesaplarına açıktır; ayrıca açılmaz."
         sag={
           <button onClick={() => fetchKullanicilar(true)} disabled={yenileniyor}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5 disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
@@ -275,7 +302,8 @@ export default function YetkilendirmePage() {
         <p className="mb-3 text-xs inline-flex items-center gap-1.5 text-amber-400"><Clock size={12} /> {yeniSayisi} kullanıcının henüz hiçbir sayfa yetkisi yok; açıp kaydedin.</p>
       )}
 
-      <div className="space-y-3">
+      {/* pb-20: sag alttaki destek dugmesi son kartin son yetkisini ortmesin (05.11.2026) */}
+      <div className="space-y-3 pb-20">
         {kullanicilar.map((k, idx) => {
           const kirli = degisti.has(k.user_id);
           const yeni = !yetkiVarMi(k);
@@ -339,7 +367,7 @@ export default function YetkilendirmePage() {
                         const etiketler = g.tip === "sayfa" ? SAYFA_ETIKETLER : SEKME_ETIKETLER;
                         const deger = g.tip === "sayfa" ? !!k.sayfa_yetkileri[key] : !!k.sekme_yetkileri[key];
                         return (
-                          <YetkiDugmesi key={key} value={deger} etiket={etiketler[key]}
+                          <YetkiDugmesi key={key} value={deger} etiket={etiketler[key]} aciklama={ACIKLAMALAR[key]}
                             ariaEtiket={g.tip === "sayfa" ? `${k.email} · ${etiketler[key]}` : `${k.email} · ${etiketler[key]} sekmesi`}
                             onChange={(v) => handleToggle(k.user_id, g.tip, key, v)} />
                         );

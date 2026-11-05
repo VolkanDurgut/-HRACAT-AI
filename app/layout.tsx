@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/lib/toast-context";
 import ProgressBar from "@/components/progress-bar";
+import SayfaGecisi from "@/components/sayfa-gecisi";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
             <ProgressBar />
+            <SayfaGecisi />
             {children}
           </ToastProvider>
         </AuthProvider>

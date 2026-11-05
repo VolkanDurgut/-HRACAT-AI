@@ -1060,3 +1060,13 @@
   Beyanname; yüklenen yeşil ve tıklanınca açılır, eksik kesik çerçeveli; sonda "Eksik: …". Bölünmüşte
   "Fatura 1/2". Test: scratchpad `e2e_fatura_parca.mjs` (FATURA_TEST=1), `fatura/test.mts` (gerçek iki
   e-Fatura metniyle; örnekler repoda YOK).
+
+
+## Ana Panel evraklar + konteyner rezervasyon ön seçimi (06.11.2026)
+
+- Ana Panel'de her dosyanın ikinci satırının başında "EVRAKLAR n/4" (testid `evrak-sayac`) ve
+  sırayla Konşimento Talimatı gönderildi / Fatura kesildi / Draft BL alındı / Beyanname
+  gönderildi çipleri; altında "Tüm evraklar tamam" ya da "Eksik: …". Cut-off ve rezervasyon
+  rozetlerinde "Beyanname yüklendi" yerine "Beyanname gönderildi".
+- Konteynerler sekmesi: dosyanın TEK rezervasyonu varsa "Konteyner Ekle" ve "Toplu Ekle"
+  formlarında rezervasyon kendiliğinden seçilir (kullanıcı değiştirebilir).

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -43,6 +44,7 @@ type KonteynerRow = {
 export default function KantarPage() {
   const { user, companyId, yetkiler, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const [konteynerler, setKonteynerler] = useState<KonteynerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [arama, setArama] = useState("");
@@ -366,7 +368,7 @@ export default function KantarPage() {
               {baglantiSorunu ? <span>Bağlantı yok · {sonGuncellemeSaat}</span> : <span>Canlı</span>}
             </span>
             {digerSayfa && (
-              <button onClick={() => router.push(digerSayfa)}
+              <button onClick={() => gecisliGit(digerSayfa)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
                 style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
                 title="Uygulamanın diğer sayfalarına dön">

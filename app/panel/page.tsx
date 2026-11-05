@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, Suspense, useCallback } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
@@ -32,43 +33,55 @@ function evrakDurumlari(d: DosyaWithRelations) {
   const faturaYuklu = parca ? parca.filter((p) => !!p.fatura_dosya_url).length : d.fatura_dosya_url ? 1 : 0;
   const faturaToplam = parca ? parca.length : 1;
   return [
-    { ad: "Konşimento Talimatı", kisa: "Konşimento T.", url: d.konsimento_dosya_url, tamam: !!d.konsimento_dosya_url, ek: null as string | null },
-    { ad: "Fatura", kisa: "Fatura", url: d.fatura_dosya_url || parca?.find((p) => p.fatura_dosya_url)?.fatura_dosya_url || null, tamam: faturaYuklu >= faturaToplam, ek: parca ? `${faturaYuklu}/${faturaToplam}` : null },
-    { ad: "Draft BL", kisa: "Draft BL", url: d.draft_bl_dosya_url, tamam: !!d.draft_bl_dosya_url, ek: null },
-    { ad: "Beyanname", kisa: "Beyanname", url: d.beyanname_dosya_url, tamam: !!d.beyanname_dosya_url, ek: null },
+    // durum: tamamlandiginda kullanilan fiil (panel cut-off rozetleriyle ayni dil: "Talimat gönderildi", "Draft BL alındı")
+    { ad: "Konşimento Talimatı", durum: "gönderildi", url: d.konsimento_dosya_url, tamam: !!d.konsimento_dosya_url, ek: null as string | null },
+    { ad: "Fatura", durum: "kesildi", url: d.fatura_dosya_url || parca?.find((p) => p.fatura_dosya_url)?.fatura_dosya_url || null, tamam: faturaYuklu >= faturaToplam, ek: parca ? `${faturaYuklu}/${faturaToplam}` : null },
+    { ad: "Draft BL", durum: "alındı", url: d.draft_bl_dosya_url, tamam: !!d.draft_bl_dosya_url, ek: null },
+    { ad: "Beyanname", durum: "gönderildi", url: d.beyanname_dosya_url, tamam: !!d.beyanname_dosya_url, ek: null },
   ];
 }
 
 function EvrakDurumu({ dosya }: { dosya: DosyaWithRelations }) {
+  // 06.11.2026 (kullanici: "Evraklar kismi ve evraklar daha on planda olmali"): durum satirinin
+  // EN USTUNDE, daha buyuk rozetler + "n/4" sayaci; tamamlanan rozet "Beyanname gönderildi" gibi okunur.
   const evraklar = evrakDurumlari(dosya);
+  const tamam = evraklar.filter((e) => e.tamam).length;
   const eksik = evraklar.filter((e) => !e.tamam).map((e) => (e.ek ? `${e.ad} (${e.ek})` : e.ad));
+  const hepsi = eksik.length === 0;
   return (
-    <div className="flex items-center gap-1.5 flex-wrap mt-1.5" data-testid="evrak-durumu">
-      <span className="text-[10px] font-semibold uppercase tracking-wide mr-0.5" style={{ color: TEXT_MUTED }}>Evraklar</span>
+    <div className="flex items-center gap-2 flex-wrap" data-testid="evrak-durumu">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider mr-1 text-white">
+        <FileText size={13} style={{ color: ACCENT }} /> Evraklar
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums" data-testid="evrak-sayac"
+          style={hepsi ? { backgroundColor: "rgba(16,185,129,0.15)", color: "#6EE7B7" } : { backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D" }}>
+          {tamam}/{evraklar.length}
+        </span>
+      </span>
       {evraklar.map((e) => {
+        const metin = e.tamam ? `${e.ad} ${e.durum}` : e.ek ? `${e.ad} ${e.ek}` : e.ad;
         const ic = (
           <>
-            {e.tamam ? <CheckCircle2 size={11} /> : <CircleDashed size={11} />}
-            {e.ad}{e.ek ? ` ${e.ek}` : ""}
+            {e.tamam ? <CheckCircle2 size={13} /> : <CircleDashed size={13} />}
+            {metin}
           </>
         );
-        const sinif = "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border";
+        const sinif = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border";
         return e.url ? (
           <a key={e.ad} href={e.url} target="_blank" rel="noopener noreferrer" data-evrak={e.ad} data-tamam={e.tamam ? "evet" : "hayir"}
-            title={e.tamam ? `${e.ad} yüklendi - belgeyi aç` : `${e.ad}: ${e.ek} yüklendi - yüklenen belgeyi aç`}
+            title={e.tamam ? `${e.ad} ${e.durum} - belgeyi aç` : `${e.ad}: ${e.ek} - yüklenen belgeyi aç`}
             className={`${sinif} hover:opacity-90 transition-opacity`}
-            style={e.tamam ? { borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" } : { borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.08)", color: "#FCD34D" }}>
+            style={e.tamam ? { borderColor: "rgba(16,185,129,0.45)", backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" } : { borderColor: "rgba(245,158,11,0.45)", backgroundColor: "rgba(245,158,11,0.12)", color: "#FCD34D" }}>
             {ic}
           </a>
         ) : (
           <span key={e.ad} data-evrak={e.ad} data-tamam="hayir" title={`${e.ad} henüz yüklenmedi`} className={sinif}
-            style={{ borderColor: CARD_BORDER, borderStyle: "dashed", color: TEXT_MUTED }}>
+            style={{ borderColor: "#3A4253", borderStyle: "dashed", color: "#9AA3B5" }}>
             {ic}
           </span>
         );
       })}
-      <span className="text-[10px] ml-1" style={{ color: eksik.length ? "#FCD34D" : "#6EE7B7" }} data-testid="evrak-eksik">
-        {eksik.length ? `Eksik: ${eksik.join(", ")}` : "Tüm evraklar yüklendi"}
+      <span className="text-[11px] font-medium ml-1" style={{ color: hepsi ? "#6EE7B7" : "#FCD34D" }} data-testid="evrak-eksik">
+        {hepsi ? "Tüm evraklar tamam" : `Eksik: ${eksik.join(", ")}`}
       </span>
     </div>
   );
@@ -84,6 +97,7 @@ function PanelContent() {
   const { user, yetkiler, companyId, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const searchParams = useSearchParams();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const { showToast } = useToast();
   const initialFilter = searchParams.get("filter") || "tumu";
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
@@ -326,9 +340,9 @@ function PanelContent() {
                             {latestRez!.beyanname_cutoff ? (
                               <CutoffSayac
                                 deger={latestRez!.beyanname_cutoff}
-                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Beyanname yüklendi" : null}
+                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Beyanname gönderildi" : null}
                                 tamamHref={dosya.beyanname_dosya_url}
-                                tamamAciklama="Beyanname yüklendi - belgeyi aç"
+                                tamamAciklama="Beyanname gönderildi - belgeyi aç"
                               />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
                           </td>
@@ -352,7 +366,7 @@ function PanelContent() {
                             </a>
                           )}
                           <button
-                            onClick={() => router.push(`/dosya/${dosya.id}`)}
+                            onClick={() => gecisliGit(`/dosya/${dosya.id}`)}
                             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                             style={{ backgroundColor: ACCENT }}
                           >
@@ -373,8 +387,9 @@ function PanelContent() {
 
                     {/* Durum adımları — kompakt tek satır */}
                     <tr className={`border-b ${staggerClass}`} style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                      <td colSpan={8} className="px-4 py-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                      <td colSpan={8} className="px-4 py-2.5">
+                        <EvrakDurumu dosya={dosya} />
+                        <div className="flex items-center gap-1.5 flex-wrap mt-2">
                           {akisAdimlari.map((adim) => (
                             <span
                               key={adim.label}
@@ -389,7 +404,6 @@ function PanelContent() {
                             {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}
                           </span>
                         </div>
-                        <EvrakDurumu dosya={dosya} />
                       </td>
                     </tr>
                   </React.Fragment>

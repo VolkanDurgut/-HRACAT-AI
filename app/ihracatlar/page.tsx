@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, AnaSiparis, SEVKIYAT_EVRAKLARI, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
@@ -29,6 +30,7 @@ type AnaSiparisWithProgress = AnaSiparis & { ilerleme: SiparisIlerlemesi };
 export default function IhracatlarPage() {
   const { user, yetkiler, companyId, loading: authLoading } = useAuth();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const { showToast } = useToast();
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
   const [acikSiparisler, setAcikSiparisler] = useState<AnaSiparisWithProgress[]>([]);
@@ -257,7 +259,7 @@ export default function IhracatlarPage() {
       if (dbError) throw dbError;
 
       showToast("Yeni sevkiyat dosyası oluşturuldu. Rezervasyon bilgilerini girin.", "success");
-      router.push(`/dosya/${yeniDosya.id}?tab=rezervasyon&action=new`);
+      gecisliGit(`/dosya/${yeniDosya.id}?tab=rezervasyon&action=new`);
     } catch {
       showToast("Dosya oluşturulurken hata oluştu.", "error");
       setDevamOlusturuluyor(false);
@@ -542,7 +544,7 @@ export default function IhracatlarPage() {
                   </a>
                 )}
                 <button
-                  onClick={() => router.push(`/dosya/${selectedDosya.id}`)}
+                  onClick={() => gecisliGit(`/dosya/${selectedDosya.id}`)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
                   style={{ backgroundColor: ACCENT }}
                 >

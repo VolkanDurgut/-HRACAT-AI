@@ -246,3 +246,16 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
   emin olmadığın proje detayı varsa (örn. "bu migration uygulandı mı", "bu
   bundle'ı nasıl uyguluyorsun") tahmin etme, kullanıcıya sor ya da bu dosyayı
   güncel tut.
+
+## Uygulama + edge ortak modülleri (06.11.2026)
+
+- Saf hesap modülleri hem uygulamada hem edge function'da kullanılacaksa
+  `supabase/functions/_shared/` altına konur, kendi aralarında `./x.ts` uzantılı import eder
+  (Deno kuralı). `tsconfig.json`'da `allowImportingTsExtensions: true` bunun için açık.
+- Uygulamadaki eski yol (`lib/sayi-oku.ts`, `lib/ulke-bul.ts`, `lib/liman-anahtari.ts`,
+  `lib/diib/hesap.ts`) korunur ve `_shared`'dan **adlarıyla tek tek** yeniden dışa aktarır
+  (`export { a, b } from "@/supabase/functions/_shared/..."`). `export *` KULLANILMAZ: tsx
+  test düzeninde (CJS) adlar görünmüyor.
+- Bu modüllerden birini değiştirmek, onu kullanan edge function'ların YENİDEN deploy
+  edilmesini gerektirir (`diib-gunluk-rapor`: diib-hesap, diib-excel, diib-rapor, sayi-oku,
+  ulke-bul, liman-anahtari).

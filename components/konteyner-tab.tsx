@@ -68,6 +68,16 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
   const [topluRezId, setTopluRezId] = React.useState("");
   const [topluSaving, setTopluSaving] = React.useState(false);
 
+  // 06.11.2026 (kullanici: "rezervasyon 1'den fazla degilse konteyner kaydinda secili gelmeli"):
+  // tek rezervasyon varsa tekli ve toplu kayit formunda o rezervasyon secili gelir (kayittan sonra da).
+  const tekRezervasyonId = rezervasyonlar.length === 1 ? rezervasyonlar[0].id : "";
+  React.useEffect(() => {
+    if (tekRezervasyonId && showForm && !form.rezervasyon_id) update("rezervasyon_id", tekRezervasyonId);
+  }, [tekRezervasyonId, showForm, form.rezervasyon_id, update]);
+  React.useEffect(() => {
+    if (tekRezervasyonId && showTopluForm && !topluRezId) setTopluRezId(tekRezervasyonId);
+  }, [tekRezervasyonId, showTopluForm, topluRezId]);
+
   const handleTopluKaydet = async () => {
     if (!topluMetin.trim()) return;
     setTopluSaving(true);

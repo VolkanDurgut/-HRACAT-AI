@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
 import { supabase, Dosya, Rezervasyon, Konteyner, SurecTakibi, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTimeTR, autoSuggestContainers } from "@/lib/cutoff-utils";
@@ -67,6 +68,7 @@ function evrakEslestir(evraklar: string[], anahtar: string): string | null {
 function DosyaDetailContent() {
   const { id } = useParams();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const searchParams = useSearchParams();
   const { user, yetkiler, companyId } = useAuth(); // companyId global context'ten alındı
   const { showToast } = useToast();
@@ -132,7 +134,7 @@ function DosyaDetailContent() {
     setDurumSaving(false);
     setShowDurumConfirm(false);
     if (isAcik) {
-      router.push("/panel");
+      gecisliGit("/panel");
     } else {
       setDosya({ ...dosya, durum: newDurum });
     }
@@ -186,7 +188,7 @@ function DosyaDetailContent() {
           description="Dosya silinmiş olabilir ya da bu dosyaya erişim yetkiniz bulunmuyor."
           action={
             <button
-              onClick={() => router.push("/panel")}
+              onClick={() => gecisliGit("/panel")}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90"
               style={{ backgroundColor: ACCENT }}
             >

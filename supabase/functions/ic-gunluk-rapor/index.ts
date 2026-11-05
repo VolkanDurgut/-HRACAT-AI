@@ -116,7 +116,7 @@ async function sirketRaporu(companyId: string, tarih: string) {
     `ic_is_emirleri?select=id,is_emri_no,durum,urun,ambalaj,teslim,hedef_tur,hedef_kg,hedef_arac,devir_kg,kapanis_zamani,olusturma,ic_musteriler(unvan,kisa_ad)&company_id=eq.${companyId}&or=(durum.eq.acik,kapanis_zamani.gte.${tarih}T00:00:00%2B03:00)&order=id`
   );
   const emirler: RaporIsEmri[] = emirHam.map(({ ic_musteriler, ...e }) => ({ ...e, musteri: ic_musteriler?.unvan || "-", musteri_kisa: ic_musteriler?.kisa_ad || null }));
-  const sevkKolon = "id,is_emri_id,plaka,dorse_plaka,net_kg,irsaliye_no,irsaliye_tarihi,olusturma,cikis_durumu,cikis_zamani,gecmis";
+  const sevkKolon = "id,is_emri_id,plaka,dorse_plaka,net_kg,irsaliye_no,irsaliye_tarihi,olusturma,cikis_durumu,cikis_zamani,gecmis,irsaliye_dosya_yolu";
   // Bu siparislerin tum araclari + bugun yuklenen tum araclar (baska siparisteki dahil)
   const gunBas = `${tarih}T00:00:00%2B03:00`;
   const [emirSevk, gunSevk] = await Promise.all([
@@ -139,7 +139,7 @@ async function sirketRaporu(companyId: string, tarih: string) {
   try {
     const alisHam = await hepsiniCek<AlisHam>(`ic_alis_siparisleri?select=id,alis_no,durum,urun,depo,miktar_kg,kapanis_zamani,ic_tedarikciler(unvan,kisa_ad)&company_id=eq.${companyId}&durum=eq.acik&order=id`);
     alislar = alisHam.map(({ ic_tedarikciler, ...a }) => ({ ...a, tedarikci: ic_tedarikciler?.unvan || "-", tedarikci_kisa: ic_tedarikciler?.kisa_ad || null }));
-    const tKolon = "id,alis_id,plaka,dorse_plaka,net_kg,teslim_zamani,irsaliye_no,irsaliye_tarihi,olusturma,sevk_id,gecmis";
+    const tKolon = "id,alis_id,plaka,dorse_plaka,net_kg,teslim_zamani,irsaliye_no,irsaliye_tarihi,olusturma,sevk_id,gecmis,irsaliye_dosya_yolu";
     const [acikTeslim, gunTeslim] = await Promise.all([
       alislar.length ? hepsiniCek<RaporTeslim>(`ic_alis_teslimler?select=${tKolon}&company_id=eq.${companyId}&alis_id=in.${inListe(alislar.map((a) => a.id))}&order=id`) : Promise.resolve([]),
       hepsiniCek<RaporTeslim>(`ic_alis_teslimler?select=${tKolon}&company_id=eq.${companyId}&or=(teslim_zamani.gte.${gunBas},olusturma.gte.${gunBas})&order=id`),

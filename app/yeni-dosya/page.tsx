@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, UrunDetay, SEVKIYAT_EVRAKLARI, AnaSiparis, getGuvenliDosyaUrl, yazmaHatasi } from "@/lib/supabase";
@@ -30,6 +31,7 @@ function pdfMi(file: File): boolean {
 export default function YeniDosyaPage() {
   const { user, companyId, yetkiler, loading: authLoading } = useAuth(); // Global context'ten companyId alındı
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const { showToast } = useToast();
   const [step, setStep] = useState<Step>("upload");
 
@@ -524,7 +526,7 @@ export default function YeniDosyaPage() {
                 </p>
               </div>
               <button
-                onClick={() => router.push(`/dosya/${dosyaId}`)}
+                onClick={() => gecisliGit(`/dosya/${dosyaId}`)}
                 className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors text-white"
                 style={{ borderColor: CARD_BORDER }}
               >
@@ -536,7 +538,7 @@ export default function YeniDosyaPage() {
                 <h3 className="font-semibold text-white mb-1">Rezervasyon Ekle</h3>
                 <p className="text-sm mb-4" style={{ color: TEXT_MUTED }}>Booking no, cut-off tarihleri ve yükleme bilgilerini girin.</p>
                 <button
-                  onClick={() => router.push(`/dosya/${dosyaId}?tab=rezervasyon&action=new`)}
+                  onClick={() => gecisliGit(`/dosya/${dosyaId}?tab=rezervasyon&action=new`)}
                   className="w-full py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
                   style={{ backgroundColor: ACCENT }}
                 >
@@ -641,14 +643,14 @@ export default function YeniDosyaPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => router.push(`/dosya/${dosyaId}`)}
+                onClick={() => gecisliGit(`/dosya/${dosyaId}`)}
                 className="px-6 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
                 style={{ backgroundColor: ACCENT }}
               >
                 Dosyayı Görüntüle
               </button>
               <button
-                onClick={() => router.push("/panel")}
+                onClick={() => gecisliGit("/panel")}
                 className="px-6 py-2.5 rounded-lg font-medium text-sm border hover:bg-white/5 transition-all"
                 style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
               >

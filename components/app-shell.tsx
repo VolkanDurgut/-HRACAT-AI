@@ -10,6 +10,7 @@ import CutoffUyarilari from "@/components/cutoff-uyarilari";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { Loader2, LogOut, ShieldAlert } from "lucide-react";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
+import { girisSonrasiKaydet } from "@/lib/giris-donus";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 
 const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYetkileri> = {
@@ -66,6 +67,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user) {
+      // E-postadaki belge baglantisi (/belge/...) giristen sonra yeniden acilsin (06.11.2026)
+      if (pathname.startsWith("/belge/")) girisSonrasiKaydet(pathname + window.location.search);
       router.replace("/");
       return;
     }

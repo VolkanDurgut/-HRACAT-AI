@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
+import { girisSonrasiAl } from "@/lib/giris-donus";
 import { Loader2, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -37,7 +38,7 @@ export default function GirisSayfasi() {
     // yetkisi olan -> /kantar). Hic sayfa yetkisi yoksa /panel'e gider ve
     // orada AppShell "Erisim yetkiniz yok" ekranini gosterir - dongu olusmaz.
     // (28.10.2026: eski Kontrol Merkezi /dashboard kaldirildi.)
-    if (!loading && user) router.replace(ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel");
+    if (!loading && user) router.replace(girisSonrasiAl() || ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel");
   }, [user, loading, yetkiler, router]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -49,7 +50,7 @@ export default function GirisSayfasi() {
       setAuthError("Giriş bilgileri hatalı. Lütfen e-posta ve şifrenizi kontrol edin.");
       setIsProcessing(false);
     } else {
-      router.push("/panel");
+      router.push(girisSonrasiAl() || "/panel");
     }
   };
 

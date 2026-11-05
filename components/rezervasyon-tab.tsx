@@ -469,7 +469,7 @@ function RezervasyonCard({ rez, dosya, onRefresh, onDeleteRequest, companyId }: 
   const talimatDurumu = talimatCutoffTamamMi(dosya)
     ? tamamRozeti(dosya.konsimento_dosya_url ? "Talimat gönderildi" : "Draft BL alındı")
     : null;
-  const beyannameDurumu = beyannameCutoffTamamMi(dosya) ? tamamRozeti("Beyanname yüklendi") : null;
+  const beyannameDurumu = beyannameCutoffTamamMi(dosya) ? tamamRozeti("Beyanname gönderildi") : null;
 
   return (
     <div className="max-w-5xl rounded-xl border shadow-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

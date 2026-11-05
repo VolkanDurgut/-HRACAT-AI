@@ -329,3 +329,22 @@
   Canlı: dashboard ve analiz yetkisi herkes için aynıydı → erişim değişmedi.
 - Test: `scratchpad/km/e2e.mjs` (açılış, menü, 4 kart değerleri, tıklanamaz kart, /dashboard
   yönlendirmesi, kantar kullanıcısı).
+
+
+## DİİB günlük raporu (06.11.2026)
+
+- Edge function `diib-gunluk-rapor`, pg_cron `diib-gunluk-rapor` `0 14 * * *` (17:00 TR).
+  Hesap DİİB Takibi sayfasıyla AYNI (`_shared/diib-hesap.ts`); e-posta HTML'i
+  `_shared/diib-rapor.ts`; ek, sayfadaki "Excel'e aktar" ile AYNI XLSX (`_shared/diib-excel.ts`,
+  uygulamada `lib/diib/excel-yaz.ts` yalnız zip'ler).
+- İçerik: özet kutuları (kalan, gerçekleşen, bugün kesilen, faturası bekleyen), güncel DİİB,
+  DİİB durumu (doluluk + bekleyen + "sonra" kalanı), bugün kesilen faturalar, faturası
+  kesilmemiş yüklemeler (talimat cut-off sırası, DİİB payı / bölünme önerisi). Fiyat yalnız
+  DİİB tutarları. Müşteriye gitmez; booking no yok.
+- Secret'lar: `DIIB_RAPOR_CANLI` ("evet" değilse her gönderim yalnız test adresine "[TEST]"),
+  `DIIB_RAPOR_ALICI` (virgülle, en fazla 6), `DIIB_RAPOR_TEST_ALICISI`.
+- Çağrı yetkisi ic-gunluk-rapor ile aynı ilke: anon yalnız 16:55-18:00 TR penceresinde;
+  anon `{"test":true}` yalnız test modunda, 24 saatte en fazla 3. Admin: `{"deneme":true}`
+  (mail yok, HTML döner) / `{"test":true}`.
+- Tekrar koruması: `diib_rapor_gonderimleri` (şirket + gün için zamanlanmış tek kayıt;
+  RLS açık, yalnız service_role).

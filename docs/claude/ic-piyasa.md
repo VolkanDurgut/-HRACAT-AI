@@ -694,3 +694,14 @@
   adresi; pg_cron `ic-gunluk-rapor-sabah/-ogle/-aksam` (06:15 / 09:15 / 14:15 UTC), eski tek iş kaldırıldı.
   Anon pencere: oturum saatinden 5 dk önce – 60 dk sonra. `ic-gunluk-rapor` v2 deploy, repoyla birebir.
 - İlk gerçek gönderim 04.11.2026 17:15:05 (akşam oturumu, 3 alıcı). Saat değişikliği = sabit + 3 cron işi.
+
+
+## Raporda "İrsaliye İncele" (06.11.2026)
+
+- İç piyasa günlük raporunda (yüklenen ve gelen tabloları) irsaliye no'nun altında
+  "İrsaliye İncele ›" bağlantısı: `/belge/irsaliye?s=<ic_sevkler.id>` ya da `?a=<ic_alis_teslimler.id>`
+  (`_shared/ic-gunluk-rapor.ts` `irsaliyeHucresi`; sorgu UUID ile doğrulanır). Dosya yoksa
+  yalnız numara yazılır.
+- Sayfa (`app/belge/irsaliye/page.tsx`) oturum ister; satırı şirkete göre okur, PDF'i 10 dk'lık
+  imzalı adresle gösterir (Yeni sekmede aç / İndir). Mailde oturumsuz açılırsa giriş sonrası
+  aynı sayfaya döner (`lib/giris-donus.ts`, yalnız `/belge/` yolları, sessionStorage).

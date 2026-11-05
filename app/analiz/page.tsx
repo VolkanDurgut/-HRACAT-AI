@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
@@ -259,6 +260,7 @@ function SecimGrubu<T extends string>({ secenekler, deger, onChange, etiket }: {
 export default function AnalizPage() {
   const { user, companyId, yetkiler, loading: authLoading } = useAuth();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const [dosyalar, setDosyalar] = useState<DosyaFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [yilFiltre, setYilFiltre] = useState<string>(TUM_YILLAR);
@@ -646,7 +648,7 @@ export default function AnalizPage() {
                   </thead>
                   <tbody>
                     {gemiModal.dosyalar.map((d, i) => (
-                      <tr key={i} onClick={() => router.push(`/dosya/${d.dosyaId}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer" style={{ borderColor: CARD_BORDER }}>
+                      <tr key={i} onClick={() => gecisliGit(`/dosya/${d.dosyaId}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer" style={{ borderColor: CARD_BORDER }}>
                         <td className="px-4 py-2.5 font-medium text-white whitespace-nowrap">{d.dosyaNo}</td>
                         <td className="px-4 py-2.5 max-w-[180px] truncate" style={{ color: TEXT_MUTED }} title={d.aliciFirma}>{d.aliciFirma}</td>
                         <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{d.varisLimani}</td>
@@ -793,7 +795,7 @@ export default function AnalizPage() {
                     </thead>
                     <tbody>
                       {sonSevkiyatlar.map(({ d, tarih }) => (
-                        <tr key={d.id} onClick={() => router.push(`/dosya/${d.id}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }}>
+                        <tr key={d.id} onClick={() => gecisliGit(`/dosya/${d.id}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }}>
                           <td className="px-4 py-2.5 text-xs font-medium text-white whitespace-nowrap">{d.dosya_no}</td>
                           <td className="px-4 py-2.5 text-xs max-w-[160px] truncate" style={{ color: TEXT_MUTED }} title={`${d.alici_firma || "—"} · ${limanAnahtari(d.varis_limani) || "—"}`}>{d.alici_firma || "—"}</td>
                           <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarih ? formatDateTR(tarih) : "—"}</td>

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
@@ -67,6 +68,7 @@ type Props = {
  */
 export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, companyId, ayarlar, onRefresh, arsiv = false }: Props) {
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const { user } = useAuth();
   const { showToast } = useToast();
   const [onaylaniyor, setOnaylaniyor] = useState(false);
@@ -432,7 +434,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           <button
             type="button"
-            onClick={() => router.push(`/dosya/${dosya.id}`)}
+            onClick={() => gecisliGit(`/dosya/${dosya.id}`)}
             title="İlgili ihracat dosyasını aç"
             className="text-xs font-semibold hover:underline"
             style={{ color: ACCENT }}

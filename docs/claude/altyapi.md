@@ -410,3 +410,14 @@
 - `yedekleme-gonder` YEDEKLENECEK_TABLOLAR'a `diib_belgeleri`, `diib_ihracatlari`,
   `diib_dosya_bolunmeleri` eklendi (sıra: belgeler önce; FK). Edge deploy migration canlıya
   uygulandıktan SONRA yapılır (tablo yokken yedek hata verir).
+
+
+## Sayfa geçişi (06.11.2026)
+
+- `components/sayfa-gecisi.tsx` (`app/layout.tsx`'te): Kullanım Kılavuzu'ndaki logolu geçiş
+  bütün SAYFA geçişlerinde (pathname değişince). Aynı kökenli `<a>` tıklamaları yakalanır;
+  programatik geçişte `useGecisliYonlendirme()` (`router.push` yerine). Sekme (`?tab=`)
+  değişimi geçiş YAPMAZ. Hedef sayfanın adı imleçle yazılır (`sayfaAdi`).
+- Çıkış 420 ms + giriş 560 ms, güvenlik zaman aşımı 2,6 s; `pointer-events: none`,
+  `prefers-reduced-motion` desteği; sınıflar `sg-` önekli (chat yazı animasyonuna dokunmaz).
+  Geçiş istenmeyen bağlantıya `data-gecis-yok`.

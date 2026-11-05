@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useRouter, usePathname } from "next/navigation";
 import { BellRing, BellPlus, ChevronDown, ChevronUp, Mail, ArrowRight, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -140,6 +141,7 @@ export function BildirimIzniButonu() {
 export default function CutoffUyarilari() {
   const { user, companyId, yetkiler } = useAuth();
   const router = useRouter();
+  const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const pathname = usePathname();
   const { showToast } = useToast();
   const simdi = useSimdi();
@@ -254,7 +256,7 @@ export default function CutoffUyarilari() {
       if (bildirimDestekleniyor() && Notification.permission === "granted") {
         try {
           const n = new Notification(baslik, { body: govde, tag: k.anahtar });
-          n.onclick = () => { window.focus(); router.push(hedefSayfa); n.close(); };
+          n.onclick = () => { window.focus(); gecisliGit(hedefSayfa); n.close(); };
         } catch { /* bazi tarayicilar (mobil) yapici ile bildirime izin vermez */ }
       }
     });
@@ -369,7 +371,7 @@ export default function CutoffUyarilari() {
                   )}
                   <button
                     type="button"
-                    onClick={() => router.push(draft ? "/draft-onay" : `/dosya/${k.dosya.id}`)}
+                    onClick={() => gecisliGit(draft ? "/draft-onay" : `/dosya/${k.dosya.id}`)}
                     className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                     style={{ backgroundColor: ACCENT }}
                   >

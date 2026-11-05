@@ -42,6 +42,12 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
     setYukleniyor(false);
   }, [companyId, yetkili]);
   useEffect(() => { getir(); }, [getir, dosya.fatura_no, dosya.diib_no]);
+  // 05.11.2026: Muhasebe kartinda parca faturasi yuklenince (fatura no parcaya yazilir) kart da tazelensin
+  useEffect(() => {
+    const dinle = () => getir();
+    window.addEventListener(DIIB_BOLUNME_OLAYI, dinle);
+    return () => window.removeEventListener(DIIB_BOLUNME_OLAYI, dinle);
+  }, [getir]);
 
   const hesap = useMemo(() => {
     if (!veri || veri.belgeler.length === 0) return null;
@@ -193,9 +199,18 @@ export default function DiibBolunmeKarti({ dosya }: { dosya: Dosya }) {
               <li key={p.id} className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="font-semibold text-white">{p.sira}. fatura</span>
                 <span style={{ color: TEXT_MUTED }}>· <span className="font-mono text-white">{belgeNo(p.diib_id)}</span> · {kgYaz(sayiOku(p.miktar_kg))} kg</span>
-                <input defaultValue={p.fatura_no || (p.sira === 1 ? dosya.fatura_no || "" : "")} placeholder="Fatura no (kesilince)" aria-label={`${p.sira}. fatura no`}
-                  onBlur={(e) => { if ((e.target.value.replace(/\s+/g, "").toUpperCase() || null) !== (p.fatura_no || null)) faturaNoKaydet(p.id, e.target.value); }}
-                  className="ml-auto w-48 px-2 py-1 border rounded-md text-xs text-white font-mono" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} />
+                {p.fatura_dosya_url ? (
+                  // Faturasi yuklenmis parca: numara faturadan okundu; burada degistirilmez (Muhasebe kartindan)
+                  <span className="ml-auto inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-mono text-white" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)" }}
+                    title="Fatura yüklendi; numara faturadan okundu" data-testid={`bolunme-fatura-${p.sira}`}>
+                    <CheckCircle2 size={12} className="text-green-400" /> {p.fatura_no || "-"}
+                  </span>
+                ) : (
+                  // key: fatura no baska yerden (fatura yukleme) degisince alan yeni degerle yeniden kurulur
+                  <input key={`${p.id}-${p.fatura_no || ""}`} defaultValue={p.fatura_no || (p.sira === 1 ? dosya.fatura_no || "" : "")} placeholder="Fatura no (kesilince)" aria-label={`${p.sira}. fatura no`}
+                    onBlur={(e) => { if ((e.target.value.replace(/\s+/g, "").toUpperCase() || null) !== (p.fatura_no || null)) faturaNoKaydet(p.id, e.target.value); }}
+                    className="ml-auto w-48 px-2 py-1 border rounded-md text-xs text-white font-mono" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} />
+                )}
               </li>
             ))}
           </ul>

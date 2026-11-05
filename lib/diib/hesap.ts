@@ -72,7 +72,7 @@ export type DiibDosyasi = {
   yuklenenKg?: number | null;
 };
 
-export type DiibBolunmesi = { id: string; dosya_id: string; diib_id: string; sira: number; miktar_kg: number | string; fatura_no: string | null };
+export type DiibBolunmesi = { id: string; dosya_id: string; diib_id: string; sira: number; miktar_kg: number | string; fatura_no: string | null; /** Parcanin yuklenen fatura PDF'i (05.11.2026) */ fatura_dosya_url?: string | null };
 
 /** Ekranda gosterilen satir: tablodan ya da otomatik (dosyadan). */
 export type DiibSatiri = {

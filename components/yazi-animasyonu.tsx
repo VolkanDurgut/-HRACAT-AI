@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { SAYFA_GECISI_BITTI, sayfaGecisiSuruyor } from "@/lib/sayfa-gecisi-olay";
 
 /**
  * Yazi animasyonu (27.10.2026, kullanici: "chatte yazıyor gibi yazılmalı; diğer
@@ -16,6 +17,9 @@ import React, { useEffect, useRef, useState } from "react";
  *   "0 dosya" -> "12 dosya" veri yuklenince) yeniden yazilmaz, aninda guncellenir.
  * - Bicimli metin (27.10.2026): `metin` yerine `parcalar` verilirse kalin / renkli
  *   parcalar korunarak yazilir (ornek: Satin Alma "Departmanlar" bilgi kutusu).
+ * - gecisiBekle (06.11.2026): sayfa gecisi perdesi ekrandaysa yazim perde kalkinca baslar (perde
+ *   arkasinda yarim kalmasin). Perde yoksa (ilk acilis, sekme degisimi) hic beklemez; olay gelmezse
+ *   en gec 3 sn sonra baslar.
  */
 export type YaziParcasi = { metin: string; sinif?: string; stil?: React.CSSProperties };
 
@@ -25,6 +29,7 @@ export function YaziAnimasyonu({
   harfMs = 14,
   enUzunMs = 1100,
   gecikmeMs = 0,
+  gecisiBekle = false,
   onBitti,
 }: {
   /** Duz metin (ya da `parcalar`). */
@@ -37,6 +42,8 @@ export function YaziAnimasyonu({
   enUzunMs?: number;
   /** Yazmaya baslamadan once bekleme (ms). */
   gecikmeMs?: number;
+  /** Sayfa gecisi perdesi kalkana kadar yazmaya baslama. */
+  gecisiBekle?: boolean;
   onBitti?: () => void;
 }) {
   const metin = parcalar ? parcalar.map((p) => p.metin).join("") : (duzMetin ?? "");
@@ -45,8 +52,18 @@ export function YaziAnimasyonu({
   const bittiRef = useRef(false);
   const onBittiRef = useRef(onBitti);
   onBittiRef.current = onBitti;
+  const [hazir, setHazir] = useState(() => !(gecisiBekle && sayfaGecisiSuruyor()));
 
   useEffect(() => {
+    if (hazir) return;
+    const basla = () => setHazir(true);
+    window.addEventListener(SAYFA_GECISI_BITTI, basla);
+    const emniyet = setTimeout(basla, 3000);
+    return () => { window.removeEventListener(SAYFA_GECISI_BITTI, basla); clearTimeout(emniyet); };
+  }, [hazir]);
+
+  useEffect(() => {
+    if (!hazir) return;
     const uzunluk = metin.length;
     const bitir = () => {
       setN(uzunluk);
@@ -70,7 +87,7 @@ export function YaziAnimasyonu({
       }, 16);
     }, gecikmeMs);
     return () => { clearTimeout(basla); if (zamanlayici) clearInterval(zamanlayici); };
-  }, [metin, harfMs, enUzunMs, gecikmeMs]);
+  }, [metin, harfMs, enUzunMs, gecikmeMs, hazir]);
 
   const sinir = bitti ? metin.length : n;
   // Parcalari ilk `sinir` harfe kadar keser (bicim korunur)

@@ -12,6 +12,7 @@ import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
  *                       Aciklama (text-sm, soluk)
  * 27.10.2026: metin (string) aciklama sayfa her acildiginda yazi animasyonuyla gelir
  * (en fazla ~0,9 sn; yer kaymasi yok; "hareketi azalt" ayarinda aninda). JSX aciklama aynen.
+ * 06.11.2026: sayfa gecisi perdesi varken yazi perde arkasinda degil, perde kalkinca baslar (gecisiBekle).
  */
 export function SayfaBasligi({
   ikon,
@@ -34,7 +35,7 @@ export function SayfaBasligi({
           <h1 className="text-xl font-bold text-white leading-tight">{baslik}</h1>
           {aciklama && (
             <p className="text-sm mt-1" style={{ color: TEXT_MUTED }}>
-              {typeof aciklama === "string" ? <YaziAnimasyonu metin={aciklama} harfMs={12} enUzunMs={900} /> : aciklama}
+              {typeof aciklama === "string" ? <YaziAnimasyonu metin={aciklama} harfMs={12} enUzunMs={900} gecisiBekle /> : aciklama}
             </p>
           )}
         </div>

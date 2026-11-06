@@ -421,3 +421,13 @@
 - Çıkış 420 ms + giriş 560 ms, güvenlik zaman aşımı 2,6 s; `pointer-events: none`,
   `prefers-reduced-motion` desteği; sınıflar `sg-` önekli (chat yazı animasyonuna dokunmaz).
   Geçiş istenmeyen bağlantıya `data-gecis-yok`.
+- 2. revize (06.11.2026): sayfa adı harf harf CSS ile belirir; toplam süre adın uzunluğundan
+  bağımsız ve çıkış fazına oranlı (ilk harf 120 ms, son harf 540 ms'de tamam; altındaki çizgi aynı
+  sürede dolar). Giriş fazında harfler aşağı süzülüp kaybolur.
+- Perde kalkarken ekrandaki yazılar (h1-h4, p, label, li, dt/dd, tr...) üstten aşağı kayarak sırayla
+  gelir (`.sg-metin-gir`, globals.css; 520 ms, sıra aralığı 26 ms, en geç 460 ms). Kendi animasyonu
+  olan öğe, fixed/sticky öğe ve `[data-sg-haric]` alanı (Evrak / Proforma asistanı kartları) atlanır;
+  sınıf animasyon bitince kaldırılır.
+- `<html data-sg-faz>` geçiş sürerken dolu; `SAYFA_GECISI_BITTI` olayı (lib/sayfa-gecisi-olay.ts).
+  `YaziAnimasyonu gecisiBekle` (sayfa başlığı alt yazısı, Proforma asistanı karşılama) perde arkasında
+  yazmaz, perde kalkınca başlar (olay gelmezse en geç 3 sn).

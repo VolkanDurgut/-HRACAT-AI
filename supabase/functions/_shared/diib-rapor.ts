@@ -5,7 +5,7 @@
 // aksam 17:00. Ornek olarak o sayfadaki Excel raporu bilgileri gonderilebilir."
 // SAF TypeScript: hesap DIIB Takibi sayfasiyla AYNI (diib-hesap.ts), e-posta eki sayfadaki
 // "Excel'e aktar" ile AYNI dosya (diib-excel.ts). Edge function: diib-gunluk-rapor.
-// Icerik: ozet kutulari, DIIB durumu (taahhut / gerceklesen / kalan / doluluk / bekleyen),
+// Icerik: ozet kutulari, DIIB durumu (taahhut / gerceklesen [devir + sistem faturalari, 06.11.2026] / kalan / doluluk / bekleyen),
 // bugun kesilen faturalar, faturasi kesilmemis yuklemeler (siraya gore, DIIB payi), guncel DIIB.
 // Fiyat: yalniz DIIB tutarlari (Excel'deki gibi). Musteriye GITMEZ.
 // ============================================================================
@@ -113,7 +113,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
     const kalanSonra = x.kalanKg - x.bekleyenKg;
     const cubuk = `<div style="background:#E2E8F0;border-radius:3px;height:6px;width:100%;margin-top:4px"><div style="background:${renk};height:6px;border-radius:3px;width:${yuzde.toFixed(1)}%"></div></div>`;
     const durum = x.belge.durum === "tamamlandi" ? `<span style="color:#047857;font-weight:bold">Tamamlandı</span>` : `<span style="color:${renk};font-weight:bold">%${sayi(x.yuzde, 1)}</span>`;
-    return `<tr style="${zebra(i)}">${td(`<b style="font-family:monospace">${esc(x.belge.belge_no)}</b><br><span style="color:#64748B;font-size:11px">${diibTarihTR(x.belge.belge_tarihi)} · sıra ${x.belge.kullanim_sirasi}</span>`, "white-space:nowrap")}${td(`${sayi(x.taahhutKg)} kg`, "text-align:right;white-space:nowrap")}${td(`${sayi(x.gerceklesenKg)} kg`, "text-align:right;white-space:nowrap")}${td(`<b>${sayi(Math.max(0, x.kalanKg))} kg</b>`, "text-align:right;white-space:nowrap")}${td(`${durum}${cubuk}`, "min-width:90px")}${td(x.bekleyenKg ? `${sayi(x.bekleyenKg)} kg<br><span style="color:${kalanSonra < 0 ? "#B91C1C" : "#64748B"};font-size:11px">sonra ${kalanSonra < 0 ? "−" : ""}${sayi(Math.abs(kalanSonra))} kg</span>` : "<span style=\"color:#94A3B8\">-</span>", "text-align:right;white-space:nowrap")}</tr>`;
+    return `<tr style="${zebra(i)}">${td(`<b style="font-family:monospace">${esc(x.belge.belge_no)}</b><br><span style="color:#64748B;font-size:11px">${diibTarihTR(x.belge.belge_tarihi)} · sıra ${x.belge.kullanim_sirasi}</span>`, "white-space:nowrap")}${td(`${sayi(x.taahhutKg)} kg`, "text-align:right;white-space:nowrap")}${td(`${sayi(x.gerceklesenKg)} kg${x.devirKg > 0 ? `<br><span style="color:#64748B;font-size:11px">sistem öncesi ${sayi(x.devirKg)}${x.satirSayisi ? ` + ${x.satirSayisi} fatura ${sayi(Math.max(0, x.gerceklesenKg - x.devirKg))}` : ""}</span>` : `<br><span style="color:#64748B;font-size:11px">${x.satirSayisi} fatura</span>`}`, "text-align:right;white-space:nowrap")}${td(`<b>${sayi(Math.max(0, x.kalanKg))} kg</b>`, "text-align:right;white-space:nowrap")}${td(`${durum}${cubuk}`, "min-width:90px")}${td(x.bekleyenKg ? `${sayi(x.bekleyenKg)} kg<br><span style="color:${kalanSonra < 0 ? "#B91C1C" : "#64748B"};font-size:11px">sonra ${kalanSonra < 0 ? "−" : ""}${sayi(Math.abs(kalanSonra))} kg</span>` : "<span style=\"color:#94A3B8\">-</span>", "text-align:right;white-space:nowrap")}</tr>`;
   }).join("");
   const dTablo = tablo(`${th("DİİB")}${th("Taahhüt", true)}${th("Gerçekleşen", true)}${th("Kalan", true)}${th("Doluluk")}${th("Bekleyen", true)}`, dRows || bos(6, "Kayıtlı DİİB yok."));
 
@@ -162,7 +162,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
   <div style="margin-top:24px;text-align:center">
     <a href="${DIIB_RAPOR_UYGULAMA_URL}/diib" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">DİİB Takibi'ni uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, DİİB Takibi sayfasındaki "Excel'e aktar" ile aynı dosyadır (Genel Tablo + her DİİB'in ihracat listesi).<br>Bekleyen yüklemeler talimat cut-off sırasına göre DİİB'e dağıtılır; "sonra" kalanı bu yüklemeler faturalanınca kalacak miktardır.<br>Her gün ${DIIB_RAPOR_SAATI}'de gönderilir · müşteriye gitmez.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, DİİB Takibi sayfasındaki "Excel'e aktar" ile aynı dosyadır (Genel Tablo + her DİİB'in ihracat listesi).<br>Gerçekleşen = sistem öncesi devir (sistem kurulmadan önce Excel'deki DİİB listesinde kesilmiş faturalar, DİİB başına bir kez girilir) + sistemde kesilen faturalar.<br>Bekleyen yüklemeler talimat cut-off sırasına göre DİİB'e dağıtılır; "sonra" kalanı bu yüklemeler faturalanınca kalacak miktardır.<br>Her gün ${DIIB_RAPOR_SAATI}'de gönderilir · müşteriye gitmez.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

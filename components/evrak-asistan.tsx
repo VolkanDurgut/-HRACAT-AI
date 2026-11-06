@@ -102,7 +102,7 @@ export function EvrakAsistanYukleme({
   };
 
   return (
-    <div className="relative">
+    <div data-sg-haric className="relative">
       <AsistanSatiri durum="hazir" belge={belge} hazirYazisi={hazirYazisi} />
       <SohbetBalonu metin={mesaj} gecikmeMs={gecikmeMs} onBitti={() => setYazildi(true)} />
       <div className={`mt-2.5 flex flex-wrap gap-1.5 transition-opacity duration-500 ${yazildi ? "opacity-100" : "opacity-0"}`} aria-label="Kontrol edilen bilgiler">
@@ -152,7 +152,7 @@ export function EvrakAsistanYukleme({
 
 export function EvrakAsistanKilitli({ belge, mesaj, gecikmeMs = 0 }: { belge: string; mesaj: string; gecikmeMs?: number }) {
   return (
-    <div>
+    <div data-sg-haric>
       <AsistanSatiri durum="bekliyor" belge={belge} />
       <SohbetBalonu metin={mesaj} gecikmeMs={gecikmeMs} />
       <div className="mt-3 flex items-center gap-2 rounded-xl border border-dashed px-3.5 py-3 text-[12px]"
@@ -173,7 +173,7 @@ export function EvrakAsistanIsleniyor({ belge, mesaj, kontroller, durumYazisi }:
     return () => clearInterval(z);
   }, []);
   return (
-    <div aria-live="polite">
+    <div data-sg-haric aria-live="polite">
       <AsistanSatiri durum="calisiyor" belge={belge} hazirYazisi={durumYazisi} />
       <div className="mt-3 rounded-xl border px-3.5 py-3" style={{ backgroundColor: ROW_HEADER_BG, borderColor: `${ACCENT}40` }}>
         <div className="flex items-center justify-between gap-3">

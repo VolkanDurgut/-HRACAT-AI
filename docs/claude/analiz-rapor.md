@@ -346,5 +346,8 @@
 - Çağrı yetkisi ic-gunluk-rapor ile aynı ilke: anon yalnız 16:55-18:00 TR penceresinde;
   anon `{"test":true}` yalnız test modunda, 24 saatte en fazla 3. Admin: `{"deneme":true}`
   (mail yok, HTML döner) / `{"test":true}`.
+- DİİB Durumu tablosunda Gerçekleşen'in altında kırılım: "sistem öncesi X + N fatura Y" (06.11.2026;
+  kullanıcı 2026/D1-02576'nın 10.662.940 kg gerçekleşenini sordu: 10.492.040 kg = Excel'deki 54 fatura
+  (UNX…293-564, 21.05-25.08.2026) devir, + 170.900 kg CRISA 2. faturası UNX…735).
 - Tekrar koruması: `diib_rapor_gonderimleri` (şirket + gün için zamanlanmış tek kayıt;
   RLS açık, yalnız service_role).

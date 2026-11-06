@@ -63,7 +63,7 @@ function AsistanBasligi({ durum }: { durum: "hazir" | "calisiyor" }) {
 /** Kart kabugu: hafif vurgu isiltisi olan koyu kart */
 function AsistanKarti({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl border shadow-sm animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+    <div data-sg-haric className="relative overflow-hidden rounded-2xl border shadow-sm animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div aria-hidden="true" className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full"
         style={{ background: `radial-gradient(circle, ${ACCENT}1F 0%, transparent 70%)` }} />
       <div className="relative p-5 sm:p-7">{children}</div>
@@ -114,7 +114,7 @@ export function ProformaAsistanYukleme({
             </span>
           </span>
         ) : (
-          <YaziAnimasyonu metin={karsilama} harfMs={20} enUzunMs={2600} onBitti={() => setYazildi(true)} />
+          <YaziAnimasyonu metin={karsilama} harfMs={20} enUzunMs={2600} gecisiBekle onBitti={() => setYazildi(true)} />
         )}
       </div>
 
@@ -293,7 +293,7 @@ export function ProformaOkumaOzeti({ veri, toplamMts, uyari }: { veri: any; topl
   ];
 
   return (
-    <div className="mb-4 rounded-2xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+    <div data-sg-haric className="mb-4 rounded-2xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
         <div className="flex items-center gap-2 min-w-0">
           <Sparkles size={15} style={{ color: ACCENT }} />

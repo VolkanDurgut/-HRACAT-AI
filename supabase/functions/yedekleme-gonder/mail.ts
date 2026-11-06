@@ -98,6 +98,7 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   banka_presetleri: { tur: "normal", metin: "Özel banka kartı kaydedilmedi; standart banka hesapları uygulamada tanımlı." },
   ihracat_musterileri: { tur: "normal", metin: "İsteğe bağlı müşteri kartı açılmadı; proforma bilgileri geçmiş dosyalardan geliyor." },
   proforma_ayarlari: { tur: "normal", metin: "Varsayılan proforma şablon metinleri kullanılıyor." },
+  ihracat_urunleri: { tur: "normal", metin: "İsteğe bağlı ürün kartı açılmadı; proformadaki ürün bilgileri geçmiş dosyalardan geliyor." },
   diib_belgeleri: { tur: "kullanilmadi", metin: "DİİB Takibi yeni (04.11.2026); ilk DİİB eklenince dolar." },
   diib_ihracatlari: { tur: "normal", metin: "DİİB satırları faturası kesilen dosyalardan otomatik gelir; burada yalnız elle eklenen / düzeltilen satırlar tutulur." },
   diib_dosya_bolunmeleri: { tur: "normal", metin: "Yalnız DİİB kalanı yetmeyen bir yükleme iki faturaya bölününce dolar." },

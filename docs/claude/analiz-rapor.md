@@ -154,7 +154,9 @@
   `acente_teklifleri` = özellik var ("Acentelerden Teklif Al", Proforma Yükle sonrası) henüz
   kullanılmadı (`acenteler`de Haziran'dan 2 deneme kaydı: MSC, MAERSK — volkandurgut e-postalı);
   `banka_presetleri`, `ihracat_musterileri`, `proforma_ayarlari` = boş olması normal
-  (isteğe bağlı / varsayılan). Test scratchpad `yedekmail/` (esbuild + Deno/fetch taklidi:
+  (isteğe bağlı / varsayılan); `ihracat_urunleri` da "Boş · normal" (06.11.2026, kullanıcı onayı;
+  önce açıklamasız "Boş" sarı rozetle çıkıyordu; v32 deploy, repo ile birebir, deneme 41/41).
+  Test scratchpad `yedekmail/` (esbuild + Deno/fetch taklidi:
   deneme, gerçek, uyarılı senaryo; 820/390 px görüntü).
 - TEST MAILI (26.10.2026, v16): gövde `{"test_maili": true}` → 20 saatlik tekrar koruması
   ATLANIR, aynı alıcıya "[TEST] " konulu TAM mail (ek dahil, üstte kesik çizgili amber

@@ -15,6 +15,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { KantarSevkiyatDurumu } from "@/components/kantar-sevkiyat-durumu";
 import { musteriKodu, sevkiyatOzetleri, type KantarDosya } from "@/lib/kantar-sevkiyat";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type KonteynerRow = {
   id: string;
@@ -301,9 +302,7 @@ export default function KantarPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 size={28} className="animate-spin" style={{ color: ACCENT }} />
-      </div>
+      <SayfaYukleniyor className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />
     );
   }
 
@@ -331,12 +330,7 @@ export default function KantarPage() {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <div className="flex items-center gap-3" style={{ color: TEXT_MUTED }}>
-          <Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} />
-          <span>Yükleniyor...</span>
-        </div>
-      </div>
+      <SayfaYukleniyor className="h-screen w-full flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} boyut={24} yazi="Yükleniyor..." />
     );
   }
 

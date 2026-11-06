@@ -14,11 +14,12 @@ import {
   checkPhytosanitaryCertificateReadiness,
   checkHealthCertificateReadiness,
 } from "@/lib/document-readiness";
-import { Loader2, FileCheck2, Search, X, Archive, Inbox } from "lucide-react";
+import { FileCheck2, Search, X, Archive, Inbox } from "lucide-react";
 import { MusteriEvrakAyarlari, BOS_MUSTERI_EVRAK_AYARLARI, musteriEvrakAyarlariniTopluGetir } from "@/lib/musteri-evrak-ayarlari";
 import { TEXT_MUTED, CARD_BG, CARD_BORDER, ROW_HEADER_BG, ACCENT } from "@/lib/theme";
 import { draftSuresiDoldu, draftYanitSonuMs } from "@/lib/draft-onay-sure";
 import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
@@ -192,9 +193,7 @@ export default function DraftOnayPage() {
         />
 
         {loading ? (
-          <div className="flex items-center gap-2 py-10 justify-center" style={{ color: TEXT_MUTED }}>
-            <Loader2 size={18} className="animate-spin" /> Yükleniyor...
-          </div>
+          <SayfaYukleniyor className="flex items-center gap-2 py-10 justify-center" boyut={18} yazi="Yükleniyor..." />
         ) : (
           <>
             {/* Sekmeler + arama */}

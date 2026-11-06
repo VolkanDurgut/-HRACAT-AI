@@ -343,6 +343,9 @@
   DİİB tutarları. Müşteriye gitmez; booking no yok.
 - Secret'lar: `DIIB_RAPOR_CANLI` ("evet" değilse her gönderim yalnız test adresine "[TEST]"),
   `DIIB_RAPOR_ALICI` (virgülle, en fazla 6), `DIIB_RAPOR_TEST_ALICISI`.
+  CANLI (06.11.2026 10:50 TR, kullanıcı onayı): alıcılar bbt@ + execution@ (unex.com.tr), secret'lar
+  kullanıcı tarafından girildi; doğrulama: anon `{"test":true}` → 403 "yalnızca yetkili" (= CANLI açık).
+  İlk deneme sırasında CANLI henüz "evet" değildi, mesensei282@'e 1 adet [TEST] maili gitti.
 - Çağrı yetkisi ic-gunluk-rapor ile aynı ilke: anon yalnız 16:55-18:00 TR penceresinde;
   anon `{"test":true}` yalnız test modunda, 24 saatte en fazla 3. Admin: `{"deneme":true}`
   (mail yok, HTML döner) / `{"test":true}`.

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { SAYFA_GECISI_BITTI, SG_FAZ_OZNITELIGI } from "@/lib/sayfa-gecisi-olay";
+import { SAYFA_GECISI_BITTI, SG_FAZ_OZNITELIGI, sayfaBekleyenSayisi } from "@/lib/sayfa-gecisi-olay";
 
 /**
  * SAYFA GECISI (06.11.2026). Kullanici: "Kullanim kilavuzundaki logolu gecis butun sayfa gecislerinde
@@ -19,7 +19,8 @@ import { SAYFA_GECISI_BITTI, SG_FAZ_OZNITELIGI } from "@/lib/sayfa-gecisi-olay";
  * - Geri / ileri tusu, yeni sekme, ctrl/cmd tiklama, indirme, dis baglanti: gecis yok.
  * - "Hareketi azalt" acikken yalniz kisa bir solma.
  * - Siniflar "sg-" onekli; mevcut yazi / sohbet animasyonlarina (yazi-imlec, yazi-nokta, evrak-ai-*)
- *   DOKUNULMAZ. Perde tiklamayi engellemez (pointer-events: none) ve en fazla ~2,6 sn kalir.
+ *   DOKUNULMAZ. Perde tiklamayi engellemez (pointer-events: none) ve en fazla ~3,5 sn kalir
+ *   (yeni sayfanin verisi en fazla 2,5 sn beklenir; asagida 3. revize).
  *
  * 06.11.2026 (2. revize). Kullanici: "Gecis ile yazilarin cikisi orantili olsun, sik olsun; gecisten
  * sonra yazilar asagiya kayarak modern bir sekilde gelsin."
@@ -37,7 +38,9 @@ export const SAYFA_GECISI_OLAYI = "ihracatai:sayfa-gecisi";
 
 const CIKIS_MS = 540;   // perde + logo gelis + sayfa adi (en az bu kadar beklenir)
 const GIRIS_MS = 560;   // logo gecis + perde kalkis
-const EMNIYET_MS = 2600; // yol hic degismezse perde kendiliginden kalkar
+const BEKLEME_UST_MS = 2500; // yeni sayfanin ilk verisi icin perdenin en uzun bekleyisi (tiklamadan itibaren)
+const BEKLEME_ARALIK_MS = 50;
+const EMNIYET_MS = BEKLEME_UST_MS + GIRIS_MS + 400; // yol hic degismezse / takilirsa perde kendiliginden kalkar
 const AD_BASLA_MS = 120; // sayfa adinin ilk harfi
 const AD_YAYILMA_MS = 250; // ilk harften son harfin baslamasina (ad uzunlugundan bagimsiz)
 const HARF_MS = 170;    // tek harfin belirme suresi -> son harf 120 + 250 + 170 = 540 ms'de tamam
@@ -75,11 +78,15 @@ export function sayfaAdi(yol: string): string {
 
 const yolKismi = (href: string) => href.split("#")[0].split("?")[0];
 
-/** Programatik gecis oncesi cagrilir (router.push'tan once). Ayni yolsa bir sey yapmaz. */
-export function sayfaGecisiBaslat(hedef: string) {
+/**
+ * Programatik gecis oncesi cagrilir (router.push'tan once). Ayni yolsa bir sey yapmaz.
+ * ad: perdede yazilacak ad (varsayilan hedefin adi; giriste hedef yetkiye gore degisebildigi icin
+ * "Hoş geldiniz" gibi genel bir ad verilir).
+ */
+export function sayfaGecisiBaslat(hedef: string, ad?: string) {
   if (typeof window === "undefined") return;
   if (yolKismi(hedef) === window.location.pathname) return;
-  window.dispatchEvent(new CustomEvent(SAYFA_GECISI_OLAYI, { detail: hedef }));
+  window.dispatchEvent(new CustomEvent(SAYFA_GECISI_OLAYI, { detail: ad ? { hedef, ad } : hedef }));
 }
 
 /** router.push yerine: logolu gecisle yonlendirir. */
@@ -134,12 +141,13 @@ export default function SayfaGecisi() {
   const [faz, setFaz] = useState<Faz>(null);
   const [ad, setAd] = useState("");
   const [azalt, setAzalt] = useState(false);
+  const [bekliyor, setBekliyor] = useState(false); // perde, yeni sayfanin verisini bekliyor
   const bas = useRef<{ zaman: number; yol: string } | null>(null);
   const zamanlayicilar = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const temizle = () => { zamanlayicilar.current.forEach(clearTimeout); zamanlayicilar.current = []; };
   const bitir = useCallback(() => {
-    temizle(); bas.current = null; setFaz(null); htmlFaz(null);
+    temizle(); bas.current = null; setFaz(null); setBekliyor(false); htmlFaz(null);
     window.dispatchEvent(new Event(SAYFA_GECISI_BITTI)); // bekleyen yazi animasyonu varsa baslasin
   }, []);
 
@@ -147,10 +155,10 @@ export default function SayfaGecisi() {
     try { setAzalt(window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch { /* yok */ }
   }, []);
 
-  const baslat = useCallback((hedef: string) => {
+  const baslat = useCallback((hedef: string, gorunenAd?: string) => {
     temizle();
     bas.current = { zaman: Date.now(), yol: window.location.pathname };
-    setAd(sayfaAdi(yolKismi(hedef))); setFaz("cikis"); htmlFaz("cikis");
+    setAd(gorunenAd || sayfaAdi(yolKismi(hedef))); setFaz("cikis"); htmlFaz("cikis");
     zamanlayicilar.current.push(setTimeout(bitir, EMNIYET_MS));
   }, [bitir]);
 
@@ -165,7 +173,11 @@ export default function SayfaGecisi() {
       if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
       baslat(url.pathname + url.search);
     };
-    const ozel = (e: Event) => { const h = (e as CustomEvent<string>).detail; if (typeof h === "string") baslat(h); };
+    const ozel = (e: Event) => {
+      const d = (e as CustomEvent<string | { hedef: string; ad: string }>).detail;
+      if (typeof d === "string") baslat(d);
+      else if (d && typeof d.hedef === "string") baslat(d.hedef, d.ad);
+    };
     document.addEventListener("click", tik, true);
     window.addEventListener(SAYFA_GECISI_OLAYI, ozel);
     return () => { document.removeEventListener("click", tik, true); window.removeEventListener(SAYFA_GECISI_OLAYI, ozel); };
@@ -176,8 +188,15 @@ export default function SayfaGecisi() {
     const b = bas.current;
     if (!b || pathname === b.yol) return;
     const kalan = Math.max(0, CIKIS_MS - (Date.now() - b.zaman));
-    zamanlayicilar.current.push(setTimeout(() => {
-      setFaz("giris"); htmlFaz("giris");
+    // 3. revize (06.11.2026): yeni sayfa ilk verisini bekliyorsa (SayfaYukleniyor) perde, veri gelene
+    // kadar kalir (en fazla BEKLEME_UST_MS). Perde kalkinca ayrica yukleniyor animasyonu gorunmez.
+    const girise = () => {
+      if (sayfaBekleyenSayisi() > 0 && Date.now() - b.zaman < BEKLEME_UST_MS) {
+        setBekliyor(true);
+        zamanlayicilar.current.push(setTimeout(girise, BEKLEME_ARALIK_MS));
+        return;
+      }
+      setBekliyor(false); setFaz("giris"); htmlFaz("giris");
       // Perde ~200 ms opak kalir: yazilar o anda gorunmez yapilir, perde acilirken asagi kayarak gelir.
       if (!azalt) {
         metinleriGetir(150);
@@ -186,7 +205,8 @@ export default function SayfaGecisi() {
       }
       zamanlayicilar.current.push(setTimeout(() => window.dispatchEvent(new Event(SAYFA_GECISI_BITTI)), azalt ? 0 : 200));
       zamanlayicilar.current.push(setTimeout(bitir, GIRIS_MS));
-    }, kalan));
+    };
+    zamanlayicilar.current.push(setTimeout(girise, kalan));
   }, [pathname, bitir, azalt]);
 
   useEffect(() => () => { temizle(); htmlFaz(null); }, []);
@@ -212,7 +232,7 @@ export default function SayfaGecisi() {
             }}>{h}</span>
           ))}
         </p>
-        <span className="sg-cizgi"><span /></span>
+        <span className={`sg-cizgi ${bekliyor && faz === "cikis" ? "sg-cizgi-bekle" : ""}`}><span /></span>
       </div>
       <style>{`
 .sg-perde { position: fixed; inset: 0; z-index: 95; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -249,8 +269,11 @@ export default function SayfaGecisi() {
   background: linear-gradient(90deg, rgba(16,185,129,.2), #6EE7B7); animation: sg-cizgi ${CIKIS_MS}ms cubic-bezier(.4,0,.2,1) both; }
 @keyframes sg-cizgi { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .sg-yazi-git .sg-cizgi { animation: sg-solus 200ms ease-in both; }
+.sg-cizgi-bekle > span { animation: sg-tara 1100ms cubic-bezier(.4,0,.2,1) infinite; background: linear-gradient(90deg, transparent, #6EE7B7 50%, transparent); }
+@keyframes sg-tara { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @keyframes sg-solus { to { opacity: 0; } }
 .sg-azalt, .sg-azalt * { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+.sg-azalt .sg-cizgi-bekle > span { animation: none !important; }
 .sg-azalt.sg-perde-git { animation: sg-perde-git 240ms linear both !important; }
 `}</style>
     </div>

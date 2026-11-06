@@ -52,6 +52,7 @@ import {
   satirEksigi,
   vadeYazi,
 } from "@/lib/ic-piyasa/fiyat-formu";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * IC PIYASA - Yan Mamul Fiyat Bilgilendirme Formu yonetim paneli (11.10.2026).
@@ -510,7 +511,7 @@ export default function IcPiyasaPage() {
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} /></div>
+        <SayfaYukleniyor />
       </AppShell>
     );
   }

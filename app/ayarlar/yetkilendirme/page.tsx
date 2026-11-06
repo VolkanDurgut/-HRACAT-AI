@@ -10,6 +10,7 @@ import AppShell from "@/components/app-shell";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Loader2, Save, UserPlus, Clock, RefreshCw, Check, ChevronDown, RotateCcw } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Yetkilendirme (super admin). 27.10.2026: kullanici listesi `yetki_kullanici_listesi`
@@ -247,9 +248,7 @@ export default function YetkilendirmePage() {
 
   if (loading) return (
     <AppShell>
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
-      </div>
+      <SayfaYukleniyor />
     </AppShell>
   );
 

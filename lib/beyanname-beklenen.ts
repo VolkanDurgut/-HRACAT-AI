@@ -9,14 +9,14 @@ import type { BeyannameBeklenen } from "@/lib/beyanname-kontrol";
 
 export async function beyannameBeklenenGetir(dosyaId: string, companyId: string): Promise<BeyannameBeklenen | null> {
   const [d, k, r, b] = await Promise.all([
-    supabase.from("ihracat_dosyalari").select("fatura_no, fatura_tarihi, toplam_tutar, para_birimi, teslim_sekli, varis_limani, alici_firma, diib_no")
+    supabase.from("ihracat_dosyalari").select("fatura_no, fatura_tarihi, toplam_tutar, para_birimi, teslim_sekli, varis_limani, yuklenme_limani, alici_firma, diib_no")
       .eq("id", dosyaId).eq("company_id", companyId).maybeSingle(),
     supabase.from("konteynerler").select("konteyner_no, net_agirlik_kg").eq("dosya_id", dosyaId).eq("company_id", companyId),
-    supabase.from("rezervasyonlar").select("gemi_adi").eq("dosya_id", dosyaId).eq("company_id", companyId),
+    supabase.from("rezervasyonlar").select("gemi_adi, yuklenme_limani").eq("dosya_id", dosyaId).eq("company_id", companyId),
     supabase.from("diib_dosya_bolunmeleri").select("sira, diib_id, fatura_no").eq("dosya_id", dosyaId).eq("company_id", companyId),
   ]);
   if (d.error || !d.data) return null;
-  const dosya = d.data as { fatura_no: string | null; fatura_tarihi: string | null; toplam_tutar: number | string | null; para_birimi: string | null; teslim_sekli: string | null; varis_limani: string | null; alici_firma: string | null; diib_no: string | null };
+  const dosya = d.data as { fatura_no: string | null; fatura_tarihi: string | null; toplam_tutar: number | string | null; para_birimi: string | null; teslim_sekli: string | null; varis_limani: string | null; yuklenme_limani: string | null; alici_firma: string | null; diib_no: string | null };
   const konteynerler = ((k.data as { konteyner_no: string | null; net_agirlik_kg: number | string | null }[] | null) || []);
   const parcalar = ((b.data as { sira: number; diib_id: string; fatura_no: string | null }[] | null) || []).sort((x, y) => x.sira - y.sira);
 
@@ -35,6 +35,10 @@ export async function beyannameBeklenenGetir(dosyaId: string, companyId: string)
   const netler = konteynerler.map((x) => Number(x.net_agirlik_kg));
   const faturalar = [dosya.fatura_no, ...parcalar.map((p) => p.fatura_no)].map((f) => (f || "").replace(/\s+/g, "").toUpperCase()).filter(Boolean);
   const tutar = Number(dosya.toplam_tutar);
+  const rezler = ((r.data as { gemi_adi: string | null; yuklenme_limani: string | null }[] | null) || []);
+  // Yukleme yeri: rezervasyondaki (gercek booking) liman; rezervasyon yoksa dosyadaki (proforma) liman
+  const rezYerleri = Array.from(new Set(rezler.map((x) => (x.yuklenme_limani || "").trim()).filter(Boolean)));
+  const yuklemeYerleri = rezYerleri.length ? rezYerleri : dosya.yuklenme_limani?.trim() ? [dosya.yuklenme_limani.trim()] : [];
   return {
     faturaNolari: Array.from(new Set(faturalar)),
     faturaTarihi: dosya.fatura_tarihi ? String(dosya.fatura_tarihi).slice(0, 10) : null,
@@ -42,8 +46,9 @@ export async function beyannameBeklenenGetir(dosyaId: string, companyId: string)
     paraBirimi: dosya.para_birimi,
     teslimSekli: dosya.teslim_sekli,
     varisLimani: dosya.varis_limani,
+    yuklemeYerleri,
     aliciFirma: dosya.alici_firma,
-    gemiler: Array.from(new Set(((r.data as { gemi_adi: string | null }[] | null) || []).map((x) => (x.gemi_adi || "").trim()).filter(Boolean))),
+    gemiler: Array.from(new Set(rezler.map((x) => (x.gemi_adi || "").trim()).filter(Boolean))),
     konteynerler: konteynerler.map((x) => (x.konteyner_no || "").replace(/\s+/g, "").toUpperCase()).filter(Boolean),
     netKg: netler.length && netler.every((n) => Number.isFinite(n) && n > 0) ? Math.round(netler.reduce((a, n) => a + n, 0) * 100) / 100 : null,
     diibler,

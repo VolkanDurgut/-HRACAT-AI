@@ -15,6 +15,7 @@ import {
   RaporAlisGirdi, RaporAlisSatiri, RaporSatisGirdi, RaporSatisSatiri, alisSatirlari, alisToplami, satisSatirlari, satisToplami,
 } from "@/lib/ic-piyasa/siparis-raporu";
 import { raporXlsx } from "@/lib/ic-piyasa/siparis-raporu-xlsx";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Ic Piyasa - SATIS & ALIS SIPARIS RAPORU (30.10.2026).
@@ -155,7 +156,7 @@ export default function SiparisRaporuPage() {
         )}
 
         {yukleniyor ? (
-          <div className="flex items-center justify-center py-20"><Loader2 size={26} className="animate-spin" style={{ color: ACCENT }} /></div>
+          <SayfaYukleniyor boyut={26} />
         ) : (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

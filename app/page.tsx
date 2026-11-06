@@ -8,6 +8,8 @@ import { girisSonrasiAl } from "@/lib/giris-donus";
 import { Loader2, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { sayfaGecisiBaslat } from "@/components/sayfa-gecisi";
 
 /**
  * Giris ekrani (kullanici karari 01.10.2026): Uygulamayi SADECE Unex Gida
@@ -50,15 +52,16 @@ export default function GirisSayfasi() {
       setAuthError("Giriş bilgileri hatalı. Lütfen e-posta ve şifrenizi kontrol edin.");
       setIsProcessing(false);
     } else {
-      router.push(girisSonrasiAl() || "/panel");
+      // Giristen sonra da logolu gecis: hedef sayfanin ilk verisi perde arkasinda yuklenir (06.11.2026)
+      const hedef = girisSonrasiAl() || "/panel";
+      sayfaGecisiBaslat(hedef, "Hoş geldiniz");
+      router.push(hedef);
     }
   };
 
   if (loading || user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
-      </div>
+      <SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />
     );
   }
 

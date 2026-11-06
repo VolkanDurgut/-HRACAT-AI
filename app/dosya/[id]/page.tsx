@@ -23,7 +23,7 @@ import LojistikCard from "@/components/lojistik-card";
 import OdemeCard from "@/components/odeme-card";
 import UrunDetaylariCard from "@/components/urun-detaylari-card";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Package, FileCheck, ExternalLink, FolderOpen } from "lucide-react";
+import { Package, FileCheck, ExternalLink, FolderOpen } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import FaturaUploadSection from "@/components/fatura-upload-section";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -35,6 +35,7 @@ import KonsimentoTalimatiSection from "@/components/konsimento-talimati-section"
 import SigortaTalimatiSection from "@/components/sigorta-talimati-section";
 import { EvrakIkonYuvasi } from "@/components/evrak-ikon-yuvasi";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
+import SayfaYukleniyor, { useSayfaYukleniyor } from "@/components/sayfa-yukleniyor";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -76,6 +77,8 @@ function DosyaDetailContent() {
   const [rezervasyonlar, setRezervasyonlar] = useState<Rezervasyon[]>([]);
   const [konteynerler, setKonteynerler] = useState<Konteyner[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ilk yukleme perde arkasinda beklenir; iskelet yalniz yavas yuklemede gorunur (06.11.2026)
+  const iskeletGoster = useSayfaYukleniyor(loading);
   const [activeTab, setActiveTab] = useState<TabKey>((searchParams.get("tab") as TabKey) || "proforma");
   const konteynerTabRef = useRef<KonteynerTabHandle>(null);
 
@@ -177,7 +180,7 @@ function DosyaDetailContent() {
     if (canAccessTab(key)) setActiveTab(key);
   };
 
-  if (loading) return <AppShell><DetailSkeleton /></AppShell>;
+  if (loading) return <AppShell>{iskeletGoster ? <DetailSkeleton /> : <div data-testid="sayfa-yukleniyor" aria-busy="true" />}</AppShell>;
 
   if (!dosya || !companyId) {
     return (
@@ -465,7 +468,7 @@ function DosyaDetailContent() {
 
 export default function DosyaDetailPage() {
   return (
-    <Suspense fallback={<AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: "#10B981" }} /></div></AppShell>}>
+    <Suspense fallback={<AppShell><SayfaYukleniyor /></AppShell>}>
       <DosyaDetailContent />
     </Suspense>
   );

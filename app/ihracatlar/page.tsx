@@ -23,6 +23,7 @@ import { siparisIlerlemesiHesapla, SiparisIlerlemesi, SiparisKalemDurumu } from 
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { SiparisTakipListesi } from "@/components/siparis-takip-karti";
 import { SiparisDevamPenceresi, type DevamOnayi } from "@/components/siparis-devam-penceresi";
+import { useSayfaYukleniyor } from "@/components/sayfa-yukleniyor";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 type AnaSiparisWithProgress = AnaSiparis & { ilerleme: SiparisIlerlemesi };
@@ -35,6 +36,8 @@ export default function IhracatlarPage() {
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
   const [acikSiparisler, setAcikSiparisler] = useState<AnaSiparisWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  // Ilk yukleme perde arkasinda beklenir; iskelet yalniz yavas yuklemede / aramada gorunur (06.11.2026)
+  const iskeletGoster = useSayfaYukleniyor(loading);
   const [siparisLoading, setSiparisLoading] = useState(true);
   const [devamEdiyor, setDevamEdiyor] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -425,7 +428,9 @@ export default function IhracatlarPage() {
         />
       </div>
 
-      {(loading || (search.trim() !== "" && aramaYukleniyor)) ? (
+      {loading && !iskeletGoster ? (
+        <div data-testid="sayfa-yukleniyor" aria-busy="true" />
+      ) : (loading || (search.trim() !== "" && aramaYukleniyor)) ? (
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="rounded-xl border p-4 animate-pulse" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

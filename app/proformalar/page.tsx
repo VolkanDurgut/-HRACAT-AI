@@ -41,6 +41,7 @@ import {
   type MusteriSecenegi,
   type ProformaTaslak,
 } from "@/lib/proforma/belge";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * PROFORMALAR - Yeni Proforma (17.10.2026, sadelestirilmis tek ekran).
@@ -327,7 +328,7 @@ export default function YeniProformaPage() {
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} /></div>
+        <SayfaYukleniyor />
       </AppShell>
     );
   }

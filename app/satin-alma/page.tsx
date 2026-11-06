@@ -20,6 +20,7 @@ import {
   HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi, urunEslesme,
   type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * SATIN ALMA (26.10.2026) - departman ihtiyac listelerinin onayi.
@@ -182,7 +183,7 @@ function SatinAlmaIcerik() {
   };
 
   if (authLoading || (yetkili && yukleniyor)) {
-    return <div className="flex justify-center py-24"><Loader2 className="animate-spin" size={26} style={{ color: TEXT_MUTED }} /></div>;
+    return <SayfaYukleniyor className="flex justify-center py-24" boyut={26} />;
   }
 
   return (
@@ -989,7 +990,7 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
 
 export default function SatinAlmaSayfasi() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}><Loader2 className="animate-spin" size={24} style={{ color: TEXT_MUTED }} /></div>}>
+    <Suspense fallback={<SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} boyut={24} />}>
       <AppShell>
         <SatinAlmaIcerik />
       </AppShell>

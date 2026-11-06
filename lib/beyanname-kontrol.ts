@@ -31,6 +31,7 @@ export type BeyannameOkunan = {
   diibler: { anahtar: string; ham: string }[];
   gemi: string | null;
   incoterm: string | null;
+  bulunduguYer: string | null;    // "esyanin bulundugu yer" (G + 4 hane antrepo/terminal kodu + ad), ham
   kalemNet: number | null;        // 1. kalemin net kg'i (ana sayfa)
   kalemKonteyner: number | null;  // 1. kalemdeki "N KONTEYNER"
   devamToplamNet: number | null;  // devam listesindeki TOPLAM ... KGM
@@ -112,6 +113,8 @@ export function beyannameMetniOku(metinler: string[]): BeyannameOkunan {
   // "Gemi ORNEK GEMI 49.95" / "Gemi MV ORNEK YILDIZ / 26 / 469"
   const gemi = /GEMI\s+([A-Z][A-Z0-9 .\-]*?[A-Z])(?=\s*(?:\/|\d|GEMI|$))/.exec(metin);
   const inco = INCOTERM.exec(metin);
+  // Esyanin bulundugu yer: "G0060 MARPORT" (onceki kutuya bitisik "ODEMEG0060" olabilir; sonraki kutu da bitisik: "G0060 ORNEKPORTAMBARLI GUMRUK..." olabilir)
+  const yer = /G\d{4}\s?([A-Z]{3,})/.exec(sadelestir(anaMetin));
   const kalemNet = /(\d+)\s*KONTEYNER\s+([\d.,]+)\s*KGM/.exec(sadelestir(anaMetin));
   const devamNet = /KGM\s*([\d.]+,\d{2})\s*GENEL\s+TOPLAM/.exec(sadelestir(devamMetni)) || /TOPLAM\s*:[^]*?([\d.]+,\d{2})\s*KGM/.exec(sadelestir(devamMetni));
 
@@ -125,12 +128,26 @@ export function beyannameMetniOku(metinler: string[]): BeyannameOkunan {
     diibler,
     gemi: gemi ? gemi[1].trim() : null,
     incoterm: inco ? inco[1] : null,
+    bulunduguYer: yer ? yer[1] : null,
     kalemNet: kalemNet ? belgeSayisi(kalemNet[2]) : null,
     kalemKonteyner: kalemNet ? Number(kalemNet[1]) : null,
     devamToplamNet: devamNet ? belgeSayisi(devamNet[1]) : null,
     devamVar: !!devamMetni,
     metin,
   };
+}
+
+/** Turkiye liman / terminal adlari (esyanin bulundugu yer karsilastirmasi). Uzun ad once. */
+const TERMINALLER = [
+  "HAYDARPASA", "ISKENDERUN", "ASYAPORT", "BANDIRMA", "TEKIRDAG", "DERINCE", "MARPORT", "KUMPORT", "NEMPORT",
+  "BORUSAN", "AMBARLI", "TRABZON", "MARDAS", "MARTAS", "AKPORT", "GEMLIK", "ALIAGA", "MERSIN", "SAMSUN", "EVYAP", "IZMIR",
+];
+/** Sistemdeki yukleme limani metninden terminal adi ("Marport / Ambarli" -> MARPORT; taninmazsa ilk kelime). */
+function terminalAdi(ham: string): string {
+  const s = ` ${sadelestir(ham).replace(/[^A-Z0-9]+/g, " ").trim()} `;
+  const terminaller = TERMINALLER.filter((t) => s.includes(` ${t} `));
+  // "AMBARLI" hem ilce hem gumruk adi: daha belirgin bir terminal yazildiysa o alinir
+  return terminaller.find((t) => t !== "AMBARLI") || terminaller[0] || s.trim().split(" ")[0] || "";
 }
 
 export type BeyannameBeklenen = {
@@ -140,6 +157,8 @@ export type BeyannameBeklenen = {
   paraBirimi: string | null;
   teslimSekli: string | null;
   varisLimani: string | null;
+  /** Yukleme limani / terminali: rezervasyon(lar)dan, yoksa dosyadan. */
+  yuklemeYerleri?: string[];
   aliciFirma: string | null;
   gemiler: string[];
   konteynerler: string[];
@@ -246,6 +265,18 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
   if (b.teslimSekli) {
     const t = sadelestir(b.teslimSekli).replace(/[^A-Z]/g, "").slice(0, 3);
     ekle("Teslim şekli", !o.incoterm ? "okunamadi" : o.incoterm === t || (t === "CFR" && o.incoterm === "CNF") ? "uyumlu" : "uyusmuyor", b.teslimSekli, o.incoterm || "-");
+  }
+  // Yukleme yeri (06.11.2026): beyannamedeki "esyanin bulundugu yer" ile rezervasyonun yukleme limani.
+  // Kutular bitisik yazilabildigi icin (".. MARPORTAMBARLI GUMRUK") BASLANGIC eslesmesine bakilir.
+  if (b.yuklemeYerleri && b.yuklemeYerleri.length) {
+    const sistem = b.yuklemeYerleri.map(terminalAdi).filter(Boolean);
+    const belgeYer = o.bulunduguYer;
+    const belgeTerminal = belgeYer ? TERMINALLER.find((t) => belgeYer.startsWith(t)) || null : null;
+    const tutuyor = !!belgeYer && sistem.some((t) => belgeYer.startsWith(t));
+    ekle("Yükleme yeri", tutuyor ? "uyumlu" : !belgeYer ? "bilgi" : belgeTerminal ? "uyusmuyor" : "bilgi",
+      b.yuklemeYerleri.join(", "), tutuyor ? sistem.find((t) => belgeYer!.startsWith(t))! : belgeTerminal || belgeYer || "-",
+      tutuyor ? undefined : !belgeYer ? "Eşyanın bulunduğu yer beyannamede okunamadı; elle bakın."
+        : belgeTerminal ? "Beyannamedeki eşyanın bulunduğu yer, rezervasyondaki yükleme limanından farklı." : "Yer adı tanınmadı; elle bakın.");
   }
   if (b.varisLimani) {
     const anahtar = limanAnahtari(b.varisLimani);

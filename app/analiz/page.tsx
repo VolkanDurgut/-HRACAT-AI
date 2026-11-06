@@ -13,7 +13,7 @@ import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Loader2, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb, LayoutDashboard } from "lucide-react";
+import { Users, Package, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb, LayoutDashboard } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
@@ -23,6 +23,7 @@ import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni
 import { SevkiyatHaritasi, type HaritaHatti, type HaritaLimani } from "@/components/analiz-harita";
 import { cikisMerkezi, type CikisMerkezi } from "@/lib/liman-koordinat";
 import { ayAdi } from "@/lib/analiz-ozet";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -608,9 +609,7 @@ export default function AnalizPage() {
 
   if (loading) return (
     <AppShell>
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
-      </div>
+      <SayfaYukleniyor />
     </AppShell>
   );
 

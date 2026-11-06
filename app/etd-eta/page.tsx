@@ -17,6 +17,7 @@ import {
 } from "@/lib/odeme-takibi";
 import { OdemeHatirlatmaPenceresi, type HatirlatmaKaydi } from "@/components/odeme-hatirlatma-penceresi";
 import { EtdExcelAktar, type ExcelYuklemeOzeti } from "@/components/etd-excel-aktar";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type SevkiyatSatir = {
   rezervasyon_id: string;
@@ -554,9 +555,7 @@ export default function EtdEtaPage() {
           </div>
         </div>
       ) : loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} />
-        </div>
+        <SayfaYukleniyor />
       ) : (
         <div className="rounded-xl border shadow-sm overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">

@@ -8,10 +8,11 @@ import Sidebar from "@/components/sidebar";
 import DestekWidget from "@/components/destek-widget";
 import CutoffUyarilari from "@/components/cutoff-uyarilari";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
-import { Loader2, LogOut, ShieldAlert } from "lucide-react";
+import { LogOut, ShieldAlert } from "lucide-react";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { girisSonrasiKaydet } from "@/lib/giris-donus";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYetkileri> = {
   "/panel": "panel",
@@ -88,9 +89,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // gerçekleşene kadar nötr bir yükleniyor ekranı gösteriliyor.
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 size={32} className="animate-spin text-emerald-500" />
-      </div>
+      <SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />
     );
   }
 
@@ -124,9 +123,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       );
     }
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 size={32} className="animate-spin text-emerald-500" />
-      </div>
+      <SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />
     );
   }
 

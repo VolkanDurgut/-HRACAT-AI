@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink, Loader2, RotateCcw, X, Compass, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink, RotateCcw, X, Compass, Lock, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
@@ -13,6 +13,7 @@ import { EkranSahnesi } from "@/components/kilavuz/ekran-sahnesi";
 import { KILAVUZ_KONULARI, type KilavuzKonusu } from "@/lib/kilavuz/konular";
 import { EKRAN_NOKTALARI } from "@/lib/kilavuz/ekran-noktalari";
 import { PAGE_BG, TEXT_MUTED } from "@/lib/theme";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * UNEX GIDA · IHRACAT AI KULLANIM KILAVUZU (28.10.2026).
@@ -152,9 +153,7 @@ export default function KilavuzSayfasi() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}>
-        <Loader2 size={32} className="animate-spin text-emerald-500" />
-      </div>
+      <SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />
     );
   }
 

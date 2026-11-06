@@ -13,7 +13,7 @@ import { IcSiparisFormuPenceresi } from "@/components/ic-siparis-formu-penceresi
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcGecmisSevkPenceresi, GecmisSevkEmri } from "@/components/ic-gecmis-sevk-penceresi";
 import {
-  ClipboardList, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
+  ClipboardList, Plus, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
   RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History, ArrowRightLeft,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -26,6 +26,7 @@ import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-p
 import { teslimFarki } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { KalanRozet } from "@/components/ic-kalan-rozet";
 import { IcDevirPenceresi } from "@/components/ic-devir-penceresi";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Ic Piyasa - Is Emirleri (12.10.2026).
@@ -252,7 +253,7 @@ export default function IsEmirleriPage() {
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} /></div>
+        <SayfaYukleniyor />
       </AppShell>
     );
   }

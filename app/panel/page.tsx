@@ -15,9 +15,10 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, Loader2, FileText, FolderOpen, CheckCircle2, CircleDashed } from "lucide-react";
+import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed } from "lucide-react";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type FilterType = "tumu" | "cutoff" | "rezervasyon" | "acik";
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
@@ -254,9 +255,7 @@ function PanelContent() {
       {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 size={24} className="animate-spin" style={{ color: ACCENT }} />
-        </div>
+        <SayfaYukleniyor boyut={24} />
       ) : filteredDosyalar.length === 0 ? (
         <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
       ) : (
@@ -420,7 +419,7 @@ function PanelContent() {
 
 export default function PanelPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }}><div className="animate-pulse" style={{ color: TEXT_MUTED }}>Yükleniyor...</div></div>}>
+    <Suspense fallback={<SayfaYukleniyor className="min-h-screen flex items-center justify-center" style={{ backgroundColor: PAGE_BG }} />}>
       <PanelContent />
     </Suspense>
   );

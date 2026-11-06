@@ -1102,6 +1102,11 @@
   `beyannameKarsilastir` (fatura no SIRA SAYI olarak — müşavir 10 hane yazıyor; tarih; toplam ±1
   aynı döviz; konteynerler küme; net toplam; DİİB yıl+sıra, D1/D2 farkı NOT; gemi; teslim şekli
   CFR=CNF; varış yeri / ülke / alıcı bulunamazsa "bilgi", uyumsuzluk sayılmaz).
+- Yükleme yeri (06.11.2026 2. adım; kullanıcı: "yükleme yeri bizde de MARPORT"): beyannamedeki
+  "eşyanın bulunduğu yer" (`G` + 4 hane + ad; önceki / sonraki kutuya bitişik yazılabilir →
+  BAŞLANGIÇ eşleşmesi) ile REZERVASYONUN yükleme limanı (yoksa dosyanınki). Dosya alanı proformadan
+  gelir ve rezervasyondan farklı olabilir (IHR-2026-0108: dosya KUMPORT, rezervasyon + beyanname
+  MARPORT). Başka bilinen terminal yazıyorsa "uyuşmuyor", okunamazsa "bilgi".
 - `lib/beyanname-beklenen.ts`: dosya + konteynerler (net hepsi > 0 ise toplam) + rezervasyon gemisi
   + bölünmüş DİİB'ler (`diib_dosya_bolunmeleri` → `diib_belgeleri`).
 - Çok kalemli (bölünmüş DİİB) beyannamede 2. kalem "Tek Tip Gümrük Beyannamesi Devam Listesi"

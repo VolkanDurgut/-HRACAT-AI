@@ -21,6 +21,7 @@ import {
   alisFiyatYazi, alisHataMesaji, alisIlerleme, alisKapatmayaHazir, alisTutarYazi, alisUrunYazi, bugunTRIso, gunTR,
 } from "@/lib/ic-piyasa/alis";
 import { vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Ic Piyasa - ALIS (30.10.2026). Lojistik Excel'inin ALIS SIPARIS RAPORU'nun
@@ -214,7 +215,7 @@ export default function AlisPage() {
         )}
 
         {yukleniyor ? (
-          <div className="flex items-center justify-center py-20"><Loader2 size={26} className="animate-spin" style={{ color: ACCENT }} /></div>
+          <SayfaYukleniyor boyut={26} />
         ) : gorunum === "tedarikciler" ? (
           <TedarikciListesi tedarikciler={tedarikciler} siparisler={siparisler} yenile={getir} />
         ) : (

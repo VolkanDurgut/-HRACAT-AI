@@ -431,3 +431,17 @@
 - `<html data-sg-faz>` geçiş sürerken dolu; `SAYFA_GECISI_BITTI` olayı (lib/sayfa-gecisi-olay.ts).
   `YaziAnimasyonu gecisiBekle` (sayfa başlığı alt yazısı, Proforma asistanı karşılama) perde arkasında
   yazmaz, perde kalkınca başlar (olay gelmezse en geç 3 sn).
+- 3. revize (06.11.2026) — sayfa yükleniyor animasyonu KALDIRILDI. Kullanıcı: "Unex geçişinden sonra
+  gelen loader animasyonu kaldırılsın." `components/sayfa-yukleniyor.tsx` (`SayfaYukleniyor` +
+  `useSayfaYukleniyor(aktif)`): sayfanın ilk veri yüklemesi sürerken `lib/sayfa-gecisi-olay.ts`
+  `sayfaBeklemeEkle()` ile perdeye "bekle" der; perde, yol değiştikten sonra bekleyen kalmayana kadar
+  (tıklamadan itibaren en fazla `BEKLEME_UST_MS` 2,5 sn) kalkmaz, beklerken sayfa adının altındaki çizgi
+  tarar. Perde kalkınca sayfa dolu gelir. Perde yoksa (yenileme / doğrudan adres) ya da veri 2,5 sn'yi
+  aşarsa simge ancak perde kalktıktan 450 ms sonra soluklaşarak belirir. `EMNIYET_MS` = 2,5 sn + giriş
+  + 400 ms. Uygulanan yerler: AppShell (oturum / yönlendirme), Giriş ekranı, Kontrol Merkezi,
+  Yetkilendirme, DİİB, Dosya Detayı (iskelet de), ETD/ETA, İç Piyasa (ana, alış, bildirimler,
+  iş emirleri, müşteriler, rapor), Kantar, Kılavuz, Proforma Oluştur, Satın Alma, Ana Panel,
+  İhracatlar (ilk yükleme iskeleti; aramadaki iskelet KALDI), İhracat Evrakları. Buton içi küçük işlem
+  simgelerine ve müşteriye açık token sayfalarına (takip / talep / çek / çıkış / rapor) DOKUNULMADI.
+  Giriş başarılı olunca da logolu geçiş ("Hoş geldiniz"; hedef yetkiye göre değişebildiği için genel
+  ad — `sayfaGecisiBaslat(hedef, ad)`). testid `sayfa-yukleniyor`.

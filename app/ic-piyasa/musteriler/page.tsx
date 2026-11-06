@@ -13,6 +13,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 import { IcMusteri, hataMesaji, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
 import { musteriMukerrer } from "@/lib/ic-piyasa/siparis-formu";
 import { IcMusteriDetay } from "@/components/ic-musteri-detay";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Ic Piyasa - Musteri kartlari (12.10.2026).
@@ -172,7 +173,7 @@ export default function IcMusterilerPage() {
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
     return (
       <AppShell>
-        <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} /></div>
+        <SayfaYukleniyor />
       </AppShell>
     );
   }

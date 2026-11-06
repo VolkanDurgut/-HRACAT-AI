@@ -27,6 +27,7 @@ import { beyannameNoOku } from "@/lib/beyanname-oku";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { ticaretYapilanUlke } from "@/lib/ulke-bul";
 import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir, yuklenenEkle, yuklenenKgleri } from "@/lib/diib/veri";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * DIIB TAKIBI (04.11.2026). Burak Bey'in "UNEX IHRACATLAR" Excel'inin IHRACAT kismi - SISTEM
@@ -186,7 +187,7 @@ function DiibIcerik() {
   };
 
   if (authLoading || (yukleniyor && !hata)) {
-    return <div className="flex justify-center py-24"><Loader2 className="animate-spin" size={26} style={{ color: TEXT_MUTED }} /></div>;
+    return <SayfaYukleniyor className="flex justify-center py-24" boyut={26} />;
   }
 
   return (

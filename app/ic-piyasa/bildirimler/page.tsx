@@ -15,6 +15,7 @@ import {
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { BILDIRIM_ETIKET, elleGonderimMetni, kapanisOzeti, musteriEpostaKonusu, musteriEpostaMetni, sablonBul } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { IC_BELGE_BUCKET, hataMesaji, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
+import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 /**
  * Ic Piyasa - Bildirimler (12.10.2026).
@@ -328,7 +329,7 @@ export default function BildirimlerPage() {
   };
 
   if (authLoading || (yetkili && yukleniyor && !okumaHatasi)) {
-    return <AppShell><div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin" style={{ color: ACCENT }} /></div></AppShell>;
+    return <AppShell><SayfaYukleniyor /></AppShell>;
   }
 
   return (

@@ -1070,3 +1070,18 @@
   rozetlerinde "Beyanname yüklendi" yerine "Beyanname gönderildi".
 - Konteynerler sekmesi: dosyanın TEK rezervasyonu varsa "Konteyner Ekle" ve "Toplu Ekle"
   formlarında rezervasyon kendiliğinden seçilir (kullanıcı değiştirebilir).
+
+## Proforma Yükle: sistem proformasını yapay zekâsız okuma (06.11.2026)
+
+- Proforma Oluştur'un indirdiği PDF'in bilgisinde Title "Proforma <NO>", Creator "İhracat AI" yazar.
+  Proforma Yükle önce bunu dener (`lib/proforma/okuma-pdf.ts`, tarayıcıda unpdf): no ile Kayıtlı
+  Proformalar'daki taslak (`proformalar.taslak`) bulunur, alanlar PDF'i çizen AYNI `belgeOlustur` ile
+  taslaktan üretilir (`lib/proforma/okuma.ts`), proforma-oku ile aynı alan adlarında döner.
+- Doğrulama: proforma no, alıcı unvanının ilk 3 kelimesi, toplam ve her kalemin miktar / fiyat / tutarı
+  PDF metninde aynen yazmalı. Biri tutmazsa (PDF indirildikten sonra taslak değişmiş), kayıt yoksa,
+  Creator farklıysa, kullanıcının Proformalar yetkisi yoksa (RLS) ya da herhangi bir hata olursa
+  sessizce eski yapay zekâ okumasına (edge proforma-oku) geçilir; akış durmaz.
+- Okunan kayıtta `okuma_kaynagi: "sistem_proformasi"` (ham_veri'de denetim izi); okuma özetinde
+  "yapay zekâ kullanılmadı" satırı (testid `proforma-okuma-kaynak`).
+- Test: gerçek proforma türleri (CFR / CIF / FOB, EUR, çok kalem) birebir; e2e `e2e_pfoku` (mock
+  `PF_OKU_TEST=1`; mock proforma-oku çağrılırsa 500 döner, test çağrılmadığını doğrular).

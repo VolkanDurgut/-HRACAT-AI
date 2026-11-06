@@ -19,6 +19,7 @@ import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 import { guncelDiibNoGetir } from "@/lib/diib/veri";
+import { sistemProformasiOku } from "@/lib/proforma/okuma-pdf";
 
 // 25.10.2026: sayfa "Proforma Yukle" (AI asistan gorunumu); adres ve yetki anahtari (yeni_dosya) degismedi.
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -106,7 +107,13 @@ export default function YeniDosyaPage() {
     let okumaBasarisiz = false;
     try {
       let extracted: any = null;
-      try {
+      // 06.11.2026: Proforma Olustur'dan indirilen proforma, Kayitli Proformalar'daki kaydindan
+      // YAPAY ZEKASIZ okunur (PDF metniyle rakam rakam dogrulanir; lib/proforma/okuma.ts). Sistem
+      // disi / kaydi olmayan / tutmayan proformada asagidaki yapay zeka okumasi aynen devam eder.
+      const sistem = await sistemProformasiOku(pdfFile, companyId);
+      if (sistem.tur === "okundu") extracted = sistem.veri;
+      else if (sistem.tur === "uyusmuyor") console.info("Sistem proformasi kaydiyla PDF uyusmadi; yapay zeka okumasina geciliyor:", sistem.proformaNo, sistem.eksik);
+      if (!extracted) try {
         const formData = new FormData();
         formData.append("file", pdfFile);
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;

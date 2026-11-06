@@ -1081,6 +1081,9 @@
   PDF metninde aynen yazmalı. Biri tutmazsa (PDF indirildikten sonra taslak değişmiş), kayıt yoksa,
   Creator farklıysa, kullanıcının Proformalar yetkisi yoksa (RLS) ya da herhangi bir hata olursa
   sessizce eski yapay zekâ okumasına (edge proforma-oku) geçilir; akış durmaz.
+- Liman: teslim ifadesindeki liman YALNIZ Türkiye limanıysa (FOB AMBARLI) yükleme limanı; değilse teslim
+  şekli ne olursa olsun varış limanı ("FOB SANTIAGO DE CUBA BASIS" → varış SANTIAGO DE CUBA). 06.11.2026
+  ilk canlı denemede (IHR-2026-0111, sonra silindi) yükleme limanına varış yazılmıştı; düzeltildi.
 - Okunan kayıtta `okuma_kaynagi: "sistem_proformasi"` (ham_veri'de denetim izi); okuma özetinde
   "yapay zekâ kullanılmadı" satırı (testid `proforma-okuma-kaynak`).
 - Test: gerçek proforma türleri (CFR / CIF / FOB, EUR, çok kalem) birebir; e2e `e2e_pfoku` (mock

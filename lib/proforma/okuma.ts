@@ -19,6 +19,7 @@
 import { belgeOlustur, genelSayiYaz, paraYaz, teslimSekliBul, type ProformaBelgesi, type ProformaTaslak } from "@/lib/proforma/belge";
 import { SATICI, VARSAYILAN_ALT_BILGI, VARSAYILAN_OZEL_SARTLAR, VARSAYILAN_UST_BILGI } from "@/lib/proforma/sabitler";
 import { bankaBul, SABIT_HESAP_ADI } from "@/lib/bankalar";
+import { turkiyeLimaniMi } from "@/lib/varis-limani-kontrol";
 
 /** Sistem tarafindan uretilen PDF mi (PDF bilgisindeki Creator). */
 export function sistemUretimiMi(olusturan: string | null | undefined): boolean {
@@ -46,7 +47,12 @@ export function teslimLimani(teslimIfadesi: string): string {
     .replace(/^(.+?\sPORT)\s+(\S.*)$/i, "$1, $2");
 }
 
-/** Liman yukleme limani olan teslim sekilleri (FOB AMBARLI PORT = yukleme). */
+/**
+ * Liman yukleme limani olan teslim sekilleri (FOB AMBARLI PORT = yukleme). 06.11.2026: proformalarda
+ * "FOB SANTIAGO DE CUBA BASIS" gibi varis limaniyla yazilmis FOB da var (IHR-2026-0111 denemesinde
+ * yukleme limani "SANTIAGO DE CUBA" oldu). Bu yuzden liman YALNIZ Turkiye limaniysa yukleme sayilir;
+ * degilse (teslim sekli ne olursa olsun) varis limanidir.
+ */
 const YUKLEMEDE_TESLIM = new Set(["FOB", "FCA", "EXW", "FAS"]);
 
 function ambalajTuru(paketleme: string): string {
@@ -68,7 +74,7 @@ function ilgiliSatiri(ilgiliKisi: string, desen: RegExp): string {
 export function belgedenOkunan(b: ProformaBelgesi, taslak: ProformaTaslak): Record<string, unknown> {
   const teslim = teslimSekliBul(b.teslimIfadesi, taslak.teslimSekli);
   const liman = teslimLimani(b.teslimIfadesi);
-  const yuklemede = YUKLEMEDE_TESLIM.has(teslim);
+  const yuklemede = YUKLEMEDE_TESLIM.has(teslim) && turkiyeLimaniMi(liman);
   const banka = bankaBul(b.banka);
   const hesap = banka ? (b.paraBirimi === "EUR" ? banka.eur : banka.usd) : null;
   const avans = /ADVANCE|DEPOSIT/i.test(b.ikinci.etiket) ? b.ikinci.tutar : 0;

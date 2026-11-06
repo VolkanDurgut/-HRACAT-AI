@@ -705,3 +705,10 @@
 - Sayfa (`app/belge/irsaliye/page.tsx`) oturum ister; satırı şirkete göre okur, PDF'i 10 dk'lık
   imzalı adresle gösterir (Yeni sekmede aç / İndir). Mailde oturumsuz açılırsa giriş sonrası
   aynı sayfaya döner (`lib/giris-donus.ts`, yalnız `/belge/` yolları, sessionStorage).
+- 06.11.2026 ALIŞ EŞİTLEME (kullanıcı onaylı; lojistik "siparişler açılmamış" dedi; 05.11 Sipariş Alım
+  Raporu Excel'i): yeni tedarikçi kartları LÜLEBURGAZ AJANS, İPSALA AJANS; AS-2026-0006 Lüleburgaz
+  500 t (1223, 7202002 MAYDÜ), AS-2026-0007 İpsala 590 t (1222, 7201001 MAYDÜ), AS-2026-0008 İpsala
+  1.940 kg (Havsa AS-0001'den kalan, 07.10 / termin 21.10). AS-0001 700.000 → 698.060 kg (teslim
+  698.060). Kapatmalar MANUEL (kullanıcı tercihi): AS-0001/0003/0004 tam teslim ama "açık"; Alış
+  satırı açılınca "Tamamlandı olarak kapat". Satış tarafı Excel ile birebir (IE-0007 fazlası 18.940 kg
+  04.11'de IE-0008'e devredilmişti).

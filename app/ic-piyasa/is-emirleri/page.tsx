@@ -167,6 +167,8 @@ export default function IsEmirleriPage() {
   // Bugun yuklenen (tum is emirleri)
   const bugunTR = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
   const bugunSevkler = sevkler.filter((s) => new Date(s.olusturma).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugunTR);
+  // Hedefe ulasmis (>= %98) ama hala acik is emirleri: satirda "Kapatmaya hazir" + hizli "Tamamla" (06.11.2026)
+  const kapatmayaHazirSayi = emirler.filter((e) => e.durum === "acik" && hedefTamam(e, yuklenenKg(e, sevkMap.get(e.id) || []), (sevkMap.get(e.id) || []).length)).length;
   const uyariliSayi = sevkler.filter((s) => s.uyarilar?.length && emirler.find((e) => e.id === s.is_emri_id)?.durum === "acik").length;
 
   const irsaliyeAc = async (yol: string, ad = "İrsaliye") => {
@@ -288,7 +290,7 @@ export default function IsEmirleriPage() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <Ozet baslik="Açık İş Emri" deger={String(sayilar.acik)} renk="text-sky-400" />
+        <Ozet baslik="Açık İş Emri" deger={String(sayilar.acik)} alt={kapatmayaHazirSayi ? `${kapatmayaHazirSayi} kapatmaya hazır` : undefined} renk="text-sky-400" />
         <Ozet baslik="Bugün Yüklenen" deger={`${bugunSevkler.length} araç`} alt={kgYazi(bugunSevkler.reduce((t, s) => t + Number(s.net_kg), 0))} renk="text-white" />
         <Ozet baslik="Açık Emirlerde Yüklenen" deger={kgYazi(emirler.filter((e) => e.durum === "acik").reduce((t, e) => t + yuklenenKg(e, sevkMap.get(e.id) || []), 0))} renk="text-white" />
         <Ozet baslik="Kontrol Bekleyen Uyarı" deger={String(uyariliSayi)} renk={uyariliSayi ? "text-amber-400" : "text-emerald-400"} />
@@ -354,6 +356,7 @@ export default function IsEmirleriPage() {
                         <td className="px-3 py-3 align-top">
                           <p className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.is_emri_no}</p>
                           <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DURUM_RENK[e.durum]}`}>{DURUM_ETIKET[e.durum]}</span>
+                          {e.durum === "acik" && tamam && <span className="ml-1 inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 whitespace-nowrap" data-testid="kapatmaya-hazir">Kapatmaya hazır</span>}
                         </td>
                         <td className="px-3 py-3 align-top max-w-[240px]">
                           <p className="text-xs font-medium text-white truncate" title={e.ic_musteriler?.unvan}>{e.ic_musteriler?.kisa_ad || e.ic_musteriler?.unvan || "-"}</p>
@@ -393,6 +396,12 @@ export default function IsEmirleriPage() {
                         </td>
                         <td className="px-3 py-3 align-top">
                           <div className="flex items-center justify-end gap-1.5">
+                            {e.durum === "acik" && tamam && (
+                              <button onClick={(ev) => { ev.stopPropagation(); setDurumIslem({ emir: e, hedef: "tamamlandi" }); }} title="Siparişi tamamlandı olarak kapat" data-testid="hizli-tamamla"
+                                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/10 whitespace-nowrap" style={{ borderColor: "#065F46" }}>
+                                <CheckCircle2 size={12} /> Tamamla
+                              </button>
+                            )}
                             {e.siparis_formu_yolu && (
                               <button onClick={(ev) => { ev.stopPropagation(); irsaliyeAc(e.siparis_formu_yolu as string, "Sipariş formu"); }} title="Sipariş formunu görüntüle"
                                 className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:opacity-90" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}>
@@ -612,7 +621,7 @@ export default function IsEmirleriPage() {
         description={
           durumIslem?.hedef === "tamamen_sil" ? `İptal edilmiş iş emri, ${(sevkMap.get(durumIslem.emir.id) || []).length} araç kaydı, irsaliye PDF'leri ve bildirimleriyle kalıcı olarak silinir. Geri alınamaz.`
           : durumIslem?.hedef === "sil" ? "Sevk girilmemiş iş emri kalıcı olarak silinir."
-          : durumIslem?.hedef === "tamamlandi" ? "İş emri tamamlandı olarak kapanır ve Kantar Panelinden kalkar. Gerekirse yeniden açabilirsiniz."
+          : durumIslem?.hedef === "tamamlandi" ? kapatmaAciklamasi(durumIslem.emir, sevkMap.get(durumIslem.emir.id) || [])
           : durumIslem?.hedef === "iptal" ? "İş emri iptal edilir ve Kantar Panelinden kalkar. Girilmiş sevkler kayıtlı kalır."
           : "İş emri tekrar açık olur ve Kantar Panelinde görünür."
         }
@@ -670,6 +679,15 @@ export default function IsEmirleriPage() {
       />
     </AppShell>
   );
+}
+
+/** Kapatma onayi metni: yuklenen / hedef + musteri mesaji bilgisi (06.11.2026). */
+function kapatmaAciklamasi(e: EmirSatiri, ss: IcSevk[]): string {
+  const kg = yuklenenKg(e, ss);
+  const hedef = e.hedef_tur === "kg" ? (e.hedef_kg !== null ? kgYazi(Number(e.hedef_kg)) : "-") : `${e.hedef_arac ?? "-"} araç`;
+  const durum = e.hedef_tur === "kg" ? `Yüklenen ${kgYazi(kg)} / hedef ${hedef}.` : `Yüklenen ${ss.length} araç / hedef ${hedef}.`;
+  const mesaj = ss.length ? " Müşteriye “Siparişiniz tamamlandı” mesajı Bildirimler'e hazırlanır." : " Araç yüklenmediği için müşteriye mesaj hazırlanmaz.";
+  return `${durum}${mesaj} İş emri Kantar Panelinden kalkar; gerekirse yeniden açabilirsiniz.`;
 }
 
 function Ozet({ baslik, deger, alt, renk }: { baslik: string; deger: string; alt?: string; renk: string }) {

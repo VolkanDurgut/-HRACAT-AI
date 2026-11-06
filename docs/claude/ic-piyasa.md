@@ -712,3 +712,11 @@
   698.060). Kapatmalar MANUEL (kullanıcı tercihi): AS-0001/0003/0004 tam teslim ama "açık"; Alış
   satırı açılınca "Tamamlandı olarak kapat". Satış tarafı Excel ile birebir (IE-0007 fazlası 18.940 kg
   04.11'de IE-0008'e devredilmişti).
+- 06.11.2026 HIZLI "TAMAMLA" (kullanıcı: "iş emirleri kısmında siparişi tamamla yok sanırım"): buton
+  vardı ama Detay'ın en altındaydı. Artık hedefe ulaşan (İE: `hedefTamam` ≥ %98 / araç hedefi; Alış:
+  `alisKapatmayaHazir`) AÇIK siparişte satırda "Kapatmaya hazır" rozeti + İşlemler'de "Tamamla"
+  (testid `kapatmaya-hazir`, `hizli-tamamla`, `alis-hizli-tamamla`); aynı onay penceresi, detay
+  açılmaz. İE "Açık İş Emri" kutusunda "N kapatmaya hazır". İE kapatma onayı artık yüklenen / hedefi ve
+  araç varsa müşteriye "Siparişiniz tamamlandı" mesajının Bildirimler'e hazırlanacağını yazar
+  (`kapatmaAciklamasi`; tetikleyici değişmedi, müşteri mesajı araç toplamıyla — 04.11 kararı).
+  Kapatma her zaman ELLE (otomatik kapatma yok). e2e `e2e_tamamla.mjs` (IC_TEST) 17/17.

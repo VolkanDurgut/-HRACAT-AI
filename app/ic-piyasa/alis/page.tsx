@@ -306,7 +306,16 @@ export default function AlisPage() {
                                 <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{s.birim_fiyat !== null ? alisTutarYazi(Number(s.miktar_kg) * Number(s.birim_fiyat), s.para_birimi) : "fiyat girilmedi"}</p>
                                 {s.vade_gun !== null && <p className="text-[10px]" style={{ color: TEXT_MUTED }}>{vadeYazi(s.vade_gun)}</p>}
                               </td>
-                              <td className="px-3 py-3 align-top text-right" style={{ color: TEXT_MUTED }}>{ac ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</td>
+                              <td className="px-3 py-3 align-top text-right whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                                {/* Hizli kapatma (06.11.2026): detayi acmadan, ayni onay penceresiyle */}
+                                {hazir && (
+                                  <button onClick={(ev) => { ev.stopPropagation(); setDurumIslem({ s, hedef: "tamamlandi" }); }} title="Siparişi tamamlandı olarak kapat" data-testid="alis-hizli-tamamla"
+                                    className="inline-flex items-center gap-1 mr-2 px-2 py-1.5 rounded-lg border text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/10 align-middle" style={{ borderColor: "#065F46" }}>
+                                    <CheckCircle2 size={12} /> Tamamla
+                                  </button>
+                                )}
+                                <span className="inline-block align-middle">{ac ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
+                              </td>
                             </tr>
                             {ac && (
                               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>

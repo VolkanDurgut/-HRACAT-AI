@@ -9,7 +9,11 @@ import {
 import { KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC } from "@/supabase/functions/_shared/konsimento-hatirlatma-sabitler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
-import { Users, Container, Anchor, Scale, Hash } from "lucide-react";
+import { Users, Container, Anchor, Scale, Hash, MinusCircle, Info, RefreshCw } from "lucide-react";
+import KonsimentoTalimatHazirlik from "@/components/konsimento-talimat-hazirlik";
+import { talimatModeli } from "@/lib/konsimento/talimat";
+import { konsimentoMetniniKontrolEt, type KonsimentoKontrolSatiri, type KonsimentoKontrolDurumu } from "@/lib/konsimento/kontrol";
+import { beyannameMetniCikar } from "@/lib/beyanname-oku";
 
 // 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
 // Eski "surukleyip birakin" alani birakmayi aslinda desteklemiyordu - asistan alani destekler.
@@ -22,6 +26,10 @@ const KONSIMENTO_YETENEKLERI = [
 ];
 
 type KontrolSonucu = {
+  /** "metin" = yapay zekasiz kontrol (06.11.2026; lib/konsimento/kontrol.ts); yoksa eski AI kontrolu */
+  kaynak?: "metin";
+  sablon?: "standart" | "akkon";
+  kontroller?: KonsimentoKontrolSatiri[];
   uyumlu: boolean;
   uyusmazliklar: { alan: string; sistemde: string; dosyada: string }[];
   ozet: string;
@@ -139,6 +147,30 @@ export default function KonsimentoTalimatiSection({
     };
   };
 
+  /** Tanitilan form (standart / Akkon) + dosyada consignee var -> yapay zekasiz kontrol; yoksa null. */
+  const metinKontrolu = (metin: string | null) => {
+    if (!metin || !(dosya.consignee || "").trim()) return null;
+    return konsimentoMetniniKontrolEt(metin, talimatModeli({ dosya, rezervasyonlar, konteynerler }));
+  };
+  const [yenileniyor, setYenileniyor] = useState(false);
+  const handleYenidenKontrol = async () => {
+    if (!konsimentoDosyaUrl) return;
+    setYenileniyor(true);
+    try {
+      const res = await fetch(konsimentoDosyaUrl);
+      const sonuc = res.ok ? metinKontrolu(await beyannameMetniCikar(await res.arrayBuffer())) : null;
+      if (!sonuc) { showToast("Talimat metni okunamadı ya da form tanınmadı; yeniden yükleyerek kontrol edebilirsiniz.", "error"); return; }
+      const { data, error } = await supabase.from("ihracat_dosyalari").update({ konsimento_kontrol_sonucu: sonuc })
+        .eq("id", dosyaId).eq("company_id", companyId).select("id");
+      const hata = yazmaHatasi(error, data);
+      if (hata) { showToast(`Kaydedilemedi: ${hata}`, "error"); return; }
+      showToast(sonuc.uyumlu ? "Talimat sistemle uyumlu." : sonuc.ozet, sonuc.uyumlu ? "success" : "error");
+      onRefresh();
+    } catch {
+      showToast("Talimat okunamadı.", "error");
+    } finally { setYenileniyor(false); }
+  };
+
   const handleYukleVeKontrolEt = async (file: File) => {
     setKontrolEdiliyor(true); setKontrolHata(null);
     // Kayda baglanamayan yeni PDF depoda sahipsiz kalmasin (05.10.2026 -
@@ -155,6 +187,25 @@ export default function KonsimentoTalimatiSection({
       if (uploadError) throw new Error(`Yükleme hatası: ${uploadError.message}`);
       yuklenenYol = path;
       const dosyaUrl = await getGuvenliDosyaUrl("konsimento-talimatlari", path);
+
+      // 06.11.2026: tanitilan form -> yapay zekasiz, ucretsiz kontrol (taraflar dosyada kalir)
+      const yerelSonuc = metinKontrolu(await beyannameMetniCikar(await file.arrayBuffer()));
+      if (yerelSonuc) {
+        const { data: oncekiY } = await supabase.from("ihracat_dosyalari")
+          .select("konsimento_dosya_url").eq("id", dosyaId).eq("company_id", companyId).maybeSingle();
+        const { data: yazilan, error: yHata } = await supabase.from("ihracat_dosyalari").update({
+          konsimento_dosya_url: dosyaUrl, konsimento_dosya_adi: file.name,
+          konsimento_yukleme_tarihi: new Date().toISOString(), konsimento_kontrol_sonucu: yerelSonuc,
+        }).eq("id", dosyaId).eq("company_id", companyId).select("id");
+        const yazHata = yazmaHatasi(yHata, yazilan);
+        if (yazHata) throw new Error(`Sonuç kaydedilemedi: ${yazHata}`);
+        yuklenenYol = null;
+        await eskiDepoDosyasiniSil(oncekiY?.konsimento_dosya_url, dosyaUrl);
+        onRefresh();
+        cutoffUyarilariniYenile();
+        return;
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       const formData = new FormData();
@@ -262,6 +313,8 @@ export default function KonsimentoTalimatiSection({
           gonderiliyor={hatirlatmaGonderiliyor} onGonder={hatirlatmaGonder} />
       )}
       <div className="p-4">
+        <KonsimentoTalimatHazirlik dosya={dosya} rezervasyonlar={rezervasyonlar} konteynerler={konteynerler}
+          companyId={companyId} hazir={konsimentoHazir} onRefresh={onRefresh} />
         <input
           ref={fileInputRef}
           type="file"
@@ -325,7 +378,8 @@ export default function KonsimentoTalimatiSection({
                   <p className="text-sm font-semibold text-green-400">Konşimento talimatı sistemle uyumlu.</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs mt-1 ml-6" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
-                {kontrolSonucu.consignee && (
+                {kontrolSonucu.kontroller && <KontrolListesi satirlar={kontrolSonucu.kontroller} yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} />}
+                {!kontrolSonucu.kontroller && kontrolSonucu.consignee && (
                   <p className="text-xs ml-6 mt-1" style={{ color: TEXT_MUTED }}>
                     <span className="font-medium text-white">Consignee:</span> {kontrolSonucu.consignee}
                   </p>
@@ -340,7 +394,8 @@ export default function KonsimentoTalimatiSection({
                   <p className="text-sm font-semibold text-red-400">Konşimento talimatında uyuşmazlık tespit edildi</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
-                {kontrolSonucu.uyusmazliklar?.length > 0 && (
+                {kontrolSonucu.kontroller && <KontrolListesi satirlar={kontrolSonucu.kontroller} yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} />}
+                {!kontrolSonucu.kontroller && kontrolSonucu.uyusmazliklar?.length > 0 && (
                   <div className="space-y-1.5">
                     {kontrolSonucu.uyusmazliklar.map((u, idx) => (
                       <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
@@ -356,6 +411,41 @@ export default function KonsimentoTalimatiSection({
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const DURUM: Record<KonsimentoKontrolDurumu, { renk: string; ikon: React.ReactNode; etiket: string }> = {
+  uyumlu: { renk: "text-green-400", ikon: <CheckCircle2 size={13} />, etiket: "Uyumlu" },
+  uyusmuyor: { renk: "text-amber-400", ikon: <AlertTriangle size={13} />, etiket: "Uyuşmuyor" },
+  okunamadi: { renk: "text-slate-400", ikon: <MinusCircle size={13} />, etiket: "Okunamadı" },
+  bilgi: { renk: "text-sky-300", ikon: <Info size={13} />, etiket: "Elle bakın" },
+};
+
+/** Yapay zekasiz kontrol satirlari (beyanname kontrolu ile ayni gorunum). */
+function KontrolListesi({ satirlar, yenileniyor, onYenile }: { satirlar: KonsimentoKontrolSatiri[]; yenileniyor: boolean; onYenile: () => void }) {
+  return (
+    <div className="mt-2" data-testid="konsimento-kontrol">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" }} title="PDF metninden kurallarla okundu; yapay zekâ kullanılmadı">Metinden okundu · ücretsiz</span>
+        <button onClick={onYenile} disabled={yenileniyor} className="ml-auto inline-flex items-center gap-1 text-[11px] hover:text-white disabled:opacity-50" style={{ color: TEXT_MUTED }} title="Sistemdeki bilgiler değiştiyse yeniden karşılaştır" data-testid="konsimento-kontrol-yenile">
+          <RefreshCw size={11} className={yenileniyor ? "animate-spin" : ""} /> Yeniden kontrol et
+        </button>
+      </div>
+      <div className="mt-2 border-t divide-y" style={{ borderColor: CARD_BORDER }}>
+        {satirlar.map((k) => {
+          const d = DURUM[k.durum];
+          return (
+            <div key={k.alan} className="grid grid-cols-[18px_minmax(0,140px)_minmax(0,1fr)] sm:grid-cols-[18px_140px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-0.5 py-1.5 text-xs" style={{ borderColor: CARD_BORDER }} data-testid="konsimento-kontrol-satir">
+              <span className={`${d.renk} pt-0.5`} title={d.etiket}>{d.ikon}</span>
+              <span className="text-slate-300 font-medium">{k.alan}</span>
+              <span className="truncate" style={{ color: TEXT_MUTED }} title={k.sistem}>Sistem: <span className="text-white">{k.sistem}</span></span>
+              <span className="truncate col-start-3 sm:col-start-auto" style={{ color: TEXT_MUTED }} title={k.belge}>Talimat: <span className={k.durum === "uyusmuyor" ? "text-amber-300" : "text-white"}>{k.belge}</span></span>
+              {k.not && <span className="col-start-3 sm:col-span-2 text-[11px] break-words" style={{ color: k.durum === "uyusmuyor" ? "#FCD34D" : TEXT_MUTED }}>{k.not}</span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

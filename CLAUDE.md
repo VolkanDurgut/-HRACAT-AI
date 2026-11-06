@@ -262,3 +262,6 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Deploy edilen dosyalarda `\uXXXX` kaçış dizisi KULLANILMAZ: deploy aracı kaçışı gerçek
   karaktere çeviriyor, deploy edilen dosya repodan farklı çıkıyor (06.11.2026, liman-anahtari).
   Gerekirse `String.fromCharCode(0x...)` ile kurulur.
+- `konsimento-hatirlatma` edge'i: index + `_shared/konsimento-hatirlatma.ts`, `ihracat-ortak.ts`,
+  `konsimento-hatirlatma-sabitler.ts`, `konsimento-sablon.ts` (06.11.2026; acente → talimat şablonu
+  kaydı uygulamayla ORTAK — yeni acente tanıtımı buradan; ayrıntı docs/claude/ihracat.md).

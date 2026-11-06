@@ -7,10 +7,14 @@
 // ve ileride gerekirse kullanilir). FIYAT BILGISI YOK.
 // 05.11.2026: mail SADECE hatirlatma (dosya no + alici + konteyner sayisi + cut-off + uygulama dugmesi);
 // talimat alanlari (rezervasyon, taraflar, mal, konteyner) maile YAZILMAZ - kullanici karari.
+// 06.11.2026: talimat sistem verisinden OLUSTURULUR (uygulama, lib/konsimento/talimat-pdf.ts); mailde
+// "Talimati Gor" -> /belge/konsimento?d=<dosya> (oturum gerekir; acente sablonuna gore PDF + indir).
+// MSC (talimat MSC web sitesinden girilir): talimat olusturulmaz, mail SADECE hatirlatma.
 // ============================================================================
 
 import { ambalajTurkce, navlunAliciyaAitMi } from "./ihracat-ortak.ts";
 import { KH_SITE } from "./konsimento-hatirlatma-sabitler.ts";
+import { konsimentoSablonuBul, KONSIMENTO_SABLON_ADI } from "./konsimento-sablon.ts";
 export * from "./konsimento-hatirlatma-sabitler.ts";
 
 /** Talimattaki YUKLEYICI (shipper) blogu - kullanicinin ornek formlarindan, sabit. */
@@ -98,20 +102,34 @@ export function khMail(v: KhVeri, secenek: { test: boolean; gercekAlici: string;
   const enYakinCutoff = cutoffler.sort()[0] || null;
   const cutoffGecti = enYakinCutoff ? cutoffAni(enYakinCutoff) < Date.now() : false;
 
-  const konu = `${secenek.test ? "[TEST] " : ""}Hatırlatma: konşimento talimatı gönderilebilir · ${v.dosya_no || "-"} · ${v.alici_firma || "-"}`;
+  const sablon = konsimentoSablonuBul(rez[0]?.acente_ismi).sablon;
+  const msc = sablon === "msc_web";
+  const tarafEksik = !(v.consignee || "").trim() || !(v.notify || []).some((n) => (n || "").trim());
+  const konu = msc
+    ? `${secenek.test ? "[TEST] " : ""}Hatırlatma: konşimento talimatı (MSC web) · ${v.dosya_no || "-"} · ${v.alici_firma || "-"}`
+    : `${secenek.test ? "[TEST] " : ""}Konşimento talimatı hazır · ${v.dosya_no || "-"} · ${v.alici_firma || "-"}`;
 
   const testSeridi = secenek.test
     ? `<tr><td style="background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;padding:10px 28px;border-bottom:1px solid #FCD34D;">TEST · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: ${kacis(secenek.gercekAlici)} · CC: ${kacis(secenek.gercekCc.join(", "))}</td></tr>`
     : "";
 
-  const giris = `<p style="margin:0 0 14px;color:${LACIVERT};font-size:15px;line-height:1.55;"><b>${kacis(v.dosya_no)}</b>${v.alici_firma ? ` · ${kacis(v.alici_firma)}` : ""} dosyasının tüm konteynerleri sisteme girildi (<b>${kont.length}/${o.rezAdedi}</b>). Konşimento talimatını acenteye iletebilirsiniz.</p>`
+  const giris = `<p style="margin:0 0 14px;color:${LACIVERT};font-size:15px;line-height:1.55;"><b>${kacis(v.dosya_no)}</b>${v.alici_firma ? ` · ${kacis(v.alici_firma)}` : ""} dosyasının tüm konteynerleri sisteme girildi (<b>${kont.length}/${o.rezAdedi}</b>). ${msc
+    ? "Acente <b>MSC</b>: konşimento talimatını <b>MSC web sitesinden</b> giriniz."
+    : `Konşimento talimatı sistem bilgileriyle oluşturuldu (<b>${kacis(KONSIMENTO_SABLON_ADI[sablon])}</b>). Kontrol edip acenteye iletebilirsiniz.`}</p>`
+    + (!msc && tarafEksik
+      ? `<p style="margin:0 0 10px;padding:9px 14px;border:1px solid #FCD34D;background:#FFFBEB;border-radius:4px;font-size:13px;color:#92400E;"><b>Consignee / notify eksik.</b> Talimatı göndermeden önce dosyanın Konşimento Talimatı kartından tamamlayın.</p>`
+      : "")
     + (enYakinCutoff
       ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 6px;"><tr><td style="padding:9px 14px;border:1px solid ${cutoffGecti ? "#FCA5A5" : "#FCD34D"};background:${cutoffGecti ? "#FEF2F2" : "#FFFBEB"};border-radius:4px;font-size:13px;color:${cutoffGecti ? "#B91C1C" : "#92400E"};"><b>Talimat son tarihi (cut-off):</b> ${kacis(cutoffYazi(enYakinCutoff))}${cutoffGecti ? " · <b>SÜRE GEÇTİ</b>" : ""}</td></tr></table>`
       : "");
 
   const adres = `${KH_SITE}/dosya/${v.dosya_id}?tab=evraklar`;
-  const dugme = `<p style="margin:20px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:4px;">Dosyayı uygulamada aç</a></p>
-<p style="margin:0 0 6px;color:#8B91A8;font-size:12px;">Talimat için gereken bilgiler dosyanın Evraklar sekmesindedir.</p>`;
+  const talimatAdres = `${KH_SITE}/belge/konsimento?d=${v.dosya_id}`;
+  const dugme = msc
+    ? `<p style="margin:20px 0 6px;"><a href="${kacis(adres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:4px;">Dosyayı uygulamada aç</a></p>`
+    : `<p style="margin:20px 0 6px;"><a href="${kacis(talimatAdres)}" style="display:inline-block;background:#283474;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:4px;">Talimatı Gör</a>
+<a href="${kacis(adres)}" style="display:inline-block;margin-left:8px;color:#283474;text-decoration:none;font-weight:700;font-size:14px;padding:11px 18px;border:1px solid #283474;border-radius:4px;">Dosyayı aç</a></p>
+<p style="margin:0 0 6px;color:#8B91A8;font-size:12px;">Talimat, açıldığı anda sistemdeki güncel bilgilerle oluşturulur; sayfadan indirilebilir.</p>`;
 
   const altNot = `<p style="margin:14px 0 0;color:#8B91A8;font-size:12px;line-height:1.5;">Bu hatırlatma İhracat AI tarafından ${secenek.tetik === "elle" ? `${kacis(secenek.isteyen || "bir kullanıcı")} isteğiyle` : "son konteyner girildiğinde otomatik olarak"} gönderildi. Konşimento talimatı yüklendiğinde dosyada uyum kontrolü otomatik yapılır.</p>`;
 
@@ -127,7 +145,7 @@ ${altNot}`;
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
 <td style="padding-right:16px;vertical-align:middle;"><img src="${KH_SITE}/images/logo.png" width="64" height="64" alt="Unex Gıda" style="display:block;border:0;"></td>
 <td style="vertical-align:middle;border-left:1px solid rgba(255,255,255,0.18);padding-left:16px;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">UNEX GIDA · İHRACAT OPERASYON</p>
-<p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">Hatırlatma · Konşimento talimatı</p></td>
+<p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">${msc ? "Hatırlatma · Konşimento talimatı" : "Konşimento talimatı hazır"}</p></td>
 </tr></table></td></tr>
 ${testSeridi}
 <tr><td style="padding:24px 28px;">${govde}</td></tr>

@@ -71,6 +71,7 @@ const SAYFA_ADLARI: [string, string][] = [
   ["/kilavuz", "Kullanım Kılavuzu"],
   ["/dosya/", "Dosya Detayı"],
   ["/belge/irsaliye", "İrsaliye"],
+  ["/belge/konsimento", "Konşimento Talimatı"],
 ];
 export function sayfaAdi(yol: string): string {
   return SAYFA_ADLARI.find(([p]) => yol === p || yol.startsWith(p.endsWith("/") ? p : `${p}/`) || yol.startsWith(p + "?"))?.[1] ?? "İhracat AI";

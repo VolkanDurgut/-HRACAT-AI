@@ -1117,3 +1117,49 @@
   kontrol et". Kontrol yüklemeyi DURDURMAZ; yalnız uyarır. Storage temizliği devam dosyasını da siler.
 - Test: gerçek beyanname + devam (repo dışı) 11/11 uyumlu; eski biçim beyanname; e2e `e2e_beyan`
   (mock `FATURA_TEST=1 BEYAN_TEST=1`, kurmaca PDF'ler).
+
+## Konşimento talimatı: acente şablonları, otomatik oluşturma, ücretsiz kontrol (06.11.2026)
+
+- Kullanıcı: "Beyanname kontrol mekanizmasının aynısı konşimentoda. Her acentenin talimat şablonu farklı,
+  sisteme tanıtacağız. Talimat sistemdeki bilgilerle otomatik oluşturulacak; tüm konteynerler alınınca
+  test olarak sensei adresine gidecek, Talimat Gör ile açılıp indirilecek (iç piyasa irsaliyesi gibi).
+  Consignee / notify aynı müşterinin önceki sevkiyatından otomatik; yeni müşteride elle."
+- KAYIT (`supabase/functions/_shared/konsimento-sablon.ts`, uygulama + edge ortak):
+  AKKON → Akkon Lines formu · MSC → web sitesi (talimat OLUŞTURULMAZ, yalnız hatırlatma) ·
+  DRAFT (Maersk/CMA/Hapag), ESNA, ADMIRAL → standart (DRAFT/MAERSK formu; kullanıcı: "ESNA/HAPAG ve
+  ADMIRAL için DRAFT/MAERSK talimatı geçerli") · tanımsız acente → standart, "varsayılan" rozetiyle;
+  dosyada elle değiştirilebilir (`ham_veri.konsimento_talimati.sablon`).
+- Model `lib/konsimento/talimat.ts` (saf): booking (çok rezervasyonda "A + B"), shipper (form başına
+  sabit Unex bloğu + "ON BEHALF OF" ek satırı), consignee (`dosya.consignee`), notify
+  (`ham_veri.notify`), gemi/sefer (standart "POLAR X 645W", Akkon "M/V X / SEG..."), yükleme (Ambarlı
+  terminalleri: standart "ISTANBUL-MARPORT", Akkon "MARPORT - AMBARLI"), tahliye (varış limanının ilk
+  parçası, "PORT" atılır), mal tanımı EN/TR (varsayılan WHEAT FLOUR / BUĞDAY UNU, değiştirilebilir),
+  ambalaj (detaylı ambalaj, parantezli marka atılır, adet konteyner toplamından), GTİP 11010015, navlun
+  PREPAID / FOB grubunda COLLECT, BL tipi, Akkon BL adedi 3/3 + özel ibareler, konteyner tablosu +
+  toplamlar, eksikler listesi. Dosya adı "<booking> <ALICI-ilk-kelime> KONSIMENTO TALIMATI.pdf".
+- PDF `lib/konsimento/talimat-pdf.ts` (jsPDF + autotable, Inter: gömülü Carlito alt kümesinde ş/ğ/ı/İ
+  YOK). Akkon formunda gümrük müşaviri bloğu ŞİRKET AYARI: `companies.konsimento_gumruk_musaviri`
+  (repo herkese açık; değer canlıda SQL ile girildi, repoda yok).
+- Kontrol `lib/konsimento/kontrol.ts` (yapay zekâsız): form tanıma (standart / Akkon), değerin belgede
+  GEÇMESİ ile karşılaştırma (metin sırası forma göre değişiyor), konteyner satırı ISO 6346 + mühür / kap /
+  net / brüt. Alanlar: booking (Akkon formunda alan yok → bilgi), gemi/sefer (sefer farkı uyuşmuyor),
+  limanlar, konteynerler, mühür, kap/net/brüt, toplamlar, navlun, GTİP, consignee, notify. Yükleme:
+  tanınan form + dosyada consignee varsa ÜCRETSİZ kontrol (taraflar dosyada kalır); aksi halde eski
+  yapay zekâ kontrolü (yeni müşteride consignee/notify'ı talimattan okur). "Yeniden kontrol et".
+  Gerçek örnekler (repo dışı): standart 12/12 uyumlu; Akkon örneğinde sefer SEG0426W, sistemde SEG0426E.
+- Hafıza: migration `20261106160000_konsimento_taraf_hafizasi.sql` — `trg_dosya_taraf_doldur` (BEFORE
+  INSERT): aynı şirket + aynı alıcı (büyük harf / boşluk sade) en son dosyadan consignee (boşsa),
+  notify, konşimento tercihleri (şablon hariç) + `consignee_kaynak='onceki_sevkiyat'`, `taraf_kaynagi`.
+  Asla hata fırlatmaz; mevcut dosyalara dokunmaz. Geçmiş seçenekler `lib/konsimento/taraf-gecmisi.ts`
+  (en yeni önce, tekil). Canlı test: geri alınan işlemle (iz kalmadı).
+- Arayüz: Konşimento Talimatı kartında `components/konsimento-talimat-hazirlik.tsx` (şablon rozeti,
+  consignee/notify + kaynağı, "Taraflar ve tercihler" formu: geçmiş çipleri, "Consignee ile aynı",
+  ON BEHALF OF, mal tanımı, BL tipi, form seçimi, Akkon BL adedi / özel ibare; tüm konteynerler girilince
+  "Talimatı Gör" + "İndir"). Sayfa `/belge/konsimento?d=<dosya>` (oturum; PDF her açılışta güncel
+  veriden; Yeni sekmede aç / İndir; MSC'de bilgi). Kontrol satırları testid `konsimento-kontrol*`.
+- Hatırlatma maili (`_shared/konsimento-hatirlatma.ts`): standart/Akkon'da konu "Konşimento talimatı
+  hazır", "Talimatı Gör" + "Dosyayı aç", consignee/notify eksikse uyarı; MSC'de konu "Hatırlatma:
+  konşimento talimatı (MSC web)", yalnız "Dosyayı uygulamada aç". Mod değişmedi: CANLI değilse yalnız
+  test adresi (mesensei282@). Mail şablonu override'ı (elle form seçimi) görmez, acenteye bakar.
+- Testler: unit `/home/claude/test/kons/{model,donus,kh,kontrol_gercek}.mts`, e2e `e2e_kons.mjs`
+  (mock `FATURA_TEST=1 KONS_TEST=1`) 20/20.

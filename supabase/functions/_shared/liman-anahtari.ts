@@ -19,6 +19,12 @@ const TURKCE_ADLAR: Record<string, string> = {
   CIBUTI: "DJIBOUTI",
 };
 
+/**
+ * NFD sonrasi birlesik isaretler (U+0300-U+036F). Kaynakta unicode kacis dizisi YAZILMAZ: edge deploy araci
+ * kacisi gercek karaktere ceviriyor, deploy edilen dosya repodan farkli gorunuyordu (06.11.2026).
+ */
+const BIRLESIK_ISARETLER = new RegExp(`[${String.fromCharCode(0x300)}-${String.fromCharCode(0x36f)}]`, "g");
+
 export function sadelestir(metin: string): string {
   return metin
     .toLocaleUpperCase("tr-TR")
@@ -29,7 +35,7 @@ export function sadelestir(metin: string): string {
     .replace(/Ö/g, "O")
     .replace(/Ç/g, "C")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(BIRLESIK_ISARETLER, "");
 }
 
 export function limanAnahtari(ham: string | null | undefined): string | null {

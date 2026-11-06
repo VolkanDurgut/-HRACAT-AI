@@ -259,3 +259,6 @@ ayarlarından çözülür — Claude'un commit yazarlığını değiştirmesiyle
 - Bu modüllerden birini değiştirmek, onu kullanan edge function'ların YENİDEN deploy
   edilmesini gerektirir (`diib-gunluk-rapor`: diib-hesap, diib-excel, diib-rapor, sayi-oku,
   ulke-bul, liman-anahtari).
+- Deploy edilen dosyalarda `\uXXXX` kaçış dizisi KULLANILMAZ: deploy aracı kaçışı gerçek
+  karaktere çeviriyor, deploy edilen dosya repodan farklı çıkıyor (06.11.2026, liman-anahtari).
+  Gerekirse `String.fromCharCode(0x...)` ile kurulur.

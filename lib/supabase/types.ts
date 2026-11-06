@@ -99,6 +99,10 @@ export type Dosya = {
   beyanname_dosya_url: string | null;
   beyanname_dosya_adi: string | null;
   beyanname_yukleme_tarihi: string | null;
+  // 06.11.2026: beyanname yapay zekasiz kontrolu (lib/beyanname-kontrol.ts) + devam listesi
+  beyanname_kontrol_sonucu?: import("@/lib/beyanname-kontrol").BeyannameKontrolSonucu | null;
+  beyanname_devam_dosya_url?: string | null;
+  beyanname_devam_dosya_adi?: string | null;
   // Musteri draft icin revize istediyse (bkz. migration 20260930140000).
   draft_revize_istendi: boolean | null;
   draft_revize_notu: string | null;

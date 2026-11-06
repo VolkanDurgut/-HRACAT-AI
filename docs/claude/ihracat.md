@@ -1088,3 +1088,27 @@
   "yapay zekâ kullanılmadı" satırı (testid `proforma-okuma-kaynak`).
 - Test: gerçek proforma türleri (CFR / CIF / FOB, EUR, çok kalem) birebir; e2e `e2e_pfoku` (mock
   `PF_OKU_TEST=1`; mock proforma-oku çağrılırsa 500 döner, test çağrılmadığını doğrular).
+
+## Gümrük beyannamesi kontrolü — yapay zekâsız, ücretsiz (06.11.2026)
+
+- Kullanıcı: "Beyanname de okutulmasını ve kontrol sağlanmasını istiyorum, en azından ücretsiz bir
+  şekilde sistemdeki bilgiler ile kontrol sağlanabilmeli." Beyanname PDF'leri metin katmanlı; okuma
+  tarayıcıda unpdf ile, YAPAY ZEKÂ YOK, edge fonksiyonu yok.
+- Migration `20261106120000_beyanname_kontrolu.sql` (yalnız ekleme, nullable): `ihracat_dosyalari`
+  `beyanname_kontrol_sonucu jsonb`, `beyanname_devam_dosya_url`, `beyanname_devam_dosya_adi`.
+- `lib/beyanname-kontrol.ts` (saf): `beyannameMetniOku` (beyanname no, döviz + toplam bedel, fatura
+  no / tarih, ISO 6346 kontrol haneli konteynerler — boşluklu yazım dahil, DİİB'ler, gemi (MV/MS/MT
+  öneki atılır), Incoterm, kalem neti, devam listesi "KGM … GENEL TOPLAM") +
+  `beyannameKarsilastir` (fatura no SIRA SAYI olarak — müşavir 10 hane yazıyor; tarih; toplam ±1
+  aynı döviz; konteynerler küme; net toplam; DİİB yıl+sıra, D1/D2 farkı NOT; gemi; teslim şekli
+  CFR=CNF; varış yeri / ülke / alıcı bulunamazsa "bilgi", uyumsuzluk sayılmaz).
+- `lib/beyanname-beklenen.ts`: dosya + konteynerler (net hepsi > 0 ise toplam) + rezervasyon gemisi
+  + bölünmüş DİİB'ler (`diib_dosya_bolunmeleri` → `diib_belgeleri`).
+- Çok kalemli (bölünmüş DİİB) beyannamede 2. kalem "Tek Tip Gümrük Beyannamesi Devam Listesi"
+  ayrı PDF'tir (gümrük devir belgesi DEĞİL). Gümrük Beyannamesi kartında "Devam listesi ekle":
+  BEYAN NO ana beyannameyle aynı olmalı; yeni ana beyanname yüklenince farklı no'lu devam silinir.
+  Devam yoksa net / DİİB "okunamadı" + "Devam listesini ekleyin" ipucu.
+- Sonuç kartı (testid `beyanname-kontrol*`): uyumlu / uyuşmuyor / okunamadı satırları, "Yeniden
+  kontrol et". Kontrol yüklemeyi DURDURMAZ; yalnız uyarır. Storage temizliği devam dosyasını da siler.
+- Test: gerçek beyanname + devam (repo dışı) 11/11 uyumlu; eski biçim beyanname; e2e `e2e_beyan`
+  (mock `FATURA_TEST=1 BEYAN_TEST=1`, kurmaca PDF'ler).

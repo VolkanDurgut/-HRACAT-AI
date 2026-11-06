@@ -30,3 +30,16 @@ export async function beyannameNoOku(veri: ArrayBuffer | Uint8Array): Promise<st
     return null;
   }
 }
+
+/** PDF'in tum metni (06.11.2026, beyanname kontrolu icin); gorsel / bozuk PDF'te null. */
+export async function beyannameMetniCikar(veri: ArrayBuffer | Uint8Array): Promise<string | null> {
+  try {
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const pdf = await getDocumentProxy(new Uint8Array(veri));
+    const { text } = await extractText(pdf, { mergePages: true });
+    const metin = Array.isArray(text) ? text.join("\n") : text;
+    return metin && metin.trim() ? metin : null;
+  } catch {
+    return null;
+  }
+}

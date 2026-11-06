@@ -1,7 +1,7 @@
 /**
  * Iki DIIB'e bolunen yukleme -> fatura talimatindaki fatura parcalari (04.11.2026). Saf modul.
  * Kullanici: DIIB'in kalani yetmeyince "tam bir sekilde kapatabilmek icin 2 ayri fatura
- * olusturuluyor" (orn. CRISA 250.000 kg = 79.100 kg 04219 + 170.900 kg 02576).
+ * olusturuluyor" (orn. 250.000 kg = 79.100 kg DIIB-A + 170.900 kg DIIB-B).
  *
  * Kalemler faturalara SIRAYLA dagitilir (1. fatura once 1. kalemden dolar; bir kalem iki faturaya
  * bolunebilir). Birim fiyatlar degismez. Tutarlar kurusa yuvarlanir; bir kalemin son parcasi kalem

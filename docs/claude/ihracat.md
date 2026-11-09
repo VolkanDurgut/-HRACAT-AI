@@ -1203,3 +1203,21 @@ ve sağlam bir kontrol yapılmasını rica edeceğim. Önemli bilgiler kontrol e
   "Elle kontrol" olarak kaydedilir; fatura no uydurulmaz. `fatura-kontrol` edge fonksiyonu canlıda duruyor ama uygulama çağırmıyor.
 - Ekran (`components/fatura-upload-section.tsx`): alan listesi (`fatura-alanlar`), "Elle kontrol" rozeti ve kartı (`fatura-okunamadi`).
 - Test: `fatura/test2.mts` (iki gerçek fatura metni, yerel; repoda yok), e2e `e2e_fatura_parca.mjs` (alan listesi), `e2e_fatura_okunamadi.mjs`.
+
+## VGM Raporu maili — tüm konteynerlerin VGM'i girilince (10.11.2026)
+
+Kullanıcı: "Toplam bütün konteynerlerin VGM'i hazır olduğunda operation mailine VGM raporu gönderilsin. Mailde VGM indir
+butonu olsun. Tıklayınca hemen indirebilsin." Metin: "Kolay gelsin Volkan Bey, VGM Raporu ektedir. Lütfen ilgili acenteye
+gönderimini sağlayalım." Canlı alıcılar (kullanıcı): bbt@, execution@, export@, export2@, operation@ (To: execution@, diğerleri CC).
+
+- Edge `vgm-rapor` (pg_cron, anon): yalnız `VGM_RAPOR_CANLI = evet` iken tarar. Koşul: **Açık** dosya, rezervasyon konteyner
+  adedi > 0, girilen konteyner ≥ adet, her konteynerde `vgm_kg > 0`. Dosya başına bir kez (`vgm_rapor_gonderimleri`, kısmi
+  benzersiz index; `hata` 3 denemeye kadar tekrar). Mail: PDF eki + "VGM İndir" (depodaki PDF'in 30 günlük imzalı adresi,
+  giriş gerekmez) + "Dosyayı aç". Konu: `VGM Raporu · <dosya no> · <alıcı>` (booking no konuda/gövdede yok; PDF'te var).
+- `{"test": true, "dosya_id"}`: "[TEST]" yalnız test adresine (`VGM_RAPOR_TEST_ALICISI`, varsayılan mesensei282@), 24 saatte 5;
+  gönderilmiş saymaz. `{"onceden_isaretle": true}` (service_role): canlıya geçerken şu an tamam olan açık dosyalar `onceden`
+  (geriye dönük mail gitmez).
+- PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
+  aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe); edge onu sabit commit'ten
+  (jsDelivr, derleme anında paketlenir) alır.
+- Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan execution@), `VGM_RAPOR_CC` (varsayılan bbt@, export@, export2@, operation@).

@@ -1208,15 +1208,16 @@ ve sağlam bir kontrol yapılmasını rica edeceğim. Önemli bilgiler kontrol e
 
 Kullanıcı: "Toplam bütün konteynerlerin VGM'i hazır olduğunda operation mailine VGM raporu gönderilsin. Mailde VGM indir
 butonu olsun. Tıklayınca hemen indirebilsin." Metin: "Kolay gelsin Volkan Bey, VGM Raporu ektedir. Lütfen ilgili acenteye
-gönderimini sağlayalım." Canlı alıcılar (kullanıcı): bbt@, execution@, export@, export2@, operation@ (To: execution@, diğerleri CC).
+gönderimini sağlayalım." Canlı alıcılar (kullanıcı 10.11.2026): **To: operation@**, CC: bbt@, execution@, export@, export2@.
 
 - Edge `vgm-rapor` (pg_cron, anon): yalnız `VGM_RAPOR_CANLI = evet` iken tarar. Koşul: **Açık** dosya, rezervasyon konteyner
   adedi > 0, girilen konteyner ≥ adet, her konteynerde `vgm_kg > 0`. Dosya başına bir kez (`vgm_rapor_gonderimleri`, kısmi
   benzersiz index; `hata` 3 denemeye kadar tekrar). Mail: PDF eki + "VGM İndir" (depodaki PDF'in 30 günlük imzalı adresi,
-  giriş gerekmez) + "Dosyayı aç". Konu: `VGM Raporu · <dosya no> · <alıcı>` (booking no konuda/gövdede yok; PDF'te var).
+  giriş gerekmez) + "Dosyayı aç". Konu: `VGM Raporu · <dosya no> · <alıcı> · Rezervasyon <booking>`; rezervasyon no Acente kutusunda ve
+  Sevkiyat Bilgileri tablosunda da var (kullanıcı 10.11.2026; bu mailde booking no İSTENİYOR). Tema: Günlük İhracat Raporu ile aynı.
 - `{"test": true, "dosya_id"}`: "[TEST]" yalnız test adresine (`VGM_RAPOR_TEST_ALICISI`, varsayılan mesensei282@), 24 saatte 5;
   gönderilmiş saymaz. `{"onceden_isaretle": true}` (service_role): canlıya geçerken şu an tamam olan açık dosyalar `onceden`
   (geriye dönük mail gitmez).
 - PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
   aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe; ~25 KB, edge ile birlikte dağıtılır).
-- Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan execution@), `VGM_RAPOR_CC` (varsayılan bbt@, export@, export2@, operation@).
+- Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan operation@), `VGM_RAPOR_CC` (varsayılan bbt@, execution@, export@, export2@). Secret geçersizse varsayılan kullanılır.

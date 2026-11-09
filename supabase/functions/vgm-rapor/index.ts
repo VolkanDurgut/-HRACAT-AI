@@ -147,7 +147,9 @@ function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: stri
   const gemiler = Array.from(new Set(h.rez.map((r) => (r.gemi_adi || "").trim()).filter(Boolean))).join(", ");
   const acente = Array.from(new Set(h.rez.map((r) => (r.acente_ismi || "").trim()).filter(Boolean))).join(", ");
   const toplamVgm = h.kont.reduce((s, k) => s + (sayi(k.vgm_kg) || 0), 0);
-  const konu = `${test ? "[TEST] " : ""}VGM Raporu · ${h.dosya.dosya_no || "-"} · ${h.dosya.alici_firma || "-"}`;
+  // Rezervasyon (booking) no: konu + Acente kutusu + tablo (kullanici 10.11.2026)
+  const rezNo = Array.from(new Set(h.rez.map((r) => (r.booking_no || "").trim()).filter(Boolean))).join(", ");
+  const konu = `${test ? "[TEST] " : ""}VGM Raporu · ${h.dosya.dosya_no || "-"} · ${h.dosya.alici_firma || "-"}${rezNo ? ` · Rezervasyon ${rezNo}` : ""}`;
   const tarih = trZaman().slice(0, 10);
   const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
     `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${kacis(etiket)}</div><div style="font-size:20px;font-weight:bold;color:${renk};line-height:1.25">${kacis(deger)}</div><div style="font-size:11px;color:#475569;line-height:1.45">${kacis(alt)}</div></td>`;
@@ -174,7 +176,7 @@ function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: stri
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>
     ${kutu("Konteyner", `${h.kont.length}`, "VGM'i girildi", LACIVERT)}${kutuArasi}
     ${kutu("Toplam VGM", `${toplamVgm.toLocaleString("tr-TR")} kg`, "tüm konteynerler", "#047857")}${kutuArasi}
-    ${kutu("Acente", acente || "-", gemiler || "-", "#B45309")}
+    ${kutu("Acente", acente || "-", rezNo ? `Rezervasyon: ${rezNo}` : gemiler || "-", "#B45309")}
   </tr></table>
   ${bolumBaslik("Sevkiyat Bilgileri")}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
@@ -182,6 +184,7 @@ function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: stri
     ${satir("Alıcı", h.dosya.alici_firma || "-", 1)}
     ${satir("Gemi", gemiler || "-", 2)}
     ${satir("Acente", acente || "-", 3)}
+    ${satir("Rezervasyon No", rezNo || "-", 4)}
   </table>
   <div style="margin-top:24px;text-align:center">
     <a href="${kacis(indirAdresi)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 22px;border-radius:6px">VGM İndir</a>

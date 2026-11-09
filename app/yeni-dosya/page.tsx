@@ -96,6 +96,26 @@ export default function YeniDosyaPage() {
     return parseFloat(String(extracted.toplam_miktar || extracted.miktar || 0));
   };
 
+  // 10.11.2026: rezervasyon ekranindan "Yeni Proforma Ekle" -> ayni sayfada yukleme
+  // adimina temiz baslangic (onceki dosyanin hicbir durumu tasinmaz).
+  const yeniProformaBaslat = () => {
+    setPdfFile(null);
+    setError(null);
+    setLoading(false);
+    setDosyaId(null);
+    setDosyaNo(null);
+    setAsama("okuma");
+    setProformData(null);
+    setVarisLimaniNotu(null);
+    setMevcutAnaSiparis(null);
+    setGonderilmisMts(0);
+    setYeniSiparisMts("");
+    const girdi = document.getElementById("pdf-input") as HTMLInputElement | null;
+    if (girdi) girdi.value = "";
+    setStep("upload");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleUpload = async () => {
     if (!pdfFile || !user) return;
     setLoading(true);
@@ -532,13 +552,24 @@ export default function YeniDosyaPage() {
                   <span style={{ color: TEXT_MUTED }}> Sırada rezervasyon ya da navlun teklifi var.</span>
                 </p>
               </div>
-              <button
-                onClick={() => gecisliGit(`/dosya/${dosyaId}`)}
-                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors text-white"
-                style={{ borderColor: CARD_BORDER }}
-              >
-                Dosyayı Görüntüle
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={yeniProformaBaslat}
+                  data-yeni-proforma=""
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors text-white"
+                  style={{ borderColor: `${ACCENT}66` }}
+                >
+                  <FileUp size={13} style={{ color: ACCENT }} />
+                  Yeni Proforma Ekle
+                </button>
+                <button
+                  onClick={() => gecisliGit(`/dosya/${dosyaId}`)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 transition-colors text-white"
+                  style={{ borderColor: CARD_BORDER }}
+                >
+                  Dosyayı Görüntüle
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <div className="rounded-xl border shadow-sm p-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

@@ -3,12 +3,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import { supabase, Dosya, Rezervasyon, Konteyner, getGuvenliDosyaUrl, yazmaHatasi, eskiDepoDosyasiniSil } from "@/lib/supabase";
 import { formatDateTR, formatDateTimeTR } from "@/lib/cutoff-utils";
 import {
-  FileText, CheckCircle2, AlertTriangle, X, RotateCcw, Banknote, FileType2, ExternalLink, Split
+  FileText, CheckCircle2, AlertTriangle, X, RotateCcw, Banknote, FileType2, ExternalLink, Split, MinusCircle, Info,
+  Ship, Anchor, Landmark,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
 import { Hash, CalendarDays, Coins, Scale, Container } from "lucide-react";
-import { faturaKarsilastir, faturaMetniOku, pdfMetni, type FaturaBeklenen, type FaturaKontrolSonucu } from "@/lib/fatura-oku";
+import { faturaKarsilastir, faturaMetniOku, faturaOkunamadiSonucu, pdfMetni, type FaturaBeklenen, type FaturaBeklenenEk, type FaturaKontrolSonucu, type FaturaKontrolDurumu } from "@/lib/fatura-oku";
+import { VARSAYILAN_GTIP } from "@/lib/konsimento/talimat";
 import { faturaBolunmesi, parcaAgirliklari } from "@/lib/diib/bolunme-talimat";
 import { diibAnahtari } from "@/lib/diib/hesap";
 import { DIIB_BOLUNME_OLAYI } from "@/lib/diib/veri";
@@ -16,6 +18,10 @@ import { DIIB_BOLUNME_OLAYI } from "@/lib/diib/veri";
 // 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
 // 05.11.2026 (kullanici: "masrafsiz ve dogru okutamaz miyiz?"): fatura ONCE PDF metninden kurallarla
 // okunur (lib/fatura-oku.ts, ucretsiz); metin okunamazsa eski yapay zeka kontrolu (fatura-kontrol) calisir.
+// 10.11.2026 (kullanici: "fatura kontrolunde de ucretsiz ve saglam bir kontrol; onemli bilgiler kontrol
+// edilmeli"): yapay zeka yedegi KALDIRILDI (okunamayan fatura "elle kontrol" olarak kaydedilir) ve
+// kontrol beyanname kontrolu gibi ALAN ALAN: tutar, konteyner, agirlik, kap, DIIB, teslim, gemi,
+// rezervasyon no, cikis / varis limani, alici, marka, odeme sekli, araci banka, GTIP.
 // 05.11.2026 (kullanici: "DIIB dagiliminda 2 fatura yuklemek durumundayiz"): bolunmus yuklemede her
 // parcaya AYRI fatura yuklenir (diib_dosya_bolunmeleri.fatura_*); 1. parca dosyanin fatura_* alanlarina
 // da yazilir (panel / raporlar / DIIB eskisi gibi). Bolunmus faturada dosyanin DIIB No'su DEGISMEZ.
@@ -26,7 +32,11 @@ const FATURA_YETENEKLERI = [
   { ikon: <Coins size={11} />, metin: "Tutar ve para birimi" },
   { ikon: <Scale size={11} />, metin: "Net / brüt ağırlık" },
   { ikon: <Container size={11} />, metin: "Konteynerler" },
+  { ikon: <Ship size={11} />, metin: "Teslim, gemi, rezervasyon" },
+  { ikon: <Anchor size={11} />, metin: "Çıkış / varış limanı" },
+  { ikon: <Landmark size={11} />, metin: "Alıcı, marka, ödeme, banka, GTİP" },
 ];
+const KONTROL_ADIMLARI = ["Fatura no / tarih", "DİİB", "Tutar", "Ağırlıklar", "Konteynerler", "Teslim / gemi / liman", "Alıcı / marka / banka"];
 
 type Props = {
   dosya: Dosya;
@@ -88,52 +98,32 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   }, [parcalariGetir, dosya.fatura_no]);
   const bolunmus = parcalar.length >= 2;
 
-  const buildFaturaSistemVerisi = (parca?: { kg: number; brut: number | null; kap: number | null; tutar: number }) => {
-    const rez = rezervasyonlar[0];
+  // Faturada aranacak ek bilgiler (dosya + rezervasyonlar). Bolunmuste DIIB parcadan gelir.
+  const beklenenEk = (parcaMi: boolean): FaturaBeklenenEk => {
+    const tekil = (xs: (string | null | undefined)[]) => Array.from(new Set(xs.map((x) => (x || "").trim()).filter(Boolean)));
+    const rezYerleri = tekil(rezervasyonlar.map((r) => r.yuklenme_limani));
     return {
-      satici_firma: dosya.satici_firma,
-      alici_firma: dosya.alici_firma,
-      urun_tanimi: dosya.urun_tanimi,
-      toplam_tutar: parca ? parca.tutar : dosya.toplam_tutar,
-      para_birimi: dosya.para_birimi,
-      proforma_no: dosya.proforma_no,
-      gemi_adi: rez?.gemi_adi,
-      yukleme_limani: rez?.yuklenme_limani || dosya.yuklenme_limani,
-      varis_limani: dosya.varis_limani,
-      diib_no: dosya.diib_no,
-      diib_tarihi: dosya.diib_tarihi,
-      toplam_net_kg: parca ? parca.kg : toplamNet > 0 ? toplamNet : null,
-      toplam_brut_kg: parca ? parca.brut : toplamBrut > 0 ? toplamBrut : null,
-      toplam_kap_adeti: parca ? parca.kap : toplamKap > 0 ? toplamKap : null,
-      konteynerler: konteynerler.map((k) => ({
-        konteyner_no: k.konteyner_no,
-        net_agirlik_kg: k.net_agirlik_kg,
-        brut_agirlik_kg: (k as any).brut_agirlik_kg,
-        kap_adeti: (k as any).pieces
-      })),
+      aliciFirma: dosya.alici_firma,
+      teslimSekli: dosya.teslim_sekli,
+      varisLimani: dosya.varis_limani,
+      yuklemeYerleri: rezYerleri.length ? rezYerleri : tekil([dosya.yuklenme_limani]),
+      gemiler: tekil(rezervasyonlar.map((r) => r.gemi_adi)),
+      rezervasyonNolari: tekil(rezervasyonlar.map((r) => r.booking_no)),
+      marka: dosya.marka,
+      odemeSekli: dosya.gumruk_odeme_sekli,
+      banka: dosya.banka,
+      diibNo: parcaMi ? null : dosya.diib_no,
+      gtip: VARSAYILAN_GTIP,
     };
   };
 
   /**
-   * Faturayi okur ve kontrol eder: once PDF metni (ucretsiz, kurallarla); fatura no okunamazsa
-   * yapay zeka (fatura-kontrol). Sonuc bicimi ikisinde ayni.
+   * Faturayi okur ve kontrol eder: PDF metni (ucretsiz, kurallarla). Metin okunamazsa yapay zekaya
+   * GIDILMEZ (10.11.2026): sonuc "elle kontrol" olarak kaydedilir.
    */
-  const faturaKontrolEt = async (file: File, beklenen: FaturaBeklenen, sistemVerisi: Record<string, unknown>): Promise<FaturaKontrolSonucu> => {
+  const faturaKontrolEt = async (file: File, beklenen: FaturaBeklenen): Promise<FaturaKontrolSonucu> => {
     const okunan = faturaMetniOku(await pdfMetni(await file.arrayBuffer()));
-    if (okunan) return faturaKarsilastir(okunan, beklenen);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("sistem_verisi", JSON.stringify(sistemVerisi));
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const { data: { session } } = await supabase.auth.getSession();
-    const response = await fetch(`${supabaseUrl}/functions/v1/fatura-kontrol`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-      body: formData,
-    });
-    const data: FaturaKontrolSonucu & { error?: string } = await response.json();
-    if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
-    return { ...data, kaynak: "yapay_zeka" };
+    return okunan ? faturaKarsilastir(okunan, beklenen) : faturaOkunamadiSonucu();
   };
 
   const pdfYukle = async (file: File): Promise<{ path: string; url: string }> => {
@@ -153,7 +143,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const data = await faturaKontrolEt(file, {
         konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: toplamNet || null, brutKg: toplamBrut || null,
         kap: toplamKap || null, tutar: Number(dosya.toplam_tutar) || null, paraBirimi: dosya.para_birimi || null,
-      }, buildFaturaSistemVerisi());
+        ek: beklenenEk(false),
+      });
 
       // Yeniden yuklemede eski faturanin adresi: kayit basariyla guncellenince
       // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
@@ -232,7 +223,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: h.kg, brutKg: ag?.brut ?? null, kap: ag?.kap ?? null,
         tutar: h.tutar, paraBirimi: dosya.para_birimi || null,
         parca: { sira: p.sira, diibAnahtar: diibAnahtari(p.belge_no), diibMetni: p.belge_no },
-      }, buildFaturaSistemVerisi({ kg: h.kg, brut: ag?.brut ?? null, kap: ag?.kap ?? null, tutar: h.tutar }));
+        ek: beklenenEk(true),
+      });
 
       const { data: onceki } = await supabase.from("diib_dosya_bolunmeleri").select("fatura_dosya_url").eq("id", p.id).eq("company_id", companyId).maybeSingle();
       const faturaNo = (sonuc.fatura_no || p.fatura_no || "").replace(/\s+/g, "").toUpperCase() || null;
@@ -317,7 +309,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
                       {p.fatura_no ? <> · Fatura No <b className="text-white font-mono">{p.fatura_no}</b></> : null}
                     </p>
                   </div>
-                  {p.fatura_dosya_url && sonuc && <DurumRozeti uyumlu={sonuc.uyumlu} />}
+                  {p.fatura_dosya_url && sonuc && <DurumRozeti uyumlu={sonuc.uyumlu} okunamadi={!!sonuc.okunamadi} />}
                 </div>
                 <div className="p-3">
                   {!p.fatura_dosya_url && parcaIslem !== p.id && (
@@ -340,7 +332,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
                   )}
                   {parcaIslem === p.id && (
                     <EvrakAsistanIsleniyor belge={`${p.sira}. Fatura`} mesaj="Fatura okunuyor ve bu faturanın payıyla karşılaştırılıyor…"
-                      kontroller={["Fatura no / tarih", "DİİB", "Tutar", "Ağırlıklar", "Konteynerler"]} />
+                      kontroller={KONTROL_ADIMLARI} />
                   )}
                   {parcaHata[p.id] && (
                     <p className="mt-2 text-xs text-amber-300 rounded-lg border bg-amber-500/10 px-3 py-2" style={{ borderColor: "rgba(251,191,36,0.35)" }} role="alert">{parcaHata[p.id]}</p>
@@ -358,14 +350,14 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       <div className="p-4">
         <div className="flex items-center justify-between gap-4 mb-2">
           <p className="text-sm font-medium text-white">Fatura</p>
-          {dosya.fatura_dosya_url && faturaKontrolSonucu && <DurumRozeti uyumlu={faturaKontrolSonucu.uyumlu} />}
+          {dosya.fatura_dosya_url && faturaKontrolSonucu && <DurumRozeti uyumlu={faturaKontrolSonucu.uyumlu} okunamadi={!!faturaKontrolSonucu.okunamadi} />}
         </div>
 
         {!dosya.fatura_dosya_url && !faturaYukleniyor && (
           konteynerlerTamam ? (
             <EvrakAsistanYukleme
               belge="Fatura"
-              mesaj="Faturayı buraya bırakın. Fatura no, tarih ve DİİB numarasını okuyup tutar, ağırlık ve konteynerleri sistemdeki bilgilerle karşılaştırayım."
+              mesaj="Faturayı buraya bırakın. Fatura no, tarih ve DİİB'i okuyup tutar, ağırlık, konteyner, teslim, gemi, liman, alıcı, marka, ödeme ve banka bilgilerini sistemle karşılaştırayım (ücretsiz)."
               yetenekler={FATURA_YETENEKLERI}
               accept=".pdf,application/pdf"
               bicimNotu="PDF"
@@ -384,7 +376,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
         {faturaYukleniyor && (
           <EvrakAsistanIsleniyor belge="Fatura" mesaj="Fatura okunuyor ve sistemle karşılaştırılıyor…"
-            kontroller={["Fatura no / tarih", "DİİB", "Tutar", "Ağırlıklar", "Konteynerler"]} />
+            kontroller={KONTROL_ADIMLARI} />
         )}
 
         {faturaHata && (
@@ -407,7 +399,14 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   );
 }
 
-function DurumRozeti({ uyumlu }: { uyumlu: boolean }) {
+function DurumRozeti({ uyumlu, okunamadi }: { uyumlu: boolean; okunamadi?: boolean }) {
+  if (okunamadi) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-300 bg-slate-500/15 px-2.5 py-1 rounded-full">
+        <MinusCircle size={12} /> Elle kontrol
+      </span>
+    );
+  }
   return uyumlu ? (
     <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full">
       <CheckCircle2 size={12} /> Yüklendi
@@ -454,6 +453,18 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
             <span>Fatura Tarihi: <strong className="text-white">{formatDateTR(sonuc.fatura_tarihi || faturaTarihi)}</strong></span>
             {diibNo && <span>DİİB No: <strong className="text-white">{diibNo}</strong></span>}
           </div>
+          <AlanListesi sonuc={sonuc} />
+        </div>
+      ) : sonuc.okunamadi ? (
+        <div className="p-3 rounded-lg border-2 border-slate-500/40 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }} data-testid="fatura-okunamadi">
+          <div className="flex items-center gap-2 flex-wrap">
+            <MinusCircle size={16} className="text-slate-300" />
+            <p className="text-sm font-semibold text-slate-200">Fatura metni okunamadı · elle kontrol edin</p>
+          </div>
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>{sonuc.ozet}</p>
+          <button onClick={onKaldir} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border hover:text-white" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+            <RotateCcw size={12} /> e-Fatura PDF&apos;ini yükle
+          </button>
         </div>
       ) : (
         <div className="p-3 rounded-lg border-2 border-red-500/40 space-y-2" style={{ backgroundColor: ROW_HEADER_BG }}>
@@ -463,7 +474,7 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
             {kaynak}
           </div>
           {sonuc.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{sonuc.ozet}</p>}
-          {sonuc.uyusmazliklar?.length > 0 && (
+          {sonuc.kontroller ? <AlanListesi sonuc={sonuc} /> : sonuc.uyusmazliklar?.length > 0 && (
             <div className="space-y-1.5">
               {sonuc.uyusmazliklar.map((u, idx) => (
                 <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
@@ -479,6 +490,34 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+const DURUM: Record<FaturaKontrolDurumu, { renk: string; ikon: React.ReactNode; etiket: string }> = {
+  uyumlu: { renk: "text-green-400", ikon: <CheckCircle2 size={13} />, etiket: "Uyumlu" },
+  uyusmuyor: { renk: "text-amber-400", ikon: <AlertTriangle size={13} />, etiket: "Uyuşmuyor" },
+  okunamadi: { renk: "text-slate-400", ikon: <MinusCircle size={13} />, etiket: "Okunamadı" },
+  bilgi: { renk: "text-sky-300", ikon: <Info size={13} />, etiket: "Elle bakın" },
+};
+
+/** Alan alan kontrol (10.11.2026; beyanname kontrolu gorunumu). Eski kayitlarda (kontroller yok) cizilmez. */
+function AlanListesi({ sonuc }: { sonuc: FaturaKontrolSonucu }) {
+  if (!sonuc.kontroller || !sonuc.kontroller.length) return null;
+  return (
+    <div className="mt-2 rounded-lg border divide-y" style={{ borderColor: CARD_BORDER }} data-testid="fatura-alanlar">
+      {sonuc.kontroller.map((k) => {
+        const d = DURUM[k.durum];
+        return (
+          <div key={k.alan} className="grid grid-cols-[18px_minmax(0,130px)_minmax(0,1fr)] sm:grid-cols-[18px_150px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-0.5 px-3 py-1.5 text-xs" style={{ borderColor: CARD_BORDER }} data-testid="fatura-alan-satir" data-durum={k.durum}>
+            <span className={`${d.renk} pt-0.5`} title={d.etiket}>{d.ikon}</span>
+            <span className="text-slate-300 font-medium">{k.alan}</span>
+            <span className="truncate" style={{ color: TEXT_MUTED }} title={k.sistem}>Sistem: <span className="text-white">{k.sistem}</span></span>
+            <span className="truncate col-start-3 sm:col-start-auto" style={{ color: TEXT_MUTED }} title={k.belge}>Fatura: <span className={k.durum === "uyusmuyor" ? "text-amber-300" : "text-white"}>{k.belge}</span></span>
+            {k.not && <span className="col-start-3 sm:col-span-2 sm:col-start-3 text-[11px]" style={{ color: k.durum === "uyusmuyor" ? "#FCD34D" : TEXT_MUTED }}>{k.not}</span>}
+          </div>
+        );
+      })}
     </div>
   );
 }

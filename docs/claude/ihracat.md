@@ -1185,3 +1185,21 @@ Sadece OM GENERAL için üretim-tüketim arası 15 ay, diğerleri 1 yıl."
 Proforma yüklenince açılan "İhracat dosyası oluşturuldu" şeridinde **Yeni Proforma Ekle** düğmesi
 (`data-yeni-proforma`). Aynı sayfada temiz yükleme adımına döner; önceki dosyanın durumu taşınmaz.
 Ürün kütüphanesi (`ihracat_urunleri`) 10.11.2026'da kayıtlı proformalardaki 5 üründen dolduruldu (kullanıcı onayı).
+
+## Fatura kontrolü — ücretsiz, alan alan (10.11.2026)
+
+Kullanıcı: "Ücretsiz beyanname kontrol mekanizması iyi çalışıyor. Aynı şekilde fatura kontrolünde de ücretsiz
+ve sağlam bir kontrol yapılmasını rica edeceğim. Önemli bilgiler kontrol edilmeli."
+
+- `lib/fatura-oku.ts`: `faturaEkOku` e-Fatura metninden ek alanları okur (iki Unex şablonu: "Genel Açıklamalar"
+  satırları ve üst blok): alıcı (SAYIN …), teslim şekli, GTİP, gemi, çıkış / varış limanı, marka, ödeme şekli,
+  aracı banka, rezervasyon (sipariş) no, konteyner adedi.
+- `faturaKarsilastir` artık `kontroller[]` (beyanname kontrolü biçimi: uyumlu / uyusmuyor / okunamadi / bilgi) döndürür.
+  Uyuşmazlık sayılanlar: tutar + döviz, konteyner, net / brüt, kap, DİİB (tek faturada dosyanın DİİB'i; D1/D2 farkı not),
+  teslim şekli, gemi, çıkış limanı (tanınan terminal farklıysa), varış limanı (faturada yazıp farklıysa), marka,
+  ödeme şekli, aracı banka (tanınan bankalar farklıysa). Alıcı (baş harf desteği), rezervasyon no, GTİP: bulunamazsa / farklıysa "elle bakın".
+  Eski `uyusmazliklar` dizisi korunur (eski kayıtlar ve rozet aynı).
+- **Yapay zekâ yedeği kaldırıldı**: metni olmayan (taranmış / görsel) fatura `faturaOkunamadiSonucu()` ile
+  "Elle kontrol" olarak kaydedilir; fatura no uydurulmaz. `fatura-kontrol` edge fonksiyonu canlıda duruyor ama uygulama çağırmıyor.
+- Ekran (`components/fatura-upload-section.tsx`): alan listesi (`fatura-alanlar`), "Elle kontrol" rozeti ve kartı (`fatura-okunamadi`).
+- Test: `fatura/test2.mts` (iki gerçek fatura metni, yerel; repoda yok), e2e `e2e_fatura_parca.mjs` (alan listesi), `e2e_fatura_okunamadi.mjs`.

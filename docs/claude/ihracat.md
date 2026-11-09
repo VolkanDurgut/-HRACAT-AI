@@ -1218,6 +1218,11 @@ gönderimini sağlayalım." Canlı alıcılar (kullanıcı 10.11.2026): **To: op
 - `{"test": true, "dosya_id"}`: "[TEST]" yalnız test adresine (`VGM_RAPOR_TEST_ALICISI`, varsayılan mesensei282@), 24 saatte 5;
   gönderilmiş saymaz. `{"onceden_isaretle": true}` (service_role): canlıya geçerken şu an tamam olan açık dosyalar `onceden`
   (geriye dönük mail gitmez).
+- **Anında gönderim** (kullanıcı 10.11.2026: "en geç 10 dakika değil, hemen; konteyner sayısı kadar DBA yüklendiğinde"):
+  `trg_vgm_rapor_konteyner` (konteynerler insert/update vgm_kg,dosya_id/delete) ve `trg_vgm_rapor_rezervasyon`
+  (konteyner_adedi update/delete) → `vgm_dosya_tamam()` true ve işaretli değilse `net.http_post` ile `vgm-rapor` hemen
+  çağrılır (anahtar cron komutundan okunur, repoda yok; tetik hata verirse yalnız uyarı, kayıt bozulmaz). 10 dakikalık
+  `vgm-rapor` cron'u yedek/yeniden deneme. Canlıya geçiş 10.11.2026: IHR-2026-0110 `onceden`, cron kuruldu.
 - PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
   aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe; ~25 KB, edge ile birlikte dağıtılır).
 - Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan operation@), `VGM_RAPOR_CC` (varsayılan bbt@, execution@, export@, export2@). Secret geçersizse varsayılan kullanılır.

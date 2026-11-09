@@ -1,9 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { jsPDF } from "npm:jspdf@4.2.1";
 import { autoTable } from "npm:jspdf-autotable@5.0.8";
-// Font (~25 KB) dagitimda gomulsun diye depodaki SABIT commit'ten alinir (jsDelivr; derleme aninda paketlenir,
-// calisma aninda disariya gidilmez). Kaynak: supabase/functions/_shared/roboto-vgm-base64.ts @ d7f08db.
-import { ROBOTO_VGM_BASE64 } from "https://cdn.jsdelivr.net/gh/VolkanDurgut/-HRACAT-AI@d7f08db6dc6dd488e4bbf7b79763ffeae197c45a/supabase/functions/_shared/roboto-vgm-base64.ts";
+import { ROBOTO_VGM_BASE64 } from "../_shared/roboto-vgm-base64.ts";
 import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "../_shared/vgm-pdf.ts";
 
 // ============================================================================

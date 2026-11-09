@@ -1218,6 +1218,5 @@ gönderimini sağlayalım." Canlı alıcılar (kullanıcı): bbt@, execution@, e
   gönderilmiş saymaz. `{"onceden_isaretle": true}` (service_role): canlıya geçerken şu an tamam olan açık dosyalar `onceden`
   (geriye dönük mail gitmez).
 - PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
-  aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe); edge onu sabit commit'ten
-  (jsDelivr, derleme anında paketlenir) alır.
+  aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe; ~25 KB, edge ile birlikte dağıtılır).
 - Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan execution@), `VGM_RAPOR_CC` (varsayılan bbt@, export@, export2@, operation@).

@@ -1163,3 +1163,25 @@
   test adresi (mesensei282@). Mail şablonu override'ı (elle form seçimi) görmez, acenteye bakar.
 - Testler: unit `/home/claude/test/kons/{model,donus,kh,kontrol_gercek}.mts`, e2e `e2e_kons.mjs`
   (mock `FATURA_TEST=1 KONS_TEST=1`) 20/20.
+
+## Üretim / son kullanım tarihi otomatiği (10.11.2026)
+
+Kullanıcı: "Üretim ve tüketim tarihi her zaman o yüklemeye ait boş ekipman alım tarihi - 1 gün.
+Sadece OM GENERAL için üretim-tüketim arası 15 ay, diğerleri 1 yıl."
+
+- Migration `20261110010000_uretim_tarihi_otomatik.sql` (veritabanı tetikleyicisi; ekran yolundan bağımsız):
+  - `uretim_tarihi = min(rezervasyonlar.ekipman_alim_tarihi) - 1 gün` (birden fazla rezervasyonda EN ERKEN alım).
+  - `son_kullanim_tarihi = uretim + 12 ay`; alıcı `OM GENERAL…` ile başlıyorsa `+ 15 ay`.
+  - Yalnız **Açık** dosyalar. Rezervasyon ekle / alım tarihi değiştir / sil / dosya değiştir → yeniden hesap.
+- `ihracat_dosyalari.uretim_tarihi_elle`: tarihlerden biri herhangi bir yoldan değişirse `true`
+  (sistem bir daha yazmaz). İkisi de boşaltılırsa `false` → hemen yeniden otomatik hesap.
+  Migration anında dolu olan tüm tarihler elle sayıldı (geçmiş / kapalı dosyalara dokunulmadı).
+- Ek Bilgiler kartı: otomatik tarihte etiket "Üretim Tarihi · otomatik"; düzenleme penceresinde kural ipucu.
+- Fonksiyonlar `security definer`, `anon/authenticated` için EXECUTE kapalı; tetikleyici asla hata fırlatmaz.
+- Test: canlıda `begin … rollback` ile 8 senaryo + yetkili kullanıcı (RLS) senaryosu; e2e `e2e_uretim.mjs`.
+
+## Proforma Yükle — rezervasyon ekranında "Yeni Proforma Ekle" (10.11.2026)
+
+Proforma yüklenince açılan "İhracat dosyası oluşturuldu" şeridinde **Yeni Proforma Ekle** düğmesi
+(`data-yeni-proforma`). Aynı sayfada temiz yükleme adımına döner; önceki dosyanın durumu taşınmaz.
+Ürün kütüphanesi (`ihracat_urunleri`) 10.11.2026'da kayıtlı proformalardaki 5 üründen dolduruldu (kullanıcı onayı).

@@ -43,6 +43,8 @@ export type Dosya = {
   diib_tarihi: string | null;
   uretim_tarihi: string | null;
   son_kullanim_tarihi: string | null;
+  /** true: uretim/son kullanim tarihi elle girildi; false: bos ekipman alimindan otomatik (10.11.2026) */
+  uretim_tarihi_elle?: boolean;
   navlun_tutari: number | null;
   fatura_talimati_gonderildi: boolean | null;
   // Bu sevkiyat icin ECTN basvurusu yapilacak mi (talep: 28.09.2026). true ise

@@ -254,8 +254,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           
           <CopyableField dark label="Beyanname No" value={dosya.beyanname_no} />
           <CopyableField dark label="BL No" value={dosya.bl_no} />
-          <CopyableField dark label="Üretim Tarihi" value={formatDateTR(dosya.uretim_tarihi)} />
-          <CopyableField dark label="Son Kullanım Tarihi" value={formatDateTR(dosya.son_kullanim_tarihi)} />
+          {/* 10.11.2026: elle girilmediyse bos ekipman alim tarihinden otomatik (migration 20261110010000) */}
+          <CopyableField dark label={dosya.uretim_tarihi && dosya.uretim_tarihi_elle === false ? "Üretim Tarihi · otomatik" : "Üretim Tarihi"} value={formatDateTR(dosya.uretim_tarihi)} />
+          <CopyableField dark label={dosya.son_kullanim_tarihi && dosya.uretim_tarihi_elle === false ? "Son Kullanım Tarihi · otomatik" : "Son Kullanım Tarihi"} value={formatDateTR(dosya.son_kullanim_tarihi)} />
           <CopyableField dark label="DİİB No" value={dosya.diib_no} />
           <CopyableField dark label="Ödeme Şekli (Fatura Talimatı)" value={dosya.gumruk_odeme_sekli} />
         </div>
@@ -313,6 +314,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Son Kullanım Tarihi</label>
           <input type="date" value={form.son_kullanim_tarihi} onChange={(e) => update("son_kullanim_tarihi", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, colorScheme: "dark" }} />
         </div>
+        <p data-uretim-ipucu="" className="col-span-2 md:col-span-3 -mt-1 text-[11px] leading-snug" style={{ color: TEXT_MUTED }}>
+          Üretim tarihi boş ekipman alım tarihinin 1 gün öncesi, son kullanım +1 yıl (OM GENERAL için +15 ay) olarak otomatik yazılır. Elle değiştirirseniz sistem dokunmaz; iki tarihi de boşaltırsanız yeniden otomatik hesaplanır.
+        </p>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>DİİB No</label>
           {/* Muhasebe talebi (26.09.2026): ayri bir "DIIB Tarihi" alanina gerek

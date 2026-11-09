@@ -191,15 +191,18 @@
     (ilerleme metniyle); "Saat" → `arac_cikis_saati` (önceki saat mesajının yerine geçer);
     "Bugün değil" → yetkiliye e-posta. Çıktı bir kez işlenir (sonraki istekler `zaten`).
     İptal edilmiş iş emrinde çıkış işlenmez.
-  - `ic_bildirim_zamanla`: planlanan saat gelince / 60 dk cevap yoksa lojistiğe hatırlatma;
-    +30 dk (planlıda) veya 120 dk (bekleyende) hâlâ yoksa yetkiliye uyarı. Son 3 gün.
+  - `ic_bildirim_zamanla`: planlanan saat gelince / 60 dk cevap yoksa lojistiğe hatırlatma
+    (tek sefer). Son 3 gün. Yetkiliye "Cevap yok / Lojistikten çıkış cevabı gelmedi"
+    (`cikis_cevap_yok`) uyarısı 09.11.2026 kullanıcı talebiyle KAPATILDI ("Bize ilave bir
+    bilgilendirme gelmesin"; migration `20261109200000`). Geri açmadan önce kullanıcıya sor.
+    Şablon edge'de duruyor ama artık üretilmiyor; `cikis_uyari` kolonu kullanılmıyor.
   - E-posta: `ic_bildirim_eposta_al` (skip locked) + `ic_bildirim_eposta_sonuc` (3 deneme,
     sonra `hata`).
 - "Siparişiniz tamamlandı" tekrar koruması (migration `20261012220000`): iş emri yeniden
   açılınca BEKLEYEN tamamlandı mesajı atlanır; tekrar kapatılınca eskisi atlanıp güncel
   toplamlarla yenisi hazırlanır. Gönderilmiş mesaja dokunulmaz. Hiç sevki olmayan iş emri
   kapatılırsa tamamlandı mesajı hazırlanmaz.
-- Uyarı e-postaları (cevap yok / bugün çıkmayacak) Alıcı + CC (kullanıcı kararı 12.10.2026:
+- Uyarı e-postaları (bugün çıkmayacak; cevap yok kapalı) Alıcı + CC (kullanıcı kararı 12.10.2026:
   Alıcı execution@unex.com.tr, CC bbt@unex.com.tr). `ic_piyasa_ayarlari.yetkili_cc` (virgülle,
   boşluksuz, en fazla 5; CHECK), gönderim anında `ic_bildirim_eposta_al` `ic_bildirimler.cc`'yi
   doldurur (yalnız alici='yetkili'), edge function Resend'e `cc` verir. Lojistik e-postasında CC

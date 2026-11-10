@@ -83,6 +83,8 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   pazar_temaslar: { ad: "Görüşmeler (sorgulama / hatırlatma)", grup: "Pazar (CRM)" },
   pazar_gorevler: { ad: "Günlük müşteri görevleri", grup: "Pazar (CRM)" },
   pazar_gorev_gonderimleri: { ad: "Günlük görev maili kaydı", grup: "Pazar (CRM)" },
+  pazar_ekip: { ad: "Satış ekibi (görev alanlar)", grup: "Pazar (CRM)" },
+  pazar_gelenler: { ad: "Arşivden yakalanan müşteri cevapları", grup: "Pazar (CRM)" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -118,6 +120,7 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   pazar_temaslar: { tur: "kullanilmadi", metin: "Görüşme süreci yeni (10.11.2026); görev sayfasında ilk mail \"Gönderdim\" ile kaydedilince dolar." },
   pazar_gorevler: { tur: "kullanilmadi", metin: "Günlük görevler yeni (10.11.2026); ilk günlük mail ile dolar." },
   pazar_gorev_gonderimleri: { tur: "kullanilmadi", metin: "Günlük görev maili yeni (10.11.2026); ilk gönderimle dolar." },
+  pazar_gelenler: { tur: "kullanilmadi", metin: "Cevap tespiti yeni (10.11.2026); arşiv Gmail betiği kurulup ilk müşteri cevabı gelince dolar." },
 };
 const BOS_ROZET: Record<"normal" | "kullanilmiyor" | "kullanilmadi" | "bilinmiyor", [string, string, string]> = {
   kullanilmiyor: ["#F1F5F9", "#475569", "Kullanılmıyor"],

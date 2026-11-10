@@ -131,10 +131,36 @@ müşterilerle aynı sistem, Şafak Bey'e hitaben." Migration `20261110070000_pa
 - Test: `e2e_gorev.mjs` 38 kontrol (görev sahibi, imza adresi, numarasız WhatsApp, kopyala).
 - Bekleyen: `pazar_ekip` yedek listesine 3.5 ile birlikte eklenecek (yedekleme-gonder bir sonraki dağıtımda).
 
+## 3.5 Gelen cevap tespiti + görev sayfası akışı (10.11.2026)
+
+Kullanıcı: "Cevap bildirmeden yeni müşteriye geçilebilmeli; ama temasa geçtiğini bildirmeden geçememeli."
+"Fuar listesinde telefonlar mevcut; paylaş butonu olsun, WhatsApp'tan hızlı temas. Bizim müşterilerimizin telefonuna
+gerek yok, WhatsApp grupları var." Cevap tespiti onaylandı (arşiv Gmail + Apps Script).
+
+Görev sayfası:
+- "Bugün atla" kalktı. "Yeni müşteriyle devam et" (alt şerit + başarı ekranı) yalnız bu görevde temas kaydı
+  (Gönderdim ya da sonuç) varken açık: `pazar_gorev_bilgi` → `gorev.temas_var`. Sonuç bildirmek zorunlu değil.
+- WhatsApp: yetkilinin her numarası için ayrı düğme (fuar listesinden: 714 potansiyel yetkiliden 688'inde telefon);
+  numarasız müşteride "WhatsApp grubuna gönder" (wa.me/?text, grup seçilir); telefonda "Paylaş" (Web Share API).
+- Arşivden gelen son cevap sayfanın üstünde: tarih, gönderen, konu, alıntısız metin + sistemin önerisi ("Öneriyi kaydet").
+
+Migration `20261110080000_pazar_gelen.sql`:
+- `pazar_gelenler` (mesaj_id = Message-ID tekil, gönderen, konu, özet ≤2000, tarih, tür cevap / otomatik, öneri).
+- `pazar_gelen_kaydet(mesajlar)`: kendi alan adlarımız / sistem adresleri atlanır; yetkili e-postası, yoksa özel alan adı
+  (ücretsiz posta servisleri hariç, tek firma) ile eşleşir; eşleşmeyen kaydedilmez. Otomatik yanıt süreci etkilemez.
+  Süreçteki firmada (sorgulandı / hatırlatma / sessiz) gerçek cevap → aşama "cevap", hatırlatma durur, 30 gün bekler,
+  temas kaydı (işleyen "arşiv (otomatik)"); süreç dışı yazışmada 14 gün sorgulama seçilmez. Öneri yalnız öneri:
+  ilgilenmiyor > sipariş > teklif (anahtar kelime, yapay zekâ yok). 10.11 canlı deneme (ROLLBACK): doğru.
+- Edge `pazar-gorev` v3: `{islem: "gelen"}` + başlık `x-pazar-anahtar` = secret `PAZAR_GELEN_ANAHTAR` (≥24 karakter,
+  sabit süreli karşılaştırma; secret yoksa 503).
+- Apps Script: `docs/apps-script/pazar-gelen.gs` (arşiv hesabında; ANAHTAR + ANON betik özelliklerinde, repoda gizli yok;
+  10 dk tetikleyici; alıntı satırlarını keser; imleç + 1 saat geri tarama, tekrar Message-ID ile elenir).
+- Posta: unex.com.tr = Promail üzerinde SmarterMail; execution@ zaten arşive yönlendiriyor. export@ / export2@ için de
+  SmarterMail yönlendirmesi ("kopyasını kutuda bırak") önerildi; Outlook'u etkilemez.
+- Yedek: `pazar_ekip`, `pazar_gelenler` yedekleme listesinde (yedekleme-gonder v43).
+- Test: `e2e_gorev.mjs` 43 kontrol (sıradaki kilidi, atla yok, gelen cevap + öneri, WhatsApp gönderdim).
+
 ## Sıradaki adımlar
 
-3.5 cevap tespiti: arşiv (unex.execution.arsiv@) yalnız execution@'ın alıcı / CC olduğu mailleri alıyor; görev
-mailleri execution@'ı CC'ye eklediği için "tümünü yanıtla" cevapları arşive düşer. Plan: arşiv hesabında Google Apps
-Script (10 dk'da bir) → edge'e gelen mailin göndereni / konusu / ilk satırları → yetkili e-postası ya da alan adıyla
-firma eşleşir → "Cevap geldi" otomatik kaydedilir, hatırlatma durur; otomatik yanıt (izin / out of office) hatırlatmayı
-durdurmaz; "ilgilenmiyor / teklif / sipariş" sınıflaması önerilir · 3.6 Burak Bey ekranı.
+Canlıya alma (kullanıcı onayı): pg_cron `pazar-gorev` + `PAZAR_GOREV_CANLI=evet`; `PAZAR_GELEN_ANAHTAR` + Apps Script
+kurulumu; export@ / export2@ yönlendirmesi · 3.6 Burak Bey ekranı.

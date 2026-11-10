@@ -16,6 +16,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // degil, veritabaninda). Her kisiye AYRI gorev listesi + AYRI mail ("Gunaydin <hitap>"); alici o kisinin adresi,
 // CC: PAZAR_GOREV_CC (varsayilan bbt@, execution@). Ekip bossa eski davranis: tek liste export@'a.
 // Test: PAZAR_GOREV_TEST_ALICISI (varsayilan mesensei282@); her kisi icin ayri [TEST] maili.
+// GELEN CEVAP (3.5, migration 20261110080000): {"islem": "gelen", "mesajlar": [...]} + baslik x-pazar-anahtar =
+// secret PAZAR_GELEN_ANAHTAR (arsiv Gmail'deki Apps Script: docs/apps-script/pazar-gelen.gs). Secret yoksa kapali.
+// Eslestirme / siniflama / surec etkisi veritabaninda: pazar_gelen_kaydet.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -37,10 +40,19 @@ const CC = adresler("PAZAR_GOREV_CC", ["bbt@unex.com.tr", "execution@unex.com.tr
 type Kisi = { kod: string | null; eposta: string; hitap: string | null };
 const VARSAYILAN_KISI: Kisi = { kod: null, eposta: "export@unex.com.tr", hitap: null };
 const TEST_ALICISI = adresler("PAZAR_GOREV_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const GELEN_ANAHTAR = (Deno.env.get("PAZAR_GELEN_ANAHTAR") || "").trim();
+
+/** Sabit sureli karsilastirma (anahtar tahmini zamanlamadan sizmasin). */
+function anahtarDogru(gelen: string): boolean {
+  if (GELEN_ANAHTAR.length < 24 || gelen.length !== GELEN_ANAHTAR.length) return false;
+  let fark = 0;
+  for (let i = 0; i < gelen.length; i++) fark |= gelen.charCodeAt(i) ^ GELEN_ANAHTAR.charCodeAt(i);
+  return fark === 0;
+}
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-pazar-anahtar",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (veri: unknown, status = 200) => new Response(JSON.stringify(veri), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -237,6 +249,21 @@ Deno.serve(async (req: Request) => {
       });
       if (!s.ok) return json({ hata: s.hata || "İşlem kaydedilemedi." }, 400);
       return json(s.veri);
+    }
+
+    // ---- Gelen cevaplar (arsiv Gmail -> Apps Script), gizli anahtarla ----
+    if (govde.islem === "gelen") {
+      if (!GELEN_ANAHTAR) return json({ hata: "Gelen cevap tespiti kapalı (PAZAR_GELEN_ANAHTAR yok)." }, 503);
+      if (!anahtarDogru(req.headers.get("x-pazar-anahtar") || "")) return json({ hata: "Yetkisiz." }, 401);
+      const liste = Array.isArray(govde.mesajlar) ? govde.mesajlar.slice(0, 100) : [];
+      const mesajlar = liste.filter((m): m is Record<string, unknown> => !!m && typeof m === "object").map((m) => ({
+        mesaj_id: kirp(m.mesaj_id, 300), gonderen: kirp(m.gonderen, 200), gonderen_ad: kirp(m.gonderen_ad, 200),
+        konu: kirp(m.konu, 300), ozet: kirp(m.ozet, 2000), tarih: kirp(m.tarih, 40),
+      }));
+      if (!mesajlar.length) return json({ kaydedilen: 0, cevap: 0, eslesmeyen: 0, atlanan: 0 });
+      const k = await rpc<unknown>("pazar_gelen_kaydet", { p_mesajlar: mesajlar });
+      if (!k.ok) return json({ hata: k.hata || "Kaydedilemedi." }, 500);
+      return json(k.veri);
     }
 
     // ---- Test: bugunun gorevleri + [TEST] mail yalniz test adresine ----

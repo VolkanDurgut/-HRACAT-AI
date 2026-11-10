@@ -4,13 +4,15 @@
  */
 export type GorevNeden = "hatirlatma1" | "hatirlatma2" | "siparissiz" | "potansiyel";
 export type GorevBilgisi = {
-  gorev: { tarih: string; sira: number; neden: GorevNeden; durum: "bekliyor" | "yapildi" | "atlandi"; isleyen: string | null; tamamlanma: string | null; atanan?: string | null };
+  gorev: { tarih: string; sira: number; neden: GorevNeden; durum: "bekliyor" | "yapildi" | "atlandi"; isleyen: string | null; tamamlanma: string | null; atanan?: string | null; temas_var?: boolean };
   /** Gorevin atandigi satisci (pazar_ekip); eski gorevlerde null. */
   ekip?: { kod: string; eposta: string; hitap: string | null } | null;
   adim: "sorgulama" | "hatirlatma1" | "hatirlatma2";
   firma: { ad: string; ulke: string | null; durum: "musteri" | "potansiyel"; crm_asama: string; alici_adi: string | null; son_siparis: string | null; aktif: boolean };
   kisiler: { id: string; ad: string | null; eposta: string | null; eposta_gecerli: boolean; telefonlar: string[]; whatsapp: string | null }[];
   fuarlar: string[];
+  /** Arsivden tespit edilen son cevaplar (3.5; son 30 gun). */
+  gelenler?: { tarih: string; gonderen: string; konu: string | null; ozet: string | null; tur: "cevap" | "otomatik"; oneri: "teklif" | "siparis" | "ilgilenmiyor" | null }[];
   son_urun: string | null;
   gecmis: { adim: string; kanal: string | null; sonuc: string | null; alici: string | null; konu: string | null; isleyen: string | null; olusturma: string }[];
   gunun_gorevleri: { sira: number; durum: string; token: string; ad: string; neden: GorevNeden }[];

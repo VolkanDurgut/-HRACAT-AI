@@ -133,6 +133,9 @@ const YEDEKLENECEK_TABLOLAR = [
   "pazar_temaslar",
   "pazar_gorevler",
   "pazar_gorev_gonderimleri",
+  // PAZAR satis ekibi (gorev alanlar) + arsivden tespit edilen musteri cevaplari (10.11.2026, 3.3b / 3.5)
+  "pazar_ekip",
+  "pazar_gelenler",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

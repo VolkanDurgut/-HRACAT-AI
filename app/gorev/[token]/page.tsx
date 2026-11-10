@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Copy, Loader2, Mail, MessageCircle, PartyPopper, SkipForward, ThumbsDown, ThumbsUp, FileText, ShoppingCart, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Copy, Inbox, Loader2, Lock, Mail, MessageCircle, PartyPopper, Share2, ThumbsDown, ThumbsUp, FileText, ShoppingCart, UserRound } from "lucide-react";
 import { YildizAlani } from "@/components/kilavuz/yildiz-alani";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
@@ -19,6 +19,10 @@ import { ACCENT, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
  * Kurallar (sonraki adim tarihleri) veritabaninda: pazar_gorev_isle (migration 20261110060000).
  * 10.11.2026: gorev kisiye atanir (Harun Bey export@ / Safak Bey export2@ -> pazar_ekip); "Ben" secimi kalkti,
  * isleyen sunucuda gorevin sahibi. WhatsApp: numara yoksa da acilir (kisi WhatsApp'ta secilir) + "Metni kopyala".
+ * 10.11.2026 (kullanici): "Cevap bildirmeden yeni musteriye gecilebilmeli; ama temasa gectigini bildirmeden
+ * gecilememeli." -> "Bugun atla" kalkti; "Yeni musteriyle devam et" yalniz bu gorevde temas (Gonderdim / sonuc)
+ * kaydi varken acik (gorev.temas_var). Her numara icin WhatsApp + "Paylas" (telefonun paylasim menusu).
+ * 3.5: arsivden gelen cevap + oneri sayfanin ustunde; "Oneriyi kaydet" ile sonuc islenir.
  */
 
 const NEDEN: Record<GorevNeden, { etiket: string; renk: string }> = {
@@ -32,6 +36,7 @@ const ADIMLAR: { kod: GorevBilgisi["adim"]; ad: string }[] = [
   { kod: "hatirlatma1", ad: "Hatırlatma 1" },
   { kod: "hatirlatma2", ad: "Hatırlatma 2" },
 ];
+const ONERI_ADI: Record<string, string> = { teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor" };
 const SONUC_ADI: Record<string, string> = { cevap: "Cevap verdi", teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor" };
 const ADIM_ADI: Record<string, string> = { sorgulama: "Sipariş sorgulama", hatirlatma1: "Hatırlatma 1", hatirlatma2: "Hatırlatma 2", sonuc: "Sonuç", atla: "Atlandı" };
 
@@ -104,6 +109,12 @@ export default function GorevSayfasi() {
   const eposta = kisi?.eposta && kisi.eposta_gecerli ? kisi.eposta : null;
   const wpNumara = kisi ? kisi.whatsapp || kisi.telefonlar[0] || null : null;
   const wpNumaraliAdres = wpNumara ? whatsappAdresi(wpNumara, wpMetin) : null;
+  // Yetkilinin tum numaralari (WhatsApp once), her biri icin ayri dugme
+  const numaralar = kisi ? Array.from(new Set([kisi.whatsapp, ...kisi.telefonlar].filter((x): x is string => !!x && whatsappAdresi(x, "") !== null))) : [];
+  const paylasilabilir = typeof navigator !== "undefined" && typeof (navigator as Navigator & { share?: unknown }).share === "function";
+  async function paylas() {
+    try { await navigator.share({ text: wpMetin }); setBekleyen({ kanal: "whatsapp", alici: "Paylaşım menüsü" }); } catch { /* vazgecildi */ }
+  }
   // Numara yoksa da WhatsApp acilir; mesaj hazir gelir, kisi WhatsApp'ta secilir
   const wpAdres = wpNumaraliAdres || whatsappPaylasAdresi(wpMetin);
 
@@ -145,6 +156,7 @@ export default function GorevSayfasi() {
   }
 
   const n = bilgi ? NEDEN[bilgi.gorev.neden] : null;
+  const temasVar = !!bilgi?.gorev.temas_var;
   const islenmis = bilgi && bilgi.gorev.durum !== "bekliyor";
   const toplam = bilgi?.gunun_gorevleri.length || 0;
   const yapilan = bilgi?.gunun_gorevleri.filter((g) => g.durum !== "bekliyor").length || 0;
@@ -193,6 +205,22 @@ export default function GorevSayfasi() {
           </div>
         ) : (
           <div className="space-y-4 mt-2">
+            {/* 3.5: arsivden tespit edilen cevap */}
+            {(bilgi.gelenler || []).filter((g) => g.tur === "cevap").slice(0, 1).map((g) => (
+              <section key={g.tarih + g.gonderen} className={`${kart} p-4`} style={{ ...kartStil, borderColor: "rgba(96,165,250,0.5)" }} data-testid="gelen-cevap">
+                <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#93C5FD" }}><Inbox size={14} /> Müşteriden cevap geldi · {tarihTR(g.tarih)} · {g.gonderen}</p>
+                {g.konu && <p className="text-sm mt-1 font-medium break-words">{g.konu}</p>}
+                {g.ozet && <p className="text-xs mt-1 whitespace-pre-line break-words" style={{ color: "#C9D1DC" }}>{g.ozet}</p>}
+                {g.oneri && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span style={{ color: TEXT_MUTED }}>Sistemin önerisi:</span>
+                    <span className="font-semibold" data-testid="gelen-oneri">{ONERI_ADI[g.oneri]}</span>
+                    <button type="button" disabled={isleniyor} onClick={() => isle(g.oneri as GorevIslemi, {}, { baslik: ONERI_ADI[g.oneri as string], alt: "Kaydedildi." })}
+                      className="h-7 px-2.5 rounded-md border disabled:opacity-60" style={{ borderColor: "rgba(96,165,250,0.5)", color: "#93C5FD" }} data-testid="oneri-kaydet">Öneriyi kaydet</button>
+                  </div>
+                )}
+              </section>
+            ))}
             {/* Firma */}
             <section className={`${kart} p-5`} style={kartStil}>
               <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-semibold" style={{ backgroundColor: `${n!.renk}22`, color: n!.renk }} data-testid="gorev-neden">{n!.etiket}</span>
@@ -277,17 +305,33 @@ export default function GorevSayfasi() {
                   className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: eposta ? ACCENT : "#374151", cursor: eposta ? "pointer" : "not-allowed" }} data-testid="outlook-ac">
                   <Mail size={16} /> Outlook&apos;ta aç
                 </a>
-                <a href={wpAdres} target="_blank" rel="noopener noreferrer"
-                  onClick={() => setBekleyen({ kanal: "whatsapp", alici: wpNumaraliAdres ? `+${(wpNumara || "").replace(/\D/g, "")}` : "WhatsApp (kişi seçildi)" })}
-                  className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold border" style={{ borderColor: "rgba(37,211,102,0.5)", color: "#86EFAC" }} data-testid="whatsapp-ac" data-numarali={wpNumaraliAdres ? "evet" : "hayir"}>
-                  <MessageCircle size={16} /> {wpNumaraliAdres ? "WhatsApp'ta gönder" : "WhatsApp'ta gönder (kişi seç)"}
-                </a>
+                {numaralar.length > 0 ? numaralar.map((no, i) => (
+                  <a key={no} href={whatsappAdresi(no, wpMetin) || wpAdres} target="_blank" rel="noopener noreferrer"
+                    onClick={() => setBekleyen({ kanal: "whatsapp", alici: `+${no.replace(/\D/g, "")}` })}
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold border" style={{ borderColor: "rgba(37,211,102,0.5)", color: "#86EFAC" }}
+                    data-testid={i === 0 ? "whatsapp-ac" : "whatsapp-ac-diger"} data-numarali="evet">
+                    <MessageCircle size={16} /> WhatsApp +{no.replace(/\D/g, "")}
+                  </a>
+                )) : (
+                  <a href={wpAdres} target="_blank" rel="noopener noreferrer"
+                    onClick={() => setBekleyen({ kanal: "whatsapp", alici: bilgi.firma.durum === "musteri" ? "WhatsApp grubu" : "WhatsApp (kişi seçildi)" })}
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold border" style={{ borderColor: "rgba(37,211,102,0.5)", color: "#86EFAC" }} data-testid="whatsapp-ac" data-numarali="hayir">
+                    <MessageCircle size={16} /> {bilgi.firma.durum === "musteri" ? "WhatsApp grubuna gönder" : "WhatsApp'ta gönder (kişi seç)"}
+                  </a>
+                )}
+                {paylasilabilir && (
+                  <button type="button" onClick={paylas} className="inline-flex items-center gap-2 h-11 px-4 rounded-xl text-sm border" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }} data-testid="paylas">
+                    <Share2 size={15} /> Paylaş
+                  </button>
+                )}
                 <button type="button" onClick={metniKopyala} className="inline-flex items-center gap-2 h-11 px-4 rounded-xl text-sm border" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }} data-testid="wp-kopyala">
                   {kopyalandi ? <Check size={15} /> : <Copy size={15} />} {kopyalandi ? "Kopyalandı" : "Mesajı kopyala"}
                 </button>
               </div>
               {!wpNumaraliAdres && (
-                <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }} data-testid="wp-numara-yok">Bu yetkilinin telefonu kayıtlı değil: WhatsApp açılınca mesaj hazır gelir, kişiyi WhatsApp&apos;ta seçersiniz.</p>
+                <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }} data-testid="wp-numara-yok">{bilgi.firma.durum === "musteri"
+                  ? "Müşterimizin WhatsApp grubu: WhatsApp açılınca mesaj hazır gelir, grubu seçip gönderirsiniz."
+                  : "Bu yetkilinin telefonu kayıtlı değil: WhatsApp açılınca mesaj hazır gelir, kişiyi WhatsApp'ta seçersiniz."}</p>
               )}
               <details className="mt-3">
                 <summary className="text-xs cursor-pointer" style={{ color: TEXT_MUTED }}>WhatsApp mesajını düzenle</summary>
@@ -311,8 +355,8 @@ export default function GorevSayfasi() {
 
             {/* Sonuc */}
             <section className={`${kart} p-5`} style={kartStil}>
-              <h2 className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Müşteri döndü mü?</h2>
-              <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Cevap geldiyse işaretleyin; süreç durur, hatırlatma gitmez.</p>
+              <h2 className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Müşteri döndü mü? <span className="normal-case tracking-normal font-normal">(zorunlu değil)</span></h2>
+              <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Cevap geldiyse işaretleyin; süreç durur, hatırlatma gitmez. Mailden gelen cevaplar arşivden otomatik de yakalanır.</p>
               <div className="flex flex-wrap gap-2">
                 {([
                   ["cevap", "Cevap verdi", <ThumbsUp key="i" size={14} />, "#6EE7B7", "Cevap kaydedildi. Takip sizde; hatırlatma gönderilmeyecek."],
@@ -325,10 +369,6 @@ export default function GorevSayfasi() {
                     {ikon} {ad}
                   </button>
                 ))}
-                <button type="button" disabled={isleniyor || !!islenmis} onClick={() => isle("atla", {}, { baslik: "Bugün atlandı", alt: "Bu firma birkaç gün sonra yeniden karşınıza çıkacak." })} data-sonuc="atla"
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs border disabled:opacity-40 ml-auto" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                  <SkipForward size={14} /> Bugün atla
-                </button>
               </div>
             </section>
 
@@ -347,6 +387,19 @@ export default function GorevSayfasi() {
             )}
 
             {hata && <p className="text-sm rounded-lg px-3 py-2" style={{ backgroundColor: "rgba(239,68,68,0.1)", color: "#FCA5A5" }} data-testid="gorev-hata">{hata}</p>}
+
+            {/* Siradaki musteri: yalniz temas bildirildiyse */}
+            {siradaki && (
+              <section className={`${kart} p-4 flex flex-wrap items-center justify-between gap-3`} style={kartStil}>
+                <span className="text-xs" style={{ color: TEXT_MUTED }} data-testid="siradaki-not">
+                  {temasVar ? `Sıradaki: ${siradaki.ad}` : "Sıradaki müşteriye geçmek için önce bu müşteriyle temasınızı (mail ya da WhatsApp) “Evet, gönderdim” ile bildirin."}
+                </span>
+                <button type="button" onClick={devamEt} disabled={!temasVar} data-testid="siradaki"
+                  className="inline-flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed" style={{ backgroundColor: temasVar ? ACCENT : "#374151" }}>
+                  {temasVar ? <ArrowRight size={16} /> : <Lock size={15} />} Yeni müşteriyle devam et
+                </button>
+              </section>
+            )}
           </div>
         )}
       </main>

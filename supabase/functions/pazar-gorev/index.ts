@@ -19,6 +19,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // GELEN CEVAP (3.5, migration 20261110080000): {"islem": "gelen", "mesajlar": [...]} + baslik x-pazar-anahtar =
 // secret PAZAR_GELEN_ANAHTAR (arsiv Gmail'deki Apps Script: docs/apps-script/pazar-gelen.gs). Secret yoksa kapali.
 // Eslestirme / siniflama / surec etkisi veritabaninda: pazar_gelen_kaydet.
+// DUYURU (10.11.2026, kullanici: "bilgilendirici mail iletmeli miyiz? ilk etapta test"): {"islem": "duyuru", "test": true}
+// -> ekipteki her kisi icin tanitim maili YALNIZ test adresine (test sinirina sayilir). Gercek gonderim
+// {"islem": "duyuru"} + x-pazar-anahtar ZORUNLU; kisi basina BIR kez (pazar_gorev_gonderimleri atanan "duyuru-<kod>").
+// Mailde "Rehberi izle" -> /gorev/rehber (girissiz animasyonlu anlatim). Gorsel yok (Outlook webp gostermez).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -171,6 +175,56 @@ function mailOlustur(gorevler: OzetGorev[], kisi: Kisi, cc: string[], test: bool
   return { konu, html };
 }
 
+/** Hafta ici bir sonraki gun (bugun TR 09:00 oncesiyse bugun) - duyurudaki baslangic tarihi. */
+function baslangicGunu(): string {
+  const d = new Date(Date.now() + 3 * 3600_000);
+  if (d.getUTCHours() >= 9) d.setUTCDate(d.getUTCDate() + 1);
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
+  const gun = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"][d.getUTCDay()];
+  return `${trTarih(d.toISOString().slice(0, 10))} ${gun}`;
+}
+
+function duyuruMaili(kisi: Kisi, cc: string[], test: boolean): { konu: string; html: string } {
+  const konu = `${test ? "[TEST] " : ""}Yeni: Bugünkü müşteriniz · hafta içi her sabah 09:00`;
+  const adim = (no: number, renk: string, baslik: string, metin: string) => `<tr>
+    <td style="width:40px;vertical-align:top;padding:10px 0"><div style="width:28px;height:28px;border-radius:14px;background:${renk};color:#fff;font-size:13px;font-weight:bold;line-height:28px;text-align:center">${no}</div></td>
+    <td style="vertical-align:top;padding:10px 0;border-bottom:1px solid #EEF2F7"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${kacis(baslik)}</div><div style="font-size:13px;color:#475569;line-height:1.55;margin-top:2px">${metin}</div></td>
+  </tr>`;
+  const testSeridi = test
+    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi. Gerçek gönderimde alıcı: <b>${kacis(kisi.eposta)}</b>${kisi.hitap ? ` (${kacis(kisi.hitap)})` : ""} · CC: ${kacis(cc.join(", "))}</div>`
+    : "";
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:6px;padding:24px">
+<tr><td>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
+    <td style="width:56px;vertical-align:middle"><img src="${SITE}/images/logo.png" width="48" height="48" alt="Unex Gıda" style="display:block;width:48px;height:48px;border:0"></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">Unex Gıda İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">UNEX Satış · Yeni çalışma düzeni</div></td>
+  </tr></table>
+  ${testSeridi}
+  <p style="margin:18px 0 6px;color:#1E293B;font-size:15px;line-height:1.55">Merhaba${kisi.hitap ? ` ${kacis(kisi.hitap)}` : ""},</p>
+  <p style="margin:0 0 14px;color:#1E293B;font-size:14px;line-height:1.6"><b>${kacis(baslangicGunu())}</b> sabahından itibaren hafta içi her sabah 09:00'da size özel <b>&ldquo;Bugünkü müşteriniz&rdquo;</b> maili gelecek. Amaç, siparişi olmayan müşterilerimizle ve fuar potansiyelleriyle düzenli temas kurmak. Her gün en fazla 6 müşteri; mesajlar hazır, birkaç dakikanızı alır.</p>
+  <div style="margin:18px 0 4px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">Her gün 4 adım</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    ${adim(1, YESIL, "Mail gelir, Başla'ya basarsınız", "Görev sayfası açılır; giriş ya da şifre gerekmez. Firma, yetkili ve son sipariş bilgisi tek kartta.")}
+    ${adim(2, LACIVERT, "Outlook'ta aç → Gönder → “Evet, gönderdim”", "İngilizce mesaj hazırdır, isterseniz düzenlersiniz. Outlook alıcı, konu ve metin dolu açılır; bbt@ ve execution@ bilgiye kendiliğinden eklenir.")}
+    ${adim(3, "#25D366", "İsterseniz WhatsApp'tan da", "Fuar potansiyellerinde numaraya doğrudan, kendi müşterilerimizde WhatsApp grubuna; aynı hazır mesajla.")}
+    ${adim(4, "#D97706", "Sıradaki müşteriye geçin", "Temasınızı bildirince sıradaki açılır. Bugün ulaşılamıyorsa kısa bir nedenle “Müşteriyi atla”.")}
+  </table>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:4px"><tr><td style="padding:12px 14px;font-size:13px;color:#334155;line-height:1.6">
+    <b style="color:${LACIVERT}">Sistem sizin için takip eder:</b> hatırlatmalar 4 ve 6 iş günü sonra listenize kendiliğinden gelir; müşteri &ldquo;Tümünü yanıtla&rdquo; ile cevap verirse cevap yakalanır ve hatırlatma durur.
+  </td></tr></table>
+  <div style="margin-top:22px;text-align:center">
+    <a href="${kacis(`${SITE}/gorev/rehber`)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:15px;font-weight:bold;padding:12px 30px;border-radius:6px">Rehberi izle (3 dakika)</a>
+    <div style="margin-top:8px;font-size:11px;color:#94A3B8">Ekran görüntüleriyle, adım adım; giriş gerektirmez.</div>
+  </div>
+  <div style="margin-top:20px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Sorularınız için: execution@unex.com.tr<br>Bu bilgilendirme İhracat AI tarafından gönderildi.</div>
+</td></tr></table>
+</td></tr></table></body></html>`;
+  return { konu, html };
+}
+
 async function mailGonder(to: string[], cc: string[], konu: string, html: string): Promise<string | null> {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
   const res = await fetch("https://api.resend.com/emails", {
@@ -264,6 +318,43 @@ Deno.serve(async (req: Request) => {
       const k = await rpc<unknown>("pazar_gelen_kaydet", { p_mesajlar: mesajlar });
       if (!k.ok) return json({ hata: k.hata || "Kaydedilemedi." }, 500);
       return json(k.veri);
+    }
+
+    // ---- Duyuru (tanitim) maili: test -> yalniz test adresi; gercek -> anahtar zorunlu, kisi basina bir kez ----
+    if (govde.islem === "duyuru") {
+      const test = govde.test === true;
+      if (test) {
+        const gun = new Date(Date.now() - 24 * 3600_000).toISOString();
+        const sayilan = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&durum=eq.test&olusturma=gte.${gun}`);
+        if (sayilan.length >= 8) return json({ error: "Test sınırı (24 saatte 8 mail) doldu." }, 429);
+      } else {
+        if (!GELEN_ANAHTAR) return json({ hata: "Duyuru gönderimi kapalı (anahtar yok)." }, 503);
+        if (!anahtarDogru(req.headers.get("x-pazar-anahtar") || "")) return json({ hata: "Yetkisiz." }, 401);
+      }
+      const sonuc: { kisi: string | null; durum: string; hata?: string }[] = [];
+      for (const s of await sirketler()) {
+        for (const k of await ekip(s)) {
+          const atanan = `duyuru-${k.kod || "ekip"}`;
+          if (!test) {
+            const onceki = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&company_id=eq.${s}&atanan=eq.${encodeURIComponent(atanan)}&durum=eq.gonderildi`);
+            if (onceki.length) { sonuc.push({ kisi: k.kod, durum: "zaten_gonderildi" }); continue; }
+          }
+          const ccGercek = CC.filter((a) => a !== k.eposta);
+          const { konu, html } = duyuruMaili(k, ccGercek, test);
+          const to = test ? TEST_ALICISI : [k.eposta];
+          const cc = test ? [] : ccGercek;
+          try {
+            const id = await mailGonder(to, cc, konu, html);
+            await kaydet({ company_id: s, tarih: trBugun(), atanan, durum: test ? "test" : "gonderildi", alicilar: [...to, ...cc], gorev_sayisi: 0, mesaj_id: id });
+            sonuc.push({ kisi: k.kod, durum: test ? "test" : "gonderildi" });
+          } catch (e) {
+            const hata = e instanceof Error ? e.message : String(e);
+            await kaydet({ company_id: s, tarih: trBugun(), atanan, durum: "hata", alicilar: [...to, ...cc], gorev_sayisi: 0, hata });
+            sonuc.push({ kisi: k.kod, durum: "hata", hata });
+          }
+        }
+      }
+      return json({ duyuru: true, test, sonuc });
     }
 
     // ---- Test: bugunun gorevleri + [TEST] mail yalniz test adresine ----

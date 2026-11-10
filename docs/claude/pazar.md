@@ -189,7 +189,21 @@ atlamada seçenek olarak gösterilmeli." + "Pazar sayfası çok dağınık; tuta
   11.11 prova (ROLLBACK): Harun Bey 6 siparişsiz; Şafak Bey 4 siparişsiz + 2 potansiyel; yazışan 3 müşteri dışarıda.
 - Test: `e2e_gorev.mjs` 50 (atla paneli, seçenek, zorunlu neden), `e2e_pazar.mjs` 80 (sekmeler, Takip bölümleri).
 
+## 3.7 Satış Rehberi + duyuru maili (10.11.2026)
+
+Kullanıcı: "Konu ile ilgili bilgilendirici mail iletmeli miyiz? İlk etapta mesensei282'ye test. Kullanım kılavuzu gibi
+düşün; aynı UNEX kullanım kılavuzundaki gibi görüntülü animasyonlu bir sunum."
+- Kılavuz sunumu ortak bileşene çıkarıldı: `components/kilavuz/sunum.tsx` → `KilavuzSunum` (konular, noktalar, başlık,
+  konum anahtarı, çıkış, kapak/son metinleri prop). `/kilavuz` davranışı DEĞİŞMEDİ (e2e_kilavuz_vgm 44).
+- `/gorev/rehber` (girişsiz, noindex): "Satış Rehberi", 7 evren (`lib/pazar/rehber.ts`): sabah maili → müşteriyi tanı →
+  mesaj/Outlook → WhatsApp → sonuç + atla → otomatik cevap → Takip. Ekranlar `public/kilavuz/{pazar-mail, gorev-*,
+  pazar-takip}.webp` (KURGUSAL mock veri, kişi adı yok), noktalar `lib/pazar/rehber-noktalari.ts` (OTOMATİK).
+- Edge `pazar-gorev` v6: `{"islem":"duyuru","test":true}` → ekipteki her kişi için tanıtım maili YALNIZ test adresine;
+  gerçek gönderim `{"islem":"duyuru"}` + `x-pazar-anahtar` zorunlu, kişi başına bir kez (`atanan = duyuru-<kod>`).
+  Mail: başlangıç günü, 4 adım, "Sistem sizin için takip eder", "Rehberi izle (3 dakika)" → `/gorev/rehber`.
+- Test: `e2e_rehber.mjs` 22. 10.11 duyuru testi: 2 mail, yalnız mesensei282.
+
 ## Sıradaki adımlar
 
-İlk canlı sabahın kontrolü (11.11): gönderim kaydı, görevler, işlemeler · export@ / export2@ yönlendirmesi gerekirse ·
+Duyurunun gerçek gönderimi (kullanıcı onayıyla) · İlk canlı sabahın kontrolü (11.11): gönderim kaydı, görevler, işlemeler · export@ / export2@ yönlendirmesi gerekirse ·
 Dalga 4 Yönetim Paneli · Dalga 5 Transit.

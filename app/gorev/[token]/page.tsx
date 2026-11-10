@@ -385,7 +385,7 @@ export default function GorevSayfasi() {
               {atlaAcik && (
                 <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "rgba(251,191,36,0.35)", backgroundColor: "rgba(251,191,36,0.06)" }} data-testid="atla-panel">
                   <p className="text-sm font-medium text-white">Neden atlıyorsunuz?</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Kısa yazın; nedeni Burak Bey Takip ekranında görür. Firma birkaç gün sonra yeniden sıraya girer.</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Kısa yazın; neden Takip ekranında görünür. Firma birkaç gün sonra yeniden sıraya girer.</p>
                   {(bilgi.atlama_nedenleri || []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {(bilgi.atlama_nedenleri || []).map((n) => (

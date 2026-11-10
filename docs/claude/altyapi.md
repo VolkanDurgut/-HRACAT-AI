@@ -404,6 +404,8 @@
   (`sonrakiBaslik`), telefon "Sağa kaydırın". Tıklayınca `ileri()`. Son ekranda YOK.
   `main` sağdan `pr-12 md:pr-24` boşluk alır (panel içeriği / İleri düğmesini örtmez).
   Kaydırma (touch) ve ← → davranışı DEĞİŞMEDİ. Test: e2e_kilavuz_vgm (1440/1366/390).
+- 10.11.2026: sunum `components/kilavuz/sunum.tsx` (`KilavuzSunum`) bileşenine çıkarıldı; `/kilavuz` artık ince
+  sarmalayıcı. Aynı bileşeni girişsiz `/gorev/rehber` (Satış Rehberi) kullanır — ayrıntı `pazar.md` §3.7.
 
 ## Gece yedeği — DİİB tabloları (04.11.2026)
 

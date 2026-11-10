@@ -39,3 +39,17 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
   Horoz, K+N), PDF ek (Link, K+N). Hedef fiyat yazışması ("Hedef mevcut mudur?") ve kabul ("Navlun rakamı 1800 Usd
   olmak üzere … rezervasyon talebimiz") da okunacak. Arşiv 26.10.2026'dan beri dolu; öncesi için execution@ kutusundan
   Gmail'e tek seferlik içe aktarma (Apps Script `tara` eski tarihli mailleri işlemez: `after:` + mail tarihi kontrolü).
+
+### 4.2.1 Okuyucu: `supabase/functions/_shared/navlun-oku.ts` (10.11.2026, canlıya bağlı DEĞİL)
+- Saf fonksiyonlar, yapay zekâ yok. `navlunMesajOku(mesaj, acenteler)` → olaylar: `teklif`, `karsi_teklif`
+  ("X usd destek olabilirim"), `hedef` (bizden "Hedef rakamı X"), `hedef_soru`, `hedef_kabul` ("Hedefiniz uygundur"),
+  `kabul` (bizden "Navlun bedeli X olmak üzere … booking"), `servis_yok`, `yer_yok`, `ek_teklif` (fiyat PDF/görselde).
+- Acente alan adı → ad tablosu REPODA YOK (üçüncü taraf bilgisi); canlıda DB'den parametre olarak verilecek.
+- Ayıklananlar: masraf/ceza/KDV'li tutarlar (ör. "Usd 50+Kdv VGM geç bildirim"), rezervasyonu alınmış işin operasyon
+  yazışmaları (konu `B<no> //`, "Rezervasyonunuz alınmıştır", "föy ektedir"), liman/terminal gönderenleri.
+- Test (yalnız test ortamı, arşivin 26.10–10.11 arası 60 yazışması / 192 mesaj / 88 acente mesajı): 33 fiyat olayı
+  (31 teklif + 2 karşı teklif), 6 hedef, 2 kabul, 1 hedef kabulü, 5 servis/yer yok, 12 "fiyat ekte"; kalan 37 acente
+  mesajında fiyat yok (bekleme, soru, föy, ekipman). Bilinen eksik: Kuehne+Nagel fiyatı her zaman görsel+PDF'te,
+  Link çoğunlukla PDF'te → canlıda Apps Script PDF metnini çıkarıp aynı okuyucuya verecek.
+- Sıradaki: `navlun_teklifleri` tablosu (mesaj_id tekil, idempotent), Apps Script'e navlun etiketi + PDF metni, sayfa
+  "Navlun Bildirimi" (liman × acente son fiyat, hedef, kabul), hata kuyruğu (okunamayan mesaj) = tek müdahale alanı.

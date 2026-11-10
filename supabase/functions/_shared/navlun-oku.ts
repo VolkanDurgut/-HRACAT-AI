@@ -1,0 +1,301 @@
+// NAVLUN BILDIRIMI - mail okuyucu (saf fonksiyonlar, yapay zeka yok, veri yok).
+//
+// Girdi: operasyonun "<LIMAN> // NAVLUN TALEBI" yazismalarindaki TEK bir mesaj
+// (konu, gonderen, govde). Cikti: o mesajdan cikan navlun olaylari.
+//
+// Olay turleri:
+//   teklif        acente fiyat verdi (liman, tutar, ekipman, armator, free time, gecerlilik)
+//   karsi_teklif  acente "X usd olarak destek olabilirim" dedi
+//   hedef         bizim taraf hedef fiyat verdi ("Hedef rakami X")
+//   hedef_soru    acente hedef sordu
+//   kabul         bizim taraf "Navlun bedeli X olmak uzere ... booking" dedi
+//   servis_yok    acentenin o limana servisi/kontrati yok
+//   yer_yok       gemiler dolu
+//   ek_teklif     fiyat metinde degil, ekte/gorselde (PDF okuyucu gerekir)
+//   hedef_kabul   acente "hedefiniz uygundur" dedi (tutar = son hedefimiz, toplayici baglar)
+//
+// Not: Bu dosya gercek musteri/acente verisi icermez.
+
+export type NavlunOlayTuru =
+  | "teklif" | "karsi_teklif" | "hedef" | "hedef_soru" | "kabul"
+  | "servis_yok" | "yer_yok" | "ek_teklif" | "hedef_kabul";
+
+export interface NavlunOlay {
+  tur: NavlunOlayTuru;
+  liman: string | null;        // POD (konu veya govdeden)
+  tutar: number | null;        // USD / konteyner
+  ekipman: string | null;      // 20DC | 40HC | 40DC
+  armator: string | null;
+  free_time_gun: number | null;
+  gecerlilik: string | null;   // ham metin (30.11 / 30.11.2026)
+  lokal_dahil: boolean | null;
+  pol: string | null;
+}
+
+export interface NavlunMesaj {
+  konu: string;
+  gonderen: string;            // e-posta adresi
+  govde: string;               // duz metin (alinti dahil olabilir)
+  ekler?: string[];            // dosya adlari
+}
+
+const BIZIM_ALAN = "unex.com.tr";
+
+// Acente alan adi -> gorunen ad tablosu REPODA TUTULMAZ (ucuncu taraf bilgisi);
+// canlida veritabanindan okunup parametre olarak verilir.
+export type AcenteTablosu = Record<string, string>;
+
+const ARMATORLER: Array<[RegExp, string]> = [
+  [/\bmaersk\b/i, "Maersk"],
+  [/\bmsc\b/i, "MSC"],
+  [/\bcma(\s*cgm)?\b/i, "CMA CGM"],
+  [/\bhapag|\bhapaq/i, "Hapag-Lloyd"],
+  [/\bone(\s*line)?\b(?!\s*(?:bir|tane))/, "ONE"],
+  [/\boocl\b/i, "OOCL"],
+  [/\bturkon\b/i, "Turkon"],
+  [/\bakkon\b/i, "Akkon"],
+  [/\bculines\b/i, "Culines"],
+  [/\bevergreen\b/i, "Evergreen"],
+  [/\bcosco\b/i, "COSCO"],
+  [/\bzim\b/i, "ZIM"],
+  [/\batako\b/i, "Atako"],
+  [/\badmiral\b/i, "Admiral"],
+];
+
+// Konudan atilacak kelimeler
+const KONU_GURULTU = new Set([
+  "UNEX", "RE", "FW", "FWD", "YNT", "MSC", "UNEX GIDA", "IHRACAT", "HK", "HK.",
+  "AMERIKA", "AMERİKA", "ANGOLA", "SEYCHELLES ISLAND", "SEYCHELLES ISLANDS",
+]);
+
+export function acenteAdi(gonderen: string, acenteler: AcenteTablosu): string | null {
+  const alan = (gonderen.split("@")[1] || "").toLowerCase().trim();
+  if (!alan) return null;
+  if (acenteler[alan]) return acenteler[alan];
+  const k = Object.keys(acenteler).find((a) => alan.endsWith("." + a));
+  return k ? acenteler[k] : null;
+}
+
+export function bizdenMi(gonderen: string): boolean {
+  return gonderen.toLowerCase().trim().endsWith("@" + BIZIM_ALAN);
+}
+
+function buyukTr(s: string): string {
+  return s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase();
+}
+
+/** Konudan varis limanini cikar: "RE: UNEX // AMERIKA // BOSTON // NAVLUN TALEBI HK." -> "BOSTON" */
+export function konudanLiman(konu: string): string | null {
+  const parcalar = konu.split("//").map((p) => p.replace(/^\s*(re|fw|fwd|ynt)\s*:\s*/i, "").trim());
+  const adaylar: string[] = [];
+  for (const p0 of parcalar) {
+    let p = buyukTr(p0).replace(/\s+/g, " ").trim();
+    if (!p) continue;
+    if (/NAVLUN|TALEB|TAELB|PROGRAM|TEKLIF|BOOKING|REZERVASYON/.test(p)) continue;
+    if (/^[A-Z]?\d{6,}$/.test(p)) continue;           // booking no
+    if (/^FR\.\d/.test(p) || /DENIZCILIK|DENİZCİLİK/.test(p)) continue;
+    // "ASYAPORT - BINGAZI" -> "BINGAZI" (POL - POD)
+    if (p.includes(" - ")) p = p.split(" - ").pop()!.trim();
+    if (KONU_GURULTU.has(p) || KONU_GURULTU.has(p.replace(/İ/g, "I"))) continue;
+    adaylar.push(p);
+  }
+  return adaylar.length ? adaylar[adaylar.length - 1] : null;
+}
+
+/** Govdeden alintiyi ve imzayi at; yalnizca yeni yazilan kismi birak. */
+export function yeniKisim(govde: string): string {
+  let t = govde.replace(/\r/g, "");
+  const kes = [
+    /\n\s*From:\s/i, /\n\s*Kimden:\s/i, /\n-{2,}\s*Original Message/i,
+    /\n\s*Gönderen:\s/i, /\n.{0,120}şunları yazdı/i, /\n.{0,120}wrote:/i,
+    /\n\s*>/, /\n_{8,}/,
+    /\n\s*Booking onayı verildikten sonra/i,
+    /\n\s*Best Regards|\n\s*Saygılarımla|\n\s*Brgds|\n\s*İyi Çalışmalar\s*&/i,
+  ];
+  for (const r of kes) {
+    const m = t.search(r);
+    if (m > 0) t = t.slice(0, m);
+  }
+  return t.replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/[’`´]/g, "'").trim();
+}
+
+function sayi(s: string): number | null {
+  const temiz = s.replace(/[^\d.,]/g, "");
+  if (!temiz) return null;
+  // 2,220 / 2.220 binlik ayirici; 1625,50 ondalik (nadir)
+  let n: number;
+  if (/^\d{1,3}([.,]\d{3})+$/.test(temiz)) n = Number(temiz.replace(/[.,]/g, ""));
+  else n = Number(temiz.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+function makulMu(n: number | null): n is number {
+  return n != null && n >= 50 && n <= 20000;
+}
+
+function ekipmanBul(s: string): string | null {
+  const t = s.toUpperCase().replace(/\s+/g, "");
+  if (/40'?(HC|HQ)/.test(t)) return "40HC";
+  if (/40'?(DC|DV|GP)?\b/.test(t) && !/20/.test(t)) return "40DC";
+  if (/2D0C|20'?(DC|DV|GP|ALL|')|20\b|1\*20/.test(t)) return "20DC";
+  return null;
+}
+
+function armatorBul(s: string, yakin?: number): string | null {
+  let en: { ad: string; d: number } | null = null;
+  for (const [r, ad] of ARMATORLER) {
+    const g = new RegExp(r.source, r.flags.includes("g") ? r.flags : r.flags + "g");
+    let m: RegExpExecArray | null;
+    while ((m = g.exec(s))) {
+      const d = yakin == null ? m.index : Math.abs(m.index - yakin);
+      if (!en || d < en.d) en = { ad, d };
+    }
+  }
+  return en ? en.ad : null;
+}
+
+function freeTimeBul(s: string): number | null {
+  const m = s.match(/(\d{1,2})\s*(?:gün|gun|days?)\s*(?:ft\b|free|frfee)/i)
+    || s.match(/(\d{1,2})\s*(?:calendar\s*)?days?\s*free/i)
+    || s.match(/(\d{1,2})\s*free\s*var/i)
+    || s.match(/(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/i)
+    || s.match(/(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/i);
+  return m ? Number(m[1]) : null;
+}
+
+function gecerlilikBul(s: string): string | null {
+  const m = s.match(/(?:validity|geçerlilik|gecerlilik|geçerli(?:dir)?|gecerlidir)[^\d\n]{0,25}(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)/i)
+    || s.match(/(\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?)\s*(?:geçerli|gecerli)/i);
+  return m ? m[1] : null;
+}
+
+function polBul(s: string): string | null {
+  const m = s.match(/POL\s*[:\-]?\s*([A-ZÇĞİÖŞÜa-zçğıöşü .\-]{3,30}?)(?:\s+POD|\n|$)/);
+  return m ? m[1].trim().toUpperCase() : null;
+}
+
+function bos(): Omit<NavlunOlay, "tur"> {
+  return { liman: null, tutar: null, ekipman: null, armator: null, free_time_gun: null, gecerlilik: null, lokal_dahil: null, pol: null };
+}
+
+/** USD'ye bitisik tum tutarlari bul (her biri icin cevresindeki ekipman). */
+function tutarlar(s: string): Array<{ tutar: number; ekipman: string | null; i: number }> {
+  const sonuc: Array<{ tutar: number; ekipman: string | null; i: number }> = [];
+  const r = /(?:usd|\$)\s*[:\-–]?\s*([\d][\d.,]*)|([\d][\d.,]*)\s*(?:usd|\$)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = r.exec(s))) {
+    const n = sayi(m[1] || m[2]);
+    if (!makulMu(n)) continue;
+    const cevre = s.slice(Math.max(0, m.index - 25), m.index + m[0].length + 25);
+    // masraf / ceza / kdv'li kalemler navlun degildir
+    if (/masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i.test(s.slice(Math.max(0, m.index - 60), m.index + m[0].length + 30))) continue;
+    sonuc.push({ tutar: n, ekipman: ekipmanBul(cevre), i: m.index });
+  }
+  return sonuc;
+}
+
+/** Dikey tablo (Horoz tipi): BASLIK satiri, ardindan her liman icin bir deger. */
+function dikeyTablo(s: string): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; gec: string | null }> | null {
+  const satir = s.split("\n").map((x) => x.trim()).filter(Boolean);
+  const pod = satir.findIndex((x) => /TESL[İI]MAT L[İI]MANI|\(POD\)/i.test(x));
+  const nav = satir.findIndex((x) => /^NAVLUN$/i.test(x));
+  if (pod < 0 || nav < 0) return null;
+  const baslikMi = (x: string) => /ADRES|L[İI]MAN|S[ÜU]RE|^NAVLUN$|^HAT$|GE[ÇC]ERL|^VGM$|TA[ŞS]IMA|LOKAL|INCOTERM|FREE T|MASRAF/i.test(x);
+  const limanlar: string[] = [];
+  for (let i = pod + 1; i < satir.length && i <= pod + 6 && !baslikMi(satir[i]); i++) limanlar.push(satir[i]);
+  const kac = limanlar.length;
+  if (!kac) return null;
+  const al = (bas: RegExp) => {
+    const k = satir.findIndex((x) => bas.test(x));
+    return k < 0 ? [] : satir.slice(k + 1, k + 1 + kac);
+  };
+  const navlun = satir.slice(nav + 1, nav + 1 + kac);
+  const hat = al(/^HAT$/i), ft = al(/^FREE T[İI]ME$/i), gec = al(/^GE[ÇC]ERL[İI]L[İI]K$/i);
+  const out = [];
+  for (let i = 0; i < kac; i++) {
+    const t = tutarlar(navlun[i] || "")[0];
+    if (!t) continue;
+    out.push({ liman: buyukTr(limanlar[i]), tutar: t.tutar, ekipman: t.ekipman ?? ekipmanBul(navlun[i]), armator: armatorBul(hat[i] || ""), ft: freeTimeBul("ft " + (ft[i] || "")), gec: gec[i] || null });
+  }
+  return out.length ? out : null;
+}
+
+// Kendisi armator olan acenteler: armator yazmasa da teklif o hattindir
+const HAT_ACENTE = new Set(["MSC", "ONE", "Akkon", "Culines", "Evergreen", "Hapag-Lloyd", "Maersk", "CMA CGM", "Arkas"]);
+
+/** Tek mesajdan navlun olaylarini cikar. */
+export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu): NavlunOlay[] {
+  const liman0 = konudanLiman(m.konu);
+  const yeni = yeniKisim(m.govde || "");
+  const duz = yeni.replace(/\s+/g, " ");
+  const olaylar: NavlunOlay[] = [];
+  const hat = acenteAdi(m.gonderen, acenteler);
+  const ekle = (tur: NavlunOlayTuru, x: Partial<NavlunOlay> = {}) => {
+    const o: NavlunOlay = { ...bos(), liman: liman0, ...x, tur };
+    if (!o.armator && hat && HAT_ACENTE.has(hat) && !bizdenMi(m.gonderen)) o.armator = hat;
+    olaylar.push(o);
+  };
+
+  if (bizdenMi(m.gonderen)) {
+    const h = duz.match(/hedef(?:\s*(?:rakam(?:ı|i)?|fiyat(?:ı|i)?|imiz))?\s*(?:olarak)?[^\d]{0,30}?([\d][\d.,]*)\s*(?:usd|\$)?/i);
+    if (h && /hedef/i.test(duz) && makulMu(sayi(h[1]))) ekle("hedef", { tutar: sayi(h[1]), ekipman: ekipmanBul(duz) ?? "20DC" });
+    const k = duz.match(/navlun\s*(?:bedeli|rakam(?:ı|i))\s*([\d][\d.,]*)\s*(?:usd|\$)?\s*olmak üzere/i);
+    if (k && makulMu(sayi(k[1]))) ekle("kabul", { tutar: sayi(k[1]), ekipman: "20DC", armator: armatorBul(duz) });
+    return olaylar;
+  }
+
+  if (!hat) return olaylar; // liman/terminal vb. -> navlun degil
+  // Rezervasyonu alinmis is: operasyon yazismasi (fon, ekipman, dolu giris) -> navlun teklifi degil
+  if (/\bB?\d{8,}\s*\/\//.test(m.konu) || /rezervasyonunuz alınm|rez(?:ervasyon)? formu|föy(?:ler)? ektedir|booking(?:ler)? (?:hazır|ekte|girişleri)/i.test(duz)) return olaylar;
+
+  if (/servis(?:imiz)?\s*(?:mevcut değil|bulunmamakta)|kontrat(?:ımız)?\s*bulunmamakta|özel rakam(?:ımız|imiz)?\s*bulunmamakta|ozel rakamimiz bulunmamaktadir/i.test(duz)) {
+    ekle("servis_yok");
+    return olaylar;
+  }
+  if (/gemileri dolu|yer (?:yok|bulunmamakta)|no space/i.test(duz)) ekle("yer_yok");
+  if (/hedef(?:iniz)?\s*(?:var\s*m[ıi]|mevcut\s*mu|ifyat|fiyat)/i.test(duz) && !/hedefiniz uygundur/i.test(duz)) ekle("hedef_soru");
+  if (/hedef(?:iniz)?\s*uygun/i.test(duz)) { ekle("hedef_kabul"); return olaylar; }
+
+  const tablo = dikeyTablo(yeni);
+  if (tablo) {
+    for (const r of tablo) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman ?? "20DC", armator: r.armator, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: /lokaller[İI]?\s*\n?\s*DAH[İI]L/i.test(yeni) || null, pol: "AMBARLI" });
+    return olaylar;
+  }
+
+  const ft = freeTimeBul(duz), gec = gecerlilikBul(duz), pol = polBul(yeni);
+  const lokal = /lokaller(?:i)?\s*dahil|all\s*in|pol lokaller dahil/i.test(duz) ? true : (/\+\s*lokaller/i.test(duz) ? false : null);
+  const destek = /destek ol(?:abil|uyor)/i.test(duz);
+
+  // Satir bazli coklu liman: "Istanbul – Jakarta :USD340/20all in"
+  const satirlar = yeni.split("\n");
+  let satirdan = 0;
+  for (const s of satirlar) {
+    const mm = s.match(/^\s*[A-Za-zÇĞİÖŞÜçğıöşü]+\s*[–-]\s*([A-Za-zÇĞİÖŞÜçğıöşü/ ]+?)\s*:\s*(?:usd)\s*([\d][\d.,]*)/i);
+    if (mm && makulMu(sayi(mm[2]))) {
+      for (const lim of mm[1].split("/")) ekle("teklif", { liman: buyukTr(lim.trim()), tutar: sayi(mm[2]), ekipman: ekipmanBul(s) ?? "20DC", armator: armatorBul(yeni), free_time_gun: ft, lokal_dahil: /all\s*in/i.test(s) || lokal });
+      satirdan++;
+    }
+  }
+  if (satirdan) return olaylar;
+
+  const t = tutarlar(duz);
+  if (t.length) {
+    // ayni mesajda 20 ve 40 ayri fiyatlar olabilir; ekipman basina ilkini al
+    const gor = new Set<string>();
+    const pod = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-z .]{2,25}?)(?:\s+(?:FREE|VALIDITY|Hat)|\n|$)/) || [])[1];
+    for (const x of t) {
+      const ekip = x.ekipman ?? "20DC";
+      if (gor.has(ekip)) continue;
+      gor.add(ekip);
+      ekle(destek ? "karsi_teklif" : "teklif", {
+        liman: pod && !/AMBARLI|ASYAPORT|KUMPORT/i.test(pod) ? buyukTr(pod.trim()) : liman0,
+        tutar: x.tutar, ekipman: ekip, armator: armatorBul(duz, x.i), free_time_gun: ft, gecerlilik: gec, lokal_dahil: lokal, pol,
+      });
+    }
+    return olaylar;
+  }
+
+  const ekVar = (m.ekler || []).some((e) => /\.(pdf|xlsx?|docx?)$/i.test(e));
+  if (/(?:ekte(?:dir|ki)|aşağıdaki gibidir|ekli mailde)/i.test(duz) && /teklif|fiyat|navlun|price|rate/i.test(duz + " " + (ekVar ? "teklif" : ""))) ekle("ek_teklif", { free_time_gun: ft, gecerlilik: gec, armator: armatorBul(duz) });
+  return olaylar;
+}

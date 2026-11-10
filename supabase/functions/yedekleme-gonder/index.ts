@@ -123,6 +123,11 @@ const YEDEKLENECEK_TABLOLAR = [
   "diib_dosya_bolunmeleri",
   // Ic piyasa siparisler arasi tonaj devri (04.11.2026)
   "ic_is_emri_devirleri",
+  // PAZAR (UNEX Satis) CRM: firmalar, yetkililer, fuar katilimlari, ice aktarma kaydi (10.11.2026)
+  "pazar_firmalar",
+  "pazar_kisiler",
+  "pazar_fuar_katilimlari",
+  "pazar_ice_aktarimlari",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer

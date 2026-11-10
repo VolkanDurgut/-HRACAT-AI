@@ -21,6 +21,8 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   alış siparişleri, kapanış raporu.
 - `docs/claude/satin-alma.md` — departman talep formu (/talep), onay, onaylı fiş (/cek),
   katalog, tedarikçi, toplu ekleme, haftalık liste hatırlatması.
+- `docs/claude/pazar.md` — PAZAR (UNEX Satış) CRM: potansiyel / müşteri firmalar, fuar listesi
+  içe aktarma, sipariş → müşteri dönüşümü (Dalga 3).
 - `docs/claude/analiz-rapor.md` — Kontrol Merkezi (/analiz), Ana Panel özet kartları,
   günlük sevkiyat raporu ve mailleri, gece yedeği maili.
 - `docs/claude/altyapi.md` — Supabase güvenlik kararları, DB kontrolleri, log, kapasite,

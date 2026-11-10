@@ -29,6 +29,7 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/ic-piyasa": "ic_piyasa",
   "/proformalar": "proformalar",
   "/satin-alma": "satin_alma",
+  "/pazar": "pazar", // PAZAR CRM (10.11.2026)
 };
 
 // "/ayarlar" (ve alt sayfaları, örn. /ayarlar/yetkilendirme) BİLEREK yukarıdaki

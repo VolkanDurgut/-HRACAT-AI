@@ -21,6 +21,7 @@ export type SayfaYetkileri = {
   proforma_imza: boolean; // "Onayla ve Imzala" - SADECE Harun Bey (export@; 27.10.2026'ya kadar ihracat@); sayfa degil, islem yetkisi
   satin_alma: boolean; // Satin alma talepleri: departman listelerini onaylama (26.10.2026)
   ic_alis: boolean; // Ic piyasa ALIS siparisleri + tedarikciler + alis fiyatlari (30.10.2026)
+  pazar: boolean; // PAZAR (UNEX Satis) CRM: potansiyel / musteri, fuar listeleri (10.11.2026)
 };
 
 export type SekmeYetkileri = {
@@ -76,6 +77,7 @@ const VARSAYILAN_YETKILER: KullaniciYetkileri = {
     proforma_imza: false,
     satin_alma: false,
     ic_alis: false,
+    pazar: false,
   },
   sekme_yetkileri: {
     proforma: false,
@@ -151,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sayfa_yetkileri: {
             dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
             kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
-            proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false,
+            proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false,
           },
           sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
         });
@@ -163,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sayfa_yetkileri: {
           dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
           kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
-          proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false,
+          proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false,
         },
         sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
       });

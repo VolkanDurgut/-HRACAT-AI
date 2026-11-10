@@ -6,19 +6,23 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, Store } from "lucide-react";
 
 type MenuItem = {
   label: string;
   href: string;
   icon: React.ReactNode;
   yetkiKey: keyof import("@/lib/auth-context").SayfaYetkileri;
+  /** Yetkisi olmayana hic gosterilmez (soluk/kilitli hali de yok). */
+  yalnizYetkili?: boolean;
 };
 
 const mainItems: MenuItem[] = [
   // 28.10.2026: eski Kontrol Merkezi (/dashboard) kaldirildi; Analiz sayfasi "Kontrol
   // Merkezi" adiyla en uste geldi (adres ve yetki "analiz" ayni). 4 ozet karti Ana Panel'de.
   { label: "Kontrol Merkezi", href: "/analiz", icon: <LayoutDashboard size={18} />, yetkiKey: "analiz" },
+  // 10.11.2026: PAZAR (UNEX Satis CRM) - Kontrol Merkezi'nin hemen alti (kullanici karari); yalniz yetkiliye gorunur
+  { label: "Pazar", href: "/pazar", icon: <Store size={18} />, yetkiKey: "pazar", yalnizYetkili: true },
   { label: "Ana Panel",     href: "/panel",       icon: <FolderOpen size={18} />,      yetkiKey: "panel" },
   // Proforma olusturucu (17.10.2026): "Yeni Dosya Ac"in hemen ustunde (kullanici karari)
   { label: "Proforma Oluştur", href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
@@ -158,7 +162,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 px-2 pb-3 overflow-y-auto overscroll-contain" aria-label="Ana menü">
         <Bolum baslik="İhracat" />
-        <div className="space-y-0.5">{mainItems.map(renderItem)}</div>
+        <div className="space-y-0.5">{mainItems.filter((i) => !i.yalnizYetkili || yetkiler.sayfa_yetkileri[i.yetkiKey]).map(renderItem)}</div>
 
         <Bolum baslik="Operasyon" />
         <div className="space-y-0.5">{opsItems.map(renderItem)}</div>

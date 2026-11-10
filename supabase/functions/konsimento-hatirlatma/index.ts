@@ -12,7 +12,8 @@ import { khMail, KH_TEST_ALICISI, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type Kh
 //  - "elle"  : { dosya_id } kullanicinin OTURUMUYLA (kh_elle_iste yetkiyi DB'de kontrol
 //              eder) kuyruga alir ve HEMEN gonderir; sonucu doner.
 // Alicilar (secret, virgulle): KONSIMENTO_HATIRLATMA_ALICI (varsayilan operation@),
-//   KONSIMENTO_HATIRLATMA_CC (varsayilan bbt@, execution@, export@).
+//   KONSIMENTO_HATIRLATMA_CC (varsayilan bbt@, execution@, export@, export2@ - 10.11.2026).
+//  - "ayar"  : (10.11.2026) salt okunur; mod + alici + CC doner (secret degeri / dosya verisi YOK). Canli dogrulama icin.
 // MOD: KONSIMENTO_HATIRLATMA_CANLI = "evet" degilse mail SADECE test adresine
 //   (KONSIMENTO_HATIRLATMA_TEST_ALICISI, varsayilan mesensei282@) "[TEST]" konuyla gider.
 // ============================================================================
@@ -105,6 +106,10 @@ Deno.serve(async (req: Request) => {
       for (const is of isler || []) { const s = await gonder(is); if (s.mail === "gonderildi") gonderilen++; else hatali++; }
       // Anon cagrilabilir: sadece sayilar doner (dosya / alici bilgisi YOK)
       return json({ ok: true, gonderilen, hatali });
+    }
+    if (govde.islem === "ayar") {
+      // Salt okunur: mail atmadan canli ayari dogrulamak icin (adresler zaten uygulamada gorunur)
+      return json({ canli: CANLI, alici: ALICI, cc: CC });
     }
     if (govde.islem === "elle") {
       const yetki = req.headers.get("Authorization") || "";

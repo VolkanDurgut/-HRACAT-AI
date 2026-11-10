@@ -1226,3 +1226,17 @@ gönderimini sağlayalım." Canlı alıcılar (kullanıcı 10.11.2026): **To: op
 - PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
   aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe; ~25 KB, edge ile birlikte dağıtılır).
 - Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan operation@), `VGM_RAPOR_CC` (varsayılan bbt@, execution@, export@, export2@). Secret geçersizse varsayılan kullanılır.
+
+## Konşimento talimatı hatırlatması + VGM raporu — canlı denetim (10.11.2026)
+
+Kullanıcı: "Bütün konteynerler teslim alındığında operation@ adresine konşimento talimatı maili gidiyor mu? Bütün
+konteynerler dolduğunda VGM raporu operation@'a gönderiliyor mu? Canlıda olduğuna emin olmalıyız. CC: bbt@, execution@,
+export@, export2@."
+- Bulgu 1: konşimento hatırlatması hiç canlıya alınmamıştı (`KONSIMENTO_HATIRLATMA_CANLI` yok → yalnız test adresi; kuyrukta
+  yalnız 2 elle/test kaydı). Kullanıcı secret'ı `evet` girer.
+- Bulgu 2: `kh_tamamlanma_kontrol` ve `kh_kuyruk_al` "BL no doluysa hatırlatma yok" diyordu; Ek Bilgiler kartı BL no'yu booking
+  no ile önceden doldurduğu için mail kuyruğa hiç girmiyordu. Migration `20261110110000_konsimento_bl_kosulu.sql`: yalnız
+  talimat dosyası yüklüyse atlanır. ROLLBACK provası: eksik konteynerler eklenince satır `bekliyor/otomatik` oldu.
+- `KH_VARSAYILAN_CC` + export2@. Edge `konsimento-hatirlatma` v19: `{"islem":"ayar"}` salt okunur → `{canli, alici, cc}`
+  (mail atmadan canlı doğrulama; secret değeri dönmez).
+- VGM raporu: cron yanıtı `{ok:true,...}` (canlı; kapalıysa `canli:false` döner). Alıcı/CC test mailinin şeridinde görünür.

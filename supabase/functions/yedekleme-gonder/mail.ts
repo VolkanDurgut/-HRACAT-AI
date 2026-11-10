@@ -76,6 +76,10 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   satin_alma_listeleri: { ad: "İhtiyaç listeleri", grup: "Satın alma" },
   satin_alma_kalemleri: { ad: "Liste kalemleri", grup: "Satın alma" },
   satin_alma_urunleri: { ad: "Daha önce sipariş verilen ürünler", grup: "Satın alma" },
+  pazar_firmalar: { ad: "Potansiyel / müşteri firmalar", grup: "Pazar (CRM)" },
+  pazar_kisiler: { ad: "Firma yetkilileri", grup: "Pazar (CRM)" },
+  pazar_fuar_katilimlari: { ad: "Fuar katılımları", grup: "Pazar (CRM)" },
+  pazar_ice_aktarimlari: { ad: "Fuar listesi yüklemeleri", grup: "Pazar (CRM)" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -84,7 +88,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ai_usage_logs: { ad: "Yapay zekâ kullanım kayıtları", grup: "Kullanıcılar ve sistem" },
   denetim_kayitlari: { ad: "Denetim kayıtları (değişiklik geçmişi)", grup: "Kullanıcılar ve sistem" },
 };
-const GRUP_SIRASI = ["İhracat operasyonu", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Satın alma", "Kullanıcılar ve sistem", "Diğer"];
+const GRUP_SIRASI = ["İhracat operasyonu", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Satın alma", "Pazar (CRM)", "Kullanıcılar ve sistem", "Diğer"];
 
 /**
  * Kaydi 0 olan tablonun NEDENI (26.10.2026 canli kontrol: kod + veritabani).
@@ -105,6 +109,9 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   ic_is_emri_devirleri: { tur: "normal", metin: "Yalnız bir siparişin fazlası başka siparişe aktarılınca dolar." },
   satin_alma_listeleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
   satin_alma_kalemleri: { tur: "kullanilmadi", metin: "Satın Alma yeni (26.10.2026); departman ilk kalemi ekleyince dolar." },
+  pazar_kisiler: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
+  pazar_fuar_katilimlari: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
+  pazar_ice_aktarimlari: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
 };
 const BOS_ROZET: Record<"normal" | "kullanilmiyor" | "kullanilmadi" | "bilinmiyor", [string, string, string]> = {
   kullanilmiyor: ["#F1F5F9", "#475569", "Kullanılmıyor"],

@@ -2,12 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Loader2, Mail, MessageCircle, PartyPopper, SkipForward, ThumbsDown, ThumbsUp, FileText, ShoppingCart } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Copy, Loader2, Mail, MessageCircle, PartyPopper, SkipForward, ThumbsDown, ThumbsUp, FileText, ShoppingCart, UserRound } from "lucide-react";
 import { YildizAlani } from "@/components/kilavuz/yildiz-alani";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { gorevBilgisi, gorevIsle, type GorevBilgisi, type GorevIslemi, type GorevNeden } from "@/lib/pazar/gorev-api";
-import { CC_ADRESLERI, mailtoAdresi, sablonlar, whatsappAdresi } from "@/lib/pazar/sablonlar";
+import { CC_ADRESLERI, mailtoAdresi, sablonlar, whatsappAdresi, whatsappPaylasAdresi } from "@/lib/pazar/sablonlar";
 import { ACCENT, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -17,6 +17,8 @@ import { ACCENT, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
  * Akis: kisi + sablon sec -> duzenle -> "Outlook'ta ac" (mailto, CC bbt@ + execution@) -> "Gonderdim" (kayit) ->
  * basari. Sonuc dugmeleri: Cevap verdi / Teklif istedi / Siparis verdi / Ilgilenmiyor / Bugun atla.
  * Kurallar (sonraki adim tarihleri) veritabaninda: pazar_gorev_isle (migration 20261110060000).
+ * 10.11.2026: gorev kisiye atanir (Harun Bey export@ / Safak Bey export2@ -> pazar_ekip); "Ben" secimi kalkti,
+ * isleyen sunucuda gorevin sahibi. WhatsApp: numara yoksa da acilir (kisi WhatsApp'ta secilir) + "Metni kopyala".
  */
 
 const NEDEN: Record<GorevNeden, { etiket: string; renk: string }> = {
@@ -32,8 +34,6 @@ const ADIMLAR: { kod: GorevBilgisi["adim"]; ad: string }[] = [
 ];
 const SONUC_ADI: Record<string, string> = { cevap: "Cevap verdi", teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor" };
 const ADIM_ADI: Record<string, string> = { sorgulama: "Sipariş sorgulama", hatirlatma1: "Hatırlatma 1", hatirlatma2: "Hatırlatma 2", sonuc: "Sonuç", atla: "Atlandı" };
-const ISLEYEN_ANAHTARI = "pazar-gorev-isleyen";
-const ISLEYENLER = ["export@", "export2@"];
 
 const tarihTR = (t: string | null) => (t ? new Date(t).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : "");
 const ulkeYaz = (u: string | null) => (u ? u.toLocaleLowerCase("tr-TR").split(/(\s+|-)/).map((p) => (p ? p.charAt(0).toLocaleUpperCase("tr-TR") + p.slice(1) : p)).join("") : "");
@@ -60,9 +60,7 @@ export default function GorevSayfasi() {
   const [wpMetin, setWpMetin] = useState("");
   const [bekleyen, setBekleyen] = useState<Bekleyen>(null);
   const [bitti, setBitti] = useState<Bitti>(null);
-  const [isleyen, setIsleyen] = useState<string>("");
-
-  useEffect(() => { try { setIsleyen(localStorage.getItem(ISLEYEN_ANAHTARI) || ""); } catch { /* yok */ } }, []);
+  const [kopyalandi, setKopyalandi] = useState(false);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true);
@@ -79,6 +77,7 @@ export default function GorevSayfasi() {
     return sablonlar(bilgi.adim, {
       ad: kisi?.ad || null, firma: bilgi.firma.ad, musteri: bilgi.firma.durum === "musteri",
       sonSiparis: bilgi.firma.son_siparis, sonUrun: bilgi.son_urun, fuar: bilgi.fuarlar[0] || null,
+      gonderen: bilgi.ekip?.eposta || null,
     });
   }, [bilgi, kisiId]);
 
@@ -104,22 +103,27 @@ export default function GorevSayfasi() {
   const kisi = bilgi?.kisiler.find((k) => k.id === kisiId) || null;
   const eposta = kisi?.eposta && kisi.eposta_gecerli ? kisi.eposta : null;
   const wpNumara = kisi ? kisi.whatsapp || kisi.telefonlar[0] || null : null;
-  const wpAdres = wpNumara ? whatsappAdresi(wpNumara, wpMetin) : null;
+  const wpNumaraliAdres = wpNumara ? whatsappAdresi(wpNumara, wpMetin) : null;
+  // Numara yoksa da WhatsApp acilir; mesaj hazir gelir, kisi WhatsApp'ta secilir
+  const wpAdres = wpNumaraliAdres || whatsappPaylasAdresi(wpMetin);
+
+  async function metniKopyala() {
+    try {
+      await navigator.clipboard.writeText(wpMetin);
+      setKopyalandi(true);
+      setTimeout(() => setKopyalandi(false), 2000);
+    } catch { setHata("Metin kopyalanamadı; WhatsApp mesajını düzenle alanından elle kopyalayabilirsiniz."); }
+  }
 
   async function isle(is: GorevIslemi, ek: Parameters<typeof gorevIsle>[2] = {}, sonra?: Bitti) {
     setIsleniyor(true);
-    const c = await gorevIsle(String(token), is, { ...ek, isleyen: isleyen || undefined });
+    const c = await gorevIsle(String(token), is, ek);
     setIsleniyor(false);
     if (!c.ok) { setHata(c.hata); return; }
     setHata(null);
     setBilgi(c.veri);
     setBekleyen(null);
     if (sonra) setBitti(sonra);
-  }
-
-  function isleyenSec(v: string) {
-    setIsleyen(v);
-    try { localStorage.setItem(ISLEYEN_ANAHTARI, v); } catch { /* yok */ }
   }
 
   const sonrakiAdimMetni = () => {
@@ -219,14 +223,14 @@ export default function GorevSayfasi() {
               )}
             </section>
 
-            {/* Kim isliyor */}
-            <section className={`${kart} px-5 py-3 flex flex-wrap items-center gap-2`} style={kartStil}>
-              <span className="text-xs" style={{ color: TEXT_MUTED }}>Ben:</span>
-              {ISLEYENLER.map((x) => (
-                <button key={x} type="button" onClick={() => isleyenSec(x)} className="h-7 px-3 rounded-md text-xs border" data-isleyen={x}
-                  style={isleyen === x ? { backgroundColor: "rgba(16,185,129,0.16)", borderColor: "rgba(16,185,129,0.5)", color: "#fff" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>{x}</button>
-              ))}
-            </section>
+            {/* Gorevin sahibi */}
+            {bilgi.ekip && (
+              <section className={`${kart} px-5 py-3 flex flex-wrap items-center gap-2 text-sm`} style={kartStil} data-testid="gorev-sahibi">
+                <UserRound size={15} style={{ color: ACCENT }} />
+                <span>{bilgi.ekip.hitap || "Görevli"}</span>
+                <span className="text-xs" style={{ color: TEXT_MUTED }}>· mailler {bilgi.ekip.eposta} adresinden gider</span>
+              </section>
+            )}
 
             {/* Kisi */}
             <section className={`${kart} p-5`} style={kartStil}>
@@ -273,19 +277,22 @@ export default function GorevSayfasi() {
                   className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: eposta ? ACCENT : "#374151", cursor: eposta ? "pointer" : "not-allowed" }} data-testid="outlook-ac">
                   <Mail size={16} /> Outlook&apos;ta aç
                 </a>
-                {wpAdres && (
-                  <a href={wpAdres} target="_blank" rel="noopener noreferrer" onClick={() => setBekleyen({ kanal: "whatsapp", alici: `+${(wpNumara || "").replace(/\D/g, "")}` })}
-                    className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold border" style={{ borderColor: "rgba(37,211,102,0.5)", color: "#86EFAC" }} data-testid="whatsapp-ac">
-                    <MessageCircle size={16} /> WhatsApp&apos;ta aç
-                  </a>
-                )}
+                <a href={wpAdres} target="_blank" rel="noopener noreferrer"
+                  onClick={() => setBekleyen({ kanal: "whatsapp", alici: wpNumaraliAdres ? `+${(wpNumara || "").replace(/\D/g, "")}` : "WhatsApp (kişi seçildi)" })}
+                  className="inline-flex items-center gap-2 h-11 px-5 rounded-xl text-sm font-semibold border" style={{ borderColor: "rgba(37,211,102,0.5)", color: "#86EFAC" }} data-testid="whatsapp-ac" data-numarali={wpNumaraliAdres ? "evet" : "hayir"}>
+                  <MessageCircle size={16} /> {wpNumaraliAdres ? "WhatsApp'ta gönder" : "WhatsApp'ta gönder (kişi seç)"}
+                </a>
+                <button type="button" onClick={metniKopyala} className="inline-flex items-center gap-2 h-11 px-4 rounded-xl text-sm border" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }} data-testid="wp-kopyala">
+                  {kopyalandi ? <Check size={15} /> : <Copy size={15} />} {kopyalandi ? "Kopyalandı" : "Mesajı kopyala"}
+                </button>
               </div>
-              {wpAdres && (
-                <details className="mt-3">
-                  <summary className="text-xs cursor-pointer" style={{ color: TEXT_MUTED }}>WhatsApp mesajını düzenle</summary>
-                  <textarea className={`${girdi} py-2 h-24 mt-2`} style={{ borderColor: CARD_BORDER }} value={wpMetin} onChange={(e) => setWpMetin(e.target.value)} data-testid="gorev-wp" />
-                </details>
+              {!wpNumaraliAdres && (
+                <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }} data-testid="wp-numara-yok">Bu yetkilinin telefonu kayıtlı değil: WhatsApp açılınca mesaj hazır gelir, kişiyi WhatsApp&apos;ta seçersiniz.</p>
               )}
+              <details className="mt-3">
+                <summary className="text-xs cursor-pointer" style={{ color: TEXT_MUTED }}>WhatsApp mesajını düzenle</summary>
+                <textarea className={`${girdi} py-2 h-24 mt-2`} style={{ borderColor: CARD_BORDER }} value={wpMetin} onChange={(e) => setWpMetin(e.target.value)} data-testid="gorev-wp" />
+              </details>
               {bekleyen && (
                 <div className="mt-4 rounded-xl border px-4 py-3 flex flex-wrap items-center justify-between gap-3" style={{ borderColor: "rgba(16,185,129,0.4)", backgroundColor: "rgba(16,185,129,0.08)" }} data-testid="gonderdim-kutu">
                   <span className="text-sm">{bekleyen.kanal === "eposta" ? "Maili Outlook'tan gönderdiniz mi?" : "WhatsApp mesajını gönderdiniz mi?"}</span>

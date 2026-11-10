@@ -3,17 +3,19 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // ============================================================================
 // PAZAR GUNLUK GOREV (pazar-gorev) - 10.11.2026 (Dalga 3.3 + 3.4)
 // ============================================================================
-// Kullanici: "Bugunku musteriniz" maili export@ + export2@'ye (CC bbt@ + execution@), "Basla" -> girissiz gorev
+// Kullanici: "Bugunku musteriniz" maili kisiye ozel (export@ / export2@, CC bbt@ + execution@), "Basla" -> girissiz gorev
 // sayfasi (/gorev/[token]). Once hatirlatma zamani gelenler, sonra SIPARISSIZ kendi musterilerimiz, sonra fuar
 // potansiyelleri. Surec + sira kurallari: migration 20261110060000_pazar_gorev.sql (pazar_gorev_olustur / _isle).
 // Govde:
 //  - {} (pg_cron 'pazar-gorev', anon): yalniz PAZAR_GOREV_CANLI = "evet" iken, hafta ici, TR 09:00-11:59;
-//    sirket basina gorevleri olusturur ve gunde BIR mail gonderir. Veri dondurmez.
-//  - {"test": true}: bugunun gorevlerini olusturur (gercek gorevler), "[TEST]" maili YALNIZ test adresine;
-//    gonderilmis SAYMAZ; 24 saatte en fazla 5.
+//    ekipteki her kisi icin gorevleri olusturur ve kisi basina gunde BIR mail gonderir. Veri dondurmez.
+//  - {"test": true}: bugunun gorevlerini olusturur (gercek gorevler), kisi basina "[TEST]" maili YALNIZ test
+//    adresine; gonderilmis SAYMAZ; 24 saatte en fazla 8 test maili.
 //  - {"islem": "bilgi", "token"} / {"islem": "isle", "token", "is": ..., ...}: gorev sayfasi (anon, 32 haneli token).
-// Alicilar (secret, virgulle): PAZAR_GOREV_ALICI (export@, export2@), PAZAR_GOREV_CC (bbt@, execution@),
-//   PAZAR_GOREV_TEST_ALICISI (mesensei282@). Secret yoksa koddaki varsayilan.
+// KISIYE OZEL (10.11.2026, migration 20261110070000): ekip tablosu pazar_ekip (kod, e-posta, hitap; isimler repoda
+// degil, veritabaninda). Her kisiye AYRI gorev listesi + AYRI mail ("Gunaydin <hitap>"); alici o kisinin adresi,
+// CC: PAZAR_GOREV_CC (varsayilan bbt@, execution@). Ekip bossa eski davranis: tek liste export@'a.
+// Test: PAZAR_GOREV_TEST_ALICISI (varsayilan mesensei282@); her kisi icin ayri [TEST] maili.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -31,8 +33,9 @@ function adresler(ad: string, varsayilan: string[]): string[] {
   return liste.length ? Array.from(new Set(liste)).slice(0, 8) : varsayilan;
 }
 const CANLI = (Deno.env.get("PAZAR_GOREV_CANLI") || "").trim().toLowerCase() === "evet";
-const ALICI = adresler("PAZAR_GOREV_ALICI", ["export@unex.com.tr", "export2@unex.com.tr"]);
-const CC = adresler("PAZAR_GOREV_CC", ["bbt@unex.com.tr", "execution@unex.com.tr"]).filter((a) => !ALICI.includes(a));
+const CC = adresler("PAZAR_GOREV_CC", ["bbt@unex.com.tr", "execution@unex.com.tr"]);
+type Kisi = { kod: string | null; eposta: string; hitap: string | null };
+const VARSAYILAN_KISI: Kisi = { kod: null, eposta: "export@unex.com.tr", hitap: null };
 const TEST_ALICISI = adresler("PAZAR_GOREV_TEST_ALICISI", ["mesensei282@gmail.com"]);
 
 const cors = {
@@ -112,7 +115,7 @@ function nedenAlt(g: OzetGorev): string {
   return g.son_temas ? `Son temas ${trTarih(g.son_temas)} · cevap gelmedi` : "Cevap gelmedi";
 }
 
-function mailOlustur(gorevler: OzetGorev[], test: boolean): { konu: string; html: string } {
+function mailOlustur(gorevler: OzetGorev[], kisi: Kisi, cc: string[], test: boolean): { konu: string; html: string } {
   const ana = gorevler.find((g) => g.durum === "bekliyor") || gorevler[0];
   const tarih = trTarih(trBugun());
   const konu = `${test ? "[TEST] " : ""}Bugünkü müşteriniz · ${ana.ad} · ${tarih}`;
@@ -124,7 +127,7 @@ function mailOlustur(gorevler: OzetGorev[], test: boolean): { konu: string; html
   };
   const bolumBaslik = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">${kacis(t)}</div>`;
   const testSeridi = test
-    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: <b>${kacis(ALICI.join(", "))}</b> · CC: ${kacis(CC.join(", "))}</div>`
+    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: <b>${kacis(kisi.eposta)}</b>${kisi.hitap ? ` (${kacis(kisi.hitap)})` : ""} · CC: ${kacis(cc.join(", "))}</div>`
     : "";
   const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
@@ -137,7 +140,7 @@ function mailOlustur(gorevler: OzetGorev[], test: boolean): { konu: string; html
     <td style="text-align:right;vertical-align:middle"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${kacis(tarih)}</div></td>
   </tr></table>
   ${testSeridi}
-  <p style="margin:18px 0 14px;color:#1E293B;font-size:14px;line-height:1.55">Günaydın, kolay gelsin. Bugün ilk görüşeceğiniz müşteri hazır:</p>
+  <p style="margin:18px 0 14px;color:#1E293B;font-size:14px;line-height:1.55">Günaydın${kisi.hitap ? ` ${kacis(kisi.hitap)}` : ""}, kolay gelsin. Bugün ilk görüşeceğiniz müşteri hazır:</p>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2E8F0;border-top:3px solid ${n.renk};border-radius:4px"><tr><td style="padding:14px 16px">
     <div style="font-size:10px;font-weight:bold;color:${n.renk};text-transform:uppercase;letter-spacing:.5px">${kacis(n.etiket)}</div>
     <div style="font-size:20px;font-weight:bold;color:${LACIVERT};line-height:1.3;margin-top:4px">${kacis(ana.ad)}</div>
@@ -150,7 +153,7 @@ function mailOlustur(gorevler: OzetGorev[], test: boolean): { konu: string; html
   ${digerleri.length ? `${bolumBaslik(`Bugün sırada ${digerleri.length} müşteri daha`)}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${digerleri.map(satir).join("")}</table>
   <div style="margin-top:6px;font-size:11px;color:#94A3B8">İlk müşteriyi bitirince sayfadaki "Yeni müşteriyle devam et" ile sıradakine geçebilirsiniz.</div>` : ""}
-  <div style="margin-top:18px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Mailler Outlook'tan sizin adresinizden gider; bbt@ ve execution@ bilgiye eklenir. Bağlantı 3 gün geçerlidir; giriş gerektirmez.<br>İhracat AI tarafından hafta içi her sabah otomatik gönderilir.</div>
+  <div style="margin-top:18px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Mailler Outlook'tan sizin adresinizden (${kacis(kisi.eposta)}) gider; bbt@ ve execution@ bilgiye eklenir. Bağlantı 3 gün geçerlidir; giriş gerektirmez.<br>İhracat AI tarafından hafta içi her sabah otomatik gönderilir.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
   return { konu, html };
@@ -167,33 +170,40 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
   return ((await res.json()) as { id?: string }).id || null;
 }
 
+async function ekip(sirket: string): Promise<Kisi[]> {
+  const satirlar = await oku<Kisi>(`pazar_ekip?select=kod,eposta,hitap&company_id=eq.${sirket}&aktif=is.true&order=sira.asc`);
+  const gecerli = satirlar.filter((k) => k.kod && EPOSTA.test((k.eposta || "").trim().toLowerCase()));
+  return gecerli.length ? gecerli.map((k) => ({ ...k, eposta: k.eposta.trim().toLowerCase() })) : [VARSAYILAN_KISI];
+}
+
 async function sirketler(): Promise<string[]> {
   const satirlar = await oku<{ company_id: string }>("pazar_firmalar?select=company_id&limit=1000");
   return Array.from(new Set(satirlar.map((s) => s.company_id)));
 }
 
-/** Sirketin bugunku gorevlerini olusturur ve maili gonderir. */
-async function gunluk(sirket: string, test: boolean): Promise<{ durum: string; gorev: number; hata?: string }> {
+/** Bir kisinin bugunku gorevlerini olusturur ve ona maili gonderir. */
+async function gunluk(sirket: string, kisi: Kisi, test: boolean): Promise<{ kisi: string | null; durum: string; gorev: number; hata?: string }> {
   const tarih = trBugun();
-  const o = await rpc<number>("pazar_gorev_olustur", { p_company: sirket, p_tarih: tarih, p_adet: GOREV_ADET });
+  const o = await rpc<number>("pazar_gorev_olustur", { p_company: sirket, p_tarih: tarih, p_adet: GOREV_ADET, p_atanan: kisi.kod });
   if (!o.ok) throw new Error(o.hata);
-  const ozet = await rpc<OzetGorev[]>("pazar_gorev_ozeti", { p_company: sirket, p_tarih: tarih });
+  const ozet = await rpc<OzetGorev[]>("pazar_gorev_ozeti", { p_company: sirket, p_tarih: tarih, p_atanan: kisi.kod });
   const gorevler = (ozet.veri || []).filter((g) => g.durum === "bekliyor");
   if (!gorevler.length) {
-    if (!test) await kaydet({ company_id: sirket, tarih, durum: "bos", gorev_sayisi: 0 });
-    return { durum: "bos", gorev: 0 };
+    if (!test) await kaydet({ company_id: sirket, tarih, atanan: kisi.kod, durum: "bos", gorev_sayisi: 0 });
+    return { kisi: kisi.kod, durum: "bos", gorev: 0 };
   }
-  const { konu, html } = mailOlustur(gorevler, test);
-  const to = test ? TEST_ALICISI : ALICI;
-  const cc = test ? [] : CC;
+  const ccGercek = CC.filter((a) => a !== kisi.eposta);
+  const { konu, html } = mailOlustur(gorevler, kisi, ccGercek, test);
+  const to = test ? TEST_ALICISI : [kisi.eposta];
+  const cc = test ? [] : ccGercek;
   try {
     const id = await mailGonder(to, cc, konu, html);
-    await kaydet({ company_id: sirket, tarih, durum: test ? "test" : "gonderildi", alicilar: [...to, ...cc], gorev_sayisi: gorevler.length, mesaj_id: id });
-    return { durum: test ? "test" : "gonderildi", gorev: gorevler.length };
+    await kaydet({ company_id: sirket, tarih, atanan: kisi.kod, durum: test ? "test" : "gonderildi", alicilar: [...to, ...cc], gorev_sayisi: gorevler.length, mesaj_id: id });
+    return { kisi: kisi.kod, durum: test ? "test" : "gonderildi", gorev: gorevler.length };
   } catch (e) {
     const hata = e instanceof Error ? e.message : String(e);
-    await kaydet({ company_id: sirket, tarih, durum: "hata", alicilar: [...to, ...cc], gorev_sayisi: gorevler.length, hata });
-    return { durum: "hata", gorev: gorevler.length, hata };
+    await kaydet({ company_id: sirket, tarih, atanan: kisi.kod, durum: "hata", alicilar: [...to, ...cc], gorev_sayisi: gorevler.length, hata });
+    return { kisi: kisi.kod, durum: "hata", gorev: gorevler.length, hata };
   }
 }
 
@@ -233,10 +243,10 @@ Deno.serve(async (req: Request) => {
     if (govde.test === true) {
       const gun = new Date(Date.now() - 24 * 3600_000).toISOString();
       const sayilan = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&durum=eq.test&olusturma=gte.${gun}`);
-      if (sayilan.length >= 5) return json({ error: "Test sınırı (24 saatte 5) doldu." }, 429);
+      if (sayilan.length >= 8) return json({ error: "Test sınırı (24 saatte 8 mail) doldu." }, 429);
       const sonuc = [];
-      for (const s of await sirketler()) sonuc.push(await gunluk(s, true));
-      return json({ test: true, sonuc: sonuc.map((x) => ({ durum: x.durum, gorev: x.gorev, ...(x.hata ? { hata: x.hata } : {}) })) });
+      for (const s of await sirketler()) for (const k of await ekip(s)) sonuc.push(await gunluk(s, k, true));
+      return json({ test: true, sonuc: sonuc.map((x) => ({ kisi: x.kisi, durum: x.durum, gorev: x.gorev, ...(x.hata ? { hata: x.hata } : {}) })) });
     }
 
     // ---- Zamanlanmis: yalniz canli, hafta ici, TR 09:00-11:59, gunde bir mail ----
@@ -248,11 +258,14 @@ Deno.serve(async (req: Request) => {
     const tarih = trBugun();
     let gonderilen = 0;
     for (const s of await sirketler()) {
-      const onceki = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&company_id=eq.${s}&tarih=eq.${tarih}&durum=in.(gonderildi,bos)`);
-      if (onceki.length) continue;
-      const hatalar = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&company_id=eq.${s}&tarih=eq.${tarih}&durum=eq.hata`);
-      if (hatalar.length >= 3) continue;
-      if ((await gunluk(s, false)).durum === "gonderildi") gonderilen++;
+      for (const k of await ekip(s)) {
+        const kim = k.kod ? `atanan=eq.${encodeURIComponent(k.kod)}` : "atanan=is.null";
+        const onceki = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&company_id=eq.${s}&tarih=eq.${tarih}&${kim}&durum=in.(gonderildi,bos)`);
+        if (onceki.length) continue;
+        const hatalar = await oku<{ id: string }>(`pazar_gorev_gonderimleri?select=id&company_id=eq.${s}&tarih=eq.${tarih}&${kim}&durum=eq.hata`);
+        if (hatalar.length >= 3) continue;
+        if ((await gunluk(s, k, false)).durum === "gonderildi") gonderilen++;
+      }
     }
     return json({ ok: true, gonderilen });
   } catch (e) {

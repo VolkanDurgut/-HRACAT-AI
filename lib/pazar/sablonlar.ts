@@ -4,6 +4,8 @@
  * WhatsApp ilk mesaji da olsun. Uslup export@ (Harun Bey) maillerinden." -> "Dear X," acilisi, kisa, sicak,
  * "valuable" ve net bir istek (miktar + varis limani). Gonderilmeden once gorev sayfasinda duzenlenebilir.
  * Mailler musteriye INGILIZCE; ekran Turkce.
+ * 10.11.2026: imzadaki adres gorevin atandigi satiscinin adresi (export@ / export2@); WhatsApp numarasi
+ * yoksa wa.me kisi secme baglantisi (whatsappPaylasAdresi).
  */
 
 export type GorevAdimi = "sorgulama" | "hatirlatma1" | "hatirlatma2";
@@ -18,11 +20,13 @@ export type SablonBaglami = {
   sonUrun: string | null;
   /** Fuar etiketi (potansiyelde). */
   fuar: string | null;
+  /** Imzadaki adres (gorevin atandigi satisci); yoksa export@. */
+  gonderen?: string | null;
 };
 export type Sablon = { kod: string; baslik: string; konu: string; govde: string; whatsapp: string };
 
 export const CC_ADRESLERI = ["bbt@unex.com.tr", "execution@unex.com.tr"];
-const IMZA = "Kind regards,\n\nExport Department\nUNEX Gıda\nexport@unex.com.tr";
+const imza = (eposta?: string | null) => `Kind regards,\n\nExport Department\nUNEX Gıda\n${eposta || "export@unex.com.tr"}`;
 
 const ayYil = (iso: string | null) => {
   if (!iso) return "";
@@ -57,6 +61,7 @@ export function sablonlar(adim: GorevAdimi, b: SablonBaglami): Sablon[] {
   const hitap = `Dear ${hitapAdi(b.ad)},`;
   const urun = urunIfadesi(b.sonUrun);
   const son = ayYil(b.sonSiparis);
+  const IMZA = imza(b.gonderen);
 
   if (adim === "hatirlatma1") {
     return [{
@@ -133,6 +138,11 @@ export function sablonlar(adim: GorevAdimi, b: SablonBaglami): Sablon[] {
 export function mailtoAdresi(alici: string, konu: string, govde: string): string {
   const q = [`cc=${encodeURIComponent(CC_ADRESLERI.join(","))}`, `subject=${encodeURIComponent(konu)}`, `body=${encodeURIComponent(govde.replace(/\n/g, "\r\n"))}`];
   return `mailto:${encodeURIComponent(alici).replace(/%40/g, "@")}?${q.join("&")}`;
+}
+
+/** Numara yokken: WhatsApp acilir, mesaj hazir, kisi WhatsApp'ta secilir. */
+export function whatsappPaylasAdresi(metin: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(metin)}`;
 }
 
 /** WhatsApp (wa.me) baglantisi; numara ulke koduyla, yalniz rakam. */

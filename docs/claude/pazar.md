@@ -112,7 +112,29 @@ Uygulama:
 Canlıya alma (kullanıcı test mailini ve görev sayfasını onaylayınca): pg_cron `pazar-gorev` (hafta içi sabah, 30 dk'da
 bir; edge günde bir gönderir) + secret `PAZAR_GOREV_CANLI=evet`.
 
+## 3.3b Kişiye özel görev + WhatsApp kolaylığı (10.11.2026)
+
+Kullanıcı: "Bugünkü müşteriniz maili export@'a (CC bbt@ + execution@), Harun Bey'e hitaben; export2@ için farklı
+müşterilerle aynı sistem, Şafak Bey'e hitaben." Migration `20261110070000_pazar_ekip.sql`:
+- `pazar_ekip` (kod, e-posta, hitap, sıra, aktif): görev alan satışçılar. İsimler repoda DEĞİL, veritabanında (SQL ile
+  eklendi). `pazar` yetkisine salt okunur.
+- `pazar_gorevler.atanan` (ekip kodu): her kişinin AYRI listesi; aynı firma aynı gün iki kişiye verilmez.
+  `pazar_gorev_olustur(…, p_atanan)`, `pazar_gorev_ozeti(…, p_atanan)`; `pazar_gorev_bilgi` görev sahibini (`ekip`)
+  döner ve "Yeni müşteriyle devam et" yalnız o kişinin listesinde gezer; `pazar_gorev_isle` işleyeni sahibinden yazar.
+- `pazar_gorev_gonderimleri.atanan`: günde kişi başına bir mail.
+- Edge `pazar-gorev` v2: ekipteki her kişiye ayrı mail ("Günaydın <hitap>"), alıcı kişinin adresi, CC bbt@ + execution@.
+  `PAZAR_GOREV_ALICI` artık kullanılmıyor. Test: kişi başına ayrı [TEST] maili (24 saatte en fazla 8).
+- Görev sayfası: "Ben" seçimi kalktı (görevin sahibi görünür); şablon imzasında sahibin adresi; WhatsApp numara
+  yoksa da açılır (`wa.me/?text=`; kişi WhatsApp'ta seçilir) + "Mesajı kopyala".
+- Kendi müşterilerimizde telefon yok: sevkiyat dosyalarında telefon alanı bulunmuyor (24 müşteriden 2'si fuar
+  listesinden telefonlu). Kaynak: arşiv mail imzaları (kullanıcı onayıyla toplanacak) ya da firma kartından elle.
+- Test: `e2e_gorev.mjs` 38 kontrol (görev sahibi, imza adresi, numarasız WhatsApp, kopyala).
+- Bekleyen: `pazar_ekip` yedek listesine 3.5 ile birlikte eklenecek (yedekleme-gonder bir sonraki dağıtımda).
+
 ## Sıradaki adımlar
 
-3.5 arşivden cevap tespiti (Gönderdim / cevap otomatik) · 3.6 Burak Bey ekranı (yalnız Volkan Bey ve Burak Bey) ·
-export@ / export2@ görev paylaşımı (şu an ikisi aynı maili alır; sayfa "işlendi (export2@)" gösterir).
+3.5 cevap tespiti: arşiv (unex.execution.arsiv@) yalnız execution@'ın alıcı / CC olduğu mailleri alıyor; görev
+mailleri execution@'ı CC'ye eklediği için "tümünü yanıtla" cevapları arşive düşer. Plan: arşiv hesabında Google Apps
+Script (10 dk'da bir) → edge'e gelen mailin göndereni / konusu / ilk satırları → yetkili e-postası ya da alan adıyla
+firma eşleşir → "Cevap geldi" otomatik kaydedilir, hatırlatma durur; otomatik yanıt (izin / out of office) hatırlatmayı
+durdurmaz; "ilgilenmiyor / teklif / sipariş" sınıflaması önerilir · 3.6 Burak Bey ekranı.

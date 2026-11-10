@@ -4,7 +4,9 @@
  */
 export type GorevNeden = "hatirlatma1" | "hatirlatma2" | "siparissiz" | "potansiyel";
 export type GorevBilgisi = {
-  gorev: { tarih: string; sira: number; neden: GorevNeden; durum: "bekliyor" | "yapildi" | "atlandi"; isleyen: string | null; tamamlanma: string | null };
+  gorev: { tarih: string; sira: number; neden: GorevNeden; durum: "bekliyor" | "yapildi" | "atlandi"; isleyen: string | null; tamamlanma: string | null; atanan?: string | null };
+  /** Gorevin atandigi satisci (pazar_ekip); eski gorevlerde null. */
+  ekip?: { kod: string; eposta: string; hitap: string | null } | null;
   adim: "sorgulama" | "hatirlatma1" | "hatirlatma2";
   firma: { ad: string; ulke: string | null; durum: "musteri" | "potansiyel"; crm_asama: string; alici_adi: string | null; son_siparis: string | null; aktif: boolean };
   kisiler: { id: string; ad: string | null; eposta: string | null; eposta_gecerli: boolean; telefonlar: string[]; whatsapp: string | null }[];

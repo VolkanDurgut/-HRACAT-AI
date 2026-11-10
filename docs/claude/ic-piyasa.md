@@ -723,3 +723,11 @@
   araç varsa müşteriye "Siparişiniz tamamlandı" mesajının Bildirimler'e hazırlanacağını yazar
   (`kapatmaAciklamasi`; tetikleyici değişmedi, müşteri mesajı araç toplamıyla — 04.11 kararı).
   Kapatma her zaman ELLE (otomatik kapatma yok). e2e `e2e_tamamla.mjs` (IC_TEST) 17/17.
+
+## Lojistik talebiyle açılan satış iş emirleri (10.11.2026)
+
+- Lojistik (WhatsApp ile gelen iki kepek satışı) için 2 satış iş emri kullanıcı onayıyla SQL ile açıldı (ekran akışıyla
+  aynı alanlar: müşteri kartı, ürün, miktar, fiyat, vade, teslim şekli, nakliye, termin, talimat veren, açan
+  execution@). Ürün özellikleri bir önceki aynı ürünlü iş emrinden kopyalandı (kontrol notu düşüldü).
+- "Sipariş alındı" müşteri bildirimleri `bekliyor` bırakıldı (tasarım gereği elle gönderilir).
+

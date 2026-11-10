@@ -349,6 +349,7 @@ function PazarIcerik() {
               firma={acik}
               kisiler={kisiHarita.get(acik.id) || []}
               katilimlar={katilimHarita.get(acik.id) || []}
+              temaslar={(veri.temaslar || []).filter((t) => t.firma_id === acik.id).sort((a, b) => b.olusturma.localeCompare(a.olusturma))}
               durum={durumlar.get(acik.id) || null}
               tumFirmalar={firmalar}
               ulkeler={tumUlkeler}

@@ -7,7 +7,7 @@ import { Building2, ExternalLink, GitMerge, Loader2, Mail, MessageCircle, Pencil
 import { useToast } from "@/lib/toast-context";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
-import { pazarFirmaBirlestir, pazarFirmaGuncelle, pazarKisiKaydet, ulkeGosterim, type PazarFirma, type PazarKatilim, type PazarKisi } from "@/lib/pazar/veri";
+import { pazarFirmaBirlestir, pazarFirmaGuncelle, pazarKisiKaydet, ulkeGosterim, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarTemas } from "@/lib/pazar/veri";
 import type { MusteriDurumu } from "@/lib/pazar/musteri";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
@@ -31,14 +31,22 @@ function Bolum({ baslik, children, sag }: { baslik: string; children: React.Reac
   );
 }
 
+const ASAMA: Record<PazarFirma["crm_asama"], string> = {
+  yeni: "Henüz görüşülmedi", sorgulandi: "Sipariş sorgulandı · cevap bekleniyor", hatirlatma1: "1. hatırlatma gönderildi",
+  hatirlatma2: "Son hatırlatma gönderildi", sessiz: "Cevap gelmedi · beklemede", cevap: "Cevap verdi", teklif: "Teklif istedi",
+  siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor",
+};
+const TEMAS_ADI: Record<string, string> = { sorgulama: "Sipariş sorgulama", hatirlatma1: "Hatırlatma 1", hatirlatma2: "Hatırlatma 2", atla: "Atlandı", cevap: "Cevap verdi", teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor" };
+
 type KisiForm = { kisiId: string | null; ad: string; eposta: string; telefon: string; whatsapp: string };
 
 export function FirmaKarti({
-  firma, kisiler, katilimlar, durum, tumFirmalar, ulkeler, onKapat, onDegisti,
+  firma, kisiler, katilimlar, temaslar, durum, tumFirmalar, ulkeler, onKapat, onDegisti,
 }: {
   firma: PazarFirma;
   kisiler: PazarKisi[];
   katilimlar: PazarKatilim[];
+  temaslar: PazarTemas[];
   durum: MusteriDurumu | null;
   tumFirmalar: PazarFirma[];
   ulkeler: string[];
@@ -166,6 +174,21 @@ export function FirmaKarti({
               </div>
             </Bolum>
           )}
+
+          <Bolum baslik="Görüşme">
+            <div className="text-sm" data-testid="kart-gorusme">
+              <p style={{ color: firma.crm_asama === "yeni" ? TEXT_MUTED : "#fff" }} data-kart-asama>{ASAMA[firma.crm_asama] || firma.crm_asama}</p>
+              {firma.sonraki_adim && <p className="text-xs mt-0.5" style={{ color: "#FCD34D" }}>Sonraki hatırlatma: {tarihTR(firma.sonraki_adim)}</p>}
+              {firma.bekleme_bitis && !firma.sonraki_adim && <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Yeniden sıraya girer: {tarihTR(firma.bekleme_bitis)}</p>}
+              {temaslar.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs" style={{ color: "#C9D1DC" }}>
+                  {temaslar.slice(0, 10).map((t) => (
+                    <li key={t.id}>{tarihTR(t.olusturma)} · {TEMAS_ADI[t.sonuc || t.adim] || t.adim}{t.kanal ? ` · ${t.kanal === "eposta" ? "e-posta" : "WhatsApp"}` : ""}{t.alici ? ` · ${t.alici}` : ""}{t.isleyen ? ` · ${t.isleyen}` : ""}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Bolum>
 
           <Bolum
             baslik={`Yetkililer (${kisiler.length})`}

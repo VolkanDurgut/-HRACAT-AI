@@ -70,11 +70,49 @@ Migration `20261110050000_pazar_musteri_karti.sql`:
   `components/pazar/firma-karti.tsx` (sağdan panel): sipariş durumu + geçmişi, yetkililer, fuarlar, ülke / not,
   birleştir. Arama Türkçe "I/ı" sorununa karşı `toLocaleLowerCase("tr-TR").replace(/ı/g, "i")`.
 - Arşivden (unex.execution.arsiv@) 20 müşteriye 38 yetkili e-postası eklendi (10.11.2026, kullanıcı onayıyla; emin
-  olunmayan 3 adres eklenmedi). E-postası olmayan: Boulangerie Farid, Riviera Biscuit, Mohamed Ilmi Koumane, Ste Ayra.
+  olunmayan 3 adres eklenmedi). E-postası olmayan 4 müşteri kartı doğru adres bulununca elle tamamlanacak.
 - Test: `e2e_pazar.mjs` (PAZAR_TEST=1; 60 kontrol: aktif/siparişsiz, kalan FCL, kart, yetkili, birleştir, ek anahtar).
+
+## 3.3 + 3.4 Günlük "Bugünkü müşteriniz" + görüşme süreci (10.11.2026)
+
+Migration `20261110060000_pazar_gorev.sql`:
+- `pazar_firmalar`: `crm_asama` (yeni → sorgulandi → hatirlatma1 → hatirlatma2 → sessiz; sonuç: cevap / teklif /
+  siparis / ilgilenmiyor), `sonraki_adim` (hatırlatma günü), `bekleme_bitis` (yeniden sıraya girme), `son_temas`.
+- `pazar_temaslar` (görüşme kaydı; `pazar` yetkisine salt okunur, denetimli), `pazar_gorevler` (günlük görev +
+  32 haneli token; istemciye HİÇ açık değil), `pazar_gorev_gonderimleri` (günde bir mail kaydı).
+- `pazar_gorev_olustur(şirket, tarih, 6)`: önce süresi dolan hatırlatma 2 → Sessiz (müşteri 30, potansiyel 60 gün);
+  sıra: (1) hatırlatma günü gelenler, (2) SİPARİŞSİZ müşterilerimiz (son siparişi en eski önce; e-posta ya da telefon
+  şart; açık siparişi olan seçilmez), (3) fuar potansiyelleri (son fuar yılı, geçerli e-posta, telefon, müşterimiz
+  olan ülke). Son 3 günde işlenmemiş görevi olan firma tekrar verilmez. Aynı gün tekrar çağrı = aynı görevler.
+- `pazar_gorev_isle(token, işlem, …)`: "Gönderdim" → sorgulama (+4 iş günü hatırlatma 1) → hatırlatma 1 (+6 iş günü
+  hatırlatma 2) → hatırlatma 2 (+10 gün sonra Sessiz). Aynı görevde ikinci gönderim (e-posta + WhatsApp) aşamayı
+  ilerletmez. Cevap verdi / Teklif istedi / Sipariş verdi → 30 gün bekler; İlgilenmiyor → 180 gün; Bugün atla → 7 gün
+  (hatırlatmadaysa 2 iş günü ertelenir). `pazar_gorev_bilgi` (görev sayfası verisi; bağlantı 3 gün geçerli),
+  `pazar_gorev_ozeti` (mail). Hepsi anon / authenticated'a KAPALI; yalnız edge `pazar-gorev` (service_role).
+
+Edge `pazar-gorev` (verify_jwt açık; anon anahtarla çağrılır):
+- `{}` = pg_cron: yalnız `PAZAR_GOREV_CANLI=evet` iken, hafta içi, TR 09:00–11:59, şirket başına günde BİR mail.
+- `{"test":true}` = bugünün görevlerini oluşturur, "[TEST]" maili YALNIZ test adresine (24 saatte en fazla 5).
+- `{"islem":"bilgi"|"isle","token",…}` = görev sayfası.
+- Alıcı secret'ları: `PAZAR_GOREV_ALICI` (varsayılan export@ + export2@), `PAZAR_GOREV_CC` (bbt@ + execution@),
+  `PAZAR_GOREV_TEST_ALICISI`. Mail: açık İhracat AI teması, "Bugünkü müşteriniz" kartı + yeşil **Başla** + sıradakiler.
+
+Uygulama:
+- `app/gorev/[token]` (girişsiz, noindex; AppShell yok): evren arka planı, adım göstergesi, "Ben: export@ / export2@"
+  seçimi (tarayıcıda hatırlanır), yetkili seçimi, şablon sekmeleri (konu / gövde düzenlenebilir), **Outlook'ta aç**
+  (mailto; CC bbt@ + execution@) → "Gönderdim" onayı, WhatsApp, sonuç düğmeleri, geçmiş, "Yeni müşteriyle devam et".
+- `lib/pazar/sablonlar.ts` (saf): müşteri sorgulama M1–M3, potansiyel P1–P3, hatırlatma H1–H2; imza Export Department.
+- `lib/pazar/gorev-api.ts`: edge çağrısı. Firma kartında "Görüşme" bölümü (aşama, sonraki hatırlatma, temaslar).
+- Yedek: üç tablo `yedekleme-gonder` listesinde ("Pazar (CRM)" grubu).
+- `yedekleme-gonder` geri yükleme testi PARÇALI çalışır (bağ kontrollü tablolar tek parçada, diğerleri tablo tablo):
+  fuar aktarımı + 7 günlük denetim kaydıyla tek RPC 8 sn sınırına takılıyordu (10.11 deneme: 48/48 birebir).
+- Test: `e2e_gorev.mjs` (PAZAR_TEST=1; 34 kontrol). Canlı test 10.11.2026: 6 görev (hepsi siparişsiz müşteri),
+  [TEST] maili yalnız test adresine.
+
+Canlıya alma (kullanıcı test mailini ve görev sayfasını onaylayınca): pg_cron `pazar-gorev` (hafta içi sabah, 30 dk'da
+bir; edge günde bir gönderir) + secret `PAZAR_GOREV_CANLI=evet`.
 
 ## Sıradaki adımlar
 
-3.3 "Bugünkü müşteriniz" maili (yalnız export@, CC bbt@ + execution@;
-test sensei) + Başla ekranı · 3.4 üç insan sesli şablon + WhatsApp ilk mesaj (Outlook ile) · 3.5 arşivden
-cevap tespiti · 3.6 Burak Bey ekranı (yalnız Volkan Bey ve Burak Bey).
+3.5 arşivden cevap tespiti (Gönderdim / cevap otomatik) · 3.6 Burak Bey ekranı (yalnız Volkan Bey ve Burak Bey) ·
+export@ / export2@ görev paylaşımı (şu an ikisi aynı maili alır; sayfa "işlendi (export2@)" gösterir).

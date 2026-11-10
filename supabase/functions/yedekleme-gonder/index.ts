@@ -41,6 +41,7 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //    tablolara gercekten yuklenir; satirlar canliyla md5 karsilastirilir ve
 //    tablolar arasi baglar kontrol edilir. Sonuc mailde yazar; sorun varsa
 //    konu "[UYARI]". Canliya hicbir sey yazilmaz.
+//    10.11.2026: PARCALI calisir (geriYuklemeTestiParcali); tek seferde 8 sn sinirina takiliyordu.
 //  - MAIL GORUNUMU (26.10.2026): gunluk raporla ayni kurumsal tasarim, tablolar
 //    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
 //    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
@@ -128,6 +129,10 @@ const YEDEKLENECEK_TABLOLAR = [
   "pazar_kisiler",
   "pazar_fuar_katilimlari",
   "pazar_ice_aktarimlari",
+  // PAZAR gorusmeleri, gunluk gorevler (token dahil), gunluk mail kaydi (10.11.2026, Dalga 3.3/3.4)
+  "pazar_temaslar",
+  "pazar_gorevler",
+  "pazar_gorev_gonderimleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer
@@ -319,6 +324,37 @@ type GeriYuklemeSonucu = {
   tablolar: { tablo: string; durum: string; satir?: number; farkli?: number; canlida_yok?: number; hata?: string }[];
 };
 
+/** Geri yukleme testi PARCALI (10.11.2026): tek RPC'de tum paket (Pazar fuar aktarimi + 7 gunluk
+ * denetim kayitlari ile ~10 MB) PostgREST'in 8 sn statement_timeout sinirina takiliyordu.
+ * Bag kontrolu yapilan tablolar (yedek_geri_yukleme_testi icindeki bag listesi) AYNI parcada,
+ * diger her tablo kendi parcasinda test edilir; sonuclar birlestirilir. Bir parca hata verirse
+ * o parcanin tablolari YUKLENEMEDI sayilir (test durmaz). Fonksiyonun kendisi degismedi. */
+const BAG_TABLOLARI = ["ihracat_dosyalari", "rezervasyonlar", "konteynerler", "dosya_evraklari", "acente_teklifleri", "acenteler", "ana_siparisler", "kullanici_rolleri", "companies"];
+async function geriYuklemeTestiParcali(yedek: Record<string, unknown>): Promise<GeriYuklemeSonucu> {
+  const tablolar = Object.keys(yedek).filter((t) => !t.startsWith("_"));
+  const bagParcasi = tablolar.filter((t) => BAG_TABLOLARI.includes(t));
+  const parcalar = [bagParcasi, ...tablolar.filter((t) => !BAG_TABLOLARI.includes(t)).map((t) => [t])].filter((p) => p.length);
+  const toplam: GeriYuklemeSonucu = { tablo_sayisi: 0, yuklenemeyen: 0, birebir: 0, bag_sorunlari: [], tablolar: [] };
+  for (const parca of parcalar) {
+    const altPaket: Record<string, unknown> = {};
+    for (const t of parca) altPaket[t] = yedek[t];
+    try {
+      const s = (await rpc("yedek_geri_yukleme_testi", { paket: altPaket })) as GeriYuklemeSonucu;
+      toplam.tablo_sayisi += s.tablo_sayisi;
+      toplam.yuklenemeyen += s.yuklenemeyen;
+      toplam.birebir += s.birebir;
+      toplam.bag_sorunlari.push(...s.bag_sorunlari);
+      toplam.tablolar.push(...s.tablolar);
+    } catch (e) {
+      const hata = e instanceof Error ? e.message : String(e);
+      for (const t of parca) toplam.tablolar.push({ tablo: t, durum: "YUKLENEMEDI", hata });
+      toplam.tablo_sayisi += parca.length;
+      toplam.yuklenemeyen += parca.length;
+    }
+  }
+  return toplam;
+}
+
 type KapasiteSatiri = { kaynak: string; bayt: number | null; kota: number; oran: number | null };
 
 function kapasiteDurumu(oran: number | null): "normal" | "uyari" | "kritik" | "olculemedi" {
@@ -475,7 +511,7 @@ Deno.serve(async (req: Request) => {
     // ---- Geri yukleme testi: paket GERCEKTEN yuklenebiliyor mu? ----
     let geriYukleme: GeriYuklemeSonucu | null = null;
     try {
-      geriYukleme = (await rpc("yedek_geri_yukleme_testi", { paket })) as GeriYuklemeSonucu;
+      geriYukleme = await geriYuklemeTestiParcali(yedek);
       if (geriYukleme.yuklenemeyen > 0) {
         const adlar = geriYukleme.tablolar.filter((t) => t.durum === "YUKLENEMEDI").map((t) => `${t.tablo} (${t.hata})`);
         uyarilar.push(`Geri yükleme testi: ${geriYukleme.yuklenemeyen} tablo yüklenemedi: ${adlar.join("; ")}`);

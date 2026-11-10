@@ -80,6 +80,9 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   pazar_kisiler: { ad: "Firma yetkilileri", grup: "Pazar (CRM)" },
   pazar_fuar_katilimlari: { ad: "Fuar katılımları", grup: "Pazar (CRM)" },
   pazar_ice_aktarimlari: { ad: "Fuar listesi yüklemeleri", grup: "Pazar (CRM)" },
+  pazar_temaslar: { ad: "Görüşmeler (sorgulama / hatırlatma)", grup: "Pazar (CRM)" },
+  pazar_gorevler: { ad: "Günlük müşteri görevleri", grup: "Pazar (CRM)" },
+  pazar_gorev_gonderimleri: { ad: "Günlük görev maili kaydı", grup: "Pazar (CRM)" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -112,6 +115,9 @@ export const BOS_ACIKLAMA: Record<string, { tur: "normal" | "kullanilmiyor" | "k
   pazar_kisiler: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
   pazar_fuar_katilimlari: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
   pazar_ice_aktarimlari: { tur: "kullanilmadi", metin: "Pazar yeni (10.11.2026); fuar listesi yüklenince dolar." },
+  pazar_temaslar: { tur: "kullanilmadi", metin: "Görüşme süreci yeni (10.11.2026); görev sayfasında ilk mail \"Gönderdim\" ile kaydedilince dolar." },
+  pazar_gorevler: { tur: "kullanilmadi", metin: "Günlük görevler yeni (10.11.2026); ilk günlük mail ile dolar." },
+  pazar_gorev_gonderimleri: { tur: "kullanilmadi", metin: "Günlük görev maili yeni (10.11.2026); ilk gönderimle dolar." },
 };
 const BOS_ROZET: Record<"normal" | "kullanilmiyor" | "kullanilmadi" | "bilinmiyor", [string, string, string]> = {
   kullanilmiyor: ["#F1F5F9", "#475569", "Kullanılmıyor"],

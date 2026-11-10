@@ -21,6 +21,22 @@ export type PazarFirma = {
   /** Birlestirilmis (farkli yazilmis) adlarin anahtarlari (3.2). */
   ek_anahtarlar: string[];
   notlar: string | null;
+  /** 3.4 gorusme sureci (pazar_gorev_isle). */
+  crm_asama: "yeni" | "sorgulandi" | "hatirlatma1" | "hatirlatma2" | "sessiz" | "cevap" | "teklif" | "siparis" | "ilgilenmiyor";
+  sonraki_adim: string | null;
+  bekleme_bitis: string | null;
+  son_temas: string | null;
+};
+export type PazarTemas = {
+  id: string;
+  firma_id: string;
+  adim: "sorgulama" | "hatirlatma1" | "hatirlatma2" | "sonuc" | "atla";
+  kanal: "eposta" | "whatsapp" | null;
+  sonuc: "cevap" | "teklif" | "siparis" | "ilgilenmiyor" | null;
+  alici: string | null;
+  konu: string | null;
+  isleyen: string | null;
+  olusturma: string;
 };
 export type PazarKisi = {
   id: string;
@@ -32,7 +48,7 @@ export type PazarKisi = {
   whatsapp: string | null;
 };
 export type PazarKatilim = { id: string; firma_id: string; fuar: string; yil: number | null; donem: string | null; etiket: string };
-export type PazarVerisi = { firmalar: PazarFirma[]; kisiler: PazarKisi[]; katilimlar: PazarKatilim[] };
+export type PazarVerisi = { firmalar: PazarFirma[]; kisiler: PazarKisi[]; katilimlar: PazarKatilim[]; temaslar: PazarTemas[] };
 
 const SAYFA = 1000;
 
@@ -50,12 +66,13 @@ async function hepsi<T>(tablo: string, kolonlar: string): Promise<T[]> {
 }
 
 export async function pazarVerisiOku(): Promise<PazarVerisi> {
-  const [firmalar, kisiler, katilimlar] = await Promise.all([
-    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,alici_adi,musteri_olma_tarihi,created_at,ek_anahtarlar,notlar"),
+  const [firmalar, kisiler, katilimlar, temaslar] = await Promise.all([
+    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,alici_adi,musteri_olma_tarihi,created_at,ek_anahtarlar,notlar,crm_asama,sonraki_adim,bekleme_bitis,son_temas"),
     hepsi<PazarKisi>("pazar_kisiler", "id,firma_id,ad,eposta,eposta_gecerli,telefonlar,whatsapp"),
     hepsi<PazarKatilim>("pazar_fuar_katilimlari", "id,firma_id,fuar,yil,donem,etiket"),
+    hepsi<PazarTemas>("pazar_temaslar", "id,firma_id,adim,kanal,sonuc,alici,konu,isleyen,olusturma"),
   ]);
-  return { firmalar, kisiler, katilimlar };
+  return { firmalar, kisiler, katilimlar, temaslar };
 }
 
 /** Firma adlari -> sunucudaki birlestirme anahtarlari (pazar_anahtar; ayni sira). */

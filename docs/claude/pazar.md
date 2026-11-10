@@ -160,6 +160,16 @@ Migration `20261110080000_pazar_gelen.sql`:
 - Yedek: `pazar_ekip`, `pazar_gelenler` yedekleme listesinde (yedekleme-gonder v43).
 - Test: `e2e_gorev.mjs` 43 kontrol (sıradaki kilidi, atla yok, gelen cevap + öneri, WhatsApp gönderdim).
 
+## 3.5b Canlı kurulum ve öneri düzeltmesi (10.11.2026)
+
+- Kullanıcı `PAZAR_GELEN_ANAHTAR` secret'ını girdi, Apps Script'i arşiv hesabına kurdu (proje "Pazar Gelen Cevap",
+  tetikleyici `tara` 10 dk). İlk çalışma (son 2 gün): 3 müşteri cevabı kaydedildi (üçü de yetkili e-postasıyla birebir
+  eşleşme; süreç dışı yazışma → 14 gün sorgulama seçilmez), 43 eşleşmeyen mail kaydedilmedi.
+- Öneri kuralı `pazar_gelen_oneri(konu, özet)` fonksiyonuna taşındı (migration `20261110090000_pazar_gelen_oneri.sql`):
+  "confirmed / signed / approved PI, proforma, contract" ve "order ref" → sipariş (önceden "teklif" çıkıyordu); konu da
+  değerlendirilir; mevcut kayıtların önerisi yeniden hesaplandı.
+- export@ / export2@ yönlendirmesi şimdilik açılmadı (kullanıcı: görev mailleri execution@'ı CC'ler); bir–iki hafta izlenecek.
+
 ## Sıradaki adımlar
 
 Canlıya alma (kullanıcı onayı): pg_cron `pazar-gorev` + `PAZAR_GOREV_CANLI=evet`; `PAZAR_GELEN_ANAHTAR` + Apps Script

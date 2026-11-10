@@ -21,5 +21,21 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
   (navlun ile lokal masrafı yer değiştirmiş görünen 3 açık dosya TAŞINMADI; kullanıcıya soruldu).
 - DERS: aynı tabloyu tek sorgunun iki CTE'sinde güncelleme → ikinci güncelleme sessizce atlanır; ayrı sorgu.
   Çok ifadeli çağrıda bir ifade hata verirse hepsi geri alınır.
-- Sıradaki: navlun formu (girişsiz, öneri = hattın son fiyatı), `/siparisler` sayfası + Excel'e aktar,
-  17:00 Sipariş Raporu (execution@, bbt@, export@, export2@; fiyat görünür), yedeğe yeni tablolar, Kontrol Merkezi 12 ay.
+- Sıradaki: `/siparisler` sayfası + Excel'e aktar, 17:00 Sipariş Raporu (execution@, bbt@, export@, export2@; fiyat
+  görünür), yedeğe yeni tablolar, Kontrol Merkezi 12 ay.
+
+## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
+
+- Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı
+  itirazıyla AYNI GÜN kaldırıldı: "Formu birisi doldurmayacak, form maillerden güncellenecek. Bizim doldurabileceğimiz
+  bir alan olmamalı; sistem yalnız hatayla karşılaşınca müdahale edebileceğimiz bir alan olmalı." → migration
+  `20261110140000_navlun_formu_kaldir.sql` (tablo + 4 fonksiyon drop); edge `navlun-formu` 410 "kullanım dışı" (panelden
+  silinebilir). Formdan HİÇ veri yazılmadı. Sayfa / istemci kodu hiç yayına çıkmadı. GERİ EKLENMEZ.
+- Kalan veri düzeltmesi (kullanıcı onayı): IHR-2026-0113 / 0114 / 0115'te navlun ile lokal masraf yer değiştirmişti →
+  takas edildi (faturası / talimatı olmayan dosyalar; CI navlunu buradan okur), plana da yansıdı.
+- Kullanıcının asıl istediği: "Hangi şirketin nereye ne kadar navlun verdiği; sürekli kendini güncel tutan bir navlun
+  bildirimi." Kaynak: operation@'ın acentelere sorduğu "UNEX // <LİMAN> // NAVLUN TALEBİ HK." yazışmaları (execution@
+  CC → arşiv Gmail). Teklif biçimleri: kısa metin ("Usd 875/20dc · Cma"), yapılandırılmış metin (MSC POL/POD/VALIDITY,
+  Horoz, K+N), PDF ek (Link, K+N). Hedef fiyat yazışması ("Hedef mevcut mudur?") ve kabul ("Navlun rakamı 1800 Usd
+  olmak üzere … rezervasyon talebimiz") da okunacak. Arşiv 26.10.2026'dan beri dolu; öncesi için execution@ kutusundan
+  Gmail'e tek seferlik içe aktarma (Apps Script `tara` eski tarihli mailleri işlemez: `after:` + mail tarihi kontrolü).

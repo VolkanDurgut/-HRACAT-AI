@@ -324,8 +324,8 @@ begin
   end loop;
 end $$;
 
--- 7) Sayfa yetkisi: super adminler (Volkan Bey, Burak Bey) + satis (Harun Bey export@, export2@).
---    Digerleri Ayarlar > Yetkilendirme'den.
+-- 7) Sayfa yetkisi: YALNIZ execution@ (Volkan Bey) ve bbt@ (Burak Bey) - kullanici karari 10.11.2026.
+--    export@ / export2@ sayfaya girmez; onlara gunluk "Bugunku musteriniz" (wizard) maili gider (3.3).
 update public.kullanici_yetkileri
    set sayfa_yetkileri = coalesce(sayfa_yetkileri, '{}'::jsonb) || '{"pazar": true}'::jsonb
- where lower(email) in ('execution@unex.com.tr', 'bbt@unex.com.tr', 'export@unex.com.tr', 'export2@unex.com.tr');
+ where lower(email) in ('execution@unex.com.tr', 'bbt@unex.com.tr');

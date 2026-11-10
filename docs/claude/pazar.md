@@ -6,7 +6,8 @@ uygulanmış olanı anlatır.
 ## Kullanıcı kararları (10.11.2026)
 
 - Menüde **Kontrol Merkezi'nin hemen altında**, "UNEX Satış" personel satış paneli. Yetki: `pazar`
-  (yalnız yetkiliye görünür; soluk/kilitli hali yok). İlk yetkililer: execution@, bbt@, export@, export2@.
+  (yalnız yetkiliye görünür; soluk/kilitli hali yok). Yetki YALNIZ execution@ ve bbt@ (kullanıcı 10.11.2026);
+  export@ / export2@ sayfaya girmez, onlara "Bugünkü müşteriniz" wizard maili gider (3.3).
 - "POTANSİYEL MÜŞTERİLERİ AYRI TUTMALISIN. ONLARIN DA SİPARİŞLERİNE GÖRE CRM OLMALI."
   → `pazar_firmalar.durum` = `potansiyel` | `musteri`. Sipariş (ihracat dosyası / ana sipariş) açılan alıcı
   otomatik `musteri`; sipariş verisi KOPYALANMAZ, `alici_adi` ile okunur.

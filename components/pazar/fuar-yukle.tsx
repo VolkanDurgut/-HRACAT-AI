@@ -61,7 +61,13 @@ export function FuarYukle({ mevcutFirmalar, onKapat, onAktarildi }: {
   const [onizleme, setOnizleme] = useState<Onizleme | null>(null);
   const [sonuc, setSonuc] = useState<AktarmaSonucu | null>(null);
 
-  const mevcut = useMemo(() => new Map(mevcutFirmalar.map((f) => [f.anahtar, f])), [mevcutFirmalar]);
+  // Ana anahtar + birlestirilmis adlarin anahtarlari (sunucudaki pazar_firma_bul ile ayni)
+  const mevcut = useMemo(() => {
+    const m = new Map<string, PazarFirma>();
+    for (const f of mevcutFirmalar) for (const a of [f.anahtar, ...(f.ek_anahtarlar || [])]) if (a && !m.has(a)) m.set(a, f);
+    for (const f of mevcutFirmalar) m.set(f.anahtar, f);
+    return m;
+  }, [mevcutFirmalar]);
 
   async function dosyaSecildi(dosya: File | undefined) {
     if (!dosya) return;

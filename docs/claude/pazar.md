@@ -48,8 +48,33 @@ Uygulama:
 - Test: `e2e_pazar.mjs` (PAZAR_TEST=1; kurgusal `pazar/test_fuar.xlsx`), `pazar/test_fuar.mts` (birim; gerçek
   dosya yalnız yerelde).
 
+## 3.2 Müşterilerimiz kartı + firma kartı (10.11.2026)
+
+Kullanıcı: "Bizim kendi müşterilerimiz farklı bir kartta olmalı; yanında şu an siparişleri var mı yok mu
+görebilmeliyiz. Mevcut siparişi yoksa export adresine ilk bunlardan başlamalıyız."
+"Proforma kesilen firmayı müşteri sayayım mı?" → **"Hayır, rezervasyon girildikten sonra müşteri sayabilirsin."**
+
+Migration `20261110050000_pazar_musteri_karti.sql`:
+- Müşteriye dönüşüm artık **rezervasyon** ile: `trg_pazar_rezervasyon` (rezervasyonlar insert / dosya_id) ve
+  `trg_pazar_dosya_alici` (rezervasyonlu dosyada alıcı adı değişirse). Dosya / ana sipariş açılması tek başına
+  müşteri yapmaz (eski `trg_pazar_dosya`, `trg_pazar_ana_siparis`, `pazar_siparis_tetik` kaldırıldı).
+- `pazar_firmalar.ek_anahtarlar`: birleştirilmiş (farklı yazılmış) adlar. `pazar_firma_bul()` ana + ek anahtarla
+  arar; fuar aktarma ve müşteri işaretleme bunu kullanır (birleştirilen ad bir daha ayrı kayıt olmaz).
+- RPC (hepsi `pazar` yetkisi): `pazar_musteri_siparisleri()` (müşterilerin dosya / rezervasyon / açık dosya
+  konteynerleri (DBA var/yok) / tamamlanmamış ana siparişleri; salt okunur), `pazar_firma_guncelle` (ülke, not),
+  `pazar_kisi_kaydet` (yetkili ekle / düzelt; silme yok), `pazar_firma_birlestir` (kaynak → hedef, kaynak silinir).
+- Uygulama: `lib/pazar/musteri.ts` (saf) → **Aktif** = rezervasyonlu açık dosya ya da sevk edilmemiş miktarı olan
+  ana sipariş (`lib/siparis-takip` ile aynı hesap); **Siparişsiz** = müşteri ama şu an siparişi yok (en uzun süredir
+  siparişsiz önce; 3.3 günlük mailin ilk adayları). Ülke kartta yoksa varış limanı / alıcı adresi (Kontrol Merkezi kuralı).
+- `app/pazar/page.tsx`: üstte "Müşterilerimiz" (Siparişsiz / Aktif / Tümü), altta "Potansiyel müşteriler".
+  `components/pazar/firma-karti.tsx` (sağdan panel): sipariş durumu + geçmişi, yetkililer, fuarlar, ülke / not,
+  birleştir. Arama Türkçe "I/ı" sorununa karşı `toLocaleLowerCase("tr-TR").replace(/ı/g, "i")`.
+- Arşivden (unex.execution.arsiv@) 20 müşteriye 38 yetkili e-postası eklendi (10.11.2026, kullanıcı onayıyla; emin
+  olunmayan 3 adres eklenmedi). E-postası olmayan: Boulangerie Farid, Riviera Biscuit, Mohamed Ilmi Koumane, Ste Ayra.
+- Test: `e2e_pazar.mjs` (PAZAR_TEST=1; 60 kontrol: aktif/siparişsiz, kalan FCL, kart, yetkili, birleştir, ek anahtar).
+
 ## Sıradaki adımlar
 
-3.2 müşteri kartı + sipariş geçmişi · 3.3 "Bugünkü müşteriniz" maili (yalnız export@, CC bbt@ + execution@;
+3.3 "Bugünkü müşteriniz" maili (yalnız export@, CC bbt@ + execution@;
 test sensei) + Başla ekranı · 3.4 üç insan sesli şablon + WhatsApp ilk mesaj (Outlook ile) · 3.5 arşivden
 cevap tespiti · 3.6 Burak Bey ekranı (yalnız Volkan Bey ve Burak Bey).

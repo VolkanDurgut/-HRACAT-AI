@@ -18,6 +18,9 @@ export type PazarFirma = {
   alici_adi: string | null;
   musteri_olma_tarihi: string | null;
   created_at: string;
+  /** Birlestirilmis (farkli yazilmis) adlarin anahtarlari (3.2). */
+  ek_anahtarlar: string[];
+  notlar: string | null;
 };
 export type PazarKisi = {
   id: string;
@@ -48,7 +51,7 @@ async function hepsi<T>(tablo: string, kolonlar: string): Promise<T[]> {
 
 export async function pazarVerisiOku(): Promise<PazarVerisi> {
   const [firmalar, kisiler, katilimlar] = await Promise.all([
-    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,alici_adi,musteri_olma_tarihi,created_at"),
+    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,alici_adi,musteri_olma_tarihi,created_at,ek_anahtarlar,notlar"),
     hepsi<PazarKisi>("pazar_kisiler", "id,firma_id,ad,eposta,eposta_gecerli,telefonlar,whatsapp"),
     hepsi<PazarKatilim>("pazar_fuar_katilimlari", "id,firma_id,fuar,yil,donem,etiket"),
   ]);
@@ -96,4 +99,64 @@ export async function fuarListesiAktar(dosyaAdi: string, firmalar: FuarFirma[]):
 export function ulkeGosterim(ulke: string | null | undefined): string {
   if (!ulke) return "";
   return ulke.toLocaleLowerCase("tr-TR").split(/(\s+|-)/).map((p) => (p ? p.charAt(0).toLocaleUpperCase("tr-TR") + p.slice(1) : p)).join("");
+}
+
+// ---------------------------------------------------------------------------
+// 3.2 Musterilerimiz karti + firma karti (10.11.2026)
+// ---------------------------------------------------------------------------
+
+export type MusteriDosyasi = {
+  id: string;
+  anahtar: string;
+  dosya_no: string | null;
+  durum: string | null;
+  olusturma_tarihi: string | null;
+  varis_limani: string | null;
+  alici_adresi: string | null;
+  ana_siparis_id: string | null;
+  urun_detaylari: unknown;
+  toplam_konteyner: number | null;
+  proforma_no: string | null;
+};
+export type MusteriAnaSiparisi = {
+  id: string;
+  anahtar: string;
+  proforma_no: string | null;
+  urun_tanimi: string | null;
+  toplam_mts: number | null;
+  urun_detaylari_master: unknown;
+  tamamlandi: boolean | null;
+  olusturma_tarihi: string | null;
+};
+export type MusteriSiparisVerisi = {
+  dosyalar: MusteriDosyasi[];
+  rezervasyonlar: { dosya_id: string; konteyner_adedi: number | null }[];
+  konteynerler: { dosya_id: string; dba_dosya_url: string | null }[];
+  ana_siparisler: MusteriAnaSiparisi[];
+};
+
+/** Musteri firmalarinin dosya / rezervasyon / acik siparis verisi (salt okunur RPC; kopyalanmaz). */
+export async function pazarMusteriSiparisleri(): Promise<MusteriSiparisVerisi> {
+  const { data, error } = await supabase.rpc("pazar_musteri_siparisleri");
+  if (error) throw new Error(error.message);
+  const v = (data || {}) as Partial<MusteriSiparisVerisi>;
+  return { dosyalar: v.dosyalar || [], rezervasyonlar: v.rezervasyonlar || [], konteynerler: v.konteynerler || [], ana_siparisler: v.ana_siparisler || [] };
+}
+
+export async function pazarFirmaGuncelle(firmaId: string, ulke: string | null, notlar: string | null): Promise<void> {
+  const { error } = await supabase.rpc("pazar_firma_guncelle", { p_firma: firmaId, p_ulke: ulke, p_notlar: notlar });
+  if (error) throw new Error(error.message);
+}
+
+export async function pazarKisiKaydet(g: { firmaId: string; kisiId: string | null; ad: string; eposta: string; telefon: string; whatsapp: string }): Promise<void> {
+  const { error } = await supabase.rpc("pazar_kisi_kaydet", {
+    p_firma: g.firmaId, p_kisi: g.kisiId, p_ad: g.ad, p_eposta: g.eposta, p_telefon: g.telefon, p_whatsapp: g.whatsapp,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Ayni firmanin farkli yazilmis iki kaydini birlestirir (kaynak silinir, hedefe tasinir). */
+export async function pazarFirmaBirlestir(kaynakId: string, hedefId: string): Promise<void> {
+  const { error } = await supabase.rpc("pazar_firma_birlestir", { p_kaynak: kaynakId, p_hedef: hedefId });
+  if (error) throw new Error(error.message);
 }

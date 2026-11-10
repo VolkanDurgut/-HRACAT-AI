@@ -170,7 +170,26 @@ Migration `20261110080000_pazar_gelen.sql`:
   değerlendirilir; mevcut kayıtların önerisi yeniden hesaplandı.
 - export@ / export2@ yönlendirmesi şimdilik açılmadı (kullanıcı: görev mailleri execution@'ı CC'ler); bir–iki hafta izlenecek.
 
+## 3.6 Takip ekranı + nedenli atlama + canlıya alma (10.11.2026)
+
+Kullanıcı: "Her ihtimale karşı müşteriyi atla butonu olmalı; neden kısa yazılmalı, yazılanlar hafızaya alınıp bir sonraki
+atlamada seçenek olarak gösterilmeli." + "Pazar sayfası çok dağınık; tutarlı, düzenli, kolay okunabilir olmalı. Burak Bey
+önündeki ekranda gerekli takibi yapabilmeli." + "Canlıya alalım."
+- Migration `20261110100000_pazar_atla_takip.sql`: `pazar_gorev_isle('atla')` neden ZORUNLU (≥3 karakter →
+  `pazar_temaslar.konu`, 120); `pazar_gorev_bilgi.temas_var` atlamayı da sayar; `atlama_nedenleri` (şirketin en sık /
+  en yeni 8 nedeni); `pazar_takip(gün)` (Takip sekmesi; token'sız; yalnız `pazar` yetkisi).
+- Görev sayfası: "Müşteriyi atla" → neden paneli (önceki nedenler çip, serbest metin, ≥3 karakter) → başarı ekranında
+  neden + "Yeni müşteriyle devam et". Geçmişte atlama nedeni görünür.
+- Pazar sayfası üç sekme: **Takip** (varsayılan; `components/pazar/takip.tsx`: Bugün — kişi başına görevler, durum
+  [mail / WhatsApp / sonuç / atlandı + neden], ilerleme, son 7 gün; Gelen cevaplar — son 14 gün + öneri; Süreçteki
+  firmalar — aşama, son temas + işleyen, sonraki adım [gecikti kırmızı / bugün sarı]) | Müşterilerimiz (aşama etiketi) |
+  Potansiyel. Üst kartlar: bugün işlenen, süreçteki firma, gelen cevap (14 gün), siparişsiz müşteri.
+- Canlı: 10.11 test görevleri (12, dokunulmamış) temizlendi; pg_cron `pazar-gorev` `*/30 6-8 * * 1-5` (UTC = TR
+  09:00–11:30; edge kişi başına günde bir mail). Gönderim `PAZAR_GOREV_CANLI=evet` secret'ına bağlı (kullanıcı girer).
+  11.11 prova (ROLLBACK): Harun Bey 6 siparişsiz; Şafak Bey 4 siparişsiz + 2 potansiyel; yazışan 3 müşteri dışarıda.
+- Test: `e2e_gorev.mjs` 50 (atla paneli, seçenek, zorunlu neden), `e2e_pazar.mjs` 80 (sekmeler, Takip bölümleri).
+
 ## Sıradaki adımlar
 
-Canlıya alma (kullanıcı onayı): pg_cron `pazar-gorev` + `PAZAR_GOREV_CANLI=evet`; `PAZAR_GELEN_ANAHTAR` + Apps Script
-kurulumu; export@ / export2@ yönlendirmesi · 3.6 Burak Bey ekranı.
+İlk canlı sabahın kontrolü (11.11): gönderim kaydı, görevler, işlemeler · export@ / export2@ yönlendirmesi gerekirse ·
+Dalga 4 Yönetim Paneli · Dalga 5 Transit.

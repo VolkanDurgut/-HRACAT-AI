@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, Mail, MessageCircle, PackageCheck, RefreshCw, Search, Store, Upload, Users } from "lucide-react";
+import { Activity, AlertTriangle, Building2, CalendarClock, Inbox, Mail, MessageCircle, RefreshCw, Search, Store, Upload, Users } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -9,10 +9,11 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { FuarYukle } from "@/components/pazar/fuar-yukle";
 import { FirmaKarti } from "@/components/pazar/firma-karti";
+import { PazarTakip } from "@/components/pazar/takip";
 import { useAuth } from "@/lib/auth-context";
 import {
-  pazarMusteriSiparisleri, pazarVerisiOku, ulkeGosterim,
-  type MusteriSiparisVerisi, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarVerisi,
+  pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
+  type MusteriSiparisVerisi, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarVerisi, type TakipVerisi,
 } from "@/lib/pazar/veri";
 import { musteriDurumu, type MusteriDurumu } from "@/lib/pazar/musteri";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
@@ -26,9 +27,18 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  *  - Satira tiklayinca firma karti (components/pazar/firma-karti.tsx).
  * Musteri = rezervasyonu girilmis dosyasi olan alici (migration 20261110050000).
  * Yetki: "pazar" (yalniz execution@ ve bbt@). Veri: lib/pazar/veri.ts (okuma; yazma RPC).
+ * 10.11.2026 (kullanici: "cok daginik; tutarli, duzenli, kolay okunabilir olmali; Burak Bey onundeki ekranda takibi
+ * yapabilmeli"): uc sekme -> Takip (varsayilan; components/pazar/takip.tsx) | Musterilerimiz | Potansiyel.
+ * Ust ozet kartlari surec odakli: bugun islenen, surecteki firma, gelen cevap (14 gun), siparissiz musteri.
  */
 
 type MusteriFiltre = "siparissiz" | "aktif" | "hepsi";
+type Sekme = "takip" | "musteriler" | "potansiyel";
+const SUREC_ASAMA = new Set(["sorgulandi", "hatirlatma1", "hatirlatma2", "cevap", "teklif", "siparis"]);
+const ASAMA_KISA: Record<string, string> = {
+  sorgulandi: "Sorgulandı", hatirlatma1: "1. hatırlatma", hatirlatma2: "2. hatırlatma", sessiz: "Sessiz",
+  cevap: "Cevap geldi", teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor",
+};
 const SAYFA_BOYU = 50;
 
 function Rozet({ tur }: { tur: "aktif" | "siparissiz" | "potansiyel" }) {
@@ -85,14 +95,22 @@ function PazarIcerik() {
   const [ulke, setUlke] = useState("");
   const [goster, setGoster] = useState(SAYFA_BOYU);
   const [acikFirma, setAcikFirma] = useState<string | null>(null);
+  const [sekme, setSekme] = useState<Sekme>("takip");
+  const [takip, setTakip] = useState<TakipVerisi | null>(null);
+  const [takipHata, setTakipHata] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true);
     setHata(null);
     try {
-      const [v, s] = await Promise.all([pazarVerisiOku(), pazarMusteriSiparisleri()]);
+      const [v, s, t] = await Promise.all([
+        pazarVerisiOku(), pazarMusteriSiparisleri(),
+        // Takip okunamazsa sayfanin geri kalani calismaya devam eder
+        pazarTakipOku().then((x) => { setTakipHata(null); return x; }).catch((e: unknown) => { setTakipHata(e instanceof Error ? e.message : "Takip okunamadı."); return null; }),
+      ]);
       setVeri(v);
       setSiparis(s);
+      setTakip(t);
     } catch (e) {
       setHata(e instanceof Error ? e.message : "Veri okunamadı.");
     } finally {
@@ -165,6 +183,11 @@ function PazarIcerik() {
   }, [potansiyeller, ulke, arama, kisiHarita]);
 
   const acik = acikFirma ? firmalar.find((f) => f.id === acikFirma) || null : null;
+  const bugunGorevleri = takip ? takip.gorevler.filter((g) => g.tarih === takip.bugun) : [];
+  const bugunToplam = bugunGorevleri.length;
+  const bugunIslenen = bugunGorevleri.filter((g) => g.durum !== "bekliyor").length;
+  const surecSay = firmalar.filter((f) => SUREC_ASAMA.has(f.crm_asama)).length;
+  const cevapSay = takip ? takip.gelenler.filter((g) => g.tur === "cevap" && Date.parse(g.tarih) >= Date.now() - 14 * 86400000).length : 0;
 
   if (!yetkili) return null;
 
@@ -199,16 +222,31 @@ function PazarIcerik() {
         <SayfaYukleniyor />
       ) : veri ? (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <OzetKarti testId="ozet-aktif" ikon={<PackageCheck size={14} />} etiket="Aktif müşteri" deger={aktifSay} alt="Şu an siparişi var" />
-            <OzetKarti testId="ozet-siparissiz" ikon={<Building2 size={14} />} etiket="Siparişsiz müşteri" deger={siparissizSay} alt="İlk aranacaklar" />
-            <OzetKarti testId="ozet-potansiyel" ikon={<Users size={14} />} etiket="Potansiyel müşteri" deger={potansiyeller.length} alt={`${tumUlkeler.length} ülke`} />
-            <OzetKarti testId="ozet-kisi" ikon={<Mail size={14} />} etiket="Yetkili kişi" deger={veri.kisiler.length}
-              alt={`${musteriler.filter((f) => !(kisiHarita.get(f.id) || []).some((k) => k.eposta && k.eposta_gecerli)).length} müşteride e-posta yok`} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <OzetKarti testId="ozet-bugun" ikon={<CalendarClock size={14} />} etiket="Bugün işlenen" deger={takip ? `${bugunIslenen}/${bugunToplam}` : "—"} alt="günlük görevler" />
+            <OzetKarti testId="ozet-surec" ikon={<Activity size={14} />} etiket="Süreçteki firma" deger={surecSay} alt="sorgulama · hatırlatma · cevap" />
+            <OzetKarti testId="ozet-cevap" ikon={<Inbox size={14} />} etiket="Gelen cevap" deger={takip ? cevapSay : "—"} alt="son 14 gün" />
+            <OzetKarti testId="ozet-siparissiz" ikon={<Building2 size={14} />} etiket="Siparişsiz müşteri" deger={siparissizSay} alt={`${aktifSay} aktif · ${musteriler.length} müşteri`} />
           </div>
 
+          <div className="flex w-full sm:w-auto sm:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5 mb-4" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="pazar-sekmeler">
+            {([["takip", "Takip", <Activity key="i" size={14} />], ["musteriler", `Müşterilerimiz (${musteriler.length})`, <Building2 key="i" size={14} />], ["potansiyel", `Potansiyel (${potansiyeller.length})`, <Users key="i" size={14} />]] as [Sekme, string, React.ReactNode][]).map(([k, etiket, ikon]) => (
+              <button key={k} type="button" role="tab" aria-selected={sekme === k} onClick={() => setSekme(k)} data-sekme={k}
+                className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 sm:px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+                style={sekme === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
+                {ikon} {etiket}
+              </button>
+            ))}
+          </div>
+
+          {sekme === "takip" && (takip ? (
+            <PazarTakip takip={takip} firmalar={firmalar} temaslar={veri.temaslar || []} onFirma={setAcikFirma} />
+          ) : (
+            <div className="rounded-xl border p-4 text-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: "#FCA5A5" }} data-testid="takip-hata">{takipHata || "Takip bilgisi okunamadı."}</div>
+          ))}
+
           {/* ---- Musterilerimiz ---- */}
-          <section className="rounded-xl border mb-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="musterilerimiz">
+          {sekme === "musteriler" && <section className="rounded-xl border mb-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="musterilerimiz">
             <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-b" style={{ borderColor: CARD_BORDER }}>
               <div className="flex items-center gap-2">
                 <Building2 size={16} style={{ color: ACCENT }} />
@@ -245,7 +283,10 @@ function PazarIcerik() {
                         <tr key={f.id} className="border-t align-top cursor-pointer hover:bg-white/[0.02]" style={{ borderColor: CARD_BORDER }} data-musteri={f.ad} onClick={() => setAcikFirma(f.id)}>
                           <td className="px-3 py-2">
                             <button type="button" className="text-left text-white font-medium leading-snug hover:underline" onClick={(e) => { e.stopPropagation(); setAcikFirma(f.id); }}>{f.ad}</button>
-                            <div className="mt-1"><Rozet tur={d?.aktif ? "aktif" : "siparissiz"} /></div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Rozet tur={d?.aktif ? "aktif" : "siparissiz"} />
+                              {f.crm_asama !== "yeni" && <span className="text-[11px]" style={{ color: SUREC_ASAMA.has(f.crm_asama) ? "#93C5FD" : TEXT_MUTED }} data-asama={f.crm_asama}>{ASAMA_KISA[f.crm_asama]}</span>}
+                            </div>
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap hidden sm:table-cell"><UlkeHucresi ulke={f.ulke || d?.ulke || null} kaynak={f.ulke ? f.ulke_kaynagi : "siparis"} /></td>
                           <td className="px-3 py-2 text-xs min-w-[200px]" data-siparis-hucre>
@@ -268,10 +309,10 @@ function PazarIcerik() {
                 </table>
               </div>
             )}
-          </section>
+          </section>}
 
           {/* ---- Potansiyel musteriler (fuar) ---- */}
-          <section className="rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="potansiyeller">
+          {sekme === "potansiyel" && <section className="rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="potansiyeller">
             <div className="flex flex-wrap items-center gap-2 p-3 border-b" style={{ borderColor: CARD_BORDER }}>
               <div className="flex items-center gap-2 mr-2">
                 <Users size={16} style={{ color: "#93C5FD" }} />
@@ -342,7 +383,7 @@ function PazarIcerik() {
                 </div>
               </>
             )}
-          </section>
+          </section>}
 
           {acik && (
             <FirmaKarti

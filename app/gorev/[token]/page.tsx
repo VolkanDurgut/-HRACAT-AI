@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Copy, Inbox, Loader2, Lock, Mail, MessageCircle, PartyPopper, Share2, ThumbsDown, ThumbsUp, FileText, ShoppingCart, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, CheckCircle2, Clock, Copy, Inbox, Loader2, Lock, Mail, MessageCircle, PartyPopper, Share2, SkipForward, ThumbsDown, ThumbsUp, FileText, ShoppingCart, UserRound } from "lucide-react";
 import { YildizAlani } from "@/components/kilavuz/yildiz-alani";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
@@ -23,6 +23,9 @@ import { ACCENT, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
  * gecilememeli." -> "Bugun atla" kalkti; "Yeni musteriyle devam et" yalniz bu gorevde temas (Gonderdim / sonuc)
  * kaydi varken acik (gorev.temas_var). Her numara icin WhatsApp + "Paylas" (telefonun paylasim menusu).
  * 3.5: arsivden gelen cevap + oneri sayfanin ustunde; "Oneriyi kaydet" ile sonuc islenir.
+ * 10.11.2026 (kullanici): "Her ihtimale karsi musteriyi atla butonu olmali; neden yazilmali, yazilanlar hafizaya
+ * alinip bir sonraki atlamada secenek olarak gosterilmeli." -> "Musteriyi atla": neden zorunlu (sunucu da zorlar),
+ * onceki nedenler secenek (bilgi.atlama_nedenleri); nedenli atlama sonrasi siradakine gecilir.
  */
 
 const NEDEN: Record<GorevNeden, { etiket: string; renk: string }> = {
@@ -58,6 +61,8 @@ export default function GorevSayfasi() {
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [isleniyor, setIsleniyor] = useState(false);
+  const [atlaAcik, setAtlaAcik] = useState(false);
+  const [atlaNeden, setAtlaNeden] = useState("");
   const [kisiId, setKisiId] = useState<string>("");
   const [sablonKod, setSablonKod] = useState<string>("");
   const [konu, setKonu] = useState("");
@@ -126,15 +131,16 @@ export default function GorevSayfasi() {
     } catch { setHata("Metin kopyalanamadı; WhatsApp mesajını düzenle alanından elle kopyalayabilirsiniz."); }
   }
 
-  async function isle(is: GorevIslemi, ek: Parameters<typeof gorevIsle>[2] = {}, sonra?: Bitti) {
+  async function isle(is: GorevIslemi, ek: Parameters<typeof gorevIsle>[2] = {}, sonra?: Bitti): Promise<boolean> {
     setIsleniyor(true);
     const c = await gorevIsle(String(token), is, ek);
     setIsleniyor(false);
-    if (!c.ok) { setHata(c.hata); return; }
+    if (!c.ok) { setHata(c.hata); return false; }
     setHata(null);
     setBilgi(c.veri);
     setBekleyen(null);
     if (sonra) setBitti(sonra);
+    return true;
   }
 
   const sonrakiAdimMetni = () => {
@@ -357,7 +363,7 @@ export default function GorevSayfasi() {
             <section className={`${kart} p-5`} style={kartStil}>
               <h2 className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: TEXT_MUTED }}>Müşteri döndü mü? <span className="normal-case tracking-normal font-normal">(zorunlu değil)</span></h2>
               <p className="text-xs mb-3" style={{ color: TEXT_MUTED }}>Cevap geldiyse işaretleyin; süreç durur, hatırlatma gitmez. Mailden gelen cevaplar arşivden otomatik de yakalanır.</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
                 {([
                   ["cevap", "Cevap verdi", <ThumbsUp key="i" size={14} />, "#6EE7B7", "Cevap kaydedildi. Takip sizde; hatırlatma gönderilmeyecek."],
                   ["teklif", "Teklif istedi", <FileText key="i" size={14} />, "#93C5FD", "Teklif talebi kaydedildi. Proformayı hazırlayabilirsiniz."],
@@ -369,7 +375,37 @@ export default function GorevSayfasi() {
                     {ikon} {ad}
                   </button>
                 ))}
+                {!islenmis && !atlaAcik && (
+                  <button type="button" disabled={isleniyor} onClick={() => { setAtlaAcik(true); setAtlaNeden(""); }} data-testid="atla-ac"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs border disabled:opacity-60 ml-auto" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                    <SkipForward size={14} /> Müşteriyi atla
+                  </button>
+                )}
               </div>
+              {atlaAcik && (
+                <div className="mt-4 rounded-lg border p-3" style={{ borderColor: "rgba(251,191,36,0.35)", backgroundColor: "rgba(251,191,36,0.06)" }} data-testid="atla-panel">
+                  <p className="text-sm font-medium text-white">Neden atlıyorsunuz?</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>Kısa yazın; nedeni Burak Bey Takip ekranında görür. Firma birkaç gün sonra yeniden sıraya girer.</p>
+                  {(bilgi.atlama_nedenleri || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {(bilgi.atlama_nedenleri || []).map((n) => (
+                        <button key={n} type="button" onClick={() => setAtlaNeden(n)} data-atla-secenek={n}
+                          className="h-7 px-2.5 rounded-full text-xs border" style={atlaNeden === n ? { borderColor: "rgba(251,191,36,0.6)", color: "#FCD34D", backgroundColor: "rgba(251,191,36,0.1)" } : { borderColor: CARD_BORDER, color: "#C9D1DC" }}>{n}</button>
+                      ))}
+                    </div>
+                  )}
+                  <input value={atlaNeden} onChange={(e) => setAtlaNeden(e.target.value.slice(0, 120))} maxLength={120} placeholder="Örn. müşteri izinde, haftaya tekrar dene" data-testid="atla-neden"
+                    className={`${girdi} h-10 mt-2`} style={{ borderColor: CARD_BORDER }} />
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <button type="button" disabled={isleniyor || atlaNeden.trim().length < 3} data-testid="atla-kaydet"
+                      onClick={() => { const n = atlaNeden.trim(); isle("atla", { konu: n }, { baslik: "Müşteri atlandı", alt: `Neden: ${n}. Firma birkaç gün sonra yeniden sıraya girer.` }).then((ok) => { if (ok) setAtlaAcik(false); }); }}
+                      className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg text-xs font-semibold text-white disabled:opacity-40" style={{ backgroundColor: "#B45309" }}>
+                      <SkipForward size={14} /> Atla ve kaydet
+                    </button>
+                    <button type="button" onClick={() => setAtlaAcik(false)} className="h-9 px-3 rounded-lg text-xs border" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {bilgi.gecmis.length > 0 && (
@@ -379,7 +415,7 @@ export default function GorevSayfasi() {
                   {bilgi.gecmis.map((g, i) => (
                     <li key={i} className="flex items-start gap-2" style={{ color: "#C9D1DC" }}>
                       <Clock size={12} className="mt-0.5 shrink-0" style={{ color: TEXT_MUTED }} />
-                      <span>{tarihTR(g.olusturma)} · {g.sonuc ? SONUC_ADI[g.sonuc] : ADIM_ADI[g.adim] || g.adim}{g.kanal ? ` · ${g.kanal === "eposta" ? "e-posta" : "WhatsApp"}` : ""}{g.alici ? ` · ${g.alici}` : ""}{g.isleyen ? ` · ${g.isleyen}` : ""}</span>
+                      <span>{tarihTR(g.olusturma)} · {g.sonuc ? SONUC_ADI[g.sonuc] : ADIM_ADI[g.adim] || g.adim}{g.kanal ? ` · ${g.kanal === "eposta" ? "e-posta" : "WhatsApp"}` : ""}{g.alici ? ` · ${g.alici}` : ""}{g.adim === "atla" && g.konu ? ` · ${g.konu}` : ""}{g.isleyen ? ` · ${g.isleyen}` : ""}</span>
                     </li>
                   ))}
                 </ul>

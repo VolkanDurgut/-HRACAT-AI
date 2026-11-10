@@ -177,3 +177,36 @@ export async function pazarFirmaBirlestir(kaynakId: string, hedefId: string): Pr
   const { error } = await supabase.rpc("pazar_firma_birlestir", { p_kaynak: kaynakId, p_hedef: hedefId });
   if (error) throw new Error(error.message);
 }
+
+// ---- Takip (Burak Bey ekrani, 10.11.2026; migration 20261110100000) ----
+export type PazarEkip = { kod: string; eposta: string; hitap: string | null; sira: number; aktif: boolean };
+export type PazarGelen = {
+  id: string; firma_id: string; gonderen: string; konu: string | null; ozet: string | null; tarih: string;
+  tur: "cevap" | "otomatik"; oneri: "teklif" | "siparis" | "ilgilenmiyor" | null;
+};
+export type TakipGorev = {
+  tarih: string; atanan: string | null; sira: number; neden: "hatirlatma1" | "hatirlatma2" | "siparissiz" | "potansiyel";
+  durum: "bekliyor" | "yapildi" | "atlandi"; isleyen: string | null; tamamlanma: string | null; firma_id: string;
+  son: { adim: PazarTemas["adim"]; kanal: PazarTemas["kanal"]; sonuc: PazarTemas["sonuc"]; konu: string | null; olusturma: string } | null;
+};
+export type TakipVerisi = { bugun: string; ekip: PazarEkip[]; gelenler: PazarGelen[]; gorevler: TakipGorev[] };
+
+/** Takip sekmesi: ekip, son 30 gunun gelen cevaplari, son 7 gunun gorevleri (token'siz RPC). */
+export async function pazarTakipOku(): Promise<TakipVerisi> {
+  const otuzGun = new Date(Date.now() - 30 * 86400000).toISOString();
+  const [ekip, gelen, takip] = await Promise.all([
+    supabase.from("pazar_ekip").select("kod,eposta,hitap,sira,aktif").order("sira"),
+    supabase.from("pazar_gelenler").select("id,firma_id,gonderen,konu,ozet,tarih,tur,oneri").gte("tarih", otuzGun).order("tarih", { ascending: false }).limit(300),
+    supabase.rpc("pazar_takip", { p_gun: 7 }),
+  ]);
+  if (ekip.error) throw new Error(ekip.error.message);
+  if (gelen.error) throw new Error(gelen.error.message);
+  if (takip.error) throw new Error(takip.error.message);
+  const t = (takip.data || {}) as { bugun?: string; gorevler?: TakipGorev[] };
+  return {
+    bugun: t.bugun || new Date().toISOString().slice(0, 10),
+    ekip: ((ekip.data || []) as PazarEkip[]).filter((e) => e.aktif),
+    gelenler: (gelen.data || []) as PazarGelen[],
+    gorevler: t.gorevler || [],
+  };
+}

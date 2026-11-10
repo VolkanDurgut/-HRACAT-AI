@@ -16,6 +16,8 @@ export type GorevBilgisi = {
   son_urun: string | null;
   gecmis: { adim: string; kanal: string | null; sonuc: string | null; alici: string | null; konu: string | null; isleyen: string | null; olusturma: string }[];
   gunun_gorevleri: { sira: number; durum: string; token: string; ad: string; neden: GorevNeden }[];
+  /** Sirkette daha once yazilan atlama nedenleri (en sik / en yeni 8). */
+  atlama_nedenleri?: string[];
 };
 export type GorevIslemi = "gonderildi" | "cevap" | "teklif" | "siparis" | "ilgilenmiyor" | "atla";
 export type GorevCevap<T> = { ok: true; veri: T } | { ok: false; hata: string; durum: number };

@@ -194,6 +194,11 @@ function tutarlar(s: string): Array<{ tutar: number; ekipman: string | null; i: 
   return sonuc;
 }
 
+/** Metindeki tum navlun tutari adaylari (masraf kalemleri haric). Ekten okumada belirsizlik kontrolu icin. */
+export function fiyatAdaylari(metin: string): Array<{ tutar: number; ekipman: string }> {
+  return tutarlar(metin.replace(/\s+/g, " ")).map((x) => ({ tutar: x.tutar, ekipman: x.ekipman ?? "20DC" }));
+}
+
 /** Dikey tablo (Horoz tipi): BASLIK satiri, ardindan her liman icin bir deger. */
 function dikeyTablo(s: string): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; gec: string | null }> | null {
   const satir = s.split("\n").map((x) => x.trim()).filter(Boolean);

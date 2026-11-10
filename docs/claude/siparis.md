@@ -40,7 +40,7 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
   olmak üzere … rezervasyon talebimiz") da okunacak. Arşiv 26.10.2026'dan beri dolu; öncesi için execution@ kutusundan
   Gmail'e tek seferlik içe aktarma (Apps Script `tara` eski tarihli mailleri işlemez: `after:` + mail tarihi kontrolü).
 
-### 4.2.1 Okuyucu: `supabase/functions/_shared/navlun-oku.ts` (10.11.2026, canlıya bağlı DEĞİL)
+### 4.2.1 Okuyucu: `supabase/functions/_shared/navlun-oku.ts` (10.11.2026)
 - Saf fonksiyonlar, yapay zekâ yok. `navlunMesajOku(mesaj, acenteler)` → olaylar: `teklif`, `karsi_teklif`
   ("X usd destek olabilirim"), `hedef` (bizden "Hedef rakamı X"), `hedef_soru`, `hedef_kabul` ("Hedefiniz uygundur"),
   `kabul` (bizden "Navlun bedeli X olmak üzere … booking"), `servis_yok`, `yer_yok`, `ek_teklif` (fiyat PDF/görselde).
@@ -51,5 +51,22 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
   (31 teklif + 2 karşı teklif), 6 hedef, 2 kabul, 1 hedef kabulü, 5 servis/yer yok, 12 "fiyat ekte"; kalan 37 acente
   mesajında fiyat yok (bekleme, soru, föy, ekipman). Bilinen eksik: Kuehne+Nagel fiyatı her zaman görsel+PDF'te,
   Link çoğunlukla PDF'te → canlıda Apps Script PDF metnini çıkarıp aynı okuyucuya verecek.
-- Sıradaki: `navlun_teklifleri` tablosu (mesaj_id tekil, idempotent), Apps Script'e navlun etiketi + PDF metni, sayfa
-  "Navlun Bildirimi" (liman × acente son fiyat, hedef, kabul), hata kuyruğu (okunamayan mesaj) = tek müdahale alanı.
+
+### 4.2.2 Canlı akış (10.11.2026)
+- Migration `20261110150000_navlun_bildirimi.sql` (CANLIDA): `navlun_acenteler` (alan adı → ad; veri yalnız DB'de,
+  11 acente), `navlun_mesajlari` (Message-ID tekil; durum okundu / bilgi / okunamadi / duzeltildi / yoksayildi),
+  `navlun_teklifleri` (olaylar). İstemciye salt okunur ("analiz" veya "proformalar"). `navlun_kaydet` yalnız servis;
+  aynı mail yeniden gelirse olayları yenilenir, elle çözülmüş maile dokunulmaz. `navlun_hata_coz` (authenticated +
+  yetki): okunamayan maile elle fiyat (kaynak 'elle') ya da yoksay = TEK müdahale alanı.
+- Edge `navlun-bildirimi` (v1, verify_jwt; anahtar = PAZAR_GELEN_ANAHTAR, başlık `x-pazar-anahtar`): `kaydet` /
+  `durum`. İşleme `_shared/navlun-isle.ts`: fiyat metinde yoksa Apps Script'in gönderdiği ek metni (PDF ya da en
+  büyük görselin Drive OCR'ı) okunur; ekten çıkan fiyat ekipman başına TEK değilse (belirsiz) → okunamadi.
+  Liman/terminal ve bilinmeyen gönderen kaydedilmez; bizden fiyatsız yazışma kaydedilmez.
+- Apps Script `docs/apps-script/navlun.gs`: Pazar betiğiyle AYNI proje (ANAHTAR/ANON ortak), "Drive API" hizmeti
+  (OCR için). `navlunGecmis` (26.10'dan bugüne, "BITTI" yazana kadar tekrar), `navlunKur` (15 dk tetikleyici).
+- Sayfa `/navlun` "Navlun Bildirimi" (menü: Operasyon; yetki "analiz", yalnız yetkiliye görünür): liman kartları
+  (son hareket önce), en iyi 20'DC, hedefimiz, kabul edilen, acente × armatör × ekipman son fiyat, rozetler (karşı
+  teklif, hedefi kabul, lokal dahil, PDF'ten / görselden / elle), fiyatsız durumlar (servis yok, yer yok, fiyat ekte),
+  arama. Özet: `lib/navlun/ozet.ts` (saf). Test: e2e_navlun 39 + yetkisiz 3 (kurgusal veri).
+- Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
+  başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

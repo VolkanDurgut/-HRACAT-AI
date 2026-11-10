@@ -38,6 +38,8 @@ const mainItems: MenuItem[] = [
 const opsItems: MenuItem[] = [
   { label: "ETD/ETA",       href: "/etd-eta", icon: <Ship size={18} />,      yetkiKey: "etd_eta" },
   { label: "Kantar Paneli", href: "/kantar",  icon: <Weight size={18} />,    yetkiKey: "kantar" },
+  // 10.11.2026: Navlun Bildirimi - acente teklifleri maillerden otomatik; yetki "analiz", yalniz yetkiliye gorunur
+  { label: "Navlun Bildirimi", href: "/navlun", icon: <Anchor size={18} />, yetkiKey: "analiz", yalnizYetkili: true },
 ];
 
 // Ic Piyasa (11.10.2026): SADECE yetkisi olan kullaniciya gorunur (diger

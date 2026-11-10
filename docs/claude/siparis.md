@@ -68,5 +68,11 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
   (son hareket önce), en iyi 20'DC, hedefimiz, kabul edilen, acente × armatör × ekipman son fiyat, rozetler (karşı
   teklif, hedefi kabul, lokal dahil, PDF'ten / görselden / elle), fiyatsız durumlar (servis yok, yer yok, fiyat ekte),
   arama. Özet: `lib/navlun/ozet.ts` (saf). Test: e2e_navlun 39 + yetkisiz 3 (kurgusal veri).
+- İlk canlı okuma (10.11.2026 22:00) sonrası düzeltme (edge v2): ekten okunan bazı tutarlar yanlıştı (K+N PDF'inde
+  180 = yan masraf, Draft föy ekindeki 50, MSC genel tarife "WAF & RELAY" konusu, ONE'da gövdedeki POD "USNYC").
+  Kurallar: ek YALNIZ mail metni "teklif ekte / aşağıdaki gibidir" diyorsa okunur; ekte fiyat ancak "freight / navlun /
+  ocean / all in" kelimesinin yanında ve yan masraf kodu (THC, BL, ISPS, VGM…) değilse kabul; konudaki liman esas;
+  genel tarife (&'li konu) liman sayılmaz; ek metni denetim için `ozet`'e yazılır. Yeniden okuma: betik özelliği
+  NAVLUN_GECMIS_I silinip navlunGecmis tekrar çalıştırılır (idempotent; kayıtlar yenilenir).
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

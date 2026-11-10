@@ -178,8 +178,12 @@ function bos(): Omit<NavlunOlay, "tur"> {
   return { liman: null, tutar: null, ekipman: null, armator: null, free_time_gun: null, gecerlilik: null, lokal_dahil: null, pol: null };
 }
 
-/** USD'ye bitisik tum tutarlari bul (her biri icin cevresindeki ekipman). */
-function tutarlar(s: string): Array<{ tutar: number; ekipman: string | null; i: number }> {
+// Ekten (PDF / OCR) okumada: fiyat yalniz navlun kelimesinin yaninda kabul edilir; yan masraf kodlari elenir.
+const NAVLUN_KELIME = /freight|navlun|ocean|o\/f|all\s*-?\s*in|deniz\s*nakliye|rate/i;
+const YAN_MASRAF = /\b(thc|bl|b\/l|isps|vgm|ens|ams|seal|doc(?:umentation)?|ebs|caf|baf|lss|pss|gri|ecs|ets|cic|imo|telex|handling|muhur|mühür)\b/i;
+
+/** USD'ye bitisik tum tutarlari bul (her biri icin ekipman). */
+function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: string | null; i: number }> {
   const sonuc: Array<{ tutar: number; ekipman: string | null; i: number }> = [];
   const r = /(?:usd|\$)\s*[:\-–]?\s*([\d][\d.,]*)|([\d][\d.,]*)\s*(?:usd|\$)/gi;
   let m: RegExpExecArray | null;
@@ -189,18 +193,26 @@ function tutarlar(s: string): Array<{ tutar: number; ekipman: string | null; i: 
     const cevre = s.slice(Math.max(0, m.index - 25), m.index + m[0].length + 25);
     // masraf / ceza / kdv'li kalemler navlun degildir
     if (/masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i.test(s.slice(Math.max(0, m.index - 60), m.index + m[0].length + 30))) continue;
-    sonuc.push({ tutar: n, ekipman: ekipmanBul(cevre), i: m.index });
+    if (siki) {
+      const once = s.slice(Math.max(0, m.index - 60), m.index);
+      if (!NAVLUN_KELIME.test(once) || YAN_MASRAF.test(s.slice(Math.max(0, m.index - 30), m.index))) continue;
+    }
+    // Ekipman: once fiyatin hemen ONCESINDE ("20DC: 1625 USD"), yoksa cevresinde ("Usd 875/20dc")
+    const sonra = s.slice(m.index + m[0].length, m.index + m[0].length + 14);
+    const egik = /^\s*\//.test(sonra) ? ekipmanBul(sonra.replace(/^\s*\//, "")) : null;      // "Usd 875/20dc"
+    const onceki = ekipmanBul(s.slice(Math.max(0, m.index - 25), m.index));                    // "20DC: 1625 USD"
+    sonuc.push({ tutar: n, ekipman: egik ?? onceki ?? ekipmanBul(cevre), i: m.index });
   }
   return sonuc;
 }
 
 /** Metindeki tum navlun tutari adaylari (masraf kalemleri haric). Ekten okumada belirsizlik kontrolu icin. */
 export function fiyatAdaylari(metin: string): Array<{ tutar: number; ekipman: string }> {
-  return tutarlar(metin.replace(/\s+/g, " ")).map((x) => ({ tutar: x.tutar, ekipman: x.ekipman ?? "20DC" }));
+  return tutarlar(metin.replace(/\s+/g, " "), true).map((x) => ({ tutar: x.tutar, ekipman: x.ekipman ?? "20DC" }));
 }
 
 /** Dikey tablo (Horoz tipi): BASLIK satiri, ardindan her liman icin bir deger. */
-function dikeyTablo(s: string): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; gec: string | null }> | null {
+function dikeyTablo(s: string, siki = false): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; gec: string | null }> | null {
   const satir = s.split("\n").map((x) => x.trim()).filter(Boolean);
   const pod = satir.findIndex((x) => /TESL[İI]MAT L[İI]MANI|\(POD\)/i.test(x));
   const nav = satir.findIndex((x) => /^NAVLUN$/i.test(x));
@@ -218,7 +230,7 @@ function dikeyTablo(s: string): Array<{ liman: string; tutar: number; ekipman: s
   const hat = al(/^HAT$/i), ft = al(/^FREE T[İI]ME$/i), gec = al(/^GE[ÇC]ERL[İI]L[İI]K$/i);
   const out = [];
   for (let i = 0; i < kac; i++) {
-    const t = tutarlar(navlun[i] || "")[0];
+    const t = tutarlar("NAVLUN " + (navlun[i] || ""), siki)[0];
     if (!t) continue;
     out.push({ liman: buyukTr(limanlar[i]), tutar: t.tutar, ekipman: t.ekipman ?? ekipmanBul(navlun[i]), armator: armatorBul(hat[i] || ""), ft: freeTimeBul("ft " + (ft[i] || "")), gec: gec[i] || null });
   }
@@ -229,8 +241,11 @@ function dikeyTablo(s: string): Array<{ liman: string; tutar: number; ekipman: s
 const HAT_ACENTE = new Set(["MSC", "ONE", "Akkon", "Culines", "Evergreen", "Hapag-Lloyd", "Maersk", "CMA CGM", "Arkas"]);
 
 /** Tek mesajdan navlun olaylarini cikar. */
-export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu): NavlunOlay[] {
-  const liman0 = konudanLiman(m.konu);
+export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
+  const siki = !!secenek.ek;
+  const lim = konudanLiman(m.konu);
+  // Genel tarife konulari ("WAF & RELAY & ...") tek liman degildir
+  const liman0 = lim && !/&|,/.test(lim) && lim.length <= 30 ? lim : null;
   const yeni = yeniKisim(m.govde || "");
   const duz = yeni.replace(/\s+/g, " ");
   const olaylar: NavlunOlay[] = [];
@@ -261,7 +276,7 @@ export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu): Navlun
   if (/hedef(?:iniz)?\s*(?:var\s*m[ıi]|mevcut\s*mu|ifyat|fiyat)/i.test(duz) && !/hedefiniz uygundur/i.test(duz)) ekle("hedef_soru");
   if (/hedef(?:iniz)?\s*uygun/i.test(duz)) { ekle("hedef_kabul"); return olaylar; }
 
-  const tablo = dikeyTablo(yeni);
+  const tablo = dikeyTablo(yeni, siki);
   if (tablo) {
     for (const r of tablo) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman ?? "20DC", armator: r.armator, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: /lokaller[İI]?\s*\n?\s*DAH[İI]L/i.test(yeni) || null, pol: "AMBARLI" });
     return olaylar;
@@ -283,22 +298,25 @@ export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu): Navlun
   }
   if (satirdan) return olaylar;
 
-  const t = tutarlar(duz);
-  if (t.length) {
+  const t = tutarlar(duz, siki);
+  const pod = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-z .]{2,25}?)(?:\s+(?:FREE|VALIDITY|Hat)|\n|$)/) || [])[1];
+  // Konudaki liman esas; govdedeki POD yalniz konu limansizsa. Liman yoksa (genel tarife) fiyat yazilmaz.
+  const limanSec = liman0 ?? (pod && !/AMBARLI|ASYAPORT|KUMPORT|FREE|TIME|VALIDITY/i.test(pod) ? buyukTr(pod.trim()) : null);
+  if (t.length && limanSec) {
     // ayni mesajda 20 ve 40 ayri fiyatlar olabilir; ekipman basina ilkini al
     const gor = new Set<string>();
-    const pod = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-z .]{2,25}?)(?:\s+(?:FREE|VALIDITY|Hat)|\n|$)/) || [])[1];
     for (const x of t) {
       const ekip = x.ekipman ?? "20DC";
       if (gor.has(ekip)) continue;
       gor.add(ekip);
       ekle(destek ? "karsi_teklif" : "teklif", {
-        liman: pod && !/AMBARLI|ASYAPORT|KUMPORT/i.test(pod) ? buyukTr(pod.trim()) : liman0,
+        liman: limanSec,
         tutar: x.tutar, ekipman: ekip, armator: armatorBul(duz, x.i), free_time_gun: ft, gecerlilik: gec, lokal_dahil: lokal, pol,
       });
     }
     return olaylar;
   }
+  if (t.length) return olaylar;
 
   const ekVar = (m.ekler || []).some((e) => /\.(pdf|xlsx?|docx?)$/i.test(e));
   if (/(?:ekte(?:dir|ki)|aşağıdaki gibidir|ekli mailde)/i.test(duz) && /teklif|fiyat|navlun|price|rate/i.test(duz + " " + (ekVar ? "teklif" : ""))) ekle("ek_teklif", { free_time_gun: ft, gecerlilik: gec, armator: armatorBul(duz) });

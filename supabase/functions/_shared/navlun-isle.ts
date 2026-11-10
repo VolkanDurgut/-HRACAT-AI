@@ -40,8 +40,10 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
 
   const metindeFiyat = olaylar.some((o) => FIYATLI.has(o.tur));
   const ekBekleniyor = olaylar.some((o) => o.tur === "ek_teklif");
-  if (!biz && !metindeFiyat && g.ek_metin.trim()) {
-    const ekten = navlunMesajOku({ konu: g.konu, gonderen: g.gonderen, govde: g.ek_metin }, acenteler)
+  // Ek yalniz mail metni "teklif ekte / asagidaki gibidir" diyorsa okunur (foy, booking onayi vb. ekler fiyat degil)
+  if (!biz && !metindeFiyat && ekBekleniyor && g.ek_metin.trim()) {
+    kaynak = g.ek_kaynak === "gorsel" ? "gorsel" : "pdf";
+    const ekten = navlunMesajOku({ konu: g.konu, gonderen: g.gonderen, govde: g.ek_metin }, acenteler, { ek: true })
       .filter((o) => FIYATLI.has(o.tur));
     if (ekten.length && ektenGuvenli(ekten, g.ek_metin)) {
       // metindeki free time / gecerlilik bilgisi ekten gelen fiyata tasinir
@@ -50,10 +52,6 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
         ...olaylar.filter((o) => o.tur !== "ek_teklif"),
         ...ekten.map((o) => ({ ...o, free_time_gun: o.free_time_gun ?? ekBilgi?.free_time_gun ?? null, gecerlilik: o.gecerlilik ?? ekBilgi?.gecerlilik ?? null, armator: o.armator ?? ekBilgi?.armator ?? null })),
       ];
-      kaynak = g.ek_kaynak === "gorsel" ? "gorsel" : "pdf";
-    } else if (ekten.length || ekBekleniyor) {
-      kaynak = g.ek_kaynak === "gorsel" ? "gorsel" : "pdf";
-      if (!olaylar.some((o) => o.tur === "ek_teklif")) olaylar.push({ tur: "ek_teklif", liman, tutar: null, ekipman: null, armator: null, free_time_gun: null, gecerlilik: null, lokal_dahil: null, pol: null });
     }
   }
 
@@ -66,7 +64,10 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
   return {
     mesaj_id: g.mesaj_id, konu: g.konu, gonderen: g.gonderen, acente, liman, liman_anahtar: limanAnahtari(liman),
     tarih: g.tarih, kaynak, durum,
-    ozet: durum === "okunamadi" ? yeniKisim(g.govde).slice(0, 1500) : null,
+    // Ekten okunan / okunamayan teklifte ek metni de saklanir (denetim + hata kuyrugunda gosterim)
+    ozet: durum === "okunamadi" || kaynak !== "metin"
+      ? (yeniKisim(g.govde).slice(0, 600) + (g.ek_metin.trim() ? "\n--- EK ---\n" + g.ek_metin.replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim() : "")).slice(0, 2000)
+      : null,
     olaylar: olaylar.map((o) => ({ ...o, liman_anahtar: limanAnahtari(o.liman) })),
   };
 }

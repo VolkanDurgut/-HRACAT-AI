@@ -149,5 +149,8 @@ Kullanıcı: "Sipariş listesi içinde aynı şeyi yapmalıyız. Excel yükleyeb
   `navlun_acenteler`'e otomatik eklenir (ad: bilinen armatör adı, yoksa alan adı etiketi; kişisel posta, bizim alan,
   pasife alınmış alan adı öğrenilmez). (3) Betik: görsel ekte en büyük 3 görsel sırayla OCR'lanır, bizim imza/logo
   (unex.com.tr) atlanır, fiyat içermeyen görsel gönderilmez.
+- Edge v4 (11.11.2026): kullanıcı "bazı destinasyonlar yok" → geçmiş okuma 26.10'dan başlıyordu; 26.10 öncesi biten
+  yazışmalar (ör. Beyrut, Cape Town) hiç okunmamıştı → betikte NAVLUN_ILK_TARIH = 2026/09/01 (arşivin tamamı).
+  Konudaki booking listesi ("TEMA // … //277… + 277…") liman sanılıyordu → yok sayılır (liman TEMA).
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

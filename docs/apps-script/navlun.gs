@@ -22,7 +22,7 @@
  */
 
 var NAVLUN_URL = 'https://tnzbihsfbhqzkcliicdk.supabase.co/functions/v1/navlun-bildirimi';
-var NAVLUN_ILK_TARIH = '2026/10/26';
+var NAVLUN_ILK_TARIH = '2026/09/01';   // arsivin tamami (11.11.2026: 26.10 oncesi Beyrut / Cape Town eksikti)
 var NAVLUN_KENDI = /@(unex\.com\.tr|ihracatasistanim\.com)$/i;
 var NAVLUN_PAKET = 20;
 var NAVLUN_SURE_MS = 4.5 * 60 * 1000;   // Apps Script 6 dk siniri; guvenli pay

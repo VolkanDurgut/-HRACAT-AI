@@ -99,6 +99,7 @@ export function konudanLiman(konu: string): string | null {
     if (!p) continue;
     if (/NAVLUN|TALEB|TAELB|PROGRAM|TEKLIF|BOOKING|REZERVASYON/.test(p)) continue;
     if (/^[A-Z]?\d{6,}$/.test(p)) continue;           // booking no
+    if (/^[\d\s+,&/.-]+$/.test(p)) continue;           // booking listesi: "277725875 + 277709899"
     if (/^FR\.\d/.test(p) || /DENIZCILIK|DENİZCİLİK/.test(p)) continue;
     // "ASYAPORT - BINGAZI" -> "BINGAZI" (POL - POD)
     if (p.includes(" - ")) p = p.split(" - ").pop()!.trim();

@@ -6,7 +6,8 @@
  *   Proforma | Firma Adı | Ürün | Fiyat | Miktar | Tutar | Konteyner | Liman | BL NO | Marka | Paketleme
  *   - Ust bolum: sevk edilen satir YESIL boyali. Yesil + BL -> sevk_edildi; yesil, BL yok -> bl_eksik.
  *     Yesil degil ama BL (booking) yazili -> rezervasyonlu.
- *   - "ÖN ÖDEMESİ ALINMIŞ" basligindan sonra -> on_odeme_alindi; "ÖN ÖDEMESİ ALINMAMIŞ" -> onay_bekliyor.
+ *   - "ÖN ÖDEMESİ ALINMIŞ…" basligindan sonra -> on_odeme_alindi; "ÖN ÖDEMESİ (VEYA ONAYI) ALINMAMIŞ" -> onay_bekliyor
+ *     (11.11.2026: "VEYA ONAYI" ekli baslik taninmiyordu, 11 siparis yanlislikla on odeme alindi oldu - duzeltildi).
  * Sutunlar BASLIK METNINDEN bulunur (sistemin "Excel indir" ciktisi da okunur; ek sutunlari yok sayilir).
  * Eslesme (sistemdeki siparis_defteri satirlari): proforma no (revize "R" eki yok sayilir) + BL; BL'si sonradan
  * eklenen / degisen satir ayni proformanin tek adayina baglanir. Hicbir kayit silinmez.
@@ -89,7 +90,7 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
   const uyarilar: string[] = [];
   for (const sayfa of sayfalar) {
     let sutun: Record<string, number> | null = null;
-    let blok: "ust" | "alindi" | "alinmamis" = "ust";
+    let blok: "ust" | "alindi" | "alinmamis" | "iptal" = "ust";
     const satirlar: SiparisExcelSatiri[] = [];
     let sira = 0;
     for (const [no, h, renk] of sayfa.satirlar) {
@@ -107,9 +108,16 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
         }
         continue;
       }
+      // Bolum basliklari (proforma no degil, "ON ODEME" gecen satir): "ÖN ÖDEMESİ VEYA ONAYI ALINMAMIŞ" / "ÖN ÖDEMESİ ALINMIŞ- ONAYLI …"
       const a = baslikAnahtari(metin(h[0]));
-      if (/ONODEMESIALINMAMIS/.test(a)) { blok = "alinmamis"; continue; }
-      if (/ONODEMESIALINMIS/.test(a)) { blok = "alindi"; continue; }
+      if (/ONODEME/.test(a) && !/^[A-Z]{3,}\d{6}/.test(a)) {
+        // Karar "ON ODEMESI"nin hemen ardindaki kelimeyle: "…ALINMIŞ- … REZERVASYON ALINMAMIŞ" ALINMIS bolumudur
+        if (/ONODEMESI(VEYAONAYI)?(ALINMAMIS|ALINMADI)/.test(a)) { blok = "alinmamis"; continue; }
+        if (/ONODEMESI(ALINMIS|ALINDI)/.test(a)) { blok = "alindi"; continue; }
+      }
+      // Sistemin kendi ciktisindaki "İPTAL EDİLEN SİPARİŞLER" bolumu aktarilmaz (iptal yalniz sistemde degisir)
+      if (/^IPTALEDILEN/.test(a)) { blok = "iptal"; continue; }
+      if (blok === "iptal") continue;
       const proforma = deger(h[sutun.proforma_no]);
       const firma = deger(h[sutun.firma]);
       if (!proforma && !firma) continue;

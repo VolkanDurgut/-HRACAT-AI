@@ -21,8 +21,11 @@ export async function yuklemePlaniOku(): Promise<PlanSatiri[]> {
   return ((data || []) as Record<string, unknown>[]).map(planNormalize);
 }
 
-export async function onOdemeIsaretle(proformaNo: string, alindi: boolean): Promise<void> {
-  const { error } = await supabase.rpc("siparis_on_odeme_isaretle", { p_proforma_no: proformaNo, p_alindi: alindi });
+/** On odeme: alindi=true icin tutar zorunlu (siparis_on_odeme_kaydet). */
+export async function onOdemeKaydet(proformaNo: string, alindi: boolean, tutar?: number, para = "USD", tarih?: string): Promise<void> {
+  const { error } = await supabase.rpc("siparis_on_odeme_kaydet", {
+    p_proforma_no: proformaNo, p_alindi: alindi, p_tutar: alindi ? tutar ?? null : null, p_para_birimi: para, p_tarih: alindi ? tarih ?? null : null,
+  });
   if (error) throw new Error(error.message);
 }
 

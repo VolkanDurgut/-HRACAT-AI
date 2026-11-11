@@ -26,6 +26,9 @@ export type SiparisSatiri = {
   durum: SiparisDurum;
   on_odeme: boolean;
   on_odeme_tarihi: string | null;
+  /** Export'un girdigi on odeme tutari (Excel'den gelen eski siparislerde yok) */
+  on_odeme_tutar: number | null;
+  on_odeme_para: string | null;
   dosya_no: string | null;
   booking_no: string | null;
   etd: string | null;
@@ -36,7 +39,8 @@ export type PlanKalemi = { cinsi: string | null; konteyner: number | null; cuval
 
 export type PlanSatiri = {
   anahtar: string;
-  kaynak: "excel" | "sistem";
+  /** excel: operasyonun plani; sistem: Excel'de olmayan rezervasyon; siparis: on odemesi alinmis, rezervasyonu yok */
+  kaynak: "excel" | "sistem" | "siparis";
   hafta: number | null;
   yil: number | null;
   etd: string | null;
@@ -89,8 +93,47 @@ export function siparisNormalize(r: Record<string, unknown>): SiparisSatiri {
   return {
     ...(r as unknown as SiparisSatiri),
     sira: sayi(r.sira), birim_fiyat: sayi(r.birim_fiyat), miktar_mt: sayi(r.miktar_mt), tutar: sayi(r.tutar), konteyner: sayi(r.konteyner),
-    on_odeme: r.on_odeme === true,
+    on_odeme: r.on_odeme === true, on_odeme_tutar: sayi(r.on_odeme_tutar), on_odeme_para: typeof r.on_odeme_para === "string" ? r.on_odeme_para : null,
   };
+}
+
+/**
+ * Siparis listesi BOLUMLERI - export'un Excel'indeki duzen ve basliklar (11.11.2026, kullanici):
+ *   1) rezervasyonu alinan / sevk edilen (ust bolum; sevk edilen satir yesil)
+ *   2) "ÖN ÖDEMESİ ALINMIŞ- ONAYLI PROFORMA FAKAT HENÜZ REZERVASYON ALINMAMIŞ. MÜŞTERİ SİPARİŞ VERDİĞİNDE HAREKETE GEÇİLECEKTİR."
+ *   3) "ÖN ÖDEMESİ VEYA ONAYI ALINMAMIŞ"  (yeni kesilen proforma buraya duser; durumu bos)
+ * Her bolumde en guncel EN ALTTA.
+ */
+export type SiparisBolumu = "rezervasyon" | "on_odeme" | "bekleyen" | "iptal";
+export const BOLUM_BASLIGI: Record<SiparisBolumu, string> = {
+  rezervasyon: "REZERVASYONU ALINAN VE SEVK EDİLEN SİPARİŞLER",
+  on_odeme: "ÖN ÖDEMESİ ALINMIŞ- ONAYLI PROFORMA FAKAT HENÜZ REZERVASYON ALINMAMIŞ. MÜŞTERİ SİPARİŞ VERDİĞİNDE HAREKETE GEÇİLECEKTİR.",
+  bekleyen: "ÖN ÖDEMESİ VEYA ONAYI ALINMAMIŞ",
+  iptal: "İPTAL EDİLEN SİPARİŞLER",
+};
+export const BOLUM_SIRASI: SiparisBolumu[] = ["rezervasyon", "on_odeme", "bekleyen", "iptal"];
+
+export function siparisBolumu(d: SiparisDurum): SiparisBolumu {
+  if (d === "on_odeme_alindi") return "on_odeme";
+  if (d === "onay_bekliyor") return "bekleyen";
+  if (d === "iptal") return "iptal";
+  return "rezervasyon";
+}
+
+export type BolumOzeti = { bolum: SiparisBolumu; satirlar: SiparisSatiri[]; adet: number; mt: number; konteyner: number; tutar: Record<string, number> };
+
+/** Bolumlere ayir (her bolum siparisSirala ile: eski -> yeni, en guncel en altta). */
+export function siparisBolumleri(liste: SiparisSatiri[]): BolumOzeti[] {
+  return BOLUM_SIRASI.map((bolum) => {
+    const satirlar = siparisSirala(liste.filter((s) => siparisBolumu(s.durum) === bolum));
+    const tutar: Record<string, number> = {};
+    for (const s of satirlar) if (s.tutar !== null) tutar[s.para_birimi || "USD"] = (tutar[s.para_birimi || "USD"] || 0) + s.tutar;
+    return {
+      bolum, satirlar, adet: satirlar.length, tutar,
+      mt: Math.round(satirlar.reduce((t, s) => t + (s.miktar_mt || 0), 0) * 100) / 100,
+      konteyner: satirlar.reduce((t, s) => t + (s.konteyner || 0), 0),
+    };
+  });
 }
 
 export function planNormalize(r: Record<string, unknown>): PlanSatiri {
@@ -131,7 +174,10 @@ export type PlanHaftasi = { anahtar: string; hafta: number | null; yil: number |
  * Satirin haftasi. Excel'den gelen satirda operasyonun koydugu hafta (ETD'den yeniden hesaplanmaz; ETD sonraki
  * haftada olsa bile yukleme o haftadadir). Sistemden gelen (Excel'de olmayan rezervasyon) satirda ETD'den.
  */
+export const BEKLEYEN_BLOK = "REZERVASYON ALINMADI — ÖN ÖDEMESİ ALINMIŞ SİPARİŞLER";
+
 export function planHaftasi(p: Pick<PlanSatiri, "kaynak" | "hafta" | "yil" | "etd" | "hafta_baslik">): PlanHaftasi {
+  if (p.kaynak === "siparis") return { anahtar: "bekleyen", hafta: null, yil: null, etiket: BEKLEYEN_BLOK };
   if (p.kaynak === "excel" && p.hafta && p.yil) return { anahtar: `${p.yil}|${p.hafta}`, hafta: p.hafta, yil: p.yil, etiket: p.hafta_baslik };
   const h = p.etd ? haftaNo(p.etd) : null;
   if (h) return { anahtar: `${h.yil}|${h.hafta}`, hafta: h.hafta, yil: h.yil, etiket: null };
@@ -157,7 +203,9 @@ export function planBloklari(liste: PlanSatiri[]): PlanBlogu[] {
     if (!b.etiket) b.etiket = b.hafta && b.yil ? haftaEtiketi(b.hafta, b.yil) : "HAFTA BELİRSİZ (ETD YOK)";
     b.satirlar = planSirala(b.satirlar);
   }
-  return bloklar.sort((a, b) => (a.yil ?? 9999) - (b.yil ?? 9999) || (a.hafta ?? 99) - (b.hafta ?? 99));
+  // "Rezervasyon alinmadi" blogu en ustte (operasyonun yapacagi is), sonra haftalar eski -> yeni
+  const oncelik = (b: PlanBlogu) => (b.anahtar === "bekleyen" ? 0 : 1);
+  return bloklar.sort((a, b) => oncelik(a) - oncelik(b) || (a.yil ?? 9999) - (b.yil ?? 9999) || (a.hafta ?? 99) - (b.hafta ?? 99));
 }
 
 export function trTarih(iso: string | null): string {

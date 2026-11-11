@@ -8,10 +8,10 @@ import { EmptyState } from "@/components/empty-state";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import {
-  ACIK_DURUMLAR, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planKalemleri, saat, siparisOzeti, siparisSirala, trTarih,
+  BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planKalemleri, saat, siparisBolumleri, siparisBolumu, siparisOzeti, trTarih,
   type PlanSatiri, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
-import { onOdemeIsaretle, siparisListesiOku, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { onOdemeKaydet, siparisListesiOku, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
@@ -20,12 +20,12 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  * SIPARIS LISTESI + YUKLEME PLANI (11.11.2026). Kullanici: "Siparis formu ile yukleme planinin otomatik ve hatasiz
  * bir sekilde hazirlanabilmeli; sonra raporlayabilmeliyiz." "Siparis listesinde on odeme girilebilsin."
  *  - Liste ve plan kimse tarafindan doldurulmaz: proforma / dosya / rezervasyondan canli hesaplanir (lib/siparis/liste.ts).
- *  - Elle girilen TEK alan: "On odeme" kutusu (rezervasyon oncesi siparislerde; "proformalar" yetkisi).
+ *  - Elle girilen: on odeme (TUTAR + tarih; rezervasyon oncesi siparislerde; "proformalar" yetkisi).
+ *  - Siparis listesi export'un Excel'indeki gibi BOLUMLU (lib/siparis/liste.ts BOLUM_BASLIGI); en guncel en altta.
  *  - Excel indir: export'un ve operasyonun Excel'iyle ayni basliklar (lib/siparis/xlsx.ts).
  */
 
 type Sekme = "siparis" | "plan";
-type SiparisFiltre = "acik" | "tum" | SiparisDurum;
 
 const DURUM_RENK: Record<SiparisDurum, [string, string]> = {
   onay_bekliyor: ["rgba(148,163,184,0.14)", "#CBD5E1"],
@@ -55,69 +55,211 @@ function OzetKarti({ etiket, deger, alt, renk, testId, onClick, secili }: { etik
   );
 }
 
+const paraIsareti = (p: string | null) => (p === "EUR" ? "€" : p === "TRY" ? "₺" : "$");
+
+/** On odeme hucresi: bekleyen satirda "On odeme alindi" butonu; alinmis satirda tutar + tarih (+ geri al). */
+function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
+  s: SiparisSatiri; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: boolean;
+}) {
+  const [onay, setOnay] = useState(false);
+  const degisir = yetkili && ON_ODEME_DEGISIR.includes(s.durum) && !!s.proforma_no;
+  if (s.durum === "onay_bekliyor") {
+    return degisir ? (
+      <button type="button" onClick={() => onAc(s)} disabled={mesgul} data-onodeme-ac
+        className="h-7 px-2.5 rounded-md text-[11.5px] font-semibold text-white whitespace-nowrap hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+        Ön ödeme alındı
+      </button>
+    ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
+  }
+  if (!s.on_odeme) return <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
+  return (
+    <div className="text-xs whitespace-nowrap" data-onodeme>
+      <span className="text-sky-300 font-medium tabular-nums">
+        {s.on_odeme_tutar !== null ? `${sayiGoster(s.on_odeme_tutar, 2)} ${paraIsareti(s.on_odeme_para)}` : "Alındı"}
+      </span>
+      {s.on_odeme_tarihi ? <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.on_odeme_tarihi)}</span> : null}
+      {degisir && s.durum === "on_odeme_alindi" && (
+        onay ? (
+          <span className="block mt-0.5 text-[11px]">
+            <button type="button" onClick={() => { setOnay(false); onGeriAl(s); }} disabled={mesgul} className="text-red-300 underline mr-2" data-onodeme-geri-evet>Evet, geri al</button>
+            <button type="button" onClick={() => setOnay(false)} style={{ color: TEXT_MUTED }}>Vazgeç</button>
+          </span>
+        ) : (
+          <span className="block mt-0.5 text-[11px]">
+            {s.on_odeme_tutar === null && <button type="button" onClick={() => onAc(s)} disabled={mesgul} className="underline mr-2" style={{ color: ACCENT }} data-onodeme-tutar>Tutar gir</button>}
+            <button type="button" onClick={() => setOnay(true)} disabled={mesgul} className="underline" style={{ color: TEXT_MUTED }} data-onodeme-geri>Geri al</button>
+          </span>
+        )
+      )}
+    </div>
+  );
+}
+
 /** Export'un sipariş listesi Excel'iyle BİREBİR aynı 11 başlık; sağda sistem sütunları */
 const SIPARIS_BASLIKLARI = ["Proforma", "Firma Adı", "Ürün", "Fiyat", "Miktar", "Tutar", "Konteyner", "Liman", "BL NO", "Marka", "Paketleme"];
 
-function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
-  liste: SiparisSatiri[]; isaretleyebilir: boolean; onIsaretle: (s: SiparisSatiri, v: boolean) => void; bekleyen: string | null;
+function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, mesgul }: {
+  satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: string | null;
 }) {
   return (
-    <div className="rounded-xl border overflow-x-auto" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED, backgroundColor: ROW_HEADER_BG }} data-testid="siparis-baslik">
-            {SIPARIS_BASLIKLARI.map((b, i) => <th key={b} className={`px-3 py-2 font-medium whitespace-nowrap ${i >= 3 && i <= 6 ? "text-right" : ""}`}>{b}</th>)}
-            <th className="px-3 py-2 font-medium whitespace-nowrap" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>Durum</th><th className="px-3 py-2 font-medium whitespace-nowrap">Ön ödeme</th>
-            <th className="px-3 py-2 font-medium whitespace-nowrap">Dosya / Booking</th>
+    <>
+      {satirlar.map((s) => {
+        const sevk = s.durum === "sevk_edildi";
+        return (
+          <tr key={s.anahtar} className="border-t align-top" style={{ borderColor: CARD_BORDER, backgroundColor: sevk ? "rgba(16,185,129,0.07)" : undefined }}
+            data-testid="siparis-satiri" data-proforma={s.proforma_no || ""} data-bolum={siparisBolumu(s.durum)}>
+            <td className="px-3 py-2 whitespace-nowrap">
+              <span className="text-white font-medium">{s.proforma_no || "—"}</span>
+              <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
+            </td>
+            <td className="px-3 py-2 text-white min-w-[160px]">{s.firma || "—"}</td>
+            <td className="px-3 py-2 min-w-[150px]" style={{ color: "#C9D1DC" }}>{s.urun || "—"}</td>
+            <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.birim_fiyat, 2)}</td>
+            <td className="px-3 py-2 text-right tabular-nums text-white">{sayiGoster(s.miktar_mt, 2)}</td>
+            <td className="px-3 py-2 text-right tabular-nums text-white whitespace-nowrap">{s.tutar === null ? "—" : `${sayiGoster(s.tutar, 2)} ${paraIsareti(s.para_birimi)}`}</td>
+            <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.konteyner)}</td>
+            <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{s.liman || "—"}</td>
+            <td className="px-3 py-2 font-mono text-xs" style={{ color: "#C9D1DC" }}>{s.bl_no || "—"}</td>
+            <td className="px-3 py-2 min-w-[110px]" style={{ color: "#C9D1DC" }}>{s.marka || "—"}</td>
+            <td className="px-3 py-2 min-w-[110px] text-xs" style={{ color: "#C9D1DC" }}>{s.paketleme || "—"}</td>
+            <td className="px-3 py-2" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>
+              {s.durum === "onay_bekliyor" ? <span className="text-xs" style={{ color: TEXT_MUTED }} data-durum={s.durum}>—</span> : <DurumRozeti d={s.durum} />}
+              {s.benzer && s.kaynak === "sistem" && (
+                <span className="mt-1 flex items-start gap-1 text-[11px] max-w-[220px]" style={{ color: "#FCD34D" }} data-benzer>
+                  <AlertTriangle size={12} className="shrink-0 mt-0.5" /> Olası tekrar: {s.benzer}
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+              {s.dosya_no || (s.durum === "on_odeme_alindi" ? <span className="text-amber-300">Rezervasyon alınmadı</span> : "—")}
+              {s.booking_no ? <span className="block">{s.booking_no}</span> : null}
+              {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
+            </td>
+            {/* Ön ödeme işlemi tablonun sağına sabit: geniş tabloda kaydırmadan erişilir */}
+            <td className="px-3 py-2 sticky right-0" style={{ backgroundColor: CARD_BG, borderLeft: `1px solid ${CARD_BORDER}`, boxShadow: "-6px 0 8px -6px rgba(0,0,0,0.5)" }}>
+              <OnOdemeHucresi s={s} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul === s.anahtar} />
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {liste.map((s) => {
-            const degisir = isaretleyebilir && ON_ODEME_DEGISIR.includes(s.durum) && !!s.proforma_no;
-            return (
-              <tr key={s.anahtar} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="siparis-satiri" data-proforma={s.proforma_no || ""}>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <span className="text-white font-medium">{s.proforma_no || "—"}</span>
-                  <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
-                </td>
-                <td className="px-3 py-2 text-white min-w-[160px]">{s.firma || "—"}</td>
-                <td className="px-3 py-2 min-w-[150px]" style={{ color: "#C9D1DC" }}>{s.urun || "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.birim_fiyat, 2)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-white">{sayiGoster(s.miktar_mt, 2)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-white whitespace-nowrap">{s.tutar === null ? "—" : `${sayiGoster(s.tutar, 2)} ${s.para_birimi === "EUR" ? "€" : "$"}`}</td>
-                <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.konteyner)}</td>
-                <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{s.liman || "—"}</td>
-                <td className="px-3 py-2 font-mono text-xs" style={{ color: "#C9D1DC" }}>{s.bl_no || "—"}</td>
-                <td className="px-3 py-2 min-w-[110px]" style={{ color: "#C9D1DC" }}>{s.marka || "—"}</td>
-                <td className="px-3 py-2 min-w-[110px] text-xs" style={{ color: "#C9D1DC" }}>{s.paketleme || "—"}</td>
-                <td className="px-3 py-2" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>
-                  <DurumRozeti d={s.durum} />
-                  {s.benzer && s.kaynak === "sistem" && (
-                    <span className="mt-1 flex items-start gap-1 text-[11px] max-w-[220px]" style={{ color: "#FCD34D" }} data-benzer>
-                      <AlertTriangle size={12} className="shrink-0 mt-0.5" /> Olası tekrar: {s.benzer}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {degisir ? (
-                    <label className="inline-flex items-center gap-2 cursor-pointer text-xs" style={{ color: s.on_odeme ? "#93C5FD" : TEXT_MUTED }}>
-                      <input type="checkbox" checked={s.on_odeme} disabled={bekleyen === s.anahtar}
-                        onChange={(e) => onIsaretle(s, e.target.checked)} aria-label={`${s.proforma_no} ön ödeme`} className="h-4 w-4 accent-[#F4A07C]" />
-                      {s.on_odeme ? `Alındı${s.on_odeme_tarihi ? ` ${trTarih(s.on_odeme_tarihi).slice(0, 5)}` : ""}` : "Bekleniyor"}
-                    </label>
-                  ) : (
-                    <span className="text-xs" style={{ color: s.on_odeme ? "#93C5FD" : TEXT_MUTED }}>{s.on_odeme ? "Alındı" : "—"}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>
-                  {s.dosya_no || "—"}{s.booking_no ? <span className="block">{s.booking_no}</span> : null}
-                  {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+        );
+      })}
+    </>
+  );
+}
+
+/** Excel'deki gibi bölümlü sipariş listesi; her bölümde en güncel en altta. */
+function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, mesgul, sevkAcik, setSevkAcik }: {
+  liste: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: string | null;
+  sevkAcik: boolean; setSevkAcik: (v: boolean) => void;
+}) {
+  const bolumler = useMemo(() => siparisBolumleri(liste), [liste]);
+  return (
+    <div className="space-y-4">
+      {bolumler.map((b) => {
+        if (b.bolum === "iptal" && !b.adet) return null;
+        const sevkler = b.bolum === "rezervasyon" ? b.satirlar.filter((s) => s.durum === "sevk_edildi") : [];
+        const gorunen = b.bolum === "rezervasyon" && !sevkAcik ? b.satirlar.filter((s) => s.durum !== "sevk_edildi") : b.satirlar;
+        const tutarlar = Object.entries(b.tutar).map(([p, t]) => `${sayiGoster(t, 0)} ${paraIsareti(p)}`).join(" + ") || "—";
+        const vurgu = b.bolum === "on_odeme" ? "#93C5FD" : b.bolum === "bekleyen" ? "#CBD5E1" : b.bolum === "rezervasyon" ? "#6EE7B7" : "#64748B";
+        return (
+          <section key={b.bolum} id={`bolum-${b.bolum}`} className="rounded-xl border overflow-hidden scroll-mt-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={`bolum-${b.bolum}`}>
+            <div className="px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1" style={{ backgroundColor: ROW_HEADER_BG, borderLeft: `3px solid ${vurgu}` }}>
+              <h3 className="text-[13px] font-semibold text-white leading-snug" data-bolum-baslik>{BOLUM_BASLIGI[b.bolum]}</h3>
+              <span className="text-xs ml-auto tabular-nums whitespace-nowrap" style={{ color: TEXT_MUTED }} data-bolum-ozet>
+                {b.adet} sipariş · {sayiGoster(b.mt, 2)} MT · {b.konteyner} kont. · {tutarlar}
+              </span>
+            </div>
+            {b.adet === 0 ? (
+              <p className="px-4 py-4 text-sm" style={{ color: TEXT_MUTED }}>Bu bölümde sipariş yok.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }} data-testid="siparis-baslik">
+                      {SIPARIS_BASLIKLARI.map((h, i) => <th key={h} className={`px-3 py-2 font-medium whitespace-nowrap ${i >= 3 && i <= 6 ? "text-right" : ""}`}>{h}</th>)}
+                      <th className="px-3 py-2 font-medium whitespace-nowrap" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>Durum</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap">Dosya / Booking</th>
+                      <th className="px-3 py-2 font-medium whitespace-nowrap sticky right-0" style={{ backgroundColor: CARD_BG, borderLeft: `1px solid ${CARD_BORDER}` }}>Ön ödeme</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.bolum === "rezervasyon" && sevkler.length > 0 && (
+                      <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
+                        <td colSpan={14} className="px-3 py-2">
+                          <button type="button" onClick={() => setSevkAcik(!sevkAcik)} className="text-xs font-medium" style={{ color: "#6EE7B7" }} data-sevk-ac>
+                            {sevkAcik ? `Sevk edilen ${sevkler.length} siparişi gizle ▲` : `Sevk edilen ${sevkler.length} sipariş gizli — göster ▼`}
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul} />
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "Ön ödeme alındı" penceresi: tutar (zorunlu), para birimi, ödeme tarihi. */
+function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () => void; onKaydet: (tutar: number, para: string, tarih: string) => Promise<string | null> }) {
+  const bugun = bugunIst();
+  const [tutar, setTutar] = useState(s.on_odeme_tutar !== null ? String(s.on_odeme_tutar).replace(".", ",") : "");
+  const [para, setPara] = useState(s.on_odeme_para || (s.para_birimi === "EUR" ? "EUR" : "USD"));
+  const [tarih, setTarih] = useState(s.on_odeme_tarihi || bugun);
+  const [hata, setHata] = useState<string | null>(null);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const sayi = Number(tutar.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+  const gonder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!Number.isFinite(sayi) || sayi <= 0) { setHata("Ön ödeme tutarını girin."); return; }
+    if (!tarih || tarih > bugun) { setHata("Ödeme tarihi bugünden ileri olamaz."); return; }
+    setKaydediliyor(true); setHata(null);
+    const h = await onKaydet(Math.round(sayi * 100) / 100, para, tarih);
+    setKaydediliyor(false);
+    if (h) setHata(h);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true" aria-labelledby="onodeme-baslik"
+      onMouseDown={(e) => { if (e.target === e.currentTarget && !kaydediliyor) onKapat(); }} data-testid="onodeme-formu">
+      <form onSubmit={gonder} className="w-full max-w-md rounded-xl border shadow-xl" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
+          <p id="onodeme-baslik" className="text-sm font-semibold text-white">Ön ödeme alındı</p>
+          <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+            {s.proforma_no} · {s.firma}{s.tutar !== null ? ` · proforma ${sayiGoster(s.tutar, 2)} ${paraIsareti(s.para_birimi)}` : ""}
+          </p>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="grid grid-cols-[1fr_96px] gap-2">
+            <label className="text-xs" style={{ color: TEXT_MUTED }}>Alınan tutar
+              <input autoFocus inputMode="decimal" value={tutar} onChange={(e) => setTutar(e.target.value)} placeholder="ör. 14.580" aria-label="Ön ödeme tutarı"
+                className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white tabular-nums" style={{ borderColor: CARD_BORDER }} />
+            </label>
+            <label className="text-xs" style={{ color: TEXT_MUTED }}>Para birimi
+              <select value={para} onChange={(e) => setPara(e.target.value)} aria-label="Para birimi"
+                className="mt-1 h-9 w-full rounded-lg border px-2 text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}>
+                <option value="USD">USD</option><option value="EUR">EUR</option><option value="TRY">TRY</option>
+              </select>
+            </label>
+          </div>
+          <label className="block text-xs" style={{ color: TEXT_MUTED }}>Ödeme tarihi
+            <input type="date" value={tarih} max={bugun} onChange={(e) => setTarih(e.target.value)} aria-label="Ödeme tarihi"
+              className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white" style={{ borderColor: CARD_BORDER, colorScheme: "dark" }} />
+          </label>
+          <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+            Kaydedince sipariş &quot;Ön ödemesi alınmış&quot; bölümüne geçer ve yükleme planında &quot;Rezervasyon alınmadı&quot; olarak görünür.
+          </p>
+          {hata && <p className="text-xs text-red-400 flex items-center gap-1.5" role="alert"><AlertTriangle size={13} />{hata}</p>}
+        </div>
+        <div className="px-5 py-3 border-t flex justify-end gap-2" style={{ borderColor: CARD_BORDER }}>
+          <button type="button" onClick={onKapat} disabled={kaydediliyor} className="px-3 py-2 rounded-lg border text-xs font-medium disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
+          <button type="submit" disabled={kaydediliyor} data-testid="onodeme-kaydet" className="px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+            {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -160,6 +302,7 @@ function PlanTablosu({ liste, bugun }: { liste: PlanSatiri[]; bugun: string }) {
                     <td className={`${hucre} text-white font-medium min-w-[160px] whitespace-normal`}>
                       {p.musteri || "—"}
                       {p.kaynak === "sistem" ? <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-500/15 text-sky-300" title="Excel'de yok; rezervasyondan">sistemden</span> : null}
+                      {p.kaynak === "siparis" && p.proforma_no ? <span className="block text-[11px] font-normal" style={{ color: TEXT_MUTED }}>{p.proforma_no}</span> : null}
                     </td>
                     <td className={hucre} style={renk}>{k[0].cinsi || "—"}</td>
                     <td className={`${hucre} text-right tabular-nums text-white`}>{sayiGoster(k[0].konteyner)}</td>
@@ -169,7 +312,11 @@ function PlanTablosu({ liste, bugun }: { liste: PlanSatiri[]; bugun: string }) {
                     <td className={hucre} style={renk}>{p.acente || "—"}</td>
                     <td className={hucre} style={renk}>{p.liman || "—"}</td>
                     <td className={hucre} style={renk}>{p.ekipman || p.ekipman_alim_yeri || "—"}</td>
-                    <td className={`${hucre} font-mono text-white`}>{p.booking_no || "—"}</td>
+                    <td className={`${hucre} font-mono text-white`}>
+                      {p.kaynak === "siparis"
+                        ? <span className="font-sans px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-amber-500/15 text-amber-300" data-rez-yok>Rezervasyon alınmadı</span>
+                        : p.booking_no || "—"}
+                    </td>
                     <td className={hucre} style={renk}>{trTarih(p.bos_ekipman_tarihi) || "—"}</td>
                     <td className={hucre} style={renk}>{trTarih(p.ardiyesiz_giris) || "—"}</td>
                     <td className={hucre} style={renk}>{trTarih(p.talimat_cutoff) || "—"}</td>
@@ -215,7 +362,8 @@ function SiparisIcerik() {
   const [plan, setPlan] = useState<PlanSatiri[] | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  const [filtre, setFiltre] = useState<SiparisFiltre>("acik");
+  const [sevkAcik, setSevkAcik] = useState(false);
+  const [onOdemeSatir, setOnOdemeSatir] = useState<SiparisSatiri | null>(null);
   const [planTum, setPlanTum] = useState(false);
   const [arama, setArama] = useState("");
   const [bekleyen, setBekleyen] = useState<string | null>(null);
@@ -239,11 +387,9 @@ function SiparisIcerik() {
   const q = norm(arama.trim());
   const gorunenSiparis = useMemo(() => {
     let l = siparisler || [];
-    if (filtre === "acik") l = l.filter((s) => ACIK_DURUMLAR.includes(s.durum));
-    else if (filtre !== "tum") l = l.filter((s) => s.durum === filtre);
     if (q) l = l.filter((s) => [s.proforma_no, s.firma, s.urun, s.liman, s.marka, s.booking_no, s.dosya_no, s.bl_no].some((v) => v && norm(v).includes(q)));
-    return siparisSirala(l);
-  }, [siparisler, filtre, q]);
+    return l;
+  }, [siparisler, q]);
   const gorunenPlan = useMemo(() => {
     const sinir = new Date(Date.parse(`${bugun}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
     let l = plan || [];
@@ -252,12 +398,27 @@ function SiparisIcerik() {
     return l;
   }, [plan, planTum, q, bugun]);
 
-  const onIsaretle = async (s: SiparisSatiri, v: boolean) => {
+  const onOdemeKaydetFn = async (s: SiparisSatiri, tutar: number, para: string, tarih: string): Promise<string | null> => {
+    if (!s.proforma_no) return "Proforma no yok.";
+    try {
+      await onOdemeKaydet(s.proforma_no, true, tutar, para, tarih);
+      setOnOdemeSatir(null);
+      setBilgi(`${s.proforma_no}: ön ödeme kaydedildi (${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}). Sipariş "ön ödemesi alınmış" bölümüne ve yükleme planına eklendi.`);
+      await yukle();
+      return null;
+    } catch (e) { return e instanceof Error ? e.message : "Ön ödeme kaydedilemedi."; }
+  };
+  const onOdemeGeriAl = async (s: SiparisSatiri) => {
     if (!s.proforma_no) return;
     setBekleyen(s.anahtar); setHata(null);
-    try { await onOdemeIsaretle(s.proforma_no, v); await yukle(); }
-    catch (e) { setHata(e instanceof Error ? e.message : "Ön ödeme kaydedilemedi."); }
+    try { await onOdemeKaydet(s.proforma_no, false); setBilgi(`${s.proforma_no}: ön ödeme işareti geri alındı.`); await yukle(); }
+    catch (e) { setHata(e instanceof Error ? e.message : "Ön ödeme geri alınamadı."); }
     finally { setBekleyen(null); }
+  };
+  const bolumeGit = (b: string, sevk = false) => {
+    setSekme("siparis");
+    if (sevk) setSevkAcik(true);
+    setTimeout(() => document.getElementById(`bolum-${b}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const excelIndir = async () => {
@@ -280,12 +441,6 @@ function SiparisIcerik() {
     <button type="button" onClick={() => setSekme(k)} role="tab" aria-selected={sekme === k}
       className="h-9 px-4 rounded-lg text-sm font-medium" style={sekme === k ? { backgroundColor: ACCENT, color: "#FFFFFF" } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>{ad}</button>
   );
-  const filtreBtn = (k: SiparisFiltre, ad: string) => (
-    <button key={k} type="button" onClick={() => setFiltre(k)} className="h-8 px-3 rounded-full text-xs"
-      style={filtre === k ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}
-      data-filtre={k}>{ad}</button>
-  );
-
   return (
     <div className="max-w-[1400px]">
       <SayfaBasligi
@@ -311,11 +466,11 @@ function SiparisIcerik() {
       {!siparisler && yukleniyor ? <SayfaYukleniyor /> : siparisler && plan ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
-            <OzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => { setSekme("siparis"); setFiltre("acik"); }} secili={sekme === "siparis" && filtre === "acik"} />
-            <OzetKarti testId="ozet-onay" etiket="Onay bekliyor" deger={ozet.onay} onClick={() => { setSekme("siparis"); setFiltre("onay_bekliyor"); }} secili={sekme === "siparis" && filtre === "onay_bekliyor"} />
-            <OzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => { setSekme("siparis"); setFiltre("on_odeme_alindi"); }} secili={sekme === "siparis" && filtre === "on_odeme_alindi"} />
-            <OzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => { setSekme("siparis"); setFiltre("rezervasyonlu"); }} secili={sekme === "siparis" && filtre === "rezervasyonlu"} />
-            <OzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => { setSekme("siparis"); setFiltre("bl_eksik"); }} secili={sekme === "siparis" && filtre === "bl_eksik"} />
+            <OzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => bolumeGit("rezervasyon")} />
+            <OzetKarti testId="ozet-onay" etiket="Ön ödeme / onay bekliyor" deger={ozet.onay} onClick={() => bolumeGit("bekleyen")} />
+            <OzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı · rez. yok" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => bolumeGit("on_odeme")} />
+            <OzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => bolumeGit("rezervasyon")} />
+            <OzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => bolumeGit("rezervasyon", true)} />
             <OzetKarti testId="ozet-tekrar" etiket="Olası tekrar" deger={ozet.olasiTekrar} renk={ozet.olasiTekrar ? "#FCD34D" : undefined} alt="yeniden kesilmiş proforma?" />
           </div>
 
@@ -331,9 +486,10 @@ function SiparisIcerik() {
 
           {sekme === "siparis" ? (
             <>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {filtreBtn("acik", "Açık")}{filtreBtn("onay_bekliyor", "Onay bekliyor")}{filtreBtn("on_odeme_alindi", "Ön ödeme alındı")}
-                {filtreBtn("rezervasyonlu", "Rezervasyonlu")}{filtreBtn("bl_eksik", "BL eksik")}{filtreBtn("sevk_edildi", "Sevk edildi")}{filtreBtn("tum", "Tümü")}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <p className="text-xs" style={{ color: TEXT_MUTED }}>
+                  Yeni proforma &quot;Ön ödemesi veya onayı alınmamış&quot; bölümüne düşer → ön ödeme girilince rezervasyon bekleyenlere ve yükleme planına geçer → rezervasyonla üst bölüme taşınır. Her bölümde en güncel en altta.
+                </p>
                 {isaretleyebilir && (
                   <button type="button" onClick={() => setSiparisAktarAcik(true)} data-testid="siparis-aktar-ac"
                     className="h-8 px-3 ml-auto inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER }}>
@@ -347,11 +503,15 @@ function SiparisIcerik() {
                 </div>
               )}
               {siparisAktarAcik && (
-                <SiparisExcelAktar onKapat={() => setSiparisAktarAcik(false)} onAktarildi={(m) => { setSiparisAktarAcik(false); setBilgi(m); setFiltre("tum"); yukle(); }} />
+                <SiparisExcelAktar onKapat={() => setSiparisAktarAcik(false)} onAktarildi={(m) => { setSiparisAktarAcik(false); setBilgi(m); yukle(); }} />
+              )}
+              {onOdemeSatir && (
+                <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d) => onOdemeKaydetFn(onOdemeSatir, t, p, d)} />
               )}
               {gorunenSiparis.length ? (
-                <SiparisTablosu liste={gorunenSiparis} isaretleyebilir={isaretleyebilir} onIsaretle={onIsaretle} bekleyen={bekleyen} />
-              ) : <EmptyState icon={<ClipboardList size={40} />} title="Bu filtrede sipariş yok" />}
+                <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} mesgul={bekleyen}
+                  sevkAcik={sevkAcik || !!q} setSevkAcik={setSevkAcik} />
+              ) : <EmptyState icon={<ClipboardList size={40} />} title={q ? "Aramayla eşleşen sipariş yok" : "Sipariş yok"} />}
             </>
           ) : (
             <>

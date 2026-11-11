@@ -92,6 +92,29 @@ Kullanıcı: "Sipariş listesi içinde aynı şeyi yapmalıyız. Excel yükleyeb
   "sevk edildi" → "rezervasyonlu" düzeltmesi + 1 revize proforma no), 180 aynı; geri alınan kuru çalıştırma doğru.
 - Test: e2e_siparis 59 (kurgusal `siparis_ornek.xlsx`), yerel Postgres'te RPC senaryoları.
 
+## 4.6 Sipariş akışı: bölümlü liste + ön ödeme TUTARI + planda "rezervasyon alınmadı" (11.11.2026)
+Kullanıcı: "Export proforma oluşturuyor; durumu boş. Ön ödeme gelince TUTAR yazarak 'ön ödeme alındı' işaretleyecek;
+kayıt yükleme planına ve sipariş listesine otomatik dahil edilecek, rezervasyonu olmadığı için 'rezervasyonu alınmadı'
+diye ilerleyecek." Excel'deki bölümler + "en güncel en altta".
+- HATA (bizim): Excel aktarımı "ÖN ÖDEMESİ VEYA ONAYI ALINMAMIŞ" başlığını tanımadı → 11 sipariş yanlışlıkla
+  on_odeme_alindi oldu; canlıda geri alındı (guncelleyen = "duzeltme: aktarim bolum hatasi (11.11)"). Okuyucu: karar
+  "ÖN ÖDEMESİ"nin hemen ardındaki kelimeyle ("ALINMIŞ- … REZERVASYON ALINMAMIŞ" alınmış bölümüdür).
+- Migration `20261111120000_siparis_akisi_on_odeme_tutar.sql` (CANLIDA): `siparis_on_odemeler` + tutar / para_birimi;
+  `siparis_on_odeme_kaydet(proforma, alindi, tutar, para, tarih)` (alındı için tutar > 0 zorunlu; eski
+  `siparis_on_odeme_isaretle` geri uyum için duruyor); `siparis_listesi_veri` + on_odeme_tutar / on_odeme_para ve
+  "yalnız proforma ile dosyaya bağlama" artık YALNIZ proformanın Excel'de tek satırı varsa (bölünmüş sevkiyatta bekleyen
+  parça sevk edilmiş parçanın dosyasına bağlanıyordu); `yukleme_plani_veri` + kaynak `siparis` satırları (ön ödemesi
+  alınmış, rezervasyonu olmayan).
+- Ekran: 3 bölüm (+ varsa iptal) — üst "REZERVASYONU ALINAN VE SEVK EDİLEN" (sevk edilenler katlanır, yeşil),
+  "ÖN ÖDEMESİ ALINMIŞ- ONAYLI PROFORMA FAKAT HENÜZ REZERVASYON ALINMAMIŞ…", "ÖN ÖDEMESİ VEYA ONAYI ALINMAMIŞ"; bölüm
+  başlığında adet / MT / konteyner / tutar; her bölümde eski → yeni. Bekleyen satırda "Ön ödeme alındı" → pencere
+  (tutar, para birimi, tarih); alınmış satırda tutar + tarih, "Geri al" (iki adımlı), tutarı olmayan eski kayıtta
+  "Tutar gir". Ön ödeme sütunu tablonun sağına sabit. Plan: en üstte "REZERVASYON ALINMADI — ÖN ÖDEMESİ ALINMIŞ
+  SİPARİŞLER" bloğu. Excel indir: aynı bölüm başlıklarıyla (geri okunabilir; iptal bölümü aktarılmaz).
+- Canlı kontrol: 26 ön ödemesi alınmış (export listesiyle birebir), 16 onay bekleyen (11 Excel + 5 sistem proforması),
+  plan +26 "rezervasyon alınmadı"; geri alınan kuru çalıştırma (tutarsız reddedilir → işaret → planda → geri al) doğru.
+- Test: e2e_siparis 65.
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

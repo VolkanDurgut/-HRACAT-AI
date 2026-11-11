@@ -24,6 +24,35 @@ Kullanıcı: "Sipariş listesi her halükârda sisteme eklenmeli ve DİİB gibi 
 - Sıradaki: `/siparisler` sayfası + Excel'e aktar, 17:00 Sipariş Raporu (execution@, bbt@, export@, export2@; fiyat
   görünür), yedeğe yeni tablolar, Kontrol Merkezi 12 ay.
 
+## 4.3 Otomatik Sipariş Listesi + Yükleme Planı (11.11.2026) — Adım 2-3
+Kullanıcı: "Sipariş formu ile yükleme planının otomatik ve hatasız hazırlanabilmeli; sonra raporlayabilmeliyiz."
+Ön ödeme: "Sipariş listesinde ön ödeme girilebilsin" → elle girilen TEK alan.
+- İlke: KOPYA YOK. Migration `20261110160000_siparis_listesi_otomatik.sql` (+ `20261110170000_siparis_listesi_duzeltme`,
+  `20261111090000_siparis_benzer_daralt`, hepsi CANLIDA): `siparis_listesi_veri(company)` ve `yukleme_plani_veri(company)`
+  her okumada hesaplar. Kaynaklar: Excel geçmişi (`siparis_defteri`, `sevkiyat_plani`) + `proformalar` (Proforma Oluştur)
+  + `ihracat_dosyalari` (Proforma Yükle) + `rezervasyonlar`. Kullanıcı sarmalayıcıları `siparis_listesi()` /
+  `yukleme_plani()` ("proformalar" veya "analiz"); `_veri` fonksiyonları yalnız servis (17:00 raporu).
+- Eşleşme: `siparis_anahtar()` = boşluksuz, büyük harf, sondaki revize eki (`…051126R`) atılır. Excel satırı dosyaya:
+  önce `dosya_id`, sonra BL no, sonra tek eşleşen proforma. Aynı sipariş iki kez görünmez.
+- Durum (canlı): iptal (Excel) > ETD geçti: BL / draft BL varsa `sevk_edildi`, yoksa `bl_eksik` > rezervasyon var:
+  `rezervasyonlu` > ön ödeme işareti: `on_odeme_alindi` / `onay_bekliyor` (işaret yoksa Excel'deki değer).
+- Bölünmüş sevkiyat: konteyner Excel satırından; boş ürün / fiyat / tutar dosyadan tamamlanır.
+- "Olası tekrar" (`benzer`): SİSTEMDE yeni kesilmiş proforma ile Excel'deki sevk edilmemiş sipariş aynı müşteri kodu
+  (UNEX+3 harf) ve aynı miktarda ise uyarı; sistem BİRLEŞTİRMEZ, export karar verir.
+- Yükleme planı: rezervasyona bağlı satırda gemi / ETD / cut-off / konteyner / acente REZERVASYONDAN (operasyon
+  değiştirince plan da değişir); Excel'de olmayan yeni rezervasyon otomatik satır olur. Hafta: lojistiğin kuralı
+  (1. hafta = 1-7 Ocak), istemcide ETD'den hesaplanır (`planHaftasi`); SQL'deki `hafta` sütunu yalnız yedek.
+- Ön ödeme: `siparis_on_odemeler` + `siparis_on_odeme_isaretle(proforma_no, alindi)` ("proformalar"); yalnız
+  rezervasyon öncesi satırlarda değiştirilebilir.
+- Sayfa `/siparisler` "Sipariş Listesi" (menü: Proforma Yükle altında, yetki "proformalar"): özet kartları (açık / onay /
+  ön ödeme / rezervasyonlu / BL eksik / olası tekrar), iki sekme, durum filtreleri, arama, ön ödeme kutusu, Excel indir
+  (iki sayfa; export ve operasyon Excel'iyle aynı başlıklar + Durum / Ön ödeme / Dosya / Booking / ETD; plan hafta
+  bloklu; sevk edilen satır yeşil). Kod: `lib/siparis/{liste,veri,xlsx}.ts`. Test: e2e_siparis 36 (kurgusal).
+- Canlı kontrol (11.11.2026): 194 sipariş satırı (189 Excel + 5 sistem proforması; AQI revizesi birleşti), 222 plan
+  satırı; yetkili kullanıcı okuyabiliyor, yetkisiz "Yetkiniz yok."; 2 olası tekrar çifti (SBH, VHH) gösteriliyor.
+- Sıradaki (Adım 4): 17:00 Sipariş Raporu maili (execution, bbt, export, export2; fiyatlar görünür; Excel eki);
+  ilk gönderim YALNIZ test adresine.
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

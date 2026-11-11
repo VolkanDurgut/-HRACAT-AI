@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, Store } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -28,6 +28,8 @@ const mainItems: MenuItem[] = [
   { label: "Proforma Oluştur", href: "/proformalar", icon: <FileSignature size={18} />,   yetkiKey: "proformalar" },
   // 25.10.2026: "Yeni Dosya Ac" -> "Proforma Yukle" (kullanici karari; adres ve yetki ayni)
   { label: "Proforma Yükle", href: "/yeni-dosya", icon: <FileUp size={18} />,        yetkiKey: "yeni_dosya" },
+  // 11.11.2026: Siparis Listesi + Yukleme Plani - Excel'leri kimse doldurmaz; proforma/dosya/rezervasyondan otomatik
+  { label: "Sipariş Listesi", href: "/siparisler", icon: <ClipboardList size={18} />, yetkiKey: "proformalar", yalnizYetkili: true },
   { label: "İhracatlar",    href: "/ihracatlar",  icon: <Archive size={18} />,         yetkiKey: "ihracatlar" },
   // 28.10.2026: "Draft Onay" -> "İhracat Evrakları" (kullanici karari; adres ve yetki ayni)
   { label: "İhracat Evrakları", href: "/draft-onay", icon: <FileCheck2 size={18} />, yetkiKey: "draft_onay" },

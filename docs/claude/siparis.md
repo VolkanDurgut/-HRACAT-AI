@@ -53,6 +53,28 @@ Kullanıcı: "Sipariş formu ile yükleme planının otomatik ve hatasız hazır
 - Sıradaki (Adım 4): 17:00 Sipariş Raporu maili (execution, bbt, export, export2; fiyatlar görünür; Excel eki);
   ilk gönderim YALNIZ test adresine.
 
+## 4.4 Yükleme Planı — Excel'den içeri aktarma (11.11.2026)
+Kullanıcı: "Yükleme planını Excel ile içeri aktar yapılsın. ETD raporundaki gibi. Başlıklar birebir aynı olsun."
+- Migration `20261111100000_yukleme_plani_excel_aktar.sql` (CANLIDA): `sevkiyat_plani` + `kalemler` (jsonb; booking
+  altındaki ikinci ürün satırı), `hafta_baslik` (Excel'deki başlık aynen), `sira`; `sevkiyat_plani_aktarimlari` (kim / ne
+  zaman / sayılar); `booking_anahtar()`; `yukleme_plani_aktar(dosya_adi, satirlar)` ("proformalar"; tek işlem; hiçbir
+  kayıt silinmez; Excel'de boş hücre sistemdeki değeri silmez; rezervasyon / dosya / navlun alanlarına dokunmaz;
+  bağlantısız satırı aynı booking'li rezervasyona bağlar). `yukleme_plani_veri` artık kalemler / hafta_baslik / sira
+  döndürür; Excel satırında hafta Excel'deki haftadır.
+- Okuma TARAYICIDA (`lib/siparis/plan-excel.ts`, jszip): yıl sayfası, hafta başlığı satırı, 16 başlık başlık METNİNDEN,
+  alt başlık satırı atlanır; booking satırının altındaki satır = cut-off saatleri + sefer (+ varsa ikinci kalem; en
+  fazla 3 devam satırı). Aynı booking dosyada iki kez → tek booking, konteynerler toplanır, uyarı. "." / "," artıkları
+  yok sayılır. Okunamayan tarih → uyarı, değer gönderilmez.
+- Önizleme (`components/plan-excel-aktar.tsx`): yeni / değişecek (alan alan eski → yeni) / aynı / sistemde olup
+  dosyada olmayan (dokunulmaz) / uyarılar → "Aktar".
+- Görünüm ve Excel indir: operasyonun dosyasıyla birebir 16 başlık + alt başlık (BOŞ EKİPMAN / GEMİ KALKIŞ / SEFERİ;
+  KON.AD. altında haftalık toplam), her booking iki satır. Navlun / lokal / dosya no plan görünümünden çıkarıldı.
+- Hafta kuralı (Excel WEEKNUM(;1)): Pazar başlar, 1. hafta 1 Ocak'ı içeren hafta (2026: 46. hafta = 08-14 Kasım).
+  Excel satırında Excel'in haftası; Excel'de olmayan rezervasyonda ETD'den bu kuralla.
+- Canlı kontrol: gerçek dosya 222 booking; mevcut kayıtlarda 22 booking'in ikinci kalemi eksikti (konteyner az);
+  geri alınan kuru çalıştırmada iki örnek booking'in konteyneri doğru düzeldi. İlk gerçek aktarımı kullanıcı yapar.
+- Test: e2e_siparis 48 (kurgusal `plan_ornek.xlsx`), yerel Postgres'te RPC senaryoları (yetki, tekrar, şirket ayrımı).
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

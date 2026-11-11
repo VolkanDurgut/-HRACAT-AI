@@ -1,10 +1,10 @@
 /**
  * Siparis Listesi + Yukleme Plani -> .xlsx (11.11.2026). Export ve operasyonun Excel'leriyle AYNI basliklar;
  * sona sistemden gelen sutunlar eklendi (Durum, On Odeme, Dosya, Booking, ETD). Sevk edilen satir YESIL
- * (lib/xlsx-yaz.ts kurali). Yukleme plani hafta bloklari halinde: "46.HAFTA (12 KASIM - 18 KASIM)".
+ * (lib/xlsx-yaz.ts kurali). Yukleme plani operasyonun dosyasiyla ayni duzende: "46.HAFTA (08 KASIM - 14 KASIM)".
  */
 import { XS, type XlsxHucre, type XlsxSayfa } from "@/lib/xlsx-yaz";
-import { DURUM_ADI, haftaEtiketi, planHaftasi, planSirala, siparisSirala, type PlanSatiri, type SiparisSatiri } from "@/lib/siparis/liste";
+import { DURUM_ADI, planBloklari, planKalemleri, saat, siparisSirala, type PlanSatiri, type SiparisSatiri } from "@/lib/siparis/liste";
 
 const tarih = (iso: string | null): Date | null => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`) : null);
 const yesil = (t: boolean, normal: number, y: number) => (t ? y : normal);
@@ -33,34 +33,45 @@ export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi"):
   return { ad, sutunGenislik: [20, 30, 28, 9, 9, 12, 9, 14, 16, 18, 22, 22, 13, 14, 18, 11], satirlar };
 }
 
-const PLAN_BASLIK = ["MÜŞTERİ", "CİNSİ", "KON.AD.", "VARIŞ LİMANI", "ÇUVAL MARKASI", "AMBALAJ", "ACENTE", "LİMAN", "EKİPMAN", "BOOKING NO",
-  "BOŞ EKİPMAN ALIM TARİHİ", "ARDİYESİZ GİRİŞ", "TALİMAT CUT OFF", "BEYAN CUT OFF", "ETD", "GEMİ ADI", "SEFER", "NAVLUN / KONT.", "LOKAL / KONT.", "DOSYA NO"];
+/** Operasyonun yukleme plani Excel'iyle BIREBIR ayni 16 baslik ve alt baslik satiri */
+export const PLAN_BASLIK = ["MÜŞTERİ", "CİNSİ", "KON.AD.", "VARIŞ LİMANI", "ÇUVAL\nMARKASI", "AMBALAJ", "ACENTE", "LİMAN", "EKİPMAN", "BOOKING NO",
+  "BOŞ EKİPMAN\nALIM TARİHİ", "ARDİYESİZ GİRİŞ", "TALİMAT CUT OFF", "BEYAN CUT OFF", "ETD", "GEMİ ADI"];
+const ALT_BASLIK: Record<number, string> = { 8: "BOŞ EKİPMAN", 14: "GEMİ KALKIŞ", 15: "SEFERİ" };
 
+/**
+ * Yukleme plani sayfasi: operasyonun dosyasindaki duzen - hafta basligi, 16 baslik, alt baslik (KON.AD. altinda haftanin
+ * toplami), her booking IKI satir (2. satir: ikinci urun kalemi + cut-off saatleri + sefer). ETD'si gecen satir yesil.
+ */
 export function planSayfasi(liste: PlanSatiri[], ad = "Yükleme Planı", bugun?: string): XlsxSayfa {
   const satirlar: (XlsxHucre | null)[][] = [];
   const birlestir: string[] = [];
-  let sonBlok = "";
-  const son = "T";
-  for (const p of planSirala(liste)) {
-    const h = planHaftasi(p.etd, p.hafta, p.yil);
-    const blok = h.hafta && h.yil ? `${h.yil}|${h.hafta}` : "?";
-    if (blok !== sonBlok) {
-      sonBlok = blok;
-      if (satirlar.length) satirlar.push([]);
-      satirlar.push([{ v: h.hafta && h.yil ? `${h.yil} · ${haftaEtiketi(h.hafta, h.yil)}` : "HAFTA BELİRSİZ (ETD YOK)", s: XS.baslik }]);
-      birlestir.push(`A${satirlar.length}:${son}${satirlar.length}`);
-      satirlar.push(PLAN_BASLIK.map((b) => ({ v: b, s: XS.tabloBaslik })));
+  for (const b of planBloklari(liste)) {
+    if (satirlar.length) satirlar.push([], []);
+    satirlar.push([{ v: b.etiket, s: XS.baslik }]);
+    birlestir.push(`A${satirlar.length}:P${satirlar.length}`);
+    satirlar.push(PLAN_BASLIK.map((x) => ({ v: x, s: XS.tabloBaslik })));
+    satirlar.push(PLAN_BASLIK.map((_, i) => (i === 2 ? { v: b.konteyner, s: XS.toplamTamSayi } : { v: ALT_BASLIK[i] ?? "", s: XS.tabloBaslik })));
+    for (const p of b.satirlar) {
+      const t = !!(bugun && p.etd && p.etd.slice(0, 10) < bugun);
+      const m = (v: string | null | undefined) => ({ v: v ?? "", s: yesil(t, XS.metin, XS.metinYesil) });
+      const n = (v: number | null | undefined) => ({ v: v ?? null, s: yesil(t, XS.tamSayi, XS.tamSayiYesil) });
+      const d = (v: string | null) => ({ v: tarih(v), s: yesil(t, XS.tarih, XS.tarihYesil) });
+      const k = planKalemleri(p);
+      satirlar.push([
+        m(p.musteri), m(k[0].cinsi), n(k[0].konteyner), m(p.varis_limani), m(k[0].cuval_markasi), m(k[0].ambalaj), m(p.acente), m(p.liman),
+        m(p.ekipman ?? p.ekipman_alim_yeri), m(p.booking_no), d(p.bos_ekipman_tarihi), d(p.ardiyesiz_giris), d(p.talimat_cutoff), d(p.beyan_cutoff),
+        d(p.etd), m(p.gemi),
+      ]);
+      const ek = Math.max(1, k.length - 1);
+      for (let j = 0; j < ek; j++) {
+        const kk = k[j + 1];
+        satirlar.push([
+          m(""), m(kk?.cinsi), kk ? n(kk.konteyner) : m(""), m(""), m(kk?.cuval_markasi), m(kk?.ambalaj), m(""), m(""), m(""), m(""), m(""), m(""),
+          m(j === 0 ? saat(p.talimat_cutoff) : ""), m(j === 0 ? saat(p.beyan_cutoff) : ""), m(""), m(j === 0 ? p.sefer : ""),
+        ]);
+      }
     }
-    const t = !!(bugun && p.etd && p.etd.slice(0, 10) < bugun);
-    const m = (v: string | null | undefined) => ({ v: v ?? "", s: yesil(t, XS.metin, XS.metinYesil) });
-    const d = (v: string | null) => ({ v: tarih(v), s: yesil(t, XS.tarih, XS.tarihYesil) });
-    satirlar.push([
-      m(p.musteri), m(p.cinsi), { v: p.konteyner, s: yesil(t, XS.tamSayi, XS.tamSayiYesil) }, m(p.varis_limani), m(p.cuval_markasi),
-      m(p.ambalaj), m(p.acente), m(p.liman), m(p.ekipman ?? p.ekipman_alim_yeri), m(p.booking_no),
-      d(p.bos_ekipman_tarihi), d(p.ardiyesiz_giris), d(p.talimat_cutoff), d(p.beyan_cutoff), d(p.etd), m(p.gemi), m(p.sefer),
-      { v: p.navlun, s: yesil(t, XS.ondalik, XS.ondalikYesil) }, { v: p.lokal, s: yesil(t, XS.ondalik, XS.ondalikYesil) }, m(p.dosya_no),
-    ]);
   }
   if (!satirlar.length) satirlar.push([{ v: "Planlı yükleme yok.", s: XS.not }]);
-  return { ad, sutunGenislik: [26, 18, 8, 16, 16, 14, 14, 12, 12, 16, 12, 12, 12, 12, 11, 22, 10, 11, 11, 14], satirlar, birlestir };
+  return { ad, sutunGenislik: [30, 22, 9, 18, 20, 14, 16, 12, 18, 18, 13, 13, 13, 13, 12, 24], satirlar, birlestir };
 }

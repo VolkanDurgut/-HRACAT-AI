@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, Download, RefreshCw, Search, Ship } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, RefreshCw, Search, Ship, Upload } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import {
-  ACIK_DURUMLAR, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, haftaEtiketi, planHaftasi, planSirala, siparisOzeti, siparisSirala, trTarih,
+  ACIK_DURUMLAR, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planKalemleri, saat, siparisOzeti, siparisSirala, trTarih,
   type PlanSatiri, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import { onOdemeIsaretle, siparisListesiOku, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -118,61 +119,83 @@ function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
   );
 }
 
+/** Yukleme plani: operasyonun Excel'iyle BIREBIR ayni 16 baslik + alt baslik; her booking iki satir. */
+const PLAN_BASLIKLARI = ["MÜŞTERİ", "CİNSİ", "KON.AD.", "VARIŞ LİMANI", "ÇUVAL MARKASI", "AMBALAJ", "ACENTE", "LİMAN", "EKİPMAN", "BOOKING NO",
+  "BOŞ EKİPMAN ALIM TARİHİ", "ARDİYESİZ GİRİŞ", "TALİMAT CUT OFF", "BEYAN CUT OFF", "ETD", "GEMİ ADI"];
+const PLAN_ALT: Record<number, string> = { 8: "BOŞ EKİPMAN", 14: "GEMİ KALKIŞ", 15: "SEFERİ" };
+
 function PlanTablosu({ liste, bugun }: { liste: PlanSatiri[]; bugun: string }) {
-  const bloklar = useMemo(() => {
-    const out: { anahtar: string; etiket: string; satirlar: PlanSatiri[] }[] = [];
-    for (const p of planSirala(liste)) {
-      const h = planHaftasi(p.etd, p.hafta, p.yil);
-      const k = h.hafta && h.yil ? `${h.yil}|${h.hafta}` : "?";
-      let b = out[out.length - 1];
-      if (!b || b.anahtar !== k) { b = { anahtar: k, etiket: h.hafta && h.yil ? `${h.yil} · ${haftaEtiketi(h.hafta, h.yil)}` : "ETD belirsiz", satirlar: [] }; out.push(b); }
-      b.satirlar.push(p);
-    }
-    return out;
-  }, [liste]);
+  const bloklar = useMemo(() => planBloklari(liste), [liste]);
+  const hucre = "px-2.5 py-1.5 whitespace-nowrap";
   return (
     <div className="space-y-3">
       {bloklar.map((b) => (
         <div key={b.anahtar} className="rounded-xl border overflow-x-auto" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="plan-haftasi">
-          <div className="px-4 py-2 text-sm font-semibold flex items-center gap-2" style={{ backgroundColor: ROW_HEADER_BG, color: "#FFFFFF" }}>
+          <div className="px-4 py-2 text-sm font-semibold flex items-center gap-2 sticky left-0" style={{ backgroundColor: ROW_HEADER_BG, color: "#FFFFFF" }}>
             <Ship size={14} style={{ color: ACCENT }} /> <span data-hafta>{b.etiket}</span>
-            <span className="text-xs font-normal ml-auto" style={{ color: TEXT_MUTED }}>{b.satirlar.reduce((t, p) => t + (p.konteyner || 0), 0)} konteyner</span>
+            <span className="text-xs font-normal ml-3" style={{ color: TEXT_MUTED }}>{b.satirlar.length} booking · {b.konteyner} konteyner</span>
           </div>
-          <table className="w-full text-sm">
+          <table className="w-full text-[12.5px]">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
-                <th className="px-3 py-2 font-medium">Müşteri</th><th className="px-3 py-2 font-medium">Cinsi</th>
-                <th className="px-3 py-2 font-medium text-right">Kont.</th><th className="px-3 py-2 font-medium">Varış</th>
-                <th className="px-3 py-2 font-medium">Marka / Ambalaj</th><th className="px-3 py-2 font-medium">Acente / Liman</th>
-                <th className="px-3 py-2 font-medium">Booking</th><th className="px-3 py-2 font-medium">Boş ekip.</th>
-                <th className="px-3 py-2 font-medium">Ardiyesiz</th><th className="px-3 py-2 font-medium">Talimat c/o</th>
-                <th className="px-3 py-2 font-medium">Beyan c/o</th><th className="px-3 py-2 font-medium">ETD</th>
-                <th className="px-3 py-2 font-medium">Gemi / Sefer</th><th className="px-3 py-2 font-medium text-right">Navlun</th>
+              <tr className="text-left text-[10.5px] uppercase tracking-wide" style={{ color: TEXT_MUTED }} data-testid="plan-baslik">
+                {PLAN_BASLIKLARI.map((x, i) => <th key={x} className={`px-2.5 pt-2 pb-0.5 font-semibold whitespace-nowrap ${i === 2 ? "text-right" : ""}`}>{x}</th>)}
+              </tr>
+              <tr className="text-left text-[10px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
+                {PLAN_BASLIKLARI.map((x, i) => (
+                  <th key={x} className={`px-2.5 pb-1.5 font-normal whitespace-nowrap ${i === 2 ? "text-right text-white font-semibold" : ""}`}>{i === 2 ? b.konteyner : PLAN_ALT[i] ?? ""}</th>
+                ))}
               </tr>
             </thead>
-            <tbody>
-              {b.satirlar.map((p) => {
-                const gecti = !!(p.etd && p.etd.slice(0, 10) < bugun);
-                return (
-                  <tr key={p.anahtar} className="border-t" style={{ borderColor: CARD_BORDER, opacity: gecti ? 0.7 : 1 }} data-testid="plan-satiri" data-booking={p.booking_no || ""}>
-                    <td className="px-3 py-2 text-white min-w-[150px]">{p.musteri || "—"}{p.kaynak === "sistem" ? <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>sistemden</span> : null}</td>
-                    <td className="px-3 py-2 min-w-[120px]" style={{ color: "#C9D1DC" }}>{p.cinsi || "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-white">{sayiGoster(p.konteyner)}</td>
-                    <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{p.varis_limani || "—"}</td>
-                    <td className="px-3 py-2 text-xs" style={{ color: "#C9D1DC" }}>{p.cuval_markasi || "—"}<span className="block" style={{ color: TEXT_MUTED }}>{p.ambalaj || ""}</span></td>
-                    <td className="px-3 py-2 text-xs" style={{ color: "#C9D1DC" }}>{p.acente || "—"}<span className="block" style={{ color: TEXT_MUTED }}>{p.liman || ""}</span></td>
-                    <td className="px-3 py-2 whitespace-nowrap text-white">{p.booking_no || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }}>{trTarih(p.bos_ekipman_tarihi) || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }}>{trTarih(p.ardiyesiz_giris) || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }}>{trTarih(p.talimat_cutoff) || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }}>{trTarih(p.beyan_cutoff) || "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap font-medium" style={{ color: gecti ? "#6EE7B7" : "#FFFFFF" }} data-etd>{trTarih(p.etd) || "—"}</td>
-                    <td className="px-3 py-2 text-xs min-w-[130px]" style={{ color: "#C9D1DC" }}>{p.gemi || "—"}<span className="block" style={{ color: TEXT_MUTED }}>{p.sefer || ""}</span></td>
-                    <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap" style={{ color: "#C9D1DC" }}>{p.navlun === null ? "—" : `${sayiGoster(p.navlun)} $`}{p.lokal !== null ? <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>lokal {sayiGoster(p.lokal)}</span> : null}</td>
+            {b.satirlar.map((p) => {
+              const gecti = !!(p.etd && p.etd.slice(0, 10) < bugun);
+              const k = planKalemleri(p);
+              const ekSatir = Math.max(1, k.length - 1);
+              const renk = { color: "#C9D1DC" };
+              return (
+                <tbody key={p.anahtar} className="border-t" style={{ borderColor: CARD_BORDER, opacity: gecti ? 0.72 : 1 }} data-testid="plan-satiri" data-booking={p.booking_no || ""}>
+                  <tr>
+                    <td className={`${hucre} text-white font-medium min-w-[160px] whitespace-normal`}>
+                      {p.musteri || "—"}
+                      {p.kaynak === "sistem" ? <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-500/15 text-sky-300" title="Excel'de yok; rezervasyondan">sistemden</span> : null}
+                    </td>
+                    <td className={hucre} style={renk}>{k[0].cinsi || "—"}</td>
+                    <td className={`${hucre} text-right tabular-nums text-white`}>{sayiGoster(k[0].konteyner)}</td>
+                    <td className={hucre} style={renk}>{p.varis_limani || "—"}</td>
+                    <td className={hucre} style={renk}>{k[0].cuval_markasi || "—"}</td>
+                    <td className={hucre} style={renk}>{k[0].ambalaj || "—"}</td>
+                    <td className={hucre} style={renk}>{p.acente || "—"}</td>
+                    <td className={hucre} style={renk}>{p.liman || "—"}</td>
+                    <td className={hucre} style={renk}>{p.ekipman || p.ekipman_alim_yeri || "—"}</td>
+                    <td className={`${hucre} font-mono text-white`}>{p.booking_no || "—"}</td>
+                    <td className={hucre} style={renk}>{trTarih(p.bos_ekipman_tarihi) || "—"}</td>
+                    <td className={hucre} style={renk}>{trTarih(p.ardiyesiz_giris) || "—"}</td>
+                    <td className={hucre} style={renk}>{trTarih(p.talimat_cutoff) || "—"}</td>
+                    <td className={hucre} style={renk}>{trTarih(p.beyan_cutoff) || "—"}</td>
+                    <td className={`${hucre} font-semibold`} style={{ color: gecti ? "#6EE7B7" : "#FFFFFF" }} data-etd>{trTarih(p.etd) || "—"}</td>
+                    <td className={`${hucre} text-white`}>{p.gemi || "—"}</td>
                   </tr>
-                );
-              })}
-            </tbody>
+                  {Array.from({ length: ekSatir }, (_, j) => {
+                    const kk = k[j + 1];
+                    const alt = { color: TEXT_MUTED };
+                    return (
+                      <tr key={j} className="text-[11.5px]" data-ek-satir>
+                        <td className={hucre} />
+                        <td className={hucre} style={renk}>{kk?.cinsi || ""}</td>
+                        <td className={`${hucre} text-right tabular-nums text-white`}>{kk ? sayiGoster(kk.konteyner) : ""}</td>
+                        <td className={hucre} />
+                        <td className={hucre} style={renk}>{kk?.cuval_markasi || ""}</td>
+                        <td className={hucre} style={renk}>{kk?.ambalaj || ""}</td>
+                        <td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} />
+                        <td className={`${hucre} tabular-nums`} style={alt}>{j === 0 ? saat(p.talimat_cutoff) : ""}</td>
+                        <td className={`${hucre} tabular-nums`} style={alt}>{j === 0 ? saat(p.beyan_cutoff) : ""}</td>
+                        <td className={hucre} />
+                        <td className={hucre} style={alt}>{j === 0 ? p.sefer || "" : ""}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              );
+            })}
           </table>
         </div>
       ))}
@@ -194,6 +217,8 @@ function SiparisIcerik() {
   const [arama, setArama] = useState("");
   const [bekleyen, setBekleyen] = useState<string | null>(null);
   const [indiriliyor, setIndiriliyor] = useState(false);
+  const [aktarAcik, setAktarAcik] = useState(false);
+  const [bilgi, setBilgi] = useState<string | null>(null);
   const bugun = bugunIst();
 
   const yukle = useCallback(async () => {
@@ -262,7 +287,7 @@ function SiparisIcerik() {
       <SayfaBasligi
         ikon={<ClipboardList size={20} />}
         baslik="Sipariş Listesi"
-        aciklama="Proforma, dosya ve rezervasyonlardan otomatik · elle girilen tek bilgi: ön ödeme"
+        aciklama="Proforma, dosya ve rezervasyonlardan otomatik · elle girilen: ön ödeme · yükleme planı Excel'den aktarılır"
         sag={
           <div className="flex items-center gap-2">
             <button type="button" onClick={excelIndir} disabled={!siparisler || indiriliyor} className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
@@ -317,7 +342,21 @@ function SiparisIcerik() {
                   style={!planTum ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Son 7 gün + gelecek</button>
                 <button type="button" onClick={() => setPlanTum(true)} className="h-8 px-3 rounded-full text-xs" data-plan-filtre="tum"
                   style={planTum ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Tüm yıl</button>
+                {isaretleyebilir && (
+                  <button type="button" onClick={() => setAktarAcik(true)} data-testid="plan-aktar-ac"
+                    className="h-8 px-3 ml-auto inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER }}>
+                    <Upload size={13} style={{ color: ACCENT }} /> Excel&apos;den içeri aktar
+                  </button>
+                )}
               </div>
+              {bilgi && (
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2 mb-3 text-sm" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" }} role="status" data-testid="plan-bilgi">
+                  <CheckCircle2 size={15} className="shrink-0" /> <span>{bilgi}</span>
+                </div>
+              )}
+              {aktarAcik && (
+                <PlanExcelAktar onKapat={() => setAktarAcik(false)} onAktarildi={(m) => { setAktarAcik(false); setBilgi(m); setPlanTum(true); yukle(); }} />
+              )}
               {gorunenPlan.length ? <PlanTablosu liste={gorunenPlan} bugun={bugun} /> : <EmptyState icon={<Ship size={40} />} title="Planlı yükleme yok" />}
             </>
           )}

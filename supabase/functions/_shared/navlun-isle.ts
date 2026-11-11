@@ -1,5 +1,5 @@
 // Navlun Bildirimi: tek mailin kayda donusturulmesi (edge navlun-bildirimi kullanir; test edilebilir olsun diye ayri).
-import { armatorAdi, ekFormuOku, fiyatAdaylari, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
+import { armatorAdi, ekFormuOku, fiyatAdaylari, freeTimeBul, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, transitBul, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
 import { limanAnahtari } from "./liman-anahtari.ts";
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
@@ -50,9 +50,14 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
     if (ekten.length && (formdan || ektenGuvenli(ekten, g.ek_metin))) {
       // metindeki free time / gecerlilik bilgisi ekten gelen fiyata tasinir
       const ekBilgi = olaylar.find((o) => o.tur === "ek_teklif");
+      const ekDuz = g.ek_metin.replace(/\s+/g, " ");
+      const ekTransit = transitBul(ekDuz);
       olaylar = [
         ...olaylar.filter((o) => o.tur !== "ek_teklif"),
-        ...ekten.map((o) => ({ ...o, free_time_gun: o.free_time_gun ?? ekBilgi?.free_time_gun ?? null, gecerlilik: o.gecerlilik ?? ekBilgi?.gecerlilik ?? null, armator: o.armator ?? ekBilgi?.armator ?? null })),
+        ...ekten.map((o) => ({
+          ...o, free_time_gun: o.free_time_gun ?? ekBilgi?.free_time_gun ?? null, gecerlilik: o.gecerlilik ?? ekBilgi?.gecerlilik ?? null,
+          armator: o.armator ?? ekBilgi?.armator ?? null, transit_gun: o.transit_gun ?? ekBilgi?.transit_gun ?? ekTransit,
+        })),
       ];
     }
   }
@@ -71,7 +76,20 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
       ? (yeniKisim(g.govde).slice(0, 600) + (g.ek_metin.trim() ? "\n--- EK ---\n" + g.ek_metin.replace(/[ \t]+/g, " ").replace(/\n{2,}/g, "\n").trim() : "")).slice(0, 2000)
       : null,
     olaylar: olaylar.map((o) => ({ ...o, liman_anahtar: limanAnahtari(o.liman) })),
+    // 11.11.2026: ham metin saklanir -> okuyucu gelistikce sunucuda yeniden islenebilir (edge "yeniden_isle")
+    govde: g.govde.slice(0, 8000),
+    ek_metin: g.ek_metin ? g.ek_metin.slice(0, 12000) : null,
+    ek_kaynak: g.ek_kaynak || null,
+    // Elle duzeltilmis mailde (olaylari korunur) eksik free time / transit bu bilgiden tamamlanir
+    ek_bilgi: ekBilgisi(g),
   };
+}
+
+/** Mail metni + ek metninden free time ve transit (elle duzeltilmis teklifi tamamlamak icin). */
+export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): { free_time_gun: number | null; transit_gun: string | null } {
+  const metin = yeniKisim(g.govde || "").replace(/\s+/g, " ");
+  const ek = (g.ek_metin || "").replace(/\s+/g, " ");
+  return { free_time_gun: freeTimeBul(metin) ?? (ek ? freeTimeBul(ek) : null), transit_gun: transitBul(metin) ?? (ek ? transitBul(ek) : null) };
 }
 
 

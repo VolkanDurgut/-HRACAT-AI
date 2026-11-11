@@ -8,7 +8,7 @@
  * Kaynaklar (yalniz sistemde olan bilgi; tahmin YOK):
  *  - navlun_teklifleri: acentelerin mail teklifleri (teklif / karsi teklif / "hedefiniz uygundur"), hedefimiz, free time.
  *  - yukleme plani: gerceklesen navlun (rezervasyonu yapilmis yuklemenin konteyner basi navlunu, ETD ayi) - YESIL KALIN.
- * TRANSIT: maillerden henuz okunmuyor -> sutun sablondaki gibi var, bos.
+ * TRANSIT / FREE TIME: acentenin o limana SON yazdigi deger (mail metni, PDF / gorsel teklif; 11.11.2026'dan beri transit de okunur).
  * Hucre = o ay icin o blogun 20'DC fiyati (ayni ayda birden fazlaysa EN SON). 20'DC yoksa 40'HC metin olarak yazilir.
  */
 import { limanAnahtari } from "./liman-anahtari.ts";
@@ -24,6 +24,7 @@ export type NavlunOlayi = {
   para_birimi: string | null;
   ekipman: string | null;
   free_time_gun: number | null;
+  transit_gun?: string | null;
   tarih: string;
 };
 
@@ -46,6 +47,8 @@ export type NavlunBlogu = {
   hucreler: Map<string, Map<string, NavlunHucresi>>;
   /** liman anahtari -> son free time (gun) */
   freeTime: Map<string, number>;
+  /** liman anahtari -> son transit suresi (gun, "46-48") */
+  transit: Map<string, string>;
   limanSayisi: number;
 };
 
@@ -105,7 +108,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
   const bloklar = new Map<string, NavlunBlogu>();
   const blok = (ad: string) => {
     let b = bloklar.get(ad);
-    if (!b) { b = { ad, aylar: [], hucreler: new Map(), freeTime: new Map(), limanSayisi: 0 }; bloklar.set(ad, b); }
+    if (!b) { b = { ad, aylar: [], hucreler: new Map(), freeTime: new Map(), transit: new Map(), limanSayisi: 0 }; bloklar.set(ad, b); }
     return b;
   };
   const yaz = (b: NavlunBlogu, k: string, h: NavlunHucresi) => {
@@ -132,6 +135,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     const b = blok(blokAdi(o.acente, o.armator));
     yaz(b, k, { tutar, para, ekipman: (o.ekipman || "20DC").toUpperCase(), tarih: o.tarih, kaynak: "teklif" });
     if (o.free_time_gun != null) b.freeTime.set(k, o.free_time_gun);
+    if (o.transit_gun) b.transit.set(k, o.transit_gun);
   }
   let gerceklesenVar = false;
   for (const g of gerceklesen) {
@@ -202,7 +206,8 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
           r.push({ v: `${h.ekipman === "20DC" ? "" : `${h.ekipman} `}${h.tutar} ${para}`, s: A ? XS.navOrtaA : XS.navOrtaB });
         }
       }
-      r.push({ v: "", s: A ? XS.navOrtaA : XS.navOrtaB });                                   // TRANSIT: henuz okunmuyor
+      const tt = b.transit.get(l.anahtar);
+      r.push({ v: tt ? (/^\d+$/.test(tt) ? Number(tt) : tt) : "", s: A ? XS.navOrtaA : XS.navOrtaB });
       const ft = b.freeTime.get(l.anahtar);
       r.push({ v: ft ?? "", s: A ? XS.navOrtaA : XS.navOrtaB });
     });
@@ -213,13 +218,13 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
   const not = (v: string) => satirlar.push([null, { v, s: XS.not }]);
   not("Kaynak: acentelerin navlun talebi yazışmalarındaki teklifler (Navlun Bildirimi) — hücre: o ay alınan SON 20'DC fiyatı (USD).");
   if (t.gerceklesenVar) not("Yeşil kalın: gerçekleşen navlun (yükleme planı, rezervasyonu yapılmış yükleme, konteyner başı; ETD ayı).");
-  not("HEDEF: limana verdiğimiz son hedef fiyat · FREE TIME: acentenin son teklifindeki gün · TRANSIT: maillerden henüz okunmuyor.");
+  not("HEDEF: operasyonun acenteye yazdığı son hedef fiyat (\"hedef rakamımız …\") · FREE TIME / TRANSIT: acentenin teklifinde yazdığı gün (boş = teklifte belirtilmemiş).");
   not(`Oluşturma: ${tarihTr(t.tarih)} · İhracat AI`);
   return { ad, sutunGenislik: genislik, satirlar, birlestir, dondur: "D4" };
 }
 
 /** Mail ozeti icin: limanda guncel (son 60 gun) en iyi 20'DC teklif */
-export type GuncelEnIyi = { liman: string; blok: string; tutar: number; tarih: string; freeTime: number | null; hedef: number | null; teklifSayisi: number };
+export type GuncelEnIyi = { liman: string; blok: string; tutar: number; tarih: string; freeTime: number | null; transit: string | null; hedef: number | null; teklifSayisi: number };
 export function guncelEnIyiler(t: NavlunTablosu, gun = 60): GuncelEnIyi[] {
   const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
   const out: GuncelEnIyi[] = [];
@@ -233,7 +238,7 @@ export function guncelEnIyiler(t: NavlunTablosu, gun = 60): GuncelEnIyi[] {
         .sort((a, c) => c.tarih.localeCompare(a.tarih))[0];
       if (!son) continue;
       sayi++;
-      if (!en || son.tutar < en.tutar) en = { liman: l.ad, blok: b.ad, tutar: son.tutar, tarih: son.tarih, freeTime: b.freeTime.get(l.anahtar) ?? null, hedef: l.hedef?.tutar ?? null, teklifSayisi: 0 };
+      if (!en || son.tutar < en.tutar) en = { liman: l.ad, blok: b.ad, tutar: son.tutar, tarih: son.tarih, freeTime: b.freeTime.get(l.anahtar) ?? null, transit: b.transit.get(l.anahtar) ?? null, hedef: l.hedef?.tutar ?? null, teklifSayisi: 0 };
     }
     if (en) out.push({ ...en, teklifSayisi: sayi });
   }
@@ -260,7 +265,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda"): s
   const arasi = `<td style="width:2%">&nbsp;</td>`;
   const satirlar = en.map((x, i) => {
     const fark = x.hedef ? x.tutar - x.hedef : null;
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.liman)}</b>`)}${td(`<b style="color:#047857">${usd(x.tutar)}</b>`, "text-align:right;white-space:nowrap")}${td(esc(x.blok))}${td(x.freeTime != null ? `${x.freeTime} gün` : "-", "white-space:nowrap")}${td(x.hedef ? `${usd(x.hedef)}${fark !== null ? `<br><span style="font-size:11px;color:${fark <= 0 ? "#047857" : "#B45309"}">${fark <= 0 ? "hedefin altında" : `hedefin ${usd(fark)} üstünde`}</span>` : ""}` : "-", "text-align:right;white-space:nowrap")}${td(`${x.teklifSayisi}`, "text-align:right")}${td(tarihTr(new Date(Date.parse(x.tarih) + 3 * 3600000).toISOString().slice(0, 10)), "white-space:nowrap")}</tr>`;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.liman)}</b>`)}${td(`<b style="color:#047857">${usd(x.tutar)}</b>`, "text-align:right;white-space:nowrap")}${td(esc(x.blok))}${td(`${x.freeTime != null ? `${x.freeTime} gün` : "-"}${x.transit ? `<br><span style="font-size:11px;color:#64748B">transit ${esc(x.transit)} gün</span>` : ""}`, "white-space:nowrap")}${td(x.hedef ? `${usd(x.hedef)}${fark !== null ? `<br><span style="font-size:11px;color:${fark <= 0 ? "#047857" : "#B45309"}">${fark <= 0 ? "hedefin altında" : `hedefin ${usd(fark)} üstünde`}</span>` : ""}` : "-", "text-align:right;white-space:nowrap")}${td(`${x.teklifSayisi}`, "text-align:right")}${td(tarihTr(new Date(Date.parse(x.tarih) + 3 * 3600000).toISOString().slice(0, 10)), "white-space:nowrap")}</tr>`;
   }).join("");
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Navlun Tablosu</title></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
@@ -278,12 +283,12 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda"): s
     ${kutu("Fiyat Hücresi", `${doluHucre}`, "liman × acente × ay", "#B45309")}
   </tr></table>
   <div style="margin:24px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">Güncel en iyi 20'DC teklifler (son 60 gün)</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Liman")}${th("En iyi", true)}${th("Acente / Hat")}${th("Free time")}${th("Hedefimiz", true)}${th("Teklif", true)}${th("Tarih")}</tr>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Liman")}${th("En iyi", true)}${th("Acente / Hat")}${th("Free time · Transit")}${th("Hedefimiz", true)}${th("Teklif", true)}${th("Tarih")}</tr>
   ${satirlar || `<tr><td colspan="7" style="padding:10px 8px;color:#94A3B8;font-style:italic;font-size:12px">Son 60 günde teklif yok.</td></tr>`}</table>
   <div style="margin-top:24px;text-align:center">
     <a href="${NAVLUN_TABLOSU_URL}/navlun" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">Navlun Bildirimi'ni aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, operasyonun navlun tablosuyla aynı düzendedir (satır: liman · blok: acente / hat · sütun: ay, TRANSIT, FREE TIME) ve Navlun Bildirimi sayfasındaki "Excel indir" ile aynı dosyadır.<br>Hücre: o ay alınan son 20'DC teklifi; yeşil kalın = gerçekleşen navlun (yükleme planı). TRANSIT maillerden henüz okunmuyor.<br>Müşteriye gitmez.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, operasyonun navlun tablosuyla aynı düzendedir (satır: liman · blok: acente / hat · sütun: ay, TRANSIT, FREE TIME) ve Navlun Bildirimi sayfasındaki "Excel indir" ile aynı dosyadır.<br>Hücre: o ay alınan son 20'DC teklifi; yeşil kalın = gerçekleşen navlun (yükleme planı). FREE TIME / TRANSIT boşsa acente teklifinde belirtmemiştir.<br>Müşteriye gitmez.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

@@ -29,7 +29,7 @@ export async function navlunVerisiOku(gun = 120): Promise<NavlunVerisi> {
   for (let i = 0; i < 10; i++) {
     const { data, error } = await supabase
       .from("navlun_teklifleri")
-      .select("mesaj_id,tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,gecerlilik,lokal_dahil,kaynak,tarih")
+      .select("mesaj_id,tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,gecerlilik,lokal_dahil,kaynak,tarih")
       .gte("tarih", bas)
       .order("tarih", { ascending: true })
       .order("id", { ascending: true })

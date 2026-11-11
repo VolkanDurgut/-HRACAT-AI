@@ -27,6 +27,8 @@ export interface NavlunOlay {
   ekipman: string | null;      // 20DC | 40HC | 40DC
   armator: string | null;
   free_time_gun: number | null;
+  /** Transit suresi (gun) ham: "35" ya da "46-48" (11.11.2026) */
+  transit_gun: string | null;
   gecerlilik: string | null;   // ham metin (30.11 / 30.11.2026)
   lokal_dahil: boolean | null;
   pol: string | null;
@@ -161,13 +163,43 @@ function armatorBul(s: string, yakin?: number): string | null {
   return en ? en.ad : null;
 }
 
-function freeTimeBul(s: string): number | null {
+export function freeTimeBul(s: string): number | null {
   const m = s.match(/(\d{1,2})\s*(?:gün|gun|days?)\s*(?:ft\b|free|frfee)/i)
     || s.match(/(\d{1,2})\s*(?:calendar\s*)?days?\s*free/i)
     || s.match(/(\d{1,2})\s*free\s*var/i)
     || s.match(/(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/i)
-    || s.match(/(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/i);
-  return m ? Number(m[1]) : null;
+    || s.match(/(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/i)
+    // 11.11.2026: demuraj / serbest gun yazimlari ("14 DEM + 3 DET", "Demuraj serbest süre: 21", "21 gün serbest", "free days 14")
+    || s.match(/(\d{1,2})\s*(?:gün|gun|days?)?\s*DEM(?:URRAGE|URAJ)?\b(?!\s*tarife)/i)
+    || s.match(/demura(?:j|ge)\s*(?:serbest\s*s[üu]re(?:si)?)?\s*[:\-–]?\s*(\d{1,2})\s*(?:gün|gun|days?)?(?!\s*saat)\b/i)
+    || s.match(/(\d{1,2})\s*(?:gün|gun|days?)\s*serbest/i)
+    || s.match(/free\s*days?\s*[:\-–]?\s*(\d{1,2})\b/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 60 ? n : null;
+}
+
+/**
+ * Transit suresi (11.11.2026): "Transit süre 46-48 gün", "TT: 85-105 gün", "Transit time: 35 days", "T/T 30 days",
+ * "seyir süresi 28 gün", "35 days transit". Gun ifadesi ZORUNLU (kosul maddelerindeki "transit sureler..." sayisizdir).
+ * Metinde birbirinden farkli birden fazla deger varsa (rota basina farkli) belirsiz -> null.
+ */
+export function transitBul(s: string): string | null {
+  const r = /(?:transit\s*(?:time|s[üu]re(?:si)?)?|t\/t|\btt\b|seyir\s*s[üu]re(?:si)?|sailing\s*time)\s*[:\-–]?\s*(?:yakla[şs][ıi]k|approx\.?|abt\.?|~|ort(?:alama)?\.?)?\s*(\d{1,3}(?:\s*[-–\/]\s*\d{1,3})?)\s*(?:gün|gun|days?|g\b)|(\d{1,3}(?:\s*[-–]\s*\d{1,3})?)\s*(?:gün|gun|days?)\s*(?:transit|t\/t)/gi;
+  const gor = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = r.exec(s))) {
+    const ham = (m[1] || m[2]).replace(/\s+/g, "").replace(/[–\/]/g, "-");
+    const [a, b] = ham.split("-").map(Number);
+    if (!(a >= 1 && a <= 150) || (b !== undefined && !(b >= a && b <= 180))) continue;
+    gor.add(ham);
+  }
+  // Etiketli alan, birimsiz: "Tahmini Transit Süre : 28" (Link teklif formu)
+  if (!gor.size) {
+    const e = s.match(/transit\s*(?:time|s[üu]re(?:si)?)\s*:\s*(\d{1,3})\b(?!\s*(?:saat|hour|%|usd|\$|[.,]\d))/i);
+    if (e && Number(e[1]) >= 1 && Number(e[1]) <= 150) gor.add(e[1]);
+  }
+  return gor.size === 1 ? [...gor][0] : null;
 }
 
 function gecerlilikBul(s: string): string | null {
@@ -182,7 +214,7 @@ function polBul(s: string): string | null {
 }
 
 function bos(): Omit<NavlunOlay, "tur"> {
-  return { liman: null, tutar: null, ekipman: null, armator: null, free_time_gun: null, gecerlilik: null, lokal_dahil: null, pol: null };
+  return { liman: null, tutar: null, ekipman: null, armator: null, free_time_gun: null, transit_gun: null, gecerlilik: null, lokal_dahil: null, pol: null };
 }
 
 // Ekten (PDF / OCR) okumada: fiyat yalniz navlun kelimesinin yaninda kabul edilir; yan masraf kodlari elenir.
@@ -219,7 +251,7 @@ export function fiyatAdaylari(metin: string): Array<{ tutar: number; ekipman: st
 }
 
 /** Dikey tablo (Horoz tipi): BASLIK satiri, ardindan her liman icin bir deger. */
-function dikeyTablo(s: string, siki = false): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; gec: string | null }> | null {
+function dikeyTablo(s: string, siki = false): Array<{ liman: string; tutar: number; ekipman: string | null; armator: string | null; ft: number | null; tt: string | null; gec: string | null }> | null {
   const satir = s.split("\n").map((x) => x.trim()).filter(Boolean);
   const pod = satir.findIndex((x) => /TESL[İI]MAT L[İI]MANI|\(POD\)/i.test(x));
   const nav = satir.findIndex((x) => /^NAVLUN$/i.test(x));
@@ -235,11 +267,12 @@ function dikeyTablo(s: string, siki = false): Array<{ liman: string; tutar: numb
   };
   const navlun = satir.slice(nav + 1, nav + 1 + kac);
   const hat = al(/^HAT$/i), ft = al(/^FREE T[İI]ME$/i), gec = al(/^GE[ÇC]ERL[İI]L[İI]K$/i);
+  const tr = al(/^(?:ORTALAMA\s+)?TRANS[İI]T\s*S[ÜU]RE(?:S[İI])?$/i);
   const out = [];
   for (let i = 0; i < kac; i++) {
     const t = tutarlar("NAVLUN " + (navlun[i] || ""), siki)[0];
     if (!t) continue;
-    out.push({ liman: buyukTr(limanlar[i]), tutar: t.tutar, ekipman: t.ekipman ?? ekipmanBul(navlun[i]), armator: armatorBul(hat[i] || ""), ft: freeTimeBul("ft " + (ft[i] || "")), gec: gec[i] || null });
+    out.push({ liman: buyukTr(limanlar[i]), tutar: t.tutar, ekipman: t.ekipman ?? ekipmanBul(navlun[i]), armator: armatorBul(hat[i] || ""), ft: freeTimeBul("ft " + (ft[i] || "")), tt: transitBul("transit " + (tr[i] || "")), gec: gec[i] || null });
   }
   return out.length ? out : null;
 }
@@ -274,7 +307,7 @@ function ftYapisal(s: string): number | null {
   const m = s.match(/\bFT\s*(\d{1,2})(?:\s*\+\s*\d{1,2})?\s*days?/i)
     || s.match(/(\d{1,2})\s*days?\s*(?:pod\s*|dest(?:ination)?\s*)?free/i)
     || s.match(/free\s*time\s*[:\-]?\s*(\d{1,2})\s*days?/i)
-    || s.match(/serbest\s*s[üu]re\s*:?\s*(\d{1,2})\b/i);
+    || s.match(/serbest\s*s[üu]re\s*:?\s*(\d{1,2})\b(?!\s*saat)/i);
   return m ? Number(m[1]) : null;
 }
 
@@ -341,8 +374,19 @@ export function ekFormuOku(ekMetin: string, konu: string): NavlunOlay[] | null {
   }));
 }
 
-/** Tek mesajdan navlun olaylarini cikar. */
+/**
+ * Tek mesajdan navlun olaylarini cikar. Fiyatli olaylara (ve "fiyat ekte"ye) mesajdaki transit suresi eklenir
+ * (11.11.2026; mesajda tek deger varsa).
+ */
 export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
+  const olaylar = navlunMesajOkuIc(m, acenteler, secenek);
+  if (!olaylar.some((o) => TRANSITLI.has(o.tur))) return olaylar;
+  const tt = transitBul(yeniKisim(m.govde || "").replace(/\s+/g, " "));
+  return tt ? olaylar.map((o) => (TRANSITLI.has(o.tur) && !o.transit_gun ? { ...o, transit_gun: tt } : o)) : olaylar;
+}
+const TRANSITLI = new Set<NavlunOlayTuru>(["teklif", "karsi_teklif", "ek_teklif"]);
+
+function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
   const siki = !!secenek.ek;
   const lim = konudanLiman(m.konu);
   // Genel tarife konulari ("WAF & RELAY & ...") tek liman degildir
@@ -379,7 +423,7 @@ export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek
 
   const tablo = dikeyTablo(yeni, siki);
   if (tablo) {
-    for (const r of tablo) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman ?? "20DC", armator: r.armator, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: /lokaller[İI]?\s*\n?\s*DAH[İI]L/i.test(yeni) || null, pol: "AMBARLI" });
+    for (const r of tablo) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman ?? "20DC", armator: r.armator, free_time_gun: r.ft, transit_gun: r.tt, gecerlilik: r.gec, lokal_dahil: /lokaller[İI]?\s*\n?\s*DAH[İI]L/i.test(yeni) || null, pol: "AMBARLI" });
     return olaylar;
   }
 

@@ -14,7 +14,7 @@ export async function navlunTablosuOku(bugun: string): Promise<{ tablo: NavlunTa
   for (let i = 0; i < 20; i++) {
     const { data, error } = await supabase
       .from("navlun_teklifleri")
-      .select("tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,tarih")
+      .select("tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih")
       .order("tarih", { ascending: true })
       .order("id", { ascending: true })
       .range(i * SAYFA, i * SAYFA + SAYFA - 1);

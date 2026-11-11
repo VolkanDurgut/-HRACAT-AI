@@ -13,6 +13,9 @@
  *                      tekrar calistirin (her calismada ~20 yazisma; ayni mail iki kez kaydedilmez).
  *   2) navlunKur     : 15 dakikalik tetikleyiciyi kurar (navlunTara).
  *   Kaldirmak icin navlunKaldir.
+ *   TAM YENIDEN OKUMA (11.11.2026, free time / transit icin bir kez): Proje Ayarlari > Betik Ozellikleri'nde
+ *   NAVLUN_GECMIS_I satirini silin, navlunGecmis'i "BITTI" yazana kadar tekrar calistirin (kayitlar yenilenir,
+ *   cift kayit olmaz). Sonrasinda sunucu saklanan metinden yeniden okuyabilir; bu adim tekrar gerekmez.
  *
  * Ne gonderilir: konusu "NAVLUN" gecen maillerin gonderen, konu, tarih, Message-ID ve alintisiz metni;
  * fiyat metinde yoksa ekteki PDF'in (yoksa en buyuk gorselin) Google Drive OCR metni. Okuma ve

@@ -210,5 +210,17 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   `_shared/xlsx-yaz.ts`: stiller 15-27 (navlun) SONA eklendi + `dondur`; mevcut stil numaraları değişmedi (siparis-rapor
   edge'i bir önceki, çıktısı aynı çekirdekle çalışıyor; bir sonraki deploy'da eşitlenir). İlk test maili 11.11.2026
   (29 liman, 28 acente/hat). Test: e2e_navlun 60.
+- Free time + transit + ham metin (11.11.2026, kullanıcı: "free time otomatik çekilebilmeli; raporu 1 kere hatasız
+  dolduralım"): migration `20261111150000_navlun_transit_govde.sql` (CANLIDA) — `navlun_teklifleri.transit_gun` ("35" /
+  "46-48"), `navlun_mesajlari.govde / ek_metin / ek_kaynak` (istemciye KAPALI: tablo SELECT yerine kolon SELECT),
+  `navlun_kaydet` metni saklar; elle düzeltilmiş maile yalnız metin + BOŞ free time / transit (`ek_bilgi`) eklenir.
+  Okuyucu: `freeTimeBul` + DEM / demuraj / "gün serbest" / "free days" (≤60; "serbest süre 6 saat" ELENİR), `transitBul`
+  ("Transit süre 46-48 gün", "TT: 85-105 gün", "Transit time 35 days", "T/T", "seyir süresi", Link "Tahmini Transit
+  Süre : 28"; gün birimi zorunlu, metinde farklı birden fazla değer = belirsiz), Horoz dikey tablosunda "ORTALAMA
+  TRANSİT SÜRE" sütunu. Edge `navlun-bildirimi` v5: `{"islem":"yeniden_isle","sayfa":n}` saklanan metinden 50'şer
+  yeniden okur (okuyucu geliştikçe betik gerekmez). Arşiv testi (259 mesaj): Draft tekliflerinin çoğunda free time /
+  transit YAZILMIYOR — boş hücre = acente belirtmemiş (uydurulmaz). Sayfa: "Transit" sütunu, Hedef'in açıklaması.
+  TEK SEFERLİK: eski mailler metni saklanmadan okunduğu için betikte NAVLUN_GECMIS_I silinip navlunGecmis "BITTI"
+  yazana kadar çalıştırılır (yeni mailler 15 dk tetikleyiciyle zaten metinle gelir).
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

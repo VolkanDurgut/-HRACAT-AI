@@ -51,7 +51,7 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
         <p className="text-white font-semibold flex items-center gap-2"><Anchor size={15} style={{ color: ACCENT }} />{l.ad}</p>
         {l.enIyi20 && <span className="text-sm" style={{ color: "#6EE7B7" }} data-en-iyi>En iyi 20&apos;DC: <b className="tabular-nums">{usd(l.enIyi20.tutar)}</b> · {l.enIyi20.acente}</span>}
-        {l.hedef && <span className="text-sm flex items-center gap-1" style={{ color: "#FCD34D" }} data-hedef><Target size={13} />Hedefimiz {usd(l.hedef.tutar)}</span>}
+        {l.hedef && <span className="text-sm flex items-center gap-1" style={{ color: "#FCD34D" }} data-hedef title="Hedef: operasyonun acenteye pazarlıkta yazdığı fiyat (ör. &quot;hedef rakamımız 1.500 USD&quot;). Bizden giden maillerden okunur; acente &quot;hedefiniz uygundur&quot; derse o acentenin fiyatı olur."><Target size={13} />Hedefimiz {usd(l.hedef.tutar)}</span>}
         {l.kabul && <span className="text-sm flex items-center gap-1" style={{ color: "#93C5FD" }} data-kabul><CheckCircle2 size={13} />Kabul edilen {usd(l.kabul.tutar)}{l.kabul.armator ? ` (${l.kabul.armator})` : ""} · {tarihGoster(l.kabul.tarih)}</span>}
         <span className="text-xs ml-auto" style={{ color: TEXT_MUTED }}>son: {tarihGoster(l.sonTarih)}</span>
       </div>
@@ -62,7 +62,7 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
                 <th className="px-4 py-2 font-medium">Acente</th><th className="px-3 py-2 font-medium">Armatör</th>
                 <th className="px-3 py-2 font-medium">Ekipman</th><th className="px-3 py-2 font-medium text-right">Navlun</th>
-                <th className="px-3 py-2 font-medium">Free time</th><th className="px-3 py-2 font-medium">Geçerlilik</th>
+                <th className="px-3 py-2 font-medium">Free time</th><th className="px-3 py-2 font-medium">Transit</th><th className="px-3 py-2 font-medium">Geçerlilik</th>
                 <th className="px-3 py-2 font-medium">Tarih</th><th className="px-3 py-2 font-medium"></th>
               </tr>
             </thead>
@@ -75,7 +75,8 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.armator || "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.ekipman}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: enIyi ? "#6EE7B7" : "#FFFFFF" }} data-tutar>{usd(f.tutar)}</td>
-                    <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.free_time_gun != null ? `${f.free_time_gun} gün` : "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-ft>{f.free_time_gun != null ? `${f.free_time_gun} gün` : "—"}</td>
+                    <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-transit>{f.transit_gun ? `${f.transit_gun} gün` : "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.gecerlilik || "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihGoster(f.tarih)}</td>
                     <td className="px-3 py-2 space-x-1 whitespace-nowrap">

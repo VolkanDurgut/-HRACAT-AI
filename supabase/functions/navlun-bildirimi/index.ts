@@ -9,6 +9,8 @@ import { acenteOgren, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle
 //   {"islem": "kaydet", "mesajlar": [{mesaj_id, gonderen, konu, govde, tarih, ek_metin?, ek_kaynak?}]}
 //   + baslik x-pazar-anahtar = secret PAZAR_GELEN_ANAHTAR (Pazar gelen cevap ile ayni betik projesi).
 //   {"islem": "durum"} + anahtar: son kayit / hata kuyrugu sayilari (salt okunur saglik kontrolu).
+//   {"islem": "yeniden_isle", "sayfa": n} + anahtar (11.11.2026): saklanan ham metinden (navlun_mesajlari.govde / ek_metin)
+//   50'ser mesaj yeniden okunur; okuyucu gelistikce betigi yeniden calistirmak gerekmez.
 // Okuma tamamen kural tabanli (_shared/navlun-oku.ts), yapay zeka yok. Yazma navlun_kaydet RPC (idempotent).
 // Durum: fiyat / hedef / kabul cikti -> okundu; fiyat ekte ama okunamadi ya da belirsiz -> okunamadi
 //   (sayfadaki hata kuyrugu = tek mudahale alani); fiyatsiz acente yazismasi -> bilgi.
@@ -88,8 +90,28 @@ Deno.serve(async (req: Request) => {
       return json({ acente: satirlar.length, okundu: await say("okundu"), okunamadi: await say("okunamadi"), bilgi: await say("bilgi"), son_mesaj: son[0]?.tarih ?? null });
     }
 
-    if (govde.islem !== "kaydet") return json({ hata: "Bilinmeyen işlem." }, 400);
     const acenteler: AcenteTablosu = Object.fromEntries(satirlar.map((s) => [s.alan_adi.toLowerCase(), s.ad]));
+
+    // 11.11.2026: saklanan ham metinden yeniden okuma (okuyucu gelistikce betigi yeniden calistirmadan). Sayfa basina 50.
+    if (govde.islem === "yeniden_isle") {
+      const sayfa = Math.max(0, Math.floor(Number(govde.sayfa) || 0));
+      const kayitli = await oku<{ mesaj_id: string; gonderen: string | null; konu: string | null; govde: string | null; tarih: string; ek_metin: string | null; ek_kaynak: string | null }>(
+        `navlun_mesajlari?select=mesaj_id,gonderen,konu,govde,tarih,ek_metin,ek_kaynak&company_id=eq.${sirket}&govde=not.is.null&order=tarih,id&limit=50&offset=${sayfa * 50}`);
+      const yeniden = [];
+      for (const r of kayitli) {
+        const k = mesajIsle({
+          mesaj_id: r.mesaj_id, gonderen: (r.gonderen || "").toLowerCase(), konu: r.konu || "", govde: r.govde || "",
+          tarih: r.tarih, ek_metin: r.ek_metin || "", ek_kaynak: r.ek_kaynak || "",
+        }, acenteler);
+        if (k) yeniden.push(k);
+      }
+      if (!yeniden.length) return json({ islenen: 0, sayfa, devam: kayitli.length === 50 });
+      const s = await rpc<Record<string, number>>("navlun_kaydet", { p_company: sirket, p_mesajlar: yeniden });
+      if (!s.ok) return json({ hata: s.hata || "Kaydedilemedi." }, 500);
+      return json({ ...(s.veri || {}), islenen: yeniden.length, sayfa, devam: kayitli.length === 50 });
+    }
+
+    if (govde.islem !== "kaydet") return json({ hata: "Bilinmeyen işlem." }, 400);
     const liste = Array.isArray(govde.mesajlar) ? govde.mesajlar.slice(0, 100) : [];
     const kayitlar = [];
     const ogrenilen: string[] = [];

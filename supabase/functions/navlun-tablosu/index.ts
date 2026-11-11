@@ -105,7 +105,7 @@ async function rpcHepsi(ad: string, companyId: string): Promise<Record<string, u
 /** Navlun Bildirimi sayfasindaki "Excel indir" ile ayni veri (lib/navlun/tablo.ts). */
 async function sirketTablosu(companyId: string, tarih: string) {
   const [olaylarHam, planHam] = await Promise.all([
-    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,tarih&company_id=eq.${companyId}&order=tarih,id`),
+    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih&company_id=eq.${companyId}&order=tarih,id`),
     rpcHepsi("yukleme_plani_veri", companyId),
   ]);
   const olaylar = olaylarHam.map((o) => ({ ...o, tutar: o.tutar == null ? null : Number(o.tutar) })) as unknown as NavlunOlayi[];

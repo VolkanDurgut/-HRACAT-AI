@@ -18,6 +18,8 @@ export type NavlunSatiri = {
   para_birimi: string;
   ekipman: string | null;
   free_time_gun: number | null;
+  /** Transit suresi (gun, ham "35" / "46-48"); 11.11.2026 */
+  transit_gun?: string | null;
   gecerlilik: string | null;
   lokal_dahil: boolean | null;
   kaynak: string;
@@ -30,6 +32,7 @@ export type AcenteFiyati = {
   tutar: number;
   armator: string | null;
   free_time_gun: number | null;
+  transit_gun: string | null;
   gecerlilik: string | null;
   lokal_dahil: boolean | null;
   kaynak: string;
@@ -88,7 +91,7 @@ export function limanOzetleri(satirlar: NavlunSatiri[]): LimanOzeti[] {
         const tutar = s.tur === "hedef_kabul" ? hedef!.tutar : (s.tutar as number);
         const ekipman = s.ekipman || "20DC";
         fiyat.set(`${s.acente}|${ekipman}|${s.armator || ""}`, {
-          acente: s.acente, ekipman, tutar, armator: s.armator, free_time_gun: s.free_time_gun, gecerlilik: s.gecerlilik,
+          acente: s.acente, ekipman, tutar, armator: s.armator, free_time_gun: s.free_time_gun, transit_gun: s.transit_gun ?? null, gecerlilik: s.gecerlilik,
           lokal_dahil: s.lokal_dahil, kaynak: s.kaynak, tarih: s.tarih, tur: s.tur,
         });
         sonFiyatTarihi.set(s.acente, s.tarih);

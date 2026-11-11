@@ -24,7 +24,7 @@ const MARKA_TURUNCU = "#F4A07C";
 type Etiket = { ad: string; x: number; y: number; yon: "sag" | "sol" | "ust" | "alt" };
 
 /** Etiketleri cakismayacak sekilde yerlestirir (buyukten kucuge); sigmayan etiket gizlenir. */
-function etiketYerlestir(noktalar: { ad: string; x: number; y: number; r: number; metin: string }[], w: number, h: number): Etiket[] {
+export function etiketYerlestir(noktalar: { ad: string; x: number; y: number; r: number; metin: string }[], w: number, h: number): Etiket[] {
   const kutular: { x0: number; y0: number; x1: number; y1: number }[] = noktalar.map((n) => ({ x0: n.x - n.r, y0: n.y - n.r, x1: n.x + n.r, y1: n.y + n.r }));
   const sonuc: Etiket[] = [];
   for (const n of noktalar) {

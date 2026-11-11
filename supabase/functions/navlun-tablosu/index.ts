@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
+import { raporAyari } from "../_shared/rapor-alici.ts";
 import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, type GerceklesenNavlun, type NavlunOlayi } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
@@ -12,8 +13,10 @@ import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTab
 // ZAMANLAMA (11.11.2026): pg_cron 'navlun-tablosu-sabah' 05:00 UTC = 08:00 TR ve 'navlun-tablosu-aksam' 14:00 UTC
 //   = 17:00 TR, her gun. Anon {} yalniz 07:55-09:00 / 16:55-18:00 penceresinde; sirket + gun + oturum icin bir kez.
 //   Rapor "son rapordan beri gelen teklifler"i ayrica listeler (her raporda en son alinan rakamlar).
-// ALICI: NAVLUN_TABLOSU_CANLI = "evet" ise zamanlanmis rapor NAVLUN_TABLOSU_ALICI'ya (virgulle, en fazla 6);
-//   degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI, varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
+// ALICI: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'navlun'); satir yoksa secret'lar (NAVLUN_TABLOSU_CANLI =
+//   "evet" + NAVLUN_TABLOSU_ALICI). Canli degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI,
+//   varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
+// MAIL (11.11.2026 revize): "Otomatik Ozet" maddeleri + TUM limanlarin siki guncel fiyat tablosu; ek Excel.
 // CAGRI YETKISI:
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ, konu + HTML doner;
 //    {"test": true} -> "[TEST]" mail YALNIZ test adresine.
@@ -143,15 +146,11 @@ Deno.serve(async (req: Request) => {
       const baslik = req.headers.get("Authorization") || "";
       if (jwtRolu(baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null) === "authenticated") return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (govde.test === true && CANLI) return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (zamanli && !oturumPenceresi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
     const tarih = trBugun();
     const oturum = oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
-    // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
-    const test = !deneme && (govde.test === true || !CANLI);
-    const alicilar = test ? TEST_ALICISI : ALICILAR;
 
     const kaynak = await hepsiniCek<{ company_id: string }>(`navlun_teklifleri?select=company_id&order=company_id`);
     const idler = Array.from(new Set(kaynak.map((b) => b.company_id))).filter((id) => !yetkili || id === yetkiliSirket);
@@ -160,6 +159,11 @@ Deno.serve(async (req: Request) => {
 
     const sonuclar: Record<string, unknown>[] = [];
     for (const companyId of idler) {
+      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, "navlun", { canli: CANLI, alicilar: ALICILAR });
+      if (!yetkili && govde.test === true && ayar.canli) { sonuclar.push({ atlandi: "Canlı raporda test yalnızca yöneticiler içindir." }); continue; }
+      // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
+      const test = !deneme && (govde.test === true || !ayar.canli);
+      const alicilar = test ? TEST_ALICISI : ayar.alicilar;
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const tablo = await sirketTablosu(companyId, tarih);
       const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar };
@@ -167,13 +171,13 @@ Deno.serve(async (req: Request) => {
       // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat)
       const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&order=gonderim_zamani.desc.nullslast&limit=1`);
       const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum) });
-      if (deneme) { sonuclar.push({ tarih, konu, alicilar: CANLI ? ALICILAR : TEST_ALICISI, ozet, html }); continue; }
-      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (NAVLUN_TABLOSU_ALICI)." }); continue; }
+      if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
+      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
 
       if (!zamanli) {
         const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
-        const t = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&test=is.true&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
+        const t = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&elle=is.true&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
         if (t.length >= 5) { sonuclar.push({ atlandi: "Son 24 saatte en fazla 5 test maili gönderilebilir." }); continue; }
       } else {
         const var_ = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&rapor_tarihi=eq.${tarih}&oturum=eq.${oturum}&elle=is.false&test=is.false&order=id`);
@@ -211,7 +215,7 @@ Deno.serve(async (req: Request) => {
       }
       sonuclar.push({ gonderildi: true, tarih, oturum, test, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? ozet : undefined });
     }
-    if (!yetkili) return json({ ok: true, tarih, oturum, test, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
+    if (!yetkili) return json({ ok: true, tarih, oturum, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
     return json({ ok: true, deneme, tarih, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);

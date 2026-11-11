@@ -152,6 +152,8 @@ export const LIMAN_GIRISI: Record<string, string> = {
   // 05.11.2026: en yakin dugum karadan gecerdi / uzak kalirdi -> elle baglanan yeni limanlar
   ASHDOD: "LEVANT", HAMAD: "KORFEZ_O", DOHA: "KORFEZ_O", "NHAVA SHEVA": "LAKADIV", MUMBAI: "LAKADIV",
   CHENNAI: "SRI_LANKA_D", MAHAJANGA: "MOZAMBIK_KAN", AGADIR: "KANARYA", SFAX: "MALTA_K", SOUSSE: "MALTA_K",
+  // 11.11.2026: Navlun Bildirimi haritasi (acik deniz uzerinden; Mona Gecidi / Hint Okyanusu)
+  "SAN JUAN": "KARAYIP_KD", "LA GUAIRA": "KARAYIP_KD", BOSTON: "ATLANTIK_O", VICTORIA: "GUARDAFUI",
 };
 
 /**

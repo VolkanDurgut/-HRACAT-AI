@@ -33,6 +33,8 @@ export const LIMAN_KOORDINAT: Record<string, [number, number]> = {
   "HO CHI MINH": [10.77, 106.7],
   // Amerika
   MARIEL: [22.99, -82.75], HAVANA: [23.14, -82.35], "SANTIAGO DE CUBA": [20.01, -75.83], VERACRUZ: [19.2, -96.13],
+  // 11.11.2026: Navlun Bildirimi haritasinda teklif istenen limanlar
+  BOSTON: [42.35, -71.04], "SAN JUAN": [18.46, -66.11],
 
   // ---- 05.11.2026 genisletme: dosyalara yeni yazilan limanlar haritada otomatik cikiyor ----
   // Levant / Dogu Akdeniz / Misir

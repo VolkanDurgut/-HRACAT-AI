@@ -5,6 +5,7 @@ import { planSayfasi, siparisSayfasi } from "../_shared/siparis-xlsx.ts";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { siparisRaporHesapla, siparisRaporHtml, siparisRaporKonusu } from "../_shared/siparis-rapor.ts";
 import { oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
+import { raporAyari } from "../_shared/rapor-alici.ts";
 
 // ============================================================================
 // SIPARIS RAPORU MAILI (siparis-rapor) - 11.11.2026
@@ -12,9 +13,10 @@ import { oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 // pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
 // ayni veri: siparis_listesi_veri + yukleme_plani_veri, service_role, yalniz okuma). Ek: sayfadaki "Excel indir" ile AYNI
 // dosya (_shared/siparis-xlsx.ts). Musteriye GITMEZ.
-// ALICILAR (secret): SIPARIS_RAPOR_CANLI = "evet" DEGILSE mail SADECE test adresine
+// ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar
+//   (SIPARIS_RAPOR_CANLI = "evet" + SIPARIS_RAPOR_ALICI). Canli DEGILSE mail SADECE test adresine
 //   (SIPARIS_RAPOR_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
-//   Canlida: SIPARIS_RAPOR_ALICI (virgulle, en fazla 6).
+// MAIL (11.11.2026 revize): yalniz "Otomatik Ozet" maddeleri; tum satirlar ekteki Excel'de.
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
 //    (siparis_rapor_gonderimleri kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
@@ -128,14 +130,12 @@ Deno.serve(async (req: Request) => {
     const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean };
     const yetkiliSirket = await yetkiliKullaniciSirketi(req);
     const yetkili = yetkiliSirket !== null;
+    if (yetkili && govde.deneme !== true && govde.test !== true) return json({ ok: false, hata: "Elle yalnızca test gönderimi yapılabilir." }, 400);
     if (!yetkili) {
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (govde.test === true && CANLI) return json({ ok: false, hata: "Test yalnızca yetkili kullanıcılar içindir." }, 403);
       if (govde.test !== true && !oturumPenceresi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
-    // Canli degilse her gonderim test adresine "[TEST]" gider (zamanlanmis gonderim dahil)
-    const test = !deneme && (govde.test === true || !CANLI);
     const tarih = trBugun();
     const oturum = oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
 
@@ -146,15 +146,20 @@ Deno.serve(async (req: Request) => {
 
     const sonuclar: Record<string, unknown>[] = [];
     for (const companyId of idler) {
+      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, "siparis", { canli: CANLI, alicilar: ALICILAR });
+      // Anon test yalniz test modunda (canli raporun alicilarina anon test gitmez)
+      if (!yetkili && govde.test === true && ayar.canli) { sonuclar.push({ atlandi: "Canlı raporda test yalnızca yöneticiler içindir." }); continue; }
+      // Canli degilse her gonderim test adresine "[TEST]" gider (zamanlanmis gonderim dahil)
+      const test = !deneme && (govde.test === true || !ayar.canli);
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const { siparisler, plan } = await sirketVerisi(companyId);
       const rapor = siparisRaporHesapla(siparisler, plan, tarih);
       const ozet = { ...rapor.ozet };
       const konu = `${test ? "[TEST] " : ""}${siparisRaporKonusu(rapor, sirketAdi)}`;
       const html = siparisRaporHtml(rapor, sirketAdi, new Date().toISOString());
-      const alicilar = test ? TEST_ALICISI : ALICILAR;
-      if (deneme) { sonuclar.push({ tarih, konu, alicilar: CANLI ? ALICILAR : TEST_ALICISI, canli: CANLI, ozet, html }); continue; }
-      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (SIPARIS_RAPOR_ALICI)." }); continue; }
+      const alicilar = test ? TEST_ALICISI : ayar.alicilar;
+      if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
+      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
 
       if (govde.test === true) {
@@ -200,8 +205,8 @@ Deno.serve(async (req: Request) => {
       }
       sonuclar.push({ gonderildi: true, test, tarih, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? ozet : undefined });
     }
-    if (!yetkili) return json({ ok: true, test, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
-    return json({ ok: true, deneme, test, canli: CANLI, tarih, sonuclar });
+    if (!yetkili) return json({ ok: true, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
+    return json({ ok: true, deneme, tarih, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("siparis-rapor hata:", mesaj);

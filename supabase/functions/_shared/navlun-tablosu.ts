@@ -13,6 +13,7 @@
  */
 import { limanAnahtari } from "./liman-anahtari.ts";
 import { XS, sutunHarfi, type XlsxHucre, type XlsxSayfa } from "./xlsx-yaz.ts";
+import { esc, raporKabugu, sikiTablo } from "./rapor-kabugu.ts";
 
 export type NavlunOlayi = {
   tur: string;
@@ -265,9 +266,6 @@ export function sonTeklifler(t: NavlunTablosu, sonraIso: string, adet = 30): Son
   return out.sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, adet);
 }
 
-const LACIVERT = "#283474";
-const MARKA_TURUNCU = "#F4A07C";
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const usd = (n: number) => `${n.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} $`;
 export const NAVLUN_TABLOSU_URL = "https://ihracatasistanim.com";
 
@@ -282,49 +280,84 @@ export type NavlunRaporSecenek = {
   oturumEtiketi?: string | null;
 };
 
+/**
+ * Mail tablosu satiri (11.11.2026, kullanici: "her zaman guncel navlun fiyatlari ayni tasarimda; hepsini tek sayfaya
+ * sigdir, siki tablo"): TUM limanlar. En iyi = her blogun SON 20'DC USD teklifi; son 60 gunde teklif varsa yalniz onlar,
+ * yoksa en son teklif (eski = gri). Son = limana en son gelen teklif (hangi acenteden olursa olsun).
+ */
+export type LimanSatiri = {
+  liman: string; enIyi: { blok: string; tutar: number; tarih: string } | null; eski: boolean;
+  freeTime: number | null; transit: string | null; hedef: number | null;
+  son: { blok: string; tutar: number; tarih: string } | null; teklifSayisi: number;
+};
+export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
+  const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
+  return t.limanlar.map((l) => {
+    const sonlar: { b: NavlunBlogu; h: NavlunHucresi }[] = [];
+    for (const b of t.bloklar) {
+      const m = b.hucreler.get(l.anahtar);
+      if (!m) continue;
+      const h = Array.from(m.values()).filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD").sort((x, y) => y.tarih.localeCompare(x.tarih))[0];
+      if (h) sonlar.push({ b, h });
+    }
+    const guncel = sonlar.filter((x) => x.h.tarih.slice(0, 10) >= sinir);
+    const havuz = guncel.length ? guncel : sonlar;
+    const en = havuz.sort((x, y) => x.h.tutar - y.h.tutar)[0];
+    const sonGelen = [...sonlar].sort((x, y) => y.h.tarih.localeCompare(x.h.tarih))[0];
+    return {
+      liman: l.ad, enIyi: en ? { blok: en.b.ad, tutar: en.h.tutar, tarih: en.h.tarih } : null, eski: !guncel.length && !!en,
+      freeTime: en ? en.b.freeTime.get(l.anahtar) ?? null : null, transit: en ? en.b.transit.get(l.anahtar) ?? null : null,
+      hedef: l.hedef?.para === "USD" ? l.hedef.tutar : null,
+      son: sonGelen ? { blok: sonGelen.b.ad, tutar: sonGelen.h.tutar, tarih: sonGelen.h.tarih } : null, teklifSayisi: guncel.length,
+    };
+  }).filter((x) => x.enIyi).sort((a, b) => (a.eski ? 1 : 0) - (b.eski ? 1 : 0) || a.liman.localeCompare(b.liman, "tr"));
+}
+
 export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", secenek: NavlunRaporSecenek = {}): string {
-  const en = guncelEnIyiler(t);
-  // Onceki rapor yoksa son 48 saat
+  const satirlar = limanSatirlari(t);
   const sinir = secenek.oncekiIso || new Date(Date.parse(`${t.tarih}T12:00:00Z`) - 48 * 3600000).toISOString();
-  const yeniler = sonTeklifler(t, sinir);
-  const yeniMi = (iso: string) => iso > sinir;
-  const trTarihSaat = (iso: string) => { const d = new Date(Date.parse(iso) + 3 * 3600000).toISOString(); return `${d.slice(8, 10)}.${d.slice(5, 7)} ${d.slice(11, 16)}`; };
-  const yeniRozet = `<span style="display:inline-block;margin-left:4px;padding:0 5px;border-radius:3px;background:#DCFCE7;color:#166534;font-size:9px;font-weight:bold;letter-spacing:.4px;vertical-align:middle">YENİ</span>`;
-  const doluHucre = t.bloklar.reduce((s, b) => s + Array.from(b.hucreler.values()).reduce((x, m) => x + m.size, 0), 0);
-  const th = (x: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};white-space:nowrap">${x}</th>`;
-  const td = (x: string, st = "") => `<td style="padding:6px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;vertical-align:top;${st}">${x}</td>`;
-  const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
-    `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${etiket}</div><div style="font-size:20px;font-weight:bold;color:${renk};line-height:1.25">${deger}</div><div style="font-size:11px;color:#475569">${alt}</div></td>`;
-  const arasi = `<td style="width:2%">&nbsp;</td>`;
-  const satirlar = en.map((x, i) => {
-    const fark = x.hedef ? x.tutar - x.hedef : null;
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.liman)}</b>`)}${td(`<b style="color:#047857">${usd(x.tutar)}</b>`, "text-align:right;white-space:nowrap")}${td(esc(x.blok))}${td(`${x.freeTime != null ? `${x.freeTime} gün` : "-"}${x.transit ? `<br><span style="font-size:11px;color:#64748B">transit ${esc(x.transit)} gün</span>` : ""}`, "white-space:nowrap")}${td(x.hedef ? `${usd(x.hedef)}${fark !== null ? `<br><span style="font-size:11px;color:${fark <= 0 ? "#047857" : "#B45309"}">${fark <= 0 ? "hedefin altında" : `hedefin ${usd(fark)} üstünde`}</span>` : ""}` : "-", "text-align:right;white-space:nowrap")}${td(`${x.teklifSayisi}`, "text-align:right")}${td(x.son ? `<b>${usd(x.son.tutar)}</b>${yeniMi(x.son.tarih) ? yeniRozet : ""}<br><span style="font-size:11px;color:#64748B">${esc(x.son.blok)} · ${trTarihSaat(x.son.tarih)}</span>` : "-", "white-space:nowrap")}</tr>`;
-  }).join("");
-  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Navlun Tablosu</title></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
-<table role="presentation" width="760" cellpadding="0" cellspacing="0" style="max-width:760px;width:100%;background:#fff;border-radius:6px;padding:24px">
-<tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
-    <td style="width:56px;vertical-align:middle"><img src="${NAVLUN_TABLOSU_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi)}" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi)} Navlun Tablosu</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Liman · Acente / Hat · Aylık 20'DC navlun</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(tarihTr(t.tarih))}</div>${secenek.oturumEtiketi ? `<div style="font-size:11px;color:#94A3B8">${esc(secenek.oturumEtiketi)}</div>` : ""}</td>
-  </tr></table>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
-    ${kutu("Liman", `${t.limanlar.length}`, `${en.length} limanda son 60 günde teklif var`, LACIVERT)}${arasi}
-    ${kutu("Acente / Hat", `${t.bloklar.length}`, "tablodaki blok sayısı", "#047857")}${arasi}
-    ${kutu("Fiyat Hücresi", `${doluHucre}`, "liman × acente × ay", "#B45309")}
-  </tr></table>
-  <div style="margin:24px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">${secenek.oncekiIso ? "Son rapordan beri gelen teklifler" : "Son 48 saatte gelen teklifler"}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Geliş")}${th("Liman")}${th("Acente / Hat")}${th("Navlun", true)}${th("Free time · Transit")}</tr>
-  ${yeniler.map((x, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(trTarihSaat(x.tarih), "white-space:nowrap")}${td(`<b>${esc(x.liman)}</b>`)}${td(esc(x.blok))}${td(`<b style="color:#047857">${x.para === "USD" ? usd(x.tutar) : `${x.tutar} ${esc(x.para)}`}</b>${x.ekipman !== "20DC" ? `<br><span style="font-size:11px;color:#64748B">${esc(x.ekipman)}</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(`${x.freeTime != null ? `${x.freeTime} gün` : "-"}${x.transit ? ` · transit ${esc(x.transit)} gün` : ""}`, "white-space:nowrap")}</tr>`).join("") || `<tr><td colspan="5" style="padding:10px 8px;color:#94A3B8;font-style:italic;font-size:12px;border-bottom:1px solid #E2E8F0">Bu aralıkta yeni teklif gelmedi; aşağıdaki rakamlar en son alınan tekliflerdir.</td></tr>`}</table>
-  <div style="margin:24px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">Güncel en iyi 20'DC teklifler (son 60 gün · her acentenin en son rakamı)</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Liman")}${th("En iyi", true)}${th("Acente / Hat")}${th("Free time · Transit")}${th("Hedefimiz", true)}${th("Teklif", true)}${th("Son gelen teklif")}</tr>
-  ${satirlar || `<tr><td colspan="7" style="padding:10px 8px;color:#94A3B8;font-style:italic;font-size:12px">Son 60 günde teklif yok.</td></tr>`}</table>
-  <div style="margin-top:24px;text-align:center">
-    <a href="${NAVLUN_TABLOSU_URL}/navlun" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">Navlun Bildirimi'ni aç</a>
-  </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, operasyonun navlun tablosuyla aynı düzendedir (satır: liman · blok: acente / hat · sütun: ay, TRANSIT, FREE TIME) ve Navlun Bildirimi sayfasındaki "Excel indir" ile aynı dosyadır.<br>Hücre: o ay alınan son 20'DC teklifi; yeşil kalın = gerçekleşen navlun (yükleme planı). FREE TIME / TRANSIT boşsa acente teklifinde belirtmemiştir.<br>Her gün 08:00 ve 17:00'de gönderilir · müşteriye gitmez.</div>
-</td></tr></table>
-</td></tr></table></body></html>`;
+  const yeniler = sonTeklifler(t, sinir, 200);
+  const kisa = (iso: string) => { const d = new Date(Date.parse(iso) + 3 * 3600000).toISOString(); return `${d.slice(8, 10)}.${d.slice(5, 7)}`; };
+  const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
+  const guncel = satirlar.filter((x) => !x.eski);
+  const altinda = guncel.filter((x) => x.hedef !== null && x.enIyi!.tutar <= x.hedef!);
+  const ustunde = guncel.filter((x) => x.hedef !== null && x.enIyi!.tutar > x.hedef!).sort((a, b) => (b.enIyi!.tutar - b.hedef!) - (a.enIyi!.tutar - a.hedef!));
+  const ucuz = [...guncel].sort((a, b) => a.enIyi!.tutar - b.enIyi!.tutar);
+
+  const m: string[] = [];
+  m.push(`<b>${satirlar.length}</b> limanda fiyat var; <b>${guncel.length}</b> limanda son 60 günde teklif alındı (${t.bloklar.length} acente / hat).`);
+  if (yeniler.length) {
+    const ilk = yeniler.slice(0, 3).map((x) => `${esc(x.liman)} ${x.para === "USD" ? usd(x.tutar) : `${x.tutar} ${esc(x.para)}`} (${esc(x.blok)})`).join(", ");
+    m.push(`${secenek.oncekiIso ? "Son rapordan beri" : "Son 48 saatte"} <b>${yeniler.length}</b> yeni teklif: ${ilk}${yeniler.length > 3 ? ` ve ${yeniler.length - 3} tane daha` : ""}.`);
+  } else m.push(`${secenek.oncekiIso ? "Son rapordan beri" : "Son 48 saatte"} yeni teklif gelmedi; rakamlar en son alınan tekliflerdir.`);
+  if (altinda.length || ustunde.length) m.push(`Hedefimiz olan limanlardan <b>${altinda.length}</b> tanesinde en iyi teklif hedefte ya da altında${ustunde.length ? `; ${ustunde.length} tanesinde üstünde (en büyük fark ${esc(ustunde[0].liman)} +${usd(ustunde[0].enIyi!.tutar - ustunde[0].hedef!)})` : ""}.`);
+  if (ucuz.length > 1) m.push(`En uygun 20'DC: ${esc(ucuz[0].liman)} ${usd(ucuz[0].enIyi!.tutar)} · en yüksek: ${esc(ucuz[ucuz.length - 1].liman)} ${usd(ucuz[ucuz.length - 1].enIyi!.tutar)}.`);
+  const ftYok = guncel.filter((x) => x.freeTime === null).length;
+  if (ftYok) m.push(`${ftYok} limanın en iyi teklifinde free time yazılmamış (acenteden teyit edilmeli).`);
+
+  const yeniRozet = `<span style="display:inline-block;margin-left:3px;padding:0 4px;border-radius:3px;background:#DCFCE7;color:#166534;font-size:8.5px;font-weight:bold">YENİ</span>`;
+  const tablo = sikiTablo(
+    [{ ad: "Liman" }, { ad: "En iyi 20'DC", sag: true }, { ad: "Acente / Hat" }, { ad: "FT", sag: true }, { ad: "TT", sag: true }, { ad: "Hedef", sag: true }, { ad: "Son gelen" }],
+    satirlar.map((x) => {
+      const gri = x.eski ? "color:#94A3B8;" : "";
+      const fark = x.hedef !== null && !x.eski ? x.enIyi!.tutar - x.hedef : null;
+      return [
+        `<b style="${gri}">${esc(kes(x.liman, 22))}</b>`,
+        `<b style="color:${x.eski ? "#94A3B8" : "#047857"}">${usd(x.enIyi!.tutar)}</b>${x.eski ? ` <span style="font-size:9.5px">(${kisa(x.enIyi!.tarih)})</span>` : ""}`,
+        `<span style="${gri}">${esc(kes(x.enIyi!.blok, 18))}</span>`,
+        x.freeTime !== null ? `${x.freeTime}` : `<span style="color:#CBD5E1">-</span>`,
+        x.transit ? esc(x.transit) : `<span style="color:#CBD5E1">-</span>`,
+        x.hedef !== null ? `<span style="color:${fark === null ? "#64748B" : fark <= 0 ? "#047857" : "#B45309"}">${usd(x.hedef)}</span>` : `<span style="color:#CBD5E1">-</span>`,
+        x.son ? `${usd(x.son.tutar)} <span style="color:#64748B">· ${esc(kes(x.son.blok, 12))} · ${kisa(x.son.tarih)}</span>${x.son.tarih > sinir ? yeniRozet : ""}` : "-",
+      ];
+    }),
+    `Güncel navlun fiyatları · ${satirlar.length} liman`,
+  );
+  return raporKabugu({
+    sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
+    ozetAlt: "Acentelerin navlun teklifleri ve yükleme planındaki gerçekleşen navluna göre",
+    maddeler: m, ekBolum: tablo,
+    dugme: { metin: "Navlun Bildirimi'ni aç", yol: "/navlun" },
+    dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde en düşüğü (gri = 60 günden eski). Yeşil hedef = teklif hedefte/altında.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
+  });
 }

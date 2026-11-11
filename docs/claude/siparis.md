@@ -233,5 +233,26 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   "Son gelen teklif" sütunu (YENİ rozeti). Edge `siparis-rapor` v2: oturum etiketi, "Her gün 08:00 ve 17:00".
   İlk akşam (11.11 17:00) iki rapor da test modunda yalnız test adresine gitti. Canlıya alma: secret'lar
   `SIPARIS_RAPOR_CANLI=evet`, `SIPARIS_RAPOR_ALICI`, `NAVLUN_TABLOSU_CANLI=evet`, `NAVLUN_TABLOSU_ALICI` (kullanıcı girer).
+- Rapor mailleri sadeleşti (11.11.2026, kullanıcı: "çok uzun; Kontrol Merkezi'ndeki gibi Otomatik Özet; ekte yalnız
+  Excel; tek sayfa"): ortak kabuk `_shared/rapor-kabugu.ts` (başlık + "Otomatik Özet" maddeleri + isteğe bağlı sıkı tablo +
+  düğme + dipnot). Sipariş raporu: yalnız 4–7 cümle (açık sipariş / ön ödemeli bekleyen / onay bekleyen / 14 gün yükleme /
+  BL eksik / bugün ön ödeme / olası tekrar), tüm satırlar ekte. Navlun raporu: 5 cümle + TÜM limanların tek satırlık sıkı
+  tablosu (`limanSatirlari`: son 60 günde her acentenin son 20'DC'si içinde en düşük; yoksa en son teklif gri; FT, TT, hedef,
+  son gelen + YENİ). Edge'ler: siparis-rapor v3, navlun-tablosu v4, musteri-ozet-rapor v2 (yeni Excel eki).
+- Rapor Alıcıları (11.11.2026): Ayarlar > Rapor Alıcıları (`app/ayarlar/raporlar`, yalnız süper admin). Migration
+  `20261111190000_rapor_alicilari.sql` (CANLIDA): `rapor_alicilari` (şirket + rapor: alıcılar ≤6, canlı), RPC
+  `rapor_alicilari_liste` / `rapor_alicilari_kaydet` (`yetki_super_admin_sirketi`). Edge'ler `_shared/rapor-alici.ts` ile
+  tabloyu okur; satır yoksa eski secret'lar. Canlı ama alıcısız = test. Sayfada Önizle (deneme: mail göndermez, HTML iframe
+  sandbox) ve Test maili (yalnız test adresi). Test: e2e_rapor_alici 20.
+- Canlı Navlun Haritası + Liman Masası (11.11.2026, kullanıcı: "Navlun Bildirimi açıldığında canlı harita karşılasın;
+  liman isimleri, sağda liste + arama, aranan dışındakilerin ışığı sönsün; limana tıklayınca acenteler + chat şeklinde
+  navlunlar + navlun raporu önde"): `lib/navlun/harita.ts` (saf: konum + es adlar BEYRUT→BEIRUT, BINGAZI→BENGHAZI…,
+  nokta durumu hedefte/üstünde/hedef yok/fiyat yok, grup sohbeti, acente listesi), `components/navlun/navlun-haritasi.tsx`
+  (Kontrol Merkezi harita dili: deniz rotaları Mersin çıkışlı, nabız atan noktalar, sağda liste + arama, Enter ilkini açar),
+  `components/navlun/liman-masasi.tsx` (önde açılan pencere: rapor kutuları + fiyat merdiveni + acenteler + sohbet;
+  "yazıyor…" animasyonu, atla, hareket azaltmada anında, Esc). `analiz-harita.tsx` yalnız `etiketYerlestir` dışa açıldı.
+  `lib/liman-koordinat.ts`: BOSTON, SAN JUAN; `lib/deniz-rotasi.ts` LIMAN_GIRISI: SAN JUAN / LA GUAIRA → KARAYIP_KD,
+  BOSTON → ATLANTIK_O, VICTORIA → GUARDAFUI. Sohbet = okunan olaylar (mail metninin tamamı değil). Test:
+  e2e_navlun_harita 37 (HARITA_TEST=1 ANALIZ_TEST=1), e2e_navlun 66 + 3.
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

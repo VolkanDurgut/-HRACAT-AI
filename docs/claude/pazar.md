@@ -224,7 +224,10 @@ export2, execution, bbt. Şimdilik test maili sensei ile."
 - Edge `musteri-ozet-rapor` (verify_jwt): anon `{}` yalnız sabah penceresi; `MUSTERI_OZET_CANLI=evet` +
   `MUSTERI_OZET_ALICI` (en fazla 6) değilse "[TEST]" yalnız test adresine; anon `{test:true}` yalnız test modunda (24 saatte 5);
   yönetici `{deneme:true}` HTML döner. İlk test 11.11.2026: 24 müşteri, 17 aktif, 41 talimat (11 acil), 16 proformalı potansiyel.
-- Test: `test/mozet/test.mts` (kurgusal veri, 18 kontrol).
+- Test: `test/mozet/test.mts` (kurgusal veri, 19 kontrol).
+- Revize (11.11.2026 akşam, kullanıcı: "beğenmedim, şimdilik canlıya almayacağız"): mail kısa (Otomatik Özet 5 cümle + en
+  acil 8 iş), tüm işler / müşteriler (İngilizce metin + e-posta) / sevkiyatlar / potansiyel EKTEKİ EXCEL'de. pg_cron
+  `musteri-ozet-rapor` PASİF (cron.alter_job active=false); Ayarlar > Rapor Alıcıları'ndan Önizle / Test maili ile denenir.
 
 ## Sıradaki adımlar
 

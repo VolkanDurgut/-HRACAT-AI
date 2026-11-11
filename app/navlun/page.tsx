@@ -10,6 +10,9 @@ import { useAuth } from "@/lib/auth-context";
 import { DURUM_ETIKETI, YENI_TUR_ADI, limanOzetleri, yeniBilgiler, type LimanOzeti, type YeniBilgi } from "@/lib/navlun/ozet";
 import { navlunHataCoz, navlunVerisiOku, type NavlunVerisi, type OkunamayanMesaj } from "@/lib/navlun/veri";
 import { navlunTablosuExcel, navlunTablosuTestMaili } from "@/lib/navlun/tablo";
+import { navlunNoktalari } from "@/lib/navlun/harita";
+import { NavlunHaritasi } from "@/components/navlun/navlun-haritasi";
+import { LimanMasasi } from "@/components/navlun/liman-masasi";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -21,6 +24,8 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  *  - Yetki: "analiz" (Kontrol Merkezi). RLS "analiz" veya "proformalar".
  *  - Excel indir / Test maili (11.11.2026): operasyonun navlun tablosuyla AYNI duzen (lib/navlun/tablo.ts ->
  *    _shared/navlun-tablosu.ts); test maili edge navlun-tablosu, yalniz test adresine.
+ *  - Canli Navlun Haritasi + Liman Masasi (11.11.2026): sayfa haritayla acilir (components/navlun/navlun-haritasi.tsx);
+ *    limana tiklayinca rapor + acenteler + sohbet one cikar (components/navlun/liman-masasi.tsx).
  */
 
 const tarihGoster = (iso: string) => {
@@ -212,6 +217,7 @@ function NavlunIcerik() {
   const [oncekiGorulme, setOncekiGorulme] = useState<string | null>(null);
   const [tabloIslem, setTabloIslem] = useState<"excel" | "mail" | null>(null);
   const [tabloBilgi, setTabloBilgi] = useState<string | null>(null);
+  const [masa, setMasa] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata(null);
@@ -222,6 +228,9 @@ function NavlunIcerik() {
 
   const limanlar = useMemo(() => (veri ? limanOzetleri(veri.satirlar) : []), [veri]);
   const bilgiler = useMemo(() => (veri ? yeniBilgiler(veri.satirlar) : []), [veri]);
+  const noktalar = useMemo(() => (veri ? navlunNoktalari(limanlar, veri.satirlar, oncekiGorulme || null) : []), [veri, limanlar, oncekiGorulme]);
+  const masaLimani = masa ? limanlar.find((l) => l.anahtar === masa) || null : null;
+  const masaKapat = useCallback(() => setMasa(null), []);
   useEffect(() => {
     if (!veri) return;
     let onceki: string | null = null;
@@ -293,6 +302,8 @@ function NavlunIcerik() {
       )}
       {!veri && yukleniyor ? <SayfaYukleniyor /> : veri ? (
         <>
+          {limanlar.length > 0 && <NavlunHaritasi noktalar={noktalar} onSec={setMasa} />}
+          {masaLimani && <LimanMasasi liman={masaLimani} satirlar={veri.satirlar} onKapat={masaKapat} />}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <OzetKarti testId="ozet-liman" ikon={<Anchor size={14} />} etiket="Liman" deger={limanlar.length} alt="son 120 gün" />
             <OzetKarti testId="ozet-teklif" ikon={<Mail size={14} />} etiket="Yeni teklif" deger={yediGun} alt="son 7 gün" />

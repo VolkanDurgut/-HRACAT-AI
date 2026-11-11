@@ -18,6 +18,9 @@
  *  EXECUTION : gemisi kalkmis, faturasi kesilmemis; gemisi kalkmis, odemesi alinmamis (konsimento X / alindi / ...).
  */
 
+import { esc, raporKabugu, sikiTablo } from "./rapor-kabugu.ts";
+import { XS, type XlsxSayfa } from "./xlsx-yaz.ts";
+
 export type MoMusteri = {
   id: string; ad: string; anahtarlar: string[]; ulke: string | null; crm_asama: string | null;
   son_temas: string | null; sonraki_adim: string | null; musteri_olma_tarihi: string | null; epostalar: string[];
@@ -246,128 +249,88 @@ export function musteriOzetHesapla(v: MoVeri, sirketAdi = "Unex Gıda"): Musteri
 }
 
 // ---------------------------------------------------------------------------
-// HTML (acik kurumsal tema: lacivert #283474, seftali #F4A07C, yesil #10B981)
+// MAIL (11.11.2026 revize, kullanici: "cok uzun; otomatik ozet metni + ekte yalniz Excel; tek sayfa")
+// Mailde: Otomatik Ozet maddeleri + en acil 8 is (tek satir). Tum talimatlar, musteriler, sevkiyatlar, musteriye
+// gonderilecek Ingilizce metin ve potansiyeller ekteki Excel'de.
 // ---------------------------------------------------------------------------
-const LACIVERT = "#283474";
-const MARKA_TURUNCU = "#F4A07C";
-const YESIL = "#10B981";
-export const MUSTERI_OZET_URL = "https://ihracatasistanim.com";
-const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const sayi = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 0 });
 
 export function musteriOzetKonusu(r: MusteriOzetRaporu, sirketAdi = "Unex Gıda"): string {
   const o = r.ozet;
-  return `${sirketAdi} Müşteri Özeti · ${trTarih(r.tarih)} · ${o.aktif} aktif müşteri · ${o.talimat} talimat${o.acil ? ` (${o.acil} acil)` : ""}`;
+  return `${sirketAdi} Müşteri Özeti · ${trTarih(r.tarih)} · ${o.aktif} aktif müşteri · ${o.talimat} iş${o.acil ? ` (${o.acil} acil)` : ""}`;
 }
 
-/** mailto: Outlook ~2000 karakter sinirina karsi govde kisaltilir. */
-function mailtoLink(epostalar: string[], konu: string, govde: string): string {
-  const g = govde.length > 1400 ? `${govde.slice(0, 1380)}\n…` : govde;
-  return `mailto:${epostalar.slice(0, 4).map(encodeURIComponent).join(",")}?subject=${encodeURIComponent(konu)}&body=${encodeURIComponent(g)}`;
+export function musteriOzetMaddeleri(r: MusteriOzetRaporu): string[] {
+  const o = r.ozet;
+  const m: string[] = [];
+  m.push(`Aktif müşteri <b>${o.aktif} / ${o.musteri}</b>: ${o.yolda} sevkiyat yolda (${sayi(o.yoldaKont)} kont.), ${o.odemeBekleyen} sevkiyatta ödeme bekleniyor.`);
+  const dep = (d: Departman) => r.talimatlar.filter((t) => t.departman === d).length;
+  m.push(`Bugün <b>${o.talimat}</b> iş: Operasyon ${dep("operasyon")} · Export ${dep("export")} · Execution ${dep("execution")}${o.acil ? `; <b style="color:#B91C1C">${o.acil} acil</b>` : ""}.`);
+  const enCok = [...r.aktifler].sort((a, b) => b.talimatlar.length - a.talimatlar.length)[0];
+  if (enCok && enCok.talimatlar.length) m.push(`En çok iş bekleyen müşteri ${esc(enCok.musteri.ad)}: ${enCok.talimatlar.length} iş (${enCok.sevkiyatlar.length} sevkiyat, ${enCok.siparisler.length} açık proforma).`);
+  const ss = r.siparissizler.filter((x) => x.siparissizGun !== null);
+  if (ss.length) m.push(`<b>${r.siparissizler.length}</b> müşterinin şu an siparişi yok; en uzun ${esc(ss[0].musteri.ad)} (${ss[0].siparissizGun} gün).`);
+  const onOdemeli = r.proformali.filter((f) => f.siparisler.some((s) => s.durum === "on_odeme_alindi")).length;
+  m.push(`Potansiyel: ${sayi(o.potansiyel)} firma; <b>${o.proformaliFirma}</b> firmaya proforma verildi, henüz müşteri değil${onOdemeli ? ` (${onOdemeli} tanesinin ön ödemesi alındı)` : ""}${r.gelenSayisi ? `; son 14 günde ${r.gelenSayisi} cevap geldi` : ""}.`);
+  return m;
 }
 
 export function musteriOzetHtml(r: MusteriOzetRaporu, sirketAdi = "Unex Gıda", oturumEtiketi = "Sabah raporu"): string {
-  const o = r.ozet;
-  const th = (x: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 6px;text-align:${sag ? "right" : "left"};white-space:nowrap">${x}</th>`;
-  const td = (x: string, st = "") => `<td style="padding:6px 6px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;vertical-align:top;${st}">${x}</td>`;
-  const alt = (x: string) => (x ? `<br><span style="color:#64748B;font-size:11px">${x}</span>` : "");
-  const tablo = (b: string, g: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${b}</tr>${g}</table>`;
-  const bos = (n: number, m: string) => `<tr><td colspan="${n}" style="padding:10px 8px;color:#94A3B8;font-style:italic;font-size:12px;border-bottom:1px solid #E2E8F0">${m}</td></tr>`;
-  const zebra = (i: number) => (i % 2 ? "background:#F8FAFC" : "");
-  const kutu = (e: string, d: string, a: string, renk: string) =>
-    `<td style="width:23.5%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${e}</div><div style="font-size:20px;font-weight:bold;color:${renk};line-height:1.25">${d}</div><div style="font-size:11px;color:#475569;line-height:1.4">${a}</div></td>`;
-  const arasi = `<td style="width:2%;font-size:0;line-height:0">&nbsp;</td>`;
-  const bolum = (t: string, a = "") => `<div style="margin:26px 0 8px;font-size:11px;font-weight:bold;letter-spacing:.8px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px;line-height:1.4">${t}${a ? `<div style="font-weight:normal;text-transform:none;letter-spacing:0;color:#64748B">${a}</div>` : ""}</div>`;
-  const rozet = (s: Seviye) => {
-    const [bg, fg, ad] = s === "acil" ? ["#FEE2E2", "#991B1B", "ACİL"] : s === "bugun" ? ["#FEF3C7", "#92400E", "BUGÜN"] : ["#E0F2FE", "#075985", "BİLGİ"];
-    return `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${bg};color:${fg};font-size:9px;font-weight:bold;letter-spacing:.4px">${ad}</span>`;
+  const seviyeRenk: Record<Seviye, string> = { acil: "#B91C1C", bugun: "#B45309", bilgi: "#0369A1" };
+  const seviyeAd: Record<Seviye, string> = { acil: "ACİL", bugun: "BUGÜN", bilgi: "BİLGİ" };
+  const sira: Record<Seviye, number> = { acil: 0, bugun: 1, bilgi: 2 };
+  const enAcil = [...r.talimatlar].sort((a, b) => sira[a.seviye] - sira[b.seviye]).filter((t) => t.seviye !== "bilgi").slice(0, 8);
+  const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
+  const tablo = enAcil.length ? sikiTablo(
+    [{ ad: "" }, { ad: "Dept." }, { ad: "Müşteri · Dosya" }, { ad: "İş" }],
+    enAcil.map((t) => [
+      `<b style="color:${seviyeRenk[t.seviye]};font-size:9.5px">${seviyeAd[t.seviye]}</b>`,
+      DEPARTMAN_ADI[t.departman],
+      `<b>${esc(kes(t.musteri, 22))}</b>${t.dosya ? ` <span style="color:#64748B;font-family:monospace">${esc(t.dosya)}</span>` : ""}`,
+      `<span style="white-space:normal">${esc(kes(t.metin, 90))}</span>`,
+    ]),
+    `Öncelikli işler · ${enAcil.length} / ${r.talimatlar.length}`,
+  ) : "";
+  return raporKabugu({
+    sirketAdi, baslik: "Müşteri Özeti", tarih: trTarih(r.tarih), oturum: oturumEtiketi,
+    ozetAlt: "İhracat dosyaları, rezervasyonlar, sipariş listesi ve UNEX Satış kayıtlarına göre",
+    maddeler: musteriOzetMaddeleri(r), ekBolum: tablo,
+    dugme: { metin: "UNEX Satış'ı aç", yol: "/pazar" },
+    dipnot: "Tüm işler (departman bazında), müşteri durumları, müşteriye gönderilecek İngilizce metin ve potansiyeller ekteki Excel'de.<br>Müşteriye sistemden mail gitmez.",
+  });
+}
+
+/** Ek Excel: Isler · Musteriler · Sevkiyatlar · Potansiyel */
+export function musteriOzetSayfalari(r: MusteriOzetRaporu): XlsxSayfa[] {
+  const b = (v: string) => ({ v, s: XS.tabloBaslik });
+  const m = (v: string | number | null | undefined) => ({ v: v ?? "", s: typeof v === "number" ? XS.tamSayi : XS.metin });
+  const tarih = (iso: string | null | undefined) => ({ v: iso ? new Date(`${iso.slice(0, 10)}T12:00:00`) : null, s: XS.tarih });
+  const sira: Record<Seviye, number> = { acil: 0, bugun: 1, bilgi: 2 };
+  const isler: XlsxSayfa = {
+    ad: "İşler", sutunGenislik: [9, 12, 30, 18, 90],
+    satirlar: [["Öncelik", "Departman", "Müşteri", "Dosya / Proforma", "İş"].map(b),
+      ...[...r.talimatlar].sort((x, y) => sira[x.seviye] - sira[y.seviye]).map((t) => [m(t.seviye === "acil" ? "ACİL" : t.seviye === "bugun" ? "BUGÜN" : "BİLGİ"), m(DEPARTMAN_ADI[t.departman]), m(t.musteri), m(t.dosya), m(t.metin)])],
   };
-  const asamaRozet = (a: SevkAsamasi) => {
-    const [bg, fg] = a === "rezervasyon_bekliyor" ? ["#F1F5F9", "#475569"] : a === "planlandi" ? ["#E0E7FF", LACIVERT] : a === "yolda" ? ["#DCFCE7", "#166534"] : ["#FFEDD5", "#9A3412"];
-    return `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:${bg};color:${fg};font-size:10px;font-weight:bold;white-space:nowrap">${ASAMA_ADI[a]}</span>`;
+  const musteriler: XlsxSayfa = {
+    ad: "Müşteriler", sutunGenislik: [30, 14, 10, 10, 10, 10, 10, 12, 10, 18, 80],
+    satirlar: [["Müşteri", "Ülke", "Durum", "Sevkiyat", "Yoldaki kont.", "Ödeme bekleyen", "Açık proforma", "Son dosya", "Siparişsiz gün", "E-posta", "Müşteriye gönderilecek metin"].map(b),
+      ...[...r.aktifler, ...r.siparissizler].map((x) => [m(x.musteri.ad), m(x.ulke), m(x.aktif ? "Aktif" : "Siparişsiz"), m(x.sevkiyatlar.length),
+        m(x.sevkiyatlar.filter((s) => s.asama === "yolda").reduce((t, s) => t + s.konteyner, 0)), m(x.sevkiyatlar.filter((s) => s.odemeBekliyor).length),
+        m(x.siparisler.length), tarih(x.sonSiparis), m(x.siparissizGun), m(x.musteri.epostalar.join(", ")), m(x.musteriMetni)])],
   };
-
-  const kutular = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
-    ${kutu("Aktif Müşteri", `${o.aktif} / ${o.musteri}`, "sevkiyatı ya da açık siparişi olan", LACIVERT)}${arasi}
-    ${kutu("Yoldaki Sevkiyat", `${o.yolda}`, `${sayi(o.yoldaKont)} konteyner`, "#047857")}${arasi}
-    ${kutu("Ödeme Bekleyen", `${o.odemeBekleyen}`, "gemisi kalkmış, konşimento serbest değil", "#B45309")}${arasi}
-    ${kutu("Bugünkü Talimat", `${o.talimat}`, o.acil ? `${o.acil} acil` : "acil yok", o.acil ? "#B91C1C" : "#475569")}
-  </tr></table>`;
-
-  // 1) Departman talimatlari
-  const depBolumleri = (["operasyon", "export", "execution"] as Departman[]).map((dep) => {
-    const l = r.talimatlar.filter((t) => t.departman === dep);
-    const sat = l.map((t, i) => `<tr style="${zebra(i)}">${td(rozet(t.seviye), "width:52px")}${td(`<b>${esc(t.musteri)}</b>${alt(t.dosya ? `<span style="font-family:monospace">${esc(t.dosya)}</span>` : "")}`)}${td(esc(t.metin))}</tr>`).join("");
-    return `<div style="margin:12px 0 4px;font-size:12px;font-weight:bold;color:${LACIVERT}">${DEPARTMAN_ADI[dep]} <span style="font-weight:normal;color:#64748B">· ${l.length} talimat</span></div>${tablo(`${th("")}${th("Müşteri · Dosya")}${th("Talimat")}`, sat || bos(3, "Talimat yok."))}`;
-  }).join("");
-
-  // 2) Musteri kartlari
-  const kartlar = r.aktifler.map((m) => {
-    const sat = m.sevkiyatlar.map((s, i) => `<tr style="${zebra(i)}">${td(`<b style="font-family:monospace">${esc(s.dosya.dosya_no || "-")}</b>${alt(esc(s.dosya.varis_limani || ""))}`, "white-space:nowrap")}${td(`${esc(s.booking || "-")}${alt(esc(s.gemi || ""))}`)}${td(`${kisa(s.etd)}${alt(s.eta ? `ETA ${kisa(s.eta)}` : "")}`, "white-space:nowrap")}${td(`${s.konteyner || "-"}`, "text-align:right")}${td(asamaRozet(s.asama))}${td(s.etd && s.etd <= r.tarih ? (s.odemeAlindi ? `<span style="color:#047857">Alındı</span>${alt(esc(s.konsimento || ""))}` : `<b style="color:#B45309">Bekliyor</b>${alt(esc(s.konsimento || "girilmedi"))}`) : `<span style="color:#94A3B8">-</span>`, "white-space:nowrap")}</tr>`).join("");
-    const sip = m.siparisler.map((p) => `<div style="font-size:12px;color:#1E293B;margin-top:4px">• Proforma <b style="font-family:monospace">${esc(p.proforma_no || "-")}</b> ${esc(p.urun || "")} · ${p.miktar_mt ? `${sayi(Number(p.miktar_mt))} MT` : "-"}${p.konteyner ? ` · ${p.konteyner} kont.` : ""} — <span style="color:${p.durum === "on_odeme_alindi" ? "#047857" : "#B45309"};font-weight:bold">${p.durum === "on_odeme_alindi" ? "ön ödeme alındı, rezervasyon bekliyor" : "onay / ön ödeme bekliyor"}</span>${p.proforma_tarihi ? ` <span style="color:#64748B">(${kisa(p.proforma_tarihi)})</span>` : ""}</div>`).join("");
-    const konu = `${sirketAdi} — order status update ${trTarih(r.tarih)}`;
-    const dugme = m.musteri.epostalar.length
-      ? `<a href="${mailtoLink(m.musteri.epostalar, konu, m.musteriMetni)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:12px;font-weight:bold;padding:7px 12px;border-radius:5px">Müşteriye özeti Outlook'ta hazırla</a><span style="font-size:11px;color:#64748B;margin-left:8px">${esc(m.musteri.epostalar.slice(0, 4).join(", "))}</span>`
-      : `<span style="font-size:11px;color:#B45309">Kayıtlı e-posta yok — UNEX Satış &gt; firma kartından yetkili eklenmeli.</span>`;
-    const ozetMetin = `<div style="margin-top:8px;padding:8px 10px;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:4px;font-size:11px;color:#334155;white-space:pre-wrap;font-family:Arial,Helvetica,sans-serif">${esc(m.musteriMetni)}</div>`;
-    return `<div style="margin-top:14px;border:1px solid #E2E8F0;border-left:4px solid ${LACIVERT};border-radius:4px;padding:10px 12px">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(m.musteri.ad)}</div><div style="font-size:11px;color:#64748B">${esc(m.ulke || "Ülke belirsiz")} · ${m.sevkiyatlar.length} sevkiyat · ${m.siparisler.length} açık proforma${m.talimatlar.length ? ` · ${m.talimatlar.length} talimat` : ""}</div></td>
-      <td style="text-align:right;vertical-align:top">${m.talimatlar.some((t) => t.seviye === "acil") ? rozet("acil") : ""}</td></tr></table>
-      ${m.sevkiyatlar.length ? `<div style="margin-top:8px">${tablo(`${th("Dosya · Varış")}${th("Booking · Gemi")}${th("ETD")}${th("Kont.", true)}${th("Durum")}${th("Ödeme")}`, sat)}</div>` : ""}
-      ${sip}
-      ${ozetMetin}
-      <div style="margin-top:8px">${dugme}</div>
-    </div>`;
-  }).join("");
-
-  // 3) Siparissiz musteriler
-  const sRows = r.siparissizler.map((m, i) => `<tr style="${zebra(i)}">${td(`<b>${esc(m.musteri.ad)}</b>`)}${td(esc(m.ulke || "-"))}${td(kisa(m.sonSiparis), "white-space:nowrap")}${td(m.siparissizGun !== null ? `${m.siparissizGun} gün` : "-", "text-align:right;white-space:nowrap")}${td(esc(CRM_ADI[m.musteri.crm_asama || "yeni"] || m.musteri.crm_asama || "-"))}</tr>`).join("");
-
-  // 4) Potansiyel
-  const p = r.potansiyel;
-  const pfRows = r.proformali.map((f, i) => `<tr style="${zebra(i)}">${td(`<b>${esc(f.firma)}</b>`)}${td(f.siparisler.map((s) => `<span style="font-family:monospace">${esc(s.proforma_no || "-")}</span>`).join("<br>"))}${td(`${f.mt ? `${sayi(f.mt)} MT` : "-"}${alt(f.konteyner ? `${f.konteyner} kont.` : "")}`, "text-align:right;white-space:nowrap")}${td(f.siparisler.some((s) => s.durum === "on_odeme_alindi") ? `<b style="color:#047857">Ön ödeme alındı</b>` : `<span style="color:#B45309">Onay / ön ödeme bekliyor</span>`)}${td(f.gun !== null ? `${f.gun} gün` : "-", "text-align:right;white-space:nowrap")}</tr>`).join("");
-  const surecRows = p.surecte.slice(0, 15).map((f, i) => `<tr style="${zebra(i)}">${td(`<b>${esc(f.ad)}</b>`)}${td(esc(f.ulke || "-"))}${td(esc(CRM_ADI[f.crm_asama] || f.crm_asama))}${td(kisa(f.son_temas), "white-space:nowrap")}${td(f.sonraki_adim ? `${kisa(f.sonraki_adim)}${f.sonraki_adim < r.tarih ? ` <b style="color:#B91C1C">gecikti</b>` : f.sonraki_adim === r.tarih ? ` <b style="color:#B45309">bugün</b>` : ""}` : "-", "white-space:nowrap")}</tr>`).join("");
-  const asamaMetni = Object.entries(p.asamalar).sort((a, b) => b[1] - a[1]).map(([a, n]) => `${esc(CRM_ADI[a] || a)} ${n}`).join(" · ");
-  const ulkeMetni = p.ulkeler.map((u) => `${esc(u.ulke)} ${u.adet}`).join(" · ");
-  const pKutular = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:6px;border-collapse:separate"><tr>
-    ${kutu("Potansiyel Firma", sayi(p.toplam), "fuar listesi + gelen talepler", LACIVERT)}${arasi}
-    ${kutu("Proforma Verilen", `${r.proformali.length}`, "henüz müşterimiz değil", YESIL)}${arasi}
-    ${kutu("Süreçte", `${p.surecte.length}`, "sorgulandı / hatırlatma / cevap", "#B45309")}${arasi}
-    ${kutu("Son 7 Gün Temas", `${p.temas7}`, `${r.gelenSayisi} gelen cevap (14 gün)`, "#475569")}
-  </tr></table>`;
-
-  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Müşteri Özeti</title></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
-<table role="presentation" width="820" cellpadding="0" cellspacing="0" style="max-width:820px;width:100%;background:#fff;border-radius:6px;padding:24px">
-<tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
-    <td style="width:56px;vertical-align:middle"><img src="${MUSTERI_OZET_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi)}" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi)} Müşteri Özeti</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Departman talimatları · Müşteri durumu · Potansiyel</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(trTarih(r.tarih))}</div><div style="font-size:11px;color:#94A3B8">${esc(oturumEtiketi)}</div></td>
-  </tr></table>
-  ${kutular}
-
-  ${bolum("Departman talimatları", "Her satır bir iş: sorumlu departman yapar, gerekirse müşteriye aşağıdaki özetle bilgi verir.")}
-  ${depBolumleri}
-
-  ${bolum(`Müşteri özetleri · ${r.aktifler.length} aktif müşteri`, "Sevkiyatı yolda / planlı ya da açık proforması olan müşteriler; en acil üstte. Müşteri metni fiyat içermez.")}
-  ${kartlar || `<div style="font-size:12px;color:#94A3B8;font-style:italic">Aktif müşteri yok.</div>`}
-
-  ${bolum(`Şu an siparişi olmayan müşteriler · ${r.siparissizler.length}`, "En uzun süredir sipariş vermeyen üstte; UNEX Satış günlük görevleri bu listeden başlar.")}
-  ${tablo(`${th("Müşteri")}${th("Ülke")}${th("Son dosya")}${th("Siparişsiz", true)}${th("Görüşme")}`, sRows || bos(5, "Hepsinin aktif siparişi var."))}
-
-  ${bolum("Potansiyel müşteriler", `Aşamalar: ${asamaMetni || "-"}${ulkeMetni ? `<br>En çok: ${ulkeMetni}` : ""}`)}
-  ${pKutular}
-  <div style="margin:14px 0 4px;font-size:12px;font-weight:bold;color:${LACIVERT}">Proforma verilmiş, henüz müşterimiz olmayan firmalar <span style="font-weight:normal;color:#64748B">· ön ödemeli üstte</span></div>
-  ${tablo(`${th("Firma")}${th("Proforma")}${th("Miktar", true)}${th("Durum")}${th("Bekleme", true)}`, pfRows || bos(5, "Yok."))}
-  <div style="margin:14px 0 4px;font-size:12px;font-weight:bold;color:${LACIVERT}">Görüşme sürecindeki potansiyeller</div>
-  ${tablo(`${th("Firma")}${th("Ülke")}${th("Aşama")}${th("Son temas")}${th("Sonraki adım")}`, surecRows || bos(5, "Süreçte potansiyel firma yok; UNEX Satış görevleri ilerledikçe burada görünür."))}
-
-  <div style="margin-top:24px;text-align:center">
-    <a href="${MUSTERI_OZET_URL}/pazar" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">UNEX Satış'ı aç</a>
-  </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Veriler ihracat dosyaları, rezervasyonlar, sipariş listesi ve UNEX Satış kayıtlarından anlık hesaplanır.<br>Ödeme: konşimento Telex / Seawaybill / Vesaik ise alındı sayılır (ETD-ETA ile aynı kural).<br>Müşteriye sistemden mail gitmez; "Outlook'ta hazırla" ile departmanınız gönderir. Her gün 08:00'de gönderilir.</div>
-</td></tr></table>
-</td></tr></table></body></html>`;
+  const sevkiyatlar: XlsxSayfa = {
+    ad: "Sevkiyatlar", sutunGenislik: [28, 16, 18, 22, 24, 11, 11, 7, 20, 22, 16],
+    satirlar: [["Müşteri", "Dosya", "Varış", "Booking", "Gemi", "ETD", "ETA", "Kont.", "Durum", "Konşimento / ödeme", "Fatura"].map(b),
+      ...r.aktifler.flatMap((x) => x.sevkiyatlar.map((s) => [m(x.musteri.ad), m(s.dosya.dosya_no), m(s.dosya.varis_limani), m(s.booking), m(s.gemi), tarih(s.etd), tarih(s.eta), m(s.konteyner),
+        m(ASAMA_ADI[s.asama]), m(s.etd && s.etd <= r.tarih ? (s.odemeAlindi ? `Alındı (${s.konsimento || "-"})` : `Bekliyor (${s.konsimento || "girilmedi"})`) : "-"), m(s.dosya.fatura_no)]))],
+  };
+  const potansiyel: XlsxSayfa = {
+    ad: "Potansiyel", sutunGenislik: [30, 26, 12, 10, 26, 10],
+    satirlar: [["Proforma verilmiş firma", "Proforma", "Miktar (MT)", "Kont.", "Durum", "Bekleme (gün)"].map(b),
+      ...r.proformali.map((f) => [m(f.firma), m(f.siparisler.map((s) => s.proforma_no || "-").join(", ")), m(f.mt), m(f.konteyner),
+        m(f.siparisler.some((s) => s.durum === "on_odeme_alindi") ? "Ön ödeme alındı" : "Onay / ön ödeme bekliyor"), m(f.gun)]),
+      [], ["Görüşme sürecindeki firma", "Ülke", "Aşama", "Son temas", "Sonraki adım"].map(b),
+      ...r.potansiyel.surecte.map((f) => [m(f.ad), m(f.ulke), m(CRM_ADI[f.crm_asama] || f.crm_asama), tarih(f.son_temas), tarih(f.sonraki_adim)])],
+  };
+  return [isler, musteriler, sevkiyatlar, potansiyel];
 }

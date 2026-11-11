@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { musteriOzetHesapla, musteriOzetHtml, musteriOzetKonusu, type MoVeri } from "../_shared/musteri-ozet.ts";
+import JSZip from "npm:jszip@3.10.1";
+import { musteriOzetHesapla, musteriOzetHtml, musteriOzetKonusu, musteriOzetSayfalari, type MoVeri } from "../_shared/musteri-ozet.ts";
 import { oturumPenceresi } from "../_shared/rapor-oturum.ts";
+import { raporAyari } from "../_shared/rapor-alici.ts";
+import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 
 // ============================================================================
 // MUSTERI OZET RAPORU MAILI (musteri-ozet-rapor) - 11.11.2026
@@ -8,9 +11,10 @@ import { oturumPenceresi } from "../_shared/rapor-oturum.ts";
 // pg_cron 'musteri-ozet-rapor' 05:00 UTC = 08:00 TR, her gun. Veri: musteri_ozet_veri(p_company) RPC (yalniz
 // service_role; salt okunur). Hesap + HTML: _shared/musteri-ozet.ts. Departmanlara gunluk talimat + her aktif
 // musterinin durumu + potansiyel musteriler. Musteriye sistemden mail GITMEZ (mailto ile departman gonderir).
-// ALICILAR (secret): MUSTERI_OZET_CANLI = "evet" DEGILSE mail SADECE test adresine
+// ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'musteri_ozet'); satir yoksa secret'lar
+//   (MUSTERI_OZET_CANLI = "evet" + MUSTERI_OZET_ALICI). Canli DEGILSE mail SADECE test adresine
 //   (MUSTERI_OZET_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
-//   Canlida: MUSTERI_OZET_ALICI (virgulle, en fazla 6; operation / export / export2 / execution / bbt).
+// MAIL (11.11.2026 revize): "Otomatik Ozet" + en acil 8 is; ek Excel (Isler, Musteriler, Sevkiyatlar, Potansiyel).
 // CAGRI YETKISI (siparis-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 07:55-09:00 TR penceresinde; sirket + gun icin bir kez (canli). Yanitta veri yok.
 //    Anon {"test": true}: YALNIZ test modunda (alici sabit test adresi), 24 saatte en fazla 5.
@@ -112,14 +116,10 @@ Deno.serve(async (req: Request) => {
       const baslik = req.headers.get("Authorization") || "";
       if (jwtRolu(baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null) === "authenticated") return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (govde.test === true && CANLI) return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (zamanli && oturumPenceresi(Date.now()) !== "sabah") return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
     const tarih = trBugun();
-    // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
-    const test = !deneme && (govde.test === true || !CANLI);
-    const alicilar = test ? TEST_ALICISI : ALICILAR;
 
     // UNEX Satis (Pazar) kaydi olan sirketler (yetkili kullanicida yalniz kendi sirketi)
     const kaynak = await hepsiniCek<{ company_id: string }>(`pazar_firmalar?select=company_id&durum=eq.musteri&order=company_id`);
@@ -129,13 +129,18 @@ Deno.serve(async (req: Request) => {
 
     const sonuclar: Record<string, unknown>[] = [];
     for (const companyId of idler) {
+      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, "musteri_ozet", { canli: CANLI, alicilar: ALICILAR });
+      if (!yetkili && govde.test === true && ayar.canli) { sonuclar.push({ atlandi: "Canlı raporda test yalnızca yöneticiler içindir." }); continue; }
+      // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
+      const test = !deneme && (govde.test === true || !ayar.canli);
+      const alicilar = test ? TEST_ALICISI : ayar.alicilar;
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const rapor = musteriOzetHesapla(await sirketVerisi(companyId), sirketAdi);
       const ozet = rapor.ozet;
       const konu = `${test ? "[TEST] " : ""}${musteriOzetKonusu(rapor, sirketAdi)}`;
       const html = musteriOzetHtml(rapor, sirketAdi, "Sabah raporu");
-      if (deneme) { sonuclar.push({ tarih, konu, alicilar: CANLI ? ALICILAR : TEST_ALICISI, canli: CANLI, ozet, html }); continue; }
-      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (MUSTERI_OZET_ALICI)." }); continue; }
+      if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
+      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
 
       if (!zamanli) {
@@ -155,10 +160,16 @@ Deno.serve(async (req: Request) => {
       if (!k.ok) throw new Error(`musteri_ozet_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);
       const kayitId = ((await k.json()) as { id: string }[])[0]?.id;
 
+      const zip = new JSZip();
+      for (const f of xlsxParcalari(musteriOzetSayfalari(rapor))) zip.file(f.yol, f.icerik);
+      const ek = await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
       const mRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: `${sirketAdi} Müşteri Özeti <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html }),
+        body: JSON.stringify({
+          from: `${sirketAdi} Müşteri Özeti <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html,
+          attachments: [{ filename: `Musteri_Ozeti_${tarih}.xlsx`, content: ek }],
+        }),
       });
       if (!mRes.ok) {
         const hata = (await mRes.text()).slice(0, 300);
@@ -174,8 +185,8 @@ Deno.serve(async (req: Request) => {
       }
       sonuclar.push({ gonderildi: true, test, tarih, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? ozet : undefined });
     }
-    if (!yetkili) return json({ ok: true, test, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
-    return json({ ok: true, deneme, test, canli: CANLI, tarih, sonuclar });
+    if (!yetkili) return json({ ok: true, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
+    return json({ ok: true, deneme, tarih, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("musteri-ozet-rapor hata:", mesaj);

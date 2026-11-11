@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { supabase } from "@/lib/supabase";
 import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store } from "lucide-react";
 
 type MenuItem = {
@@ -68,30 +67,10 @@ const NAVY = "#10B981";
 const BORDER = "#1E2530";
 const TEXT_MUTED = "#8B95A5";
 
-// Marka: "{Sirket} Ihracat AI" (gunluk rapor maili/sayfasi ile ayni). Sidebar her
-// sayfada yeniden olustugu icin sirket adi modul seviyesinde bir kez okunur.
-let sirketAdiOnbellek: { companyId: string; ad: string } | null = null;
-
+// Marka (11.11.2026, kullanici): logonun yaninda yalniz "IHRACAT YONETIM" (sirket adi ve "Ihracat AI" kaldirildi).
 export default function Sidebar() {
   const pathname = usePathname();
-  const { signOut, user, yetkiler, isSuperAdmin, companyId } = useAuth();
-  const [sirketAdi, setSirketAdi] = useState(
-    companyId && sirketAdiOnbellek?.companyId === companyId ? sirketAdiOnbellek.ad : ""
-  );
-
-  useEffect(() => {
-    if (!companyId) return;
-    if (sirketAdiOnbellek?.companyId === companyId) { setSirketAdi(sirketAdiOnbellek.ad); return; }
-    let iptal = false;
-    supabase.from("companies").select("company_name").eq("id", companyId).maybeSingle()
-      .then(({ data }) => {
-        const ad = (data?.company_name || "").trim();
-        if (!ad) return; // okunamazsa varsayilan "Ihracat AI" kalir
-        sirketAdiOnbellek = { companyId, ad };
-        if (!iptal) setSirketAdi(ad);
-      });
-    return () => { iptal = true; };
-  }, [companyId]);
+  const { signOut, user, yetkiler, isSuperAdmin } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ayarlarAcik, setAyarlarAcik] = useState(pathname.startsWith("/ayarlar"));
 
@@ -158,8 +137,7 @@ export default function Sidebar() {
       <Link href={ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel"} onClick={closeMobile} className="mx-2 mt-2 px-3 py-3 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
         <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div className="min-w-0">
-          {sirketAdi && <p className="text-[11px] font-medium leading-tight truncate" style={{ color: TEXT_MUTED }}>{sirketAdi}</p>}
-          <h1 className="font-semibold text-[15px] leading-tight text-white">İhracat AI</h1>
+          <h1 className="font-semibold text-[14px] leading-tight tracking-[0.06em] text-white whitespace-nowrap">İHRACAT YÖNETİM</h1>
         </div>
       </Link>
       <div className="mx-4 h-px" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />

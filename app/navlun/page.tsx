@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Anchor, CheckCircle2, FileWarning, Mail, RefreshCw, Search, Ship, Target } from "lucide-react";
+import { AlertTriangle, Anchor, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -9,6 +9,7 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import { DURUM_ETIKETI, YENI_TUR_ADI, limanOzetleri, yeniBilgiler, type LimanOzeti, type YeniBilgi } from "@/lib/navlun/ozet";
 import { navlunHataCoz, navlunVerisiOku, type NavlunVerisi, type OkunamayanMesaj } from "@/lib/navlun/veri";
+import { navlunTablosuExcel, navlunTablosuTestMaili } from "@/lib/navlun/tablo";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -18,6 +19,8 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  *  - Veri: arsiv Gmail -> Apps Script (docs/apps-script/navlun.gs) -> edge navlun-bildirimi -> navlun_teklifleri.
  *  - Sayfa SALT OKUNUR; tek mudahale "Okunamayan teklifler" (fiyat ekte / gorselde ve okunamadi): elle fiyat ya da yoksay.
  *  - Yetki: "analiz" (Kontrol Merkezi). RLS "analiz" veya "proformalar".
+ *  - Excel indir / Test maili (11.11.2026): operasyonun navlun tablosuyla AYNI duzen (lib/navlun/tablo.ts ->
+ *    _shared/navlun-tablosu.ts); test maili edge navlun-tablosu, yalniz test adresine.
  */
 
 const tarihGoster = (iso: string) => {
@@ -206,6 +209,8 @@ function NavlunIcerik() {
   const [arama, setArama] = useState("");
   // Son görülme (bu tarayıcıda): ondan yeni gelen bilgiler panelde "yeni" işaretlenir
   const [oncekiGorulme, setOncekiGorulme] = useState<string | null>(null);
+  const [tabloIslem, setTabloIslem] = useState<"excel" | "mail" | null>(null);
+  const [tabloBilgi, setTabloBilgi] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata(null);
@@ -231,6 +236,27 @@ function NavlunIcerik() {
   }, [limanlar, arama]);
   const yediGun = veri ? veri.satirlar.filter((s) => (s.tur === "teklif" || s.tur === "karsi_teklif") && Date.parse(s.tarih) >= Date.now() - 7 * 86400000).length : 0;
 
+  const bugunIst = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
+  const tabloExcel = async () => {
+    setTabloIslem("excel"); setHata(null); setTabloBilgi(null);
+    try {
+      const bugun = bugunIst();
+      const { blob, planOkunamadi } = await navlunTablosuExcel(bugun);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Navlun_Tablosu_${bugun.split("-").reverse().join(".")}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      if (planOkunamadi) setTabloBilgi("Excel indirildi. Yükleme planı yetkiniz olmadığı için gerçekleşen navlunlar tabloya eklenmedi.");
+    } catch (e) { setHata(e instanceof Error ? e.message : "Excel oluşturulamadı."); }
+    finally { setTabloIslem(null); }
+  };
+  const tabloMail = async () => {
+    setTabloIslem("mail"); setHata(null); setTabloBilgi(null);
+    try { setTabloBilgi(await navlunTablosuTestMaili()); } catch (e) { setHata(e instanceof Error ? e.message : "Test maili gönderilemedi."); }
+    finally { setTabloIslem(null); }
+  };
+
   if (!yetkili) return null;
   return (
     <div className="max-w-[1500px]">
@@ -239,11 +265,26 @@ function NavlunIcerik() {
         baslik="Navlun Bildirimi"
         aciklama="Acentelerin navlun teklifleri · operasyon yazışmalarından otomatik"
         sag={
-          <button type="button" onClick={yukle} disabled={yukleniyor} aria-label="Yenile" className="h-9 w-9 inline-flex items-center justify-center rounded-lg border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-            <RefreshCw size={15} className={yukleniyor ? "animate-spin" : ""} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={tabloExcel} disabled={!!tabloIslem} data-testid="navlun-tablosu-excel" title="Operasyonun navlun tablosuyla aynı düzende Excel"
+              className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
+              <Download size={15} /> {tabloIslem === "excel" ? "Hazırlanıyor…" : "Excel indir"}
+            </button>
+            <button type="button" onClick={tabloMail} disabled={!!tabloIslem} data-testid="navlun-tablosu-mail" title="Navlun tablosunu test adresine gönder"
+              className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }}>
+              <Send size={14} /> {tabloIslem === "mail" ? "Gönderiliyor…" : "Test maili"}
+            </button>
+            <button type="button" onClick={yukle} disabled={yukleniyor} aria-label="Yenile" className="h-9 w-9 inline-flex items-center justify-center rounded-lg border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <RefreshCw size={15} className={yukleniyor ? "animate-spin" : ""} />
+            </button>
+          </div>
         }
       />
+      {tabloBilgi && (
+        <div className="flex items-start gap-2 rounded-lg border px-3 py-2 mb-4 text-sm" data-testid="navlun-tablosu-bilgi" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" }}>
+          <CheckCircle2 size={16} className="shrink-0 mt-0.5" /> <span>{tabloBilgi}</span>
+        </div>
+      )}
       {hata && (
         <div className="flex items-start gap-2 rounded-lg border px-3 py-2 mb-4 text-sm" style={{ borderColor: "rgba(239,68,68,0.35)", backgroundColor: "rgba(239,68,68,0.08)", color: "#FCA5A5" }}>
           <AlertTriangle size={16} className="shrink-0 mt-0.5" /> <span>{hata}</span>

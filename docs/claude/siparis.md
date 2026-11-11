@@ -197,5 +197,18 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
 - Edge v4 (11.11.2026): kullanıcı "bazı destinasyonlar yok" → geçmiş okuma 26.10'dan başlıyordu; 26.10 öncesi biten
   yazışmalar (ör. Beyrut, Cape Town) hiç okunmamıştı → betikte NAVLUN_ILK_TARIH = 2026/09/01 (arşivin tamamı).
   Konudaki booking listesi ("TEMA // … //277… + 277…") liman sanılıyordu → yok sayılır (liman TEMA).
+- Navlun Tablosu (11.11.2026): kullanıcı "operasyonun navlun tablosu şablonunda, mevcut bilgilerimizle Excel indir + test
+  maili". Şablon: satır = liman (B PORT), C HEDEF, acente / hat başına blok (2. satırda birleşik ad), blokta fiyat alınan
+  aylar + TRANSIT + FREE TIME; D4'ten donmuş. Saf: `_shared/navlun-tablosu.ts` (web `lib/navlun/tablo.ts` + edge
+  `navlun-tablosu` AYNI dosya). Kaynak: `navlun_teklifleri` (teklif / karşı teklif / hedef kabul; hedef; free time) +
+  yükleme planındaki gerçekleşen navlun (konteyner başı, ETD ayı; Excel'de YEŞİL KALIN). Hücre = o ayın SON 20'DC fiyatı
+  (20'DC yoksa "40HC n $" metin; USD dışı para metin). Ad eşleri yalnız bu tablo için (KUEHNE/K+N, CMA, HAPAG, MAAERSK,
+  ZİM, AKKON LINES, ONE LINE; plan "DRAFT/CMA" = "DRAFT - CMA-CGM"). TRANSIT maillerden henüz OKUNMUYOR (sütun boş).
+  Edge `navlun-tablosu` (verify_jwt): yalnız `{test:true}` / yönetici `{deneme:true}`; mail YALNIZ test adresine
+  ("[TEST]"), şirket başına 24 saatte 5; zamanlanmış gönderim YOK. Migration `20261111140000_navlun_tablosu.sql`
+  (CANLIDA): `navlun_tablosu_gonderimleri`. Sayfa: "Excel indir" + "Test maili" (oturumlu, yönetici değilse 403).
+  `_shared/xlsx-yaz.ts`: stiller 15-27 (navlun) SONA eklendi + `dondur`; mevcut stil numaraları değişmedi (siparis-rapor
+  edge'i bir önceki, çıktısı aynı çekirdekle çalışıyor; bir sonraki deploy'da eşitlenir). İlk test maili 11.11.2026
+  (29 liman, 28 acente/hat). Test: e2e_navlun 60.
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

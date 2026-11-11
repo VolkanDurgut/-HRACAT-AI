@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/empty-state";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import {
-  BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planKalemleri, saat, siparisBolumleri, siparisBolumu, siparisOzeti, trTarih,
-  type PlanSatiri, type SiparisDurum, type SiparisSatiri,
+  BEKLEYEN_BLOK, BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planGorunumu, planKalemleri, planSirala, saat, siparisBolumleri,
+  siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import { onOdemeKaydet, siparisListesiOku, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
@@ -66,14 +66,14 @@ function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
   if (s.durum === "onay_bekliyor") {
     return degisir ? (
       <button type="button" onClick={() => onAc(s)} disabled={mesgul} data-onodeme-ac
-        className="h-7 px-2.5 rounded-md text-[11.5px] font-semibold text-white whitespace-nowrap hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+        className="min-h-7 px-2 py-1 rounded-md text-[11px] leading-tight font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
         Ön ödeme alındı
       </button>
     ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
   }
   if (!s.on_odeme) return <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
   return (
-    <div className="text-xs whitespace-nowrap" data-onodeme>
+    <div className="text-xs" data-onodeme>
       <span className="text-sky-300 font-medium tabular-nums">
         {s.on_odeme_tutar !== null ? `${sayiGoster(s.on_odeme_tutar, 2)} ${paraIsareti(s.on_odeme_para)}` : "Alındı"}
       </span>
@@ -95,50 +95,67 @@ function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
   );
 }
 
-/** Export'un sipariş listesi Excel'iyle BİREBİR aynı 11 başlık; sağda sistem sütunları */
-const SIPARIS_BASLIKLARI = ["Proforma", "Firma Adı", "Ürün", "Fiyat", "Miktar", "Tutar", "Konteyner", "Liman", "BL NO", "Marka", "Paketleme"];
+/**
+ * Sipariş tablosu - EKRANA SIĞAR (11.11.2026): export Excel'inin 11 başlığı korunur; ilişkili başlıklar aynı sütunda
+ * üst / alt satır (ÜRÜN / MARKA · PAKETLEME, LİMAN / BL NO). Excel indir 11 ayrı sütun (birebir).
+ */
+const SIPARIS_SUTUNLARI: Array<{ basliklar: string[]; genislik: string; sag?: boolean }> = [
+  { basliklar: ["Proforma"], genislik: "12%" },
+  { basliklar: ["Firma Adı"], genislik: "13%" },
+  { basliklar: ["Ürün", "Marka · Paketleme"], genislik: "16%" },
+  { basliklar: ["Fiyat"], genislik: "6%", sag: true },
+  { basliklar: ["Miktar"], genislik: "6%", sag: true },
+  { basliklar: ["Tutar"], genislik: "9%", sag: true },
+  { basliklar: ["Konteyner"], genislik: "7%", sag: true },
+  { basliklar: ["Liman", "BL NO"], genislik: "10%" },
+  { basliklar: ["Durum"], genislik: "8%" },
+  { basliklar: ["Dosya / Booking"], genislik: "8%" },
+  { basliklar: ["Ön ödeme"], genislik: "9%" },
+];
 
 function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, mesgul }: {
   satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: string | null;
 }) {
+  const alt = { color: TEXT_MUTED };
+  const h = "px-2 py-2 align-top break-words";
   return (
     <>
       {satirlar.map((s) => {
         const sevk = s.durum === "sevk_edildi";
         return (
-          <tr key={s.anahtar} className="border-t align-top" style={{ borderColor: CARD_BORDER, backgroundColor: sevk ? "rgba(16,185,129,0.07)" : undefined }}
+          <tr key={s.anahtar} className="border-t" style={{ borderColor: CARD_BORDER, backgroundColor: sevk ? "rgba(16,185,129,0.07)" : undefined }}
             data-testid="siparis-satiri" data-proforma={s.proforma_no || ""} data-bolum={siparisBolumu(s.durum)}>
-            <td className="px-3 py-2 whitespace-nowrap">
-              <span className="text-white font-medium">{s.proforma_no || "—"}</span>
-              <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
+            <td className={h}>
+              <span className="text-white font-medium break-all">{s.proforma_no || "—"}</span>
+              <span className="block text-[11px]" style={alt}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
             </td>
-            <td className="px-3 py-2 text-white min-w-[160px]">{s.firma || "—"}</td>
-            <td className="px-3 py-2 min-w-[150px]" style={{ color: "#C9D1DC" }}>{s.urun || "—"}</td>
-            <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.birim_fiyat, 2)}</td>
-            <td className="px-3 py-2 text-right tabular-nums text-white">{sayiGoster(s.miktar_mt, 2)}</td>
-            <td className="px-3 py-2 text-right tabular-nums text-white whitespace-nowrap">{s.tutar === null ? "—" : `${sayiGoster(s.tutar, 2)} ${paraIsareti(s.para_birimi)}`}</td>
-            <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.konteyner)}</td>
-            <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{s.liman || "—"}</td>
-            <td className="px-3 py-2 font-mono text-xs" style={{ color: "#C9D1DC" }}>{s.bl_no || "—"}</td>
-            <td className="px-3 py-2 min-w-[110px]" style={{ color: "#C9D1DC" }}>{s.marka || "—"}</td>
-            <td className="px-3 py-2 min-w-[110px] text-xs" style={{ color: "#C9D1DC" }}>{s.paketleme || "—"}</td>
-            <td className="px-3 py-2" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>
-              {s.durum === "onay_bekliyor" ? <span className="text-xs" style={{ color: TEXT_MUTED }} data-durum={s.durum}>—</span> : <DurumRozeti d={s.durum} />}
+            <td className={`${h} text-white`}>{s.firma || "—"}</td>
+            <td className={h} style={{ color: "#C9D1DC" }}>
+              {s.urun || "—"}
+              <span className="block text-[11px]" style={alt}>{[s.marka, s.paketleme].filter(Boolean).join(" · ") || "—"}</span>
+            </td>
+            <td className={`${h} text-right tabular-nums`} style={{ color: "#C9D1DC" }}>{sayiGoster(s.birim_fiyat, 2)}</td>
+            <td className={`${h} text-right tabular-nums text-white`}>{sayiGoster(s.miktar_mt, 2)}</td>
+            <td className={`${h} text-right tabular-nums text-white`}>{s.tutar === null ? "—" : `${sayiGoster(s.tutar, 2)} ${paraIsareti(s.para_birimi)}`}</td>
+            <td className={`${h} text-right tabular-nums`} style={{ color: "#C9D1DC" }}>{sayiGoster(s.konteyner)}</td>
+            <td className={h} style={{ color: "#C9D1DC" }}>
+              {s.liman || "—"}
+              <span className="block font-mono text-[11px] break-all" style={alt}>{s.bl_no || "—"}</span>
+            </td>
+            <td className={h}>
+              {s.durum === "onay_bekliyor" ? <span className="text-xs" style={alt} data-durum={s.durum}>—</span> : <DurumRozeti d={s.durum} />}
               {s.benzer && s.kaynak === "sistem" && (
-                <span className="mt-1 flex items-start gap-1 text-[11px] max-w-[220px]" style={{ color: "#FCD34D" }} data-benzer>
+                <span className="mt-1 flex items-start gap-1 text-[11px]" style={{ color: "#FCD34D" }} data-benzer>
                   <AlertTriangle size={12} className="shrink-0 mt-0.5" /> Olası tekrar: {s.benzer}
                 </span>
               )}
             </td>
-            <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+            <td className={`${h} text-xs`} style={alt}>
               {s.dosya_no || (s.durum === "on_odeme_alindi" ? <span className="text-amber-300">Rezervasyon alınmadı</span> : "—")}
-              {s.booking_no ? <span className="block">{s.booking_no}</span> : null}
+              {s.booking_no ? <span className="block break-all">{s.booking_no}</span> : null}
               {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
             </td>
-            {/* Ön ödeme işlemi tablonun sağına sabit: geniş tabloda kaydırmadan erişilir */}
-            <td className="px-3 py-2 sticky right-0" style={{ backgroundColor: CARD_BG, borderLeft: `1px solid ${CARD_BORDER}`, boxShadow: "-6px 0 8px -6px rgba(0,0,0,0.5)" }}>
-              <OnOdemeHucresi s={s} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul === s.anahtar} />
-            </td>
+            <td className={h}><OnOdemeHucresi s={s} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul === s.anahtar} /></td>
           </tr>
         );
       })}
@@ -171,20 +188,22 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, mesgul, sevkAcik, se
             {b.adet === 0 ? (
               <p className="px-4 py-4 text-sm" style={{ color: TEXT_MUTED }}>Bu bölümde sipariş yok.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto md:overflow-visible">
+                <table className="w-full min-w-[820px] md:min-w-0 table-fixed text-[12px]">
+                  <colgroup>{SIPARIS_SUTUNLARI.map((c) => <col key={c.basliklar[0]} style={{ width: c.genislik }} />)}</colgroup>
                   <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }} data-testid="siparis-baslik">
-                      {SIPARIS_BASLIKLARI.map((h, i) => <th key={h} className={`px-3 py-2 font-medium whitespace-nowrap ${i >= 3 && i <= 6 ? "text-right" : ""}`}>{h}</th>)}
-                      <th className="px-3 py-2 font-medium whitespace-nowrap" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>Durum</th>
-                      <th className="px-3 py-2 font-medium whitespace-nowrap">Dosya / Booking</th>
-                      <th className="px-3 py-2 font-medium whitespace-nowrap sticky right-0" style={{ backgroundColor: CARD_BG, borderLeft: `1px solid ${CARD_BORDER}` }}>Ön ödeme</th>
+                    <tr className="text-left text-[10px] uppercase tracking-wide align-bottom" style={{ color: TEXT_MUTED }} data-testid="siparis-baslik">
+                      {SIPARIS_SUTUNLARI.map((c) => (
+                        <th key={c.basliklar[0]} className={`px-2 py-2 font-semibold leading-tight ${c.sag ? "text-right" : ""}`}>
+                          {c.basliklar.map((x, i) => <span key={x} className={`block ${i ? "font-normal" : ""}`}>{x}</span>)}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
                     {b.bolum === "rezervasyon" && sevkler.length > 0 && (
                       <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
-                        <td colSpan={14} className="px-3 py-2">
+                        <td colSpan={11} className="px-3 py-2">
                           <button type="button" onClick={() => setSevkAcik(!sevkAcik)} className="text-xs font-medium" style={{ color: "#6EE7B7" }} data-sevk-ac>
                             {sevkAcik ? `Sevk edilen ${sevkler.length} siparişi gizle ▲` : `Sevk edilen ${sevkler.length} sipariş gizli — göster ▼`}
                           </button>
@@ -264,85 +283,80 @@ function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () 
   );
 }
 
-/** Yukleme plani: operasyonun Excel'iyle BIREBIR ayni 16 baslik + alt baslik; her booking iki satir. */
-const PLAN_BASLIKLARI = ["MÜŞTERİ", "CİNSİ", "KON.AD.", "VARIŞ LİMANI", "ÇUVAL MARKASI", "AMBALAJ", "ACENTE", "LİMAN", "EKİPMAN", "BOOKING NO",
-  "BOŞ EKİPMAN ALIM TARİHİ", "ARDİYESİZ GİRİŞ", "TALİMAT CUT OFF", "BEYAN CUT OFF", "ETD", "GEMİ ADI"];
-const PLAN_ALT: Record<number, string> = { 8: "BOŞ EKİPMAN", 14: "GEMİ KALKIŞ", 15: "SEFERİ" };
+/**
+ * Yukleme plani tablosu - EKRANA SIGAR (yatay kaydirma yok, 11.11.2026): operasyonun 16 basligi korunur, birbiriyle
+ * ilgili basliklar ayni sutunda ust / alt satir olarak durur (ör. ACENTE / LİMAN). Excel indir 16 ayri sutun (birebir).
+ */
+const PLAN_SUTUNLARI: Array<{ basliklar: string[]; genislik: string; sag?: boolean }> = [
+  { basliklar: ["MÜŞTERİ"], genislik: "13%" },
+  { basliklar: ["CİNSİ", "ÇUVAL MARKASI · AMBALAJ"], genislik: "17%" },
+  { basliklar: ["KON.AD."], genislik: "5%", sag: true },
+  { basliklar: ["VARIŞ LİMANI"], genislik: "9%" },
+  { basliklar: ["ACENTE", "LİMAN"], genislik: "10%" },
+  { basliklar: ["EKİPMAN", "BOOKING NO"], genislik: "11%" },
+  { basliklar: ["BOŞ EKİPMAN ALIM TARİHİ", "ARDİYESİZ GİRİŞ"], genislik: "9%" },
+  { basliklar: ["TALİMAT CUT OFF", "BEYAN CUT OFF"], genislik: "9%" },
+  { basliklar: ["ETD"], genislik: "8%" },
+  { basliklar: ["GEMİ ADI", "SEFERİ"], genislik: "10%" },
+];
+/** "2026-11-13T10:00:00+00:00" -> "13.11 10:00" (cut-off; yil hafta basligindan belli) */
+const kisaCutoff = (iso: string | null) => { const t = trTarih(iso); return t ? `${t.slice(0, 5)}${saat(iso) ? ` ${saat(iso)}` : ""}` : "—"; };
 
-function PlanTablosu({ liste, bugun }: { liste: PlanSatiri[]; bugun: string }) {
-  const bloklar = useMemo(() => planBloklari(liste), [liste]);
-  const hucre = "px-2.5 py-1.5 whitespace-nowrap";
+function PlanTablosu({ bloklar, bugun }: { bloklar: PlanBlogu[]; bugun: string }) {
+  const alt = { color: TEXT_MUTED };
+  const hucre = "px-2 py-1.5 align-top break-words";
   return (
     <div className="space-y-3">
       {bloklar.map((b) => (
-        <div key={b.anahtar} className="rounded-xl border overflow-x-auto" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="plan-haftasi">
-          <div className="px-4 py-2 text-sm font-semibold flex items-center gap-2 sticky left-0" style={{ backgroundColor: ROW_HEADER_BG, color: "#FFFFFF" }}>
+        <div key={b.anahtar} className="rounded-xl border overflow-x-auto md:overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="plan-haftasi">
+          <div className="px-4 py-2 text-sm font-semibold flex flex-wrap items-center gap-x-3 gap-y-0.5" style={{ backgroundColor: ROW_HEADER_BG, color: "#FFFFFF", borderLeft: `3px solid ${b.anahtar === "bekleyen" ? "#FBBF24" : b.anahtar === "son" ? "#6EE7B7" : ACCENT}` }}>
             <Ship size={14} style={{ color: ACCENT }} /> <span data-hafta>{b.etiket}</span>
-            <span className="text-xs font-normal ml-3" style={{ color: TEXT_MUTED }}>{b.satirlar.length} booking · {b.konteyner} konteyner</span>
+            <span className="text-xs font-normal" style={alt}>{b.satirlar.length} booking · {b.konteyner} konteyner</span>
           </div>
-          <table className="w-full text-[12.5px]">
+          <table className="w-full min-w-[820px] md:min-w-0 table-fixed text-[12px]">
+            <colgroup>{PLAN_SUTUNLARI.map((c) => <col key={c.basliklar[0]} style={{ width: c.genislik }} />)}</colgroup>
             <thead>
-              <tr className="text-left text-[10.5px] uppercase tracking-wide" style={{ color: TEXT_MUTED }} data-testid="plan-baslik">
-                {PLAN_BASLIKLARI.map((x, i) => <th key={x} className={`px-2.5 pt-2 pb-0.5 font-semibold whitespace-nowrap ${i === 2 ? "text-right" : ""}`}>{x}</th>)}
-              </tr>
-              <tr className="text-left text-[10px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
-                {PLAN_BASLIKLARI.map((x, i) => (
-                  <th key={x} className={`px-2.5 pb-1.5 font-normal whitespace-nowrap ${i === 2 ? "text-right text-white font-semibold" : ""}`}>{i === 2 ? b.konteyner : PLAN_ALT[i] ?? ""}</th>
+              <tr className="text-left text-[10px] uppercase tracking-wide align-bottom" style={alt} data-testid="plan-baslik">
+                {PLAN_SUTUNLARI.map((c) => (
+                  <th key={c.basliklar[0]} className={`px-2 pt-2 pb-1.5 font-semibold leading-tight ${c.sag ? "text-right" : ""}`}>
+                    {c.basliklar.map((x, i) => <span key={x} className={`block ${i ? "font-normal" : ""}`}>{x}</span>)}
+                  </th>
                 ))}
               </tr>
             </thead>
             {b.satirlar.map((p) => {
               const gecti = !!(p.etd && p.etd.slice(0, 10) < bugun);
               const k = planKalemleri(p);
-              const ekSatir = Math.max(1, k.length - 1);
-              const renk = { color: "#C9D1DC" };
               return (
-                <tbody key={p.anahtar} className="border-t" style={{ borderColor: CARD_BORDER, opacity: gecti ? 0.72 : 1 }} data-testid="plan-satiri" data-booking={p.booking_no || ""}>
+                <tbody key={p.anahtar} className="border-t" style={{ borderColor: CARD_BORDER, opacity: gecti && b.anahtar !== "son" ? 0.72 : 1 }} data-testid="plan-satiri" data-booking={p.booking_no || ""}>
                   <tr>
-                    <td className={`${hucre} text-white font-medium min-w-[160px] whitespace-normal`}>
+                    <td className={`${hucre} text-white font-medium`}>
                       {p.musteri || "—"}
-                      {p.kaynak === "sistem" ? <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-500/15 text-sky-300" title="Excel'de yok; rezervasyondan">sistemden</span> : null}
-                      {p.kaynak === "siparis" && p.proforma_no ? <span className="block text-[11px] font-normal" style={{ color: TEXT_MUTED }}>{p.proforma_no}</span> : null}
+                      {p.kaynak === "sistem" ? <span className="ml-1 align-middle px-1 py-0.5 rounded text-[9.5px] font-medium bg-sky-500/15 text-sky-300" title="Excel'de yok; rezervasyondan">sistemden</span> : null}
+                      {p.kaynak === "siparis" && p.proforma_no ? <span className="block text-[11px] font-normal" style={alt}>{p.proforma_no}</span> : null}
                     </td>
-                    <td className={hucre} style={renk}>{k[0].cinsi || "—"}</td>
-                    <td className={`${hucre} text-right tabular-nums text-white`}>{sayiGoster(k[0].konteyner)}</td>
-                    <td className={hucre} style={renk}>{p.varis_limani || "—"}</td>
-                    <td className={hucre} style={renk}>{k[0].cuval_markasi || "—"}</td>
-                    <td className={hucre} style={renk}>{k[0].ambalaj || "—"}</td>
-                    <td className={hucre} style={renk}>{p.acente || "—"}</td>
-                    <td className={hucre} style={renk}>{p.liman || "—"}</td>
-                    <td className={hucre} style={renk}>{p.ekipman || p.ekipman_alim_yeri || "—"}</td>
-                    <td className={`${hucre} font-mono text-white`}>
+                    <td className={hucre} style={{ color: "#C9D1DC" }}>
+                      {k.map((x, i) => (
+                        <span key={i} className={`block ${i ? "mt-1" : ""}`}>
+                          {k.length > 1 && x.konteyner !== null ? <span className="text-white tabular-nums">{x.konteyner}× </span> : null}{x.cinsi || "—"}
+                          <span className="block text-[11px]" style={alt}>{[x.cuval_markasi, x.ambalaj].filter(Boolean).join(" · ") || "—"}</span>
+                        </span>
+                      ))}
+                    </td>
+                    <td className={`${hucre} text-right tabular-nums text-white font-medium`}>{sayiGoster(p.konteyner)}</td>
+                    <td className={hucre} style={{ color: "#C9D1DC" }}>{p.varis_limani || "—"}</td>
+                    <td className={hucre} style={{ color: "#C9D1DC" }}>{p.acente || "—"}<span className="block text-[11px]" style={alt}>{p.liman || "—"}</span></td>
+                    <td className={hucre} style={{ color: "#C9D1DC" }}>
+                      <span className="block">{p.ekipman || p.ekipman_alim_yeri || "—"}</span>
                       {p.kaynak === "siparis"
-                        ? <span className="font-sans px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-amber-500/15 text-amber-300" data-rez-yok>Rezervasyon alınmadı</span>
-                        : p.booking_no || "—"}
+                        ? <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-300" data-rez-yok>Rezervasyon alınmadı</span>
+                        : <span className="block font-mono text-[11px] text-white break-all">{p.booking_no || "—"}</span>}
                     </td>
-                    <td className={hucre} style={renk}>{trTarih(p.bos_ekipman_tarihi) || "—"}</td>
-                    <td className={hucre} style={renk}>{trTarih(p.ardiyesiz_giris) || "—"}</td>
-                    <td className={hucre} style={renk}>{trTarih(p.talimat_cutoff) || "—"}</td>
-                    <td className={hucre} style={renk}>{trTarih(p.beyan_cutoff) || "—"}</td>
-                    <td className={`${hucre} font-semibold`} style={{ color: gecti ? "#6EE7B7" : "#FFFFFF" }} data-etd>{trTarih(p.etd) || "—"}</td>
-                    <td className={`${hucre} text-white`}>{p.gemi || "—"}</td>
+                    <td className={`${hucre} tabular-nums`} style={{ color: "#C9D1DC" }}>{trTarih(p.bos_ekipman_tarihi) || "—"}<span className="block" style={alt}>{trTarih(p.ardiyesiz_giris) || "—"}</span></td>
+                    <td className={`${hucre} tabular-nums`} style={{ color: "#C9D1DC" }}>{kisaCutoff(p.talimat_cutoff)}<span className="block" style={alt}>{kisaCutoff(p.beyan_cutoff)}</span></td>
+                    <td className={`${hucre} tabular-nums font-semibold whitespace-nowrap`} style={{ color: gecti ? "#6EE7B7" : "#FFFFFF" }} data-etd>{trTarih(p.etd) || "—"}</td>
+                    <td className={hucre} style={{ color: "#C9D1DC" }}>{p.gemi || "—"}<span className="block text-[11px]" style={alt}>{p.sefer || ""}</span></td>
                   </tr>
-                  {Array.from({ length: ekSatir }, (_, j) => {
-                    const kk = k[j + 1];
-                    const alt = { color: TEXT_MUTED };
-                    return (
-                      <tr key={j} className="text-[11.5px]" data-ek-satir>
-                        <td className={hucre} />
-                        <td className={hucre} style={renk}>{kk?.cinsi || ""}</td>
-                        <td className={`${hucre} text-right tabular-nums text-white`}>{kk ? sayiGoster(kk.konteyner) : ""}</td>
-                        <td className={hucre} />
-                        <td className={hucre} style={renk}>{kk?.cuval_markasi || ""}</td>
-                        <td className={hucre} style={renk}>{kk?.ambalaj || ""}</td>
-                        <td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} /><td className={hucre} />
-                        <td className={`${hucre} tabular-nums`} style={alt}>{j === 0 ? saat(p.talimat_cutoff) : ""}</td>
-                        <td className={`${hucre} tabular-nums`} style={alt}>{j === 0 ? saat(p.beyan_cutoff) : ""}</td>
-                        <td className={hucre} />
-                        <td className={hucre} style={alt}>{j === 0 ? p.sefer || "" : ""}</td>
-                      </tr>
-                    );
-                  })}
                 </tbody>
               );
             })}
@@ -390,12 +404,18 @@ function SiparisIcerik() {
     if (q) l = l.filter((s) => [s.proforma_no, s.firma, s.urun, s.liman, s.marka, s.booking_no, s.dosya_no, s.bl_no].some((v) => v && norm(v).includes(q)));
     return l;
   }, [siparisler, q]);
-  const gorunenPlan = useMemo(() => {
-    const sinir = new Date(Date.parse(`${bugun}T00:00:00Z`) - 7 * 86400000).toISOString().slice(0, 10);
+  const planBloklariGorunen = useMemo((): PlanBlogu[] => {
     let l = plan || [];
-    if (!planTum) l = l.filter((p) => !p.etd || p.etd.slice(0, 10) >= sinir);
-    if (q) l = l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no].some((v) => v && norm(v).includes(q)));
-    return l;
+    if (q) l = l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no, p.proforma_no].some((v) => v && norm(v).includes(q)));
+    if (planTum) return planBloklari(l);
+    const g = planGorunumu(l, bugun);
+    const ozel = (anahtar: string, etiket: string, satirlar: PlanSatiri[]): PlanBlogu[] =>
+      satirlar.length ? [{ anahtar, etiket, yil: null, hafta: null, satirlar, konteyner: satirlar.reduce((t, p) => t + (p.konteyner || 0), 0) }] : [];
+    return [
+      ...ozel("bekleyen", BEKLEYEN_BLOK, planSirala(g.bekleyen)),
+      ...ozel("son", `TAMAMLANAN SON ${g.son.length} SEVKİYAT`, g.son),
+      ...planBloklari(g.guncel),
+    ];
   }, [plan, planTum, q, bugun]);
 
   const onOdemeKaydetFn = async (s: SiparisSatiri, tutar: number, para: string, tarih: string): Promise<string | null> => {
@@ -517,7 +537,7 @@ function SiparisIcerik() {
             <>
               <div className="flex flex-wrap gap-2 mb-3">
                 <button type="button" onClick={() => setPlanTum(false)} className="h-8 px-3 rounded-full text-xs" data-plan-filtre="guncel"
-                  style={!planTum ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Son 7 gün + gelecek</button>
+                  style={!planTum ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Güncel: son 5 sevkiyat + bu hafta ve sonrası</button>
                 <button type="button" onClick={() => setPlanTum(true)} className="h-8 px-3 rounded-full text-xs" data-plan-filtre="tum"
                   style={planTum ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Tüm yıl</button>
                 {isaretleyebilir && (
@@ -535,7 +555,7 @@ function SiparisIcerik() {
               {aktarAcik && (
                 <PlanExcelAktar onKapat={() => setAktarAcik(false)} onAktarildi={(m) => { setAktarAcik(false); setBilgi(m); setPlanTum(true); yukle(); }} />
               )}
-              {gorunenPlan.length ? <PlanTablosu liste={gorunenPlan} bugun={bugun} /> : <EmptyState icon={<Ship size={40} />} title="Planlı yükleme yok" />}
+              {planBloklariGorunen.length ? <PlanTablosu bloklar={planBloklariGorunen} bugun={bugun} /> : <EmptyState icon={<Ship size={40} />} title="Planlı yükleme yok" />}
             </>
           )}
         </>

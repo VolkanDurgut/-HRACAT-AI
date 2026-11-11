@@ -132,11 +132,21 @@ function cogulAmbalaj(a: string): string {
   return /\bBAG$/.test(s) ? `${s}S` : s;
 }
 
-/** Kap adedi + ambalaj (EN): detayli ambalajdaki parantezli marka atilir, adet konteyner toplamindan. */
+/** Birden fazla "N PIECES OF ..." kalemi (karisik ambalaj): "1.000 PIECES OF 25 KG … & 200 PIECES OF 30 KG …" */
+export function cokluAmbalaj(s: string): boolean {
+  return (s.match(/\d[\d.,]*\s*(PIECES|PCS|BAGS?|ADET)\b/gi) || []).length > 1;
+}
+
+/**
+ * Kap adedi + ambalaj (EN): detayli ambalajdaki parantezli marka atilir, adet konteyner toplamindan.
+ * KARISIK ambalajda (birden fazla kalem) metne DOKUNULMAZ: bastaki adedi toplamla degistirmek
+ * "1.200 PIECES OF 25 KG … & 200 PIECES OF 30 KG …" gibi fazla bildirim uretiyordu (11.11.2026).
+ * Toplam ayrica "TOTAL N PIECES" satirinda yazilir. (Fatura tarafinda ayni kural: lib/invoice-builder.ts.)
+ */
 export function ambalajIngilizce(detayli: string | null, ambalaj: string | null, toplamKap: number): string {
   let s = buyuk(temiz(detayli)).replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
   if (s) {
-    if (toplamKap > 0) s = s.replace(/^[\d.,]+\s+PIECES?\s+OF\s+/, `${sayiTr(toplamKap)} PIECES OF `);
+    if (toplamKap > 0 && !cokluAmbalaj(s)) s = s.replace(/^[\d.,]+\s+PIECES?\s+OF\s+/, `${sayiTr(toplamKap)} PIECES OF `);
     return s;
   }
   const a = cogulAmbalaj(temiz(ambalaj));
@@ -145,7 +155,8 @@ export function ambalajIngilizce(detayli: string | null, ambalaj: string | null,
 
 /** Akkon TR kalibi: "10.000 ADET 25 KG ÇUVALLARDA" */
 export function ambalajTurkceTalimat(ambalajEn: string): string {
-  return ambalajTurkce(ambalajEn).replace(/\bPP\s+(?=ÇUVAL)/, "").replace(/ÇUVAL$/, "ÇUVALLARDA");
+  // Karisik ambalajda her kalem ayni kalipla: "1.000 ADET 25 KG ÇUVALLARDA & 200 ADET 30 KG ÇUVALLARDA"
+  return ambalajTurkce(ambalajEn).replace(/\bPP\s+(?=ÇUVAL)/g, "").replace(/ÇUVAL(?=\s*(?:&|$))/g, "ÇUVALLARDA");
 }
 
 function guvenliAd(s: string): string {

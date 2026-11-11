@@ -115,6 +115,28 @@ diye ilerleyecek." Excel'deki bölümler + "en güncel en altta".
   plan +26 "rezervasyon alınmadı"; geri alınan kuru çalıştırma (tutarsız reddedilir → işaret → planda → geri al) doğru.
 - Test: e2e_siparis 65.
 
+## 4.7 Ekrana sığan listeler + "güncel" plan görünümü + Sipariş Raporu maili (11.11.2026)
+Kullanıcı: "Listeler ekrana sığmalı… sağa kaydırmak zorunda kalıyoruz." / "Tamamlanan son 5 sevkiyat ve güncel kaldığımız
+yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail raporlama yapılmalı. İlk başta test adresiyle."
+- Tablolar `table-fixed` + yüzde genişlik; iki bilgi tek hücrede üst üste (Ürün / Marka · Paketleme, Liman / BL NO; planda
+  16 başlığın hepsi 10 görsel sütunda). Masaüstünde yatay kaydırma yok; yalnız mobilde `overflow-x-auto`.
+- Plan "Güncel" (varsayılan): `planGorunumu()` → rezervasyon alınmadı bloğu + "TAMAMLANAN SON 5 SEVKİYAT" (ETD geçmiş son 5)
+  + bu hafta ve sonrası. ETD'si boş + haftası geçmiş eski satırlar (ör. Excel'de tarihi okunamayan 2. / 20. hafta) yalnız
+  "Tüm yıl"da. Ön ödeme işaretlenince plan CANLI hesaplandığı için anında güncellenir (kopya yok).
+- Saf mantık TEK YERDE (web + edge ortak): `supabase/functions/_shared/siparis-liste.ts`, `siparis-xlsx.ts`, `xlsx-yaz.ts`
+  (zip'siz XML çekirdek). `lib/siparis/liste.ts`, `lib/siparis/xlsx.ts` yalnız yeniden dışa aktarır; `lib/xlsx-yaz.ts`
+  çekirdeği jszip ile paketler.
+- Mail: edge `siparis-rapor` + `_shared/siparis-rapor.ts`; migration `20261111130000_siparis_rapor.sql` (CANLIDA):
+  `siparis_rapor_gonderimleri` (şirket + gün tek zamanlanmış kayıt) + pg_cron `siparis-rapor` hafta içi 14:00 UTC.
+  İçerik: 4 kutu, bugün ön ödemesi işaretlenenler, ön ödemesi alınmış (rezervasyon bekleyen), onay bekleyen (fiyat/tutar
+  ile), rezervasyonlu sevk bekleyen, önümüzdeki 14 gün yükleme planı. Ek: sayfadaki "Excel indir" ile AYNI dosya.
+  `SIPARIS_RAPOR_CANLI` = "evet" olmadıkça YALNIZ test adresine "[TEST]" gider; canlı alıcılar `SIPARIS_RAPOR_ALICI`
+  (kullanıcı onayı olmadan açılmaz). İlk test gönderimi 11.11.2026'da yapıldı.
+- Konşimento talimatı: karma ambalajda ("1.000 PIECES OF 25 KG … & 200 PIECES OF 30 KG …") baştaki adet artık toplam kapla
+  DEĞİŞTİRİLMEZ (`cokluAmbalaj`); Türkçe "1.000 ADET 25 KG ÇUVALLARDA & 200 ADET 30 KG ÇUVALLARDA".
+- Navlun Bildirimi: sağda kare kutularda "yeni bilgi" paneli (son görülme tarayıcıda), kutuya tıklayınca limana gider.
+- Test: e2e_siparis 67, e2e_navlun 42 (+ e2e 46, yetki 38, rehber 22, kılavuz+vgm 44, pazar 80, görev 50).
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

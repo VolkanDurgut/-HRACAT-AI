@@ -7,7 +7,7 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
-import { DURUM_ETIKETI, limanOzetleri, type LimanOzeti } from "@/lib/navlun/ozet";
+import { DURUM_ETIKETI, YENI_TUR_ADI, limanOzetleri, yeniBilgiler, type LimanOzeti, type YeniBilgi } from "@/lib/navlun/ozet";
 import { navlunHataCoz, navlunVerisiOku, type NavlunVerisi, type OkunamayanMesaj } from "@/lib/navlun/veri";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
@@ -145,6 +145,58 @@ function OkunamayanSatir({ m, onCozuldu }: { m: OkunamayanMesaj; onCozuldu: () =
   );
 }
 
+const SON_GORULME = "navlun_son_gorulme";
+
+function onceGoster(iso: string): string {
+  const dk = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+  if (dk < 60) return `${dk} dk önce`;
+  if (dk < 1440) return `${Math.round(dk / 60)} sa önce`;
+  return `${Math.round(dk / 1440)} gün önce`;
+}
+
+/** Sağ panel: navlun her güncellendiğinde yeni gelen bilgiler kare kutularda; tıklayınca ilgili liman kartına gider. */
+function YeniBilgiPaneli({ bilgiler, oncekiGorulme, onOkundu }: { bilgiler: YeniBilgi[]; oncekiGorulme: string | null; onOkundu: () => void }) {
+  const yeniSayi = oncekiGorulme ? bilgiler.filter((b) => b.tarih > oncekiGorulme).length : 0;
+  const git = (b: YeniBilgi) => {
+    const el = document.querySelector(`[data-liman="${CSS.escape(b.liman_anahtar || "")}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.animate([{ boxShadow: `0 0 0 2px ${ACCENT}` }, { boxShadow: "0 0 0 0 transparent" }], { duration: 2200, easing: "ease-out" });
+  };
+  const renk = (tur: string) => (tur === "teklif" || tur === "karsi_teklif" ? "#6EE7B7" : tur === "servis_yok" || tur === "yer_yok" ? "#FCA5A5" : tur === "kabul" || tur === "hedef_kabul" ? "#93C5FD" : "#FCD34D");
+  return (
+    <aside className="xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto rounded-xl border p-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="yeni-bilgiler">
+      <div className="flex items-center gap-2 mb-2.5">
+        <p className="text-[13px] font-semibold text-white">Yeni gelen bilgiler</p>
+        {yeniSayi > 0 && <span className="px-1.5 py-0.5 rounded-full text-[10.5px] font-semibold text-white" style={{ backgroundColor: ACCENT }} data-yeni-sayi>{yeniSayi} yeni</span>}
+        {yeniSayi > 0 && <button type="button" onClick={onOkundu} className="ml-auto text-[11px] underline" style={{ color: TEXT_MUTED }}>Okundu say</button>}
+      </div>
+      {bilgiler.length === 0 ? <p className="text-xs" style={{ color: TEXT_MUTED }}>Henüz bilgi yok.</p> : (
+        <div className="grid grid-cols-2 gap-2">
+          {bilgiler.map((b) => {
+            const yeni = !!oncekiGorulme && b.tarih > oncekiGorulme;
+            return (
+              <button key={b.anahtar} type="button" onClick={() => git(b)} title={`${b.liman || ""} · ${b.acente || ""}`}
+                className="aspect-square rounded-lg border p-2.5 text-left flex flex-col hover:bg-white/[0.04] transition-colors"
+                style={{ borderColor: yeni ? ACCENT : CARD_BORDER, backgroundColor: yeni ? "rgba(244,160,124,0.06)" : "transparent" }} data-yeni-kart data-yeni={yeni ? "1" : "0"}>
+                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: renk(b.tur) }}>
+                  {yeni && <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} />}{YENI_TUR_ADI[b.tur] || b.tur}
+                </span>
+                <span className="mt-1 text-[13px] font-semibold text-white leading-tight line-clamp-2">{b.liman || "—"}</span>
+                <span className="mt-auto">
+                  {b.tutar !== null && <span className="block text-base font-semibold tabular-nums text-white">{b.tutar.toLocaleString("tr-TR")} {b.para_birimi === "EUR" ? "€" : "$"}<span className="text-[10.5px] font-normal ml-1" style={{ color: TEXT_MUTED }}>{b.ekipman === "20DC" ? "20'DC" : b.ekipman || ""}</span></span>}
+                  <span className="block text-[11px] truncate" style={{ color: "#C9D1DC" }}>{[b.acente, b.armator && b.armator !== b.acente ? b.armator : null].filter(Boolean).join(" · ") || "—"}</span>
+                  <span className="block text-[10.5px]" style={{ color: TEXT_MUTED }}>{onceGoster(b.tarih)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </aside>
+  );
+}
+
 function NavlunIcerik() {
   const { yetkiler } = useAuth();
   const yetkili = !!yetkiler.sayfa_yetkileri.analiz;
@@ -152,6 +204,8 @@ function NavlunIcerik() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [arama, setArama] = useState("");
+  // Son görülme (bu tarayıcıda): ondan yeni gelen bilgiler panelde "yeni" işaretlenir
+  const [oncekiGorulme, setOncekiGorulme] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata(null);
@@ -161,6 +215,15 @@ function NavlunIcerik() {
   useEffect(() => { if (yetkili) yukle(); }, [yetkili, yukle]);
 
   const limanlar = useMemo(() => (veri ? limanOzetleri(veri.satirlar) : []), [veri]);
+  const bilgiler = useMemo(() => (veri ? yeniBilgiler(veri.satirlar) : []), [veri]);
+  useEffect(() => {
+    if (!veri) return;
+    let onceki: string | null = null;
+    try { onceki = window.localStorage.getItem(SON_GORULME); } catch { /* gizli mod */ }
+    setOncekiGorulme((v) => v ?? onceki ?? "");
+    const enYeni = bilgiler[0]?.tarih;
+    if (enYeni) { try { window.localStorage.setItem(SON_GORULME, enYeni); } catch { /* yok say */ } }
+  }, [veri, bilgiler]);
   const gorunen = useMemo(() => {
     const q = norm(arama.trim());
     if (!q) return limanlar;
@@ -170,7 +233,7 @@ function NavlunIcerik() {
 
   if (!yetkili) return null;
   return (
-    <div className="max-w-7xl">
+    <div className="max-w-[1500px]">
       <SayfaBasligi
         ikon={<Ship size={20} />}
         baslik="Navlun Bildirimi"
@@ -204,6 +267,8 @@ function NavlunIcerik() {
             </div>
           )}
 
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+          <div className="min-w-0">
           <div className="relative mb-3 max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
             <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Liman, acente veya armatör ara" aria-label="Ara"
@@ -216,6 +281,11 @@ function NavlunIcerik() {
           ) : (
             <div className="space-y-3">{gorunen.map((l) => <LimanKarti key={l.anahtar} l={l} />)}</div>
           )}
+          </div>
+          <div className="order-first xl:order-none">
+            <YeniBilgiPaneli bilgiler={bilgiler} oncekiGorulme={oncekiGorulme || null} onOkundu={() => setOncekiGorulme(bilgiler[0]?.tarih || "")} />
+          </div>
+          </div>
         </>
       ) : null}
     </div>

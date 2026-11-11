@@ -112,3 +112,24 @@ export function limanOzetleri(satirlar: NavlunSatiri[]): LimanOzeti[] {
   }
   return sonuc.sort((a, b) => b.sonTarih.localeCompare(a.sonTarih));
 }
+
+/** Sag panel "Yeni gelen bilgiler" (11.11.2026): son okunan olaylar, en yeni once. */
+export type YeniBilgi = {
+  anahtar: string; tur: string; liman: string | null; liman_anahtar: string | null; acente: string | null;
+  armator: string | null; tutar: number | null; para_birimi: string; ekipman: string | null; tarih: string;
+};
+const PANEL_TURLERI = new Set(["teklif", "karsi_teklif", "servis_yok", "yer_yok", "hedef_kabul", "kabul", "hedef", "hedef_soru"]);
+export const YENI_TUR_ADI: Record<string, string> = {
+  teklif: "Yeni teklif", karsi_teklif: "Karşı teklif", servis_yok: "Servis yok", yer_yok: "Yer yok",
+  hedef_kabul: "Hedef kabul", kabul: "Kabul edildi", hedef: "Hedefimiz", hedef_soru: "Hedef soruyor",
+};
+export function yeniBilgiler(satirlar: NavlunSatiri[], adet = 16): YeniBilgi[] {
+  return satirlar
+    .filter((s) => PANEL_TURLERI.has(s.tur) && s.liman_anahtar)
+    .sort((a, b) => b.tarih.localeCompare(a.tarih))
+    .slice(0, adet)
+    .map((s, i) => ({
+      anahtar: `${s.mesaj_id}|${s.tur}|${s.ekipman || ""}|${i}`, tur: s.tur, liman: s.liman, liman_anahtar: s.liman_anahtar, acente: s.acente,
+      armator: s.armator, tutar: s.tutar, para_birimi: s.para_birimi, ekipman: s.ekipman, tarih: s.tarih,
+    }));
+}

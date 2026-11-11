@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { AcenteTablosu } from "../_shared/navlun-oku.ts";
-import { mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
+import { acenteOgren, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
 
 // ============================================================================
 // NAVLUN BILDIRIMI (navlun-bildirimi) - 10.11.2026
@@ -12,7 +12,8 @@ import { mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
 // Okuma tamamen kural tabanli (_shared/navlun-oku.ts), yapay zeka yok. Yazma navlun_kaydet RPC (idempotent).
 // Durum: fiyat / hedef / kabul cikti -> okundu; fiyat ekte ama okunamadi ya da belirsiz -> okunamadi
 //   (sayfadaki hata kuyrugu = tek mudahale alani); fiyatsiz acente yazismasi -> bilgi.
-// Acente alan adlari repoda degil, navlun_acenteler tablosunda.
+// Acente alan adlari repoda degil, navlun_acenteler tablosunda. Tabloda olmayan bir alan adi "NAVLUN TALEBI"
+//   konulu mailde acikca teklif verirse otomatik eklenir (yanit: ogrenilen).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -55,6 +56,17 @@ async function rpc<T>(ad: string, govde: unknown): Promise<{ ok: boolean; veri: 
   return { ok: true, veri: (metin ? JSON.parse(metin) : null) as T, hata: "" };
 }
 
+/** Yeni acente alan adi (varsa dokunmaz). */
+async function acenteEkle(sirket: string, alan: string, ad: string): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/navlun_acenteler?on_conflict=company_id,alan_adi`, {
+    method: "POST",
+    headers: { ...basliklar, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify([{ company_id: sirket, alan_adi: alan, ad }]),
+  });
+  if (!res.ok) console.error("navlun acente eklenemedi", res.status, (await res.text()).slice(0, 200));
+  return res.ok;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
   if (req.method !== "POST") return json({ hata: "Yalnız POST." }, 405);
@@ -63,7 +75,9 @@ Deno.serve(async (req: Request) => {
     if (!anahtarDogru(req.headers.get("x-pazar-anahtar") || "")) return json({ hata: "Yetkisiz." }, 401);
     const govde = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-    const satirlar = await oku<{ company_id: string; alan_adi: string; ad: string }>("navlun_acenteler?select=company_id,alan_adi,ad&aktif=is.true");
+    const tum = await oku<{ company_id: string; alan_adi: string; ad: string; aktif: boolean }>("navlun_acenteler?select=company_id,alan_adi,ad,aktif");
+    const satirlar = tum.filter((s) => s.aktif);
+    const pasif = new Set(tum.filter((s) => !s.aktif).map((s) => s.alan_adi.toLowerCase()));   // elle kapatilan alan adi yeniden ogrenilmez
     const sirketler = Array.from(new Set(satirlar.map((s) => s.company_id)));
     if (sirketler.length !== 1) return json({ hata: "Acente tablosu tek şirkete ait olmalı." }, 500);
     const sirket = sirketler[0];
@@ -78,6 +92,7 @@ Deno.serve(async (req: Request) => {
     const acenteler: AcenteTablosu = Object.fromEntries(satirlar.map((s) => [s.alan_adi.toLowerCase(), s.ad]));
     const liste = Array.isArray(govde.mesajlar) ? govde.mesajlar.slice(0, 100) : [];
     const kayitlar = [];
+    const ogrenilen: string[] = [];
     let atlanan = 0;
     for (const m of liste) {
       if (!m || typeof m !== "object") { atlanan++; continue; }
@@ -87,15 +102,20 @@ Deno.serve(async (req: Request) => {
         govde: kirp(r.govde, 8000), tarih: kirp(r.tarih, 40), ek_metin: kirp(r.ek_metin, 12000), ek_kaynak: kirp(r.ek_kaynak, 10),
       };
       if (!g.mesaj_id || !g.gonderen || !/navlun/i.test(g.konu) || Number.isNaN(Date.parse(g.tarih))) { atlanan++; continue; }
-      const k = mesajIsle(g, acenteler);
+      let k = mesajIsle(g, acenteler);
+      if (!k) {
+        // Tabloda olmayan alan adi navlun teklifi veriyorsa acente olarak ogrenilir (elle tablo bakimi gerekmez)
+        const o = acenteOgren(g, acenteler);
+        if (o && !pasif.has(o.alan) && (await acenteEkle(sirket, o.alan, o.ad))) { acenteler[o.alan] = o.ad; ogrenilen.push(o.ad); k = o.kayit; }
+      }
       if (!k) { atlanan++; continue; }
       kayitlar.push(k);
     }
-    if (!kayitlar.length) return json({ yeni: 0, guncellenen: 0, atlanan, olay: 0 });
+    if (!kayitlar.length) return json({ yeni: 0, guncellenen: 0, atlanan, olay: 0, ogrenilen });
     const s = await rpc<Record<string, number>>("navlun_kaydet", { p_company: sirket, p_mesajlar: kayitlar });
     if (!s.ok) return json({ hata: s.hata || "Kaydedilemedi." }, 500);
     const v = s.veri || {};
-    return json({ ...v, atlanan: (v.atlanan || 0) + atlanan, okunamadi: kayitlar.filter((k) => k.durum === "okunamadi").length });
+    return json({ ...v, atlanan: (v.atlanan || 0) + atlanan, okunamadi: kayitlar.filter((k) => k.durum === "okunamadi").length, ogrenilen });
   } catch (e) {
     console.error("navlun-bildirimi", e);
     return json({ hata: "Beklenmeyen hata." }, 500);

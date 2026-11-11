@@ -1,5 +1,5 @@
 // Navlun Bildirimi: tek mailin kayda donusturulmesi (edge navlun-bildirimi kullanir; test edilebilir olsun diye ayri).
-import { fiyatAdaylari, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
+import { armatorAdi, ekFormuOku, fiyatAdaylari, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
 import { limanAnahtari } from "./liman-anahtari.ts";
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
@@ -43,9 +43,11 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
   // Ek yalniz mail metni "teklif ekte / asagidaki gibidir" diyorsa okunur (foy, booking onayi vb. ekler fiyat degil)
   if (!biz && !metindeFiyat && ekBekleniyor && g.ek_metin.trim()) {
     kaynak = g.ek_kaynak === "gorsel" ? "gorsel" : "pdf";
-    const ekten = navlunMesajOku({ konu: g.konu, gonderen: g.gonderen, govde: g.ek_metin }, acenteler, { ek: true })
+    // Once bilinen teklif formu (K+N, Link...): yerlesim sabit, belirsizlik yok. Taninmazsa genel siki okuma.
+    const formdan = ekFormuOku(g.ek_metin, g.konu);
+    const ekten = formdan ?? navlunMesajOku({ konu: g.konu, gonderen: g.gonderen, govde: g.ek_metin }, acenteler, { ek: true })
       .filter((o) => FIYATLI.has(o.tur));
-    if (ekten.length && ektenGuvenli(ekten, g.ek_metin)) {
+    if (ekten.length && (formdan || ektenGuvenli(ekten, g.ek_metin))) {
       // metindeki free time / gecerlilik bilgisi ekten gelen fiyata tasinir
       const ekBilgi = olaylar.find((o) => o.tur === "ek_teklif");
       olaylar = [
@@ -72,3 +74,34 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// Yeni acente ogrenme: tabloda olmayan bir alan adindan "NAVLUN TALEBI" konulu mail gelir ve
+// icerik acikca navlun teklifi gibi okunursa (fiyat / teklif ekte / servis yok / hedef sorusu)
+// alan adi acente olarak eklenir. Kisisel posta, bizim alan ve booking yazismalari ogrenilmez.
+// ---------------------------------------------------------------------------
+const KISISEL = /^(gmail|googlemail|hotmail|outlook|live|yahoo|yandex|icloud|me|msn|aol|mail|proton(?:mail)?)\./i;
+const OGRENILIR = new Set(["teklif", "karsi_teklif", "ek_teklif", "servis_yok", "hedef_soru"]);
+
+/** Alan adindan gorunen acente adi: bilinen armator adi ("oocl.com" -> OOCL), yoksa ilk etiket buyuk harfle. */
+export function alandanAd(alan: string): string {
+  const etiket = alan.split(".")[0] || alan;
+  // "coscoshipping" -> "cosco shipping", "akkonlines" -> "akkon lines"
+  const ayrik = etiket.replace(/[-_]/g, " ").replace(/(shipping|lines?|container|logistics|denizcilik)$/i, " $1");
+  return armatorAdi(ayrik) ?? etiket.charAt(0).toUpperCase() + etiket.slice(1);
+}
+
+export function acenteOgren(g: NavlunGirdi, acenteler: AcenteTablosu): { alan: string; ad: string; kayit: NonNullable<ReturnType<typeof mesajIsle>> } | null {
+  if (bizdenMi(g.gonderen) || acenteAdi(g.gonderen, acenteler)) return null;
+  const alan = (g.gonderen.split("@")[1] || "").toLowerCase().trim();
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(alan) || KISISEL.test(alan) || /ihracatasistanim/.test(alan)) return null;
+  if (!/NAVLUN\s*TALEB|NAVLUN\s*TAELB/i.test(buyukHarf(g.konu))) return null;
+  const ad = alandanAd(alan);
+  const kayit = mesajIsle(g, { ...acenteler, [alan]: ad });
+  if (!kayit || !kayit.olaylar.some((o) => OGRENILIR.has(o.tur))) return null;
+  return { alan, ad, kayit };
+}
+
+function buyukHarf(s: string): string {
+  return s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase().replace(/İ/g, "I");
+}

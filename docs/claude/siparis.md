@@ -103,5 +103,12 @@ Kullanıcı: "Sipariş formu ile yükleme planının otomatik ve hatasız hazır
   ocean / all in" kelimesinin yanında ve yan masraf kodu (THC, BL, ISPS, VGM…) değilse kabul; konudaki liman esas;
   genel tarife (&'li konu) liman sayılmaz; ek metni denetim için `ozet`'e yazılır. Yeniden okuma: betik özelliği
   NAVLUN_GECMIS_I silinip navlunGecmis tekrar çalıştırılır (idempotent; kayıtlar yenilenir).
+- Edge v3 (11.11.2026): (1) bilinen teklif formları ekten doğrudan okunur (`ekFormuOku`): K+N tipi
+  "Ambarli M → X Port → Port … 20GE … Rate Total USD n" (çok rotalı olabilir; rota başına farklı FT varsa armatör/FT
+  boş bırakılır) ve Link tipi "Tahliye Limanı … HERŞEY DAHİL TAŞIMA FİYATI 0 n USD"; form tanınmazsa eski sıkı okuma.
+  (2) Tabloda olmayan alan adı "NAVLUN TALEBİ" konulu mailde açıkça teklif / servis yok / hedef sorusu yazarsa
+  `navlun_acenteler`'e otomatik eklenir (ad: bilinen armatör adı, yoksa alan adı etiketi; kişisel posta, bizim alan,
+  pasife alınmış alan adı öğrenilmez). (3) Betik: görsel ekte en büyük 3 görsel sırayla OCR'lanır, bizim imza/logo
+  (unex.com.tr) atlanır, fiyat içermeyen görsel gönderilmez.
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

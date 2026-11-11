@@ -150,9 +150,11 @@ function navlunEkMetni(m) {
   var gorsel = ekler.filter(function (a) {
     return /^image\/(png|jpe?g)$/i.test(a.getContentType()) && a.getSize() > 15000 && a.getSize() < 4 * 1024 * 1024;
   }).sort(function (a, b) { return b.getSize() - a.getSize(); });
-  if (gorsel.length) {
-    var g = navlunOcr(gorsel[0].copyBlob());
-    return g.trim() ? { metin: g, kaynak: 'gorsel' } : null;
+  // En buyuk 3 gorsel sirayla okunur; bizim imzamiz/logomuz atlanir, fiyat icermeyen gorsel gonderilmez.
+  for (var i = 0; i < gorsel.length && i < 3; i++) {
+    var g = navlunOcr(gorsel[i].copyBlob());
+    if (!g.trim() || /unex\.com\.tr|ihracatasistanim/i.test(g)) continue;
+    if (/usd|\$|eur|freight|navlun|ta[şs]ıma|rate/i.test(g) && /\d{2,}/.test(g)) return { metin: g, kaynak: 'gorsel' };
   }
   return null;
 }

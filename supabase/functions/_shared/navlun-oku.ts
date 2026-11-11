@@ -76,6 +76,12 @@ export function acenteAdi(gonderen: string, acenteler: AcenteTablosu): string | 
   return k ? acenteler[k] : null;
 }
 
+/** Metinde gecen armator (ARMATORLER tablosundan), yoksa null. */
+export function armatorAdi(s: string): string | null {
+  for (const [r, ad] of ARMATORLER) if (new RegExp(r.source, r.flags.includes("i") ? r.flags : r.flags + "i").test(s)) return ad;
+  return null;
+}
+
 export function bizdenMi(gonderen: string): boolean {
   return gonderen.toLowerCase().trim().endsWith("@" + BIZIM_ALAN);
 }
@@ -238,7 +244,101 @@ function dikeyTablo(s: string, siki = false): Array<{ liman: string; tutar: numb
 }
 
 // Kendisi armator olan acenteler: armator yazmasa da teklif o hattindir
-const HAT_ACENTE = new Set(["MSC", "ONE", "Akkon", "Culines", "Evergreen", "Hapag-Lloyd", "Maersk", "CMA CGM", "Arkas"]);
+const HAT_ACENTE = new Set(["MSC", "ONE", "Akkon", "Culines", "Evergreen", "Hapag-Lloyd", "Maersk", "CMA CGM", "Arkas", "OOCL", "COSCO", "ZIM", "Turkon"]);
+
+// ---------------------------------------------------------------------------
+// Bilinen teklif formlari (PDF / OCR): sabit yerlesimli belgelerden dogrudan okuma.
+// Genel "siki" okumadan once denenir; form taninmazsa null doner ve genel yol calisir.
+// ---------------------------------------------------------------------------
+
+const EKIPMAN_KOD: Array<[RegExp, string]> = [
+  [/^(?:40\s*(?:HC|HQ|HCD|HIGH\s*CUBE))$/i, "40HC"],
+  [/^(?:40\s*(?:GE|GP|DC|DV|STANDARD\s*DRY|DRY))$/i, "40DC"],
+  [/^(?:20\s*(?:GE|GP|DC|DV|STANDARD\s*DRY|DRY))$/i, "20DC"],
+];
+function ekipmanKod(s: string): string | null {
+  const t = s.trim().replace(/\s+/g, " ");
+  for (const [r, k] of EKIPMAN_KOD) if (r.test(t)) return k;
+  return null;
+}
+
+/** Bir metin parcasindaki tek armator (birden fazla farkli armator varsa null). */
+function tekArmator(s: string): string | null {
+  const gor = new Set<string>();
+  for (const [r, ad] of ARMATORLER) if (new RegExp(r.source, r.flags).test(s)) gor.add(ad);
+  return gor.size === 1 ? [...gor][0] : null;
+}
+
+function ftYapisal(s: string): number | null {
+  const m = s.match(/\bFT\s*(\d{1,2})(?:\s*\+\s*\d{1,2})?\s*days?/i)
+    || s.match(/(\d{1,2})\s*days?\s*(?:pod\s*|dest(?:ination)?\s*)?free/i)
+    || s.match(/free\s*time\s*[:\-]?\s*(\d{1,2})\s*days?/i)
+    || s.match(/serbest\s*s[üu]re\s*:?\s*(\d{1,2})\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+type YapisalSatir = { liman: string | null; tutar: number; ekipman: string; armator: string | null; ft: number | null; gec: string | null; lokal: boolean | null };
+
+/** Kuehne+Nagel tipi teklif: "Ambarli M -> X Port -> Port ... 20GE ... Rate Total USD 1,475.00" (birden fazla rota olabilir). */
+function knFormu(d: string): YapisalSatir[] | null {
+  const rota = /→\s*([A-Za-zÇĞİÖŞÜçğıöşü .'\-]{2,40}?)\s+Port\s*→\s*Port\b/g;
+  const bas: Array<{ liman: string; i: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = rota.exec(d))) bas.push({ liman: buyukTr(m[1].trim()), i: m.index });
+  if (!bas.length) return null;
+  const yorumI = d.search(/Pricing Comment/i);
+  const yorum = yorumI >= 0 ? d.slice(yorumI, yorumI + 400) : "";
+  const ftSay = (yorum.match(/\bFT\s*\d|\d{1,2}\s*days?\s*(?:pod\s*)?free|free\s*time\s*\d/gi) || []).length;
+  const belirsiz = ftSay > 1;                           // rota/armator basina farkli FT: armator ve FT yazilmaz
+  const gecM = d.match(/Ge[çc]erlilik S[üu]resi\s*\d{1,2}\.\d{1,2}\.\d{4}\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
+  const lokal = /Including[:\s]*O?THC\s*\+\s*POL\s*Locals/i.test(yorum) ? true : null;
+  const out: YapisalSatir[] = [];
+  for (let k = 0; k < bas.length; k++) {
+    const son = k + 1 < bas.length ? bas[k + 1].i : (yorumI > bas[k].i ? yorumI : d.length);
+    const parca = d.slice(bas[k].i, son);
+    const blok = parca.match(/Services\s+Curr\s+((?:(?:20|40|45)\s*(?:GE|GP|DC|DV|HC|HQ)\s*)+)[\s\-]*Rate\s+Total\s+((?:USD\s*[\d.,]+\s*)+)/i);
+    if (!blok) return null;                             // form bozuk: genel yola birak
+    const ekip = blok[1].trim().split(/\s+(?=\d)/).map(ekipmanKod);
+    const tut = [...blok[2].matchAll(/USD\s*([\d.,]+)/gi)].map((x) => sayi(x[1].replace(/\.\d{2}$/, "")));
+    if (ekip.length !== tut.length || ekip.some((e) => !e) || tut.some((t) => !makulMu(t))) return null;
+    for (let j = 0; j < ekip.length; j++) {
+      out.push({ liman: bas[k].liman, tutar: tut[j] as number, ekipman: ekip[j] as string, armator: belirsiz ? null : tekArmator(yorum), ft: belirsiz ? null : ftYapisal(yorum), gec: gecM ? gecM[1] : null, lokal });
+    }
+  }
+  return out.length ? out : null;
+}
+
+/** Link tipi teklif: "Tahliye Limani : X ... Hat : Y ... 20 Standard Dry ... HERSEY DAHIL TASIMA FIYATI 0 2450 USD". */
+function linkFormu(d: string): YapisalSatir[] | null {
+  const fiyat = [...d.matchAll(/HER[ŞS]EY DAH[İI]L TA[ŞS]IMA F[İI]YATI\s+(?:\d{1,2}\s+)?([\d.,]+)\s*USD/gi)].map((x) => sayi(x[1]));
+  if (!fiyat.length || fiyat.some((t) => !makulMu(t))) return null;
+  const ekip = [...d.matchAll(/\b((?:20|40)\s*(?:Standard\s*Dry|High\s*Cube|HC|DC))\b/gi)].map((x) => ekipmanKod(x[1]));
+  if (ekip.length !== fiyat.length || ekip.some((e) => !e)) return null;
+  const tah = d.match(/Tahliye Liman[ıi]\s*:\s*([A-Za-zÇĞİÖŞÜçğıöşü .'\-]{2,40}?)\s*,/i);
+  const ds = d.match(/Demuraj Serbest S[üu]re\s*:\s*(\d{1,2})\b/i);
+  return fiyat.map((t, j) => ({
+    liman: tah ? buyukTr(tah[1].trim()) : null, tutar: t as number, ekipman: ekip[j] as string,
+    armator: tekArmator(d), ft: ds ? Number(ds[1]) : null, gec: null, lokal: true,     // "hersey dahil"
+  }));
+}
+
+/**
+ * Ek metni bilinen bir teklif formuysa olaylari dondur; degilse null (genel okuma denenir).
+ * Tek rotali teklifte liman konudan alinir (sayfadaki liman kartlari konu limaniyla eslesir).
+ */
+export function ekFormuOku(ekMetin: string, konu: string): NavlunOlay[] | null {
+  const d = ekMetin.replace(/\s+/g, " ");
+  const satir = knFormu(d) ?? linkFormu(d);
+  if (!satir) return null;
+  const lim = konudanLiman(konu);
+  const konuLiman = lim && !/&|,/.test(lim) && lim.length <= 30 ? lim : null;
+  const limanSayisi = new Set(satir.map((x) => x.liman ?? "")).size;
+  return satir.map((x) => ({
+    ...bos(), tur: "teklif" as const,
+    liman: limanSayisi === 1 ? (konuLiman ?? x.liman) : (x.liman ?? konuLiman),
+    tutar: x.tutar, ekipman: x.ekipman, armator: x.armator, free_time_gun: x.ft, gecerlilik: x.gec, lokal_dahil: x.lokal,
+  }));
+}
 
 /** Tek mesajdan navlun olaylarini cikar. */
 export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {

@@ -13,6 +13,7 @@ import {
 } from "@/lib/siparis/liste";
 import { onOdemeIsaretle, siparisListesiOku, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
+import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -54,6 +55,9 @@ function OzetKarti({ etiket, deger, alt, renk, testId, onClick, secili }: { etik
   );
 }
 
+/** Export'un sipariş listesi Excel'iyle BİREBİR aynı 11 başlık; sağda sistem sütunları */
+const SIPARIS_BASLIKLARI = ["Proforma", "Firma Adı", "Ürün", "Fiyat", "Miktar", "Tutar", "Konteyner", "Liman", "BL NO", "Marka", "Paketleme"];
+
 function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
   liste: SiparisSatiri[]; isaretleyebilir: boolean; onIsaretle: (s: SiparisSatiri, v: boolean) => void; bekleyen: string | null;
 }) {
@@ -61,13 +65,10 @@ function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
     <div className="rounded-xl border overflow-x-auto" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED, backgroundColor: ROW_HEADER_BG }}>
-            <th className="px-3 py-2 font-medium">Proforma</th><th className="px-3 py-2 font-medium">Firma</th>
-            <th className="px-3 py-2 font-medium">Ürün</th><th className="px-3 py-2 font-medium text-right">Fiyat</th>
-            <th className="px-3 py-2 font-medium text-right">MT</th><th className="px-3 py-2 font-medium text-right">Tutar</th>
-            <th className="px-3 py-2 font-medium text-right">Kont.</th><th className="px-3 py-2 font-medium">Liman</th>
-            <th className="px-3 py-2 font-medium">Durum</th><th className="px-3 py-2 font-medium">Ön ödeme</th>
-            <th className="px-3 py-2 font-medium">Dosya / Booking</th>
+          <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED, backgroundColor: ROW_HEADER_BG }} data-testid="siparis-baslik">
+            {SIPARIS_BASLIKLARI.map((b, i) => <th key={b} className={`px-3 py-2 font-medium whitespace-nowrap ${i >= 3 && i <= 6 ? "text-right" : ""}`}>{b}</th>)}
+            <th className="px-3 py-2 font-medium whitespace-nowrap" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>Durum</th><th className="px-3 py-2 font-medium whitespace-nowrap">Ön ödeme</th>
+            <th className="px-3 py-2 font-medium whitespace-nowrap">Dosya / Booking</th>
           </tr>
         </thead>
         <tbody>
@@ -80,13 +81,16 @@ function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
                   <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
                 </td>
                 <td className="px-3 py-2 text-white min-w-[160px]">{s.firma || "—"}</td>
-                <td className="px-3 py-2 min-w-[150px]" style={{ color: "#C9D1DC" }}>{s.urun || "—"}{s.marka ? <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{s.marka}</span> : null}</td>
+                <td className="px-3 py-2 min-w-[150px]" style={{ color: "#C9D1DC" }}>{s.urun || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.birim_fiyat, 2)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-white">{sayiGoster(s.miktar_mt, 2)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-white whitespace-nowrap">{s.tutar === null ? "—" : `${sayiGoster(s.tutar, 2)} ${s.para_birimi === "EUR" ? "€" : "$"}`}</td>
                 <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }}>{sayiGoster(s.konteyner)}</td>
                 <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{s.liman || "—"}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 font-mono text-xs" style={{ color: "#C9D1DC" }}>{s.bl_no || "—"}</td>
+                <td className="px-3 py-2 min-w-[110px]" style={{ color: "#C9D1DC" }}>{s.marka || "—"}</td>
+                <td className="px-3 py-2 min-w-[110px] text-xs" style={{ color: "#C9D1DC" }}>{s.paketleme || "—"}</td>
+                <td className="px-3 py-2" style={{ borderLeft: `1px solid ${CARD_BORDER}` }}>
                   <DurumRozeti d={s.durum} />
                   {s.benzer && s.kaynak === "sistem" && (
                     <span className="mt-1 flex items-start gap-1 text-[11px] max-w-[220px]" style={{ color: "#FCD34D" }} data-benzer>
@@ -108,7 +112,6 @@ function SiparisTablosu({ liste, isaretleyebilir, onIsaretle, bekleyen }: {
                 <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>
                   {s.dosya_no || "—"}{s.booking_no ? <span className="block">{s.booking_no}</span> : null}
                   {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
-                  {s.bl_no ? <span className="block">BL {s.bl_no}</span> : null}
                 </td>
               </tr>
             );
@@ -218,6 +221,7 @@ function SiparisIcerik() {
   const [bekleyen, setBekleyen] = useState<string | null>(null);
   const [indiriliyor, setIndiriliyor] = useState(false);
   const [aktarAcik, setAktarAcik] = useState(false);
+  const [siparisAktarAcik, setSiparisAktarAcik] = useState(false);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const bugun = bugunIst();
 
@@ -330,7 +334,21 @@ function SiparisIcerik() {
               <div className="flex flex-wrap gap-2 mb-3">
                 {filtreBtn("acik", "Açık")}{filtreBtn("onay_bekliyor", "Onay bekliyor")}{filtreBtn("on_odeme_alindi", "Ön ödeme alındı")}
                 {filtreBtn("rezervasyonlu", "Rezervasyonlu")}{filtreBtn("bl_eksik", "BL eksik")}{filtreBtn("sevk_edildi", "Sevk edildi")}{filtreBtn("tum", "Tümü")}
+                {isaretleyebilir && (
+                  <button type="button" onClick={() => setSiparisAktarAcik(true)} data-testid="siparis-aktar-ac"
+                    className="h-8 px-3 ml-auto inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER }}>
+                    <Upload size={13} style={{ color: ACCENT }} /> Excel&apos;den içeri aktar
+                  </button>
+                )}
               </div>
+              {bilgi && (
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2 mb-3 text-sm" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#6EE7B7" }} role="status" data-testid="siparis-bilgi">
+                  <CheckCircle2 size={15} className="shrink-0" /> <span>{bilgi}</span>
+                </div>
+              )}
+              {siparisAktarAcik && (
+                <SiparisExcelAktar onKapat={() => setSiparisAktarAcik(false)} onAktarildi={(m) => { setSiparisAktarAcik(false); setBilgi(m); setFiltre("tum"); yukle(); }} />
+              )}
               {gorunenSiparis.length ? (
                 <SiparisTablosu liste={gorunenSiparis} isaretleyebilir={isaretleyebilir} onIsaretle={onIsaretle} bekleyen={bekleyen} />
               ) : <EmptyState icon={<ClipboardList size={40} />} title="Bu filtrede sipariş yok" />}

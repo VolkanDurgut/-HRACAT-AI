@@ -75,6 +75,23 @@ Kullanıcı: "Yükleme planını Excel ile içeri aktar yapılsın. ETD raporund
   geri alınan kuru çalıştırmada iki örnek booking'in konteyneri doğru düzeldi. İlk gerçek aktarımı kullanıcı yapar.
 - Test: e2e_siparis 48 (kurgusal `plan_ornek.xlsx`), yerel Postgres'te RPC senaryoları (yetki, tekrar, şirket ayrımı).
 
+## 4.5 Sipariş Listesi — Excel'den içeri aktarma (11.11.2026)
+Kullanıcı: "Sipariş listesi içinde aynı şeyi yapmalıyız. Excel yükleyebilmeliyiz."
+- Migration `20261111110000_siparis_listesi_excel_aktar.sql` (CANLIDA): `siparis_listesi_aktar(dosya_adi, satirlar)`
+  ("proformalar"; tek işlem; satırda `id` → o kayıt güncellenir, yoksa yeni kayıt [kaynak_anahtar `aktarim:<uuid>`];
+  boş hücre silmez; `iptal` durumu değişmez; dosya bağı ve ön ödeme işaretlerine dokunmaz) + `siparis_defteri_aktarimlari`.
+- Okuma (`lib/siparis/siparis-excel.ts`, ortak okuyucu `lib/siparis/xlsx-oku.ts`; satır dolgu rengi de okunur): başlık
+  satırı "Proforma … Paketleme" (sistemin Excel indir çıktısı da okunur). Durum: YEŞİL satır + BL → sevk_edildi, yeşil
+  BL yok → bl_eksik, yeşil değil + BL → rezervasyonlu, "ÖN ÖDEMESİ ALINMIŞ" bölümü → on_odeme_alindi, "ALINMAMIŞ" →
+  onay_bekliyor. Tutar formülü yoksa fiyat × miktar. Sayı olmayan fiyat → uyarı, boş gönderilir.
+- Eşleşme İSTEMCİDE (önizleme = yazılan): proforma anahtarı (boşluksuz, büyük harf, sondaki revize "R" yok) +
+  1) aynı BL, 2) ikisinde BL yok, 3) aynı miktar + konteyner, 4) Excel sırasına en yakın. Eşleşmeyen sistem kaydı
+  "dosyada yok" olarak listelenir, SİLİNMEZ.
+- Tablo: export Excel'iyle birebir 11 başlık + sistem sütunları (Durum, Ön ödeme, Dosya / Booking).
+- Canlı kontrol: export'un 10.11 dosyası 189 satır → 0 yeni, 9 değişecek (yeşil olmayan, booking'li 8 satır
+  "sevk edildi" → "rezervasyonlu" düzeltmesi + 1 revize proforma no), 180 aynı; geri alınan kuru çalıştırma doğru.
+- Test: e2e_siparis 59 (kurgusal `siparis_ornek.xlsx`), yerel Postgres'te RPC senaryoları.
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

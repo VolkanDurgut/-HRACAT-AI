@@ -12,6 +12,7 @@
  * Sutunlar BASLIK METNINDEN bulunur (sira degisse de calisir). Hafta, dosyadaki hafta basligindan alinir.
  * Cut-off saatleri yerel saattir; rezervasyonlarla ayni kuralla UTC etiketiyle saklanir ("…T10:00:00+00:00").
  */
+import { baslikAnahtari, xlsxHamOku, type HamSayfa, type HucreDegeri } from "./xlsx-oku";
 
 export type PlanKalemi = { cinsi: string | null; konteyner: number | null; cuval_markasi: string | null; ambalaj: string | null };
 
@@ -43,18 +44,6 @@ export type PlanExcelSatiri = {
 
 export type PlanExcelSonucu = { satirlar: PlanExcelSatiri[]; uyarilar: string[]; sayfalar: string[] };
 
-export type HucreDegeri = string | number | null;
-/** Bir sayfanin satirlari: [excel satir no, hucreler (0 = A sutunu)] */
-export type HamSayfa = { ad: string; satirlar: Array<[number, HucreDegeri[]]> };
-
-const ENBUYUK_BOYUT = 15 * 1024 * 1024;
-
-export function baslikAnahtari(s: string): string {
-  return s
-    .toLocaleUpperCase("tr-TR")
-    .replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ü/g, "U").replace(/Ö/g, "O").replace(/Ç/g, "C")
-    .replace(/[^A-Z0-9]/g, "");
-}
 
 /** Beklenen 16 baslik: alan -> baslik anahtari (onek eslesmesi) */
 const BASLIKLAR: Array<[keyof PlanExcelSatiri | "konad", string, string]> = [
@@ -250,70 +239,9 @@ export function planSayfalariniCoz(sayfalar: HamSayfa[]): PlanExcelSonucu {
 
 // --------------------------------------------------------------------------- dosya okuma (tarayici)
 
-function sutunNo(ref: string): number {
-  const harf = (ref.match(/^[A-Z]+/) || [""])[0];
-  let n = 0;
-  for (const c of harf) n = n * 26 + (c.charCodeAt(0) - 64);
-  return n - 1;
-}
-function elemanlar(kok: Document | Element, ad: string): Element[] {
-  return Array.from(kok.getElementsByTagNameNS("*", ad));
-}
-function metinIcerik(el: Element): string {
-  return elemanlar(el, "t").filter((t) => !(t.parentElement && t.parentElement.localName === "rPh")).map((t) => t.textContent || "").join("");
-}
-
-/** .xlsx / .xlsm -> ham sayfalar (yalniz yil adli sayfalar, ilk 20 sutun). */
+/** .xlsx / .xlsm -> plan satirlari (yalniz yil adli sayfalar). */
 export async function planExceliOku(dosya: File | Blob): Promise<PlanExcelSonucu> {
-  if (dosya.size > ENBUYUK_BOYUT) throw new Error("Dosya 15 MB'tan büyük.");
-  const JSZip = (await import("jszip")).default;
-  let zip: Awaited<ReturnType<typeof JSZip.loadAsync>>;
-  try { zip = await JSZip.loadAsync(await dosya.arrayBuffer()); }
-  catch { throw new Error("Dosya okunamadı. Lütfen .xlsx veya .xlsm Excel dosyası seçin."); }
-  const oku = async (yol: string) => zip.file(yol)?.async("string") ?? null;
-  const xml = (s: string) => new DOMParser().parseFromString(s, "application/xml");
-  const wbMetin = await oku("xl/workbook.xml");
-  const relMetin = await oku("xl/_rels/workbook.xml.rels");
-  if (!wbMetin || !relMetin) throw new Error("Bu dosya bir Excel çalışma kitabı değil.");
-  const rels = new Map<string, string>();
-  for (const r of elemanlar(xml(relMetin), "Relationship")) rels.set(r.getAttribute("Id") || "", (r.getAttribute("Target") || "").replace(/^\/?xl\//, "").replace(/^\//, ""));
-  const paylasilan: string[] = [];
-  const ssMetin = await oku("xl/sharedStrings.xml");
-  if (ssMetin) for (const si of elemanlar(xml(ssMetin), "si")) paylasilan.push(metinIcerik(si));
-
-  const sayfalar: HamSayfa[] = [];
-  for (const s of elemanlar(xml(wbMetin), "sheet")) {
-    const ad = (s.getAttribute("name") || "").trim();
-    if (!/^\d{4}$/.test(ad)) continue;
-    const rid = s.getAttribute("r:id") || s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id") || "";
-    const yol = rels.get(rid);
-    const sh = yol ? await oku(`xl/${yol}`) : null;
-    if (!sh) continue;
-    const satirlar: Array<[number, HucreDegeri[]]> = [];
-    for (const row of elemanlar(xml(sh), "row")) {
-      const no = Number(row.getAttribute("r"));
-      const hucreler: HucreDegeri[] = [];
-      let dolu = false;
-      for (const c of elemanlar(row, "c")) {
-        const i = sutunNo(c.getAttribute("r") || "");
-        if (i < 0 || i > 19) continue;
-        const t = c.getAttribute("t") || "n";
-        const v = elemanlar(c, "v")[0]?.textContent ?? null;
-        let d: HucreDegeri = null;
-        if (t === "s") d = v !== null ? paylasilan[Number(v)] ?? null : null;
-        else if (t === "inlineStr") d = metinIcerik(c);
-        else if (t === "str") d = v;
-        else if (t === "e" || t === "b") d = null;
-        else d = v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : v;
-        if (d !== null && d !== "") dolu = true;
-        hucreler[i] = d;
-      }
-      if (dolu) satirlar.push([no, hucreler]);
-    }
-    satirlar.sort((a, b) => a[0] - b[0]);
-    sayfalar.push({ ad, satirlar });
-  }
-  return planSayfalariniCoz(sayfalar);
+  return planSayfalariniCoz(await xlsxHamOku(dosya, { sayfa: (ad) => /^\d{4}$/.test(ad) }));
 }
 
 // --------------------------------------------------------------------------- onizleme (sistemle karsilastirma)

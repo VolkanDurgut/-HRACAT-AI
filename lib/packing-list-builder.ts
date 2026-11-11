@@ -2,6 +2,7 @@ import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatDateTR, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { kalemleriOku } from "@/lib/konteyner-icerik";
 
 /** HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi). */
 function escapeHtml(value: string | null | undefined): string {
@@ -342,6 +343,34 @@ function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { row
 
   const rows = konteynerler
     .map((k, idx) => {
+      // 11.11.2026: konteyner icerigi girilmisse (birden fazla urun / cuval) her kalem ayri satir; konteyner no,
+      // muhur ve brut konteyner basina bir kez (rowspan). Tek kalem: konteynerin urunu acikca secilmis.
+      const kalemler = kalemleriOku((k as any).kalemler);
+      if (kalemler.length) {
+        const gross = (k as any).brut_agirlik_kg || 0;
+        const n = kalemler.length;
+        totalGross += gross;
+        const tekKalem = n === 1;
+        return kalemler.map((x, j) => {
+          const pieces = tekKalem ? (x.pieces ?? (k as any).pieces ?? 0) : (x.pieces || 0);
+          const nett = tekKalem ? (x.net_kg ?? k.net_agirlik_kg ?? 0) : (x.net_kg || 0);
+          totalPieces += pieces;
+          totalNett += nett;
+          const marka = x.marka ? escapeHtml(x.marka) : ((k as any).marka ? escapeHtml(String((k as any).marka)) : varsayilanMarka);
+          const ilk = j === 0;
+          const rs = n > 1 ? ` rowspan="${n}"` : "";
+          return `<tr class="kont-satir${n > 1 ? " kont-kalem" : ""}">
+        ${ilk ? `<td style="text-align:center;"${rs}>${idx + 1}</td>` : ""}
+        <td>${escapeHtml(x.urun)}</td>
+        <td style="text-align:center;">${marka}</td>
+        ${ilk ? `<td class="num"${rs}>${safe(k.konteyner_no)}</td>
+        <td class="num"${rs}>${safe(k.muhur_no)}</td>` : ""}
+        <td class="num">${pieces ? pieces.toLocaleString("tr-TR") : "-"}</td>
+        <td class="num">${nett ? nett.toLocaleString("tr-TR") + " KG" : "-"}</td>
+        ${ilk ? `<td class="num"${rs}>${gross ? gross.toLocaleString("tr-TR") + " KG" : "-"}</td>` : ""}
+      </tr>`;
+        }).join("\n");
+      }
       const pieces = (k as any).pieces || 0;
       const nett = k.net_agirlik_kg || 0;
       const gross = (k as any).brut_agirlik_kg || 0;

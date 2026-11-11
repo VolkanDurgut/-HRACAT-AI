@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle, ClipboardCheck, Download, ExternalLink, FileSearch, Loader2, Pencil, Plus, RefreshCw, Search, Split, Trash2, X,
+  AlertTriangle, ClipboardCheck, Download, ExternalLink, FileSearch, FileText, Loader2, Pencil, Plus, RefreshCw, Search, Split, Trash2, X,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -128,6 +128,34 @@ function DiibIcerik() {
   }, [ozetler, sonuc]);
   useEffect(() => { if (!secili && ozetler.length) setSecili(kullanimda ?? ozetler[0].belge.id); }, [ozetler, kullanimda, secili]);
   const seciliOzet = ozetler.find((o) => o.belge.id === secili) ?? null;
+
+  // Faturayi incele (11.11.2026): satirin dosyasindaki fatura PDF'i; bolunmus yuklemede o parcanin PDF'i.
+  const faturaUrl = useCallback((s: DiibSatiri): string | null => {
+    if (!s.dosyaId) return null;
+    const parcalar = bolunmeler.filter((b) => b.dosya_id === s.dosyaId);
+    if (parcalar.length) {
+      const p = s.bolunmeSira ? parcalar.find((b) => b.sira === s.bolunmeSira)
+        : parcalar.find((b) => faturaNorm(b.fatura_no) && faturaNorm(b.fatura_no) === faturaNorm(s.faturaNo));
+      if (p?.fatura_dosya_url) return p.fatura_dosya_url;
+    }
+    const d = dosyalar.find((x) => x.id === s.dosyaId);
+    if (!d?.fatura_dosya_url) return null;
+    // Bolunmus dosyada ana PDF yalniz ilk parcaya / ayni fatura no'ya aittir
+    return !parcalar.length || faturaNorm(d.fatura_no) === faturaNorm(s.faturaNo) || s.bolunmeSira === 1 ? d.fatura_dosya_url : null;
+  }, [bolunmeler, dosyalar]);
+
+  // Rapor mailindeki "faturayi incele" baglantisi: /diib?fatura=NO -> ilgili DIIB secilir, satir aranir
+  const [derinBag, setDerinBag] = useState<string | null>(null);
+  useEffect(() => {
+    const no = new URLSearchParams(window.location.search).get("fatura");
+    if (no) setDerinBag(no.slice(0, 40));
+  }, []);
+  useEffect(() => {
+    if (!derinBag || !sonuc.satirlar.length) return;
+    const s = sonuc.satirlar.find((x) => faturaNorm(x.faturaNo) === faturaNorm(derinBag));
+    if (s) { setSecili(s.diibId); setArama(derinBag); }
+    setDerinBag(null);
+  }, [derinBag, sonuc]);
   const email = user?.email?.toLowerCase() ?? null;
 
   // Excel'e aktar: Burak Bey'in formu, tamamen sistem verisinden
@@ -235,7 +263,7 @@ function DiibIcerik() {
             onEslestir={(dosya, diibId) => setSatirFormu({ satir: null, diibId, dosya })} />
           <BekleyenYuklemeler sonuc={sonuc} ozetler={ozetler} bolunmeler={bolunmeler} />
           {seciliOzet && (
-            <DiibAyrinti ozet={seciliOzet} satirlar={sonuc.satirlar.filter((s) => s.diibId === seciliOzet.belge.id)} arama={arama} setArama={setArama}
+            <DiibAyrinti ozet={seciliOzet} faturaUrl={faturaUrl} satirlar={sonuc.satirlar.filter((s) => s.diibId === seciliOzet.belge.id)} arama={arama} setArama={setArama}
               onBelgeDuzenle={() => setBelgeFormu(seciliOzet.belge)}
               onSatirEkle={() => setSatirFormu({ satir: null, diibId: seciliOzet.belge.id })}
               onSatirDuzenle={(s) => setSatirFormu({ satir: s, diibId: s.diibId })}
@@ -490,8 +518,8 @@ const KAYNAK: Record<DiibSatiri["kaynak"], { etiket: string; sinif: string; titl
   elle: { etiket: "Elle", sinif: "bg-amber-500/10 text-amber-300", title: "Elle eklendi" },
 };
 
-function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirEkle, onSatirDuzenle, onSatirSil }: {
-  ozet: DiibOzeti; satirlar: DiibSatiri[]; arama: string; setArama: (s: string) => void;
+function DiibAyrinti({ ozet, faturaUrl, satirlar, arama, setArama, onBelgeDuzenle, onSatirEkle, onSatirDuzenle, onSatirSil }: {
+  ozet: DiibOzeti; faturaUrl: (s: DiibSatiri) => string | null; satirlar: DiibSatiri[]; arama: string; setArama: (s: string) => void;
   onBelgeDuzenle: () => void; onSatirEkle: () => void; onSatirDuzenle: (s: DiibSatiri) => void; onSatirSil: (s: DiibSatiri) => void;
 }) {
   const ara = arama.trim().toLocaleLowerCase("tr-TR");
@@ -533,7 +561,19 @@ function DiibAyrinti({ ozet, satirlar, arama, setArama, onBelgeDuzenle, onSatirE
                 const faturasiz = !faturaNorm(s.faturaNo);
                 return (
                   <tr key={s.anahtar} className="border-t hover:bg-white/[0.02]" style={{ borderColor: CARD_BORDER, backgroundColor: faturasiz ? "rgba(245,158,11,0.06)" : undefined }} data-testid="diib-satir">
-                    <td className="px-3 py-2 text-xs font-mono whitespace-nowrap text-white">{s.faturaNo || <span className="text-amber-300 font-sans font-semibold">Fatura no yok</span>}{s.bolunmeSira ? <span className="ml-1 text-[10px] text-sky-300 font-sans">({s.bolunmeSira}. fatura)</span> : null}</td>
+                    <td className="px-3 py-2 text-xs font-mono whitespace-nowrap text-white">
+                      {(() => {
+                        const url = faturaUrl(s);
+                        const no = s.faturaNo || <span className="text-amber-300 font-sans font-semibold">Fatura no yok</span>;
+                        return url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer" data-testid="fatura-ac" title={`${s.faturaNo || "Fatura"} PDF'ini aç`}
+                            className="inline-flex items-center gap-1.5 hover:underline decoration-dotted underline-offset-2">
+                            {no}<FileText size={12} className="shrink-0" style={{ color: ACCENT }} aria-hidden="true" />
+                          </a>
+                        ) : no;
+                      })()}
+                      {s.bolunmeSira ? <span className="ml-1 text-[10px] text-sky-300 font-sans">({s.bolunmeSira}. fatura)</span> : null}
+                    </td>
                     <td className="px-3 py-2 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.beyannameNo || "-"}</td>
                     <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.faturaTarihi ? formatDateTR(s.faturaTarihi) : "-"}</td>
                     <td className="px-3 py-2 text-sm text-white max-w-[240px]" title={s.ulke ? `${s.cari} · ${s.ulke}` : s.cari}><span className="flex items-center gap-1.5 min-w-0"><UlkeBayrak ulke={s.ulke} /><span className="truncate">{s.cari}</span></span></td>

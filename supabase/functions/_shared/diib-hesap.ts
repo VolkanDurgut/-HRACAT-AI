@@ -68,6 +68,8 @@ export type DiibDosyasi = {
   para_birimi: string | null;
   diib_no: string | null;
   beyanname_dosya_url?: string | null;
+  /** Kesilen faturanin PDF'i (DIIB takibinde "faturayi ac"; 11.11.2026) */
+  fatura_dosya_url?: string | null;
   /** Yuklenen konteynerlerin net toplami (TUM konteynerlerde net > 0 ise; yoksa null). veri.ts doldurur. */
   yuklenenKg?: number | null;
 };

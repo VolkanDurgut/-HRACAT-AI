@@ -1240,3 +1240,20 @@ export@, export2@."
 - `KH_VARSAYILAN_CC` + export2@. Edge `konsimento-hatirlatma` v19: `{"islem":"ayar"}` salt okunur → `{canli, alici, cc}`
   (mail atmadan canlı doğrulama; secret değeri dönmez).
 - VGM raporu: cron yanıtı `{ok:true,...}` (canlı; kapalıysa `canli:false` döner). Alıcı/CC test mailinin şeridinde görünür.
+
+## Konteyner içeriği, DİİB fatura bağlantısı, bekleyen evrak animasyonu (11.11.2026)
+
+- Kullanıcı: "Bir konteynerde 2 farklı ürün var; packing'de o konteynerin 2 ürün ismi yazması normal; bir konteynere 2 ayrı
+  çuval ekleyebilmeliyiz. Diğer konteynerde tek ürün yazmalı." Migration `20261111160000_konteyner_kalemleri.sql` (CANLIDA):
+  `konteynerler.kalemler jsonb` (null ya da 1–6 kalem: ürün, çuval markası, kap, net kg). `lib/konteyner-icerik.ts` (saf),
+  `components/konteyner-icerik.tsx`: Konteynerler sekmesinde marka hücresinin altında "Ürün seç" / ürün adı / "N ürün";
+  pencere ürünleri proformadan, çuvalı marka listesinden ya da serbest alır; birden çok kalemde kap + net zorunlu; toplam
+  konteynerle tutmazsa uyarı (kayıt yine yapılır). Dosyada tek ürün varsa ve kalem girilmemişse düğme görünmez.
+  `lib/packing-list-builder.ts`: kalemli konteyner kalem başına satır (seri, konteyner, mühür, brüt birleşik); tek kalemde
+  konteynerin kap / net'i. Mevcut veri DEĞİŞMEDİ: kalemi olmayan konteyner eskisi gibi basılır. Test: e2e_kalem 10
+  (FATURA_TEST=1 KALEM_TEST=1).
+- "DİİB raporunda ilgili faturayı inceleyebilmeli": DİİB Takibi ayrıntısında fatura no → fatura PDF'i (bölünmüş dosyada
+  parçanın PDF'i; `fatura-ac`), `/diib?fatura=NO` ilgili DİİB'i açar ve aramayı faturaya süzer. DİİB günlük mailinde
+  "Bugün kesilen faturalar"daki fatura no bu bağlantıya gider (giriş gerekir; mailde PDF adresi YOK). Edge
+  `diib-gunluk-rapor` v18. Test: e2e_diib 24.
+- Ana Panel: bekleyen evrak ikonları (`evrak-bekliyor-ikon`) yavaşça döner (2,8 sn); "hareket azaltma" tercihinde durur.

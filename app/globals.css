@@ -228,3 +228,8 @@ html:has([data-sabit-zemin]) ::-webkit-scrollbar-thumb:hover { background: #3A43
 @keyframes sg-metin-gir { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
 .sg-metin-gir { animation: sg-metin-gir 520ms cubic-bezier(0.16, 1, 0.3, 1) var(--sg-g, 0ms) both; }
 @media (prefers-reduced-motion: reduce) { .sg-metin-gir { animation: none; } }
+
+/* 11.11.2026: bekleyen evrak (kesik daire) ikonu yavasca doner - "bekleniyor" hissi. Hareket azaltma tercihinde durur. */
+@keyframes evrak-bekliyor-don { to { transform: rotate(360deg); } }
+.evrak-bekliyor-ikon { animation: evrak-bekliyor-don 2.8s linear infinite; transform-origin: 50% 50%; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .evrak-bekliyor-ikon { animation: none; } }

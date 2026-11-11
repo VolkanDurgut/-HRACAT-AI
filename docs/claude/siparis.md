@@ -222,5 +222,16 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   transit YAZILMIYOR — boş hücre = acente belirtmemiş (uydurulmaz). Sayfa: "Transit" sütunu, Hedef'in açıklaması.
   TEK SEFERLİK: eski mailler metni saklanmadan okunduğu için betikte NAVLUN_GECMIS_I silinip navlunGecmis "BITTI"
   yazana kadar çalıştırılır (yeni mailler 15 dk tetikleyiciyle zaten metinle gelir).
+- Günde iki rapor (11.11.2026, kullanıcı: "güncel navlun excelinin ve sipariş raporunun her gün sabah 08.00 ve 17.00
+  raporlanması; alıcılar bbt / execution / export / export2; navlun raporunda her raporda en son alınan rakamlar"):
+  `_shared/rapor-oturum.ts` (sabah 07:55–09:00 / akşam 16:55–18:00 penceresi, `oturumAdi`). Migration
+  `20261111170000_gunluk_raporlar_iki_oturum.sql` (CANLIDA): `oturum` kolonu; sipariş tekilliği şirket + gün + oturum
+  (elle hariç), navlun tekilliği şirket + gün + oturum (elle ve test hariç); pg_cron `siparis-rapor-sabah/aksam`,
+  `navlun-tablosu-sabah/aksam` (05:00 / 14:00 UTC); eski `siparis-rapor` işi kaldırıldı. Edge `navlun-tablosu` v3:
+  anon `{}` yalnız pencerede; `NAVLUN_TABLOSU_CANLI=evet` + `NAVLUN_TABLOSU_ALICI`, değilse "[TEST]" yalnız test adresine;
+  mailde "Son rapordan beri gelen teklifler" (önceki gönderimden sonra; ilk raporda son 48 saat) + en iyi tablosunda
+  "Son gelen teklif" sütunu (YENİ rozeti). Edge `siparis-rapor` v2: oturum etiketi, "Her gün 08:00 ve 17:00".
+  İlk akşam (11.11 17:00) iki rapor da test modunda yalnız test adresine gitti. Canlıya alma: secret'lar
+  `SIPARIS_RAPOR_CANLI=evet`, `SIPARIS_RAPOR_ALICI`, `NAVLUN_TABLOSU_CANLI=evet`, `NAVLUN_TABLOSU_ALICI` (kullanıcı girer).
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.

@@ -174,6 +174,8 @@ export type Konteyner = {
   pieces: number | null;
   brut_agirlik_kg: number | null;
   marka: string | null;
+  /** Konteyner icerigi (birden fazla urun / cuval; lib/konteyner-icerik.ts). 11.11.2026 */
+  kalemler?: unknown;
   irsaliye_dosya_url: string | null;
   irsaliye_dosya_adi: string | null;
   irsaliye_yukleme_tarihi: string | null;

@@ -16,6 +16,8 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/t
 import { kapUyumsuzlugu } from "@/lib/siparis-devam";
 import { ElleTartimPenceresi } from "@/components/elle-tartim-penceresi";
 import { elleTartimMi, type ElleTartimFormu } from "@/lib/elle-tartim";
+import { KonteynerIcerikHucresi } from "@/components/konteyner-icerik";
+import { urunSecenekleri } from "@/lib/konteyner-icerik";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -284,6 +286,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>
                         <MarkaHucresi konteynerId={k.id} deger={(k as any).marka} secenekler={markaListesi} companyId={companyId} onKaydedildi={onRefresh} />
+                        <div><KonteynerIcerikHucresi konteyner={k} urunler={urunSecenekleri(dosya.urun_detaylari)} markalar={markaListesi} companyId={companyId} onKaydedildi={onRefresh} /></div>
                       </td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.plaka || <span style={{ color: "#4A5262" }}>-</span>}</td>
                       <td className="px-4 py-3 text-sm text-right" style={{ color: TEXT_MUTED }}>{k.tare_kg ? `${k.tare_kg} KG` : <span style={{ color: "#4A5262" }}>-</span>}</td>

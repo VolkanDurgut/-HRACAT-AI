@@ -62,7 +62,7 @@ function EvrakDurumu({ dosya }: { dosya: DosyaWithRelations }) {
         const metin = e.tamam ? `${e.ad} ${e.durum}` : e.ek ? `${e.ad} ${e.ek}` : e.ad;
         const ic = (
           <>
-            {e.tamam ? <CheckCircle2 size={13} /> : <CircleDashed size={13} />}
+            {e.tamam ? <CheckCircle2 size={13} /> : <CircleDashed size={13} className="evrak-bekliyor-ikon" data-bekliyor aria-hidden="true" />}
             {metin}
           </>
         );

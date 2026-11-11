@@ -8,12 +8,13 @@ import {
   BOLUM_BASLIGI, DURUM_ADI, planGorunumu, planHaftasi, planKalemleri, planSirala, saat, siparisBolumleri, siparisOzeti, trTarih,
   type PlanSatiri, type SiparisOzeti, type SiparisSatiri,
 } from "./siparis-liste.ts";
+import { RAPOR_SAATLERI, oturumAdi, oturumSaatten } from "./rapor-oturum.ts";
 
 const LACIVERT = "#283474";
 const MARKA_TURUNCU = "#F4A07C";
 const YESIL = "#10B981";
 export const SIPARIS_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
-export const SIPARIS_RAPOR_SAATI = "17:00";
+export const SIPARIS_RAPOR_SAATI = RAPOR_SAATLERI;
 /** Plan bolumunde gosterilecek ileri gun sayisi (ETD bugun .. bugun+14) */
 const PLAN_GUN = 14;
 
@@ -134,7 +135,7 @@ export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olus
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${SIPARIS_RAPOR_UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi)}" style="display:block;width:48px;height:48px;border:0"></td>
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi)} Sipariş Raporu</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Sipariş Listesi · Yükleme Planı</div></td>
-    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(trTarih(r.tarih))}</div><div style="font-size:11px;color:#94A3B8">Akşam raporu · ${esc(saatYaz)}</div></td>
+    <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(trTarih(r.tarih))}</div><div style="font-size:11px;color:#94A3B8">${esc(oturumAdi(oturumSaatten(Date.parse(olusturmaIso))))} · ${esc(saatYaz)}</div></td>
   </tr></table>
   ${kutular}
   ${bugun}
@@ -154,7 +155,7 @@ export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olus
   <div style="margin-top:24px;text-align:center">
     <a href="${SIPARIS_RAPOR_UYGULAMA_URL}/siparisler" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">Siparişleri uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, Siparişler sayfasındaki "Excel indir" ile aynı dosyadır (Sipariş Listesi + Yükleme Planı).<br>Liste proforma, ön ödeme, dosya ve rezervasyon kayıtlarından anlık hesaplanır; sevk edilen siparişler yalnız ekte yer alır.<br>Her iş günü ${SIPARIS_RAPOR_SAATI}'de gönderilir · müşteriye gitmez.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Ekteki Excel, Siparişler sayfasındaki "Excel indir" ile aynı dosyadır (Sipariş Listesi + Yükleme Planı).<br>Liste proforma, ön ödeme, dosya ve rezervasyon kayıtlarından anlık hesaplanır; sevk edilen siparişler yalnız ekte yer alır.<br>Her gün ${SIPARIS_RAPOR_SAATI}'de gönderilir · müşteriye gitmez.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

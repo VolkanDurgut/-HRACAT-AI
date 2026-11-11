@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
+import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, type GerceklesenNavlun, type NavlunOlayi } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
@@ -8,14 +9,16 @@ import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTab
 // ============================================================================
 // Operasyonun elle tuttugu navlun tablosuyla AYNI duzende Excel (_shared/navlun-tablosu.ts; Navlun Bildirimi sayfasindaki
 // "Excel indir" ile ayni dosya) + kisa HTML ozet. Veri: navlun_teklifleri + yukleme_plani_veri (service_role, yalniz okuma).
-// ZAMANLANMIS GONDERIM YOK (cron yok); yalniz istekle. Musteriye GITMEZ.
-// ALICI: NAVLUN_TABLOSU_CANLI = "evet" olsa bile bu surumde YALNIZ test adresine "[TEST]" gider
-//   (NAVLUN_TABLOSU_TEST_ALICISI, varsayilan mesensei282@gmail.com). Canli alicilar kullanici onayiyla eklenecek.
+// ZAMANLAMA (11.11.2026): pg_cron 'navlun-tablosu-sabah' 05:00 UTC = 08:00 TR ve 'navlun-tablosu-aksam' 14:00 UTC
+//   = 17:00 TR, her gun. Anon {} yalniz 07:55-09:00 / 16:55-18:00 penceresinde; sirket + gun + oturum icin bir kez.
+//   Rapor "son rapordan beri gelen teklifler"i ayrica listeler (her raporda en son alinan rakamlar).
+// ALICI: NAVLUN_TABLOSU_CANLI = "evet" ise zamanlanmis rapor NAVLUN_TABLOSU_ALICI'ya (virgulle, en fazla 6);
+//   degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI, varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
 // CAGRI YETKISI:
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ, konu + HTML doner;
-//    {"test": true} -> "[TEST]" mail.
+//    {"test": true} -> "[TEST]" mail YALNIZ test adresine.
 //  - Anon {"test": true}: yalniz canli degilken (kurulum dogrulamasi).
-//  - Her iki durumda sirket basina 24 saatte en fazla 5 test maili (navlun_tablosu_gonderimleri).
+//  - Test mailleri sirket basina 24 saatte en fazla 5 (navlun_tablosu_gonderimleri).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -32,6 +35,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
   return liste.length ? Array.from(new Set(liste)).slice(0, 6) : varsayilan;
 }
 const CANLI = (Deno.env.get("NAVLUN_TABLOSU_CANLI") || "").trim().toLowerCase() === "evet";
+const ALICILAR = adresler("NAVLUN_TABLOSU_ALICI", []);
 const TEST_ALICISI = adresler("NAVLUN_TABLOSU_TEST_ALICISI", ["mesensei282@gmail.com"]);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
@@ -132,16 +136,22 @@ Deno.serve(async (req: Request) => {
     const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean };
     const yetkiliSirket = await yetkiliKullaniciSirketi(req);
     const yetkili = yetkiliSirket !== null;
-    if (govde.deneme !== true && govde.test !== true) return json({ ok: false, hata: "Yalnızca test gönderimi yapılabilir." }, 400);
+    const zamanli = govde.deneme !== true && govde.test !== true;
+    if (yetkili && zamanli) return json({ ok: false, hata: "Elle yalnızca test gönderimi yapılabilir." }, 400);
     if (!yetkili) {
       // Oturumlu ama yonetici olmayan kullanici: anon test yoluna DUSMEZ
       const baslik = req.headers.get("Authorization") || "";
       if (jwtRolu(baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null) === "authenticated") return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (CANLI) return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
+      if (govde.test === true && CANLI) return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
+      if (zamanli && !oturumPenceresi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
     const tarih = trBugun();
+    const oturum = oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
+    // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
+    const test = !deneme && (govde.test === true || !CANLI);
+    const alicilar = test ? TEST_ALICISI : ALICILAR;
 
     const kaynak = await hepsiniCek<{ company_id: string }>(`navlun_teklifleri?select=company_id&order=company_id`);
     const idler = Array.from(new Set(kaynak.map((b) => b.company_id))).filter((id) => !yetkili || id === yetkiliSirket);
@@ -153,19 +163,28 @@ Deno.serve(async (req: Request) => {
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const tablo = await sirketTablosu(companyId, tarih);
       const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar };
-      const konu = `[TEST] ${navlunTablosuKonusu(tablo, sirketAdi)}`;
-      const html = navlunTablosuHtml(tablo, sirketAdi);
-      if (deneme) { sonuclar.push({ tarih, konu, alicilar: TEST_ALICISI, ozet, html }); continue; }
+      const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi)}`;
+      // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat)
+      const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&order=gonderim_zamani.desc.nullslast&limit=1`);
+      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum) });
+      if (deneme) { sonuclar.push({ tarih, konu, alicilar: CANLI ? ALICILAR : TEST_ALICISI, ozet, html }); continue; }
+      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (NAVLUN_TABLOSU_ALICI)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
 
-      const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const t = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
-      if (t.length >= 5) { sonuclar.push({ atlandi: "Son 24 saatte en fazla 5 test maili gönderilebilir." }); continue; }
+      if (!zamanli) {
+        const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
+        const t = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&test=is.true&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
+        if (t.length >= 5) { sonuclar.push({ atlandi: "Son 24 saatte en fazla 5 test maili gönderilebilir." }); continue; }
+      } else {
+        const var_ = await hepsiniCek<{ id: string }>(`navlun_tablosu_gonderimleri?select=id&company_id=eq.${companyId}&rapor_tarihi=eq.${tarih}&oturum=eq.${oturum}&elle=is.false&test=is.false&order=id`);
+        if (var_.length) { sonuclar.push({ atlandi: "Bu oturumun raporu zaten gönderilmiş." }); continue; }
+      }
       const k = await fetch(`${SUPABASE_URL}/rest/v1/navlun_tablosu_gonderimleri`, {
         method: "POST",
         headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=representation" },
-        body: JSON.stringify({ company_id: companyId, rapor_tarihi: tarih, durum: "gonderiliyor", test: true, elle: yetkili }),
+        body: JSON.stringify({ company_id: companyId, rapor_tarihi: tarih, oturum, durum: "gonderiliyor", test, elle: !zamanli }),
       });
+      if (k.status === 409) { await k.body?.cancel(); sonuclar.push({ atlandi: "Bu oturumun raporu zaten gönderilmiş." }); continue; }
       if (!k.ok) throw new Error(`navlun_tablosu_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);
       const kayitId = ((await k.json()) as { id: string }[])[0]?.id;
 
@@ -174,7 +193,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: TEST_ALICISI, subject: konu, html,
+          from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html,
           attachments: [{ filename: `Navlun_Tablosu_${tarih}.xlsx`, content: ek }],
         }),
       });
@@ -187,12 +206,12 @@ Deno.serve(async (req: Request) => {
         await fetch(`${SUPABASE_URL}/rest/v1/navlun_tablosu_gonderimleri?id=eq.${kayitId}`, {
           method: "PATCH",
           headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ durum: "gonderildi", alicilar: TEST_ALICISI.join(","), ozet, gonderim_zamani: new Date().toISOString() }),
+          body: JSON.stringify({ durum: "gonderildi", alicilar: alicilar.join(","), ozet, gonderim_zamani: new Date().toISOString() }),
         });
       }
-      sonuclar.push({ gonderildi: true, tarih, konu: yetkili ? konu : undefined, alici: yetkili ? TEST_ALICISI : undefined, ozet: yetkili ? ozet : undefined });
+      sonuclar.push({ gonderildi: true, tarih, oturum, test, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? ozet : undefined });
     }
-    if (!yetkili) return json({ ok: true, tarih, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
+    if (!yetkili) return json({ ok: true, tarih, oturum, test, gonderilen: sonuclar.filter((x) => x.gonderildi).length, atlanan: sonuclar.filter((x) => x.atlandi).length });
     return json({ ok: true, deneme, tarih, sonuclar });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);

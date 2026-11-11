@@ -4,19 +4,20 @@ import { planNormalize, siparisNormalize, type PlanSatiri, type SiparisSatiri } 
 import { planSayfasi, siparisSayfasi } from "../_shared/siparis-xlsx.ts";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { siparisRaporHesapla, siparisRaporHtml, siparisRaporKonusu } from "../_shared/siparis-rapor.ts";
+import { oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 
 // ============================================================================
 // SIPARIS RAPORU MAILI (siparis-rapor) - 11.11.2026
 // ============================================================================
-// pg_cron 'siparis-rapor' 14:00 UTC = 17:00 TR, hafta ici. Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
+// pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
 // ayni veri: siparis_listesi_veri + yukleme_plani_veri, service_role, yalniz okuma). Ek: sayfadaki "Excel indir" ile AYNI
 // dosya (_shared/siparis-xlsx.ts). Musteriye GITMEZ.
 // ALICILAR (secret): SIPARIS_RAPOR_CANLI = "evet" DEGILSE mail SADECE test adresine
 //   (SIPARIS_RAPOR_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
 //   Canlida: SIPARIS_RAPOR_ALICI (virgulle, en fazla 6).
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
-//  - Anon (pg_cron): yalniz 16:55-18:00 TR penceresinde; sirket + gun icin bir kez (siparis_rapor_gonderimleri
-//    kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
+//  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
+//    (siparis_rapor_gonderimleri kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
 //    adresi), 24 saatte en fazla 3; zamanlanmis raporu engellemez.
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ,
 //    konu + ozet + HTML doner; {"test": true} -> "[TEST]" mail (gunde en fazla 3), zamanlanmisi engellemez.
@@ -40,8 +41,6 @@ const ALICILAR = adresler("SIPARIS_RAPOR_ALICI", []);
 const TEST_ALICISI = adresler("SIPARIS_RAPOR_TEST_ALICISI", ["mesensei282@gmail.com"]);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
-const trDakika = (ms: number) => { const tr = new Date(ms + 3 * 3600_000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
-const penceredeMi = (ms: number) => { const dk = trDakika(ms); return dk >= 17 * 60 - 5 && dk < 18 * 60; };
 
 async function tekrarla(istek: () => Promise<Response>): Promise<Response> {
   for (let sira = 0; ; sira++) {
@@ -132,12 +131,13 @@ Deno.serve(async (req: Request) => {
     if (!yetkili) {
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
       if (govde.test === true && CANLI) return json({ ok: false, hata: "Test yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (govde.test !== true && !penceredeMi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
+      if (govde.test !== true && !oturumPenceresi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
     // Canli degilse her gonderim test adresine "[TEST]" gider (zamanlanmis gonderim dahil)
     const test = !deneme && (govde.test === true || !CANLI);
     const tarih = trBugun();
+    const oturum = oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
 
     // Siparis defteri olan sirketler (yetkili kullanicida yalniz kendi sirketi)
     const defter = await hepsiniCek<{ company_id: string }>(`siparis_defteri?select=company_id&order=company_id`);
@@ -162,16 +162,16 @@ Deno.serve(async (req: Request) => {
         const t = await hepsiniCek<{ id: string }>(`siparis_rapor_gonderimleri?select=id&company_id=eq.${companyId}&elle=is.true&olusturma=gte.${encodeURIComponent(esik)}&order=id`);
         if (t.length >= 3) { sonuclar.push({ atlandi: "Son 24 saatte en fazla 3 deneme raporu gönderilebilir." }); continue; }
       }
-      // Tekrar korumasi: zamanlanmis gonderim (elle degil) sirket + gun icin tek kayit
+      // Tekrar korumasi: zamanlanmis gonderim (elle degil) sirket + gun + oturum icin tek kayit
       const elle = yetkili || govde.test === true;
       if (!elle) {
-        const var_ = await hepsiniCek<{ id: string }>(`siparis_rapor_gonderimleri?select=id&company_id=eq.${companyId}&rapor_tarihi=eq.${tarih}&elle=is.false&order=id`);
+        const var_ = await hepsiniCek<{ id: string }>(`siparis_rapor_gonderimleri?select=id&company_id=eq.${companyId}&rapor_tarihi=eq.${tarih}&oturum=eq.${oturum}&elle=is.false&order=id`);
         if (var_.length) { sonuclar.push({ atlandi: "Bugünün raporu zaten gönderilmiş." }); continue; }
       }
       const k = await fetch(`${SUPABASE_URL}/rest/v1/siparis_rapor_gonderimleri`, {
         method: "POST",
         headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=representation" },
-        body: JSON.stringify({ company_id: companyId, rapor_tarihi: tarih, durum: "gonderiliyor", test, elle }),
+        body: JSON.stringify({ company_id: companyId, rapor_tarihi: tarih, oturum, durum: "gonderiliyor", test, elle }),
       });
       if (k.status === 409) { await k.body?.cancel(); sonuclar.push({ atlandi: "Bugünün raporu zaten gönderilmiş." }); continue; }
       if (!k.ok) throw new Error(`siparis_rapor_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);

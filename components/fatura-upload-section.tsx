@@ -482,11 +482,6 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
   faturaNo: string | null; faturaTarihi: string | null; diibNo: string | null; onKaldir: () => void;
   onYenidenKontrol: () => void; yenidenKontrolEdiliyor: boolean;
 }) {
-  const kaynak = sonuc.kaynak === "metin"
-    ? <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" }} data-testid="fatura-kaynak" title="PDF metninden kurallarla okundu; yapay zekâ kullanılmadı">Metinden okundu · ücretsiz</span>
-    : sonuc.kaynak === "yapay_zeka"
-      ? <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="fatura-kaynak" title="PDF'te okunabilir metin yoktu; yapay zekâ ile okundu">Yapay zekâ ile okundu</span>
-      : null;
   return (
     <div className="mt-2 space-y-2">
       <div className="flex items-center gap-2 p-3 rounded-lg border" style={{ backgroundColor: ROW_HEADER_BG, borderColor: CARD_BORDER }}>
@@ -509,7 +504,6 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
           <div className="flex items-center gap-2 flex-wrap">
             <CheckCircle2 size={16} className="text-green-400" />
             <p className="text-sm font-semibold text-green-400">Fatura bilgileri sistemle uyumlu.</p>
-            {kaynak}
           </div>
           {sonuc.ozet && <p className="text-xs mt-1 ml-6" style={{ color: TEXT_MUTED }}>{sonuc.ozet}</p>}
           <div className="mt-2 ml-6 flex flex-wrap gap-4 text-xs" style={{ color: TEXT_MUTED }}>
@@ -535,7 +529,6 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
           <div className="flex items-center gap-2 flex-wrap">
             <AlertTriangle size={16} className="text-red-400" />
             <p className="text-sm font-semibold text-red-400">Faturada uyuşmazlık tespit edildi</p>
-            {kaynak}
           </div>
           {sonuc.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{sonuc.ozet}</p>}
           {sonuc.kontroller ? <AlanListesi sonuc={sonuc} /> : sonuc.uyusmazliklar?.length > 0 && (

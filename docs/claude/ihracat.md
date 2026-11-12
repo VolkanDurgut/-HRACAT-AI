@@ -1291,3 +1291,6 @@ yazılmış) pay içinde kaldı. Fatura, sistemdeki konteyner (kantar) ağırlı
 - Test: scratchpad `fatura/test3.mts`, e2e_fatura_parca 23.
 - Not: kullanılmayan yapay zekâ kontrolünün (`fatura-kontrol`) istemi küçük ağırlık farklarını yok saymayı söylüyor;
   istemci artık bu fonksiyonu çağırmıyor.
+- 12.11.2026 (revize-1112c): kontrol kartlarındaki "Metinden okundu · ücretsiz" etiketi ve özet metnindeki "Fatura metninden
+  okundu (yapay zekâ kullanılmadı)" ifadesi kaldırıldı (kullanıcı: "programı ucuz gösteriyor"). Kayıtlı eski özetler ekranda
+  `ozetTemizle` ile temizlenir (kayıt değişmez).

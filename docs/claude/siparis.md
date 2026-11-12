@@ -268,3 +268,14 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
     hizalı); sayfa ortalı (`mx-auto`).
   - Rapor Alıcıları: liste başına en fazla 10 adres; Fatura Talimatı Onayı ve Onaylı Fatura Talimatı listeleri eklendi
     (bkz. ihracat.md "Fatura Talimatı Onayı").
+- 12.11.2026 (revize-1112c):
+  - Siparişler sayfasında **Sil**: Proforma hücresinde çöp kutusu (yalnız `proformalar` sayfa yetkisi). Excel satırı
+    (`excel:`) ve dosyası açılmamış sistem proforması (`proforma:`) silinebilir; dosyası açılmış satır silinmez (önce dosya).
+    RPC `siparis_satiri_sil(p_anahtar)` (migration `20261112100000_siparis_satiri_sil.sql`, security definer,
+    `ic_sayfa_yetkisi('proformalar')`); anahtarda başka satır kalmazsa `siparis_on_odemeler` kaydı da temizlenir.
+    Onay penceresi + bilgi mesajı. Test: e2e_siparis_sil 11.
+  - Sipariş raporu: üstte **Günün Özeti** 4 gösterge kutusu (`yoneticiOzeti`): Açık sipariş (kont · MT · tutar),
+    Ön ödemeli (rezervasyon bekliyor, en eskisi kaç gün), 14 gün yükleme (booking · kont · ilk ETD), Dikkat (BL eksik +
+    14+ gündür onay bekleyen + olası mükerrer). Altında gelen ön ödemeler tablosu. Edge `siparis-rapor` v5.
+  - Navlun raporu: "Otomatik Özet" kutusu kaldırıldı (`ozetYok`), tabloya **Anlaşılan** sütunu (bizden giden son kabul).
+    Okuyucu kabulü "Anlaşma fiyatımız X usd" yazımını da tanır. Edge `navlun-tablosu` v6, `navlun-bildirimi` v7.

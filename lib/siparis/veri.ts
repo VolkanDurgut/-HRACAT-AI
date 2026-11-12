@@ -21,6 +21,17 @@ export async function yuklemePlaniOku(): Promise<PlanSatiri[]> {
   return ((data || []) as Record<string, unknown>[]).map(planNormalize);
 }
 
+/**
+ * 12.11.2026 SATIR SILME (siparis_satiri_sil): Excel'den gelen satir (excel:) ya da dosyasi acilmamis proforma (proforma:).
+ * Ihracat dosyasi acilmis satir (dosya:) silinmez. Donus: silinen proforma no.
+ */
+export const siparisSilinebilir = (anahtar: string) => anahtar.startsWith("excel:") || anahtar.startsWith("proforma:");
+export async function siparisSatiriSil(anahtar: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc("siparis_satiri_sil", { p_anahtar: anahtar });
+  if (error) throw new Error(error.message);
+  return ((data || {}) as { proforma_no?: string | null }).proforma_no ?? null;
+}
+
 /** On odeme: alindi=true icin tutar zorunlu (siparis_on_odeme_kaydet). */
 export async function onOdemeKaydet(proformaNo: string, alindi: boolean, tutar?: number, para = "USD", tarih?: string): Promise<void> {
   const { error } = await supabase.rpc("siparis_on_odeme_kaydet", {

@@ -417,7 +417,9 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   if (bizdenMi(m.gonderen)) {
     const h = duz.match(/hedef(?:\s*(?:rakam(?:ı|i)?|fiyat(?:ı|i)?|imiz))?\s*(?:olarak)?[^\d]{0,30}?([\d][\d.,]*)\s*(?:usd|\$)?/i);
     if (h && /hedef/i.test(duz) && makulMu(sayi(h[1]))) ekle("hedef", { tutar: sayi(h[1]), ekipman: ekipmanBul(duz) ?? "20DC" });
-    const k = duz.match(/navlun\s*(?:bedeli|rakam(?:ı|i))\s*([\d][\d.,]*)\s*(?:usd|\$)?\s*olmak üzere/i);
+    // Kabul: "Navlun bedeli X olmak uzere ... booking" ya da (12.11.2026) "Anlasma fiyatimiz X usd all in"
+    const k = duz.match(/navlun\s*(?:bedeli|rakam(?:ı|i))\s*([\d][\d.,]*)\s*(?:usd|\$)?\s*olmak üzere/i)
+      || duz.match(/anla[şs]ma\s*(?:fiyat(?:ımız|imiz|ı|i)?|navlun(?:umuz)?|rakam(?:ımız|imiz)?)\s*[:\-]?\s*([\d][\d.,]*)\s*(?:usd|\$)/i);
     if (k && makulMu(sayi(k[1]))) ekle("kabul", { tutar: sayi(k[1]), ekipman: "20DC", armator: armatorBul(duz) });
     return olaylar;
   }

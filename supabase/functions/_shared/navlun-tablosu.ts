@@ -53,7 +53,11 @@ export type NavlunBlogu = {
   limanSayisi: number;
 };
 
-export type NavlunLimani = { anahtar: string; ad: string; hedef: { tutar: number; para: string; tarih: string } | null };
+export type NavlunLimani = {
+  anahtar: string; ad: string; hedef: { tutar: number; para: string; tarih: string } | null;
+  /** 12.11.2026: bizim acenteye yazdigimiz son anlasma ("Navlun bedeli X olmak uzere" / "Anlasma fiyatimiz X usd") */
+  kabul?: { tutar: number; para: string; tarih: string; armator: string | null } | null;
+};
 
 export type NavlunTablosu = { tarih: string; limanlar: NavlunLimani[]; bloklar: NavlunBlogu[]; gerceklesenVar: boolean };
 
@@ -106,6 +110,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
   const limanAd = new Map<string, { ad: string; tarih: string }>();
   const adYaz = (k: string, ad: string, t: string) => { const e = limanAd.get(k); if (!e || t >= e.tarih) limanAd.set(k, { ad: buyuk(ad), tarih: t }); };
   const hedef = new Map<string, NavlunLimani["hedef"]>();
+  const kabul = new Map<string, NonNullable<NavlunLimani["kabul"]>>();
   const bloklar = new Map<string, NavlunBlogu>();
   const blok = (ad: string) => {
     let b = bloklar.get(ad);
@@ -128,6 +133,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     if (!k) continue;
     if (o.liman) adYaz(k, o.liman, o.tarih);
     if (o.tur === "hedef" && o.tutar) { hedef.set(k, { tutar: o.tutar, para: o.para_birimi || "USD", tarih: o.tarih }); continue; }
+    if (o.tur === "kabul" && o.tutar) { kabul.set(k, { tutar: o.tutar, para: o.para_birimi || "USD", tarih: o.tarih, armator: o.armator }); continue; }
     if (!o.acente) continue;
     let tutar = o.tutar, para = o.para_birimi || "USD";
     if (o.tur === "hedef_kabul") { const h = hedef.get(k); if (!h) continue; tutar = h.tutar; para = h.para; }
@@ -157,7 +163,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
   }
   liste.sort((a, b) => b.limanSayisi - a.limanSayisi || a.ad.localeCompare(b.ad, "tr"));
   const limanlar: NavlunLimani[] = Array.from(limanAd.entries())
-    .map(([anahtar, v]) => ({ anahtar, ad: v.ad, hedef: hedef.get(anahtar) ?? null }))
+    .map(([anahtar, v]) => ({ anahtar, ad: v.ad, hedef: hedef.get(anahtar) ?? null, kabul: kabul.get(anahtar) ?? null }))
     .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
   return { tarih, limanlar, bloklar: liste, gerceklesenVar };
 }
@@ -289,6 +295,8 @@ export type LimanSatiri = {
   liman: string; enIyi: { blok: string; tutar: number; tarih: string } | null; eski: boolean;
   freeTime: number | null; transit: string | null; hedef: number | null;
   son: { blok: string; tutar: number; tarih: string } | null; teklifSayisi: number;
+  /** Son anlasilan navlun (bizden giden kabul maili), 12.11.2026 */
+  anlasilan: { tutar: number; tarih: string } | null;
 };
 export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
   const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
@@ -308,6 +316,7 @@ export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
       liman: l.ad, enIyi: en ? { blok: en.b.ad, tutar: en.h.tutar, tarih: en.h.tarih } : null, eski: !guncel.length && !!en,
       freeTime: en ? en.b.freeTime.get(l.anahtar) ?? null : null, transit: en ? en.b.transit.get(l.anahtar) ?? null : null,
       hedef: l.hedef?.para === "USD" ? l.hedef.tutar : null,
+      anlasilan: l.kabul && l.kabul.para === "USD" ? { tutar: l.kabul.tutar, tarih: l.kabul.tarih } : null,
       son: sonGelen ? { blok: sonGelen.b.ad, tutar: sonGelen.h.tutar, tarih: sonGelen.h.tarih } : null, teklifSayisi: guncel.length,
     };
   }).filter((x) => x.enIyi).sort((a, b) => (a.eski ? 1 : 0) - (b.eski ? 1 : 0) || a.liman.localeCompare(b.liman, "tr"));
@@ -316,28 +325,12 @@ export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
 export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", secenek: NavlunRaporSecenek = {}): string {
   const satirlar = limanSatirlari(t);
   const sinir = secenek.oncekiIso || new Date(Date.parse(`${t.tarih}T12:00:00Z`) - 48 * 3600000).toISOString();
-  const yeniler = sonTeklifler(t, sinir, 200);
   const kisa = (iso: string) => { const d = new Date(Date.parse(iso) + 3 * 3600000).toISOString(); return `${d.slice(8, 10)}.${d.slice(5, 7)}`; };
   const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
-  const guncel = satirlar.filter((x) => !x.eski);
-  const altinda = guncel.filter((x) => x.hedef !== null && x.enIyi!.tutar <= x.hedef!);
-  const ustunde = guncel.filter((x) => x.hedef !== null && x.enIyi!.tutar > x.hedef!).sort((a, b) => (b.enIyi!.tutar - b.hedef!) - (a.enIyi!.tutar - a.hedef!));
-  const ucuz = [...guncel].sort((a, b) => a.enIyi!.tutar - b.enIyi!.tutar);
-
-  const m: string[] = [];
-  m.push(`<b>${satirlar.length}</b> limanda fiyat var; <b>${guncel.length}</b> limanda son 60 günde teklif alındı (${t.bloklar.length} acente / hat).`);
-  if (yeniler.length) {
-    const ilk = yeniler.slice(0, 3).map((x) => `${esc(x.liman)} ${x.para === "USD" ? usd(x.tutar) : `${x.tutar} ${esc(x.para)}`} (${esc(x.blok)})`).join(", ");
-    m.push(`${secenek.oncekiIso ? "Son rapordan beri" : "Son 48 saatte"} <b>${yeniler.length}</b> yeni teklif: ${ilk}${yeniler.length > 3 ? ` ve ${yeniler.length - 3} tane daha` : ""}.`);
-  } else m.push(`${secenek.oncekiIso ? "Son rapordan beri" : "Son 48 saatte"} yeni teklif gelmedi; rakamlar en son alınan tekliflerdir.`);
-  if (altinda.length || ustunde.length) m.push(`Hedefimiz olan limanlardan <b>${altinda.length}</b> tanesinde en iyi teklif hedefte ya da altında${ustunde.length ? `; ${ustunde.length} tanesinde üstünde (en büyük fark ${esc(ustunde[0].liman)} +${usd(ustunde[0].enIyi!.tutar - ustunde[0].hedef!)})` : ""}.`);
-  if (ucuz.length > 1) m.push(`En uygun 20'DC: ${esc(ucuz[0].liman)} ${usd(ucuz[0].enIyi!.tutar)} · en yüksek: ${esc(ucuz[ucuz.length - 1].liman)} ${usd(ucuz[ucuz.length - 1].enIyi!.tutar)}.`);
-  const ftYok = guncel.filter((x) => x.freeTime === null).length;
-  if (ftYok) m.push(`${ftYok} limanın en iyi teklifinde free time yazılmamış (acenteden teyit edilmeli).`);
 
   const yeniRozet = `<span style="display:inline-block;margin-left:3px;padding:0 4px;border-radius:3px;background:#DCFCE7;color:#166534;font-size:8.5px;font-weight:bold">YENİ</span>`;
   const tablo = sikiTablo(
-    [{ ad: "Liman" }, { ad: "En iyi 20'DC", sag: true }, { ad: "Acente / Hat" }, { ad: "FT", sag: true }, { ad: "TT", sag: true }, { ad: "Hedef", sag: true }, { ad: "Son gelen" }],
+    [{ ad: "Liman" }, { ad: "En iyi 20'DC", sag: true }, { ad: "Acente / Hat" }, { ad: "FT", sag: true }, { ad: "TT", sag: true }, { ad: "Hedef", sag: true }, { ad: "Anlaşılan", sag: true }, { ad: "Son gelen" }],
     satirlar.map((x) => {
       const gri = x.eski ? "color:#94A3B8;" : "";
       const fark = x.hedef !== null && !x.eski ? x.enIyi!.tutar - x.hedef : null;
@@ -348,6 +341,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
         x.freeTime !== null ? `${x.freeTime}` : `<span style="color:#CBD5E1">-</span>`,
         x.transit ? esc(x.transit) : `<span style="color:#CBD5E1">-</span>`,
         x.hedef !== null ? `<span style="color:${fark === null ? "#64748B" : fark <= 0 ? "#047857" : "#B45309"}">${usd(x.hedef)}</span>` : `<span style="color:#CBD5E1">-</span>`,
+        x.anlasilan ? `<b style="color:#283474">${usd(x.anlasilan.tutar)}</b> <span style="color:#64748B">· ${kisa(x.anlasilan.tarih)}</span>` : `<span style="color:#CBD5E1">-</span>`,
         x.son ? `${usd(x.son.tutar)} <span style="color:#64748B">· ${esc(kes(x.son.blok, 12))} · ${kisa(x.son.tarih)}</span>${x.son.tarih > sinir ? yeniRozet : ""}` : "-",
       ];
     }),
@@ -355,9 +349,9 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
   );
   return raporKabugu({
     sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
-    ozetAlt: "Acentelerin navlun teklifleri ve yükleme planındaki gerçekleşen navluna göre",
-    maddeler: m, ekBolum: tablo,
+    // 12.11.2026 kullanici: "Navlun raporundan otomatik ozet kismini kaldiralim." -> yalniz guncel fiyat tablosu
+    ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: tablo,
     dugme: { metin: "Navlun Bildirimi'ni aç", yol: "/navlun" },
-    dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde en düşüğü (gri = 60 günden eski). Yeşil hedef = teklif hedefte/altında.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
+    dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde en düşüğü (gri = 60 günden eski). Yeşil hedef = teklif hedefte/altında. Anlaşılan = acenteye yazdığımız son anlaşma fiyatı.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
   });
 }

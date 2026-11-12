@@ -449,7 +449,6 @@ function KontrolKarti({ sonuc, pdfMi, yenileniyor, onYenile }: { sonuc: Beyannam
         <p className={`text-sm font-semibold ${sonuc.uyumlu ? "text-green-400" : "text-amber-400"}`} data-testid="beyanname-kontrol-baslik">
           {sonuc.uyumlu ? "Beyanname bilgileri sistemle uyumlu." : `${uyusmayan} alan sistemle uyuşmuyor.`}
         </p>
-        <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" }} title="PDF metninden kurallarla okundu; yapay zekâ kullanılmadı">Metinden okundu · ücretsiz</span>
         <button onClick={onYenile} disabled={yenileniyor} className="ml-auto inline-flex items-center gap-1 text-[11px] hover:text-white disabled:opacity-50" style={{ color: TEXT_MUTED }} title="Sistemdeki bilgiler değiştiyse yeniden karşılaştır" data-testid="beyanname-kontrol-yenile">
           <RefreshCw size={11} className={yenileniyor ? "animate-spin" : ""} /> Yeniden kontrol et
         </button>

@@ -241,8 +241,8 @@ export function faturaKarsilastir(f: OkunanFatura, b: FaturaBeklenen): FaturaKon
   const uyumluSay = k.filter((x) => x.durum === "uyumlu").length;
   const elle = k.filter((x) => x.durum === "bilgi" || x.durum === "okunamadi").length;
   const ozet = u.length
-    ? `${u.length} uyuşmazlık bulundu (${uyumluSay}/${kontrolEdilen} alan uyumlu). Fatura metninden okundu (yapay zekâ kullanılmadı).`
-    : `Fatura metninden okundu (yapay zekâ kullanılmadı): ${uyumluSay}/${kontrolEdilen} alan sistemle uyumlu${tutan ? ` (${tutan})` : ""}.${elle ? ` ${elle} alana elle bakın.` : ""}${notlar.length ? ` Not: ${notlar.join("; ")}.` : ""}`;
+    ? `${u.length} uyuşmazlık bulundu (${uyumluSay}/${kontrolEdilen} alan uyumlu).`
+    : `${uyumluSay}/${kontrolEdilen} alan sistemle uyumlu${tutan ? ` (${tutan})` : ""}.${elle ? ` ${elle} alana elle bakın.` : ""}${notlar.length ? ` Not: ${notlar.join("; ")}.` : ""}`;
   return {
     uyumlu: u.length === 0, uyusmazliklar: u, ozet,
     fatura_no: f.faturaNo, fatura_tarihi: f.faturaTarihi || "", diib_no: f.diibNo, diib_tarihi: f.diibTarihi, kaynak: "metin",
@@ -250,13 +250,26 @@ export function faturaKarsilastir(f: OkunanFatura, b: FaturaBeklenen): FaturaKon
   };
 }
 
+/** Eski ozetlerdeki okuma yontemi ifadelerini atar ("Fatura metninden okundu (yapay zeka kullanilmadi)"). */
+export function ozetTemizle(ozet: string): string {
+  return (ozet || "")
+    .replace(/^Fatura metninden okundu \(yapay zekâ kullanılmadı\):\s*/, "")
+    .replace(/\s*Fatura metninden okundu \(yapay zekâ kullanılmadı\)\.?/g, "")
+    .replace(/\s{2,}/g, " ").trim()
+    .replace(/^./, (c) => c.toLocaleUpperCase("tr-TR"));
+}
+
 /**
  * KAYITLI sonucu bugunku agirlik kuraliyla yeniden degerlendirir (12.11.2026). Eski kayitlar %0,2 payla "uyumlu"
  * yazilmis olabilir (ornek: net 575.000 / faturada 576.150). Yalniz alan alan kontrollu (metinden okunmus) kayitlarda;
  * kaydi DEGISTIRMEZ, gorunum icin yeni nesne doner.
  */
-export function kayitliSonucuDenetle(s: FaturaKontrolSonucu | null): FaturaKontrolSonucu | null {
-  if (!s || !s.kontroller?.length) return s;
+export function kayitliSonucuDenetle(g: FaturaKontrolSonucu | null): FaturaKontrolSonucu | null {
+  if (!g) return g;
+  // 12.11.2026 kullanici: "okuma yontemi" ifadeleri ozetten kaldirildi (eski kayitlarda da gosterilmez)
+  const temiz = ozetTemizle(g.ozet);
+  const s = temiz === g.ozet ? g : { ...g, ozet: temiz };
+  if (!s.kontroller?.length) return s;
   const kgOku = (x: string) => trSayi(x.replace(/\s*kg\s*$/i, ""));
   let degisti = false;
   const yeniUyus = [...s.uyusmazliklar];
@@ -272,7 +285,7 @@ export function kayitliSonucuDenetle(s: FaturaKontrolSonucu | null): FaturaKontr
   const uyumluSay = kontroller.filter((x) => x.durum === "uyumlu").length;
   const kontrolEdilen = kontroller.filter((x) => x.durum === "uyumlu" || x.durum === "uyusmuyor").length;
   return { ...s, uyumlu: false, uyusmazliklar: yeniUyus, kontroller,
-    ozet: `${yeniUyus.length} uyuşmazlık bulundu (${uyumluSay}/${kontrolEdilen} alan uyumlu). Fatura metninden okundu (yapay zekâ kullanılmadı).` };
+    ozet: `${yeniUyus.length} uyuşmazlık bulundu (${uyumluSay}/${kontrolEdilen} alan uyumlu).` };
 }
 
 /** Okunamayan (metinsiz) fatura: yapay zekaya gidilmez, elle bakilmasi istenir (10.11.2026). */
@@ -281,7 +294,7 @@ export function faturaOkunamadiSonucu(): FaturaKontrolSonucu {
     uyumlu: false, okunamadi: true, uyusmazliklar: [], kaynak: "metin",
     ozet: "Fatura PDF'inde okunabilir metin bulunamadı (taranmış ya da görsel PDF olabilir). e-Fatura PDF'ini yükleyin ya da bilgileri elle kontrol edin.",
     fatura_no: "", fatura_tarihi: "", diib_no: null, diib_tarihi: null,
-    kontroller: [{ alan: "Fatura metni", durum: "okunamadi", sistem: "-", belge: "-", not: "Metin katmanı yok; ücretli okuma kullanılmadı." }],
+    kontroller: [{ alan: "Fatura metni", durum: "okunamadi", sistem: "-", belge: "-", not: "Metin katmanı yok; bilgileri elle kontrol edin." }],
   };
 }
 

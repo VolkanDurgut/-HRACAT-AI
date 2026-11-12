@@ -10,8 +10,8 @@ export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; canli: boolea
 
 /** edge: Onizle / Test maili olan raporlar (fatura listelerinde yok: onlar dosya konteynerleri tamamlaninca tetiklenir). */
 export const RAPORLAR: { rapor: RaporTuru; ad: string; aciklama: string; saat: string; edge: string | null }[] = [
-  { rapor: "siparis", ad: "Sipariş Raporu", aciklama: "Gelen ön ödemeler (müşteri, konteyner, varış limanı) + Excel (Sipariş Listesi + Yükleme Planı)", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor" },
-  { rapor: "navlun", ad: "Navlun Raporu", aciklama: "Otomatik özet + tüm limanların güncel fiyatı + Excel (navlun tablosu)", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu" },
+  { rapor: "siparis", ad: "Sipariş Raporu", aciklama: "Günün özeti (4 gösterge) + gelen ön ödemeler (müşteri, konteyner, varış limanı) + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor" },
+  { rapor: "navlun", ad: "Navlun Raporu", aciklama: "Tüm limanların güncel fiyatı (en iyi teklif, hedef, anlaşılan) + Excel (navlun tablosu)", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu" },
   { rapor: "fatura_onay", ad: "Fatura Talimatı Onayı", aciklama: "Bütün konteynerleri yüklenen dosyanın talimatını onaylayan / revize isteyenler (İncele ve Onayla maili)", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null },
   { rapor: "fatura_dagitim", ad: "Onaylı Fatura Talimatı", aciklama: "Onaylanan talimat PDF ekli gider: “FATURA VE BEYANNAME TALİMATI HAKKINDA // …”", saat: "Talimat onaylanınca", edge: null },
 ];

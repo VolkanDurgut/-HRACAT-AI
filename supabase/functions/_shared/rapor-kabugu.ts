@@ -26,6 +26,8 @@ export type RaporKabugu = {
   ozetAlt: string;
   /** HTML maddeler (cagiran esc() ile kacirir; <b> serbest) */
   maddeler: string[];
+  /** true: ozet kutusu hic cizilmez (navlun raporu, 12.11.2026) */
+  ozetYok?: boolean;
   /** Ozetten sonra tek bolum (sikistirilmis tablo); yoksa bos */
   ekBolum?: string;
   dugme: { metin: string; yol: string };
@@ -44,11 +46,11 @@ export function raporKabugu(k: RaporKabugu): string {
     <td style="vertical-align:middle"><div style="font-size:17px;font-weight:bold;color:${RAPOR_LACIVERT}">${esc(k.sirketAdi)} ${esc(k.baslik)}</div></td>
     <td style="text-align:right;vertical-align:middle"><div style="font-size:13px;font-weight:bold;color:${RAPOR_LACIVERT}">${esc(k.tarih)}</div>${k.oturum ? `<div style="font-size:11px;color:#94A3B8">${esc(k.oturum)}</div>` : ""}</td>
   </tr></table>
-  <div style="margin-top:14px;border:1px solid #E2E8F0;border-left:4px solid ${RAPOR_SEFTALI};border-radius:4px;padding:10px 14px">
+  ${k.ozetYok ? "" : `<div style="margin-top:14px;border:1px solid #E2E8F0;border-left:4px solid ${RAPOR_SEFTALI};border-radius:4px;padding:10px 14px">
     <div style="font-size:13px;font-weight:bold;color:${RAPOR_LACIVERT}">${esc(k.ozetBaslik || "Otomatik Özet")}</div>
-    <div style="font-size:11px;color:#64748B;margin-bottom:6px">${esc(k.ozetAlt)}</div>
+    ${k.ozetAlt ? `<div style="font-size:11px;color:#64748B;margin-bottom:6px">${esc(k.ozetAlt)}</div>` : ""}
     ${k.ozetIcerik ?? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${k.maddeler.map(madde).join("")}</table>`}
-  </div>
+  </div>`}
   ${k.ekBolum || ""}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
     <td style="font-size:11px;color:#94A3B8;line-height:1.5;vertical-align:middle">${k.dipnot}</td>

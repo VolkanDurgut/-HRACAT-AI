@@ -306,7 +306,7 @@ export function ProformaOkumaOzeti({ veri, toplamMts, uyari }: { veri: any; topl
       </div>
       {veri?.okuma_kaynagi === "sistem_proformasi" && (
         <p data-testid="proforma-okuma-kaynak" className="px-5 pt-3 text-[11px]" style={{ color: TEXT_MUTED }}>
-          Kayıtlı Proformalar&apos;daki kaydından okundu ve PDF ile rakam rakam doğrulandı · yapay zekâ kullanılmadı
+          Kayıtlı Proformalar&apos;daki kaydından okundu ve PDF ile rakam rakam doğrulandı
         </p>
       )}
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 px-5 py-4">

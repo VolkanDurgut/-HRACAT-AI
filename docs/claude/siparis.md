@@ -322,3 +322,7 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   (harf/rakam dışı atılmış ad) + aynı limanda listede booking'i olan sipariş, booking konteyner adedi kadar bekleyenden düşülür ve
   başlıkta "N sipariş (M kont.) booking'i üstte olduğu için düşüldü" yazar. Aynı müşteri + liman tek satır ("11 sipariş"). Güncel
   teklifi olmayan limanda son anlaşma fiyatı gösterilir ("son anlaşma · tarih"). `yukleme_plani_veri` değişmedi. Edge v11.
+- 12.11.2026 (revize-1112j) CANLIYA GEÇİŞ (kullanıcı: "Raporu canlıya alalım. Rapor gönderimi her gün 17.00. Alıcılar bbt,
+  operation, execution, export, export2"): `rapor_alicilari` navlun satırı (5 alıcı, CC yok, canlı). `navlun-tablosu-sabah` cron
+  işi pasif (`cron.alter_job(18, active := false)`; geri açmak için `active := true`). Mail dipnotu ve Ayarlar'daki saat "Her gün
+  17:00". Son dakika verisinde konteyner adedi boş sipariş de (aynı müşteri + liman booking'i varsa) bekleyenden düşülür. Edge v13.

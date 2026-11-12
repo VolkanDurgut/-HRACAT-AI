@@ -400,7 +400,8 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
     const kont = p.konteyner || 0;
     const a = `${musteriAnahtari(p.musteri)}|${bk}`;
     const kalan = bk && musteriAnahtari(p.musteri) ? kapasite.get(a) || 0 : 0;
-    if (kont > 0 && kalan >= kont) { kapasite.set(a, kalan - kont); bookingliSiparis++; bookingliKont += kont; continue; }
+    // Konteyner adedi bos siparis: ayni musteri + limanda booking varsa o da dusulur
+    if (kalan > 0 && kalan >= kont) { kapasite.set(a, kalan - kont); bookingliSiparis++; bookingliKont += kont; continue; }
     bekleyenSiparis++; bekleyenKont += kont;
     const bad = bk ? adlar.get(bk) || (p.varis_limani || bk).toLocaleUpperCase("tr-TR") : (p.varis_limani || "-").toLocaleUpperCase("tr-TR");
     const be = enIyiler.get(bad);
@@ -550,7 +551,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
       sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
       ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa),
       dugme: { metin: "Navlun Evreni", yol: "/navlun" },
-      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte: ${satinAlmaBasligi(t.tarih)} (Excel). Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
+      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte: ${satinAlmaBasligi(t.tarih)} (Excel). Her gün 17:00 · müşteriye gitmez.`,
     });
   }
   return raporKabugu({

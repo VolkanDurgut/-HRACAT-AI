@@ -12,6 +12,7 @@ import { navlunSatinAlma, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosu
 // "Excel indir" ile ayni dosya) + kisa HTML ozet. Veri: navlun_teklifleri + yukleme_plani_veri (service_role, yalniz okuma).
 // ZAMANLAMA (11.11.2026): pg_cron 'navlun-tablosu-sabah' 05:00 UTC = 08:00 TR ve 'navlun-tablosu-aksam' 14:00 UTC
 //   = 17:00 TR, her gun. Anon {} yalniz 07:55-09:00 / 16:55-18:00 penceresinde; sirket + gun + oturum icin bir kez.
+//   12.11.2026 canliya gecis (kullanici: "Rapor gonderimi her gun 17.00"): 'navlun-tablosu-sabah' pasif (cron.alter_job active=false).
 //   Rapor "son rapordan beri gelen teklifler"i ayrica listeler (her raporda en son alinan rakamlar).
 // ALICI: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'navlun'); satir yoksa secret'lar (NAVLUN_TABLOSU_CANLI =
 //   "evet" + NAVLUN_TABLOSU_ALICI). Canli degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI,

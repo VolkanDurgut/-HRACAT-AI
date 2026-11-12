@@ -317,3 +317,8 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   uyumlu. Satıra eşleşme türü yazılır (mail: "anlaşma · booking / rez. / liman"; Excel KAYNAK sütunu). Edge `navlun-tablosu` v10.
   Sınır: acentelerin booking teyit mailleri (konu yalnız booking no) okunmuyor; tam booking bağlantısı için ayrı bir okuma akışı
   (gelecek faz) gerekir.
+- 12.11.2026 (revize-1112i) Canlıya geçiş öncesi gerçek veriyle önizleme: "Rezervasyon Bekleyen Müşteriler" booking'i alınmış
+  siparişleri de gösteriyordu (sipariş listesindeki durum booking alınınca hemen değişmiyor). Düzeltme yalnız raporda: aynı müşteri
+  (harf/rakam dışı atılmış ad) + aynı limanda listede booking'i olan sipariş, booking konteyner adedi kadar bekleyenden düşülür ve
+  başlıkta "N sipariş (M kont.) booking'i üstte olduğu için düşüldü" yazar. Aynı müşteri + liman tek satır ("11 sipariş"). Güncel
+  teklifi olmayan limanda son anlaşma fiyatı gösterilir ("son anlaşma · tarih"). `yukleme_plani_veri` değişmedi. Edge v11.

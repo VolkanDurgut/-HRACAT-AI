@@ -306,11 +306,15 @@ export type SatinAlmaSatiri = {
   enIyi: { tutar: number; blok: string } | null;
 };
 /** Rezervasyon bekleyen (on odemesi alinmis, booking'i yok) siparis: navlunu henuz satin alinmadi (12.11.2026). */
-export type BekleyenSatiri = { musteri: string | null; liman: string; limanAnahtar: string | null; konteyner: number; enIyi: { tutar: number; blok: string } | null };
+export type BekleyenSatiri = { musteri: string | null; liman: string; limanAnahtar: string | null; konteyner: number; siparis: number; enIyi: { tutar: number; blok: string } | null;
+  /** Guncel teklif yoksa limandaki son anlasma (bizden acenteye giden kabul) - bilgi amacli */
+  anlasma: { tutar: number; tarih: string } | null };
 export type NavlunSatinAlma = {
   satirlar: SatinAlmaSatiri[];
   toplam: Record<string, number>; konteyner: number; belirsiz: number;
   bekleyen: { siparis: number; konteyner: number };
+  /** Booking'i listede gorunen (ayni musteri + ayni liman) ama siparis listesinde hala "on odeme alindi" duran siparisler: bekleyenden dusulur */
+  bookingli: { siparis: number; konteyner: number };
   /** 12.11.2026 kullanici: "Rezervasyon bekleyen musteriler alt kisimda kendi basligi altinda" */
   bekleyenler: BekleyenSatiri[];
 };
@@ -345,17 +349,8 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
     bookingYazisma.get(b)!.add(yazismaAnahtari(konu));
   }
   const satirlar: SatinAlmaSatiri[] = [];
-  let bekleyenSiparis = 0, bekleyenKont = 0;
-  const bekleyenler: BekleyenSatiri[] = [];
   for (const p of plan) {
-    if (p.kaynak === "siparis") {
-      bekleyenSiparis++; bekleyenKont += p.konteyner || 0;
-      const bk = limanKey(p.varis_limani);
-      const bad = bk ? adlar.get(bk) || (p.varis_limani || bk).toLocaleUpperCase("tr-TR") : (p.varis_limani || "-").toLocaleUpperCase("tr-TR");
-      const be = enIyiler.get(bad);
-      bekleyenler.push({ musteri: p.musteri, liman: bad, limanAnahtar: bk, konteyner: p.konteyner || 0, enIyi: be ? { tutar: be.tutar, blok: be.blok } : null });
-      continue;
-    }
+    if (p.kaynak === "siparis") continue;
     const booking = (p.booking_no || "").trim();
     const etd = p.etd ? p.etd.slice(0, 10) : null;
     if (!booking || (etd && etd < t.tarih)) continue;
@@ -392,12 +387,36 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
       toplam: navlun !== null ? navlun * kont : null, kaynak, kaynakTarih, eslesme, enIyi: e ? { tutar: e.tutar, blok: e.blok } : null,
     });
   }
+  // Rezervasyon bekleyenler (12.11.2026 canli kontrol): siparis listesindeki durum booking alininca hemen degismiyor; ayni musteri +
+  // ayni limanda listede (ETD bugun / ileride) booking'i olan siparis, booking'in konteyner adedi kadar bekleyenden dusulur.
+  const musteriAnahtari = (m: string | null) => buyuk(m || "").replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
+  const kapasite = new Map<string, number>();
+  for (const x of satirlar) { const a = `${musteriAnahtari(x.musteri)}|${x.limanAnahtar}`; kapasite.set(a, (kapasite.get(a) || 0) + x.konteyner); }
+  let bekleyenSiparis = 0, bekleyenKont = 0, bookingliSiparis = 0, bookingliKont = 0;
+  const bekleyenler: BekleyenSatiri[] = [];
+  for (const p of plan) {
+    if (p.kaynak !== "siparis") continue;
+    const bk = limanKey(p.varis_limani);
+    const kont = p.konteyner || 0;
+    const a = `${musteriAnahtari(p.musteri)}|${bk}`;
+    const kalan = bk && musteriAnahtari(p.musteri) ? kapasite.get(a) || 0 : 0;
+    if (kont > 0 && kalan >= kont) { kapasite.set(a, kalan - kont); bookingliSiparis++; bookingliKont += kont; continue; }
+    bekleyenSiparis++; bekleyenKont += kont;
+    const bad = bk ? adlar.get(bk) || (p.varis_limani || bk).toLocaleUpperCase("tr-TR") : (p.varis_limani || "-").toLocaleUpperCase("tr-TR");
+    const be = enIyiler.get(bad);
+    // Ayni musteri + ayni liman tek satir (orn. 11 ayri siparis -> "11 sipariş")
+    const var_ = bekleyenler.find((b) => b.limanAnahtar === bk && b.liman === bad && musteriAnahtari(b.musteri) === musteriAnahtari(p.musteri));
+    if (var_) { var_.konteyner += kont; var_.siparis++; continue; }
+    const kb = bk ? t.limanlar.find((l) => l.anahtar === bk)?.kabul : null;
+    bekleyenler.push({ musteri: p.musteri, liman: bad, limanAnahtar: bk, konteyner: kont, siparis: 1, enIyi: be ? { tutar: be.tutar, blok: be.blok } : null,
+      anlasma: kb && kb.para === "USD" ? { tutar: kb.tutar, tarih: kb.tarih } : null });
+  }
   satirlar.sort((a, b) => (a.etd || "9999").localeCompare(b.etd || "9999") || a.liman.localeCompare(b.liman, "tr") || a.booking.localeCompare(b.booking));
   const toplam: Record<string, number> = {};
   for (const x of satirlar) if (x.toplam !== null) toplam[x.para] = (toplam[x.para] || 0) + x.toplam;
   return {
     satirlar, toplam, konteyner: satirlar.reduce((a, x) => a + x.konteyner, 0), belirsiz: satirlar.filter((x) => x.kaynak === "belirsiz").length,
-    bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont },
+    bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont }, bookingli: { siparis: bookingliSiparis, konteyner: bookingliKont },
     bekleyenler: bekleyenler.sort((a, b) => a.liman.localeCompare(b.liman, "tr") || (a.musteri || "").localeCompare(b.musteri || "", "tr")),
   };
 }
@@ -430,13 +449,14 @@ export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLU
   const birlestir = ["A1:K1"];
   if (sa.bekleyenler.length) {
     satirlar.push([]);
-    satirlar.push([{ v: `REZERVASYON BEKLEYEN MÜŞTERİLER · ${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} kont. (ön ödemesi alındı, navlunu henüz satın alınmadı)`, s: XS.baslik }]);
+    satirlar.push([{ v: `REZERVASYON BEKLEYEN MÜŞTERİLER · ${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} kont. (ön ödemesi alındı, navlunu henüz satın alınmadı)${sa.bookingli.siparis ? ` · ${sa.bookingli.siparis} sipariş (${sa.bookingli.konteyner} kont.) booking'i üstte olduğu için düşüldü` : ""}`, s: XS.baslik }]);
     birlestir.push(`A${satirlar.length}:K${satirlar.length}`);
     // Sutunlar ust tabloyla hizali: C musteri, D liman, E en iyi teklifin acentesi, F kont., G guncel en iyi 20'DC
     satirlar.push(["", "", "MÜŞTERİ", "VARIŞ LİMANI", "EN İYİ TEKLİF (ACENTE / HAT)", "KONT.", "GÜNCEL EN İYİ 20'DC"].map((v) => ({ v, s: XS.tabloBaslik })));
     for (const b of sa.bekleyenler) {
-      satirlar.push([{ v: "", s: XS.metin }, { v: "", s: XS.metin }, { v: b.musteri || "", s: XS.metin }, { v: b.liman, s: XS.metin },
-        { v: b.enIyi ? b.enIyi.blok : "teklif yok", s: XS.metin }, { v: b.konteyner, s: XS.tamSayi }, { v: b.enIyi ? b.enIyi.tutar : null, s: XS.tamSayi }]);
+      satirlar.push([{ v: "", s: XS.metin }, { v: "", s: XS.metin }, { v: `${b.musteri || ""}${b.siparis > 1 ? ` (${b.siparis} sipariş)` : ""}`, s: XS.metin }, { v: b.liman, s: XS.metin },
+        { v: b.enIyi ? b.enIyi.blok : b.anlasma ? `teklif yok · son anlaşma ${tarihTr(b.anlasma.tarih.slice(0, 10))}` : "teklif yok", s: XS.metin }, { v: b.konteyner, s: XS.tamSayi },
+        { v: b.enIyi ? b.enIyi.tutar : b.anlasma ? b.anlasma.tutar : null, s: XS.tamSayi }]);
     }
   }
   return { ad, sutunGenislik: [11, 17, 26, 18, 22, 7, 14, 14, 7, 22, 22], satirlar, birlestir, dondur: "A3" };
@@ -576,15 +596,15 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
     ) : `<div style="font-size:12px;color:#64748B">Yükleme planında ETD'si bugün / ileride booking yok.</div>`)
     + (sa.belirsiz ? `<div style="margin-top:5px;font-size:11.5px;color:#B45309">${sa.belirsiz} booking'in navlunu sistemde yok (dosya / yükleme planı / anlaşma maili).</div>` : "");
 
-  const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı`, "#F4A07C")
+  const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı${sa.bookingli.siparis ? ` · ${sa.bookingli.siparis} sipariş (${sa.bookingli.konteyner} kont.) booking'i yukarıda olduğu için düşüldü` : ""}`, "#F4A07C")
     + (sa.bekleyenler.length ? sikiTablo(
       [{ ad: "Müşteri" }, { ad: "Varış limanı" }, { ad: "Kont", sag: true }, { ad: "Güncel en iyi 20'DC", sag: true }, { ad: "Acente / Hat" }],
       sa.bekleyenler.map((b) => [
-        esc(kes(b.musteri || "-", 28)),
+        `${esc(kes(b.musteri || "-", 28))}${b.siparis > 1 ? ` <span style="color:#94A3B8;font-size:9.5px">${b.siparis} sipariş</span>` : ""}`,
         limanLink(b.liman, b.limanAnahtar),
         `${b.konteyner}`,
-        b.enIyi ? `<b style="color:#047857">${usd(b.enIyi.tutar)}</b>` : gri("teklif yok"),
-        b.enIyi ? esc(kes(b.enIyi.blok, 18)) : gri("-"),
+        b.enIyi ? `<b style="color:#047857">${usd(b.enIyi.tutar)}</b>` : b.anlasma ? `<span style="color:#283474">${usd(b.anlasma.tutar)}</span>` : gri("teklif yok"),
+        b.enIyi ? esc(kes(b.enIyi.blok, 18)) : b.anlasma ? `<span style="color:#64748B">son anlaşma · ${kisa(b.anlasma.tarih.slice(0, 10))}</span>` : gri("-"),
       ]),
     ) : `<div style="font-size:12px;color:#64748B">Rezervasyon bekleyen sipariş yok.</div>`);
   return ust + alt;

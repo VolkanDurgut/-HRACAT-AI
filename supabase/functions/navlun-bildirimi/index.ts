@@ -5,7 +5,7 @@ import { acenteOgren, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle
 // ============================================================================
 // NAVLUN BILDIRIMI (navlun-bildirimi) - 10.11.2026
 // ============================================================================
-// Arsiv Gmail'deki Apps Script (docs/apps-script/navlun.gs) konusu "NAVLUN" olan mailleri gonderir:
+// Arsiv Gmail'deki Apps Script (docs/apps-script/navlun.gs) konusu "NAVLUN" (12.11.2026: ya da "REZERVASYON TALEBI") olan mailleri gonderir:
 //   {"islem": "kaydet", "mesajlar": [{mesaj_id, gonderen, konu, govde, tarih, ek_metin?, ek_kaynak?}]}
 //   + baslik x-pazar-anahtar = secret PAZAR_GELEN_ANAHTAR (Pazar gelen cevap ile ayni betik projesi).
 //   {"islem": "durum"} + anahtar: son kayit / hata kuyrugu sayilari (salt okunur saglik kontrolu).
@@ -123,7 +123,8 @@ Deno.serve(async (req: Request) => {
         mesaj_id: kirp(r.mesaj_id, 300).trim(), gonderen: kirp(r.gonderen, 200).trim().toLowerCase(), konu: kirp(r.konu, 300),
         govde: kirp(r.govde, 8000), tarih: kirp(r.tarih, 40), ek_metin: kirp(r.ek_metin, 12000), ek_kaynak: kirp(r.ek_kaynak, 10),
       };
-      if (!g.mesaj_id || !g.gonderen || !/navlun/i.test(g.konu) || Number.isNaN(Date.parse(g.tarih))) { atlanan++; continue; }
+      // 12.11.2026: "<LIMAN> // 8*20 DC // REZERVASYON TALEBI" (operasyonun "Navlun rakami X olmak uzere" booking istegi = satin alinan navlun)
+      if (!g.mesaj_id || !g.gonderen || !/navlun|rezervasyon\s*taleb/i.test(g.konu) || Number.isNaN(Date.parse(g.tarih))) { atlanan++; continue; }
       let k = mesajIsle(g, acenteler);
       if (!k) {
         // Tabloda olmayan alan adi navlun teklifi veriyorsa acente olarak ogrenilir (elle tablo bakimi gerekmez)

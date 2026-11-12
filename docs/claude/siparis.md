@@ -301,3 +301,11 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   (bekleyenler aynı sayfada ayrı başlıkla; operasyonun navlun tablosu sayfadaki "Excel indir"de). Edge `navlun-tablosu` v8.
   Alıcı doğrulaması: `rapor_alicilari`ndaki kayıtlar son gerçek gönderimlerin alıcılarıyla birebir (günlük ihracat, DİİB, VGM,
   konşimento, pazar görev); alıcı değişmedi.
+- 12.11.2026 (revize-1112f) Navlun raporu doğrulaması (kullanıcı: "Bu bilgiler doğru mu, mailleri okudun mu?"): 16 booking arşiv
+  mailleriyle tek tek karşılaştırıldı. Anlaşma kaynaklı satırlar doğru: Tema 1450 $ (operation 21–22.10 "Navlun bedeli 1450 usd …
+  Polar Ecuador / Leda Maersk"; booking'ler 279000741 Leda 22.11, 279006946 + 280635803 Lexa Maersk 29.11'e kaydırıldı), Mutsamudu
+  4900 $ (bbt 05.11, 13 kont / 6 booking), Mombasa Akkon 1800 $ (operation 05.11 rezervasyon formu). Eksik: Djibouti AKKIST26051676
+  — operasyonun "UNEX // DJIBOUTI // N*20 DC // REZERVASYON TALEBİ HK." maillerinde "Navlun rakamı 1850 Usd olmak üzere" yazıyor ama
+  konu "NAVLUN" içermediği için okunmuyordu. Düzeltme: edge `navlun-bildirimi` v9 konu "REZERVASYON TALEBİ" olan mailleri de kabul
+  eder; konudaki "8*20 DC" parçası liman sayılmaz; `docs/apps-script/navlun.gs` arama sorgusu `subject:(navlun OR "rezervasyon talebi")`
+  (arşiv hesabındaki betik güncellenip `navlunGecmis` bir kez çalıştırılmalı).

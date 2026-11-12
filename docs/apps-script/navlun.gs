@@ -52,7 +52,7 @@ function navlunTara() {
     var p = PropertiesService.getScriptProperties();
     var son = Number(p.getProperty('NAVLUN_SON') || (Date.now() - 2 * 24 * 3600 * 1000));
     var baslangic = son - 3600 * 1000;   // 1 saat geri tasma: gec indekslenen mail kacmasin
-    var konular = GmailApp.search('subject:navlun after:' + Math.floor(baslangic / 1000) + ' -in:trash', 0, 100);
+    var konular = GmailApp.search('subject:(navlun OR "rezervasyon talebi") after:' + Math.floor(baslangic / 1000) + ' -in:trash', 0, 100);
     var sonuc = navlunIsle(konular, baslangic);
     p.setProperty('NAVLUN_SON', String(Math.max(sonuc.enYeni, son)));
     console.log(JSON.stringify(sonuc.ozet));
@@ -68,7 +68,7 @@ function navlunGecmis() {
   try {
     var p = PropertiesService.getScriptProperties();
     var i = Number(p.getProperty('NAVLUN_GECMIS_I') || 0);
-    var konular = GmailApp.search('subject:navlun after:' + NAVLUN_ILK_TARIH + ' -in:trash', i, 20);
+    var konular = GmailApp.search('subject:(navlun OR "rezervasyon talebi") after:' + NAVLUN_ILK_TARIH + ' -in:trash', i, 20);
     if (!konular.length) { console.log('BITTI - gecmis okuma tamamlandi.'); return; }
     var sonuc = navlunIsle(konular, 0);
     p.setProperty('NAVLUN_GECMIS_I', String(i + sonuc.islenenKonu));

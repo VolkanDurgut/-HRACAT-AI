@@ -295,3 +295,9 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
     edge'lerin CC değişikliği hazır, dağıtılmadı). Test: e2e_rapor_alici 53.
   - Müşteri Durum Raporu (edge `musteri-durum-rapor` v1, `_shared/musteri-durum.ts`): siparişi onaylı her müşteriye İngilizce
     durum (fiyat / navlun yok). Şimdilik yalnız yönetici önizleme + [TEST] maili (yalnız test adresi); canlı gönderim kapalı.
+- 12.11.2026 (revize-1112e): Navlun raporu iki başlık: üstte **Satın Alınan Navlunlar** (müşteri sütunu eklendi), altta
+  **Rezervasyon Bekleyen Müşteriler** (ön ödemeli, booking'siz siparişler: müşteri, varış limanı, konteyner, limanın güncel en iyi
+  20'DC teklifi + acentesi). Düğme "Navlun Evreni" (/navlun). Ek tek Excel: "UNEX NAVLUN SATIN ALMA LİSTESİ · <tarih>.xlsx"
+  (bekleyenler aynı sayfada ayrı başlıkla; operasyonun navlun tablosu sayfadaki "Excel indir"de). Edge `navlun-tablosu` v8.
+  Alıcı doğrulaması: `rapor_alicilari`ndaki kayıtlar son gerçek gönderimlerin alıcılarıyla birebir (günlük ihracat, DİİB, VGM,
+  konşimento, pazar görev); alıcı değişmedi.

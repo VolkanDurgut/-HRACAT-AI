@@ -31,7 +31,7 @@ export type RaporTanimi = {
 export const RAPORLAR: RaporTanimi[] = [
   { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 09:00, 12:00 ve 17:00", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Günün özeti (4 gösterge) + gelen ön ödemeler + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
-  { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Navlun satın alma listesi (yükleme planı) + Excel", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
+  { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Satın alınan navlunlar + rezervasyon bekleyen müşteriler + Excel", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
   { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "vgm", ad: "VGM Bildirimi", grup: "Operasyon", aciklama: "Konteynerleri tamamlanan dosyanın VGM PDF'i", saat: "Konteynerler tamamlanınca", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "konsimento_hatirlatma", ad: "Konşimento Hatırlatma", grup: "Operasyon", aciklama: "Fatura talimatından sonra konşimento talimatı bekleyen dosyalar", saat: "Talimat gönderilince", edge: null, testModu: false, etkin: "yakinda" },

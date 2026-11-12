@@ -3,7 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
-import { navlunSatinAlma, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { navlunSatinAlma, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -16,8 +16,9 @@ import { navlunSatinAlma, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosu
 // ALICI: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'navlun'); satir yoksa secret'lar (NAVLUN_TABLOSU_CANLI =
 //   "evet" + NAVLUN_TABLOSU_ALICI). Canli degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI,
 //   varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
-// MAIL (12.11.2026): NAVLUN SATIN ALMA LISTESI (yukleme planindaki booking'li yuklemeler + odenecek navlun; kaynak dosya / plan /
-//   anlasma maili) + "Diger navlun fiyatlari" dugmesi (/navlun). Ek Excel: satin alma listesi + operasyonun navlun tablosu.
+// MAIL (12.11.2026): "Satin Alinan Navlunlar" (yukleme planindaki booking'li yuklemeler, musteri + odenecek navlun; kaynak dosya /
+//   plan / anlasma maili) + "Rezervasyon Bekleyen Musteriler" + "Navlun Evreni" dugmesi (/navlun).
+//   Ek: "UNEX NAVLUN SATIN ALMA LISTESI · <tarih>.xlsx" (operasyonun navlun tablosu sayfadaki "Excel indir"de).
 // CAGRI YETKISI:
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ, konu + HTML doner;
 //    {"test": true} -> "[TEST]" mail YALNIZ test adresine.
@@ -130,7 +131,8 @@ async function sirketTablosu(companyId: string, tarih: string) {
 
 async function excelBase64(v: Awaited<ReturnType<typeof sirketTablosu>>): Promise<string> {
   const zip = new JSZip();
-  for (const f of xlsxParcalari([satinAlmaSayfasi(v.satinAlma, v.tablo.tarih), navlunTablosuSayfasi(v.tablo)])) zip.file(f.yol, f.icerik);
+  // 12.11.2026 kullanici: ek = "UNEX NAVLUN SATIN ALMA LISTESI · <tarih>" (operasyonun navlun tablosu sayfadaki "Excel indir"de)
+  for (const f of xlsxParcalari([satinAlmaSayfasi(v.satinAlma, v.tablo.tarih)])) zip.file(f.yol, f.icerik);
   return await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
 }
 
@@ -204,7 +206,7 @@ Deno.serve(async (req: Request) => {
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, ...(cc.length ? { cc } : {}), subject: konu, html,
-          attachments: [{ filename: `Navlun_Tablosu_${tarih}.xlsx`, content: ek }],
+          attachments: [{ filename: `${satinAlmaBasligi(tarih)}.xlsx`, content: ek }],
         }),
       });
       if (!mRes.ok) {

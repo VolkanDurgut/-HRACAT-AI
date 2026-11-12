@@ -208,9 +208,22 @@ function gecerlilikBul(s: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Yukleme limani: YALNIZ Ambarli ya da Asyaport (11.11.2026 kullanici: "Biz sadece Ambarli ve Asyaport ile
+ * calisiyoruz"). Eskiden POL'den sonraki ilk kelime aliniyordu ve "TRIST / BOSTON / JAKARTA" gibi yanlis
+ * degerler yaziliyordu; artik ikisinden biri degilse bos (null).
+ */
+export function polNormal(ham: string | null | undefined): "AMBARLI" | "ASYAPORT" | null {
+  if (!ham) return null;
+  const u = ham.toLocaleUpperCase("tr-TR");
+  if (/ASYA\s*PORT|TEK[İI]RDA[GĞ]/.test(u)) return "ASYAPORT";
+  if (/AMBARL[Iİ]/.test(u)) return "AMBARLI";
+  return null;
+}
+
 function polBul(s: string): string | null {
-  const m = s.match(/POL\s*[:\-]?\s*([A-ZÇĞİÖŞÜa-zçğıöşü .\-]{3,30}?)(?:\s+POD|\n|$)/);
-  return m ? m[1].trim().toUpperCase() : null;
+  const m = s.match(/POL\s*[:\-]?\s*([^\n]{3,40})/);
+  return m ? polNormal(m[1].split(/\bPOD\b/i)[0]) : null;
 }
 
 function bos(): Omit<NavlunOlay, "tur"> {

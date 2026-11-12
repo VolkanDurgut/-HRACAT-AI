@@ -1,19 +1,20 @@
 /**
  * Giris sonrasi donus (06.11.2026): e-postadaki "İrsaliye İncele" gibi baglantilar oturum yokken
  * giris ekranina duser; giristen sonra kullanici o belgeye geri getirilir. Yalniz /belge/ yollari
- * saklanir (acik yonlendirme yok). sessionStorage: sekme kapaninca silinir.
+ * saklanir (acik yonlendirme yok). 11.11.2026: fatura talimati onay maili (/fatura-onay?id=...) da. sessionStorage: sekme kapaninca silinir.
  */
 const ANAHTAR = "ihracatai.girisSonrasi";
+const IZINLI = /^\/(?:belge\/[a-z-]+|fatura-onay)(\?[A-Za-z0-9=&_-]*)?$/;
 
 export function girisSonrasiKaydet(yol: string) {
-  try { if (/^\/belge\/[a-z-]+(\?[A-Za-z0-9=&_-]*)?$/.test(yol)) sessionStorage.setItem(ANAHTAR, yol); } catch { /* yok */ }
+  try { if (IZINLI.test(yol)) sessionStorage.setItem(ANAHTAR, yol); } catch { /* yok */ }
 }
 
 /** Kayitli donus yolu (silmez: giris ekranindaki iki yonlendirme de ayni hedefi gorsun); yoksa null. */
 export function girisSonrasiAl(): string | null {
   try {
     const y = sessionStorage.getItem(ANAHTAR);
-    return y && /^\/belge\/[a-z-]+(\?[A-Za-z0-9=&_-]*)?$/.test(y) ? y : null;
+    return y && IZINLI.test(y) ? y : null;
   } catch { return null; }
 }
 

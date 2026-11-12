@@ -53,12 +53,28 @@ function OzetKarti({ ikon, etiket, deger, alt, testId }: { ikon: React.ReactNode
 function LimanKarti({ l }: { l: LimanOzeti }) {
   return (
     <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="liman-karti" data-liman={l.anahtar}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-        <p className="text-white font-semibold flex items-center gap-2"><Anchor size={15} style={{ color: ACCENT }} />{l.ad}</p>
-        {l.enIyi20 && <span className="text-sm" style={{ color: "#6EE7B7" }} data-en-iyi>En iyi 20&apos;DC: <b className="tabular-nums">{usd(l.enIyi20.tutar)}</b> · {l.enIyi20.acente}</span>}
-        {l.hedef && <span className="text-sm flex items-center gap-1" style={{ color: "#FCD34D" }} data-hedef title="Hedef: operasyonun acenteye pazarlıkta yazdığı fiyat (ör. &quot;hedef rakamımız 1.500 USD&quot;). Bizden giden maillerden okunur; acente &quot;hedefiniz uygundur&quot; derse o acentenin fiyatı olur."><Target size={13} />Hedefimiz {usd(l.hedef.tutar)}</span>}
-        {l.kabul && <span className="text-sm flex items-center gap-1" style={{ color: "#93C5FD" }} data-kabul><CheckCircle2 size={13} />Kabul edilen {usd(l.kabul.tutar)}{l.kabul.armator ? ` (${l.kabul.armator})` : ""} · {tarihGoster(l.kabul.tarih)}</span>}
-        <span className="text-xs ml-auto" style={{ color: TEXT_MUTED }}>son: {tarihGoster(l.sonTarih)}</span>
+      {/* 11.11.2026 kullanici: "Ayni baslik altindaki yazilar alt alta durmali, hizali olmali" -> etiket | deger izgarasi */}
+      <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+        <div className="flex items-center gap-3">
+          <p className="text-white font-semibold flex items-center gap-2"><Anchor size={15} style={{ color: ACCENT }} />{l.ad}</p>
+          <span className="text-xs ml-auto" style={{ color: TEXT_MUTED }}>son: {tarihGoster(l.sonTarih)}</span>
+        </div>
+        {(l.enIyi20 || l.hedef || l.kabul) && (
+          <dl className="mt-1.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm" data-baslik-ozet>
+            {l.enIyi20 && <>
+              <dt style={{ color: "#6EE7B7" }}>En iyi 20&apos;DC</dt>
+              <dd style={{ color: "#6EE7B7" }} data-en-iyi><b className="tabular-nums">{usd(l.enIyi20.tutar)}</b> · {l.enIyi20.acente}</dd>
+            </>}
+            {l.hedef && <>
+              <dt className="flex items-center gap-1" style={{ color: "#FCD34D" }}><Target size={13} />Hedefimiz</dt>
+              <dd style={{ color: "#FCD34D" }} data-hedef title="Hedef: operasyonun acenteye pazarlıkta yazdığı fiyat (ör. &quot;hedef rakamımız 1.500 USD&quot;). Bizden giden maillerden okunur; acente &quot;hedefiniz uygundur&quot; derse o acentenin fiyatı olur."><b className="tabular-nums">{usd(l.hedef.tutar)}</b></dd>
+            </>}
+            {l.kabul && <>
+              <dt className="flex items-center gap-1" style={{ color: "#93C5FD" }}><CheckCircle2 size={13} />Kabul edilen</dt>
+              <dd style={{ color: "#93C5FD" }} data-kabul><b className="tabular-nums">{usd(l.kabul.tutar)}</b>{l.kabul.armator ? ` (${l.kabul.armator})` : ""} · {tarihGoster(l.kabul.tarih)}</dd>
+            </>}
+          </dl>
+        )}
       </div>
       {l.fiyatlar.length > 0 && (
         <div className="overflow-x-auto">
@@ -269,7 +285,7 @@ function NavlunIcerik() {
 
   if (!yetkili) return null;
   return (
-    <div className="max-w-[1500px]">
+    <div className="max-w-[1500px] mx-auto">
       <SayfaBasligi
         ikon={<Ship size={20} />}
         baslik="Navlun Bildirimi"

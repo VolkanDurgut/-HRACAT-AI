@@ -1,6 +1,7 @@
 /**
  * SIPARIS RAPORU MAILI - hesap + HTML (11.11.2026). Edge: siparis-rapor. SAF: veri yok, ag yok.
- * Kaynak: siparis_listesi_veri + yukleme_plani_veri (Siparisler sayfasiyla AYNI veri ve ayni kurallar:
+ * 11.11.2026 (2. revize): mail = "Bugun gelen on odemeler" tablosu (musteri, konteyner, varis limani); ozet maddeleri
+ * kaldirildi. Kaynak: siparis_listesi_veri + yukleme_plani_veri (Siparisler sayfasiyla AYNI veri ve ayni kurallar:
  * siparis-liste.ts bolumleri / plan gorunumu). Ek: sayfadaki "Excel indir" ile ayni dosya (siparis-xlsx.ts).
  * Musteriye GITMEZ (ic rapor; fiyat ve tutarlar gorunur).
  */
@@ -8,8 +9,8 @@ import {
   planGorunumu, planSirala, siparisBolumleri, siparisOzeti, trTarih,
   type PlanSatiri, type SiparisOzeti, type SiparisSatiri,
 } from "./siparis-liste.ts";
-import { RAPOR_SAATLERI, oturumAdi, oturumSaatten } from "./rapor-oturum.ts";
-import { esc, paraKisa, raporKabugu } from "./rapor-kabugu.ts";
+import { RAPOR_SAATLERI, oturumAdi } from "./rapor-oturum.ts";
+import { RAPOR_LACIVERT, esc, raporKabugu } from "./rapor-kabugu.ts";
 
 export const SIPARIS_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
 export const SIPARIS_RAPOR_SAATI = RAPOR_SAATLERI;
@@ -26,6 +27,7 @@ const paraEkle = (t: ParaToplami, para: string | null, v: number | null) => { if
 
 export type SiparisRapor = {
   tarih: string;
+  oturum: "sabah" | "aksam";
   ozet: SiparisOzeti & {
     onOdemeKont: number; onOdemeMt: number; onOdemeTutar: ParaToplami;
     onayKont: number; onayMt: number; onayTutar: ParaToplami;
@@ -38,12 +40,24 @@ export type SiparisRapor = {
   planYakin: PlanSatiri[];
 };
 
-export function siparisRaporHesapla(siparisler: SiparisSatiri[], plan: PlanSatiri[], tarih: string): SiparisRapor {
+/**
+ * Ön ödeme penceresi (11.11.2026 kullanici: "Siparis raporuna bugun gelen on odemeler; musteri, konteyner adedi,
+ * varis limani"). Aksam raporu: bugun. Sabah raporu (08:00, gun yeni basladi): dun + bugun.
+ */
+export function onOdemePenceresi(tarih: string, oturum: "sabah" | "aksam"): { bas: string; bit: string } {
+  return { bas: oturum === "sabah" ? gunEkle(tarih, -1) : tarih, bit: tarih };
+}
+
+export function siparisRaporHesapla(siparisler: SiparisSatiri[], plan: PlanSatiri[], tarih: string, oturum: "sabah" | "aksam" = "aksam"): SiparisRapor {
   const bolum = (b: string) => siparisBolumleri(siparisler).find((x) => x.bolum === b)?.satirlar || [];
   const onOdeme = bolum("on_odeme");
   const onay = bolum("bekleyen");
   const acikRezervasyon = bolum("rezervasyon").filter((s) => s.durum === "rezervasyonlu" || s.durum === "bl_eksik");
-  const bugunOnOdeme = onOdeme.filter((s) => s.on_odeme_tarihi && s.on_odeme_tarihi.slice(0, 10) === tarih);
+  // Bolumden bagimsiz: ayni gun rezervasyonu da yapilan siparis de "gelen on odeme"dir
+  const p = onOdemePenceresi(tarih, oturum);
+  const bugunOnOdeme = siparisler
+    .filter((s) => s.on_odeme && s.on_odeme_tarihi && s.on_odeme_tarihi.slice(0, 10) >= p.bas && s.on_odeme_tarihi.slice(0, 10) <= p.bit)
+    .sort((a, b) => (b.on_odeme_tarihi || "").localeCompare(a.on_odeme_tarihi || "") || (a.firma || "").localeCompare(b.firma || "", "tr"));
   const g = planGorunumu(plan, tarih);
   const sinir = gunEkle(tarih, PLAN_GUN);
   const planYakin = planSirala(g.guncel.filter((p) => !p.etd || p.etd.slice(0, 10) <= sinir))
@@ -54,7 +68,7 @@ export function siparisRaporHesapla(siparisler: SiparisSatiri[], plan: PlanSatir
   for (const s of onOdeme) paraEkle(onOdemeTutar, s.para_birimi, s.tutar);
   for (const s of onay) paraEkle(onayTutar, s.para_birimi, s.tutar);
   return {
-    tarih,
+    tarih, oturum,
     ozet: {
       ...siparisOzeti(siparisler),
       onOdemeKont: kont(onOdeme), onOdemeMt: mt(onOdeme), onOdemeTutar,
@@ -68,50 +82,42 @@ export function siparisRaporHesapla(siparisler: SiparisSatiri[], plan: PlanSatir
 
 export function siparisRaporKonusu(r: SiparisRapor, sirketAdi = "Unex Gıda"): string {
   const o = r.ozet;
-  return `${sirketAdi} Sipariş Raporu · ${trTarih(r.tarih)} · ${o.onOdeme} ön ödemeli rezervasyon bekliyor · ${o.onay} onay bekliyor`;
+  const kont = r.bugunOnOdeme.reduce((t, s) => t + (s.konteyner || 0), 0);
+  const gelen = r.bugunOnOdeme.length ? `${r.bugunOnOdeme.length} ön ödeme (${kont} konteyner)` : "ön ödeme yok";
+  return `${sirketAdi} Sipariş Raporu · ${trTarih(r.tarih)} · ${r.oturum === "sabah" ? "Dün ve bugün" : "Bugün"} ${gelen} · ${o.onOdeme} ön ödemeli rezervasyon bekliyor`;
 }
 
-/** Gun farki (YYYY-MM-DD) */
-const gunFarki = (a: string, b: string) => Math.round((Date.parse(`${a.slice(0, 10)}T12:00:00Z`) - Date.parse(`${b.slice(0, 10)}T12:00:00Z`)) / 86400000);
-
-/**
- * "Otomatik Ozet" maddeleri (11.11.2026, kullanici: "rapor cok uzun; ozet metin + ekte Excel; tek sayfa").
- * Ayrinti (tum satirlar) ekteki Excel'de; mailde yalniz bu cumleler.
- */
-export function siparisOzetMaddeleri(r: SiparisRapor): string[] {
-  const o = r.ozet;
-  const m: string[] = [];
-  const acikTutar: ParaToplami = {};
-  for (const s of [...r.onOdeme, ...r.onay, ...r.acikRezervasyon]) paraEkle(acikTutar, s.para_birimi, s.tutar);
-  const tutarYaz = Object.keys(acikTutar).sort().map((p) => paraKisa(acikTutar[p], p)).join(" + ");
-  m.push(`<b>${o.acikSiparis}</b> açık sipariş: ${sayi(o.acikKont)} konteyner, ${sayi(o.acikMt)} MT${tutarYaz ? `; toplam ${esc(tutarYaz)}` : ""}.`);
-  if (r.onOdeme.length) {
-    const enEski = [...r.onOdeme].filter((s) => s.on_odeme_tarihi).sort((a, b) => (a.on_odeme_tarihi || "").localeCompare(b.on_odeme_tarihi || ""))[0];
-    const g = enEski?.on_odeme_tarihi ? gunFarki(r.tarih, enEski.on_odeme_tarihi) : null;
-    m.push(`<b>${o.onOdeme}</b> sipariş ön ödemeli, rezervasyon bekliyor (${sayi(o.onOdemeKont)} kont., ${sayi(o.onOdemeMt)} MT)${enEski && g !== null ? `; en eskisi ${esc(enEski.firma || "-")}, ${g} gündür` : ""}.`);
-  } else m.push("Ön ödemesi alınıp rezervasyon bekleyen sipariş yok.");
-  if (r.onay.length) {
-    const eski = r.onay.filter((s) => s.proforma_tarihi && gunFarki(r.tarih, s.proforma_tarihi) >= 14).length;
-    m.push(`<b>${o.onay}</b> proforma onay / ön ödeme bekliyor (${sayi(o.onayKont)} kont.${Object.keys(o.onayTutar).length ? `, ${esc(Object.keys(o.onayTutar).sort().map((p) => paraKisa(o.onayTutar[p], p)).join(" + "))}` : ""})${eski ? `; ${eski} tanesi 2 haftadan eski` : ""}.`);
-  }
-  if (r.planYakin.length) {
-    const ilk = r.planYakin.find((p) => p.etd);
-    m.push(`Önümüzdeki ${PLAN_GUN} günde <b>${o.planYakinBooking}</b> yükleme, ${sayi(o.planYakinKont)} konteyner${ilk ? `; ilk ETD ${kisaTarih(ilk.etd)} (${esc(ilk.musteri || "-")}${ilk.varis_limani ? `, ${esc(ilk.varis_limani)}` : ""})` : ""}.`);
-  } else m.push(`Önümüzdeki ${PLAN_GUN} günde planlı yükleme yok.`);
-  const rez = r.acikRezervasyon.filter((s) => s.durum === "rezervasyonlu").length;
-  if (rez || o.blEksik) m.push(`${rez ? `<b>${rez}</b> rezervasyonlu sipariş sevk bekliyor` : ""}${rez && o.blEksik ? "; " : ""}${o.blEksik ? `<b style="color:#B91C1C">${o.blEksik}</b> sevkiyatta BL eksik` : ""}.`);
-  if (r.bugunOnOdeme.length) m.push(`Bugün ön ödemesi işaretlenen: ${r.bugunOnOdeme.map((s) => `${esc(s.firma || "-")} (${esc(s.proforma_no || "-")})`).join(", ")}.`);
-  if (o.olasiTekrar) m.push(`<span style="color:#B45309">${o.olasiTekrar} proforma olası tekrar</span> — Sipariş Listesi'nde kontrol edin.`);
-  return m;
+/** Gelen on odemeler tablosu (Musteri | Konteyner | Varis limani) + toplam satiri. */
+export function onOdemeTablosu(r: SiparisRapor): string {
+  if (!r.bugunOnOdeme.length) return `<div style="font-size:13px;color:#64748B;padding:4px 0">${r.oturum === "sabah" ? "Dün ve bugün" : "Bugün"} ön ödeme gelmedi.</div>`;
+  const tekGun = r.oturum !== "sabah";
+  const th = (ad: string, sag = false, gen = "") => `<th style="background:${RAPOR_LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:6px 8px;text-align:${sag ? "right" : "left"};white-space:nowrap${gen ? `;width:${gen}` : ""}">${ad}</th>`;
+  const td = (h: string, sag = false, ek = "") => `<td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;font-size:13px;line-height:1.35;color:#1E293B;${sag ? "text-align:right;white-space:nowrap;" : ""}${ek}">${h}</td>`;
+  const satirlar = r.bugunOnOdeme.map((s, i) => `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${[
+    td(`<b>${esc(s.firma || "-")}</b>${s.proforma_no ? `<div style="font-size:11px;color:#94A3B8">${esc(s.proforma_no)}</div>` : ""}`),
+    td(s.konteyner ? sayi(s.konteyner) : "-", true),
+    td(esc(s.liman || "-")),
+    ...(tekGun ? [] : [td(kisaTarih(s.on_odeme_tarihi), true, "color:#64748B;")]),
+  ].join("")}</tr>`).join("");
+  const kont = r.bugunOnOdeme.reduce((t, s) => t + (s.konteyner || 0), 0);
+  const toplam = `<tr>${[
+    td(`<b>Toplam · ${r.bugunOnOdeme.length} sipariş</b>`, false, "border-bottom:0;border-top:2px solid " + RAPOR_LACIVERT + ";"),
+    td(`<b>${sayi(kont)}</b>`, true, "border-bottom:0;border-top:2px solid " + RAPOR_LACIVERT + ";"),
+    td("", false, "border-bottom:0;border-top:2px solid " + RAPOR_LACIVERT + ";"),
+    ...(tekGun ? [] : [td("", true, "border-bottom:0;border-top:2px solid " + RAPOR_LACIVERT + ";")]),
+  ].join("")}</tr>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Müşteri")}${th("Konteyner", true, "90px")}${th("Varış limanı", false, "34%")}${tekGun ? "" : th("Tarih", true, "60px")}</tr>${satirlar}${toplam}</table>`;
 }
 
 export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString()): string {
   const saatYaz = new Date(Date.parse(olusturmaIso) + 3 * 3600000).toISOString().slice(11, 16);
   return raporKabugu({
-    sirketAdi, baslik: "Sipariş Raporu", tarih: trTarih(r.tarih), oturum: `${oturumAdi(oturumSaatten(Date.parse(olusturmaIso)))} · ${saatYaz}`,
-    ozetAlt: "Sipariş listesi ve yükleme planına göre",
-    maddeler: siparisOzetMaddeleri(r),
+    sirketAdi, baslik: "Sipariş Raporu", tarih: trTarih(r.tarih), oturum: `${oturumAdi(r.oturum)} · ${saatYaz}`,
+    ozetBaslik: r.oturum === "sabah" ? "Dün ve Bugün Gelen Ön Ödemeler" : "Bugün Gelen Ön Ödemeler",
+    ozetAlt: "Ön ödemesi işaretlenen siparişler · müşteri, konteyner adedi ve varış limanı",
+    maddeler: [],
+    ozetIcerik: onOdemeTablosu(r),
     dugme: { metin: "Siparişleri aç", yol: "/siparisler" },
-    dipnot: `Tüm satırlar ekteki Excel'de (Sipariş Listesi + Yükleme Planı; sayfadaki "Excel indir" ile aynı).<br>Her gün ${SIPARIS_RAPOR_SAATI}'de · müşteriye gitmez.`,
+    dipnot: `Tüm siparişler ve yükleme planı ekteki Excel'de (sayfadaki "Excel indir" ile aynı).<br>Her gün ${SIPARIS_RAPOR_SAATI}'de · müşteriye gitmez.`,
   });
 }

@@ -203,31 +203,12 @@ düşün; aynı UNEX kullanım kılavuzundaki gibi görüntülü animasyonlu bir
   Mail: başlangıç günü, 4 adım, "Sistem sizin için takip eder", "Rehberi izle (3 dakika)" → `/gorev/rehber`.
 - Test: `e2e_rehber.mjs` 22. 10.11 duyuru testi: 2 mail, yalnız mesensei282.
 
-## 3.8 Müşteri Özeti raporu — departmanlara günlük talimat (11.11.2026)
+## 3.8 Müşteri Özeti raporu — KALDIRILDI (11.11.2026 akşam)
 
-Kullanıcı: "Her müşteri için özet raporu oluşturulsun. Veritabanına göre. Her gün müşterilere gönderilmesi için mail ile
-talimat verilecek departmanlara. Potansiyel müşterilerimiz için özet rapor oluşturulsun. Alıcı: operation, export,
-export2, execution, bbt. Şimdilik test maili sensei ile."
-- Migration `20261111180000_musteri_ozet_raporu.sql` (CANLIDA): `musteri_ozet_gonderimleri` (canlı zamanlanmış gönderim
-  şirket + gün tek), `musteri_ozet_veri(p_company)` (YALNIZ service_role; müşteriler + geçerli e-postaları, dosyalar
-  `pazar_anahtar` ile, rezervasyonlar, ödeme hatırlatmaları, onay / ön ödeme bekleyen siparişler, 14 günlük gelen
-  cevaplar, potansiyel özeti), pg_cron `musteri-ozet-rapor` 05:00 UTC = 08:00 TR her gün.
-- Saf: `supabase/functions/_shared/musteri-ozet.ts`. Talimat kuralları (departman + ACİL / BUGÜN / BİLGİ):
-  Operasyon — rezervasyonsuz açık dosya, ön ödemesi alınmış sipariş, 3 gün içinde talimat cut-off, draft revizesi;
-  Export — draft gönderilmedi / onay bekliyor (2+ gün), proforma onayı (3+ gün), son 3 günde gelen cevap, varışa ≤7 gün,
-  45+ gün siparişsiz; Execution — gemi kalktı fatura yok, ödeme bekliyor (konşimento Telex / Seawaybill / Vesaik değil;
-  `lib/odeme-takibi` ile aynı kural; ETD'den 120 günden eski olan düşer; varışta ya da 21+ gün ACİL).
-- Mail: özet kutuları, departman talimatları, aktif müşteri kartları (sevkiyatlar, açık proformalar, İngilizce durum metni
-  — fiyat / ödeme YOK — ve "Müşteriye özeti Outlook'ta hazırla" mailto; e-postası yoksa uyarı), siparişsiz müşteriler,
-  potansiyel (aşamalar, ülkeler, "proforma verilmiş henüz müşterimiz olmayan firmalar", görüşme sürecindekiler).
-  Müşteriye sistemden mail GİTMEZ.
-- Edge `musteri-ozet-rapor` (verify_jwt): anon `{}` yalnız sabah penceresi; `MUSTERI_OZET_CANLI=evet` +
-  `MUSTERI_OZET_ALICI` (en fazla 6) değilse "[TEST]" yalnız test adresine; anon `{test:true}` yalnız test modunda (24 saatte 5);
-  yönetici `{deneme:true}` HTML döner. İlk test 11.11.2026: 24 müşteri, 17 aktif, 41 talimat (11 acil), 16 proformalı potansiyel.
-- Test: `test/mozet/test.mts` (kurgusal veri, 19 kontrol).
-- Revize (11.11.2026 akşam, kullanıcı: "beğenmedim, şimdilik canlıya almayacağız"): mail kısa (Otomatik Özet 5 cümle + en
-  acil 8 iş), tüm işler / müşteriler (İngilizce metin + e-posta) / sevkiyatlar / potansiyel EKTEKİ EXCEL'de. pg_cron
-  `musteri-ozet-rapor` PASİF (cron.alter_job active=false); Ayarlar > Rapor Alıcıları'ndan Önizle / Test maili ile denenir.
+Kullanıcı: "Müşteri raporunu komple kaldıralım." Migration `20261111200000_fatura_onay_musteri_ozet_kaldir.sql`:
+pg_cron `musteri-ozet-rapor` silindi, `musteri_ozet_veri` RPC ve `musteri_ozet_gonderimleri` tablosu düşürüldü; kod
+(`_shared/musteri-ozet.ts`, edge klasörü) ve Rapor Alıcıları kartı kaldırıldı. Supabase'deki `musteri-ozet-rapor` edge
+fonksiyonu RPC'si olmadığı için çalışmaz; panelden silinebilir (MCP'de silme aracı yok).
 
 ## Sıradaki adımlar
 

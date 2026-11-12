@@ -18,7 +18,8 @@ import { aramayaUyar, type NavlunNoktasi, type NoktaDurumu } from "@/lib/navlun/
 import { etiketYerlestir } from "@/components/analiz-harita";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 
-const CIKIS = { ad: "Mersin", enlem: 36.79, boylam: 34.63 };
+/** Cikis: yalniz Ambarli ve Asyaport (Tekirdag) - ikisi de Marmara; rota Canakkale Bogazi'ndan (dugum "İstanbul"). */
+const CIKIS = { ad: "Ambarlı · Asyaport", rotaDugumu: "İstanbul", enlem: 40.97, boylam: 28.69 };
 const SEFTALI = "#F4A07C";
 export const DURUM_RENGI: Record<NoktaDurumu, string> = { hedefte: "#10B981", ustunde: "#F59E0B", fiyatli: "#38BDF8", fiyatsiz: "#64748B" };
 export const DURUM_ADI: Record<NoktaDurumu, string> = { hedefte: "Hedefte / altında", ustunde: "Hedefin üstünde", fiyatli: "Fiyat var (hedef yok)", fiyatsiz: "Fiyat yok" };
@@ -43,7 +44,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
   const konumlu = useMemo(() => noktalar.filter((n): n is NavlunNoktasi & { konum: NonNullable<NavlunNoktasi["konum"]> } => !!n.konum), [noktalar]);
   const konumsuz = noktalar.filter((n) => !n.konum);
   const rotalar = useMemo(() => konumlu.map((n) => {
-    const r = denizRotasi(CIKIS.ad, [CIKIS.enlem, CIKIS.boylam], n.konum.anahtar, n.konum.k);
+    const r = denizRotasi(CIKIS.rotaDugumu, [CIKIS.enlem, CIKIS.boylam], n.konum.anahtar, n.konum.k);
     return r
       ? { anahtar: n.anahtar, d: rotaYolu(r.noktalar), noktalar: r.noktalar, temsili: false }
       : { anahtar: n.anahtar, d: hatYolu(izdusum(CIKIS.enlem, CIKIS.boylam), izdusum(n.konum.k[0], n.konum.k[1])), noktalar: [] as [number, number][], temsili: true };
@@ -82,7 +83,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
         <div ref={kutuRef} className="relative w-full lg:flex-1 lg:min-w-0 h-[340px] sm:h-[440px] lg:h-[520px] overflow-hidden"
           style={{ background: "radial-gradient(120% 90% at 50% 40%, rgba(16,185,129,0.07), rgba(0,0,0,0) 70%)" }} onMouseLeave={() => setUzerinde(null)}>
           {boyut.w > 0 && (
-            <svg className="absolute inset-0 w-full h-full" viewBox={`${kirpma.x} ${kirpma.y} ${kirpma.g} ${kirpma.y2}`} preserveAspectRatio="none" role="img" aria-label="Navlun haritası: Mersin'den teklif alınan limanlara deniz rotaları">
+            <svg className="absolute inset-0 w-full h-full" viewBox={`${kirpma.x} ${kirpma.y} ${kirpma.g} ${kirpma.y2}`} preserveAspectRatio="none" role="img" aria-label="Navlun haritası: Ambarlı ve Asyaport'tan teklif alınan limanlara deniz rotaları">
               <g stroke="rgba(255,255,255,0.035)" strokeWidth="1" vectorEffect="non-scaling-stroke">
                 {Array.from({ length: 17 }, (_, i) => i * 20 + 20).map((x) => <line key={`b${x}`} x1={x} x2={x} y1={0} y2={180} vectorEffect="non-scaling-stroke" />)}
                 {Array.from({ length: 8 }, (_, i) => i * 20 + 10).map((y) => <line key={`e${y}`} x1={0} x2={360} y1={y} y2={y} vectorEffect="non-scaling-stroke" />)}
@@ -143,7 +144,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
               <span className="relative inline-flex w-2 h-2"><span className="navlun-nabiz absolute inset-0 rounded-full" style={{ border: "1.5px solid #10B981" }} /><span className="w-2 h-2 rounded-full bg-emerald-400" /></span>
               Canlı Navlun Haritası
             </p>
-            <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{noktalar.length} liman · Mersin çıkışlı · rotalar yaklaşık</p>
+            <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{noktalar.length} liman · Ambarlı / Asyaport çıkışlı · rotalar yaklaşık</p>
           </div>
           {ipucu && (
             <div className="absolute left-3 top-14 z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[180px]" style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }} data-navlun-ipucu="">

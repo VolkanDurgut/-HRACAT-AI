@@ -16,7 +16,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar
 //   (SIPARIS_RAPOR_CANLI = "evet" + SIPARIS_RAPOR_ALICI). Canli DEGILSE mail SADECE test adresine
 //   (SIPARIS_RAPOR_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
-// MAIL (11.11.2026 revize): yalniz "Otomatik Ozet" maddeleri; tum satirlar ekteki Excel'de.
+// MAIL (11.11.2026 2. revize): "Bugun gelen on odemeler" (sabah: dun + bugun) tablosu; tum satirlar ekteki Excel'de.
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
 //    (siparis_rapor_gonderimleri kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
       const test = !deneme && (govde.test === true || !ayar.canli);
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const { siparisler, plan } = await sirketVerisi(companyId);
-      const rapor = siparisRaporHesapla(siparisler, plan, tarih);
+      const rapor = siparisRaporHesapla(siparisler, plan, tarih, oturum);
       const ozet = { ...rapor.ozet };
       const konu = `${test ? "[TEST] " : ""}${siparisRaporKonusu(rapor, sirketAdi)}`;
       const html = siparisRaporHtml(rapor, sirketAdi, new Date().toISOString());

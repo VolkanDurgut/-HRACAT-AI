@@ -98,7 +98,7 @@ export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; s
           <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.15)", color: "#6EE7B7" }}><Anchor size={18} /></span>
           <div className="min-w-0 flex-1">
             <h2 className="text-white font-semibold text-lg leading-tight truncate">{liman.ad}</h2>
-            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Mersin → {liman.ad} · {acenteler.length} acente · {mesajlar.length} mesaj · son hareket {kisa(liman.sonTarih)}</p>
+            <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Ambarlı / Asyaport → {liman.ad} · {acenteler.length} acente · {mesajlar.length} mesaj · son hareket {kisa(liman.sonTarih)}</p>
           </div>
           <button ref={kapatRef} type="button" onClick={onKapat} aria-label="Kapat" className="p-2 rounded-lg hover:bg-white/10" style={{ color: TEXT_MUTED }} data-testid="masa-kapat"><X size={18} /></button>
         </div>

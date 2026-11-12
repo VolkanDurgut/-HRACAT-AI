@@ -2,8 +2,9 @@
 
 /**
  * Ayarlar > Rapor Alicilari (11.11.2026). Kullanici: "Rapor alicilari ve canli / test secimi Ayarlar'da bir sayfadan
- * yonetilsin." Siparis raporu, navlun raporu, musteri ozeti: alici listesi (en fazla 6), Canli anahtari, Onizle (mail
- * gondermez) ve Test maili (yalniz test adresine). Yalniz super admin (AppShell + bu sayfa + RPC uc katman).
+ * yonetilsin." Siparis raporu, navlun raporu: alici listesi (en fazla 10), Canli anahtari, Onizle (mail gondermez) ve
+ * Test maili (yalniz test adresine). 11.11.2026 aksam: fatura talimati onayi (onaylayanlar + dagitim) listeleri; musteri
+ * ozeti kaldirildi. Yalniz super admin (AppShell + bu sayfa + RPC uc katman).
  * Canli kapaliyken zamanlanmis rapor da "[TEST]" olarak yalniz test adresine gider.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -15,7 +16,7 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { ACCENT, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
-import { RAPORLAR, adresAyikla, raporAlicilariGetir, raporAlicilariKaydet, raporOnizle, raporTestMaili, type RaporAlicisi, type RaporTuru } from "@/lib/rapor-alicilari";
+import { AZAMI_ALICI, RAPORLAR, adresAyikla, raporAlicilariGetir, raporAlicilariKaydet, raporOnizle, raporTestMaili, type RaporAlicisi, type RaporTuru } from "@/lib/rapor-alicilari";
 
 type Taslak = { metin: string; canli: boolean };
 const tarihSaat = (iso: string | null) => (iso ? new Date(iso).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "");
@@ -48,7 +49,7 @@ export default function RaporAlicilariPage() {
     const t = taslak[rapor];
     const { gecerli, gecersiz } = adresAyikla(t.metin);
     if (gecersiz.length) { showToast(`Geçersiz e-posta: ${gecersiz.join(", ")}`, "error"); return; }
-    if (gecerli.length > 6) { showToast("En fazla 6 alıcı girilebilir.", "error"); return; }
+    if (gecerli.length > AZAMI_ALICI) { showToast(`En fazla ${AZAMI_ALICI} alıcı girilebilir.`, "error"); return; }
     if (t.canli && !gecerli.length) { showToast("Canlı rapor için en az bir alıcı girin.", "error"); return; }
     setMesgul(`kaydet-${rapor}`);
     try { await raporAlicilariKaydet(rapor, gecerli, t.canli); showToast("Kaydedildi.", "success"); await getir(); }
@@ -81,12 +82,13 @@ export default function RaporAlicilariPage() {
   return (
     <AppShell>
       <SayfaBasligi ikon={<Mail size={20} />} baslik="Rapor Alıcıları"
-        aciklama="Günlük rapor maillerinin kime gideceği. Canlı kapalıyken rapor yalnızca test adresine “[TEST]” olarak gider. Önizle mail göndermez; raporun bugünkü halini gösterir." />
+        aciklama="Rapor ve fatura talimatı maillerinin kime gideceği. Canlı kapalıyken mail yalnızca test adresine “[TEST]” olarak gider. Önizle mail göndermez; raporun bugünkü halini gösterir." />
       {hata && <p className="mb-4 text-sm text-red-400" role="alert">{hata}</p>}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         {RAPORLAR.map((r) => {
           const t = taslak[r.rapor] || { metin: "", canli: false };
           const k = kayit[r.rapor];
+          const edge = r.edge;
           const { gecerli, gecersiz } = adresAyikla(t.metin);
           return (
             <section key={r.rapor} data-testid={`rapor-${r.rapor}`} className="rounded-xl border p-4 flex flex-col gap-3" style={{ backgroundColor: CARD_BG, borderColor: k?.canli ? "rgba(16,185,129,0.45)" : CARD_BORDER }}>
@@ -102,13 +104,13 @@ export default function RaporAlicilariPage() {
                 </span>
               </div>
               <label className="text-xs" style={{ color: TEXT_MUTED }}>
-                Alıcılar <span className="opacity-70">(virgülle, en fazla 6)</span>
+                Alıcılar <span className="opacity-70">(virgülle, en fazla {AZAMI_ALICI})</span>
                 <textarea rows={3} value={t.metin} data-testid="rapor-alicilar"
                   onChange={(e) => setTaslak((s) => ({ ...s, [r.rapor]: { ...t, metin: e.target.value } }))}
                   className="mt-1 w-full text-sm border rounded-md px-2 py-1.5 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  style={{ borderColor: gecersiz.length || gecerli.length > 6 ? "rgba(248,113,113,0.6)" : CARD_BORDER, backgroundColor: "#0F141C" }} placeholder="ornek@firma.com, ..." />
+                  style={{ borderColor: gecersiz.length || gecerli.length > AZAMI_ALICI ? "rgba(248,113,113,0.6)" : CARD_BORDER, backgroundColor: "#0F141C" }} placeholder="ornek@firma.com, ..." />
               </label>
-              {(gecersiz.length > 0 || gecerli.length > 6) && <p className="text-[11px] text-red-400 -mt-2">{gecersiz.length ? `Geçersiz: ${gecersiz.join(", ")}` : "En fazla 6 alıcı."}</p>}
+              {(gecersiz.length > 0 || gecerli.length > AZAMI_ALICI) && <p className="text-[11px] text-red-400 -mt-2">{gecersiz.length ? `Geçersiz: ${gecersiz.join(", ")}` : `En fazla ${AZAMI_ALICI} alıcı.`}</p>}
               <button type="button" role="switch" aria-checked={t.canli} data-testid="rapor-canli"
                 onClick={() => setTaslak((s) => ({ ...s, [r.rapor]: { ...t, canli: !t.canli } }))}
                 className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs text-left"
@@ -123,14 +125,16 @@ export default function RaporAlicilariPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white disabled:opacity-40" style={{ backgroundColor: ACCENT }}>
                   {mesgul === `kaydet-${r.rapor}` ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Kaydet
                 </button>
-                <button type="button" onClick={() => onizle(r.edge, r.ad)} disabled={!!mesgul} data-testid="rapor-onizle"
+                {edge && <>
+                <button type="button" onClick={() => onizle(edge, r.ad)} disabled={!!mesgul} data-testid="rapor-onizle"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}>
-                  {mesgul === `onizle-${r.edge}` ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Önizle
+                  {mesgul === `onizle-${edge}` ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />} Önizle
                 </button>
-                <button type="button" onClick={() => test(r.edge)} disabled={!!mesgul} data-testid="rapor-test"
+                <button type="button" onClick={() => test(edge)} disabled={!!mesgul} data-testid="rapor-test"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#CBD5E1" }}>
-                  {mesgul === `test-${r.edge}` ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test maili
+                  {mesgul === `test-${edge}` ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test maili
                 </button>
+                </>}
               </div>
               {k?.guncelleme && <p className="text-[10px]" style={{ color: TEXT_MUTED }}>Son değişiklik {tarihSaat(k.guncelleme)}{k.guncelleyen ? ` · ${k.guncelleyen}` : ""}</p>}
             </section>

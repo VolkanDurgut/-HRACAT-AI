@@ -1,18 +1,21 @@
 /**
- * Ayarlar > Rapor Alicilari (11.11.2026). Uc gunluk rapor maili (siparis, navlun, musteri ozeti) icin alici listesi ve
- * canli / test secimi. Kayit: rapor_alicilari_liste / rapor_alicilari_kaydet RPC (yalniz super admin).
+ * Ayarlar > Rapor Alicilari (11.11.2026). Gunluk rapor mailleri (siparis, navlun) ve fatura talimati onayi (onaylayanlar,
+ * dagitim) icin alici listesi ve canli / test secimi. Musteri ozeti raporu kaldirildi (11.11.2026 aksam). Kayit: rapor_alicilari_liste / rapor_alicilari_kaydet RPC (yalniz super admin).
  * Onizleme ({deneme: true}) mail GONDERMEZ, HTML doner; test ({test: true}) "[TEST]" maili YALNIZ test adresine gider.
  */
 import { supabase } from "@/lib/supabase";
 
-export type RaporTuru = "siparis" | "navlun" | "musteri_ozet";
+export type RaporTuru = "siparis" | "navlun" | "fatura_onay" | "fatura_dagitim";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; canli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
-export const RAPORLAR: { rapor: RaporTuru; ad: string; aciklama: string; saat: string; edge: string }[] = [
-  { rapor: "siparis", ad: "Sipariş Raporu", aciklama: "Otomatik özet + Excel (Sipariş Listesi + Yükleme Planı)", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor" },
+/** edge: Onizle / Test maili olan raporlar (fatura listelerinde yok: onlar dosya konteynerleri tamamlaninca tetiklenir). */
+export const RAPORLAR: { rapor: RaporTuru; ad: string; aciklama: string; saat: string; edge: string | null }[] = [
+  { rapor: "siparis", ad: "Sipariş Raporu", aciklama: "Gelen ön ödemeler (müşteri, konteyner, varış limanı) + Excel (Sipariş Listesi + Yükleme Planı)", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor" },
   { rapor: "navlun", ad: "Navlun Raporu", aciklama: "Otomatik özet + tüm limanların güncel fiyatı + Excel (navlun tablosu)", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu" },
-  { rapor: "musteri_ozet", ad: "Müşteri Özeti", aciklama: "Otomatik özet + öncelikli işler + Excel (işler, müşteriler, sevkiyatlar, potansiyel)", saat: "Her gün 08:00 (zamanlama şu an kapalı)", edge: "musteri-ozet-rapor" },
+  { rapor: "fatura_onay", ad: "Fatura Talimatı Onayı", aciklama: "Bütün konteynerleri yüklenen dosyanın talimatını onaylayan / revize isteyenler (İncele ve Onayla maili)", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null },
+  { rapor: "fatura_dagitim", ad: "Onaylı Fatura Talimatı", aciklama: "Onaylanan talimat PDF ekli gider: “FATURA VE BEYANNAME TALİMATI HAKKINDA // …”", saat: "Talimat onaylanınca", edge: null },
 ];
+export const AZAMI_ALICI = 10;
 
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 

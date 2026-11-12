@@ -13,6 +13,7 @@ import { DetailSkeleton } from "@/components/skeleton-loaders";
 import AppShell from "@/components/app-shell";
 import RezervasyonTab from "@/components/rezervasyon-tab";
 import { faturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
+import { FaturaOnayDurumu } from "@/components/fatura-onay-durumu";
 import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
 import DiibBolunmeKarti from "@/components/diib-bolunme-karti";
@@ -254,6 +255,7 @@ function DosyaDetailContent() {
                   aktif ? "text-white hover:opacity-90 cursor-pointer" : "cursor-not-allowed opacity-50"
                 }`;
               return (
+                <>
                 <div className="flex items-center gap-2">
                   {/* "VGM Gönder" (mailto penceresi) kullanıcı isteğiyle kaldırıldı (09.10.2026); VGM PDF indirilip gönderiliyor. */}
                   <button
@@ -286,6 +288,9 @@ function DosyaDetailContent() {
                     {faturaDurumu.tur === "on" ? "Ön Fatura Talimatı" : "Fatura Talimatı"}
                   </button>
                 </div>
+                {/* 11.11.2026: konteynerler tamamlaninca fatura talimati onaya gider (lib/fatura-onay.ts) */}
+                <FaturaOnayDurumu dosyaId={dosya.id} tam={faturaDurumu.tur === "tam"} />
+                </>
               );
             })()}
           </div>

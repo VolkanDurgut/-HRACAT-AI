@@ -1,7 +1,7 @@
 /**
  * Rapor maili ortak kabugu (11.11.2026). Kullanici: "Raporlar cok uzun; Kontrol Merkezi'ndeki 'Otomatik Ozet' gibi bir
  * metin yazsin, ekinde sadece Excel olsun. Tek sayfaya sigdirabilirsek super olur."
- * Siparis raporu, navlun tablosu ve musteri ozeti AYNI kabugu kullanir: baslik + "Otomatik Ozet" maddeleri + (istege
+ * Siparis raporu ve navlun tablosu AYNI kabugu kullanir: baslik + "Otomatik Ozet" maddeleri + (istege
  * bagli) tek sikistirilmis tablo + uygulama dugmesi + kisa dipnot. SAF: veri yok, ag yok.
  * Tema: lacivert #283474, seftali #F4A07C, yesil #10B981 (acik kurumsal).
  */
@@ -18,6 +18,10 @@ export type RaporKabugu = {
   /** Tarih (dd.mm.yyyy) + oturum etiketi ("Sabah raporu") */
   tarih: string;
   oturum?: string | null;
+  /** Kutunun basligi (varsayilan "Otomatik Özet") */
+  ozetBaslik?: string;
+  /** Maddeler yerine kutunun icinde hazir HTML (orn. siparis raporunda on odemeler tablosu) */
+  ozetIcerik?: string;
   /** "Otomatik Ozet" altindaki aciklama ("Siparis listesi ve yukleme planina gore") */
   ozetAlt: string;
   /** HTML maddeler (cagiran esc() ile kacirir; <b> serbest) */
@@ -41,9 +45,9 @@ export function raporKabugu(k: RaporKabugu): string {
     <td style="text-align:right;vertical-align:middle"><div style="font-size:13px;font-weight:bold;color:${RAPOR_LACIVERT}">${esc(k.tarih)}</div>${k.oturum ? `<div style="font-size:11px;color:#94A3B8">${esc(k.oturum)}</div>` : ""}</td>
   </tr></table>
   <div style="margin-top:14px;border:1px solid #E2E8F0;border-left:4px solid ${RAPOR_SEFTALI};border-radius:4px;padding:10px 14px">
-    <div style="font-size:13px;font-weight:bold;color:${RAPOR_LACIVERT}">Otomatik Özet</div>
+    <div style="font-size:13px;font-weight:bold;color:${RAPOR_LACIVERT}">${esc(k.ozetBaslik || "Otomatik Özet")}</div>
     <div style="font-size:11px;color:#64748B;margin-bottom:6px">${esc(k.ozetAlt)}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${k.maddeler.map(madde).join("")}</table>
+    ${k.ozetIcerik ?? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${k.maddeler.map(madde).join("")}</table>`}
   </div>
   ${k.ekBolum || ""}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>

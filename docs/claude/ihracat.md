@@ -1257,3 +1257,23 @@ export@, export2@."
   "Bugün kesilen faturalar"daki fatura no bu bağlantıya gider (giriş gerekir; mailde PDF adresi YOK). Edge
   `diib-gunluk-rapor` v18. Test: e2e_diib 24.
 - Ana Panel: bekleyen evrak ikonları (`evrak-bekliyor-ikon`) yavaşça döner (2,8 sn); "hareket azaltma" tercihinde durur.
+
+## Fatura Talimatı Onayı (11.11.2026 akşam)
+
+Kullanıcı: "Bütün konteynerler yüklendiğinde fatura talimatı operation / execution / export / export2 / bbt adresine onaya
+gönderilmeli; onay veya revize butonları olmalı. Onaylanırsa onaylanmış fatura talimatı (muhasebe dahil) dağıtım listesine
+gitmeli. Konu: FATURA VE BEYANNAME TALİMATI HAKKINDA // ALICI // 6 * 20 DC // LİMAN."
+- Migration `20261111200000_fatura_onay_musteri_ozet_kaldir.sql`: `fatura_talimati_onaylari` (bekliyor → onaylandi |
+  revize; yazma YALNIZ edge, şirket kullanıcıları okur; dosya + mod başına tek bekleyen), `fatura_onay_adaylari()`
+  (service_role; açık, talimatı gönderilmemiş, rezervasyondaki konteynerlerin hepsi girilmiş dosya = `faturaTalimatiDurumu`
+  "tam"), pg_cron `fatura-onay-tara` her 10 dk.
+- Edge `fatura-onay`: anon/cron tarama (aynı modda kaydı olmayan adaya kayıt + "İncele ve Onayla" maili, çalışma başına 5);
+  kullanıcı `{gonder}` elle / tekrar onaya gönder; `{karar:"onay", pdf}` dağıtım maili PDF ekli (canlıysa dosyada
+  `fatura_talimati_gonderildi = true`); `{karar:"revize", not}` not onay grubuna. Karar YALNIZ onay listesindekiler
+  (+ testte test adresi); `durum=eq.bekliyor` koşullu PATCH ile çift karar engellenir; mail gitmezse karar geri alınır.
+- Alıcılar: Ayarlar > Rapor Alıcıları → "Fatura Talimatı Onayı" (`fatura_onay`) ve "Onaylı Fatura Talimatı"
+  (`fatura_dagitim`). Canlı kapalıyken onay ve dağıtım mailleri yalnız test adresine "[TEST]". Adresler DB'de (repoda yok).
+- Sayfa `/fatura-onay?id=` (`app/fatura-onay/page.tsx`, giriş gerekir; girişten sonra geri döner): PDF dosya
+  sayfasındaki üreticiyle tarayıcıda (`lib/fatura-onay.ts` → `talimatPdfUret`), Onayla ve gönder / Revize iste (not zorunlu).
+- Dosya sayfası > Konteynerler: `components/fatura-onay-durumu.tsx` son durum + "Onaya gönder" / "Tekrar onaya gönder".
+- Mail kalıpları: `supabase/functions/_shared/fatura-onay.ts` (dağıtım metni kullanıcının verdiği metin, aynen).

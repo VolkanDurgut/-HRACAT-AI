@@ -2,13 +2,14 @@
  * Rapor alicilari (11.11.2026). Kullanici: "Rapor alicilari ve canli / test secimi Ayarlar'dan yonetilsin."
  * Kaynak: rapor_alicilari tablosu (Ayarlar > Rapor Alicilari; migration 20261111190000). Satir yoksa edge'in eski
  * secret'larina (yedek) duser. Canli ama alicisi bos rapor canli SAYILMAZ (test adresine gider).
+ * 11.11.2026 aksam: fatura_onay / fatura_dagitim listeleri (edge fatura-onay); liste basina en fazla 10 adres.
  */
-export type RaporTuru = "siparis" | "navlun" | "musteri_ozet";
+export type RaporTuru = "siparis" | "navlun" | "fatura_onay" | "fatura_dagitim";
 export type RaporAyari = { canli: boolean; alicilar: string[]; kaynak: "ayar" | "secret" };
 
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 export const gecerliAdresler = (l: unknown): string[] =>
-  Array.from(new Set((Array.isArray(l) ? l : []).map((a) => String(a).trim().toLowerCase()).filter((a) => EPOSTA_RE.test(a)))).slice(0, 6);
+  Array.from(new Set((Array.isArray(l) ? l : []).map((a) => String(a).trim().toLowerCase()).filter((a) => EPOSTA_RE.test(a)))).slice(0, 10);
 
 export async function raporAyari(
   url: string, basliklar: Record<string, string>, companyId: string, rapor: RaporTuru, yedek: { canli: boolean; alicilar: string[] },

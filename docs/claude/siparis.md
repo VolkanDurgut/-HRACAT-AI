@@ -256,3 +256,15 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   e2e_navlun_harita 37 (HARITA_TEST=1 ANALIZ_TEST=1), e2e_navlun 66 + 3.
 - Sıradaki: gerçek akış başladıktan sonra okunamayan oranı izlenir (PDF biçimleri öğrenilir); "fiyattan rezervasyon
   başlat"; Kontrol Merkezi'ndeki gerçekleşen navlun (dosyalar) ile teklif karşılaştırması.
+- 11.11.2026 akşam (2. revize):
+  - Sipariş raporu: "Otomatik Özet" yerine **Gelen Ön Ödemeler** tablosu (Müşteri · Konteyner · Varış limanı + toplam);
+    akşam raporu bugünü, sabah raporu dün + bugünü gösterir (`onOdemePenceresi`). Bölümden bağımsız (aynı gün
+    rezervasyonu alınan da sayılır). Excel eki aynı. Edge `siparis-rapor` v4.
+  - Müşteri özeti raporu kaldırıldı (bkz. pazar.md 3.8).
+  - Navlun: çıkış yalnız Ambarlı / Asyaport (harita + Liman Masası başlığı); okuyucunun POL'ü yalnız `AMBARLI` /
+    `ASYAPORT` (`polNormal`), eski yanlış değerler migration ile düzeltildi. Edge `navlun-bildirimi` v6, `navlun-tablosu` v5
+    (yalnız ortak `rapor-alici` / `rapor-kabugu` eşitlemesi).
+  - Navlun sayfası: liman kartı başlığında "En iyi 20'DC / Hedefimiz / Kabul edilen" etiket | değer ızgarası (alt alta,
+    hizalı); sayfa ortalı (`mx-auto`).
+  - Rapor Alıcıları: liste başına en fazla 10 adres; Fatura Talimatı Onayı ve Onaylı Fatura Talimatı listeleri eklendi
+    (bkz. ihracat.md "Fatura Talimatı Onayı").

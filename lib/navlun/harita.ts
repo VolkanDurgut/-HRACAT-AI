@@ -8,7 +8,7 @@
  *
  * Kaynak: navlun_teklifleri satirlari (lib/navlun/veri.ts) + limanOzetleri (lib/navlun/ozet.ts). Konum: Kontrol
  * Merkezi'nin liman koordinatlari (lib/liman-koordinat.ts); navlun okuyucusunun Turkce yazimlari icin es adlar asagida.
- * Cikis: Mersin (navlun teklifleri yukleme limanini yazmiyor; operasyonun ana cikisi).
+ * Cikis: Ambarli / Asyaport (11.11.2026 kullanici: "Biz sadece Ambarli ve Asyaport ile calisiyoruz").
  */
 import { limanKonumu, type LimanKonumu } from "@/lib/liman-koordinat";
 import type { LimanOzeti, NavlunSatiri } from "@/lib/navlun/ozet";

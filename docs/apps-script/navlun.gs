@@ -94,7 +94,7 @@ function navlunIsle(konular, baslangic) {
       var m = liste[j];
       var t = m.getDate().getTime();
       if (t < baslangic) continue;
-      if (!/navlun/i.test(m.getSubject() || '')) continue;
+      if (!/navlun|rezervasyon\s*taleb/i.test(m.getSubject() || '')) continue;   // 12.11.2026: rezervasyon talebi de
       mesajlar.push(navlunMesaj(m));
       if (t > enYeni) enYeni = t;
     }

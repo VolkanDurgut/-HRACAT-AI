@@ -27,6 +27,8 @@ export type NavlunOlayi = {
   free_time_gun: number | null;
   transit_gun?: string | null;
   tarih: string;
+  /** 12.11.2026 booking eslestirmesi: olayin geldigi mailin konusu (kabul maili hangi yazismada / kac konteyner) */
+  konu?: string | null;
 };
 
 /** Yukleme planindan gerceklesen navlun (PlanSatiri'nin ilgili alanlari) */
@@ -299,6 +301,8 @@ export type SatinAlmaSatiri = {
   etd: string | null; booking: string; musteri: string | null; liman: string; limanAnahtar: string; blok: string; konteyner: number;
   navlun: number | null; para: string; toplam: number | null;
   kaynak: "dosya" | "plan" | "anlasma" | "belirsiz"; kaynakTarih: string | null;
+  /** Anlasma maili ile nasil eslesti: booking no ayni yazismada / rezervasyon talebi (liman + konteyner) / yalniz liman */
+  eslesme: "booking" | "rezervasyon" | "liman" | null;
   enIyi: { tutar: number; blok: string } | null;
 };
 /** Rezervasyon bekleyen (on odemesi alinmis, booking'i yok) siparis: navlunu henuz satin alinmadi (12.11.2026). */
@@ -311,12 +315,35 @@ export type NavlunSatinAlma = {
   bekleyenler: BekleyenSatiri[];
 };
 
-export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olaylar: NavlunOlayi[]): NavlunSatinAlma {
+/** Konudaki booking numaralari ("123456789 + 987654321", "ABC1234567", "XYZAB12345678"). */
+export function konuBookingleri(konu: string | null | undefined): string[] {
+  return Array.from(new Set((buyuk(konu || "").match(/\b[A-Z]{0,8}\d{7,12}\b/g) || [])));
+}
+/** Yazisma anahtari: RE/FW onekleri ve booking numarali parcalar atilmis konu ("UNEX // <LIMAN> // NAVLUN TALEBİ HK."). */
+export function yazismaAnahtari(konu: string | null | undefined): string {
+  return buyuk(konu || "").replace(/^((RE|FW|FWD|YNT|TR)\s*:\s*)+/i, "").split("//").map((x) => x.trim())
+    .filter((x) => x && !/^[A-Z]{0,8}\d{7,12}(\s*\+\s*[A-Z]{0,8}\d{7,12})*$/.test(x)).join(" // ");
+}
+/** Konudaki konteyner adedi ("8*20 DC" -> 8). */
+export function konuKonteyner(konu: string | null | undefined): number | null {
+  const m = buyuk(konu || "").match(/(?:^|\/\/)\s*(\d{1,3})\s*[*X×]\s*(?:20|40|45)\b/);
+  return m ? Number(m[1]) : null;
+}
+
+/** tumKonular: TUM navlun maillerinin konulari (olay cikmayan acente yazismalari dahil; booking no cogu zaman orada gecer). */
+export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olaylar: NavlunOlayi[], tumKonular: (string | null)[] = []): NavlunSatinAlma {
   const enIyiler = new Map(limanSatirlari(t).filter((x) => !x.eski).map((x) => [x.liman, x.enIyi]));
   const adlar = new Map(t.limanlar.map((l) => [l.anahtar, l.ad]));
   const kabuller = olaylar.filter((o) => o.tur === "kabul" && o.tutar && o.tutar > 0)
-    .map((o) => ({ k: limanKey(o.liman, o.liman_anahtar), tutar: o.tutar as number, para: o.para_birimi || "USD", tarih: o.tarih, armator: o.armator ? sirketAdi(o.armator) : null }))
+    .map((o) => ({ k: limanKey(o.liman, o.liman_anahtar), tutar: o.tutar as number, para: o.para_birimi || "USD", tarih: o.tarih, armator: o.armator ? sirketAdi(o.armator) : null,
+      yazisma: yazismaAnahtari(o.konu), rezervasyon: /REZERVASYON\s*TALEB/.test(buyuk(o.konu || "")), kont: konuKonteyner(o.konu) }))
     .sort((a, b) => b.tarih.localeCompare(a.tarih));
+  // Booking no -> gectigi yazismalar (tum navlun maillerinin konularindan; ornek "UNEX // <LIMAN> // NAVLUN TALEBI HK. //123456789")
+  const bookingYazisma = new Map<string, Set<string>>();
+  for (const konu of [...tumKonular, ...olaylar.map((o) => o.konu ?? null)]) for (const b of konuBookingleri(konu)) {
+    if (!bookingYazisma.has(b)) bookingYazisma.set(b, new Set());
+    bookingYazisma.get(b)!.add(yazismaAnahtari(konu));
+  }
   const satirlar: SatinAlmaSatiri[] = [];
   let bekleyenSiparis = 0, bekleyenKont = 0;
   const bekleyenler: BekleyenSatiri[] = [];
@@ -342,17 +369,27 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
     let para = p.navlun_para || "USD";
     let kaynak: SatinAlmaSatiri["kaynak"] = navlun ? (p.dosya_no ? "dosya" : "plan") : "belirsiz";
     let kaynakTarih: string | null = null;
+    let eslesme: SatinAlmaSatiri["eslesme"] = null;
     if (!navlun) {
+      // Eslesme onceligi (12.11.2026): 1) booking no ayni yazismada gecen anlasma  2) ayni liman + ayni konteyner adetli
+      // rezervasyon talebi  3) ayni limandaki son anlasma. Hepsinde: ETD'den once, en fazla 90 gun once, hat uyumlu.
       const sinir = etd ? new Date(Date.parse(`${etd}T12:00:00Z`) - 90 * 86400000).toISOString() : null;
-      const uygun = kabuller.find((x) => x.k === k && (!etd || x.tarih.slice(0, 10) <= etd) && (!sinir || x.tarih >= sinir)
+      const adaylar = kabuller.filter((x) => x.k === k && (!etd || x.tarih.slice(0, 10) <= etd) && (!sinir || x.tarih >= sinir)
         && (!x.armator || blok.split(" - ").some((b) => b === x.armator || b.startsWith(x.armator!) || x.armator!.startsWith(b))));
-      if (uygun) { navlun = uygun.tutar; para = uygun.para; kaynak = "anlasma"; kaynakTarih = uygun.tarih; }
+      const yazismalar = bookingYazisma.get(buyuk(booking)) || new Set<string>();
+      const secilen: [typeof adaylar[number] | undefined, SatinAlmaSatiri["eslesme"]][] = [
+        [adaylar.find((x) => yazismalar.has(x.yazisma)), "booking"],
+        [adaylar.find((x) => x.rezervasyon && x.kont !== null && x.kont === kont), "rezervasyon"],
+        [adaylar[0], "liman"],
+      ];
+      const bulunan = secilen.find(([x]) => !!x);
+      if (bulunan && bulunan[0]) { const u = bulunan[0]; navlun = u.tutar; para = u.para; kaynak = "anlasma"; kaynakTarih = u.tarih; eslesme = bulunan[1]; }
     }
     const ad = adlar.get(k) || (p.varis_limani || k).toLocaleUpperCase("tr-TR");
     const e = enIyiler.get(ad);
     satirlar.push({
       etd, booking, musteri: p.musteri, liman: ad, limanAnahtar: k, blok, konteyner: kont, navlun, para,
-      toplam: navlun !== null ? navlun * kont : null, kaynak, kaynakTarih, enIyi: e ? { tutar: e.tutar, blok: e.blok } : null,
+      toplam: navlun !== null ? navlun * kont : null, kaynak, kaynakTarih, eslesme, enIyi: e ? { tutar: e.tutar, blok: e.blok } : null,
     });
   }
   satirlar.sort((a, b) => (a.etd || "9999").localeCompare(b.etd || "9999") || a.liman.localeCompare(b.liman, "tr") || a.booking.localeCompare(b.booking));
@@ -371,6 +408,7 @@ export const satinAlmaBasligi = (tarih: string) => `UNEX NAVLUN SATIN ALMA LİST
 /** Navlun raporunun Excel eki: navlun satin alma listesi + rezervasyon bekleyen musteriler. */
 export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLUN SATIN ALMA"): XlsxSayfa {
   const KAYNAK: Record<SatinAlmaSatiri["kaynak"], string> = { dosya: "Dosya", plan: "Yükleme planı", anlasma: "Anlaşma maili", belirsiz: "Navlun bilgisi yok" };
+  const ESLESME: Record<NonNullable<SatinAlmaSatiri["eslesme"]>, string> = { booking: "booking no aynı yazışmada", rezervasyon: "rezervasyon talebi (liman + konteyner)", liman: "aynı limandaki son anlaşma" };
   const satirlar: (XlsxHucre | null)[][] = [
     [{ v: satinAlmaBasligi(tarih), s: XS.sayfaBasligi }],
     ["ETD", "BOOKING", "MÜŞTERİ", "VARIŞ LİMANI", "ACENTE / HAT", "KONT.", "NAVLUN / KONT.", "TOPLAM NAVLUN", "PARA", "KAYNAK", "GÜNCEL EN İYİ 20'DC"].map((v) => ({ v, s: XS.tabloBaslik })),
@@ -380,7 +418,7 @@ export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLU
       { v: x.etd ? new Date(`${x.etd}T12:00:00`) : "ETD yok", s: x.etd ? XS.tarih : XS.metin }, { v: x.booking, s: XS.metin }, { v: x.musteri || "", s: XS.metin },
       { v: x.liman, s: XS.metin }, { v: x.blok, s: XS.metin }, { v: x.konteyner, s: XS.tamSayi },
       { v: x.navlun, s: XS.tamSayi }, { v: x.toplam, s: XS.tamSayi }, { v: x.para, s: XS.metin },
-      { v: KAYNAK[x.kaynak] + (x.kaynakTarih ? ` (${tarihTr(x.kaynakTarih.slice(0, 10))})` : ""), s: XS.metin },
+      { v: KAYNAK[x.kaynak] + (x.eslesme ? ` · ${ESLESME[x.eslesme]}` : "") + (x.kaynakTarih ? ` (${tarihTr(x.kaynakTarih.slice(0, 10))})` : ""), s: XS.metin },
       { v: x.enIyi ? `${x.enIyi.tutar} $ · ${x.enIyi.blok}` : "", s: XS.metin },
     ]);
   }
@@ -513,6 +551,7 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
   const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
   const para = (v: number, p: string) => (p === "USD" ? usd(v) : `${v.toLocaleString("tr-TR")} ${p}`);
   const KAYNAK: Record<SatinAlmaSatiri["kaynak"], string> = { dosya: "dosya", plan: "plan", anlasma: "anlaşma", belirsiz: "" };
+  const ESLESME: Record<NonNullable<SatinAlmaSatiri["eslesme"]>, string> = { booking: "booking", rezervasyon: "rez.", liman: "liman" };
   const gri = (h: string) => `<span style="color:#CBD5E1">${h}</span>`;
   const limanLink = (ad: string, k: string | null) => k
     ? `<a href="${NAVLUN_TABLOSU_URL}/navlun?liman=${encodeURIComponent(k)}" style="color:#283474;font-weight:bold;text-decoration:none">${esc(kes(ad, 15))}</a>`
@@ -530,7 +569,7 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
         limanLink(x.liman, x.limanAnahtar),
         esc(kes(x.blok, 14)),
         `${x.konteyner}`,
-        x.navlun !== null ? `${para(x.navlun, x.para)}${KAYNAK[x.kaynak] ? ` <span style="color:#94A3B8;font-size:9.5px">${KAYNAK[x.kaynak]}</span>` : ""}` : `<span style="color:#B45309">bilgi yok</span>`,
+        x.navlun !== null ? `${para(x.navlun, x.para)}${KAYNAK[x.kaynak] ? ` <span style="color:#94A3B8;font-size:9.5px">${KAYNAK[x.kaynak]}${x.eslesme ? ` · ${ESLESME[x.eslesme]}` : ""}</span>` : ""}` : `<span style="color:#B45309">bilgi yok</span>`,
         x.toplam !== null ? `<b>${para(x.toplam, x.para)}</b>` : gri("-"),
         x.enIyi ? `<span style="color:${x.navlun !== null && x.enIyi.tutar < x.navlun ? "#B45309" : "#047857"}">${usd(x.enIyi.tutar)}</span>` : gri("-"),
       ]),

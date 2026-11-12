@@ -114,10 +114,12 @@ async function rpcHepsi(ad: string, companyId: string): Promise<Record<string, u
 /** Navlun Bildirimi sayfasindaki "Excel indir" ile ayni veri (lib/navlun/tablo.ts). */
 async function sirketTablosu(companyId: string, tarih: string) {
   const [olaylarHam, planHam] = await Promise.all([
-    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih&company_id=eq.${companyId}&order=tarih,id`),
+    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,mesaj_id&company_id=eq.${companyId}&order=tarih,id`),
     rpcHepsi("yukleme_plani_veri", companyId),
   ]);
-  const olaylar = olaylarHam.map((o) => ({ ...o, tutar: o.tutar == null ? null : Number(o.tutar) })) as unknown as NavlunOlayi[];
+  // 12.11.2026 booking eslestirmesi: olaylara kaynak mailin konusu eklenir (yazisma + konteyner adedi + konudaki booking no)
+  const konular = new Map((await hepsiniCek<{ mesaj_id: string; konu: string | null }>(`navlun_mesajlari?select=mesaj_id,konu&company_id=eq.${companyId}&order=id`)).map((m) => [m.mesaj_id, m.konu]));
+  const olaylar = olaylarHam.map((o) => ({ ...o, tutar: o.tutar == null ? null : Number(o.tutar), konu: konular.get(String(o.mesaj_id)) ?? null })) as unknown as NavlunOlayi[];
   const metin = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
   const plan: PlanNavlunSatiri[] = planHam.map((p) => ({
     varis_limani: metin(p.varis_limani), acente: metin(p.acente), navlun: p.navlun == null || p.navlun === "" ? null : Number(p.navlun) || null,
@@ -126,7 +128,7 @@ async function sirketTablosu(companyId: string, tarih: string) {
     hafta: p.hafta == null ? null : Number(p.hafta) || null, yil: p.yil == null ? null : Number(p.yil) || null,
   }));
   const tablo = navlunTablosuHesapla(olaylar, plan.filter((p) => p.kaynak !== "siparis"), tarih);
-  return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar) };
+  return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar, Array.from(konular.values())) };
 }
 
 async function excelBase64(v: Awaited<ReturnType<typeof sirketTablosu>>): Promise<string> {

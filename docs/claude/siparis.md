@@ -303,9 +303,17 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
   konşimento, pazar görev); alıcı değişmedi.
 - 12.11.2026 (revize-1112f) Navlun raporu doğrulaması (kullanıcı: "Bu bilgiler doğru mu, mailleri okudun mu?"): 16 booking arşiv
   mailleriyle tek tek karşılaştırıldı. Anlaşma kaynaklı satırlar doğru: Tema 1450 $ (operation 21–22.10 "Navlun bedeli 1450 usd …
-  Polar Ecuador / Leda Maersk"; booking'ler 279000741 Leda 22.11, 279006946 + 280635803 Lexa Maersk 29.11'e kaydırıldı), Mutsamudu
-  4900 $ (bbt 05.11, 13 kont / 6 booking), Mombasa Akkon 1800 $ (operation 05.11 rezervasyon formu). Eksik: Djibouti AKKIST26051676
+  Polar Ecuador / Leda Maersk"; ilk booking 22.11, diğer ikisi 29.11 gemisine kaydırıldı), Mutsamudu
+  4900 $ (bbt 05.11, 13 kont / 6 booking), Mombasa Akkon 1800 $ (operation 05.11 rezervasyon formu). Eksik: Djibouti (Akkon booking)
   — operasyonun "UNEX // DJIBOUTI // N*20 DC // REZERVASYON TALEBİ HK." maillerinde "Navlun rakamı 1850 Usd olmak üzere" yazıyor ama
   konu "NAVLUN" içermediği için okunmuyordu. Düzeltme: edge `navlun-bildirimi` v9 konu "REZERVASYON TALEBİ" olan mailleri de kabul
   eder; konudaki "8*20 DC" parçası liman sayılmaz; `docs/apps-script/navlun.gs` arama sorgusu `subject:(navlun OR "rezervasyon talebi")`
   (arşiv hesabındaki betik güncellenip `navlunGecmis` bir kez çalıştırılmalı).
+- 12.11.2026 (revize-1112h) Booking eşleştirmesi (kullanıcı onayı 15:03): arşiv geçmiş taraması tamamlandı (rezervasyon talebi
+  mailleri okundu); elle girilmiş geçici Mutsamudu kaydı kullanıcı onayıyla silindi (gerçek kabul maili mevcut). Satın alma listesinde
+  navlunu dosya / planda olmayan booking için anlaşma maili seçim önceliği: (1) booking no'nun geçtiği yazışmadaki kabul
+  (`navlun_mesajlari.konu`; RE/FW ve booking parçaları atılmış konu = yazışma anahtarı), (2) aynı liman + aynı konteyner adetli
+  "REZERVASYON TALEBİ" kabulü (konudaki "N*20 DC"), (3) aynı limandaki son kabul. Hepsinde ETD'den önce, en fazla 90 gün önce, hat
+  uyumlu. Satıra eşleşme türü yazılır (mail: "anlaşma · booking / rez. / liman"; Excel KAYNAK sütunu). Edge `navlun-tablosu` v10.
+  Sınır: acentelerin booking teyit mailleri (konu yalnız booking no) okunmuyor; tam booking bağlantısı için ayrı bir okuma akışı
+  (gelecek faz) gerekir.

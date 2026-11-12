@@ -279,3 +279,19 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
     14+ gündür onay bekleyen + olası mükerrer). Altında gelen ön ödemeler tablosu. Edge `siparis-rapor` v5.
   - Navlun raporu: "Otomatik Özet" kutusu kaldırıldı (`ozetYok`), tabloya **Anlaşılan** sütunu (bizden giden son kabul).
     Okuyucu kabulü "Anlaşma fiyatımız X usd" yazımını da tanır. Edge `navlun-tablosu` v6, `navlun-bildirimi` v7.
+- 12.11.2026 (revize-1112d):
+  - **Navlun raporu = Navlun Satın Alma Listesi** (`navlunSatinAlma`, `_shared/navlun-tablosu.ts`): yükleme planında booking'i
+    alınmış, ETD'si bugün / ileride (ETD'siz ise haftası bu hafta / ileride) her yükleme; navlun kaynağı dosya / plan, yoksa
+    acenteye yazılan son kabul ("anlaşma") maili (aynı liman, hat uyumlu, ETD'den önce, ≤90 gün); yoksa "bilgi yok" (tahmin
+    yok). Liman adı `/navlun?liman=X` bağlantısı (o limanın masası açılır; giriş sonrası dönüş `lib/giris-donus.ts`), düğme
+    "Diğer navlun fiyatları". Excel: 1. sayfa satın alma listesi, 2. sayfa operasyonun navlun tablosu. Edge `navlun-tablosu` v7.
+  - Navlun okuyucu: free time yükleme tarafı kuralı ("Export detention ETD – 14 gün", "boş alım … 14 gün free time") SAYILMAZ;
+    "kontrat 14 free" okunur; imzadan sonra yazılan "FT 5 DAYS" notu ekli teklife taşınır. 150 mesaj `yeniden_isle` ile yeniden
+    okundu (ör. yanlış 14 gün FT düzeldi, eksik 14 gün FT geldi). Edge `navlun-bildirimi` v8.
+  - Rapor Alıcıları sayfası yeniden tasarım (`app/ayarlar/raporlar`): 11 mail türü tek ekranda, Alıcı + CC, adres defteri
+    (`rapor_adres_defteri`), migration `20261112110000_rapor_alicilari_cc.sql` (CANLIDA). Aşamalı geçiş (`RaporTanimi.etkin`):
+    navlun + müşteri durum = Alıcı + CC; sipariş, fatura onay / dağıtım = Alıcı (CC sonraki dağıtımda); günlük ihracat, DİİB, VGM,
+    konşimento hatırlatma, pazar görev, satın alma = "Sabit" (sunucudaki alıcılar görünür, düzenleme sonraki dağıtımda; o
+    edge'lerin CC değişikliği hazır, dağıtılmadı). Test: e2e_rapor_alici 53.
+  - Müşteri Durum Raporu (edge `musteri-durum-rapor` v1, `_shared/musteri-durum.ts`): siparişi onaylı her müşteriye İngilizce
+    durum (fiyat / navlun yok). Şimdilik yalnız yönetici önizleme + [TEST] maili (yalnız test adresi); canlı gönderim kapalı.

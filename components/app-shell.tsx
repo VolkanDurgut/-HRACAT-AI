@@ -72,7 +72,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (loading) return;
     if (!user) {
       // E-postadaki belge baglantisi (/belge/...) giristen sonra yeniden acilsin (06.11.2026)
-      if (pathname.startsWith("/belge/") || pathname === "/fatura-onay") girisSonrasiKaydet(pathname + window.location.search);
+      if (pathname.startsWith("/belge/") || pathname === "/fatura-onay" || pathname === "/navlun") girisSonrasiKaydet(pathname + window.location.search);
       router.replace("/");
       return;
     }

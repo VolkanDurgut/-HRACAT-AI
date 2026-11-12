@@ -1,5 +1,6 @@
 "use client";
 
+import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Anchor, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
 import AppShell from "@/components/app-shell";
@@ -255,6 +256,19 @@ function NavlunIcerik() {
     const enYeni = bilgiler[0]?.tarih;
     if (enYeni) { try { window.localStorage.setItem(SON_GORULME, enYeni); } catch { /* yok say */ } }
   }, [veri, bilgiler]);
+  // 12.11.2026: navlun raporundaki "Diger navlun fiyatlari" baglantisi: /navlun?liman=MOMBASA -> o limanin masasi acilir
+  const [istenenLiman, setIstenenLiman] = useState<string | null>(null);
+  useEffect(() => {
+    girisSonrasiTemizle();   // mail baglantisiyla giristen donuldu: kayit silinir
+    try { const l = new URLSearchParams(window.location.search).get("liman"); if (l && l.trim()) setIstenenLiman(l.trim().slice(0, 60)); } catch { /* yok say */ }
+  }, []);
+  useEffect(() => {
+    if (!istenenLiman || !limanlar.length) return;
+    const q = norm(istenenLiman);
+    const l = limanlar.find((x) => x.anahtar === istenenLiman.toUpperCase() || norm(x.ad) === q) || limanlar.find((x) => norm(x.ad).includes(q));
+    if (l) setMasa(l.anahtar); else setArama(istenenLiman);
+    setIstenenLiman(null);
+  }, [istenenLiman, limanlar]);
   const gorunen = useMemo(() => {
     const q = norm(arama.trim());
     if (!q) return limanlar;

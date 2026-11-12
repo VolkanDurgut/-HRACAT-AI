@@ -272,10 +272,119 @@ export function sonTeklifler(t: NavlunTablosu, sonraIso: string, adet = 30): Son
   return out.sort((a, b) => b.tarih.localeCompare(a.tarih)).slice(0, adet);
 }
 
+/**
+ * NAVLUN SATIN ALMA LISTESI (12.11.2026, kullanici: "Navlun raporu icin navlun odeme / satin alma listesi; guncel yukleme
+ * planimizla orantili olmali. Navlun icin yapilan satin alimi tespit edemez miyiz?").
+ * Satir = yukleme planindaki rezervasyonu alinmis (booking'li) ve ETD'si bugun ya da ileride (ETD'siz olanlar en sonda) yukleme.
+ * Navlun kaynagi (tahmin YOK):
+ *   1) plan / dosya: yukleme planindaki konteyner basi navlun (dosya acildiysa dosyadan)
+ *   2) anlasma maili: bizden acenteye giden kabul ("Anlasma fiyatimiz X usd", "Navlun bedeli X olmak uzere"); ayni liman,
+ *      hat uyumlu, ETD'den once ve en fazla 90 gun once yazilmis EN SON kabul
+ *   3) yoksa "belirsiz" (toplam disi; operasyon tamamlar)
+ * Ayrica limanin bugunku en iyi teklifi (karsilastirma) ve rezervasyon bekleyen on odemeli siparisler.
+ */
+export type PlanNavlunSatiri = GerceklesenNavlun & {
+  kaynak: string | null; booking_no: string | null; musteri: string | null; konteyner: number | null; dosya_no: string | null;
+  /** Excel'deki hafta (ETD'si bos satirda: yalniz bu hafta / ileride ise listelenir; eski kayit girmez) */
+  hafta?: number | null; yil?: number | null;
+};
+
+/** Lojistigin hafta kurali (Pazar baslar, 1 Ocak'i iceren hafta 1) - siparis-liste.ts haftaNo ile ayni. */
+function haftaSirasi(iso: string): number {
+  const y = Number(iso.slice(0, 4));
+  const gun = Math.round((Date.UTC(y, Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) - Date.UTC(y, 0, 1)) / 86400000);
+  return y * 100 + Math.floor((gun + new Date(Date.UTC(y, 0, 1)).getUTCDay()) / 7) + 1;
+}
+export type SatinAlmaSatiri = {
+  etd: string | null; booking: string; musteri: string | null; liman: string; limanAnahtar: string; blok: string; konteyner: number;
+  navlun: number | null; para: string; toplam: number | null;
+  kaynak: "dosya" | "plan" | "anlasma" | "belirsiz"; kaynakTarih: string | null;
+  enIyi: { tutar: number; blok: string } | null;
+};
+export type NavlunSatinAlma = {
+  satirlar: SatinAlmaSatiri[];
+  toplam: Record<string, number>; konteyner: number; belirsiz: number;
+  bekleyen: { siparis: number; konteyner: number };
+};
+
+export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olaylar: NavlunOlayi[]): NavlunSatinAlma {
+  const enIyiler = new Map(limanSatirlari(t).filter((x) => !x.eski).map((x) => [x.liman, x.enIyi]));
+  const adlar = new Map(t.limanlar.map((l) => [l.anahtar, l.ad]));
+  const kabuller = olaylar.filter((o) => o.tur === "kabul" && o.tutar && o.tutar > 0)
+    .map((o) => ({ k: limanKey(o.liman, o.liman_anahtar), tutar: o.tutar as number, para: o.para_birimi || "USD", tarih: o.tarih, armator: o.armator ? sirketAdi(o.armator) : null }))
+    .sort((a, b) => b.tarih.localeCompare(a.tarih));
+  const satirlar: SatinAlmaSatiri[] = [];
+  let bekleyenSiparis = 0, bekleyenKont = 0;
+  for (const p of plan) {
+    if (p.kaynak === "siparis") { bekleyenSiparis++; bekleyenKont += p.konteyner || 0; continue; }
+    const booking = (p.booking_no || "").trim();
+    const etd = p.etd ? p.etd.slice(0, 10) : null;
+    if (!booking || (etd && etd < t.tarih)) continue;
+    // ETD'si bos: yalniz haftasi bu hafta / ileride olan (Excel'de tarihi okunamamis eski kayit listeye girmez)
+    if (!etd && !(p.hafta && p.yil && p.yil * 100 + p.hafta >= haftaSirasi(t.tarih))) continue;
+    const k = limanKey(p.varis_limani);
+    if (!k) continue;
+    const blok = p.acente ? planBlokAdi(p.acente) : "-";
+    const kont = p.konteyner || 0;
+    let navlun: number | null = p.navlun && p.navlun > 0 ? p.navlun : null;
+    let para = p.navlun_para || "USD";
+    let kaynak: SatinAlmaSatiri["kaynak"] = navlun ? (p.dosya_no ? "dosya" : "plan") : "belirsiz";
+    let kaynakTarih: string | null = null;
+    if (!navlun) {
+      const sinir = etd ? new Date(Date.parse(`${etd}T12:00:00Z`) - 90 * 86400000).toISOString() : null;
+      const uygun = kabuller.find((x) => x.k === k && (!etd || x.tarih.slice(0, 10) <= etd) && (!sinir || x.tarih >= sinir)
+        && (!x.armator || blok.split(" - ").some((b) => b === x.armator || b.startsWith(x.armator!) || x.armator!.startsWith(b))));
+      if (uygun) { navlun = uygun.tutar; para = uygun.para; kaynak = "anlasma"; kaynakTarih = uygun.tarih; }
+    }
+    const ad = adlar.get(k) || (p.varis_limani || k).toLocaleUpperCase("tr-TR");
+    const e = enIyiler.get(ad);
+    satirlar.push({
+      etd, booking, musteri: p.musteri, liman: ad, limanAnahtar: k, blok, konteyner: kont, navlun, para,
+      toplam: navlun !== null ? navlun * kont : null, kaynak, kaynakTarih, enIyi: e ? { tutar: e.tutar, blok: e.blok } : null,
+    });
+  }
+  satirlar.sort((a, b) => (a.etd || "9999").localeCompare(b.etd || "9999") || a.liman.localeCompare(b.liman, "tr") || a.booking.localeCompare(b.booking));
+  const toplam: Record<string, number> = {};
+  for (const x of satirlar) if (x.toplam !== null) toplam[x.para] = (toplam[x.para] || 0) + x.toplam;
+  return {
+    satirlar, toplam, konteyner: satirlar.reduce((a, x) => a + x.konteyner, 0), belirsiz: satirlar.filter((x) => x.kaynak === "belirsiz").length,
+    bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont },
+  };
+}
+
+/** Excel'e ikinci sayfa: navlun satin alma listesi (tum sutunlar). */
+export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLUN SATIN ALMA"): XlsxSayfa {
+  const KAYNAK: Record<SatinAlmaSatiri["kaynak"], string> = { dosya: "Dosya", plan: "Yükleme planı", anlasma: "Anlaşma maili", belirsiz: "Navlun bilgisi yok" };
+  const satirlar: (XlsxHucre | null)[][] = [
+    [{ v: `UNEX NAVLUN SATIN ALMA LİSTESİ · ${tarihTr(tarih)}`, s: XS.sayfaBasligi }],
+    ["ETD", "BOOKING", "MÜŞTERİ", "VARIŞ LİMANI", "ACENTE / HAT", "KONT.", "NAVLUN / KONT.", "TOPLAM NAVLUN", "PARA", "KAYNAK", "GÜNCEL EN İYİ 20'DC"].map((v) => ({ v, s: XS.tabloBaslik })),
+  ];
+  for (const x of sa.satirlar) {
+    satirlar.push([
+      { v: x.etd ? new Date(`${x.etd}T12:00:00`) : "ETD yok", s: x.etd ? XS.tarih : XS.metin }, { v: x.booking, s: XS.metin }, { v: x.musteri || "", s: XS.metin },
+      { v: x.liman, s: XS.metin }, { v: x.blok, s: XS.metin }, { v: x.konteyner, s: XS.tamSayi },
+      { v: x.navlun, s: XS.tamSayi }, { v: x.toplam, s: XS.tamSayi }, { v: x.para, s: XS.metin },
+      { v: KAYNAK[x.kaynak] + (x.kaynakTarih ? ` (${tarihTr(x.kaynakTarih.slice(0, 10))})` : ""), s: XS.metin },
+      { v: x.enIyi ? `${x.enIyi.tutar} $ · ${x.enIyi.blok}` : "", s: XS.metin },
+    ]);
+  }
+  const top = Object.entries(sa.toplam).map(([p, v]) => `${v.toLocaleString("tr-TR")} ${p}`).join(" + ");
+  satirlar.push([{ v: "TOPLAM", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin },
+    { v: sa.konteyner, s: XS.toplamTamSayi }, { v: "", s: XS.toplamMetin }, { v: top || "-", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin }, { v: sa.belirsiz ? `${sa.belirsiz} booking navlunsuz` : "", s: XS.toplamMetin }, { v: "", s: XS.toplamMetin }]);
+  satirlar.push([]);
+  satirlar.push([{ v: "Satır = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme. Navlun: dosya / yükleme planı; yoksa acenteye yazılan son anlaşma maili. Tahmin yoktur.", s: XS.not }]);
+  if (sa.bekleyen.siparis) satirlar.push([{ v: `Rezervasyon bekleyen ön ödemeli sipariş: ${sa.bekleyen.siparis} (${sa.bekleyen.konteyner} kont.) — navlunu henüz alınmadı.`, s: XS.not }]);
+  return { ad, sutunGenislik: [11, 17, 26, 18, 20, 7, 12, 14, 7, 22, 22], satirlar, birlestir: ["A1:K1"], dondur: "A3" };
+}
+
 const usd = (n: number) => `${n.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} $`;
 export const NAVLUN_TABLOSU_URL = "https://ihracatasistanim.com";
 
-export function navlunTablosuKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda"): string {
+export function navlunTablosuKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda", sa?: NavlunSatinAlma | null): string {
+  if (sa) {
+    const top = Object.entries(sa.toplam).map(([p, v]) => (p === "USD" ? usd(v) : `${v.toLocaleString("tr-TR")} ${p}`)).join(" + ");
+    return `${sirketAdi} Navlun Raporu · ${tarihTr(t.tarih)} · ${sa.satirlar.length} booking · ${sa.konteyner} kont.${top ? ` · ${top} navlun` : ""}`;
+  }
   return `${sirketAdi} Navlun Tablosu · ${tarihTr(t.tarih)} · ${t.limanlar.length} liman · ${t.bloklar.length} acente/hat`;
 }
 
@@ -284,6 +393,8 @@ export type NavlunRaporSecenek = {
   oncekiIso?: string | null;
   /** "Sabah raporu" / "Akşam raporu" */
   oturumEtiketi?: string | null;
+  /** 12.11.2026: navlun satin alma listesi (verilirse mailin ana bolumu budur; tum fiyatlar "Diger navlun fiyatlari" ile sayfada) */
+  satinAlma?: NavlunSatinAlma | null;
 };
 
 /**
@@ -347,6 +458,16 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
     }),
     `Güncel navlun fiyatları · ${satirlar.length} liman`,
   );
+  const sa = secenek.satinAlma;
+  if (sa) {
+    // 12.11.2026: mailin ana bolumu navlun satin alma listesi; tum limanlarin fiyatlari "Diger navlun fiyatlari" ile sayfada
+    return raporKabugu({
+      sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
+      ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa),
+      dugme: { metin: "Diğer navlun fiyatları", yol: "/navlun" },
+      dipnot: `Satır = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme. Navlun: dosya / yükleme planı; yoksa acenteye yazdığımız son anlaşma maili (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte: navlun satın alma listesi + operasyonun navlun tablosu (Excel). Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
+    });
+  }
   return raporKabugu({
     sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
     // 12.11.2026 kullanici: "Navlun raporundan otomatik ozet kismini kaldiralim." -> yalniz guncel fiyat tablosu
@@ -354,4 +475,34 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
     dugme: { metin: "Navlun Bildirimi'ni aç", yol: "/navlun" },
     dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde en düşüğü (gri = 60 günden eski). Yeşil hedef = teklif hedefte/altında. Anlaşılan = acenteye yazdığımız son anlaşma fiyatı.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
   });
+}
+
+/** Mail: navlun satin alma tablosu (12.11.2026). Liman adi /navlun?liman= baglantisi (o limanin masasi acilir). */
+export function satinAlmaHtml(sa: NavlunSatinAlma): string {
+  const kisa = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
+  const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
+  const para = (v: number, p: string) => (p === "USD" ? usd(v) : `${v.toLocaleString("tr-TR")} ${p}`);
+  const KAYNAK: Record<SatinAlmaSatiri["kaynak"], string> = { dosya: "dosya", plan: "plan", anlasma: "anlaşma", belirsiz: "" };
+  const gri = (h: string) => `<span style="color:#CBD5E1">${h}</span>`;
+  const tablo = sa.satirlar.length ? sikiTablo(
+    [{ ad: "ETD" }, { ad: "Booking" }, { ad: "Liman" }, { ad: "Acente / Hat" }, { ad: "Kont", sag: true }, { ad: "Navlun", sag: true }, { ad: "Toplam", sag: true }, { ad: "Güncel en iyi", sag: true }],
+    sa.satirlar.map((x) => [
+      x.etd ? kisa(x.etd) : gri("ETD yok"),
+      esc(kes(x.booking, 16)),
+      `<a href="${NAVLUN_TABLOSU_URL}/navlun?liman=${encodeURIComponent(x.limanAnahtar)}" style="color:#283474;font-weight:bold;text-decoration:none">${esc(kes(x.liman, 16))}</a>`,
+      esc(kes(x.blok, 16)),
+      `${x.konteyner}`,
+      x.navlun !== null ? `${para(x.navlun, x.para)}${KAYNAK[x.kaynak] ? ` <span style="color:#94A3B8;font-size:9.5px">${KAYNAK[x.kaynak]}${x.kaynakTarih ? " " + kisa(x.kaynakTarih.slice(0, 10)) : ""}</span>` : ""}` : `<span style="color:#B45309">bilgi yok</span>`,
+      x.toplam !== null ? `<b>${para(x.toplam, x.para)}</b>` : gri("-"),
+      x.enIyi ? `<span style="color:${x.navlun !== null && x.enIyi.tutar < x.navlun ? "#B45309" : "#047857"}">${usd(x.enIyi.tutar)}</span>` : gri("-"),
+    ]),
+    `Navlun Satın Alma Listesi · ${sa.satirlar.length} booking · ${sa.konteyner} konteyner`,
+  ) : `<div style="margin:14px 0 5px;font-size:12px;font-weight:bold;color:#283474">Navlun Satın Alma Listesi</div><div style="font-size:12px;color:#64748B">Yükleme planında ETD'si bugün / ileride booking yok.</div>`;
+  const top = Object.entries(sa.toplam).map(([p, v]) => para(v, p)).join(" + ");
+  const ozet = [
+    top ? `Toplam navlun: <b style="color:#283474">${top}</b>` : "",
+    sa.belirsiz ? `<span style="color:#B45309">${sa.belirsiz} booking'in navlunu sistemde yok</span>` : "",
+    sa.bekleyen.siparis ? `Rezervasyon bekleyen ön ödemeli sipariş: ${sa.bekleyen.siparis} (${sa.bekleyen.konteyner} kont.)` : "",
+  ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  return `${tablo}${ozet ? `<div style="margin-top:6px;font-size:12px;color:#1E293B">${ozet}</div>` : ""}`;
 }

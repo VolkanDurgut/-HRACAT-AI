@@ -112,7 +112,7 @@ export function konudanLiman(konu: string): string | null {
 }
 
 /** Govdeden alintiyi ve imzayi at; yalnizca yeni yazilan kismi birak. */
-export function yeniKisim(govde: string): string {
+export function yeniKisim(govde: string, imzaDahil = false): string {
   let t = govde.replace(/\r/g, "");
   const kes = [
     /\n\s*From:\s/i, /\n\s*Kimden:\s/i, /\n-{2,}\s*Original Message/i,
@@ -121,6 +121,8 @@ export function yeniKisim(govde: string): string {
     /\n\s*Booking onayı verildikten sonra/i,
     /\n\s*Best Regards|\n\s*Saygılarımla|\n\s*Brgds|\n\s*İyi Çalışmalar\s*&/i,
   ];
+  // imzaDahil (12.11.2026): imzadan SONRA yazilan teklif notu ("Saygilarimla ... ONE LINE, FT 5 DAYS") icin yalniz alinti kesilir
+  if (imzaDahil) kes.pop();
   for (const r of kes) {
     const m = t.search(r);
     if (m > 0) t = t.slice(0, m);
@@ -163,20 +165,45 @@ function armatorBul(s: string, yakin?: number): string | null {
   return en ? en.ad : null;
 }
 
+/**
+ * Varis limanindaki serbest gun (free time). 12.11.2026: yukleme tarafindaki kurallar ("Export detention kuralimiz ETD - 14 gun",
+ * "bos alim gununden ... 14 gun free time dusulerek export detention") free time SAYILMAZ; "14 free" yazimi eklendi.
+ */
+const FT_DESENLERI: RegExp[] = [
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:ft\b|free|frfee)/gi,
+  /(\d{1,2})\s*(?:calendar\s*)?days?\s*free/gi,
+  /(\d{1,2})\s*free\s*var/gi,
+  /(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/gi,
+  /(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/gi,
+  // 11.11.2026: demuraj / serbest gun yazimlari ("14 DEM + 3 DET", "Demuraj serbest süre: 21", "21 gün serbest", "free days 14")
+  /(\d{1,2})\s*(?:gün|gun|days?)?\s*DEM(?:URRAGE|URAJ)?\b(?!\s*tarife)/gi,
+  /demura(?:j|ge)\s*(?:serbest\s*s[üu]re(?:si)?)?\s*[:\-–]?\s*(\d{1,2})\s*(?:gün|gun|days?)?(?!\s*saat)\b/gi,
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*serbest/gi,
+  /free\s*days?\s*[:\-–]?\s*(\d{1,2})\b/gi,
+  // 12.11.2026: "kontrat 14 free" (gun kelimesi yok)
+  /(?<![\d'*x\/.,])(\d{1,2})\s*free\b(?!\s*(?:time|days?|var|gün|gun))/gi,
+];
+/** Eslesmenin cevresi yukleme tarafi (export detention / bos ekipman) kuraliysa free time degildir. */
+const FT_YUKLEME_TARAFI = /export\s*det|export\s*demur|ihracat\s*(?:det|demur)|origin\s*(?:det|demur|free)|bo[şs]\s*(?:konteyner|ekipman)\s*al[ıi]m|ETD\s*\(?(?:ETS)?\)?\s*[–-]\s*\d/i;
+
+/** Eslesmenin icinde gectigi cumle (". " / ";" / satir sonu ile ayrilir; "30.11" gibi tarihler bolunmez). */
+function cumle(s: string, bas: number, bit: number): string {
+  const once = s.slice(0, bas);
+  const b = Math.max(once.search(/(?:[.!?;]\s|\n)(?!.*(?:[.!?;]\s|\n))/s) + 1, 0);
+  const sonra = s.slice(bit).search(/[.!?;]\s|\n/);
+  return s.slice(b, sonra < 0 ? s.length : bit + sonra);
+}
+
 export function freeTimeBul(s: string): number | null {
-  const m = s.match(/(\d{1,2})\s*(?:gün|gun|days?)\s*(?:ft\b|free|frfee)/i)
-    || s.match(/(\d{1,2})\s*(?:calendar\s*)?days?\s*free/i)
-    || s.match(/(\d{1,2})\s*free\s*var/i)
-    || s.match(/(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/i)
-    || s.match(/(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/i)
-    // 11.11.2026: demuraj / serbest gun yazimlari ("14 DEM + 3 DET", "Demuraj serbest süre: 21", "21 gün serbest", "free days 14")
-    || s.match(/(\d{1,2})\s*(?:gün|gun|days?)?\s*DEM(?:URRAGE|URAJ)?\b(?!\s*tarife)/i)
-    || s.match(/demura(?:j|ge)\s*(?:serbest\s*s[üu]re(?:si)?)?\s*[:\-–]?\s*(\d{1,2})\s*(?:gün|gun|days?)?(?!\s*saat)\b/i)
-    || s.match(/(\d{1,2})\s*(?:gün|gun|days?)\s*serbest/i)
-    || s.match(/free\s*days?\s*[:\-–]?\s*(\d{1,2})\b/i);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return n >= 1 && n <= 60 ? n : null;
+  for (const r of FT_DESENLERI) {
+    for (const m of s.matchAll(r)) {
+      const i = m.index ?? 0;
+      if (FT_YUKLEME_TARAFI.test(cumle(s, i, i + m[0].length))) continue;
+      const n = Number(m[1]);
+      if (n >= 1 && n <= 60) return n;
+    }
+  }
+  return null;
 }
 
 /**

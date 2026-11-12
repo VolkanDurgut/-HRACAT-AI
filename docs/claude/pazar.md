@@ -214,3 +214,8 @@ fonksiyonu RPC'si olmadığı için çalışmaz; panelden silinebilir (MCP'de si
 
 Duyurunun gerçek gönderimi (kullanıcı onayıyla) · İlk canlı sabahın kontrolü (11.11): gönderim kaydı, görevler, işlemeler · export@ / export2@ yönlendirmesi gerekirse ·
 Dalga 4 Yönetim Paneli · Dalga 5 Transit.
+
+## 3.7 Müşteri maillerinde CC (12.11.2026)
+Kullanıcı: "export ve export2'nin müşteriye gönderdiği tanışma ve teklif maillerinde bbt çıkarılsın (yalnız müşteri CRM)."
+`lib/pazar/sablonlar.ts` `CC_ADRESLERI` = yalnız execution@ (görev sayfasındaki "Outlook'ta aç" mailto'su). Ekibe giden günlük
+görev maili (edge `pazar-gorev`) değişmedi. Test: e2e_gorev 50.

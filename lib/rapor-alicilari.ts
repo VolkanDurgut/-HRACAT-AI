@@ -1,23 +1,50 @@
 /**
- * Ayarlar > Rapor Alicilari (11.11.2026). Gunluk rapor mailleri (siparis, navlun) ve fatura talimati onayi (onaylayanlar,
- * dagitim) icin alici listesi ve canli / test secimi. Musteri ozeti raporu kaldirildi (11.11.2026 aksam). Kayit: rapor_alicilari_liste / rapor_alicilari_kaydet RPC (yalniz super admin).
+ * Ayarlar > Rapor Alicilari (11.11.2026). Butun otomatik maillerin alici (To) + CC listesi ve test-modlu raporlarda canli /
+ * test secimi. Kayit: rapor_alicilari_liste / rapor_alicilari_kaydet RPC (yalniz super admin).
+ * 12.11.2026 (kullanici: "Butun raporlar orada gozuksun; tiklandiginda ALICI - CC ayarlanabilsin; bizim maillerimiz hizli
+ * tiklanabilir olarak kayitli olmali; tek ekrana sigmali"): 11 mail turu, CC, adres defteri (rapor_adres_defteri_* RPC).
  * Onizleme ({deneme: true}) mail GONDERMEZ, HTML doner; test ({test: true}) "[TEST]" maili YALNIZ test adresine gider.
  */
 import { supabase } from "@/lib/supabase";
 
-export type RaporTuru = "siparis" | "navlun" | "fatura_onay" | "fatura_dagitim";
-export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; canli: boolean; guncelleyen: string | null; guncelleme: string | null };
+export type RaporTuru =
+  | "gunluk_ihracat" | "siparis" | "navlun" | "diib" | "vgm" | "konsimento_hatirlatma"
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma";
+export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
-/** edge: Onizle / Test maili olan raporlar (fatura listelerinde yok: onlar dosya konteynerleri tamamlaninca tetiklenir). */
-export const RAPORLAR: { rapor: RaporTuru; ad: string; aciklama: string; saat: string; edge: string | null }[] = [
-  { rapor: "siparis", ad: "Sipariş Raporu", aciklama: "Günün özeti (4 gösterge) + gelen ön ödemeler (müşteri, konteyner, varış limanı) + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor" },
-  { rapor: "navlun", ad: "Navlun Raporu", aciklama: "Tüm limanların güncel fiyatı (en iyi teklif, hedef, anlaşılan) + Excel (navlun tablosu)", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu" },
-  { rapor: "fatura_onay", ad: "Fatura Talimatı Onayı", aciklama: "Bütün konteynerleri yüklenen dosyanın talimatını onaylayan / revize isteyenler (İncele ve Onayla maili)", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null },
-  { rapor: "fatura_dagitim", ad: "Onaylı Fatura Talimatı", aciklama: "Onaylanan talimat PDF ekli gider: “FATURA VE BEYANNAME TALİMATI HAKKINDA // …”", saat: "Talimat onaylanınca", edge: null },
+export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
+export type RaporTanimi = {
+  rapor: RaporTuru; ad: string; grup: RaporGrubu; aciklama: string; saat: string;
+  /** Onizle / Test maili olan raporlarin edge'i */
+  edge: string | null;
+  /** true: Canli / Test anahtari var (kapaliyken yalniz test adresine gider). false: her zaman canli, yalniz alicilar */
+  testModu: boolean;
+  /** Alici listesi yerine sabit aciklama (alicisi raporun kendisinden gelir) */
+  otomatikAlici?: string;
+  /**
+   * Buradaki ayarin maile yansimasi (12.11.2026, asamali gecis): "tam" = Alici + CC; "alici" = yalniz Alici (CC sonraki
+   * guncellemede); "yakinda" = mail bugun sunucu ayarindaki sabit alicilara gider, duzenleme sonraki guncellemede acilir.
+   */
+  etkin: "tam" | "alici" | "yakinda";
+};
+
+export const RAPORLAR: RaporTanimi[] = [
+  { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 09:00, 12:00 ve 17:00", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Günün özeti (4 gösterge) + gelen ön ödemeler + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
+  { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Navlun satın alma listesi (yükleme planı) + Excel", saat: "Her gün 08:00 ve 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
+  { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "vgm", ad: "VGM Bildirimi", grup: "Operasyon", aciklama: "Konteynerleri tamamlanan dosyanın VGM PDF'i", saat: "Konteynerler tamamlanınca", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "konsimento_hatirlatma", ad: "Konşimento Hatırlatma", grup: "Operasyon", aciklama: "Fatura talimatından sonra konşimento talimatı bekleyen dosyalar", saat: "Talimat gönderilince", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "fatura_onay", ad: "Fatura Talimatı Onayı", grup: "Operasyon", aciklama: "İncele ve Onayla maili (onay / revize)", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "alici" },
+  { rapor: "fatura_dagitim", ad: "Onaylı Fatura Talimatı", grup: "Operasyon", aciklama: "Onaylanan talimat PDF ekli: “FATURA VE BEYANNAME TALİMATI HAKKINDA // …”", saat: "Talimat onaylanınca", edge: null, testModu: true, etkin: "alici" },
+  { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },
+  { rapor: "musteri_durum", ad: "Müşteri Durum Raporu", grup: "Satış ve müşteri", aciklama: "Siparişi olan her müşteriye İngilizce sipariş durumu", saat: "Canlıya alınınca belirlenecek", edge: "musteri-durum-rapor", testModu: true, otomatikAlici: "Müşterinin kendisi", etkin: "tam" },
+  { rapor: "satin_alma", ad: "Satın Alma Talebi", grup: "Satış ve müşteri", aciklama: "Satın alma listesi gönderim maili (sonuç maili ayrı)", saat: "Liste gönderilince", edge: null, testModu: false, etkin: "yakinda" },
 ];
 export const AZAMI_ALICI = 10;
 
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+export const epostaGecerli = (s: string) => EPOSTA_RE.test(s.trim());
 
 /** "a@x.com, b@y.com; c@z.com" -> temiz, tekil, kucuk harf liste + gecersizler */
 export function adresAyikla(metin: string): { gecerli: string[]; gecersiz: string[] } {
@@ -26,14 +53,33 @@ export function adresAyikla(metin: string): { gecerli: string[]; gecersiz: strin
   return { gecerli, gecersiz: parca.filter((x) => !EPOSTA_RE.test(x)) };
 }
 
+/** Kisa gorunen ad: "export2@unex.com.tr" -> "export2", baska alan adlari tam. */
+export function kisaAdres(e: string, alan = "unex.com.tr"): string {
+  return e.endsWith(`@${alan}`) ? e.slice(0, -alan.length - 1) : e;
+}
+
 export async function raporAlicilariGetir(): Promise<RaporAlicisi[]> {
   const { data, error } = await supabase.rpc("rapor_alicilari_liste");
   if (error) throw new Error(error.message);
-  return (data || []) as RaporAlicisi[];
+  return ((data || []) as RaporAlicisi[]).map((r) => ({ ...r, cc: r.cc || [], kayitli: r.kayitli !== false }));
 }
 
-export async function raporAlicilariKaydet(rapor: RaporTuru, alicilar: string[], canli: boolean): Promise<void> {
-  const { error } = await supabase.rpc("rapor_alicilari_kaydet", { p_rapor: rapor, p_alicilar: alicilar, p_canli: canli });
+export async function raporAlicilariKaydet(rapor: RaporTuru, alicilar: string[], cc: string[], canli: boolean): Promise<void> {
+  const { error } = await supabase.rpc("rapor_alicilari_kaydet", { p_rapor: rapor, p_alicilar: alicilar, p_cc: cc, p_canli: canli });
+  if (error) throw new Error(error.message);
+}
+
+export async function adresDefteriGetir(): Promise<string[]> {
+  const { data, error } = await supabase.rpc("rapor_adres_defteri_liste");
+  if (error) throw new Error(error.message);
+  return ((data || []) as { eposta: string }[]).map((x) => x.eposta);
+}
+export async function adresDefterineEkle(eposta: string): Promise<void> {
+  const { error } = await supabase.rpc("rapor_adres_defteri_ekle", { p_eposta: eposta });
+  if (error) throw new Error(error.message);
+}
+export async function adresDefterindenSil(eposta: string): Promise<void> {
+  const { error } = await supabase.rpc("rapor_adres_defteri_sil", { p_eposta: eposta });
   if (error) throw new Error(error.message);
 }
 
@@ -46,7 +92,7 @@ async function edgeCagir(edge: string, govde: Record<string, unknown>) {
     headers: { "Content-Type": "application/json", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${token}` },
     body: JSON.stringify(govde),
   });
-  const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string; sonuclar?: { html?: string; konu?: string; atlandi?: string; gonderildi?: boolean }[] };
+  const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string; sonuclar?: { html?: string; konu?: string; atlandi?: string; gonderildi?: boolean; musteriler?: string[] }[] };
   if (!res.ok || !veri.ok) throw new Error(veri.hata || `İstek başarısız (HTTP ${res.status}).`);
   const s = veri.sonuclar?.[0];
   if (!s) throw new Error("Rapor oluşturulamadı (veri yok).");
@@ -54,13 +100,13 @@ async function edgeCagir(edge: string, govde: Record<string, unknown>) {
   return s;
 }
 
-/** Mail gondermeden raporun bugunku halini getirir. */
-export async function raporOnizle(edge: string): Promise<{ konu: string; html: string }> {
-  const s = await edgeCagir(edge, { deneme: true });
-  return { konu: s.konu || "", html: s.html || "" };
+/** Mail gondermeden raporun bugunku halini getirir (musteri durum raporunda musteri secilebilir). */
+export async function raporOnizle(edge: string, ek: Record<string, unknown> = {}): Promise<{ konu: string; html: string; musteriler?: string[] }> {
+  const s = await edgeCagir(edge, { deneme: true, ...ek });
+  return { konu: s.konu || "", html: s.html || "", musteriler: s.musteriler };
 }
 
 /** "[TEST]" maili yalniz test adresine. */
-export async function raporTestMaili(edge: string): Promise<void> {
-  await edgeCagir(edge, { test: true });
+export async function raporTestMaili(edge: string, ek: Record<string, unknown> = {}): Promise<void> {
+  await edgeCagir(edge, { test: true, ...ek });
 }

@@ -37,7 +37,7 @@ export const REHBER_KONULARI: KilavuzKonusu[] = [
     adimlar: [
       { nokta: "sablonlar", baslik: "Üç hazır şablon", metin: "Yeni sipariş planı, güncel fiyat teklifi ya da kısa ve samimi. Sekmeye tıklayınca konu ve metin değişir." },
       { nokta: "metin", baslik: "Konu ve metin sizin", metin: "Metni dilediğiniz gibi düzenleyebilirsiniz. İmzada kendi e-posta adresiniz yer alır." },
-      { ekran: "gorev-gonderdim", nokta: "outlook", baslik: "Outlook'ta aç", metin: "Düğme Outlook'u hazır mailin açık hâliyle açar: alıcı, konu ve metin dolu; bbt@ ve execution@ bilgiye (CC) kendiliğinden eklenir. Gönder'e siz basarsınız." },
+      { ekran: "gorev-gonderdim", nokta: "outlook", baslik: "Outlook'ta aç", metin: "Düğme Outlook'u hazır mailin açık hâliyle açar: alıcı, konu ve metin dolu; execution@ bilgiye (CC) kendiliğinden eklenir. Gönder'e siz basarsınız." },
       { ekran: "gorev-gonderdim", nokta: "gonderdim", baslik: "Evet, gönderdim", metin: "Outlook'tan dönünce sayfa sorar: gönderdiniz mi? Evet derseniz kayıt düşer ve hatırlatma günü kendiliğinden hesaplanır. Göndermediyseniz Henüz değil'e basın." },
     ],
   },

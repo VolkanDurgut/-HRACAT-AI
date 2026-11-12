@@ -25,7 +25,8 @@ export type SablonBaglami = {
 };
 export type Sablon = { kod: string; baslik: string; konu: string; govde: string; whatsapp: string };
 
-export const CC_ADRESLERI = ["bbt@unex.com.tr", "execution@unex.com.tr"];
+/** Musteriye giden tanisma / teklif maillerinin CC'si. 12.11.2026 kullanici: bbt@ cikarildi (yalniz execution@). */
+export const CC_ADRESLERI = ["execution@unex.com.tr"];
 const imza = (eposta?: string | null) => `Kind regards,\n\nExport Department\nUNEX Gıda\n${eposta || "export@unex.com.tr"}`;
 
 const ayYil = (iso: string | null) => {
@@ -134,7 +135,7 @@ export function sablonlar(adim: GorevAdimi, b: SablonBaglami): Sablon[] {
   ];
 }
 
-/** Outlook / varsayilan e-posta uygulamasi icin mailto (CC: bbt@ + execution@). */
+/** Outlook / varsayilan e-posta uygulamasi icin mailto (CC: CC_ADRESLERI). */
 export function mailtoAdresi(alici: string, konu: string, govde: string): string {
   const q = [`cc=${encodeURIComponent(CC_ADRESLERI.join(","))}`, `subject=${encodeURIComponent(konu)}`, `body=${encodeURIComponent(govde.replace(/\n/g, "\r\n"))}`];
   return `mailto:${encodeURIComponent(alici).replace(/%40/g, "@")}?${q.join("&")}`;

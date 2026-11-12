@@ -3,7 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
-import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, type GerceklesenNavlun, type NavlunOlayi } from "../_shared/navlun-tablosu.ts";
+import { navlunSatinAlma, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -16,7 +16,8 @@ import { navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTab
 // ALICI: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'navlun'); satir yoksa secret'lar (NAVLUN_TABLOSU_CANLI =
 //   "evet" + NAVLUN_TABLOSU_ALICI). Canli degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI,
 //   varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
-// MAIL (11.11.2026 revize): "Otomatik Ozet" maddeleri + TUM limanlarin siki guncel fiyat tablosu; ek Excel.
+// MAIL (12.11.2026): NAVLUN SATIN ALMA LISTESI (yukleme planindaki booking'li yuklemeler + odenecek navlun; kaynak dosya / plan /
+//   anlasma maili) + "Diger navlun fiyatlari" dugmesi (/navlun). Ek Excel: satin alma listesi + operasyonun navlun tablosu.
 // CAGRI YETKISI:
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ, konu + HTML doner;
 //    {"test": true} -> "[TEST]" mail YALNIZ test adresine.
@@ -117,16 +118,19 @@ async function sirketTablosu(companyId: string, tarih: string) {
   ]);
   const olaylar = olaylarHam.map((o) => ({ ...o, tutar: o.tutar == null ? null : Number(o.tutar) })) as unknown as NavlunOlayi[];
   const metin = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
-  const plan: GerceklesenNavlun[] = planHam.filter((p) => p.kaynak !== "siparis").map((p) => ({
+  const plan: PlanNavlunSatiri[] = planHam.map((p) => ({
     varis_limani: metin(p.varis_limani), acente: metin(p.acente), navlun: p.navlun == null || p.navlun === "" ? null : Number(p.navlun) || null,
-    navlun_para: metin(p.navlun_para), etd: metin(p.etd),
+    navlun_para: metin(p.navlun_para), etd: metin(p.etd), kaynak: metin(p.kaynak), booking_no: metin(p.booking_no), musteri: metin(p.musteri),
+    konteyner: p.konteyner == null || p.konteyner === "" ? null : Number(p.konteyner) || null, dosya_no: metin(p.dosya_no),
+    hafta: p.hafta == null ? null : Number(p.hafta) || null, yil: p.yil == null ? null : Number(p.yil) || null,
   }));
-  return navlunTablosuHesapla(olaylar, plan, tarih);
+  const tablo = navlunTablosuHesapla(olaylar, plan.filter((p) => p.kaynak !== "siparis"), tarih);
+  return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar) };
 }
 
-async function excelBase64(t: Awaited<ReturnType<typeof sirketTablosu>>): Promise<string> {
+async function excelBase64(v: Awaited<ReturnType<typeof sirketTablosu>>): Promise<string> {
   const zip = new JSZip();
-  for (const f of xlsxParcalari([navlunTablosuSayfasi(t)])) zip.file(f.yol, f.icerik);
+  for (const f of xlsxParcalari([satinAlmaSayfasi(v.satinAlma, v.tablo.tarih), navlunTablosuSayfasi(v.tablo)])) zip.file(f.yol, f.icerik);
   return await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
 }
 
@@ -164,13 +168,15 @@ Deno.serve(async (req: Request) => {
       // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
       const test = !deneme && (govde.test === true || !ayar.canli);
       const alicilar = test ? TEST_ALICISI : ayar.alicilar;
+      const cc = test ? [] : ayar.cc;   // 12.11.2026: Ayarlar > Rapor Alicilari CC
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
-      const tablo = await sirketTablosu(companyId, tarih);
-      const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar };
-      const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi)}`;
+      const veri = await sirketTablosu(companyId, tarih);
+      const tablo = veri.tablo;
+      const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar, booking: veri.satinAlma.satirlar.length, navlunsuz: veri.satinAlma.belirsiz };
+      const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
       // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat)
       const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&order=gonderim_zamani.desc.nullslast&limit=1`);
-      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum) });
+      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum), satinAlma: veri.satinAlma });
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
@@ -192,12 +198,12 @@ Deno.serve(async (req: Request) => {
       if (!k.ok) throw new Error(`navlun_tablosu_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);
       const kayitId = ((await k.json()) as { id: string }[])[0]?.id;
 
-      const ek = await excelBase64(tablo);
+      const ek = await excelBase64(veri);
       const mRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html,
+          from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, ...(cc.length ? { cc } : {}), subject: konu, html,
           attachments: [{ filename: `Navlun_Tablosu_${tarih}.xlsx`, content: ek }],
         }),
       });
@@ -210,7 +216,7 @@ Deno.serve(async (req: Request) => {
         await fetch(`${SUPABASE_URL}/rest/v1/navlun_tablosu_gonderimleri?id=eq.${kayitId}`, {
           method: "PATCH",
           headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ durum: "gonderildi", alicilar: alicilar.join(","), ozet, gonderim_zamani: new Date().toISOString() }),
+          body: JSON.stringify({ durum: "gonderildi", alicilar: [...alicilar, ...cc.map((x) => `cc:${x}`)].join(","), ozet, gonderim_zamani: new Date().toISOString() }),
         });
       }
       sonuclar.push({ gonderildi: true, tarih, oturum, test, konu: yetkili ? konu : undefined, alici: yetkili ? alicilar : undefined, ozet: yetkili ? ozet : undefined });

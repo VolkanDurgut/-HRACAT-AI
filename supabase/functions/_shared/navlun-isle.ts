@@ -52,11 +52,15 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
       const ekBilgi = olaylar.find((o) => o.tur === "ek_teklif");
       const ekDuz = g.ek_metin.replace(/\s+/g, " ");
       const ekTransit = transitBul(ekDuz);
+      // 12.11.2026: imzadan sonra yazilan not ("Saygilarimla, ONE LINE, FT 5 DAYS - 30.11 GECERLIDIR") da okunur
+      const imzali = yeniKisim(g.govde, true).replace(/\s+/g, " ");
+      const imzaFt = freeTimeBul(imzali);
+      const imzaArmator = armatorAdi(imzali.slice(yeniKisim(g.govde).replace(/\s+/g, " ").length));
       olaylar = [
         ...olaylar.filter((o) => o.tur !== "ek_teklif"),
         ...ekten.map((o) => ({
-          ...o, free_time_gun: o.free_time_gun ?? ekBilgi?.free_time_gun ?? null, gecerlilik: o.gecerlilik ?? ekBilgi?.gecerlilik ?? null,
-          armator: o.armator ?? ekBilgi?.armator ?? null, transit_gun: o.transit_gun ?? ekBilgi?.transit_gun ?? ekTransit,
+          ...o, free_time_gun: o.free_time_gun ?? ekBilgi?.free_time_gun ?? imzaFt ?? null, gecerlilik: o.gecerlilik ?? ekBilgi?.gecerlilik ?? null,
+          armator: o.armator ?? ekBilgi?.armator ?? imzaArmator ?? null, transit_gun: o.transit_gun ?? ekBilgi?.transit_gun ?? ekTransit,
         })),
       ];
     }
@@ -89,7 +93,8 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
 export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): { free_time_gun: number | null; transit_gun: string | null } {
   const metin = yeniKisim(g.govde || "").replace(/\s+/g, " ");
   const ek = (g.ek_metin || "").replace(/\s+/g, " ");
-  return { free_time_gun: freeTimeBul(metin) ?? (ek ? freeTimeBul(ek) : null), transit_gun: transitBul(metin) ?? (ek ? transitBul(ek) : null) };
+  const imzali = yeniKisim(g.govde || "", true).replace(/\s+/g, " ");
+  return { free_time_gun: freeTimeBul(metin) ?? (ek ? freeTimeBul(ek) : null) ?? freeTimeBul(imzali), transit_gun: transitBul(metin) ?? (ek ? transitBul(ek) : null) };
 }
 
 

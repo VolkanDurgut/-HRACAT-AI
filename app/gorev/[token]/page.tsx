@@ -14,7 +14,7 @@ import { ACCENT, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
  * PAZAR 3.3 / 3.4 - "Bugunku musteriniz" gorev sayfasi (10.11.2026). GIRISSIZ (gunluk maildeki token, 3 gun).
  * Kullanici: "Basla butonu evren gibi bir ekran acsin; 3 insan gibi sablon, Outlook ile; WhatsApp ilk mesaj;
  * basari ekraninda 'Yeni musteriyle devam et'." Kilavuzdaki yildiz alani (evren) arka plan; devam ederken isik gecisi.
- * Akis: kisi + sablon sec -> duzenle -> "Outlook'ta ac" (mailto, CC bbt@ + execution@) -> "Gonderdim" (kayit) ->
+ * Akis: kisi + sablon sec -> duzenle -> "Outlook'ta ac" (mailto, CC execution@; 12.11.2026 bbt@ cikarildi) -> "Gonderdim" (kayit) ->
  * basari. Sonuc dugmeleri: Cevap verdi / Teklif istedi / Siparis verdi / Ilgilenmiyor / Bugun atla.
  * Kurallar (sonraki adim tarihleri) veritabaninda: pazar_gorev_isle (migration 20261110060000).
  * 10.11.2026: gorev kisiye atanir (Harun Bey export@ / Safak Bey export2@ -> pazar_ekip); "Ben" secimi kalkti,

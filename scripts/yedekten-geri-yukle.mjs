@@ -2,14 +2,14 @@
 // ============================================================================
 // YEDEKTEN GERI YUKLEME (felaket kurtarma) — docs/felaket-kurtarma.md adim 5
 // ============================================================================
-// Gece yedek mailindeki JSON dosyasini (ihracat-ai-yedek-GG-AA-YYYY.json)
+// Gece yedek mailindeki dosyayi (ihracat-ai-yedek-GG-AA-YYYY.zip; icinde ayni adli .json - 13.11.2026)
 // YENI ve BOS bir Supabase projesine geri yukler.
 //
 // Kullanim (bilgisayarinizda, proje klasorunde):
 //   HEDEF_SUPABASE_URL=https://<yeni-ref>.supabase.co \
 //   HEDEF_SERVICE_ROLE_KEY=<yeni projenin service_role anahtari> \
-//   node scripts/yedekten-geri-yukle.mjs <yedek.json>            -> sadece plan (hicbir sey yazmaz)
-//   node scripts/yedekten-geri-yukle.mjs <yedek.json> --onayla   -> gercekten yukler
+//   node scripts/yedekten-geri-yukle.mjs <yedek.zip|json>        -> sadece plan (hicbir sey yazmaz)
+//   node scripts/yedekten-geri-yukle.mjs <yedek.zip|json> --onayla -> gercekten yukler
 //
 // GUVENLIK KILITLERI:
 //   * Canli proje (tnzbihsfbhqzkcliicdk) hedef olarak REDDEDILIR.
@@ -95,7 +95,16 @@ async function satirSayisi(tablo) {
   return Number(aralik.split("/")[1] || 0);
 }
 
-const paket = JSON.parse(readFileSync(dosyaYolu, "utf8"));
+// 13.11.2026: yedek maili eki .zip (icinde .json). Ikisi de kabul edilir.
+async function paketMetni(yol) {
+  if (!/\.zip$/i.test(yol)) return readFileSync(yol, "utf8");
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(readFileSync(yol));
+  const json = Object.values(zip.files).find((f) => !f.dir && /\.json$/i.test(f.name));
+  if (!json) dur("Zip icinde .json yedek dosyasi yok.");
+  return await json.async("string");
+}
+const paket = JSON.parse(await paketMetni(dosyaYolu));
 const bilgi = paket._bilgi || {};
 const kullanicilar = Array.isArray(paket._kullanicilar) ? paket._kullanicilar : [];
 console.log(`Yedek: ${dosyaYolu}`);
@@ -103,7 +112,10 @@ console.log(`  olusturulma: ${bilgi.olusturulma || "?"}, surum: ${bilgi.surum ??
 if ((bilgi.uyarilar || []).length) console.log(`  ⚠ yedekteki uyarilar: ${bilgi.uyarilar.join(" | ")}`);
 if (!kullanicilar.length) console.log("  ⚠ yedekte kullanici listesi yok (surum < 3): kullanicilari elle, AYNI kimlikle olusturun.");
 
-const plan = TABLO_SIRASI.filter((t) => Array.isArray(paket[t])).map((t) => ({ tablo: t, adet: paket[t].length }));
+// 13.11.2026: listede olmayan (sonradan eklenen) tablolar paketteki sirayla, denetim kayitlarindan ONCE yuklenir.
+const listeDisi = Object.keys(paket).filter((t) => !t.startsWith("_") && Array.isArray(paket[t]) && !TABLO_SIRASI.includes(t));
+const SIRA = [...TABLO_SIRASI.filter((t) => t !== "denetim_kayitlari"), ...listeDisi, "denetim_kayitlari"];
+const plan = SIRA.filter((t) => Array.isArray(paket[t])).map((t) => ({ tablo: t, adet: paket[t].length }));
 const eksik = TABLO_SIRASI.filter((t) => !Array.isArray(paket[t]));
 console.log(`\nHedef: ${URL_}`);
 console.log(`Plan: ${kullanicilar.length} kullanici, ${plan.reduce((s, p) => s + p.adet, 0)} satir`);

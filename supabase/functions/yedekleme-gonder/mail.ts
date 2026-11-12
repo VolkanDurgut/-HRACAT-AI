@@ -18,6 +18,9 @@ export type YedekMailGirdisi = {
   ekSigiyor: boolean;
   ekAdi: string;
   ekBayt: number;
+  /** 13.11.2026: ek .zip; icindeki .json'un adi ve boyutu */
+  jsonAdi?: string;
+  jsonBayt?: number;
   toplamKayit: number;
   tablolar: TabloSayisi[];
   kapasite: KapasiteGirdisi[];
@@ -85,6 +88,26 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   pazar_gorev_gonderimleri: { ad: "Günlük görev maili kaydı", grup: "Pazar (CRM)" },
   pazar_ekip: { ad: "Satış ekibi (görev alanlar)", grup: "Pazar (CRM)" },
   pazar_gelenler: { ad: "Arşivden yakalanan müşteri cevapları", grup: "Pazar (CRM)" },
+  siparis_defteri: { ad: "Sipariş defteri (proformalar)", grup: "Sipariş, plan ve navlun" },
+  siparis_defteri_aktarimlari: { ad: "Sipariş listesi Excel yüklemeleri", grup: "Sipariş, plan ve navlun" },
+  siparis_on_odemeler: { ad: "Ön ödeme işaretleri", grup: "Sipariş, plan ve navlun" },
+  sevkiyat_plani: { ad: "Yükleme planı", grup: "Sipariş, plan ve navlun" },
+  sevkiyat_plani_aktarimlari: { ad: "Yükleme planı Excel yüklemeleri", grup: "Sipariş, plan ve navlun" },
+  odeme_excel_yuklemeleri: { ad: "Tahsilat Excel yüklemeleri", grup: "Sipariş, plan ve navlun" },
+  odeme_hatirlatmalari: { ad: "Ödeme hatırlatma mailleri", grup: "Sipariş, plan ve navlun" },
+  navlun_acenteler: { ad: "Navlun acenteleri", grup: "Sipariş, plan ve navlun" },
+  navlun_mesajlari: { ad: "Navlun mailleri (acente yazışmaları)", grup: "Sipariş, plan ve navlun" },
+  navlun_teklifleri: { ad: "Navlun teklifleri / anlaşmalar", grup: "Sipariş, plan ve navlun" },
+  fatura_talimati_onaylari: { ad: "Fatura talimatı onayları", grup: "Sipariş, plan ve navlun" },
+  konsimento_hatirlatmalari: { ad: "Konşimento hatırlatmaları", grup: "Sipariş, plan ve navlun" },
+  rapor_alicilari: { ad: "Rapor alıcıları (Ayarlar)", grup: "Raporlar" },
+  rapor_adres_defteri: { ad: "Rapor adres defteri", grup: "Raporlar" },
+  rapor_gonderimleri: { ad: "Günlük ihracat raporu gönderimleri", grup: "Raporlar" },
+  ic_gunluk_rapor_gonderimleri: { ad: "İç piyasa raporu gönderimleri", grup: "Raporlar" },
+  diib_rapor_gonderimleri: { ad: "DİİB raporu gönderimleri", grup: "Raporlar" },
+  vgm_rapor_gonderimleri: { ad: "VGM raporu gönderimleri", grup: "Raporlar" },
+  siparis_rapor_gonderimleri: { ad: "Sipariş raporu gönderimleri", grup: "Raporlar" },
+  navlun_tablosu_gonderimleri: { ad: "Navlun raporu gönderimleri", grup: "Raporlar" },
   companies: { ad: "Şirket", grup: "Kullanıcılar ve sistem" },
   kullanici_rolleri: { ad: "Kullanıcı rolleri", grup: "Kullanıcılar ve sistem" },
   kullanici_yetkileri: { ad: "Kullanıcı yetkileri", grup: "Kullanıcılar ve sistem" },
@@ -93,7 +116,7 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ai_usage_logs: { ad: "Yapay zekâ kullanım kayıtları", grup: "Kullanıcılar ve sistem" },
   denetim_kayitlari: { ad: "Denetim kayıtları (değişiklik geçmişi)", grup: "Kullanıcılar ve sistem" },
 };
-const GRUP_SIRASI = ["İhracat operasyonu", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Satın alma", "Pazar (CRM)", "Kullanıcılar ve sistem", "Diğer"];
+const GRUP_SIRASI = ["İhracat operasyonu", "Sipariş, plan ve navlun", "Evrak ayarları", "Proforma", "İç piyasa", "Kantar ve DBA otomasyonu", "Satın alma", "Pazar (CRM)", "Raporlar", "Kullanıcılar ve sistem", "Diğer"];
 
 /**
  * Kaydi 0 olan tablonun NEDENI (26.10.2026 canli kontrol: kod + veritabani).
@@ -252,7 +275,7 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
 
   // --- Ek ve oneriler
   const ekSatiri = g.ekSigiyor
-    ? `<b>Ek:</b> <span style="font-family:monospace;word-break:break-all">${esc(g.ekAdi)}</span> (${mbYaz(g.ekBayt)})`
+    ? `<b>Ek:</b> <span style="font-family:monospace;word-break:break-all">${esc(g.ekAdi)}</span> (${mbYaz(g.ekBayt)})${g.jsonAdi ? ` · sıkıştırılmış; içinde <span style="font-family:monospace">${esc(g.jsonAdi)}</span>${g.jsonBayt ? ` (${mbYaz(g.jsonBayt)})` : ""}` : ""}`
     : `<b style="color:#B91C1C">Yedek dosyası bu sefer eke sığmadı</b> (${mbYaz(g.ekBayt)}).`;
 
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>

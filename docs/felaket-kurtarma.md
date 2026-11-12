@@ -25,7 +25,7 @@ birebir" satırı görünmüyorsa veya konu `[UYARI]` ile başlıyorsa incelenme
 
 ## Gerekenler
 
-- En son yedek maili eki: `ihracat-ai-yedek-GG-AA-YYYY.json`
+- En son yedek maili eki: `ihracat-ai-yedek-GG-AA-YYYY.zip` (13.11.2026'dan beri sıkıştırılmış; içinde aynı adlı `.json`. Betik `.zip` ve `.json`'u doğrudan kabul eder)
 - Bu repo (GitHub: `VolkanDurgut/-HRACAT-AI`) ve bilgisayarda Node.js 18+
 - Supabase CLI (önerilir) veya Supabase panelindeki SQL Editor
 - Gizli anahtarlar (değerleri BURADA YAZMAZ; şifre yöneticisinde/ilgili panellerde):
@@ -73,7 +73,7 @@ bir araçtı, yeni projeye kurulmaz.)
 ### 5) Veriyi geri yükle (~5 dk)
 Önce **sadece plan** (hiçbir şey yazmaz):
 ```
-HEDEF_SUPABASE_URL=https://<YENI_REF>.supabase.co HEDEF_SERVICE_ROLE_KEY=<yeni service_role> node scripts/yedekten-geri-yukle.mjs ihracat-ai-yedek-GG-AA-YYYY.json
+HEDEF_SUPABASE_URL=https://<YENI_REF>.supabase.co HEDEF_SERVICE_ROLE_KEY=<yeni service_role> node scripts/yedekten-geri-yukle.mjs ihracat-ai-yedek-GG-AA-YYYY.zip
 ```
 Plan doğruysa aynı komutun sonuna `--onayla` ekleyin. Betik:
 kullanıcıları **aynı kimlikle** (geçici şifreyle) oluşturur → tetikleyicinin

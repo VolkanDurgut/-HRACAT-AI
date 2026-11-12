@@ -48,6 +48,8 @@ export type NavlunBlogu = {
   aylar: string[];
   /** liman anahtari -> ay -> hucre */
   hucreler: Map<string, Map<string, NavlunHucresi>>;
+  /** liman anahtari -> TUM teklifler (13.11.2026: ayni ayda gerceklesen navlun hucreyi alsa da teklif "en iyi" hesabinda kalir) */
+  teklifler: Map<string, NavlunHucresi[]>;
   /** liman anahtari -> son free time (gun) */
   freeTime: Map<string, number>;
   /** liman anahtari -> son transit suresi (gun, "46-48") */
@@ -80,8 +82,9 @@ const AD_ESLER: [RegExp, string][] = [
 const LIMAN_ESLER: Record<string, string> = { MALDIVES: "MALE", "DAR ES SELAM": "DAR ES SALAAM" };
 
 const buyuk = (s: string) => s.trim().replace(/\s+/g, " ").toLocaleUpperCase("tr-TR");
+/** Acente / hat adlari Latin: Ingilizce buyuk harf (13.11.2026: "Link" -> "LINK", "LİNK" degil). */
 export function sirketAdi(s: string): string {
-  const u = buyuk(s);
+  const u = s.trim().replace(/\s+/g, " ").toUpperCase();
   for (const [re, ad] of AD_ESLER) if (re.test(u)) return ad;
   return u;
 }
@@ -116,7 +119,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
   const bloklar = new Map<string, NavlunBlogu>();
   const blok = (ad: string) => {
     let b = bloklar.get(ad);
-    if (!b) { b = { ad, aylar: [], hucreler: new Map(), freeTime: new Map(), transit: new Map(), limanSayisi: 0 }; bloklar.set(ad, b); }
+    if (!b) { b = { ad, aylar: [], hucreler: new Map(), teklifler: new Map(), freeTime: new Map(), transit: new Map(), limanSayisi: 0 }; bloklar.set(ad, b); }
     return b;
   };
   const yaz = (b: NavlunBlogu, k: string, h: NavlunHucresi) => {
@@ -142,7 +145,9 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     else if (o.tur !== "teklif" && o.tur !== "karsi_teklif") continue;
     if (!tutar || tutar <= 0) continue;
     const b = blok(blokAdi(o.acente, o.armator));
-    yaz(b, k, { tutar, para, ekipman: (o.ekipman || "20DC").toUpperCase(), tarih: o.tarih, kaynak: "teklif" });
+    const th: NavlunHucresi = { tutar, para, ekipman: (o.ekipman || "20DC").toUpperCase(), tarih: o.tarih, kaynak: "teklif" };
+    yaz(b, k, th);
+    b.teklifler.set(k, [...(b.teklifler.get(k) || []), th]);
     if (o.free_time_gun != null) b.freeTime.set(k, o.free_time_gun);
     if (o.transit_gun) b.transit.set(k, o.transit_gun);
   }
@@ -246,9 +251,9 @@ export function guncelEnIyiler(t: NavlunTablosu, gun = 60): GuncelEnIyi[] {
     let sonGelen: GuncelEnIyi["son"] = null;
     let sayi = 0;
     for (const b of t.bloklar) {
-      const m = b.hucreler.get(l.anahtar);
+      const m = b.teklifler.get(l.anahtar);
       if (!m) continue;
-      const son = Array.from(m.values()).filter((h) => h.kaynak === "teklif" && h.ekipman === "20DC" && h.para === "USD" && h.tarih.slice(0, 10) >= sinir)
+      const son = m.filter((h) => h.kaynak === "teklif" && h.ekipman === "20DC" && h.para === "USD" && h.tarih.slice(0, 10) >= sinir)
         .sort((a, c) => c.tarih.localeCompare(a.tarih))[0];
       if (!son) continue;
       sayi++;
@@ -313,8 +318,6 @@ export type NavlunSatinAlma = {
   satirlar: SatinAlmaSatiri[];
   toplam: Record<string, number>; konteyner: number; belirsiz: number;
   bekleyen: { siparis: number; konteyner: number };
-  /** Booking'i listede gorunen (ayni musteri + ayni liman) ama siparis listesinde hala "on odeme alindi" duran siparisler: bekleyenden dusulur */
-  bookingli: { siparis: number; konteyner: number };
   /** 12.11.2026 kullanici: "Rezervasyon bekleyen musteriler alt kisimda kendi basligi altinda" */
   bekleyenler: BekleyenSatiri[];
 };
@@ -387,21 +390,17 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
       toplam: navlun !== null ? navlun * kont : null, kaynak, kaynakTarih, eslesme, enIyi: e ? { tutar: e.tutar, blok: e.blok } : null,
     });
   }
-  // Rezervasyon bekleyenler (12.11.2026 canli kontrol): siparis listesindeki durum booking alininca hemen degismiyor; ayni musteri +
-  // ayni limanda listede (ETD bugun / ileride) booking'i olan siparis, booking'in konteyner adedi kadar bekleyenden dusulur.
+  // Rezervasyon bekleyenler: yukleme_plani_veri 'siparis' satirlari = siparis_listesi_veri'de "on_odeme_alindi" kalanlar.
+  // 13.11.2026: booking'i planda olan siparis VERITABANINDA "rezervasyonlu" sayilir (migration 20261113010000; sayfa, siparis
+  // raporu ve bu rapor ayni kurali gorur). 12.11'deki rapor ici musteri+liman dusumu kaldirildi (ayni proformadaki baska
+  // siparisin booking'ini de sayiyordu).
   const musteriAnahtari = (m: string | null) => buyuk(m || "").replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
-  const kapasite = new Map<string, number>();
-  for (const x of satirlar) { const a = `${musteriAnahtari(x.musteri)}|${x.limanAnahtar}`; kapasite.set(a, (kapasite.get(a) || 0) + x.konteyner); }
-  let bekleyenSiparis = 0, bekleyenKont = 0, bookingliSiparis = 0, bookingliKont = 0;
+  let bekleyenSiparis = 0, bekleyenKont = 0;
   const bekleyenler: BekleyenSatiri[] = [];
   for (const p of plan) {
     if (p.kaynak !== "siparis") continue;
     const bk = limanKey(p.varis_limani);
     const kont = p.konteyner || 0;
-    const a = `${musteriAnahtari(p.musteri)}|${bk}`;
-    const kalan = bk && musteriAnahtari(p.musteri) ? kapasite.get(a) || 0 : 0;
-    // Konteyner adedi bos siparis: ayni musteri + limanda booking varsa o da dusulur
-    if (kalan > 0 && kalan >= kont) { kapasite.set(a, kalan - kont); bookingliSiparis++; bookingliKont += kont; continue; }
     bekleyenSiparis++; bekleyenKont += kont;
     const bad = bk ? adlar.get(bk) || (p.varis_limani || bk).toLocaleUpperCase("tr-TR") : (p.varis_limani || "-").toLocaleUpperCase("tr-TR");
     const be = enIyiler.get(bad);
@@ -417,7 +416,7 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
   for (const x of satirlar) if (x.toplam !== null) toplam[x.para] = (toplam[x.para] || 0) + x.toplam;
   return {
     satirlar, toplam, konteyner: satirlar.reduce((a, x) => a + x.konteyner, 0), belirsiz: satirlar.filter((x) => x.kaynak === "belirsiz").length,
-    bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont }, bookingli: { siparis: bookingliSiparis, konteyner: bookingliKont },
+    bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont },
     bekleyenler: bekleyenler.sort((a, b) => a.liman.localeCompare(b.liman, "tr") || (a.musteri || "").localeCompare(b.musteri || "", "tr")),
   };
 }
@@ -450,7 +449,7 @@ export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLU
   const birlestir = ["A1:K1"];
   if (sa.bekleyenler.length) {
     satirlar.push([]);
-    satirlar.push([{ v: `REZERVASYON BEKLEYEN MÜŞTERİLER · ${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} kont. (ön ödemesi alındı, navlunu henüz satın alınmadı)${sa.bookingli.siparis ? ` · ${sa.bookingli.siparis} sipariş (${sa.bookingli.konteyner} kont.) booking'i üstte olduğu için düşüldü` : ""}`, s: XS.baslik }]);
+    satirlar.push([{ v: `REZERVASYON BEKLEYEN MÜŞTERİLER · ${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} kont. (ön ödemesi alındı, navlunu henüz satın alınmadı)`, s: XS.baslik }]);
     birlestir.push(`A${satirlar.length}:K${satirlar.length}`);
     // Sutunlar ust tabloyla hizali: C musteri, D liman, E en iyi teklifin acentesi, F kont., G guncel en iyi 20'DC
     satirlar.push(["", "", "MÜŞTERİ", "VARIŞ LİMANI", "EN İYİ TEKLİF (ACENTE / HAT)", "KONT.", "GÜNCEL EN İYİ 20'DC"].map((v) => ({ v, s: XS.tabloBaslik })));
@@ -500,9 +499,9 @@ export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
   return t.limanlar.map((l) => {
     const sonlar: { b: NavlunBlogu; h: NavlunHucresi }[] = [];
     for (const b of t.bloklar) {
-      const m = b.hucreler.get(l.anahtar);
+      const m = b.teklifler.get(l.anahtar);
       if (!m) continue;
-      const h = Array.from(m.values()).filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD").sort((x, y) => y.tarih.localeCompare(x.tarih))[0];
+      const h = m.filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD").sort((x, y) => y.tarih.localeCompare(x.tarih))[0];
       if (h) sonlar.push({ b, h });
     }
     const guncel = sonlar.filter((x) => x.h.tarih.slice(0, 10) >= sinir);
@@ -597,7 +596,7 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
     ) : `<div style="font-size:12px;color:#64748B">Yükleme planında ETD'si bugün / ileride booking yok.</div>`)
     + (sa.belirsiz ? `<div style="margin-top:5px;font-size:11.5px;color:#B45309">${sa.belirsiz} booking'in navlunu sistemde yok (dosya / yükleme planı / anlaşma maili).</div>` : "");
 
-  const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı${sa.bookingli.siparis ? ` · ${sa.bookingli.siparis} sipariş (${sa.bookingli.konteyner} kont.) booking'i yukarıda olduğu için düşüldü` : ""}`, "#F4A07C")
+  const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı`, "#F4A07C")
     + (sa.bekleyenler.length ? sikiTablo(
       [{ ad: "Müşteri" }, { ad: "Varış limanı" }, { ad: "Kont", sag: true }, { ad: "Güncel en iyi 20'DC", sag: true }, { ad: "Acente / Hat" }],
       sa.bekleyenler.map((b) => [

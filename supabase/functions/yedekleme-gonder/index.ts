@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import JSZip from "npm:jszip@3.10.1";
 import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 
 // ============================================================================
@@ -45,6 +46,9 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //  - MAIL GORUNUMU (26.10.2026): gunluk raporla ayni kurumsal tasarim, tablolar
 //    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
 //    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
+//  - SIKISTIRILMIS EK (13.11.2026, kullanici: "Gunluk yedek maili gelmiyor"): 11.11'den beri JSON 10 MB'i asti
+//    (mail ~14 MB) ve execution@ kutusuna ulasmadi (Resend kabul etti, alici sunucusu boyut sinirina takildi; son
+//    ulasan 10.11, ~10,8 MB). Ek artik .zip (icinde ayni .json, DEFLATE ~%90 kucuk). Sinir sikistirilmis boyuta uygulanir.
 //  - TEST MAILI (26.10.2026): govdede {"test_maili": true} -> 20 saatlik tekrar korumasi
 //    ATLANIR, KISISEL_ALICI'ya (sirket adreslerine DEGIL) "[TEST]" konulu tam mail (ek dahil) gider, yedek_kayitlari'na
 //    durum='test' yazilir (gece yedeginin tekrar korumasina SAYILMAZ). Kotuye kullanim
@@ -136,6 +140,30 @@ const YEDEKLENECEK_TABLOLAR = [
   // PAZAR satis ekibi (gorev alanlar) + arsivden tespit edilen musteri cevaplari (10.11.2026, 3.3b / 3.5)
   "pazar_ekip",
   "pazar_gelenler",
+  // 13.11.2026 kontrol: yedekte OLMAYAN is tablolari eklendi (kullanici: "gerekli kontrolleri sagla").
+  // Siparis defteri, on odemeler, yukleme plani (Excel aktarimlari dahil)
+  "siparis_defteri",
+  "siparis_defteri_aktarimlari",
+  "siparis_on_odemeler",
+  "sevkiyat_plani",
+  "sevkiyat_plani_aktarimlari",
+  // Odeme takibi (tahsilat Excel'i + musteri hatirlatmalari)
+  "odeme_excel_yuklemeleri",
+  "odeme_hatirlatmalari",
+  // Navlun bildirimi (acente mailleri, okunan teklifler)
+  "navlun_acenteler",
+  "navlun_mesajlari",
+  "navlun_teklifleri",
+  // Fatura talimati onayi, konsimento hatirlatma
+  "fatura_talimati_onaylari",
+  "konsimento_hatirlatmalari",
+  // Rapor gonderim kayitlari (hangi rapor kime ne zaman gitti)
+  "rapor_gonderimleri",
+  "ic_gunluk_rapor_gonderimleri",
+  "diib_rapor_gonderimleri",
+  "vgm_rapor_gonderimleri",
+  "siparis_rapor_gonderimleri",
+  "navlun_tablosu_gonderimleri",
 ];
 
 // "id" kolonu OLMAYAN ayar tablolari: pakete "_" onekiyle girer
@@ -145,6 +173,9 @@ const YEDEKLENECEK_TABLOLAR = [
 const AYAR_TABLOLARI: Record<string, string> = {
   ic_piyasa_ayarlari: "company_id.asc",
   proforma_ayarlari: "company_id.asc", // Proforma sablon metinleri (17.10.2026)
+  // Ayarlar > Rapor Alicilari (13.11.2026)
+  rapor_alicilari: "company_id.asc,rapor.asc",
+  rapor_adres_defteri: "company_id.asc,eposta.asc",
 };
 
 // Denetim kayitlari: sadece son N gun (kayan pencere).
@@ -152,9 +183,9 @@ const DENETIM_TABLOSU = "denetim_kayitlari";
 const DENETIM_GUN = 7;
 
 const SAYFA_BOYUTU = 1000;
-// Resend toplam mail siniri 40 MB (base64 dahil). Base64 ~%33 buyuttugu
-// icin ham JSON icin 25 MB guvenli ust sinir.
-const MAKS_EK_BAYT = 25 * 1024 * 1024;
+// Ek .zip olarak gider (13.11.2026). Sinir SIKISTIRILMIS boyuta uygulanir: kurumsal posta sunuculari ~10 MB ustu
+// maili (base64 ile ~%33 buyur) reddedebiliyor; 6 MB zip ~8 MB mail eder.
+const MAKS_EK_BAYT = 6 * 1024 * 1024;
 // Ayni gun icinde ikinci bir yedek maili gonderilmez.
 const TEKRAR_BEKLEME_SAAT = 20;
 // Test maili: son 24 saatte en fazla bu kadar (anon anahtarla cagrilabildigi icin).
@@ -534,9 +565,14 @@ Deno.serve(async (req: Request) => {
     }
     const jsonIcerik = JSON.stringify(paket, null, 2);
     const jsonBayt = new TextEncoder().encode(jsonIcerik).length;
-    const ekSigiyor = jsonBayt <= MAKS_EK_BAYT;
+    const jsonAdi = `ihracat-ai-yedek-${tarih.replace(/\./g, "-")}.json`;
+    const zip = new JSZip();
+    zip.file(jsonAdi, jsonIcerik);
+    const ekBase64 = await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
+    const zipBayt = Math.floor((ekBase64.length * 3) / 4);
+    const ekSigiyor = zipBayt <= MAKS_EK_BAYT;
     if (!ekSigiyor) {
-      uyarilar.push(`Yedek dosyası çok büyük (${mbYaz(jsonBayt)} > ${mbYaz(MAKS_EK_BAYT)}); mail eki olarak gönderilemedi.`);
+      uyarilar.push(`Yedek dosyası çok büyük (sıkıştırılmış ${mbYaz(zipBayt)} > ${mbYaz(MAKS_EK_BAYT)}); mail eki olarak gönderilemedi.`);
     }
 
     const toplamKayit = tabloSayilari.reduce((s, t) => s + (t.adet || 0), 0);
@@ -560,13 +596,15 @@ Deno.serve(async (req: Request) => {
     };
 
     const saat = simdi.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
-    const ekAdi = `ihracat-ai-yedek-${tarih.replace(/\./g, "-")}.json`;
+    const ekAdi = jsonAdi.replace(/\.json$/, ".zip");
     const mailGirdisi = {
       tarih,
       saat,
       ekSigiyor,
       ekAdi,
-      ekBayt: jsonBayt,
+      ekBayt: zipBayt,
+      jsonAdi,
+      jsonBayt,
       toplamKayit,
       tablolar: tabloSayilari,
       kapasite: kapasite.map((k) => ({ ...k, durum: kapasiteDurumu(k.oran) })),
@@ -593,7 +631,7 @@ Deno.serve(async (req: Request) => {
       mailGovdesi.attachments = [
         {
           filename: ekAdi,
-          content: btoa(unescape(encodeURIComponent(jsonIcerik))),
+          content: ekBase64,
         },
       ];
     }

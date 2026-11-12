@@ -137,6 +137,28 @@ yeri ve ilerisini gösteren bir şey olmalı." / "Sipariş listesi için mail ra
 - Navlun Bildirimi: sağda kare kutularda "yeni bilgi" paneli (son görülme tarayıcıda), kutuya tıklayınca limana gider.
 - Test: e2e_siparis 67, e2e_navlun 42 (+ e2e 46, yetki 38, rehber 22, kılavuz+vgm 44, pazar 80, görev 50).
 
+## 4.8 Planda booking'i olan sipariş = "rezervasyonlu" (13.11.2026)
+Kullanıcı: "Her şey tablolar, veritabanı ve mailler ile birebir uyuşmalı." Sorun: yükleme planında booking'i alınmış ama
+plan satırı siparişe bağlanmamış (`siparis_id` boş) siparişler "ön ödeme alındı / rezervasyon bekliyor" görünüyordu;
+navlun raporu bunu rapor içinde müşteri + liman eşleştirmesiyle düşüyordu ve aynı proformadaki BAŞKA siparişin booking'ini
+de sayarak gerçekten bekleyen siparişi yanlışlıkla düşürebiliyordu.
+- Migration `20261113010000_siparis_plan_rezervasyon_eslesme.sql` (CANLIDA): `siparis_firma_anahtar()`,
+  `siparis_liman_anahtar()` (PORT/LİMANI atılır, virgülden önce; SINGAPUR→SINGAPORE, CIBUTI→DJIBOUTI, MALDIVES→MALE);
+  `siparis_listesi_veri` yeniden yazıldı: siparişe BAĞLI plan satırları önce kendi siparişini kapatır; bağlanmamış,
+  dosyası açılmamış, ETD'si bugün / ileride (ETD boşsa haftası bu hafta / ileride) booking'li plan satırları firma + liman
+  anahtarına göre toplanır; ön ödemesi alınmış siparişler ön ödeme tarihi → proforma sırasıyla, kümülatif konteyner bu
+  kapasiteyi aşmadıkça "rezervasyonlu" olur. Booking no / ETD yalnız tek booking varsa doldurulur.
+- Sayfa, sipariş raporu ve navlun raporu AYNI veritabanı kuralını görür; `_shared/navlun-tablosu.ts`'teki rapor içi
+  düşüm kaldırıldı (edge navlun-tablosu v14).
+- Navlun raporu ayrıca: aynı ayda gerçekleşen navlun hücreyi alsa da teklif "en iyi" hesabında kalır (`teklifler`);
+  acente / hat adları İngilizce büyük harf ("LINK", "LİNK" değil).
+
+## 4.9 Gece veri yedeği: sıkıştırılmış ek + eksik tablolar (13.11.2026)
+JSON ~10 MB'ı aşınca (mail ~14 MB) Resend kabul etse de yedek maili alıcıya ulaşmıyordu (son ulaşan 10.11). Edge
+`yedekleme-gonder` v47: ek artık `.zip` (DEFLATE 9; içinde aynı JSON), sınır sıkıştırılmış boyuta uygulanır. Sipariş,
+plan, navlun, fatura onayı ve rapor gönderim tabloları yedeğe eklendi; `rapor_alicilari` + `rapor_adres_defteri` ayar
+tablosu. `scripts/yedekten-geri-yukle.mjs` .zip okur; listede olmayan tabloları paket sırasıyla yükler.
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

@@ -181,8 +181,16 @@ function bankaAnahtari(ham: string | null | undefined): string | null {
 
 const kg = (x: number) => `${x.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} kg`;
 const para = (x: number, pb: string | null) => `${x.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${pb || ""}`.trim();
-/** Kantar / yuvarlama payi: 50 kg ya da %0,2 (buyugu). */
-const agirlikPayi = (beklenen: number) => Math.max(50, beklenen * 0.002);
+/**
+ * Agirlik payi: YALNIZ yuvarlama (1 kg). 12.11.2026 kullanici: "Net kg faturada yanlis yazilmis, neden uyari gostermedi?
+ * Bu buyuk bir guvensizlik." Eskiden 50 kg ya da %0,2 pay vardi; 575.000 kg'da 1.150 kg = 23.000 cuvalin darasi (net yerine
+ * brut yazilmis) pay icinde kaldi. Fatura, sistemdeki konteyner (kantar) agirliklarindan hazirlanir: BIREBIR tutmali.
+ */
+export const AGIRLIK_PAYI_KG = 1;
+const agirlikPayi = (_beklenen: number) => AGIRLIK_PAYI_KG;
+/** Faturada net = brut yazilmis, ama sistemde brut net'ten buyuk (dara dusulmemis). */
+const netBruteEsit = (f: OkunanFatura, b: FaturaBeklenen) =>
+  f.netKg != null && f.brutKg != null && Math.abs(f.netKg - f.brutKg) <= AGIRLIK_PAYI_KG && !!b.netKg && !!b.brutKg && b.brutKg - b.netKg > AGIRLIK_PAYI_KG;
 
 /** Okunan faturayi sistemle karsilastirir (fatura-kontrol ile ayni sonuc bicimi). */
 export function faturaKarsilastir(f: OkunanFatura, b: FaturaBeklenen): FaturaKontrolSonucu {
@@ -202,6 +210,7 @@ export function faturaKarsilastir(f: OkunanFatura, b: FaturaBeklenen): FaturaKon
 
   if (b.netKg && f.netKg != null && Math.abs(f.netKg - b.netKg) > agirlikPayi(b.netKg)) u.push({ alan: "Net ağırlık", sistemde: kg(b.netKg), dosyada: kg(f.netKg) });
   if (b.netKg && f.netKg == null) notlar.push("net kg yazmıyor");
+  if (netBruteEsit(f, b)) notlar.push("faturada net ağırlık brüte eşit yazılmış (dara düşülmemiş)");
   if (b.brutKg && f.brutKg != null && Math.abs(f.brutKg - b.brutKg) > agirlikPayi(b.brutKg)) u.push({ alan: "Brüt ağırlık", sistemde: kg(b.brutKg), dosyada: kg(f.brutKg) });
   if (b.kap && f.kap != null && Math.round(f.kap) !== Math.round(b.kap)) u.push({ alan: "Kap adedi", sistemde: b.kap.toLocaleString("tr-TR"), dosyada: f.kap.toLocaleString("tr-TR") });
 
@@ -239,6 +248,31 @@ export function faturaKarsilastir(f: OkunanFatura, b: FaturaBeklenen): FaturaKon
     fatura_no: f.faturaNo, fatura_tarihi: f.faturaTarihi || "", diib_no: f.diibNo, diib_tarihi: f.diibTarihi, kaynak: "metin",
     kontroller: k.map(({ ek: _ek, ...x }) => x),
   };
+}
+
+/**
+ * KAYITLI sonucu bugunku agirlik kuraliyla yeniden degerlendirir (12.11.2026). Eski kayitlar %0,2 payla "uyumlu"
+ * yazilmis olabilir (ornek: net 575.000 / faturada 576.150). Yalniz alan alan kontrollu (metinden okunmus) kayitlarda;
+ * kaydi DEGISTIRMEZ, gorunum icin yeni nesne doner.
+ */
+export function kayitliSonucuDenetle(s: FaturaKontrolSonucu | null): FaturaKontrolSonucu | null {
+  if (!s || !s.kontroller?.length) return s;
+  const kgOku = (x: string) => trSayi(x.replace(/\s*kg\s*$/i, ""));
+  let degisti = false;
+  const yeniUyus = [...s.uyusmazliklar];
+  const kontroller = s.kontroller.map((k) => {
+    if ((k.alan !== "Net ağırlık" && k.alan !== "Brüt ağırlık") || k.durum !== "uyumlu") return k;
+    const a = kgOku(k.sistem), b = kgOku(k.belge);
+    if (a == null || b == null || Math.abs(a - b) <= AGIRLIK_PAYI_KG) return k;
+    degisti = true;
+    if (!yeniUyus.some((u) => u.alan === k.alan)) yeniUyus.push({ alan: k.alan, sistemde: k.sistem, dosyada: k.belge });
+    return { ...k, durum: "uyusmuyor" as const, not: `Fark ${kg(b - a)}. Yükleme anındaki kontrol bu farkı pay içinde saymıştı; faturayı düzeltip yeniden yükleyin.` };
+  });
+  if (!degisti) return s;
+  const uyumluSay = kontroller.filter((x) => x.durum === "uyumlu").length;
+  const kontrolEdilen = kontroller.filter((x) => x.durum === "uyumlu" || x.durum === "uyusmuyor").length;
+  return { ...s, uyumlu: false, uyusmazliklar: yeniUyus, kontroller,
+    ozet: `${yeniUyus.length} uyuşmazlık bulundu (${uyumluSay}/${kontrolEdilen} alan uyumlu). Fatura metninden okundu (yapay zekâ kullanılmadı).` };
 }
 
 /** Okunamayan (metinsiz) fatura: yapay zekaya gidilmez, elle bakilmasi istenir (10.11.2026). */
@@ -293,8 +327,10 @@ function faturaAlanKontrolleri(f: OkunanFatura, b: FaturaBeklenen, sistemK: Set<
   if (e?.konteynerAdedi != null && sistemK.size && !b.parca) {
     ekle("Konteyner adedi", e.konteynerAdedi === sistemK.size ? "uyumlu" : "uyusmuyor", String(sistemK.size), String(e.konteynerAdedi), undefined, true);
   }
-  if (b.netKg) ekle("Net ağırlık", f.netKg == null ? "okunamadi" : Math.abs(f.netKg - b.netKg) > agirlikPayi(b.netKg) ? "uyusmuyor" : "uyumlu", kg(b.netKg), f.netKg == null ? "-" : kg(f.netKg));
-  if (b.brutKg) ekle("Brüt ağırlık", f.brutKg == null ? "okunamadi" : Math.abs(f.brutKg - b.brutKg) > agirlikPayi(b.brutKg) ? "uyusmuyor" : "uyumlu", kg(b.brutKg), f.brutKg == null ? "-" : kg(f.brutKg));
+  if (b.netKg) ekle("Net ağırlık", f.netKg == null ? "okunamadi" : Math.abs(f.netKg - b.netKg) > agirlikPayi(b.netKg) ? "uyusmuyor" : "uyumlu", kg(b.netKg), f.netKg == null ? "-" : kg(f.netKg),
+    netBruteEsit(f, b) ? "Faturada net ağırlık brüte eşit yazılmış: çuval / ambalaj darası düşülmemiş." : f.netKg != null && Math.abs(f.netKg - b.netKg) > agirlikPayi(b.netKg) ? `Fark ${kg(f.netKg - b.netKg)}.` : undefined);
+  if (b.brutKg) ekle("Brüt ağırlık", f.brutKg == null ? "okunamadi" : Math.abs(f.brutKg - b.brutKg) > agirlikPayi(b.brutKg) ? "uyusmuyor" : "uyumlu", kg(b.brutKg), f.brutKg == null ? "-" : kg(f.brutKg),
+    f.brutKg != null && Math.abs(f.brutKg - b.brutKg) > agirlikPayi(b.brutKg) ? `Fark ${kg(f.brutKg - b.brutKg)}.` : undefined);
   if (b.kap) ekle("Kap adedi", f.kap == null ? "okunamadi" : Math.round(f.kap) !== Math.round(b.kap) ? "uyusmuyor" : "uyumlu", sayiTr(b.kap), f.kap == null ? "-" : sayiTr(f.kap));
 
   // DIIB: bolunmuste parcanin (eski kural), tek faturada dosyanin DIIB'i (yeni)

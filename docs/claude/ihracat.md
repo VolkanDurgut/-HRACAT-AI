@@ -1277,3 +1277,17 @@ gitmeli. Konu: FATURA VE BEYANNAME TALİMATI HAKKINDA // ALICI // 6 * 20 DC // L
   sayfasındaki üreticiyle tarayıcıda (`lib/fatura-onay.ts` → `talimatPdfUret`), Onayla ve gönder / Revize iste (not zorunlu).
 - Dosya sayfası > Konteynerler: `components/fatura-onay-durumu.tsx` son durum + "Onaya gönder" / "Tekrar onaya gönder".
 - Mail kalıpları: `supabase/functions/_shared/fatura-onay.ts` (dağıtım metni kullanıcının verdiği metin, aynen).
+
+## Fatura kontrolünde ağırlık payı kaldırıldı (12.11.2026)
+
+Kullanıcı: "Net kg faturada yanlış yazılmış, neden uyarı göstermedi? Bu büyük bir güvensizlik." Sebep: `lib/fatura-oku.ts`
+ağırlıkta 50 kg ya da %0,2 pay tanıyordu; 575.000 kg'da 1.150 kg (= 23.000 çuvalın darası; faturada net yerine brüt
+yazılmış) pay içinde kaldı. Fatura, sistemdeki konteyner (kantar) ağırlıklarından hazırlanır, birebir tutmalı:
+- Net / brüt ağırlıkta pay yalnız 1 kg yuvarlama (`AGIRLIK_PAYI_KG`); farkta satıra "Fark … kg" notu.
+- Faturada net = brüt ve sistemde brüt > net ise ayrıca "net ağırlık brüte eşit yazılmış (dara düşülmemiş)" notu.
+- Kayıtlı sonuçlar ekranda `kayitliSonucuDenetle` ile bugünkü kuralla yeniden değerlendirilir (kayıt değişmez).
+- Fatura kartında "Yeniden kontrol et": yüklü PDF depodan indirilip yeniden okunur; yalnız `fatura_kontrol_sonucu`
+  güncellenir (tek fatura ve DİİB parçaları). Eski (yapay zekâ ile kontrol edilmiş) faturalar bununla denetlenebilir.
+- Test: scratchpad `fatura/test3.mts`, e2e_fatura_parca 23.
+- Not: kullanılmayan yapay zekâ kontrolünün (`fatura-kontrol`) istemi küçük ağırlık farklarını yok saymayı söylüyor;
+  istemci artık bu fonksiyonu çağırmıyor.

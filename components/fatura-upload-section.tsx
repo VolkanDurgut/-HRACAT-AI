@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
-import { Hash, CalendarDays, Coins, Scale, Container } from "lucide-react";
-import { faturaKarsilastir, faturaMetniOku, faturaOkunamadiSonucu, pdfMetni, type FaturaBeklenen, type FaturaBeklenenEk, type FaturaKontrolSonucu, type FaturaKontrolDurumu } from "@/lib/fatura-oku";
+import { Hash, CalendarDays, Coins, Scale, Container, RefreshCw } from "lucide-react";
+import { faturaKarsilastir, faturaMetniOku, kayitliSonucuDenetle, faturaOkunamadiSonucu, pdfMetni, type FaturaBeklenen, type FaturaBeklenenEk, type FaturaKontrolSonucu, type FaturaKontrolDurumu } from "@/lib/fatura-oku";
 import { VARSAYILAN_GTIP } from "@/lib/konsimento/talimat";
 import { faturaBolunmesi, parcaAgirliklari } from "@/lib/diib/bolunme-talimat";
 import { diibAnahtari } from "@/lib/diib/hesap";
@@ -69,7 +69,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   const [parcaIslem, setParcaIslem] = useState<string | null>(null); // yuklenen parca id
   const [parcaHata, setParcaHata] = useState<Record<string, string>>({});
 
-  const faturaKontrolSonucu = dosya.fatura_kontrol_sonucu as FaturaKontrolSonucu | null;
+  // 12.11.2026: kayitli sonuc bugunku agirlik kuraliyla (yalniz 1 kg yuvarlama payi) yeniden degerlendirilir
+  const faturaKontrolSonucu = kayitliSonucuDenetle(dosya.fatura_kontrol_sonucu as FaturaKontrolSonucu | null);
 
   const rezervasyonKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const eklenenKonteynerAdedi = konteynerler.length;
@@ -133,6 +134,42 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     return { path, url: await getGuvenliDosyaUrl("konsimento-talimatlari", path) };
   };
 
+  const dosyaBeklenen = (): FaturaBeklenen => ({
+    konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: toplamNet || null, brutKg: toplamBrut || null,
+    kap: toplamKap || null, tutar: Number(dosya.toplam_tutar) || null, paraBirimi: dosya.para_birimi || null,
+    ek: beklenenEk(false),
+  });
+
+  /**
+   * 12.11.2026 YENIDEN KONTROL: kayitli faturayi depodan alip bugunku kurallarla yeniden okur ve sonucu gunceller
+   * (dosya / tarih / fatura no degismez). Kullanici: "Net kg faturada yanlis, neden uyari gostermedi?" - eski
+   * yuklemeler (yapay zeka ya da %0,2 pay) bu dugmeyle yeniden denetlenir.
+   */
+  const [yenidenKontrol, setYenidenKontrol] = useState<string | null>(null);
+  const depodanFatura = async (url: string, ad: string | null): Promise<File> => {
+    const yol = decodeURIComponent(/\/object\/(?:sign|public)\/konsimento-talimatlari\/([^?]+)/.exec(url)?.[1] || "");
+    if (!yol) throw new Error("Fatura dosyasının depo yolu okunamadı.");
+    const { data, error } = await supabase.storage.from("konsimento-talimatlari").download(yol);
+    if (error || !data) throw new Error(`Fatura dosyası indirilemedi: ${error?.message || "bilinmeyen hata"}`);
+    return new File([data], ad || "fatura.pdf", { type: "application/pdf" });
+  };
+  const dosyaFaturasiniYenidenKontrolEt = async () => {
+    if (!dosya.fatura_dosya_url) return;
+    setYenidenKontrol("dosya"); setFaturaHata(null);
+    try {
+      const sonuc = await faturaKontrolEt(await depodanFatura(dosya.fatura_dosya_url, dosya.fatura_dosya_adi), dosyaBeklenen());
+      const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({ fatura_kontrol_sonucu: sonuc })
+        .eq("id", dosya.id).eq("company_id", companyId).select("id");
+      const hata = yazmaHatasi(error, yazilan);
+      if (hata) throw new Error(`Kontrol sonucu kaydedilemedi: ${hata}`);
+      onRefresh();
+    } catch (err: any) {
+      setFaturaHata(err.message || "Yeniden kontrol yapılamadı.");
+    } finally {
+      setYenidenKontrol(null);
+    }
+  };
+
   const handleFaturaYukle = async (file: File) => {
     setFaturaYukleniyor(true);
     setFaturaHata(null);
@@ -140,11 +177,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     try {
       const { path, url: dosyaUrl } = await pdfYukle(file);
       yuklenenYol = path;
-      const data = await faturaKontrolEt(file, {
-        konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: toplamNet || null, brutKg: toplamBrut || null,
-        kap: toplamKap || null, tutar: Number(dosya.toplam_tutar) || null, paraBirimi: dosya.para_birimi || null,
-        ek: beklenenEk(false),
-      });
+      const data = await faturaKontrolEt(file, dosyaBeklenen());
 
       // Yeniden yuklemede eski faturanin adresi: kayit basariyla guncellenince
       // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
@@ -208,6 +241,34 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   })), null);
   const parcaAgirlik = parcaHesabi.length ? parcaAgirliklari(parcaHesabi, toplamNet, toplamBrut) : [];
 
+  const parcaBeklenen = (p: FaturaParcasiKaydi, h: (typeof parcaHesabi)[number], ag: (typeof parcaAgirlik)[number] | undefined): FaturaBeklenen => ({
+    konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: h.kg, brutKg: ag?.brut ?? null, kap: ag?.kap ?? null,
+    tutar: h.tutar, paraBirimi: dosya.para_birimi || null,
+    parca: { sira: p.sira, diibAnahtar: diibAnahtari(p.belge_no), diibMetni: p.belge_no },
+    ek: beklenenEk(true),
+  });
+
+  const parcaYenidenKontrolEt = async (p: FaturaParcasiKaydi) => {
+    const i = parcalar.findIndex((x) => x.id === p.id);
+    const h = parcaHesabi[i];
+    if (!h || !p.fatura_dosya_url) return;
+    setYenidenKontrol(p.id);
+    setParcaHata((s) => ({ ...s, [p.id]: "" }));
+    try {
+      const sonuc = await faturaKontrolEt(await depodanFatura(p.fatura_dosya_url, p.fatura_dosya_adi), parcaBeklenen(p, h, parcaAgirlik[i]));
+      const r = await supabase.from("diib_dosya_bolunmeleri").update({ fatura_kontrol_sonucu: sonuc }).eq("id", p.id).eq("company_id", companyId).select("id");
+      const sorun = yazmaHatasi(r.error, r.data);
+      if (sorun) throw new Error(`Kontrol sonucu kaydedilemedi: ${sorun}`);
+      if (p.sira === 1) await supabase.from("ihracat_dosyalari").update({ fatura_kontrol_sonucu: sonuc }).eq("id", dosya.id).eq("company_id", companyId);
+      await parcalariGetir();
+      onRefresh();
+    } catch (err: any) {
+      setParcaHata((s) => ({ ...s, [p.id]: err.message || "Yeniden kontrol yapılamadı." }));
+    } finally {
+      setYenidenKontrol(null);
+    }
+  };
+
   const parcaFaturaYukle = async (p: FaturaParcasiKaydi, file: File) => {
     const i = parcalar.findIndex((x) => x.id === p.id);
     const h = parcaHesabi[i];
@@ -219,12 +280,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     try {
       const { path, url } = await pdfYukle(file);
       yuklenenYol = path;
-      const sonuc = await faturaKontrolEt(file, {
-        konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: h.kg, brutKg: ag?.brut ?? null, kap: ag?.kap ?? null,
-        tutar: h.tutar, paraBirimi: dosya.para_birimi || null,
-        parca: { sira: p.sira, diibAnahtar: diibAnahtari(p.belge_no), diibMetni: p.belge_no },
-        ek: beklenenEk(true),
-      });
+      const sonuc = await faturaKontrolEt(file, parcaBeklenen(p, h, ag));
 
       const { data: onceki } = await supabase.from("diib_dosya_bolunmeleri").select("fatura_dosya_url").eq("id", p.id).eq("company_id", companyId).maybeSingle();
       const faturaNo = (sonuc.fatura_no || p.fatura_no || "").replace(/\s+/g, "").toUpperCase() || null;
@@ -298,7 +354,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
           {parcalar.map((p, i) => {
             const h = parcaHesabi[i];
             const ag = parcaAgirlik[i];
-            const sonuc = p.fatura_kontrol_sonucu;
+            const sonuc = kayitliSonucuDenetle(p.fatura_kontrol_sonucu);
             return (
               <div key={p.id} className="rounded-lg border" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-testid={`fatura-parca-${p.sira}`}>
                 <div className="px-3 py-2.5 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: CARD_BORDER }}>
@@ -339,7 +395,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
                   )}
                   {p.fatura_dosya_url && sonuc && (
                     <FaturaSonucu url={p.fatura_dosya_url} ad={p.fatura_dosya_adi} tarih={p.fatura_yukleme_tarihi} sonuc={sonuc}
-                      faturaNo={p.fatura_no} faturaTarihi={p.fatura_tarihi} diibNo={sonuc.diib_no} onKaldir={() => parcaFaturaKaldir(p)} />
+                      faturaNo={p.fatura_no} faturaTarihi={p.fatura_tarihi} diibNo={sonuc.diib_no} onKaldir={() => parcaFaturaKaldir(p)}
+                      onYenidenKontrol={() => parcaYenidenKontrolEt(p)} yenidenKontrolEdiliyor={yenidenKontrol === p.id} />
                   )}
                 </div>
               </div>
@@ -391,7 +448,8 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
 
         {dosya.fatura_dosya_url && faturaKontrolSonucu && (
           <FaturaSonucu url={dosya.fatura_dosya_url} ad={dosya.fatura_dosya_adi} tarih={dosya.fatura_yukleme_tarihi} sonuc={faturaKontrolSonucu}
-            faturaNo={dosya.fatura_no} faturaTarihi={dosya.fatura_tarihi} diibNo={faturaKontrolSonucu.diib_no || dosya.diib_no} onKaldir={handleFaturaYenidenYukle} />
+            faturaNo={dosya.fatura_no} faturaTarihi={dosya.fatura_tarihi} diibNo={faturaKontrolSonucu.diib_no || dosya.diib_no} onKaldir={handleFaturaYenidenYukle}
+            onYenidenKontrol={dosyaFaturasiniYenidenKontrolEt} yenidenKontrolEdiliyor={yenidenKontrol === "dosya"} />
         )}
       </div>
       )}
@@ -419,9 +477,10 @@ function DurumRozeti({ uyumlu, okunamadi }: { uyumlu: boolean; okunamadi?: boole
 }
 
 /** Yuklenen fatura satiri + kontrol sonucu (tek fatura ve bolunmus faturalarda ayni). */
-function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, onKaldir }: {
+function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, onKaldir, onYenidenKontrol, yenidenKontrolEdiliyor }: {
   url: string; ad: string | null; tarih: string | null; sonuc: FaturaKontrolSonucu;
   faturaNo: string | null; faturaTarihi: string | null; diibNo: string | null; onKaldir: () => void;
+  onYenidenKontrol: () => void; yenidenKontrolEdiliyor: boolean;
 }) {
   const kaynak = sonuc.kaynak === "metin"
     ? <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" }} data-testid="fatura-kaynak" title="PDF metninden kurallarla okundu; yapay zekâ kullanılmadı">Metinden okundu · ücretsiz</span>
@@ -437,6 +496,11 @@ function FaturaSonucu({ url, ad, tarih, sonuc, faturaNo, faturaTarihi, diibNo, o
         </a>
         {tarih && <span className="text-xs shrink-0 hidden sm:inline" style={{ color: TEXT_MUTED }}>{formatDateTimeTR(tarih)}</span>}
         <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} title="Faturayı yeni sekmede aç"><ExternalLink size={12} /> Görüntüle</a>
+        <button type="button" onClick={onYenidenKontrol} disabled={yenidenKontrolEdiliyor} data-testid="fatura-yeniden-kontrol"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 hover:text-white disabled:opacity-60" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }}
+          title="Yüklenmiş faturayı bugünkü kurallarla yeniden oku ve kontrol et" aria-label="Yeniden kontrol et">
+          <RefreshCw size={12} className={yenidenKontrolEdiliyor ? "animate-spin" : ""} /> <span className="hidden sm:inline">{yenidenKontrolEdiliyor ? "Kontrol ediliyor…" : "Yeniden kontrol et"}</span>
+        </button>
         <button onClick={onKaldir} className="hover:text-white shrink-0" style={{ color: TEXT_MUTED }} title="Faturayı kaldır" aria-label="Faturayı kaldır"><X size={16} /></button>
       </div>
 

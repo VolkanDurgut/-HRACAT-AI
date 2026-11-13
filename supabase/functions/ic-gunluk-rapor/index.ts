@@ -20,8 +20,9 @@ import {
 //      {"deneme": true}  -> mail GITMEZ; konu + ozet + HTML doner (onizleme)
 //      {"test": true}    -> alicilara "[TEST]" konulu mail gider; test kaydi yazilir (zamanlanmis
 //                           raporu ENGELLEMEZ); sirket basina son 24 saatte en fazla 3 test.
-//  - Anon {"test": true}: yalniz ayarli alicilara, ayni 3/24 saat siniriyla (cron'daki anahtarla
-//    SQL'den elle test icin; adres secilemez).
+//  - Anon {"test": true}: yalniz ayarli alicilara, ayni 3/24 saat siniriyla (SQL'den elle test icin; adres secilemez).
+//    13.11.2026 guvenlik: anon test / test_adresine "x-test-anahtar" basligi ISTER (Vault rapor_test_anahtari,
+//    migration 20261113210000; dogrulama rapor_test_anahtari_dogrula). Basliksiz anon yalniz zamanlanmis rapor.
 //      {"tarih": "YYYY-MM-DD"} (deneme / test ile) gecmis gun.
 // 04.11.2026 aksam - GUNDE 3 OTURUM (kullanici: "bundan sonraki gunlerde sabah ogle aksam"; ihracat
 // raporuyla ayni duzen, 15 dk sonra): pg_cron ic-gunluk-rapor-sabah / -ogle / -aksam (06:15 / 09:15 /
@@ -167,6 +168,22 @@ async function sirketRaporu(companyId: string, tarih: string) {
   return icGunlukRaporHesapla(tarih, emirler, Array.from(sevkMap.values()), alislar, teslimler);
 }
 
+/** x-test-anahtar dogrulamasi (13.11.2026). Dogrulanamazsa (fonksiyon yok / ag) false: test reddedilir. Anahtar loglanmaz. */
+async function testAnahtariGecerli(req: Request): Promise<boolean> {
+  const anahtar = (req.headers.get("x-test-anahtar") || "").trim();
+  if (!anahtar) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/rapor_test_anahtari_dogrula`, {
+      method: "POST", headers: { ...basliklar, "Content-Type": "application/json" }, body: JSON.stringify({ p_anahtar: anahtar }),
+    });
+    if (!res.ok) { console.error("rapor_test_anahtari_dogrula:", res.status); await res.body?.cancel(); return false; }
+    return (await res.json()) === true;
+  } catch (e) {
+    console.error("rapor_test_anahtari_dogrula:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
 function json(veri: unknown, status = 200): Response {
   return new Response(JSON.stringify(veri), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -181,6 +198,8 @@ Deno.serve(async (req: Request) => {
     let oturum: IcRaporOturumu;
     if (!yetkili) {
       if (govde.deneme || ((govde.tarih || govde.oturum) && !testAdresine)) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
+      // 13.11.2026: anon test modlari Vault anahtari ister (basliksiz anon yalniz zamanlanmis rapor)
+      if ((govde.test === true || testAdresine) && !(await testAnahtariGecerli(req))) return json({ ok: false, hata: "Test yalnızca yetkili çağrılar içindir." }, 403);
       const p = penceredekiOturum(simdi);
       if (govde.test !== true && !testAdresine && !p) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
       oturum = testAdresine && IC_RAPOR_OTURUMLARI.includes(govde.oturum as IcRaporOturumu) ? (govde.oturum as IcRaporOturumu) : (p ?? saateGoreOturum(simdi));

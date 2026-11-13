@@ -764,3 +764,7 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   tabloları, kutular, kapananlar sade raporda YOK. Eski görünüm (zamanlanmış rapor) 13.11 öncesi haliyle aynı.
 - **CANLI (13.11.2026 19:01, kullanıcı: "İç piyasa raporu onaylıdır"):** `GRUPLU_CANLI = true`; zamanlanmış rapor (09:15 /
   12:15 / 17:15) sade görünümle gider. Eski görünüm kodu geri dönüş için duruyor (`gruplu` kapalıyken).
+- **Test modları anahtarlı (13.11.2026, güvenlik 2. tur):** anon `{"test": true}` (ayarlı GERÇEK alıcılara "[TEST]") ve
+  `{"test_adresine": true}` artık `x-test-anahtar` başlığı ister (Vault `rapor_test_anahtari`, migration
+  `20261113210000`). Başlıksız anon yalnız zamanlanmış rapor. SQL'den test:
+  `headers := jsonb_build_object(..., 'x-test-anahtar', (select decrypted_secret from vault.decrypted_secrets where name='rapor_test_anahtari' limit 1))`.

@@ -56,6 +56,16 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   çalıştırır (`.github/workflows/kontrol.yml`). Netlify build lint'i atlar (`ignoreDuringBuilds`); lint CI'da zorunlu.
 - Yeni saf modül / yeni hesap kuralı → yanına test. Test verisi uydurmadır (gerçek müşteri / numara yazılmaz).
 
+## Büyük sayfalar — "dokunurken düzelt" (13.11.2026)
+Toplu yeniden düzenleme YAPILMAZ (ekran testi yok; en çok kullanılan ekranlar). Bir sayfaya iş için girildiğinde:
+1. Hesap / iş kuralı → saf modül (`lib/<modül>/`) + `tests/` altında test. Önce bu.
+2. Sayfa içi bileşenleri `components/<modül>/` dosyalarına taşımak (mekanik; tsc + build yakalar). Satın Alma, DİİB,
+   Proformalar gibi çok iç bileşenli sayfalarda işe yarar. Pilot: Satın Alma (en çok iç bileşen, en az DB çağrısı),
+   sakin bir günde, davranış değiştirmeden.
+3. Veri çekme → `lib/hooks/` YALNIZ o sayfanın veri akışı zaten değişecekse. En çok İç Piyasa ana sayfasına uyar
+   (2 iç bileşen, ~16 DB çağrısı: bileşen taşımak orayı kısaltmaz).
+Rapor gönderim saatlerine yakın (ör. ilk canlı rapordan önceki akşam) çekirdek ekranlara dokunulmaz.
+
 ## Kapalı kararlar — GERİ EKLENMEZ (ayrıntı ve tarih ilgili dosyada)
 
 - Kök: giriş sayfasındaki pazarlama bölümü.

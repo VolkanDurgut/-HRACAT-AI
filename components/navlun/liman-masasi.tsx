@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Anchor, CheckCircle2, FastForward, Ship, Target, X } from "lucide-react";
 import { limanSohbeti, masaAcenteleri, type SohbetMesaji } from "@/lib/navlun/harita";
 import { DURUM_ETIKETI, type LimanOzeti, type NavlunSatiri } from "@/lib/navlun/ozet";
+import type { KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 
 const SEFTALI = "#F4A07C";
@@ -34,9 +35,9 @@ function RaporKutusu({ etiket, deger, alt, renk }: { etiket: string; deger: Reac
   );
 }
 
-export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; satirlar: NavlunSatiri[]; onKapat: () => void }) {
+export function LimanMasasi({ liman, satirlar, onKapat, baglam = null }: { liman: LimanOzeti; satirlar: NavlunSatiri[]; onKapat: () => void; baglam?: KarsilastirmaBaglami | null }) {
   const enIyi = liman.enIyi20 ? { acente: liman.enIyi20.acente, tutar: liman.enIyi20.tutar, tarih: liman.enIyi20.tarih } : null;
-  const mesajlar = useMemo(() => limanSohbeti(satirlar, liman.anahtar, enIyi), [satirlar, liman.anahtar]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mesajlar = useMemo(() => limanSohbeti(satirlar, liman.anahtar, enIyi, baglam), [satirlar, liman.anahtar, baglam]); // eslint-disable-line react-hooks/exhaustive-deps
   const acenteler = useMemo(() => masaAcenteleri(liman, mesajlar), [liman, mesajlar]);
   const [secili, setSecili] = useState<string | null>(null);
   const gorunen = useMemo(() => mesajlar.filter((m) => !secili || m.taraf === "biz" || m.acente === secili), [mesajlar, secili]);
@@ -85,9 +86,10 @@ export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; s
   }, [onKapat]);
 
   const teklifSayisi = mesajlar.filter((m) => m.tur === "teklif" || m.tur === "karsi_teklif").length;
-  const fark = liman.enIyi20 && liman.hedef ? liman.enIyi20.tutar - liman.hedef.tutar : null;
-  const merdiven = acenteler.filter((a) => a.sonFiyat !== null && a.ekipman === "20DC");
-  const enYuksek = Math.max(1, ...merdiven.map((a) => a.sonFiyat as number), liman.hedef?.tutar ?? 0);
+  // 13.11.2026: karsilastirma tutari (navlun + lokal + ek); lokali belirsiz olan en iyi sayilmaz
+  const fark = liman.enIyi20 && liman.hedef ? liman.enIyi20.karsi.toplam - liman.hedef.tutar : null;
+  const merdiven = acenteler.filter((a) => a.toplam !== null && a.ekipman === "20DC");
+  const enYuksek = Math.max(1, ...merdiven.map((a) => a.toplam as number), liman.hedef?.tutar ?? 0);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4" style={{ backgroundColor: "rgba(5,8,12,0.72)", backdropFilter: "blur(3px)" }}
@@ -106,7 +108,8 @@ export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; s
         {/* Navlun raporu */}
         <div className="px-4 sm:px-5 py-3 border-b grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ borderColor: CARD_BORDER }} data-testid="masa-rapor">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <RaporKutusu etiket="En iyi 20'DC" deger={liman.enIyi20 ? usd(liman.enIyi20.tutar) : "—"} alt={liman.enIyi20 ? `${liman.enIyi20.acente} · ${kisa(liman.enIyi20.tarih)}` : "teklif yok"} renk="#6EE7B7" />
+            <RaporKutusu etiket="En iyi 20'DC (lokal dahil)" deger={liman.enIyi20 ? usd(liman.enIyi20.karsi.toplam) : "—"} renk="#6EE7B7"
+              alt={liman.enIyi20 ? `${liman.enIyi20.acente} · ${liman.enIyi20.karsi.metin}` : liman.belirsiz20 ? <span style={{ color: "#FCD34D" }}>⚠ {liman.belirsiz20.acente}: {liman.belirsiz20.karsi.metin}</span> : "teklif yok"} />
             <RaporKutusu etiket="Hedefimiz" deger={liman.hedef ? usd(liman.hedef.tutar) : "—"} renk="#FCD34D"
               alt={fark === null ? (liman.hedef ? kisa(liman.hedef.tarih) : "hedef yazılmadı") : fark <= 0 ? <span style={{ color: "#6EE7B7" }}>en iyi teklif hedefte</span> : <span style={{ color: "#FCD34D" }}>en iyi +{usd(fark)} üstünde</span>} />
             <RaporKutusu etiket="Kabul edilen" deger={liman.kabul ? usd(liman.kabul.tutar) : "—"} alt={liman.kabul ? `${liman.kabul.armator || ""} ${kisa(liman.kabul.tarih)}`.trim() : "henüz yok"} renk="#93C5FD" />
@@ -116,13 +119,13 @@ export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; s
             <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: TEXT_MUTED }}>Fiyat merdiveni · son 20&apos;DC teklifleri</p>
             <div className="relative space-y-1">
               {merdiven.slice(0, 5).map((a) => (
-                <button key={a.acente} type="button" onClick={() => setSecili(secili === a.acente ? null : a.acente)} className="w-full flex items-center gap-2 text-[11px] group" title={`${a.acente}: ${usd(a.sonFiyat as number)}`}>
+                <button key={a.acente} type="button" onClick={() => setSecili(secili === a.acente ? null : a.acente)} className="w-full flex items-center gap-2 text-[11px] group" title={`${a.acente}: ${a.metin || ""}${a.kesin ? "" : " (lokal belirsiz: en iyi sayılmaz)"}`}>
                   <span className="w-24 truncate text-left group-hover:text-white" style={{ color: secili === a.acente ? "#FFFFFF" : "#C9D1DC" }}>{a.acente}</span>
                   <span className="flex-1 h-3.5 rounded relative" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
-                    <span className="absolute inset-y-0 left-0 rounded transition-all duration-700" style={{ width: `${((a.sonFiyat as number) / enYuksek) * 100}%`, backgroundColor: a.enIyi ? "rgba(16,185,129,0.55)" : "rgba(56,189,248,0.35)" }} />
+                    <span className="absolute inset-y-0 left-0 rounded transition-all duration-700" style={{ width: `${((a.toplam as number) / enYuksek) * 100}%`, backgroundColor: a.enIyi ? "rgba(16,185,129,0.55)" : a.kesin ? "rgba(56,189,248,0.35)" : "rgba(251,191,36,0.28)" }} />
                     {liman.hedef && <span className="absolute inset-y-[-2px] w-0.5" style={{ left: `${(liman.hedef.tutar / enYuksek) * 100}%`, backgroundColor: "#FCD34D" }} title="Hedefimiz" />}
                   </span>
-                  <span className="w-16 text-right tabular-nums font-semibold" style={{ color: a.enIyi ? "#6EE7B7" : "#E2E8F0" }}>{usd(a.sonFiyat as number)}</span>
+                  <span className="w-20 text-right tabular-nums font-semibold" style={{ color: a.enIyi ? "#6EE7B7" : a.kesin ? "#E2E8F0" : "#FCD34D" }}>{a.kesin ? "" : "⚠ "}{usd(a.toplam as number)}</span>
                 </button>
               ))}
               {!merdiven.length && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>20&apos;DC fiyat yok.</p>}
@@ -146,7 +149,7 @@ export function LimanMasasi({ liman, satirlar, onKapat }: { liman: LimanOzeti; s
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-[13px] text-white truncate">{a.acente}{a.enIyi && <span className="text-[9px] font-bold px-1 rounded" style={{ backgroundColor: "rgba(16,185,129,0.18)", color: "#6EE7B7" }}>EN İYİ</span>}</span>
                   <span className="block text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>
-                    {a.sonFiyat !== null ? `${usd(a.sonFiyat)}${a.ekipman && a.ekipman !== "20DC" ? ` ${a.ekipman}` : ""}` : a.sonDurum ? DURUM_ETIKETI[a.sonDurum] || a.sonDurum : "—"}
+                    {a.sonFiyat !== null ? `${a.metin && a.metin !== "lokal dahil" ? a.metin : usd(a.sonFiyat)}${a.ekipman && a.ekipman !== "20DC" ? ` ${a.ekipman}` : ""}${a.kesin ? "" : " ⚠"}` : a.sonDurum ? DURUM_ETIKETI[a.sonDurum] || a.sonDurum : "—"}
                     {a.freeTime != null ? ` · FT ${a.freeTime}g` : ""}{a.transit ? ` · TT ${a.transit}g` : ""}
                   </span>
                 </span>

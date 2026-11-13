@@ -12,6 +12,7 @@
  */
 import { limanKonumu, type LimanKonumu } from "@/lib/liman-koordinat";
 import type { LimanOzeti, NavlunSatiri } from "@/lib/navlun/ozet";
+import { karsilastir, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 
 /** Navlun okuyucusunun liman anahtari -> koordinat listesindeki anahtar (yalniz harita icin). */
 export const HARITA_ES_ADLARI: Record<string, string> = {
@@ -24,13 +25,17 @@ export function navlunLimanKonumu(anahtar: string): LimanKonumu | null {
   return limanKonumu(HARITA_ES_ADLARI[anahtar] || anahtar);
 }
 
-export type NoktaDurumu = "hedefte" | "ustunde" | "fiyatli" | "fiyatsiz";
+/** belirsiz (13.11.2026): fiyat var ama hicbirinin lokali kesin degil -> hedefte / ustunde denemez */
+export type NoktaDurumu = "hedefte" | "ustunde" | "fiyatli" | "belirsiz" | "fiyatsiz";
 export type NavlunNoktasi = {
   anahtar: string;
   ad: string;
   konum: LimanKonumu | null;
+  /** En iyi teklifin karsilastirma tutari (navlun + lokal + ek) */
   enIyi: number | null;
   enIyiAcente: string | null;
+  /** "340 + lokal 356 = 696" / "lokal dahil" */
+  enIyiMetin: string | null;
   hedef: number | null;
   acenteSayisi: number;
   teklifSayisi: number;
@@ -44,11 +49,13 @@ export function navlunNoktalari(limanlar: LimanOzeti[], satirlar: NavlunSatiri[]
   return limanlar.map((l) => {
     const olaylar = satirlar.filter((s) => s.liman_anahtar === l.anahtar);
     const acenteler = new Set(olaylar.map((s) => s.acente).filter(Boolean));
-    const enIyi = l.enIyi20?.tutar ?? null;
+    // 13.11.2026: karsilastirma tutari; lokali kesin teklif yoksa "belirsiz" (asla yesil degil)
+    const enIyi = l.enIyi20?.karsi.toplam ?? null;
     const hedef = l.hedef?.tutar ?? null;
-    const durum: NoktaDurumu = enIyi === null ? "fiyatsiz" : hedef === null ? "fiyatli" : enIyi <= hedef ? "hedefte" : "ustunde";
+    const durum: NoktaDurumu = enIyi === null ? (l.belirsiz20 ? "belirsiz" : "fiyatsiz") : hedef === null ? "fiyatli" : enIyi <= hedef ? "hedefte" : "ustunde";
     return {
-      anahtar: l.anahtar, ad: l.ad, konum: navlunLimanKonumu(l.anahtar), enIyi, enIyiAcente: l.enIyi20?.acente ?? null, hedef,
+      anahtar: l.anahtar, ad: l.ad, konum: navlunLimanKonumu(l.anahtar), enIyi, enIyiAcente: l.enIyi20?.acente ?? null,
+      enIyiMetin: l.enIyi20?.karsi.metin ?? null, hedef,
       acenteSayisi: acenteler.size, teklifSayisi: olaylar.filter((s) => s.tur === "teklif" || s.tur === "karsi_teklif").length,
       sonTarih: l.sonTarih, durum, yeni: !!oncekiGorulme && l.sonTarih > oncekiGorulme,
     };
@@ -86,7 +93,7 @@ export type SohbetMesaji = {
 const para = (t: number | null, p: string) => (t === null ? "" : `${t.toLocaleString("tr-TR")} ${p === "EUR" ? "€" : p === "USD" || !p ? "$" : p}`);
 const ekipmanAdi = (e: string | null) => (e === "20DC" || !e ? "20'DC" : e === "40HC" ? "40'HC" : e);
 
-export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: { acente: string; tutar: number; tarih: string } | null): SohbetMesaji[] {
+export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: { acente: string; tutar: number; tarih: string } | null, baglam: KarsilastirmaBaglami | null = null): SohbetMesaji[] {
   return satirlar
     .filter((s) => s.liman_anahtar === anahtar)
     .sort((a, b) => a.tarih.localeCompare(b.tarih))
@@ -96,8 +103,11 @@ export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: {
       if (s.free_time_gun != null) ayrinti.push(`Free time ${s.free_time_gun} gün`);
       if (s.transit_gun) ayrinti.push(`Transit ${s.transit_gun} gün`);
       if (s.gecerlilik) ayrinti.push(`Geçerlilik ${s.gecerlilik}`);
-      if (s.lokal_dahil === true) ayrinti.push("lokal dahil");
-      if (s.lokal_dahil === false) ayrinti.push("+ lokal");
+      // 13.11.2026: lokal durumu ve karsilastirma tutari (mail + acente hafizasi + rezervasyon)
+      if ((s.tur === "teklif" || s.tur === "karsi_teklif") && s.tutar) {
+        const k = karsilastir({ acente: s.acente, tutar: s.tutar, ekipman: s.ekipman, lokal_dahil: s.lokal_dahil, liman_anahtar: s.liman_anahtar }, baglam);
+        ayrinti.push(k.kesin ? k.metin : `⚠ ${k.metin}`);
+      }
       if (s.kaynak === "pdf") ayrinti.push("PDF'ten okundu");
       if (s.kaynak === "gorsel") ayrinti.push("görselden okundu");
       if (s.kaynak === "elle") ayrinti.push("elle girildi");
@@ -121,16 +131,22 @@ export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: {
 }
 
 /** Masadaki acente listesi: son fiyat (20'DC once), son durum, mesaj sayisi. */
-export type MasaAcentesi = { acente: string; sonFiyat: number | null; ekipman: string | null; freeTime: number | null; transit: string | null; sonDurum: string | null; mesaj: number; sonTarih: string; enIyi: boolean };
+export type MasaAcentesi = {
+  acente: string; sonFiyat: number | null; ekipman: string | null; freeTime: number | null; transit: string | null; sonDurum: string | null; mesaj: number; sonTarih: string; enIyi: boolean;
+  /** 13.11.2026: karsilastirma tutari ve kesinligi */
+  toplam: number | null; kesin: boolean; metin: string | null;
+};
 export function masaAcenteleri(l: LimanOzeti, mesajlar: SohbetMesaji[]): MasaAcentesi[] {
   const adlar = Array.from(new Set(mesajlar.filter((m) => m.acente).map((m) => m.acente as string)));
   return adlar.map((a) => {
-    const f = l.fiyatlar.filter((x) => x.acente === a).sort((x, y) => (x.ekipman === "20DC" ? 0 : 1) - (y.ekipman === "20DC" ? 0 : 1) || x.tutar - y.tutar)[0] || null;
+    const f = l.fiyatlar.filter((x) => x.acente === a).sort((x, y) => (x.ekipman === "20DC" ? 0 : 1) - (y.ekipman === "20DC" ? 0 : 1) || x.karsi.toplam - y.karsi.toplam)[0] || null;
     const d = l.durumlar.find((x) => x.acente === a) || null;
     const ms = mesajlar.filter((m) => m.acente === a);
     return {
       acente: a, sonFiyat: f?.tutar ?? null, ekipman: f?.ekipman ?? null, freeTime: f?.free_time_gun ?? null, transit: f?.transit_gun ?? null,
       sonDurum: d?.tur ?? null, mesaj: ms.length, sonTarih: ms[ms.length - 1]?.tarih || "", enIyi: !!l.enIyi20 && l.enIyi20.acente === a,
+      toplam: f ? f.karsi.toplam : null, kesin: !!f && f.karsi.kesin, metin: f ? f.karsi.metin : null,
     };
-  }).sort((x, y) => (x.sonFiyat === null ? 1 : 0) - (y.sonFiyat === null ? 1 : 0) || (x.sonFiyat ?? 0) - (y.sonFiyat ?? 0) || x.acente.localeCompare(y.acente, "tr"));
+  }).sort((x, y) => (x.toplam === null ? 1 : 0) - (y.toplam === null ? 1 : 0) || (x.kesin ? 0 : 1) - (y.kesin ? 0 : 1)
+    || (x.toplam ?? 0) - (y.toplam ?? 0) || x.acente.localeCompare(y.acente, "tr"));
 }

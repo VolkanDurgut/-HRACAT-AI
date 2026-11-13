@@ -3,6 +3,8 @@ import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
+import { baglamKur, type AcenteHafizasi, type LimanKurali } from "../_shared/navlun-karsilastirma.ts";
+import { limanAnahtari } from "../_shared/liman-anahtari.ts";
 import { navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
@@ -119,7 +121,7 @@ async function rpcHepsi(ad: string, companyId: string): Promise<Record<string, u
 /** Navlun Bildirimi sayfasindaki "Excel indir" ile ayni veri (lib/navlun/tablo.ts). */
 async function sirketTablosu(companyId: string, tarih: string) {
   const [olaylarHam, planHam] = await Promise.all([
-    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,mesaj_id&company_id=eq.${companyId}&order=tarih,id`),
+    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,mesaj_id,lokal_dahil&company_id=eq.${companyId}&order=tarih,id`),
     rpcHepsi("yukleme_plani_veri", companyId),
   ]);
   // 12.11.2026 booking eslestirmesi: olaylara kaynak mailin konusu eklenir (yazisma + konteyner adedi + konudaki booking no)
@@ -133,7 +135,36 @@ async function sirketTablosu(companyId: string, tarih: string) {
     hafta: p.hafta == null ? null : Number(p.hafta) || null, yil: p.yil == null ? null : Number(p.yil) || null,
   }));
   const tablo = navlunTablosuHesapla(olaylar, plan.filter((p) => p.kaynak !== "siparis"), tarih);
+  tablo.baglam = await karsilastirmaBaglami(companyId, olaylar);
   return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar, Array.from(konular.values())) };
+}
+
+/**
+ * 13.11.2026 karsilastirma baglami (Navlun Evreni ile AYNI): acente hafizasi + liman kurallari + rezervasyon kanitlari
+ * (sevkiyat_plani konteyner basi navlun + lokal). Okunamazsa null: yalniz mail metni, lokali belirsiz teklif en iyi secilmez.
+ */
+async function karsilastirmaBaglami(companyId: string, olaylar: NavlunOlayi[]) {
+  try {
+    const [hafiza, kurallar, kanit] = await Promise.all([
+      hepsiniCek<AcenteHafizasi & { lokal_20: number | string | null; lokal_40: number | string | null; ek_kont: number | string }>(
+        `navlun_acente_hafizasi?select=acente_anahtar,acente_ad,lokal,lokal_20,lokal_40,ek_kont,guven,kanit&company_id=eq.${companyId}&order=acente_anahtar`),
+      hepsiniCek<LimanKurali>(`navlun_liman_kurallari?select=liman_anahtar,temel,aciklama&company_id=eq.${companyId}&order=liman_anahtar`),
+      hepsiniCek<{ acente: string | null; varis_limani: string | null; etd: string | null; navlun_kont: number | string | null; lokal_kont: number | string | null; navlun_para: string | null }>(
+        `sevkiyat_plani?select=acente,varis_limani,etd,navlun_kont,lokal_kont,navlun_para&company_id=eq.${companyId}&navlun_kont=not.is.null&order=id`),
+    ]);
+    const sayiMi = (v: unknown) => (v == null || v === "" ? null : Number(v));
+    return baglamKur(
+      hafiza.map((h) => ({ ...h, lokal_20: sayiMi(h.lokal_20), lokal_40: sayiMi(h.lokal_40), ek_kont: Number(h.ek_kont || 0) })),
+      kurallar,
+      olaylar.filter((o) => (o.tur === "teklif" || o.tur === "karsi_teklif") && o.tutar).map((o) => ({
+        acente: o.acente, tutar: o.tutar as number, para_birimi: o.para_birimi, ekipman: o.ekipman, lokal_dahil: o.lokal_dahil ?? null, liman_anahtar: o.liman_anahtar, tarih: o.tarih,
+      })),
+      kanit.map((k) => ({ acente: k.acente, liman_anahtar: limanAnahtari(k.varis_limani), etd: k.etd, navlun: sayiMi(k.navlun_kont), lokal: sayiMi(k.lokal_kont), para: k.navlun_para })),
+    );
+  } catch (e) {
+    console.error("navlun-tablosu: karsilastirma baglami okunamadi:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 async function xlsxBase64(sayfa: Parameters<typeof xlsxParcalari>[0][number]): Promise<string> {

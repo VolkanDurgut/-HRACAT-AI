@@ -7,6 +7,8 @@
  * "Hedefiniz uygundur" (hedef_kabul) -> o andaki son hedefimiz o acentenin fiyati sayilir.
  */
 
+import { enIyiSec, karsilastir, type Karsilastirma, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
+
 export type NavlunSatiri = {
   mesaj_id: string;
   tur: string;
@@ -39,6 +41,8 @@ export type AcenteFiyati = {
   tarih: string;
   /** "teklif" | "karsi_teklif" | "hedef_kabul" */
   tur: string;
+  /** 13.11.2026: karsilastirma tutari (navlun + lokal + ek), lokal durumu ve dayanagi (lib/navlun/karsilastirma.ts) */
+  karsi: Karsilastirma;
 };
 
 export type AcenteDurumu = { acente: string; tur: string; tarih: string };
@@ -53,7 +57,10 @@ export type LimanOzeti = {
   fiyatlar: AcenteFiyati[];
   /** Fiyati olmayan acentelerin son durumu */
   durumlar: AcenteDurumu[];
+  /** 13.11.2026: YALNIZ toplami kesin teklifler arasinda en dusuk toplam (navlun + lokal + ek) */
   enIyi20: AcenteFiyati | null;
+  /** Toplami kesin olmayan (lokal belirsiz) en dusuk 20'DC teklif; en iyi sayilmaz, ayrica uyarilir */
+  belirsiz20: AcenteFiyati | null;
 };
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
@@ -66,7 +73,11 @@ export const DURUM_ETIKETI: Record<string, string> = {
   karsi_teklif: "Karşı teklif",
 };
 
-export function limanOzetleri(satirlar: NavlunSatiri[]): LimanOzeti[] {
+/**
+ * baglam (13.11.2026): acente hafizasi + rezervasyondan ogrenilen + liman kurallari. Yoksa (okunamadi) yalniz mail metni
+ * kullanilir ve lokali belirsiz teklif hic "en iyi" secilmez.
+ */
+export function limanOzetleri(satirlar: NavlunSatiri[], baglam: KarsilastirmaBaglami | null = null): LimanOzeti[] {
   const sirali = [...satirlar].filter((s) => s.liman_anahtar).sort((a, b) => a.tarih.localeCompare(b.tarih));
   const gruplar = new Map<string, NavlunSatiri[]>();
   for (const s of sirali) {
@@ -90,27 +101,35 @@ export function limanOzetleri(satirlar: NavlunSatiri[]): LimanOzeti[] {
       if ((FIYATLI.has(s.tur) && s.tutar) || (s.tur === "hedef_kabul" && hedef)) {
         const tutar = s.tur === "hedef_kabul" ? hedef!.tutar : (s.tutar as number);
         const ekipman = s.ekipman || "20DC";
+        // "Hedefiniz uygundur": hedefimiz ayni temelle (lokal dahil toplam) okunur
+        const lokalDahil = s.tur === "hedef_kabul" ? true : s.lokal_dahil;
         fiyat.set(`${s.acente}|${ekipman}|${s.armator || ""}`, {
           acente: s.acente, ekipman, tutar, armator: s.armator, free_time_gun: s.free_time_gun, transit_gun: s.transit_gun ?? null, gecerlilik: s.gecerlilik,
-          lokal_dahil: s.lokal_dahil, kaynak: s.kaynak, tarih: s.tarih, tur: s.tur,
+          lokal_dahil: lokalDahil, kaynak: s.kaynak, tarih: s.tarih, tur: s.tur,
+          karsi: karsilastir({ acente: s.acente, tutar, ekipman, lokal_dahil: lokalDahil, liman_anahtar: anahtar }, baglam),
         });
         sonFiyatTarihi.set(s.acente, s.tarih);
       } else if (s.tur !== "hedef" && s.tur !== "kabul") {
         durum.set(s.acente, { acente: s.acente, tur: s.tur, tarih: s.tarih });
       }
     }
+    // 13.11.2026: siralama karsilastirma tutarina gore; kesin olanlar once
     const fiyatlar = Array.from(fiyat.values()).sort((a, b) =>
-      (a.ekipman === "20DC" ? 0 : 1) - (b.ekipman === "20DC" ? 0 : 1) || a.ekipman.localeCompare(b.ekipman) || a.tutar - b.tutar);
+      (a.ekipman === "20DC" ? 0 : 1) - (b.ekipman === "20DC" ? 0 : 1) || a.ekipman.localeCompare(b.ekipman)
+      || (a.karsi.kesin ? 0 : 1) - (b.karsi.kesin ? 0 : 1) || a.karsi.toplam - b.karsi.toplam);
     // Fiyati olan acentenin, fiyattan ONCEKI durumu (ornegin "hedef soruyor") gosterilmez
     const durumlar = Array.from(durum.values()).filter((d) => !sonFiyatTarihi.has(d.acente) || d.tarih > (sonFiyatTarihi.get(d.acente) as string))
       .sort((a, b) => b.tarih.localeCompare(a.tarih));
     const yirmi = fiyatlar.filter((f) => f.ekipman === "20DC");
+    const secim = enIyiSec(yirmi, (f) => f.karsi);
     sonuc.push({
       anahtar,
       ad: (liste[liste.length - 1].liman || anahtar).toLocaleUpperCase("tr-TR"),
       sonTarih: liste[liste.length - 1].tarih,
       hedef, kabul, fiyatlar, durumlar,
-      enIyi20: yirmi.length ? yirmi[0] : null,
+      enIyi20: secim.enIyi,
+      // Belirsiz teklif yalniz en iyiden daha ucuzsa (ya da kesin teklif yoksa) uyari olarak gosterilir
+      belirsiz20: secim.belirsiz && (!secim.enIyi || secim.belirsiz.karsi.toplam < secim.enIyi.karsi.toplam) ? secim.belirsiz : null,
     });
   }
   return sonuc.sort((a, b) => b.sonTarih.localeCompare(a.sonTarih));

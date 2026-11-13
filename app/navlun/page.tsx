@@ -2,7 +2,7 @@
 
 import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Anchor, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
+import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -14,6 +14,7 @@ import { navlunTablosuExcel, navlunTablosuTestMaili } from "@/lib/navlun/tablo";
 import { navlunNoktalari } from "@/lib/navlun/harita";
 import { NavlunHaritasi } from "@/components/navlun/navlun-haritasi";
 import { LimanMasasi } from "@/components/navlun/liman-masasi";
+import { acenteAnahtari, karsilastir, type Karsilastirma } from "@/lib/navlun/karsilastirma";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -41,6 +42,60 @@ function Rozet({ metin, renk }: { metin: string; renk: "yesil" | "sari" | "gri" 
   return <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: r[0], color: r[1] }}>{metin}</span>;
 }
 
+/** 13.11.2026: lokal durumu rozeti (mail / acente hafizasi / rezervasyondan ogrenilen) */
+function LokalRozeti({ k }: { k: Karsilastirma }) {
+  if (k.temel === "navlun") return <span title={k.dayanak}><Rozet metin="yalnız navlun" renk="gri" /></span>;
+  if (!k.kesin) return <span title={k.dayanak}><Rozet metin={k.lokalDurum === "haric" ? "+ lokal (tutar?)" : "lokal belirsiz"} renk="sari" /></span>;
+  const kaynak = k.kaynak === "hafiza" ? " · hafıza" : k.kaynak === "rezervasyon" ? " · öğrenildi" : "";
+  return <span title={k.dayanak}><Rozet metin={`${k.lokalDurum === "haric" ? `+ lokal ${usd(k.lokal || 0)}` : "lokal dahil"}${kaynak}`} renk={k.kaynak === "rezervasyon" ? "yesil" : "gri"} /></span>;
+}
+
+/**
+ * ACENTE HAFIZASI (13.11.2026): her acentenin lokal aliskanligi ve dayanagi. Kaynak: arastirma / elle (navlun_acente_hafizasi)
+ * ve rezervasyonlardan kendiliginden ogrenilen (yukleme plani: teklif = gerceklesen navlun -> lokal dahil).
+ */
+function AcenteHafizasiPaneli({ veri }: { veri: NavlunVerisi }) {
+  const satirlar = useMemo(() => {
+    const adlar = new Map<string, string>();
+    veri.satirlar.forEach((s) => { const a = acenteAnahtari(s.acente); if (a && !adlar.has(a)) adlar.set(a, s.acente as string); });
+    return Array.from(adlar.entries()).map(([a, ad]) => {
+      const k = karsilastir({ acente: ad, tutar: 1000, ekipman: "20DC", lokal_dahil: null, liman_anahtar: null }, veri.baglam);
+      const h = veri.baglam?.hafiza.get(a);
+      const sayi = veri.satirlar.filter((s) => acenteAnahtari(s.acente) === a && (s.tur === "teklif" || s.tur === "karsi_teklif")).length;
+      return { a, ad, k, h, sayi };
+    }).sort((x, y) => y.sayi - x.sayi || x.ad.localeCompare(y.ad, "tr"));
+  }, [veri]);
+  if (!satirlar.length) return null;
+  return (
+    <div className="rounded-xl border mt-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="acente-hafizasi">
+      <div className="px-4 py-3 border-b flex items-center gap-2 text-sm text-white font-semibold" style={{ borderColor: CARD_BORDER }}>
+        <Brain size={15} style={{ color: "#C4B5FD" }} /> Acente hafızası
+      </div>
+      <p className="px-4 pt-2 text-[11px]" style={{ color: TEXT_MUTED }}>
+        Teklif lokal yazmıyorsa bu kural uygulanır. Yeni rezervasyonlarla kendiliğinden öğrenir; belirsiz acentenin teklifi en iyi sayılmaz.
+      </p>
+      <ul className="px-4 py-2 space-y-2">
+        {satirlar.map(({ a, ad, k, h, sayi }) => (
+          <li key={a} className="text-xs" data-hafiza-acente={a} title={k.dayanak}>
+            <div className="flex items-center gap-2">
+              <span className="text-white font-medium truncate">{ad}</span>
+              <span className="ml-auto shrink-0">
+                {k.lokalDurum === "dahil" ? <Rozet metin="lokal dahil" renk={k.kaynak === "rezervasyon" ? "yesil" : "gri"} />
+                  : k.lokalDurum === "haric" ? <Rozet metin={h?.lokal_20 ? `lokal hariç · ${usd(h.lokal_20)}` : "lokal hariç"} renk="mavi" />
+                  : <Rozet metin="belirsiz" renk="sari" />}
+              </span>
+            </div>
+            <p className="mt-0.5 leading-snug" style={{ color: TEXT_MUTED }}>
+              {k.kaynak === "hafiza" ? (h?.kanit || "") : k.kaynak === "rezervasyon" ? `Öğrenildi: ${k.dayanak.replace(/^Rezervasyondan öğrenildi: /, "")}` : "Henüz kanıt yok; ilk rezervasyonda öğrenilecek."}
+              {h && h.ek_kont > 0 ? ` · ek ${usd(h.ek_kont)}/kont.` : ""} · {sayi} teklif
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function OzetKarti({ ikon, etiket, deger, alt, testId }: { ikon: React.ReactNode; etiket: string; deger: number | string; alt?: string; testId: string }) {
   return (
     <div className="rounded-xl border px-4 py-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>
@@ -60,11 +115,17 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
           <p className="text-white font-semibold flex items-center gap-2"><Anchor size={15} style={{ color: ACCENT }} />{l.ad}</p>
           <span className="text-xs ml-auto" style={{ color: TEXT_MUTED }}>son: {tarihGoster(l.sonTarih)}</span>
         </div>
-        {(l.enIyi20 || l.hedef || l.kabul) && (
+        {(l.enIyi20 || l.belirsiz20 || l.hedef || l.kabul) && (
           <dl className="mt-1.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm" data-baslik-ozet>
             {l.enIyi20 && <>
-              <dt style={{ color: "#6EE7B7" }}>En iyi 20&apos;DC</dt>
-              <dd style={{ color: "#6EE7B7" }} data-en-iyi><b className="tabular-nums">{usd(l.enIyi20.tutar)}</b> · {l.enIyi20.acente}</dd>
+              <dt style={{ color: "#6EE7B7" }} title="Karşılaştırma: navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç)">En iyi 20&apos;DC</dt>
+              <dd style={{ color: "#6EE7B7" }} data-en-iyi title={l.enIyi20.karsi.dayanak}><b className="tabular-nums">{usd(l.enIyi20.karsi.toplam)}</b> · {l.enIyi20.acente}
+                {l.enIyi20.karsi.metin !== "lokal dahil" && <span style={{ color: TEXT_MUTED }}> ({l.enIyi20.karsi.metin})</span>}</dd>
+            </>}
+            {l.belirsiz20 && <>
+              <dt style={{ color: "#C4B5FD" }}>Lokal belirsiz</dt>
+              <dd style={{ color: "#C4B5FD" }} data-belirsiz title={l.belirsiz20.karsi.dayanak}><b className="tabular-nums">{usd(l.belirsiz20.tutar)}</b> · {l.belirsiz20.acente}
+                <span style={{ color: TEXT_MUTED }}> ({l.belirsiz20.karsi.metin}; en iyi sayılmadı)</span></dd>
             </>}
             {l.hedef && <>
               <dt className="flex items-center gap-1" style={{ color: "#FCD34D" }}><Target size={13} />Hedefimiz</dt>
@@ -84,6 +145,7 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
                 <th className="px-4 py-2 font-medium">Acente</th><th className="px-3 py-2 font-medium">Armatör</th>
                 <th className="px-3 py-2 font-medium">Ekipman</th><th className="px-3 py-2 font-medium text-right">Navlun</th>
+                <th className="px-3 py-2 font-medium text-right" title="Navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç)">Lokal dahil</th>
                 <th className="px-3 py-2 font-medium">Free time</th><th className="px-3 py-2 font-medium">Transit</th><th className="px-3 py-2 font-medium">Geçerlilik</th>
                 <th className="px-3 py-2 font-medium">Tarih</th><th className="px-3 py-2 font-medium"></th>
               </tr>
@@ -96,15 +158,16 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
                     <td className="px-4 py-2 text-white whitespace-nowrap">{f.acente}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.armator || "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.ekipman}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: enIyi ? "#6EE7B7" : "#FFFFFF" }} data-tutar>{usd(f.tutar)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }} data-tutar>{usd(f.tutar)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: enIyi ? "#6EE7B7" : f.karsi.kesin ? "#FFFFFF" : "#C4B5FD" }}
+                      data-toplam title={`${f.karsi.metin} · ${f.karsi.dayanak}`}>{f.karsi.kesin ? usd(f.karsi.toplam) : "?"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-ft>{f.free_time_gun != null ? `${f.free_time_gun} gün` : "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-transit>{f.transit_gun ? `${f.transit_gun} gün` : "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.gecerlilik || "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihGoster(f.tarih)}</td>
                     <td className="px-3 py-2 space-x-1 whitespace-nowrap">
                       {f.tur !== "teklif" && <Rozet metin={DURUM_ETIKETI[f.tur] || f.tur} renk="mavi" />}
-                      {f.lokal_dahil === true && <Rozet metin="lokal dahil" renk="gri" />}
-                      {f.lokal_dahil === false && <Rozet metin="+ lokal" renk="gri" />}
+                      <LokalRozeti k={f.karsi} />
                       {f.kaynak === "pdf" && <Rozet metin="PDF'ten" renk="sari" />}
                       {f.kaynak === "gorsel" && <Rozet metin="Görselden" renk="sari" />}
                       {f.kaynak === "elle" && <Rozet metin="Elle" renk="sari" />}
@@ -243,7 +306,7 @@ function NavlunIcerik() {
   }, []);
   useEffect(() => { if (yetkili) yukle(); }, [yetkili, yukle]);
 
-  const limanlar = useMemo(() => (veri ? limanOzetleri(veri.satirlar) : []), [veri]);
+  const limanlar = useMemo(() => (veri ? limanOzetleri(veri.satirlar, veri.baglam) : []), [veri]);
   const bilgiler = useMemo(() => (veri ? yeniBilgiler(veri.satirlar) : []), [veri]);
   const noktalar = useMemo(() => (veri ? navlunNoktalari(limanlar, veri.satirlar, oncekiGorulme || null) : []), [veri, limanlar, oncekiGorulme]);
   const masaLimani = masa ? limanlar.find((l) => l.anahtar === masa) || null : null;
@@ -333,7 +396,7 @@ function NavlunIcerik() {
       {!veri && yukleniyor ? <SayfaYukleniyor /> : veri ? (
         <>
           {limanlar.length > 0 && <NavlunHaritasi noktalar={noktalar} onSec={setMasa} />}
-          {masaLimani && <LimanMasasi liman={masaLimani} satirlar={veri.satirlar} onKapat={masaKapat} />}
+          {masaLimani && <LimanMasasi liman={masaLimani} satirlar={veri.satirlar} onKapat={masaKapat} baglam={veri.baglam} />}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <OzetKarti testId="ozet-liman" ikon={<Anchor size={14} />} etiket="Liman" deger={limanlar.length} alt="son 120 gün" />
             <OzetKarti testId="ozet-teklif" ikon={<Mail size={14} />} etiket="Yeni teklif" deger={yediGun} alt="son 7 gün" />
@@ -341,6 +404,11 @@ function NavlunIcerik() {
             <OzetKarti testId="ozet-son" ikon={<RefreshCw size={14} />} etiket="Son okuma" deger={veri.sonOkuma ? tarihGoster(veri.sonOkuma) : "—"} alt="arşiv mailinden" />
           </div>
 
+          {veri.baglamHatasi && (
+            <div className="mb-4 rounded-lg border px-3 py-2 text-sm flex items-start gap-2" style={{ borderColor: "rgba(251,191,36,0.35)", color: "#FCD34D" }} data-testid="baglam-hatasi">
+              <AlertTriangle size={16} className="shrink-0 mt-0.5" /> <span>{veri.baglamHatasi} Lokal bilgisi yalnız mail metninden; lokali belirsiz teklifler en iyi sayılmıyor.</span>
+            </div>
+          )}
           {veri.okunamayanlar.length > 0 && (
             <div className="rounded-xl border mb-4" style={{ backgroundColor: CARD_BG, borderColor: "rgba(251,191,36,0.35)" }} data-testid="okunamayanlar">
               <div className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: "#FCD34D" }}>
@@ -367,6 +435,7 @@ function NavlunIcerik() {
           </div>
           <div className="order-first xl:order-none">
             <YeniBilgiPaneli bilgiler={bilgiler} oncekiGorulme={oncekiGorulme || null} onOkundu={() => setOncekiGorulme(bilgiler[0]?.tarih || "")} />
+            <AcenteHafizasiPaneli veri={veri} />
           </div>
           </div>
         </>

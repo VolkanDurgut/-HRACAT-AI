@@ -21,8 +21,9 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 /** Cikis: yalniz Ambarli ve Asyaport (Tekirdag) - ikisi de Marmara; rota Canakkale Bogazi'ndan (dugum "İstanbul"). */
 const CIKIS = { ad: "Ambarlı · Asyaport", rotaDugumu: "İstanbul", enlem: 40.97, boylam: 28.69 };
 const SEFTALI = "#F4A07C";
-export const DURUM_RENGI: Record<NoktaDurumu, string> = { hedefte: "#10B981", ustunde: "#F59E0B", fiyatli: "#38BDF8", fiyatsiz: "#64748B" };
-export const DURUM_ADI: Record<NoktaDurumu, string> = { hedefte: "Hedefte / altında", ustunde: "Hedefin üstünde", fiyatli: "Fiyat var (hedef yok)", fiyatsiz: "Fiyat yok" };
+export const DURUM_RENGI: Record<NoktaDurumu, string> = { hedefte: "#10B981", ustunde: "#F59E0B", fiyatli: "#38BDF8", belirsiz: "#A78BFA", fiyatsiz: "#64748B" };
+// 13.11.2026: karsilastirma lokal dahil toplamla; lokali kesin teklif yoksa "Lokal belirsiz" (asla yesil degil)
+export const DURUM_ADI: Record<NoktaDurumu, string> = { hedefte: "Hedefte / altında", ustunde: "Hedefin üstünde", fiyatli: "Fiyat var (hedef yok)", belirsiz: "Lokal belirsiz", fiyatsiz: "Fiyat yok" };
 const usd = (n: number) => `${n.toLocaleString("tr-TR")} $`;
 
 export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[]; onSec: (anahtar: string) => void }) {
@@ -149,7 +150,8 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
           {ipucu && (
             <div className="absolute left-3 top-14 z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[180px]" style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }} data-navlun-ipucu="">
               <p className="text-xs font-semibold text-white">{ipucu.ad}</p>
-              <p style={{ color: DURUM_RENGI[ipucu.durum] }}>{ipucu.enIyi !== null ? `En iyi 20'DC ${usd(ipucu.enIyi)} · ${ipucu.enIyiAcente}` : "Fiyat yok"}</p>
+              <p style={{ color: DURUM_RENGI[ipucu.durum] }}>{ipucu.enIyi !== null ? `En iyi 20'DC ${usd(ipucu.enIyi)} · ${ipucu.enIyiAcente}` : ipucu.durum === "belirsiz" ? "Lokal belirsiz: en iyi seçilemedi" : "Fiyat yok"}</p>
+              {ipucu.enIyiMetin && ipucu.enIyiMetin !== "lokal dahil" && <p style={{ color: TEXT_MUTED }}>{ipucu.enIyiMetin}</p>}
               {ipucu.hedef !== null && <p style={{ color: "#FCD34D" }}>Hedefimiz {usd(ipucu.hedef)}</p>}
               <p style={{ color: TEXT_MUTED }}>{ipucu.acenteSayisi} acente · {ipucu.teklifSayisi} teklif · tıklayın: yazışma</p>
             </div>

@@ -409,3 +409,29 @@ Bildirimi sayfasındaki Excel indir kısmı). İlk önce test gönder, onaylarsa
   navlun alıcılarının kopyası, CANLI KAPALI → zamanlanmış gönderim de yalnız test adresine "[TEST]"). Önizle / Test o satırdan
   (`RaporTanimi.govde = {haftalik: true}`).
 - Migration `20261113160000_navlun_haftalik.sql`; pg_cron `navlun-tablosu-haftalik` `0 6 * * 6` (komut günlük işten türetilir).
+
+## 4.12 Navlun karşılaştırma + acente hafızası (13.11.2026 gece)
+
+Kullanıcı: "Beyrut navlununun yanlış gözükmesi beni çırak çıkarttı. Bunu kökten çözmeliyiz ... acenteleri gruplara ayır,
+ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı."
+
+- **Sorun:** "en iyi" yalnız tutara bakıyordu. Evergreen "USD 340 + lokaller" (lokal 356) Beyrut'ta en iyi ve hedefte
+  (600) göründü; gerçek 696 (MSC'nin gerçekleşen 700'üyle başa baş, hedefin üstünde).
+- **Tek hesap:** `supabase/functions/_shared/navlun-karsilastirma.ts` (uygulama `lib/navlun/karsilastirma.ts` ile aynı
+  kod). Karşılaştırma = navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç); hedef de bu temelle. Kullanan:
+  Navlun Evreni (liman kartı, harita, Liman Masası, sohbet), 17:00 navlun maili (`limanSatirlari`, `guncelEnIyiler`) ve
+  satın alma listesi. Excel (operasyonun tablosu) ham teklifleri gösterir, değişmedi.
+- **Lokal durumu sırası:** liman kuralı → teklif metni (`lokal_dahil`) → acente hafızası (`navlun_acente_hafizasi`) →
+  rezervasyondan öğrenilen (yükleme planı: aynı acentenin aynı limana teklifi = gerçekleşen navlun → "dahil";
+  teklif + lokal = gerçekleşen → "hariç") → bilinmiyor. Lokali kesin olmayan teklif ASLA "en iyi" seçilmez ve haritada
+  yeşil olmaz (mor "Lokal belirsiz"); listede "?" ve rozetle görünür.
+- **Kendi kendini geliştiren:** rezervasyon kanıtları her yüklemede kendiliğinden artar (tabloya yazılmaz, her açılışta
+  hesaplanır). Hafızası olmayan acente (Kuehne+Nagel, Link, Esna, ZIM) ilk eşleşen rezervasyonda öğrenilir.
+- **Hafızanın ilk hali (araştırma, 13.11 gece; canlıya SQL ile, repoda veri yok):** Draft / Akkon / MSC / Horoz dahil,
+  Martı dahil + 44 (VGM 26 + mühür 18), Evergreen hariç + 356 (mail tablosu). Dayanak: rezervasyondaki gerçekleşen
+  navlunlar (Tema 1.450, Cibuti 1.850, Mombasa 1.940, Ashdod 800) ve mail ifadeleri ("LI", "Free in ... + lokaller",
+  "lokal dahil"). Asya "all in" teklifleri yükleme limanı lokalini İÇERİYOR (ONE, Horoz metinleri); Singapur için
+  denenen "yalnız navlun" istisnası aynı gece kaldırıldı (temel = toplam).
+- **Açık veri sorunu (dokunulmadı, kullanıcıya bildirildi):** Singapur rezervasyonlarında navlun 100–175, lokal 100–400
+  girilmiş; net navlun = navlun − lokal eksiye düşüyor (fatura talimatı FOB'u etkileyebilir).
+- Testler: `tests/navlun-karsilastirma.test.ts` (Beyrut 696, belirsiz en iyi seçilmez, öğrenme, mail tarafı).

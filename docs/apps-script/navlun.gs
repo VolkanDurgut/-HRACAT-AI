@@ -17,7 +17,10 @@
  *   NAVLUN_GECMIS_I satirini silin, navlunGecmis'i "BITTI" yazana kadar tekrar calistirin (kayitlar yenilenir,
  *   cift kayit olmaz). Sonrasinda sunucu saklanan metinden yeniden okuyabilir; bu adim tekrar gerekmez.
  *
- * Ne gonderilir: konusu "NAVLUN" gecen maillerin gonderen, konu, tarih, Message-ID ve alintisiz metni;
+ * GUNCELLEME 13.11.2026 (alintidan kurtarma): bu dosyanin yeni halini projeye yapistirip kaydedin, sonra
+ *   NAVLUN_GECMIS_I satirini silip navlunGecmis'i "BITTI" yazana kadar calistirin (gecmis alintilar bir kez taranir).
+ *
+ * Ne gonderilir: konusu "NAVLUN" gecen maillerin gonderen, konu, tarih, Message-ID, alintisiz metni ve (13.11.2026) tam metni (alinti);
  * fiyat metinde yoksa ekteki PDF'in (yoksa en buyuk gorselin) Google Drive OCR metni. Okuma ve
  * siniflama sunucuda (edge "navlun-bildirimi", kural tabanli). Gecici OCR belgesi hemen silinir.
  *
@@ -121,7 +124,8 @@ function navlunIsle(konular, baslangic) {
 
 function navlunMesaj(m) {
   var kimden = navlunAdres(m.getFrom());
-  var govde = navlunAlintisiz(m.getPlainBody() || '').slice(0, 8000);
+  var tam = m.getPlainBody() || '';
+  var govde = navlunAlintisiz(tam).slice(0, 8000);
   var r = {
     mesaj_id: m.getHeader('Message-ID') || ('gmail:' + m.getId()),
     gonderen: kimden,
@@ -129,6 +133,9 @@ function navlunMesaj(m) {
     govde: govde,
     tarih: m.getDate().toISOString(),
   };
+  // 13.11.2026: alinti da gonderilir -> arsive hic ulasmamis eski teklif, sonraki yazismanin alintisindan kurtarilir
+  // (sunucu ayni teklifin dogrudan gelmis aslini bulursa alintiyi atlar; cift sayim olmaz).
+  if (tam.length > govde.length + 40) r.alinti = tam.slice(0, 30000);
   if (kimden && !NAVLUN_KENDI.test(kimden) && navlunEkGerekli(govde)) {
     var ek = navlunEkMetni(m);
     if (ek) { r.ek_metin = ek.metin.slice(0, 12000); r.ek_kaynak = ek.kaynak; }

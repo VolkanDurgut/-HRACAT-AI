@@ -355,3 +355,15 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
   operation, execution, export, export2"): `rapor_alicilari` navlun satırı (5 alıcı, CC yok, canlı). `navlun-tablosu-sabah` cron
   işi pasif (`cron.alter_job(18, active := false)`; geri açmak için `active := true`). Mail dipnotu ve Ayarlar'daki saat "Her gün
   17:00". Son dakika verisinde konteyner adedi boş sipariş de (aynı müşteri + liman booking'i varsa) bekleyenden düşülür. Edge v13.
+- 13.11.2026 (revize-1113b) Kaçan teklif — kök neden: acentenin teklif maili sistem/arşiv kapsamı başlamadan (≈16.10.2026) önce
+  gelmişse ya da arşive hiç düşmemişse, teklif yalnız sonraki yazışmaların ALINTISINDA kalıyor; betik ve okuyucu alıntıyı
+  bilerek kesiyordu, teklif hiç kaydedilmiyordu. Çözüm 1 (alıntıdan kurtarma): `docs/apps-script/navlun.gs` alıntılı tam gövdeyi
+  ayrı `alinti` alanında da gönderir (ilk 30.000 karakter); edge `navlun-bildirimi` v10 `_shared/navlun-alinti.ts` (saf) ile
+  alıntıyı bloklara ayırır (Outlook From/Sent/Subject + Kimden/Gönderildi/Konu, Gmail "… yazdı:" / "On … wrote:"), yalnız
+  ACENTE blokları, üst mailden ESKİ tarihliler okunur; `mesajIsle` "okundu" dönerse `alinti:<hash>` kimliğiyle kaydedilir
+  (aynı blok farklı maillerde aynı kimlik → tekrar yok). Aynı gönderen ±4 saat içinde aynı gövde imzasıyla zaten kayıtlıysa
+  (asıl mail gelmişse) atlanır. Özet: "Alıntıdan kurtarıldı: … (asıl mail arşive ulaşmamış)". Alıntı saati +03:00 kabul edilir.
+  Kurtarma hata verirse normal kayıt ETKİLENMEZ (try/catch). Çözüm 2 (FT/TT tamamlama): acentenin ayrı "bilgi" mailindeki
+  free time / transit time, aynı acente + limanın son 7 gündeki teklifinde alan BOŞSA doldurulur (`yeniden_isle` de yapar).
+  Arşiv betiği güncellenip `NAVLUN_GECMIS_I` silinerek `navlunGecmis` "BITTI" yazana kadar çalıştırılınca geçmiş yazışmaların
+  alıntıları da taranır.

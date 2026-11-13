@@ -762,3 +762,5 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   tedarikçi başlık satırı (araç, bugün ton, kalan toplamı, "İrsaliyeleri İncele (n)") ve altında siparişleri
   (↳ no · ürün, araç, ton, kalan / Kapandı). Günün aracı olan + açık olan bütün siparişler listelenir. Ayrıntı
   tabloları, kutular, kapananlar sade raporda YOK. Eski görünüm (zamanlanmış rapor) 13.11 öncesi haliyle aynı.
+- **CANLI (13.11.2026 19:01, kullanıcı: "İç piyasa raporu onaylıdır"):** `GRUPLU_CANLI = true`; zamanlanmış rapor (09:15 /
+  12:15 / 17:15) sade görünümle gider. Eski görünüm kodu geri dönüş için duruyor (`gruplu` kapalıyken).

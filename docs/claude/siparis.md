@@ -393,6 +393,12 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
   indirme sayısı). Sağlama: deneme modu 72 tablo / uyarısız / düğme var; anonim ve oturumsuz indirme isteği reddedildi.
 
 ## 4.11 Haftalık Toplu Navlun Tablosu — Cumartesi 09:00 (13.11.2026)
+
+> **KALDIRILDI (13.11.2026 19:01).** Kullanıcı: "Haftalık navlun maili kaldırılsın. Navlun satın alma ile beraber sadece
+> exceli gitsin." + "Her gün". Toplu navlun tablosu (`Navlun_Tablosu_GG.AA.YYYY.xlsx`, Navlun Bildirimi › Excel indir ile
+> aynı) artık her gün 17:00 navlun mailinin İKİNCİ EKİ (birincisi UNEX NAVLUN SATIN ALMA LİSTESİ). `{"haftalik": true}` 410
+> döner; pg_cron `navlun-tablosu-haftalik` pasif (active=false, silinmedi); Ayarlar › Rapor Alıcıları'ndan satır kaldırıldı
+> (veritabanındaki `navlun_haftalik` satırı kullanılmıyor, silinmedi). Aşağısı tarihçe.
 Kullanıcı: "Toplu navlun Excel cumartesi günleri gönderilecek 09.00 (navlun satın alma değil; bütün navlunların olduğu, Navlun
 Bildirimi sayfasındaki Excel indir kısmı). İlk önce test gönder, onaylarsam canlıya geçireceğiz."
 - Edge `navlun-tablosu` `{"haftalik": true}`: ek = `navlunTablosuSayfasi` (sayfadaki "Excel indir" ile aynı dosya, ad

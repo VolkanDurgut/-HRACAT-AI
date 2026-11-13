@@ -41,8 +41,8 @@ const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 // 13.11.2026 TEST ADRESINE ({"test_adresine": true}): "[TEST]" rapor YALNIZ bu adrese (sirket alicilarina DEGIL); yeni gorunumu
 // (tedarikci / musteri ozeti + Irsaliye Evreni) onaydan once gostermek icin. Anon da cagirabilir (adres sabit, 3 / 24 saat).
 const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "mesensei282@gmail.com").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)).slice(0, 2);
-// Yeni gorunum zamanlanmis raporda: kullanici onayina kadar KAPALI (yalniz test_adresine).
-const GRUPLU_CANLI = false;
+// Yeni (sade) gorunum zamanlanmis raporda: 13.11.2026 19:01 kullanici onayi ("Ic piyasa raporu onaylidir") -> ACIK.
+const GRUPLU_CANLI = true;
 
 const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
 /** Zamanlanmis oturum penceresindeysek oturum, degilse null (saatten 5 dk once - 60 dk sonra). */

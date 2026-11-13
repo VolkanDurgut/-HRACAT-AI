@@ -465,47 +465,8 @@ export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLU
 const usd = (n: number) => `${n.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} $`;
 export const NAVLUN_TABLOSU_URL = "https://ihracatasistanim.com";
 
-/** Haftalik toplu navlun tablosu ekinin adi (Navlun Bildirimi > "Excel indir" ile ayni ad). */
+/** Toplu navlun tablosu ekinin adi (Navlun Bildirimi > "Excel indir" ile ayni ad); 13.11.2026: her gunku navlun mailinin ikinci eki. */
 export const navlunTablosuDosyaAdi = (tarih: string) => `Navlun_Tablosu_${tarihTr(tarih)}.xlsx`;
-
-/**
- * HAFTALIK TOPLU NAVLUN TABLOSU (13.11.2026, kullanici: "Toplu navlun Excel cumartesi gunleri gonderilecek 09.00. Navlun satin
- * alma degil; butun navlunlarin oldugu, navlun bildirimi sayfasindaki Excel indir kismi"). Ek = navlunTablosuSayfasi (sayfadaki
- * dosyanin aynisi); govde = kisa mektup (navlunHaftalikHtml).
- */
-export function navlunHaftalikKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda"): string {
-  return `${sirketAdi} Haftalık Navlun Tablosu · ${tarihTr(t.tarih)}`;
-}
-
-/**
- * Haftalik mail govdesi (13.11.2026 kullanici: "Sayin Unex Ekibi diye baslamali, altinda 'Haftalik navlun tablosu ektedir.
- * Iyi calismalar'. Sadece Excel raporu gonderilebilir. Sablon konsimento talimati gonderim uyarisindaki gibi olabilir.").
- * Kabuk: _shared/konsimento-hatirlatma.ts khMail ile ayni (lacivert serit, seftali alt cizgi, logo). Tablo / ozet YOK.
- */
-export function navlunHaftalikHtml(tarih: string, secenek: { test: boolean; gercekAlici: string[]; gercekCc: string[] }): string {
-  const LACIVERT = "#283474", SEFTALI = "#F4A07C";
-  const testSeridi = secenek.test
-    ? `<tr><td style="background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;padding:10px 28px;border-bottom:1px solid #FCD34D;">TEST · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: ${esc(secenek.gercekAlici.join(", ") || "-")}${secenek.gercekCc.length ? ` · CC: ${esc(secenek.gercekCc.join(", "))}` : ""}</td></tr>`
-    : "";
-  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;background:#F3F2EE;font-family:Arial,Helvetica,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F2EE;padding:24px 0;"><tr><td align="center">
-<table role="presentation" width="720" cellpadding="0" cellspacing="0" style="max-width:720px;width:100%;background:#ffffff;border-radius:6px;overflow:hidden;">
-<tr><td style="background:${LACIVERT};padding:18px 28px;border-bottom:4px solid ${SEFTALI};">
-<table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td style="padding-right:16px;vertical-align:middle;"><img src="${NAVLUN_TABLOSU_URL}/images/logo.png" width="64" height="64" alt="Unex Gıda" style="display:block;border:0;"></td>
-<td style="vertical-align:middle;border-left:1px solid rgba(255,255,255,0.18);padding-left:16px;"><p style="margin:0;color:${SEFTALI};font-size:12px;letter-spacing:3px;font-weight:700;">UNEX GIDA · NAVLUN</p>
-<p style="margin:6px 0 0;color:#ffffff;font-size:21px;font-weight:700;">Haftalık Navlun Tablosu · ${tarihTr(tarih)}</p></td>
-</tr></table></td></tr>
-${testSeridi}
-<tr><td style="padding:24px 28px;">
-<p style="margin:0 0 14px;color:${LACIVERT};font-size:15px;line-height:1.55;">Sayın Unex Ekibi,</p>
-<p style="margin:0 0 14px;color:${LACIVERT};font-size:15px;line-height:1.55;">Haftalık navlun tablosu ektedir.</p>
-<p style="margin:0 0 6px;color:${LACIVERT};font-size:15px;line-height:1.55;">İyi çalışmalar.</p>
-<p style="margin:18px 0 0;padding-top:12px;border-top:1px solid #E5E7EB;color:#8B91A8;font-size:12px;line-height:1.5;">Ek: <b>${esc(navlunTablosuDosyaAdi(tarih))}</b> (Navlun Bildirimi › Excel indir ile aynı dosya). Bu mail İhracat AI tarafından her Cumartesi 09:00'da gönderilir.</p>
-</td></tr>
-</table></td></tr></table></body></html>`;
-}
 
 export function navlunTablosuKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda", sa?: NavlunSatinAlma | null): string {
   if (sa) {
@@ -592,7 +553,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
       sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
       ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa),
       dugme: { metin: "Navlun Evreni", yol: "/navlun" },
-      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte: ${satinAlmaBasligi(t.tarih)} (Excel). Her gün 17:00 · müşteriye gitmez.`,
+      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte iki Excel: ${satinAlmaBasligi(t.tarih)} ve ${navlunTablosuDosyaAdi(t.tarih)} (bütün navlunlar; Navlun Bildirimi › Excel indir ile aynı). Her gün 17:00 · müşteriye gitmez.`,
     });
   }
   return raporKabugu({

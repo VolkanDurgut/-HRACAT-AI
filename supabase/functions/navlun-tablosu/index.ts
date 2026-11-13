@@ -3,7 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
-import { navlunHaftalikHtml, navlunHaftalikKonusu, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -25,12 +25,10 @@ import { navlunHaftalikHtml, navlunHaftalikKonusu, navlunSatinAlma, navlunTablos
 //    {"test": true} -> "[TEST]" mail YALNIZ test adresine.
 //  - Anon {"test": true}: yalniz canli degilken (kurulum dogrulamasi).
 //  - Test mailleri sirket basina 24 saatte en fazla 5 (navlun_tablosu_gonderimleri).
-// HAFTALIK TOPLU NAVLUN TABLOSU (13.11.2026, kullanici: "Toplu navlun Excel cumartesi gunleri gonderilecek 09.00. Navlun satin
-//   alma degil; butun navlunlarin oldugu, Navlun Bildirimi sayfasindaki Excel indir"). Govdede {"haftalik": true}:
-//   ek = navlunTablosuSayfasi (sayfadaki "Excel indir" ile ayni dosya), govde = kisa mektup ("Sayin Unex Ekibi, Haftalik navlun
-//   tablosu ektedir. Iyi calismalar."; konsimento hatirlatma kabugu; navlunHaftalikHtml).
-//   pg_cron 'navlun-tablosu-haftalik' Cumartesi 06:00 UTC = 09:00 TR; anon yalniz Cumartesi 08:55-10:00 TR. Alici: Ayarlar >
-//   Rapor Alicilari "navlun_haftalik" (canli kapaliyken YALNIZ test adresine "[TEST]"). Tekrar korumasi: oturum = "haftalik".
+// TOPLU NAVLUN TABLOSU EKI (13.11.2026 aksam, kullanici: "Haftalik navlun maili kaldirilsin. Navlun satin alma ile beraber
+//   sadece exceli gitsin." + "Her gun"): her gunku navlun maili IKI Excel ekiyle gider: (1) UNEX NAVLUN SATIN ALMA LISTESI,
+//   (2) Navlun_Tablosu_GG.AA.YYYY.xlsx = Navlun Bildirimi > "Excel indir" ile ayni dosya (navlunTablosuSayfasi).
+//   Ayri cumartesi maili KALDIRILDI: {"haftalik": true} 410 doner; pg_cron 'navlun-tablosu-haftalik' pasif (active=false).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -51,12 +49,6 @@ const ALICILAR = adresler("NAVLUN_TABLOSU_ALICI", []);
 const TEST_ALICISI = adresler("NAVLUN_TABLOSU_TEST_ALICISI", ["mesensei282@gmail.com"]);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
-/** Haftalik gonderim penceresi: Cumartesi 08:55-10:00 (Istanbul). */
-function haftalikPencere(ms: number): boolean {
-  const tr = new Date(ms + 3 * 3600_000);
-  const dk = tr.getUTCHours() * 60 + tr.getUTCMinutes();
-  return tr.getUTCDay() === 6 && dk >= 9 * 60 - 5 && dk < 10 * 60;
-}
 
 async function tekrarla(istek: () => Promise<Response>): Promise<Response> {
   for (let sira = 0; ; sira++) {
@@ -144,16 +136,20 @@ async function sirketTablosu(companyId: string, tarih: string) {
   return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar, Array.from(konular.values())) };
 }
 
-async function excelBase64(v: Awaited<ReturnType<typeof sirketTablosu>>, haftalik = false): Promise<string> {
+async function xlsxBase64(sayfa: Parameters<typeof xlsxParcalari>[0][number]): Promise<string> {
   const zip = new JSZip();
-  if (haftalik) {
-    // 13.11.2026: toplu navlun tablosu = Navlun Bildirimi > "Excel indir" (lib/navlun/tablo.ts) ile ayni sayfa
-    for (const f of xlsxParcalari([navlunTablosuSayfasi(v.tablo)])) zip.file(f.yol, f.icerik);
-    return await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
-  }
-  // 12.11.2026 kullanici: ek = "UNEX NAVLUN SATIN ALMA LISTESI · <tarih>" (operasyonun navlun tablosu sayfadaki "Excel indir"de)
-  for (const f of xlsxParcalari([satinAlmaSayfasi(v.satinAlma, v.tablo.tarih)])) zip.file(f.yol, f.icerik);
+  for (const f of xlsxParcalari([sayfa])) zip.file(f.yol, f.icerik);
   return await zip.generateAsync({ type: "base64", compression: "DEFLATE" });
+}
+/**
+ * Mailin ekleri (13.11.2026): (1) "UNEX NAVLUN SATIN ALMA LISTESI · <tarih>" (12.11.2026), (2) toplu navlun tablosu =
+ * Navlun Bildirimi > "Excel indir" (lib/navlun/tablo.ts) ile ayni sayfa, "Navlun_Tablosu_GG.AA.YYYY.xlsx".
+ */
+async function ekler(v: Awaited<ReturnType<typeof sirketTablosu>>, tarih: string): Promise<{ filename: string; content: string }[]> {
+  return [
+    { filename: `${satinAlmaBasligi(tarih)}.xlsx`, content: await xlsxBase64(satinAlmaSayfasi(v.satinAlma, v.tablo.tarih)) },
+    { filename: navlunTablosuDosyaAdi(tarih), content: await xlsxBase64(navlunTablosuSayfasi(v.tablo)) },
+  ];
 }
 
 function json(veri: unknown, status = 200): Response {
@@ -163,8 +159,9 @@ function json(veri: unknown, status = 200): Response {
 Deno.serve(async (req: Request) => {
   try {
     const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean; haftalik?: boolean };
-    const haftalik = govde.haftalik === true;
-    const rapor = haftalik ? "navlun_haftalik" : "navlun";
+    // 13.11.2026: ayri haftalik mail kaldirildi (toplu tablo her gunku mailin ikinci eki)
+    if (govde.haftalik === true) return json({ ok: false, hata: "Haftalık navlun maili kaldırıldı; toplu navlun tablosu her günkü navlun mailinde ektedir." }, 410);
+    const rapor = "navlun";
     const yetkiliSirket = await yetkiliKullaniciSirketi(req);
     const yetkili = yetkiliSirket !== null;
     const zamanli = govde.deneme !== true && govde.test !== true;
@@ -174,11 +171,11 @@ Deno.serve(async (req: Request) => {
       const baslik = req.headers.get("Authorization") || "";
       if (jwtRolu(baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null) === "authenticated") return json({ ok: false, hata: "Test maili yalnızca yöneticiler gönderebilir." }, 403);
       if (govde.deneme) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
-      if (zamanli && !(haftalik ? haftalikPencere(Date.now()) : oturumPenceresi(Date.now()))) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
+      if (zamanli && !oturumPenceresi(Date.now())) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
     }
     const deneme = yetkili && govde.deneme === true;
     const tarih = trBugun();
-    const oturum = haftalik ? "haftalik" : oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
+    const oturum = oturumPenceresi(Date.now()) ?? oturumSaatten(Date.now());
 
     const kaynak = await hepsiniCek<{ company_id: string }>(`navlun_teklifleri?select=company_id&order=company_id`);
     const idler = Array.from(new Set(kaynak.map((b) => b.company_id))).filter((id) => !yetkili || id === yetkiliSirket);
@@ -187,8 +184,7 @@ Deno.serve(async (req: Request) => {
 
     const sonuclar: Record<string, unknown>[] = [];
     for (const companyId of idler) {
-      // Haftalik raporun yedek (secret) ayari yok: Ayarlar'da satir yoksa yalniz test adresine
-      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, rapor, haftalik ? { canli: false, alicilar: [] } : { canli: CANLI, alicilar: ALICILAR });
+      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, rapor, { canli: CANLI, alicilar: ALICILAR });
       if (!yetkili && govde.test === true && ayar.canli) { sonuclar.push({ atlandi: "Canlı raporda test yalnızca yöneticiler içindir." }); continue; }
       // Canli degilse zamanlanmis rapor da test adresine "[TEST]" gider
       const test = !deneme && (govde.test === true || !ayar.canli);
@@ -198,13 +194,10 @@ Deno.serve(async (req: Request) => {
       const veri = await sirketTablosu(companyId, tarih);
       const tablo = veri.tablo;
       const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar, booking: veri.satinAlma.satirlar.length, navlunsuz: veri.satinAlma.belirsiz };
-      const konu = `${test ? "[TEST] " : ""}${haftalik ? navlunHaftalikKonusu(tablo, sirketAdi) : navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
-      // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Haftalik mailde tablo yok.
-      const onceki = haftalik ? [] : await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&oturum=neq.haftalik&order=gonderim_zamani.desc.nullslast&limit=1`);
-      const html = haftalik
-        // 13.11.2026 kullanici: yalniz kisa metin + Excel (konsimento hatirlatma sablonu)
-        ? navlunHaftalikHtml(tarih, { test: !deneme && test, gercekAlici: ayar.alicilar, gercekCc: ayar.cc })
-        : navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma });
+      const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
+      // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Eski haftalik kayitlar haric.
+      const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&oturum=neq.haftalik&order=gonderim_zamani.desc.nullslast&limit=1`);
+      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma });
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
@@ -226,13 +219,13 @@ Deno.serve(async (req: Request) => {
       if (!k.ok) throw new Error(`navlun_tablosu_gonderimleri yazılamadı (HTTP ${k.status}): ${(await k.text()).slice(0, 200)}`);
       const kayitId = ((await k.json()) as { id: string }[])[0]?.id;
 
-      const ek = await excelBase64(veri, haftalik);
+      const ekListesi = await ekler(veri, tarih);
       const mRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, ...(cc.length ? { cc } : {}), subject: konu, html,
-          attachments: [{ filename: haftalik ? navlunTablosuDosyaAdi(tarih) : `${satinAlmaBasligi(tarih)}.xlsx`, content: ek }],
+          attachments: ekListesi,
         }),
       });
       if (!mRes.ok) {

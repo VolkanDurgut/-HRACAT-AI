@@ -3,7 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
 import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
-import { navlunHaftalikKonusu, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { navlunHaftalikHtml, navlunHaftalikKonusu, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -27,7 +27,8 @@ import { navlunHaftalikKonusu, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTab
 //  - Test mailleri sirket basina 24 saatte en fazla 5 (navlun_tablosu_gonderimleri).
 // HAFTALIK TOPLU NAVLUN TABLOSU (13.11.2026, kullanici: "Toplu navlun Excel cumartesi gunleri gonderilecek 09.00. Navlun satin
 //   alma degil; butun navlunlarin oldugu, Navlun Bildirimi sayfasindaki Excel indir"). Govdede {"haftalik": true}:
-//   ek = navlunTablosuSayfasi (sayfadaki "Excel indir" ile ayni dosya), govde = guncel fiyat tablosu (son haftanin teklifleri YENI).
+//   ek = navlunTablosuSayfasi (sayfadaki "Excel indir" ile ayni dosya), govde = kisa mektup ("Sayin Unex Ekibi, Haftalik navlun
+//   tablosu ektedir. Iyi calismalar."; konsimento hatirlatma kabugu; navlunHaftalikHtml).
 //   pg_cron 'navlun-tablosu-haftalik' Cumartesi 06:00 UTC = 09:00 TR; anon yalniz Cumartesi 08:55-10:00 TR. Alici: Ayarlar >
 //   Rapor Alicilari "navlun_haftalik" (canli kapaliyken YALNIZ test adresine "[TEST]"). Tekrar korumasi: oturum = "haftalik".
 // ============================================================================
@@ -198,10 +199,11 @@ Deno.serve(async (req: Request) => {
       const tablo = veri.tablo;
       const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar, booking: veri.satinAlma.satirlar.length, navlunsuz: veri.satinAlma.belirsiz };
       const konu = `${test ? "[TEST] " : ""}${haftalik ? navlunHaftalikKonusu(tablo, sirketAdi) : navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
-      // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Haftalikta: son 7 gun.
+      // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Haftalik mailde tablo yok.
       const onceki = haftalik ? [] : await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&oturum=neq.haftalik&order=gonderim_zamani.desc.nullslast&limit=1`);
       const html = haftalik
-        ? navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: new Date(Date.now() - 7 * 86400_000).toISOString(), oturumEtiketi: "Haftalık rapor", haftalik: true })
+        // 13.11.2026 kullanici: yalniz kisa metin + Excel (konsimento hatirlatma sablonu)
+        ? navlunHaftalikHtml(tarih, { test: !deneme && test, gercekAlici: ayar.alicilar, gercekCc: ayar.cc })
         : navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma });
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }

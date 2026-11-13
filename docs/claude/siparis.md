@@ -396,7 +396,8 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
 Kullanıcı: "Toplu navlun Excel cumartesi günleri gönderilecek 09.00 (navlun satın alma değil; bütün navlunların olduğu, Navlun
 Bildirimi sayfasındaki Excel indir kısmı). İlk önce test gönder, onaylarsam canlıya geçireceğiz."
 - Edge `navlun-tablosu` `{"haftalik": true}`: ek = `navlunTablosuSayfasi` (sayfadaki "Excel indir" ile aynı dosya, ad
-  `Navlun_Tablosu_GG.AA.YYYY.xlsx`), gövde = güncel fiyat tablosu (son 7 günün teklifleri YENİ). Anon yalnız Cumartesi
+  `Navlun_Tablosu_GG.AA.YYYY.xlsx`), gövde = kısa mektup (kullanıcı: "Sayın Unex Ekibi, Haftalık navlun tablosu ektedir. İyi
+  çalışmalar. Sadece Excel; şablon konşimento talimatı uyarısındaki gibi" → `navlunHaftalikHtml`). Anon yalnız Cumartesi
   08:55-10:00 TR; tekrar koruması `oturum = 'haftalik'`. Günlük raporun "YENİ" hesabı haftalık gönderimi saymaz.
 - Alıcı: Ayarlar › Rapor Alıcıları "Haftalık Navlun Tablosu" (`rapor_alicilari.rapor = 'navlun_haftalik'`; kurulumda günlük
   navlun alıcılarının kopyası, CANLI KAPALI → zamanlanmış gönderim de yalnız test adresine "[TEST]"). Önizle / Test o satırdan

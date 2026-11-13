@@ -382,3 +382,12 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
     (olayları silinir, kayıt + metin kalır, not: "Alıntı kayda alınmadı: <neden>"); FT/TT tamamlama alıntı kayıtlarından yapılmaz.
   - Yeniden işleme sonrası tüm kayıtlar önceki görüntüyle satır satır karşılaştırıldı: yalnız yukarıdaki düzeltmeler + 3 teklifin
     boş FT / TT alanı (ayrı "bilgi" mailinden) doldu; diğer tüm kayıtlar aynı.
+- 13.11.2026 (revize-1113c) Gece yedeği: EK YERİNE GİRİŞ GEREKTİREN LİNK (kullanıcı kararı). Zip'li mail de (~1,2 MB) execution@
+  kutusuna ulaşmadı (diğer raporlar ulaşıyor → kurumsal sunucu .zip ekini karantinaya alıyor). Migration
+  `20261113140000_yedek_indirme.sql`: özel kova `veri-yedekleri` (public=false, yalnız application/zip, politika YOK),
+  `yedek_kayitlari.dosya_yolu / dosya_bayt`, `yedek_indirmeleri` (kim / ne zaman indirdi), RPC `yedek_listesi()` ve
+  `yedek_indirme_izni(id)` (ikisi de `yetki_super_admin_sirketi()` ile yalnız süper admin). Edge `yedekleme-gonder` v48: zip
+  `<yıl>/ihracat-ai-yedek-GG-AA-YYYY.zip` olarak depoya, mailde ek yok, "Yedeği indir" düğmesi → `/ayarlar/yedekler`; depoya
+  yüklenemezse eski yol (ek + uyarı); 30 günden eski zip'ler depodan silinir (kayıt kalır). Yeni edge `yedek-indir`: kullanıcının
+  tokeniyle izin RPC'si → 120 sn imzalı link (CORS yalnız ihracatasistanim.com). Sayfa: Ayarlar > Veri Yedekleri (son 60 gece,
+  indirme sayısı). Sağlama: deneme modu 72 tablo / uyarısız / düğme var; anonim ve oturumsuz indirme isteği reddedildi.

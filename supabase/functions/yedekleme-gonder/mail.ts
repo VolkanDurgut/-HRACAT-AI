@@ -16,6 +16,10 @@ export type YedekMailGirdisi = {
   tarih: string; // "26.10.2026"
   saat: string; // "03:00"
   ekSigiyor: boolean;
+  /** 13.11.2026: zip ozel depoda (mail eki yok); indirme Ayarlar > Yedekler sayfasindan, giris gerekir. */
+  depoda?: boolean;
+  indirmeLinki?: string;
+  saklamaGun?: number;
   ekAdi: string;
   ekBayt: number;
   /** 13.11.2026: ek .zip; icindeki .json'un adi ve boyutu */
@@ -163,6 +167,7 @@ export const BUCKET_BILGISI: Record<string, string> = {
   evraklar: "Üretilen evrak arşivi — CI, PL, CoO, Phyto, Health…",
   "geri-bildirim-ekleri": "Sorun Bildir ekleri",
   "ic-piyasa-belgeler": "İç piyasa — irsaliye ve sipariş formları",
+  "veri-yedekleri": "Günlük veri yedekleri (zip, giriş gerektirir)",
 };
 
 /**
@@ -215,7 +220,7 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
   // --- Durum bandi
   const okunamayan = g.tablolar.filter((t) => t.adet === null).length;
   const bant = g.uyarilar.length === 0
-    ? `<div style="margin-top:14px;border:1px solid #A7F3D0;border-left:4px solid #10B981;background:#ECFDF5;border-radius:4px;padding:9px 12px;font-size:13px;color:#065F46"><b>✔ Yedek alındı ve doğrulandı.</b> ${g.ekSigiyor ? "Yedek dosyası ektedir." : ""} Geri yükleme testi tüm tablolarda birebir sonuç verdi.</div>`
+    ? `<div style="margin-top:14px;border:1px solid #A7F3D0;border-left:4px solid #10B981;background:#ECFDF5;border-radius:4px;padding:9px 12px;font-size:13px;color:#065F46"><b>✔ Yedek alındı ve doğrulandı.</b> ${g.depoda ? "Yedek dosyası güvenli depoda; aşağıdaki düğmeyle indirilir." : g.ekSigiyor ? "Yedek dosyası ektedir." : ""} Geri yükleme testi tüm tablolarda birebir sonuç verdi.</div>`
     : `<div style="margin-top:14px;border:1px solid #FECACA;border-left:4px solid #DC2626;background:#FEF2F2;border-radius:4px;padding:9px 12px;font-size:12px;color:#7F1D1D"><div style="font-size:11px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:#B91C1C;margin-bottom:4px">Dikkat edilmesi gerekenler (${g.uyarilar.length})</div><ul style="margin:0;padding-left:18px">${g.uyarilar.map((u) => `<li style="margin:2px 0">${esc(u)}</li>`).join("")}</ul></div>`;
 
   // --- Ozet kutulari
@@ -273,8 +278,19 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
   const depoBolumu = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Klasör")}${th("Dosya", true)}${th("Boyut", true)}</tr>${bucketSatirlari || `<tr><td colspan="3" style="padding:10px;color:#94A3B8;font-style:italic;font-size:12px">Dosya listesi alınamadı.</td></tr>`}</table>
   <div style="margin-top:6px;font-size:11px;color:#64748B;line-height:1.5">PDF dosyalarının kendisi mail ekine sığmadığı için yedekte <b>yer almaz</b>; Supabase Storage'da durur. Yedekte bu dosyaların tam <b>listesi</b> (klasör, yol, boyut, tarih) vardır.</div>`;
 
+  // --- Indirme dugmesi (13.11.2026: ek yerine giris gerektiren link)
+  const indirmeKutusu = g.depoda && g.indirmeLinki
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr><td style="border:1px solid #E2E8F0;border-left:4px solid ${MARKA_TURUNCU};border-radius:4px;padding:12px 14px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:middle;font-size:12px;color:#334155;line-height:1.55"><div style="font-size:13px;font-weight:bold;color:${LACIVERT}">Yedek dosyası</div><span style="font-family:monospace;word-break:break-all">${esc(g.ekAdi)}</span> · ${mbYaz(g.ekBayt)}${g.jsonBayt ? ` (açılınca ${mbYaz(g.jsonBayt)})` : ""}<br><span style="color:#64748B">Güvenlik için mail eki olarak gönderilmez; indirmek için uygulamaya giriş gerekir (yalnız yetkili yöneticiler). ${g.saklamaGun ? `${g.saklamaGun} gün saklanır.` : ""}</span></td>
+      <td style="vertical-align:middle;text-align:right;width:170px;padding-left:12px"><a href="${esc(g.indirmeLinki)}" style="display:inline-block;background:${LACIVERT};color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px;white-space:nowrap">Yedeği indir</a></td>
+    </tr></table></td></tr></table>`
+    : "";
+
   // --- Ek ve oneriler
-  const ekSatiri = g.ekSigiyor
+  const ekSatiri = g.depoda
+    ? `<b>Dosya:</b> güvenli depoda (<span style="font-family:monospace">${esc(g.ekAdi)}</span>); Ayarlar &gt; Yedekler sayfasından indirilir.`
+    : g.ekSigiyor
     ? `<b>Ek:</b> <span style="font-family:monospace;word-break:break-all">${esc(g.ekAdi)}</span> (${mbYaz(g.ekBayt)})${g.jsonAdi ? ` · sıkıştırılmış; içinde <span style="font-family:monospace">${esc(g.jsonAdi)}</span>${g.jsonBayt ? ` (${mbYaz(g.jsonBayt)})` : ""}` : ""}`
     : `<b style="color:#B91C1C">Yedek dosyası bu sefer eke sığmadı</b> (${mbYaz(g.ekBayt)}).`;
 
@@ -288,8 +304,9 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
     <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Günlük Veri Yedeği</div></td>
     <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(g.tarih)}</div><div style="font-size:11px;color:#94A3B8">Otomatik yedek · ${esc(g.saat)}</div></td>
   </tr></table>
-  ${g.test ? `<div style="margin-top:14px;border:1px dashed #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST GÖNDERİMİ</b> · Bu mail elle istenen bir denemedir; içerik ve ekteki yedek gerçektir. Otomatik yedek her gece 03:00'te gönderilir.${g.gercekAlicilar?.length ? `<div style="margin-top:4px">Gece yedeğinin alıcıları: <b>${g.gercekAlicilar.map(esc).join(", ")}</b></div>` : ""}</div>` : ""}
+  ${g.test ? `<div style="margin-top:14px;border:1px dashed #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST GÖNDERİMİ</b> · Bu mail elle istenen bir denemedir; içerik ve yedek dosyası gerçektir. Otomatik yedek her gece 03:00'te gönderilir.${g.gercekAlicilar?.length ? `<div style="margin-top:4px">Gece yedeğinin alıcıları: <b>${g.gercekAlicilar.map(esc).join(", ")}</b></div>` : ""}</div>` : ""}
   ${bant}
+  ${indirmeKutusu}
   ${kutular}
 
   ${bolumBaslik("Yedeklenen Tablolar")}
@@ -301,7 +318,7 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
   <div style="margin-top:22px;border:1px solid #E2E8F0;border-radius:4px;padding:10px 12px;font-size:12px;color:#334155;line-height:1.6">
     ${ekSatiri}<br>
     Kapasite sınırları: <b>%85</b>'te uyarı, <b>%90</b>'da kritik (Supabase Free plan kotası).${g.kullaniciSayisi !== null ? `<br>Giriş kullanıcıları yedekte: <b>${sayi(g.kullaniciSayisi)}</b> (şifreler yedeğe <b>alınmaz</b>).` : ""}<br>
-    Bu dosyayı güvenli bir yerde (bilgisayarınızda veya bulut depolamada) saklamanızı öneririz.
+    ${g.depoda ? "İndirdiğiniz dosyayı güvenli bir yerde saklayın; içinde şirketin tüm kayıtları vardır." : "Bu dosyayı güvenli bir yerde (bilgisayarınızda veya bulut depolamada) saklamanızı öneririz."}
   </div>
 </td></tr></table>
 </td></tr></table></body></html>`;

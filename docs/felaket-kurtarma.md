@@ -14,7 +14,7 @@ uygulanmaz**; Supabase panelinden proje yeniden başlatılır.
 
 | | Hedef | Bugünkü durum (05.10.2026) |
 |---|---|---|
-| **RPO – veri** (en fazla ne kadar veri kaybedilir) | 24 saat | ✅ Her gece 03:00 tam yedek (mail eki). En kötü durumda son yedekten sonraki gün kaybolur. |
+| **RPO – veri** (en fazla ne kadar veri kaybedilir) | 24 saat | ✅ Her gece 03:00 tam yedek (13.11.2026'dan beri özel depoda `veri-yedekleri`, 30 gün; Ayarlar > Veri Yedekleri'nden indirilir, mailde yalnız özet + link). En kötü durumda son yedekten sonraki gün kaybolur. |
 | **RPO – denetim geçmişi** | 7 gün | ✅ Yedekte son 7 gün var; daha eskisi yedekte yok (bilinçli, mail boyutu). |
 | **RPO – PDF dosyaları** | — | ⚠️ **Yedek YOK.** Supabase Storage'da duruyor; proje kaybolursa PDF'ler de kaybolur. Karar bekliyor (aşağıda). |
 | **RTO** (sistem ne kadar sürede ayağa kalkar) | ≤ 2 saat | ✅ Bu kılavuz + `scripts/yedekten-geri-yukle.mjs` ile yaklaşık 1–2 saat (PDF'ler hariç). |
@@ -25,7 +25,7 @@ birebir" satırı görünmüyorsa veya konu `[UYARI]` ile başlıyorsa incelenme
 
 ## Gerekenler
 
-- En son yedek maili eki: `ihracat-ai-yedek-GG-AA-YYYY.zip` (13.11.2026'dan beri sıkıştırılmış; içinde aynı adlı `.json`. Betik `.zip` ve `.json`'u doğrudan kabul eder)
+- En son yedek: `ihracat-ai-yedek-GG-AA-YYYY.zip` (Ayarlar > Veri Yedekleri'nden indirilir; içinde aynı adlı `.json`. Betik `.zip` ve `.json`'u doğrudan kabul eder). **Proje tamamen kaybolursa depo da gider:** bu yüzden zip'i düzenli olarak indirip şirket dışında (bilgisayar / bulut) saklayın.
 - Bu repo (GitHub: `VolkanDurgut/-HRACAT-AI`) ve bilgisayarda Node.js 18+
 - Supabase CLI (önerilir) veya Supabase panelindeki SQL Editor
 - Gizli anahtarlar (değerleri BURADA YAZMAZ; şifre yöneticisinde/ilgili panellerde):
@@ -57,7 +57,7 @@ tek fark 6. adımdaki zamanlanmış iş).
 ### 4) Edge function'lar ve gizli anahtarlar (~10 dk)
 ```
 supabase secrets set GEMINI_API_KEY=... RESEND_API_KEY=... GERI_BILDIRIM_ALICI=...
-supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder gunluk-rapor-gonder ic-piyasa satin-alma konsimento-hatirlatma
+supabase functions deploy proforma-oku konsimento-kontrol dba-oku fatura-kontrol destek-asistan geri-bildirim-gonder yedekleme-gonder yedek-indir gunluk-rapor-gonder ic-piyasa satin-alma konsimento-hatirlatma
 supabase functions deploy dba-otomatik --no-verify-jwt   # yetki cihaz anahtariyla (x-cihaz-anahtari)
 # istege bagli: gunluk raporu sirket adreslerine gondermek icin (virgulle)
 supabase secrets set GUNLUK_RAPOR_ALICILARI=adres1@...,adres2@...

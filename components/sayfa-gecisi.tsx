@@ -57,6 +57,7 @@ const SAYFA_ADLARI: [string, string][] = [
   ["/ic-piyasa/musteriler", "İç Piyasa Müşterileri"],
   ["/ic-piyasa", "İç Piyasa"],
   ["/ayarlar/yetkilendirme", "Yetkilendirme"],
+  ["/ayarlar/yedekler", "Veri Yedekleri"],
   ["/ayarlar", "Ayarlar"],
   ["/analiz", "Kontrol Merkezi"],
   ["/panel", "Ana Panel"],

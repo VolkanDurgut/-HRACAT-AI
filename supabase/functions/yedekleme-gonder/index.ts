@@ -6,7 +6,7 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 // GUNLUK VERI YEDEGI (yedekleme-gonder)
 // ============================================================================
 // Her gece 00:00 UTC (03:00 TR) pg_cron "gunluk-yedek-maili" isiyle tetiklenir
-// ve veritabaninin JSON yedegini mail eki olarak YEDEK_ALICILARI adreslerine gonderir.
+// ve veritabaninin JSON yedegini (zip) ozel depoya yukler; ozet maili YEDEK_ALICILARI adreslerine gider (13.11.2026).
 //
 // v2 (01.10.2026) iyilestirmeleri:
 //  - SAYFALAMA: PostgREST tek istekte en fazla 1000 satir dondurur. Eskiden
@@ -49,8 +49,13 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //  - SIKISTIRILMIS EK (13.11.2026, kullanici: "Gunluk yedek maili gelmiyor"): 11.11'den beri JSON 10 MB'i asti
 //    (mail ~14 MB) ve execution@ kutusuna ulasmadi (Resend kabul etti, alici sunucusu boyut sinirina takildi; son
 //    ulasan 10.11, ~10,8 MB). Ek artik .zip (icinde ayni .json, DEFLATE ~%90 kucuk). Sinir sikistirilmis boyuta uygulanir.
+//  - EK YERINE INDIRME LINKI (13.11.2026, kullanici karari "Ek yerine giris gerektiren link"): zip ekli mail de
+//    execution@ kutusuna ulasmadi (kurumsal sunucu .zip ekini karantinaya aliyor). Zip artik OZEL depoya
+//    ("veri-yedekleri", politika yok) yuklenir, mailde ek YOK; "Yedegi indir" dugmesi Ayarlar > Yedekler sayfasina
+//    gider (yalniz super admin; imzali 2 dk link edge "yedek-indir"). Depoya yuklenemezse eski yol: zip ek olarak
+//    gider + uyari. Depodaki zip'ler SAKLAMA_GUN gun saklanir, sonra silinir (kayit + dosya listesi kalir).
 //  - TEST MAILI (26.10.2026): govdede {"test_maili": true} -> 20 saatlik tekrar korumasi
-//    ATLANIR, KISISEL_ALICI'ya (sirket adreslerine DEGIL) "[TEST]" konulu tam mail (ek dahil) gider, yedek_kayitlari'na
+//    ATLANIR, KISISEL_ALICI'ya (sirket adreslerine DEGIL) "[TEST]" konulu tam mail gider (zip depoda "test/" altinda), yedek_kayitlari'na
 //    durum='test' yazilir (gece yedeginin tekrar korumasina SAYILMAZ). Kotuye kullanim
 //    korumasi: son 24 saatte en fazla TEST_GUNLUK_SINIR test maili (migration 20261026031500).
 //  - KULLANICI LISTESI (05.10.2026): pakete "_kullanicilar" eklenir (kimlik,
@@ -186,6 +191,10 @@ const SAYFA_BOYUTU = 1000;
 // Ek .zip olarak gider (13.11.2026). Sinir SIKISTIRILMIS boyuta uygulanir: kurumsal posta sunuculari ~10 MB ustu
 // maili (base64 ile ~%33 buyur) reddedebiliyor; 6 MB zip ~8 MB mail eder.
 const MAKS_EK_BAYT = 6 * 1024 * 1024;
+// 13.11.2026: zip mail eki yerine ozel depoda (bkz. ust aciklama).
+const YEDEK_KOVASI = "veri-yedekleri";
+const SAKLAMA_GUN = 30;
+const YEDEKLER_SAYFASI = "https://ihracatasistanim.com/ayarlar/yedekler";
 // Ayni gun icinde ikinci bir yedek maili gonderilmez.
 const TEKRAR_BEKLEME_SAAT = 20;
 // Test maili: son 24 saatte en fazla bu kadar (anon anahtarla cagrilabildigi icin).
@@ -311,6 +320,51 @@ async function sonGunTestSayisi(): Promise<number> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/yedek_kayitlari?select=id&durum=eq.test&created_at=gte.${encodeURIComponent(esik)}`, { headers: servisBasliklari });
   if (!res.ok) return TEST_GUNLUK_SINIR;
   return ((await res.json()) as unknown[]).length;
+}
+
+/** Zip'i ozel depoya yukler (ayni yol varsa ustune yazar). Basarisizsa hata metni doner. */
+async function depoyaYukle(yol: string, icerik: Uint8Array): Promise<string | null> {
+  try {
+    const res = await geciciHatadaTekrarla(() =>
+      fetch(`${SUPABASE_URL}/storage/v1/object/${YEDEK_KOVASI}/${yol}`, {
+        method: "POST",
+        headers: { ...servisBasliklari, "Content-Type": "application/zip", "x-upsert": "true" },
+        body: icerik as unknown as BodyInit,
+      })
+    );
+    if (res.ok) return null;
+    return `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
+/** SAKLAMA_GUN'den eski zip'leri depodan siler, kaydin dosya_yolu'nu bosaltir. Hata yedegi durdurmaz (uyari doner). */
+async function eskiYedekleriTemizle(): Promise<string | null> {
+  try {
+    const esik = new Date(Date.now() - SAKLAMA_GUN * 24 * 60 * 60 * 1000).toISOString();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/yedek_kayitlari?select=id,dosya_yolu&dosya_yolu=not.is.null&created_at=lt.${encodeURIComponent(esik)}&limit=100`,
+      { headers: servisBasliklari }
+    );
+    if (!res.ok) return `Eski yedekler okunamadı (HTTP ${res.status}).`;
+    const eski = (await res.json()) as { id: string; dosya_yolu: string }[];
+    if (!eski.length) return null;
+    const sil = await fetch(`${SUPABASE_URL}/storage/v1/object/${YEDEK_KOVASI}`, {
+      method: "DELETE",
+      headers: { ...servisBasliklari, "Content-Type": "application/json" },
+      body: JSON.stringify({ prefixes: eski.map((e) => e.dosya_yolu) }),
+    });
+    if (!sil.ok) return `Eski yedek dosyaları silinemedi (HTTP ${sil.status}).`;
+    const g = await fetch(`${SUPABASE_URL}/rest/v1/yedek_kayitlari?id=in.(${eski.map((e) => e.id).join(",")})`, {
+      method: "PATCH",
+      headers: { ...servisBasliklari, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ dosya_yolu: null }),
+    });
+    return g.ok ? null : `Eski yedek kayıtları güncellenemedi (HTTP ${g.status}).`;
+  } catch (e) {
+    return `Eski yedek temizliği: ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
 
 async function calismayiKaydet(kayit: Record<string, unknown>): Promise<void> {
@@ -568,11 +622,30 @@ Deno.serve(async (req: Request) => {
     const jsonAdi = `ihracat-ai-yedek-${tarih.replace(/\./g, "-")}.json`;
     const zip = new JSZip();
     zip.file(jsonAdi, jsonIcerik);
-    const ekBase64 = await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
-    const zipBayt = Math.floor((ekBase64.length * 3) / 4);
-    const ekSigiyor = zipBayt <= MAKS_EK_BAYT;
-    if (!ekSigiyor) {
-      uyarilar.push(`Yedek dosyası çok büyük (sıkıştırılmış ${mbYaz(zipBayt)} > ${mbYaz(MAKS_EK_BAYT)}); mail eki olarak gönderilemedi.`);
+    const zipIcerik = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 9 } });
+    const zipBayt = zipIcerik.length;
+    const ekAdi = jsonAdi.replace(/\.json$/, ".zip");
+
+    // 13.11.2026: zip ozel depoya (mail eki karantinaya takiliyordu). Deneme modunda hicbir sey yazilmaz.
+    let dosyaYolu: string | null = null;
+    let ekSigiyor = false;
+    if (!deneme) {
+      const yol = testMaili
+        ? `test/${ekAdi.replace(/\.zip$/, "")}-${simdi.toISOString().slice(11, 19).replace(/:/g, "")}.zip`
+        : `${simdi.getUTCFullYear()}/${ekAdi}`;
+      const yukleHata = await depoyaYukle(yol, zipIcerik);
+      if (!yukleHata) {
+        dosyaYolu = yol;
+        const temizlik = testMaili ? null : await eskiYedekleriTemizle();
+        if (temizlik) uyarilar.push(temizlik);
+      } else {
+        // Yedek kaybolmasin: eski yol (mail eki) - karantinaya takilabilir, uyari yazilir
+        ekSigiyor = zipBayt <= MAKS_EK_BAYT;
+        uyarilar.push(
+          `Yedek dosyası depoya yüklenemedi (${yukleHata}); ` +
+            (ekSigiyor ? "mail eki olarak gönderildi (şirket posta sunucusu eki engelleyebilir)." : `eke de sığmadı (${mbYaz(zipBayt)}).`)
+        );
+      }
     }
 
     const toplamKayit = tabloSayilari.reduce((s, t) => s + (t.adet || 0), 0);
@@ -596,11 +669,13 @@ Deno.serve(async (req: Request) => {
     };
 
     const saat = simdi.toLocaleTimeString("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
-    const ekAdi = jsonAdi.replace(/\.json$/, ".zip");
     const mailGirdisi = {
       tarih,
       saat,
       ekSigiyor,
+      depoda: !!dosyaYolu || deneme,
+      indirmeLinki: YEDEKLER_SAYFASI,
+      saklamaGun: SAKLAMA_GUN,
       ekAdi,
       ekBayt: zipBayt,
       jsonAdi,
@@ -628,10 +703,11 @@ Deno.serve(async (req: Request) => {
       html,
     };
     if (ekSigiyor) {
+      // Yalniz depoya yuklenemediyse (yedek kaybolmasin)
       mailGovdesi.attachments = [
         {
           filename: ekAdi,
-          content: ekBase64,
+          content: await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } }),
         },
       ];
     }
@@ -653,6 +729,8 @@ Deno.serve(async (req: Request) => {
       json_bayt: jsonBayt,
       storage_dosya_sayisi: storageDosyalari.length,
       uyarilar,
+      dosya_yolu: dosyaYolu,
+      dosya_bayt: dosyaYolu ? zipBayt : null,
     });
 
     return jsonCevap({ ...ozet, test: testMaili, aliciSayisi: testMaili ? 1 : YEDEK_ALICILARI.length });

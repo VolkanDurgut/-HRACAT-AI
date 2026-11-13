@@ -750,3 +750,9 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   (alış: miktar − tüm teslimler; satış: `kalanMetni`, devir dahil; toplam yalnız pozitif kg kalanlar). Evrende üstte
   "Kalan" kutucuğu, sağ panelde sipariş başına ilerleme çubuğu + kalan (seçili belgenin siparişi şeftali çerçeveli);
   kalan okunamazsa belgeler yine görünür.
+- **Bütün kısımlarda kalan (13.11.2026, "İç piyasa raporunda bütün kısımlarda aynı durum olmalı"; yalnız `gruplu`):**
+  araç satırlarında siparişin kalanı; Yüklenen / Gelen kutularında ve bölüm başlıklarında "kalan X ton" (günün
+  araçlarının bağlı olduğu açık siparişler); Açık Satış / Açık Alış başında müşteri / tedarikçi bazında kalan (hedef,
+  gerçekleşen, % çubuğu, kalan) + tablolarda TOPLAM satırı; Kapananlarda TOPLAM + "Eksik kapanan". Araç hedefli
+  satış kalanı tonaja çevrilmez, "+ n araç" yazılır. Tek hesap: `alisKalanDurumu`, `acikSatis.kalan` (kalanMetni).
+  `gruplu` kapalıyken HTML önceki sürümle bayt bayt aynı (kontrol edildi).

@@ -155,14 +155,16 @@ Deno.serve(async (req: Request) => {
     // 11.11.2026: saklanan ham metinden yeniden okuma (okuyucu gelistikce betigi yeniden calistirmadan). Sayfa basina 50.
     if (govde.islem === "yeniden_isle") {
       const sayfa = Math.max(0, Math.floor(Number(govde.sayfa) || 0));
-      const kayitli = await oku<{ mesaj_id: string; gonderen: string | null; konu: string | null; govde: string | null; tarih: string; ek_metin: string | null; ek_kaynak: string | null }>(
-        `navlun_mesajlari?select=mesaj_id,gonderen,konu,govde,tarih,ek_metin,ek_kaynak&company_id=eq.${sirket}&govde=not.is.null&order=tarih,id&limit=50&offset=${sayfa * 50}`);
+      const kayitli = await oku<{ mesaj_id: string; gonderen: string | null; konu: string | null; govde: string | null; tarih: string; ek_metin: string | null; ek_kaynak: string | null; ozet: string | null }>(
+        `navlun_mesajlari?select=mesaj_id,gonderen,konu,govde,tarih,ek_metin,ek_kaynak,ozet&company_id=eq.${sirket}&govde=not.is.null&order=tarih,id&limit=50&offset=${sayfa * 50}`);
       const yeniden = [];
       for (const r of kayitli) {
         const k = mesajIsle({
           mesaj_id: r.mesaj_id, gonderen: (r.gonderen || "").toLowerCase(), konu: r.konu || "", govde: r.govde || "",
           tarih: r.tarih, ek_metin: r.ek_metin || "", ek_kaynak: r.ek_kaynak || "",
         }, acenteler);
+        // Alintidan kurtarilan kaydin "Alintidan kurtarildi" notu yeniden okumada silinmez
+        if (k && r.mesaj_id.startsWith("alinti:") && r.ozet) k.ozet = r.ozet;
         if (k) yeniden.push(k);
       }
       if (!yeniden.length) return json({ islenen: 0, sayfa, devam: kayitli.length === 50 });

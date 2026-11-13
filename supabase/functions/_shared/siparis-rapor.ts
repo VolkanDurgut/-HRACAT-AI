@@ -109,6 +109,41 @@ export function onOdemeTablosu(r: SiparisRapor): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Müşteri")}${th("Konteyner", true, "90px")}${th("Varış limanı", false, "34%")}${tekGun ? "" : th("Tarih", true, "60px")}</tr>${satirlar}${toplam}</table>`;
 }
 
+/**
+ * Onaylanmis (on odemesi alinmis) ama rezervasyonu alinmamis musteriler (13.11.2026 kullanici: "Siparis raporunda
+ * onaylanmis ama rezervasyonu alinmamis musteriler ozette gosterilmeli"). Kaynak: on_odeme_alindi bolumu (veritabani kurali:
+ * planda booking'i olan siparis "rezervasyonlu" sayilir, burada gorunmez). Ayni musteri + ayni liman tek satir;
+ * en uzun bekleyen ustte.
+ */
+export function rezervasyonBekleyenTablosu(r: SiparisRapor): string {
+  if (!r.onOdeme.length) return `<div style="font-size:13px;color:#64748B;padding:4px 0">Rezervasyon bekleyen onaylı sipariş yok.</div>`;
+  const anahtar = (s: SiparisSatiri) => `${(s.firma || "").trim().toLocaleUpperCase("tr-TR")}|${(s.liman || "").trim().toLocaleUpperCase("tr-TR")}`;
+  const gruplar = new Map<string, { firma: string; liman: string; siparis: number; kont: number; enEski: string | null }>();
+  for (const s of r.onOdeme) {
+    const k = anahtar(s);
+    const g = gruplar.get(k) || { firma: s.firma || "-", liman: s.liman || "-", siparis: 0, kont: 0, enEski: null };
+    g.siparis++; g.kont += s.konteyner || 0;
+    const t = s.on_odeme_tarihi ? s.on_odeme_tarihi.slice(0, 10) : null;
+    if (t && (!g.enEski || t < g.enEski)) g.enEski = t;
+    gruplar.set(k, g);
+  }
+  const liste = Array.from(gruplar.values()).sort((a, b) => (a.enEski || "9999").localeCompare(b.enEski || "9999") || a.firma.localeCompare(b.firma, "tr"));
+  const th = (ad: string, sag = false, gen = "") => `<th style="background:${RAPOR_LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:6px 8px;text-align:${sag ? "right" : "left"};white-space:nowrap${gen ? `;width:${gen}` : ""}">${ad}</th>`;
+  const td = (h: string, sag = false, ek = "") => `<td style="padding:5px 8px;border-bottom:1px solid #EEF2F7;font-size:12.5px;line-height:1.35;color:#1E293B;${sag ? "text-align:right;white-space:nowrap;" : ""}${ek}">${h}</td>`;
+  const satirlar = liste.map((g, i) => {
+    const gun = g.enEski ? gunFarki(r.tarih, g.enEski) : null;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${[
+      td(`<b>${esc(g.firma)}</b>${g.siparis > 1 ? ` <span style="font-size:11px;color:#94A3B8">${g.siparis} sipariş</span>` : ""}`),
+      td(sayi(g.kont), true),
+      td(esc(g.liman)),
+      td(gun === null ? `<span style="color:#94A3B8">tarih yok</span>` : `${kisaTarih(g.enEski)} <span style="color:${gun >= 14 ? "#B91C1C" : "#64748B"}">· ${gun} gün</span>`, true),
+    ].join("")}</tr>`;
+  }).join("");
+  const ust = "border-bottom:0;border-top:2px solid " + RAPOR_LACIVERT + ";";
+  const toplam = `<tr>${td(`<b>Toplam · ${r.onOdeme.length} sipariş</b>`, false, ust)}${td(`<b>${sayi(r.ozet.onOdemeKont)}</b>`, true, ust)}${td("", false, ust)}${td("", true, ust)}</tr>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${th("Müşteri")}${th("Konteyner", true, "80px")}${th("Varış limanı", false, "30%")}${th("Ön ödeme · bekleme", true, "130px")}</tr>${satirlar}${toplam}</table>`;
+}
+
 const gunFarki = (a: string, b: string) => Math.round((Date.parse(`${a.slice(0, 10)}T12:00:00Z`) - Date.parse(`${b.slice(0, 10)}T12:00:00Z`)) / 86400000);
 const tutarYaz = (t: ParaToplami) => Object.keys(t).sort().map((p) => paraKisa(t[p], p)).join(" + ");
 
@@ -147,6 +182,8 @@ export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olus
     ozetAlt: "",
     maddeler: [],
     ozetIcerik: `${yoneticiOzeti(r)}
+    <div style="margin:10px 0 5px;font-size:12px;font-weight:bold;color:${RAPOR_LACIVERT}">Onaylı · Rezervasyonu Alınmamış Müşteriler</div>
+    ${rezervasyonBekleyenTablosu(r)}
     <div style="margin:10px 0 5px;font-size:12px;font-weight:bold;color:${RAPOR_LACIVERT}">${r.oturum === "sabah" ? "Dün ve Bugün Gelen Ön Ödemeler" : "Bugün Gelen Ön Ödemeler"}</div>
     ${onOdemeTablosu(r)}`,
     dugme: { metin: "Siparişleri aç", yol: "/siparisler" },

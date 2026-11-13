@@ -159,6 +159,13 @@ JSON ~10 MB'ı aşınca (mail ~14 MB) Resend kabul etse de yedek maili alıcıya
 plan, navlun, fatura onayı ve rapor gönderim tabloları yedeğe eklendi; `rapor_alicilari` + `rapor_adres_defteri` ayar
 tablosu. `scripts/yedekten-geri-yukle.mjs` .zip okur; listede olmayan tabloları paket sırasıyla yükler.
 
+## 4.10 Sipariş raporu: "Onaylı · Rezervasyonu Alınmamış Müşteriler" (13.11.2026)
+Kullanıcı: "Sipariş raporunda onaylanmış ama rezervasyonu alınmamış müşteriler özette gösterilmeli."
+`_shared/siparis-rapor.ts` `rezervasyonBekleyenTablosu`: "Günün Özeti" kutusunda 4 göstergenin altında; kaynak
+`on_odeme_alindi` bölümü (4.8 kuralıyla planda booking'i olan sipariş burada görünmez). Aynı müşteri + aynı liman tek
+satır (sipariş adedi), konteyner, en eski ön ödeme tarihi ve bekleme günü (14+ gün kırmızı; tarihi girilmemiş eski
+kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapor hâlâ test modunda.
+
 ## 4.2 Navlun formu → KALDIRILDI; yerine Navlun Bildirimi (10.11.2026)
 
 - Elle girişli navlun formu kuruldu (migration `20261110130000_navlun_formu.sql`, edge `navlun-formu`) ve kullanıcı

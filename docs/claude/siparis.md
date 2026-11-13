@@ -367,3 +367,18 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
   free time / transit time, aynı acente + limanın son 7 gündeki teklifinde alan BOŞSA doldurulur (`yeniden_isle` de yapar).
   Arşiv betiği güncellenip `NAVLUN_GECMIS_I` silinerek `navlunGecmis` "BITTI" yazana kadar çalıştırılınca geçmiş yazışmaların
   alıntıları da taranır.
+- 13.11.2026 (revize-1113c) Geçmiş taraması sağlaması (10 alıntı kaydı tek tek okundu) + "tt" okuma:
+  - Hatalar: bir hattın genel tarifesindeki "$200 PSS artışı" başka limanın fiyatı sanılmış; bir acentenin "USD 2000 .-/20'dv" teklifi 40'lığa
+    yazılmış, "IMO lokal farkı USD 165" 20'lik fiyat sanılmış; iki alıntı kaydı, aynı teklifin doğrudan gelen asılının
+    çifti (alıntı başlığındaki alt satıra taşan alıcı listesi gövde imzasını bozmuştu).
+  - Okuyucu (`_shared/navlun-oku.ts`): "fiyat .-/20'dv" ekipmanı; fiyattan hemen önce "farkı / IMO / PSS / GRI / VGM / telex /
+    OBL / etiket / artışı" ya da hemen sonra "PSS / GRI / artış / zam / fark" geçen tutar navlun DEĞİL. Transit: etiket ile sayı
+    arasında dolgu kelime ("tt ise 44 gün", "TT tahmini olarak 60 gibi", "tahmini minimum TT 90", "Transit süremizi 50/55 gün");
+    açık etikette (tt, t/t, transit time / süre) gün birimi zorunlu değil, yalnız "transit" kelimesinde zorunlu; "Ödeme: TT 30
+    gün" ve "TT 14 gün free" transit sayılmaz. Free time: "5 gün standard free".
+  - Alıntı korumaları (edge `navlun-bildirimi` v12, `alintiKontrol`): yalnız fiyatlı teklif; aynı acente + liman + tutar ±4 saat
+    içinde başka kayıtta varsa atlanır; konudaki liman metinde geçmiyor ve 3+ farklı fiyat varsa (genel tarife) atlanır. Alıntı
+    başlığında alt satıra taşan adres listesi başlığa dahil. Yeniden işlemede kurala uymayan alıntı kaydı "bilgi"ye çekilir
+    (olayları silinir, kayıt + metin kalır, not: "Alıntı kayda alınmadı: <neden>"); FT/TT tamamlama alıntı kayıtlarından yapılmaz.
+  - Yeniden işleme sonrası tüm kayıtlar önceki görüntüyle satır satır karşılaştırıldı: yalnız yukarıdaki düzeltmeler + 3 teklifin
+    boş FT / TT alanı (ayrı "bilgi" mailinden) doldu; diğer tüm kayıtlar aynı.

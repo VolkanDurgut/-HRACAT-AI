@@ -171,7 +171,7 @@ function armatorBul(s: string, yakin?: number): string | null {
  * "bos alim gununden ... 14 gun free time dusulerek export detention") free time SAYILMAZ; "14 free" yazimi eklendi.
  */
 const FT_DESENLERI: RegExp[] = [
-  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:ft\b|free|frfee)/gi,
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:standa?r[td]\s*)?(?:ft\b|free|frfee)/gi,
   /(\d{1,2})\s*(?:calendar\s*)?days?\s*free/gi,
   /(\d{1,2})\s*free\s*var/gi,
   /(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/gi,
@@ -209,23 +209,30 @@ export function freeTimeBul(s: string): number | null {
 
 /**
  * Transit suresi (11.11.2026): "Transit süre 46-48 gün", "TT: 85-105 gün", "Transit time: 35 days", "T/T 30 days",
- * "seyir süresi 28 gün", "35 days transit". Gun ifadesi ZORUNLU (kosul maddelerindeki "transit sureler..." sayisizdir).
+ * "seyir süresi 28 gün", "35 days transit". Kosul maddelerindeki "transit sureler..." sayisizdir, okunmaz.
  * Metinde birbirinden farkli birden fazla deger varsa (rota basina farkli) belirsiz -> null.
  */
+// 13.11.2026 (kullanici: "Bazi acenteler 'tt' olarak cevap veriyor, onlari da okuyabilmeliyiz"): etiket ile sayi arasinda
+// dolgu kelimeler ("tt ISE 44 gun", "TT TAHMINI OLARAK 60 gibi", "tahmini MINIMUM TT 90") ve "Transit SUREMIZI 50/55 gun".
+// Acik etiketlerde (tt, t/t, transit time / sure, seyir suresi) gun birimi ZORUNLU DEGIL; yalniz "transit" kelimesinde zorunlu.
+const TT_DOLGU = "(?:\\s*(?:[:\\-–=~]|ise|da|de|ise\\s+de|tahmini(?:\\s+olarak)?|tahminen|olarak|ortalama|ort\\.?|yakla[şs][ıi]k|approx\\.?|abt\\.?|about|around|est(?:imated)?\\.?|min(?:imum)?\\.?|max(?:imum)?\\.?|en\\s+az|en\\s+fazla|civar[ıi]))*\\s*";
+const TT_SAYI = "(\\d{1,3}(?:\\s*[-–\\/]\\s*\\d{1,3})?)";
+const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:free|ft\\b|dem|det|serbest)))";
+const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt\\b|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
+const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t)`, "gi");
+// "Odeme: TT 30 gun" gibi odeme kosulu transit degildir
+const TT_ODEME = /(?:ödeme|odeme|payment|vade|pe[şs]in|advance)[^\n]{0,20}$/i;
+
 export function transitBul(s: string): string | null {
-  const r = /(?:transit\s*(?:time|s[üu]re(?:si)?)?|t\/t|\btt\b|seyir\s*s[üu]re(?:si)?|sailing\s*time)\s*[:\-–]?\s*(?:yakla[şs][ıi]k|approx\.?|abt\.?|~|ort(?:alama)?\.?)?\s*(\d{1,3}(?:\s*[-–\/]\s*\d{1,3})?)\s*(?:gün|gun|days?|g\b)|(\d{1,3}(?:\s*[-–]\s*\d{1,3})?)\s*(?:gün|gun|days?)\s*(?:transit|t\/t)/gi;
   const gor = new Set<string>();
-  let m: RegExpExecArray | null;
-  while ((m = r.exec(s))) {
-    const ham = (m[1] || m[2]).replace(/\s+/g, "").replace(/[–\/]/g, "-");
-    const [a, b] = ham.split("-").map(Number);
-    if (!(a >= 1 && a <= 150) || (b !== undefined && !(b >= a && b <= 180))) continue;
-    gor.add(ham);
-  }
-  // Etiketli alan, birimsiz: "Tahmini Transit Süre : 28" (Link teklif formu)
-  if (!gor.size) {
-    const e = s.match(/transit\s*(?:time|s[üu]re(?:si)?)\s*:\s*(\d{1,3})\b(?!\s*(?:saat|hour|%|usd|\$|[.,]\d))/i);
-    if (e && Number(e[1]) >= 1 && Number(e[1]) <= 150) gor.add(e[1]);
+  for (const r of [TT_ACIK, TT_BIRIMLI]) {
+    for (const m of s.matchAll(r)) {
+      if (TT_ODEME.test(s.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0))) continue;
+      const ham = (m[1] || m[2]).replace(/\s+/g, "").replace(/[–\/]/g, "-");
+      const [a, b] = ham.split("-").map(Number);
+      if (!(a >= 1 && a <= 150) || (b !== undefined && !(b >= a && b <= 180))) continue;
+      gor.add(ham);
+    }
   }
   return gor.size === 1 ? [...gor][0] : null;
 }
@@ -262,6 +269,10 @@ function bos(): Omit<NavlunOlay, "tur"> {
 const NAVLUN_KELIME = /freight|navlun|ocean|o\/f|all\s*-?\s*in|deniz\s*nakliye|rate/i;
 const YAN_MASRAF = /\b(thc|bl|b\/l|isps|vgm|ens|ams|seal|doc(?:umentation)?|ebs|caf|baf|lss|pss|gri|ecs|ets|cic|imo|telex|handling|muhur|mühür)\b/i;
 
+const EK_KALEM_ONCE = /fark[ıi]?\s*[:\-]?\s*(?:usd|\$)?\s*$|\b(?:imo|pss|gri|vgm|telex|obl)\b[^\n]{0,8}$|art[ıi][şs][ıi]?\s*[:\-]?\s*(?:usd|\$)?\s*$|etiket/i;
+const EK_KALEM_SONRA = /^\s*(?:[.,]\s*-)?\s*(?:\+\s*kdv\s*)?(?:pss|gri|art[ıi][şs]|zam\b|fark)/i;
+const EGIK = /^\s*(?:[.,]\s*-?\s*|-\s*)?\//;
+
 /** USD'ye bitisik tum tutarlari bul (her biri icin ekipman). */
 function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: string | null; i: number }> {
   const sonuc: Array<{ tutar: number; ekipman: string | null; i: number }> = [];
@@ -273,17 +284,24 @@ function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: stri
     const cevre = s.slice(Math.max(0, m.index - 25), m.index + m[0].length + 25);
     // masraf / ceza / kdv'li kalemler navlun degildir
     if (/masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i.test(s.slice(Math.max(0, m.index - 60), m.index + m[0].length + 30))) continue;
+    // 13.11.2026: ek kalem / artis navlun degildir ("IMO lokal farki USD 165", "$200 PSS artisi", "VGM USD 45")
+    if (EK_KALEM_ONCE.test(s.slice(Math.max(0, m.index - 25), m.index)) || EK_KALEM_SONRA.test(s.slice(m.index + m[0].length, m.index + m[0].length + 20))) continue;
     if (siki) {
       const once = s.slice(Math.max(0, m.index - 60), m.index);
       if (!NAVLUN_KELIME.test(once) || YAN_MASRAF.test(s.slice(Math.max(0, m.index - 30), m.index))) continue;
     }
     // Ekipman: once fiyatin hemen ONCESINDE ("20DC: 1625 USD"), yoksa cevresinde ("Usd 875/20dc")
     const sonra = s.slice(m.index + m[0].length, m.index + m[0].length + 14);
-    const egik = /^\s*\//.test(sonra) ? ekipmanBul(sonra.replace(/^\s*\//, "")) : null;      // "Usd 875/20dc"
+    const egik = EGIK.test(sonra) ? ekipmanBul(sonra.replace(EGIK, "")) : null;      // "Usd 875/20dc", "USD 2000 .-/20'dv"
     const onceki = ekipmanBul(s.slice(Math.max(0, m.index - 25), m.index));                    // "20DC: 1625 USD"
     sonuc.push({ tutar: n, ekipman: egik ?? onceki ?? ekipmanBul(cevre), i: m.index });
   }
   return sonuc;
+}
+
+/** Metindeki farkli navlun tutarlari (masraf / ek kalem haric, gevsek okuma). Alintidaki genel tarifeyi tanimak icin. */
+export function tutarAdaylari(metin: string): number[] {
+  return [...new Set(tutarlar(metin.replace(/&#39;/g, "'").replace(/[’`´]/g, "'").replace(/\s+/g, " ")).map((x) => x.tutar))];
 }
 
 /** Metindeki tum navlun tutari adaylari (masraf kalemleri haric). Ekten okumada belirsizlik kontrolu icin. */

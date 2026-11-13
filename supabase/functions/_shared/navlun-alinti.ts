@@ -14,6 +14,8 @@
 // Tarih saat dilimi: Istanbul (+03:00) kabul edilir (yazismalarin tamami Turkiye ofislerinden).
 // Not: Bu dosya gercek musteri/acente verisi icermez.
 
+import { limanAnahtari, sadelestir } from "./liman-anahtari.ts";
+
 export type AlintiMesaji = { gonderen: string; tarih: string; konu: string | null; govde: string };
 
 const AYLAR: Record<string, number> = {
@@ -97,7 +99,8 @@ export function alintiMesajlari(tamGovde: string, sinir = 15): AlintiMesaji[] {
         const t = x.match(TARIH), kk = x.match(KONU);
         if (t) tarihHam = t[1];
         else if (kk) konu = kk[1].trim() || null;
-        else if (!DIGER.test(x) && !/^\s+\S/.test(x)) break;   // devam eden alici satirlari girintili olabilir
+        // devam eden alici satirlari girintili olabilir ya da adres listesi olarak alt satira tasar ("a@b.com; c@d.com")
+        else if (!DIGER.test(x) && !/^\s+\S/.test(x) && !/@[^\s]+\.[a-z]{2,}|[;,]\s*$/i.test(x)) break;
       }
       if (tarihHam) basliklar.push({ satir: i, bitis: j, gonderenHam: k[1], tarihHam, konu });
       continue;
@@ -123,6 +126,20 @@ export function alintiMesajlari(tamGovde: string, sinir = 15): AlintiMesaji[] {
     sonuc.push({ gonderen, tarih, konu: h.konu, govde });
   }
   return sonuc;
+}
+
+const harfler = (x: string) => sadelestir(x).replace(/[^A-Z]/g, "");
+
+/**
+ * Alintidaki blok GENEL TARIFE mi (13.11.2026: "LA GUAIRA" yazismasinin alintisinda Bati Afrika tarifesi + "$200 PSS artisi"
+ * La Guaira fiyati sanilmisti): konudaki liman metinde gecmiyor VE metinde 3+ farkli fiyat var -> o limanin teklifi degil.
+ */
+export function genelTarifeMi(govde: string, liman: string | null, fiyatlar: number[]): boolean {
+  if (fiyatlar.length < 3) return false;
+  if (!liman) return true;
+  const metin = harfler(govde);
+  const adaylar = new Set([harfler(liman), harfler(limanAnahtari(liman) || "")].filter((x) => x.length >= 3));
+  return ![...adaylar].some((x) => metin.includes(x));
 }
 
 /** Ayni alinti farkli yazismalarda tekrar gecse de ayni kimlik (kayit idempotent). FNV-1a 64 bit (iki 32 bit). */

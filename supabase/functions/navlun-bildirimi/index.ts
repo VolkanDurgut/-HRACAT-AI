@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { AcenteTablosu } from "../_shared/navlun-oku.ts";
-import { bizdenMi } from "../_shared/navlun-oku.ts";
+import { bizdenMi, tutarAdaylari } from "../_shared/navlun-oku.ts";
 import { acenteOgren, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
-import { alintiKimligi, alintiMesajlari, govdeImzasi } from "../_shared/navlun-alinti.ts";
+import { alintiKimligi, alintiMesajlari, genelTarifeMi, govdeImzasi } from "../_shared/navlun-alinti.ts";
 
 // ============================================================================
 // NAVLUN BILDIRIMI (navlun-bildirimi) - 10.11.2026
@@ -19,6 +19,9 @@ import { alintiKimligi, alintiMesajlari, govdeImzasi } from "../_shared/navlun-a
 // 13.11.2026 ALINTIDAN KURTARMA: betik ayrica "alinti" (mailin tam metni) gonderir. Alintidaki acente teklifleri
 //   (_shared/navlun-alinti.ts) kendi gonderen + tarihiyle "alinti:<ozet>" kimligiyle kaydedilir; ayni gonderenden +-4 saat
 //   icinde ayni metinle dogrudan gelmis asli varsa ATLANIR (cift sayim yok). Arsive hic ulasmamis teklif boylece kaybolmaz.
+//   13.11.2026 sagalama sonrasi korumalar (alintiKontrol): yalniz FIYATLI teklif; ayni acente + liman + tutar +-4 saat icinde
+//   baska kayitta varsa ATLANIR (asli farkli baslik / imza ile gelmis olsa bile); konudaki liman metinde gecmiyor ve 3+ fiyat
+//   varsa (genel tarife) ATLANIR. Yeniden islemede kurala uymayan alinti kaydi "bilgi"ye cekilir (olaylari silinir, notu yazar).
 // 13.11.2026 FREE TIME / TRANSIT TAMAMLAMA: fiyatsiz acente cevabi ("14 gun free time mevcut, tt 44 gun") ayni acentenin
 //   ayni limana son 7 gundeki teklifinin BOS free time / transit alanini doldurur (dolu alana dokunmaz).
 // Acente alan adlari repoda degil, navlun_acenteler tablosunda. Tabloda olmayan bir alan adi "NAVLUN TALEBI"
@@ -78,6 +81,26 @@ async function acenteEkle(sirket: string, alan: string, ad: string): Promise<boo
 
 type Kayit = NonNullable<ReturnType<typeof mesajIsle>>;
 const SAAT = 3600_000;
+const FIYATLI = new Set(["teklif", "karsi_teklif"]);
+
+/**
+ * Alintidan cikan kayit kaydedilmeli mi? Uygunsa null, degilse nedeni.
+ * sadeceDogrudan: yeniden islemede yalniz dogrudan gelmis (alinti olmayan) kayitlarla karsilastirilir.
+ */
+async function alintiKontrol(sirket: string, k: Kayit, govde: string, sadeceDogrudan: boolean): Promise<string | null> {
+  const fiyatli = k.olaylar.filter((o) => FIYATLI.has(o.tur) && o.tutar !== null);
+  if (!fiyatli.length) return "fiyat yok";
+  if (genelTarifeMi(govde, k.liman, tutarAdaylari(govde))) return "genel tarife (konudaki liman metinde geçmiyor)";
+  if (!k.acente) return null;
+  const t = Date.parse(k.tarih);
+  const bas = new Date(t - 4 * SAAT).toISOString(), bit = new Date(t + 4 * SAAT).toISOString();
+  const var_ = await oku<{ liman_anahtar: string | null; tutar: number | string | null }>(
+    `navlun_teklifleri?select=liman_anahtar,tutar&company_id=eq.${sirket}&acente=eq.${encodeURIComponent(k.acente)}` +
+    `&tur=in.(teklif,karsi_teklif)&tarih=gte.${encodeURIComponent(bas)}&tarih=lte.${encodeURIComponent(bit)}` +
+    `&mesaj_id=neq.${encodeURIComponent(k.mesaj_id)}${sadeceDogrudan ? "&mesaj_id=not.like.alinti:*" : ""}&limit=200`);
+  const ayni = (o: Kayit["olaylar"][number]) => var_.some((x) => x.liman_anahtar === o.liman_anahtar && Number(x.tutar) === Number(o.tutar));
+  return fiyatli.every(ayni) ? "aynı teklif zaten kayıtlı" : null;
+}
 
 /** Alintidaki acente teklifleri (dogrudan gelmis asli olmayanlar). */
 async function alintidanKurtar(sirket: string, ust: NavlunGirdi, alinti: string, acenteler: AcenteTablosu, toplu: NavlunGirdi[], gorulen: Set<string>): Promise<Kayit[]> {
@@ -92,6 +115,7 @@ async function alintidanKurtar(sirket: string, ust: NavlunGirdi, alinti: string,
     if (gorulen.has(g.mesaj_id)) continue;
     const k = mesajIsle(g, acenteler);
     if (!k || k.durum !== "okundu") continue;                 // fiyatsiz / anlamsiz alinti kaydedilmez
+    if (await alintiKontrol(sirket, k, g.govde, false)) continue;
     const imza = govdeImzasi(a.govde);
     // Ayni toplu gonderimde asli da varsa
     if (toplu.some((x) => x.gonderen === g.gonderen && Math.abs(Date.parse(x.tarih) - t) <= 4 * SAAT && govdeImzasi(x.govde) === imza)) continue;
@@ -110,7 +134,7 @@ async function alintidanKurtar(sirket: string, ust: NavlunGirdi, alinti: string,
 async function bilgiTamamla(sirket: string, kayitlar: Kayit[]): Promise<number> {
   let n = 0;
   for (const k of kayitlar) {
-    if (k.durum !== "bilgi" || !k.acente || !k.liman_anahtar) continue;
+    if (k.durum !== "bilgi" || !k.acente || !k.liman_anahtar || k.mesaj_id.startsWith("alinti:")) continue;
     const ft = k.ek_bilgi.free_time_gun, tt = k.ek_bilgi.transit_gun;
     const alanlar: [string, unknown][] = [];
     if (ft !== null && ft > 0 && ft <= 60) alanlar.push(["free_time_gun", ft]);
@@ -163,8 +187,13 @@ Deno.serve(async (req: Request) => {
           mesaj_id: r.mesaj_id, gonderen: (r.gonderen || "").toLowerCase(), konu: r.konu || "", govde: r.govde || "",
           tarih: r.tarih, ek_metin: r.ek_metin || "", ek_kaynak: r.ek_kaynak || "",
         }, acenteler);
-        // Alintidan kurtarilan kaydin "Alintidan kurtarildi" notu yeniden okumada silinmez
-        if (k && r.mesaj_id.startsWith("alinti:") && r.ozet) k.ozet = r.ozet;
+        if (k && r.mesaj_id.startsWith("alinti:")) {
+          // Alinti kaydi ayni kurallardan gecer; uymayan "bilgi"ye cekilir (olaylari silinir, kayit ve metin kalir)
+          const neden = k.durum === "okundu" ? await alintiKontrol(sirket, k, r.govde || "", true) : "fiyat yok";
+          if (neden) { yeniden.push({ ...k, durum: "bilgi" as const, olaylar: [], ozet: `Alıntı kayda alınmadı: ${neden}.` }); continue; }
+          // "Alintidan kurtarildi" notu yeniden okumada silinmez
+          if (r.ozet && r.ozet.startsWith("Alıntıdan kurtarıldı")) k.ozet = r.ozet;
+        }
         if (k) yeniden.push(k);
       }
       if (!yeniden.length) return json({ islenen: 0, sayfa, devam: kayitli.length === 50 });

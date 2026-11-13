@@ -250,3 +250,14 @@ html:has([data-sabit-zemin]) ::-webkit-scrollbar-thumb:hover { background: #3A43
   .navlun-nabiz, .navlun-balon, .navlun-yaziyor span, .navlun-masa { animation: none; }
   .navlun-nabiz { opacity: 0; }
 }
+
+/* Irsaliye Evreni (13.11.2026, app/belge/irsaliyeler): belge havada suzulur, gecislerde 3B gelir; uzerine gelince durur. */
+@keyframes irsaliye-gel {
+  0% { opacity: 0; transform: perspective(1600px) rotateX(16deg) rotateY(-12deg) translate3d(0, 40px, -160px); }
+  100% { opacity: 1; transform: perspective(1600px) rotateX(0) rotateY(0) translate3d(0, 0, 0); }
+}
+@keyframes irsaliye-suzul { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.irsaliye-gel { animation: irsaliye-gel 0.55s cubic-bezier(.2,.8,.2,1) both; }
+.irsaliye-suzul { animation: irsaliye-suzul 6s ease-in-out infinite; }
+.irsaliye-suzul:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .irsaliye-gel, .irsaliye-suzul { animation: none; } }

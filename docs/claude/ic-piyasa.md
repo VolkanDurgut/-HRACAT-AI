@@ -731,3 +731,17 @@
   execution@). Ürün özellikleri bir önceki aynı ürünlü iş emrinden kopyalandı (kontrol notu düşüldü).
 - "Sipariş alındı" müşteri bildirimleri `bekliyor` bırakıldı (tasarım gereği elle gönderilir).
 
+
+## Günlük rapor: tedarikçi / müşteri bazında toplam + İrsaliye Evreni (13.11.2026)
+Kullanıcı: "İpsala Ajans toplam gelen, Lüleburgaz Ajans toplam gelen tonaj ve araç sayısı ile belirtilmeli; İrsaliye İncele
+tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı; tek ekranda; mümkünse 3D, belge havada okunabilir."
+- Mail (`_shared/ic-gunluk-rapor.ts`, seçenek `gruplu`): "Gelenler"in başında **tedarikçi bazında toplam** (alış nolar, araç,
+  ton, payı gösteren çubuk, "İrsaliyeleri İncele (n)"), "Yüklenenler"in başında aynısı **müşteri bazında**. Satırdaki
+  "İrsaliye İncele" de evreni o belge seçili açar. Edge `ic-gunluk-rapor` artık `tedarikci_id` / `musteri_id` okur.
+- Onaya kadar zamanlanmış rapor ESKİ görünümde (`GRUPLU_CANLI = false`); yeni görünüm yalnız `{"test_adresine": true}` ile
+  (anon da çağırabilir; "[TEST]" YALNIZ `IC_RAPOR_TEST_ALICISI`, varsayılan mesensei282; isteğe bağlı `tarih`, `oturum`; 3 / 24 saat).
+- Ekran `/belge/irsaliyeler?tur=alis|satis&gun=YYYY-MM-DD[&k=<tedarikçi / müşteri id>][&odak=<teslim / sevk id>]`
+  (`app/belge/irsaliyeler/page.tsx` veri, `components/irsaliye-evreni.tsx` görünüm): solda araçlar, ortada seçili irsaliye
+  havada (geçişte 3B gelir, süzülür, üzerine gelince durur; arkada sıradaki belgeler kart yığını), sağda bilgiler; ← → ,
+  büyük okuma, yeni sekme, indir. Kayıtlar RLS + company_id; belgeler 15 dk imzalı adres. Seçili belge adreste `odak`.
+  Eski tek belge sayfası `/belge/irsaliye?s= / ?a=` eski mailler için durur.

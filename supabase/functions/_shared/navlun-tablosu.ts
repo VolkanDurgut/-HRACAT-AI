@@ -465,6 +465,18 @@ export function satinAlmaSayfasi(sa: NavlunSatinAlma, tarih: string, ad = "NAVLU
 const usd = (n: number) => `${n.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} $`;
 export const NAVLUN_TABLOSU_URL = "https://ihracatasistanim.com";
 
+/** Haftalik toplu navlun tablosu ekinin adi (Navlun Bildirimi > "Excel indir" ile ayni ad). */
+export const navlunTablosuDosyaAdi = (tarih: string) => `Navlun_Tablosu_${tarihTr(tarih)}.xlsx`;
+
+/**
+ * HAFTALIK TOPLU NAVLUN TABLOSU (13.11.2026, kullanici: "Toplu navlun Excel cumartesi gunleri gonderilecek 09.00. Navlun satin
+ * alma degil; butun navlunlarin oldugu, navlun bildirimi sayfasindaki Excel indir kismi"). Ek = navlunTablosuSayfasi (sayfadaki
+ * dosyanin aynisi); govde = guncel fiyat tablosu, hafta icinde gelen teklifler "YENI".
+ */
+export function navlunHaftalikKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda"): string {
+  return `${sirketAdi} Haftalık Navlun Tablosu · ${tarihTr(t.tarih)} · ${t.limanlar.length} liman · ${t.bloklar.length} acente/hat`;
+}
+
 export function navlunTablosuKonusu(t: NavlunTablosu, sirketAdi = "Unex Gıda", sa?: NavlunSatinAlma | null): string {
   if (sa) {
     const top = Object.entries(sa.toplam).map(([p, v]) => (p === "USD" ? usd(v) : `${v.toLocaleString("tr-TR")} ${p}`)).join(" + ");
@@ -480,6 +492,8 @@ export type NavlunRaporSecenek = {
   oturumEtiketi?: string | null;
   /** 12.11.2026: navlun satin alma listesi (verilirse mailin ana bolumu budur; tum fiyatlar "Diger navlun fiyatlari" ile sayfada) */
   satinAlma?: NavlunSatinAlma | null;
+  /** 13.11.2026: haftalik toplu navlun tablosu (Cumartesi 09:00) - baslik ve dipnot */
+  haftalik?: boolean;
 };
 
 /**
@@ -551,6 +565,14 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
       ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa),
       dugme: { metin: "Navlun Evreni", yol: "/navlun" },
       dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi.<br>Ekte: ${satinAlmaBasligi(t.tarih)} (Excel). Her gün 17:00 · müşteriye gitmez.`,
+    });
+  }
+  if (secenek.haftalik) {
+    return raporKabugu({
+      sirketAdi, baslik: "Haftalık Navlun Tablosu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
+      ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: tablo,
+      dugme: { metin: "Navlun Bildirimi'ni aç", yol: "/navlun" },
+      dipnot: `Ekte: ${navlunTablosuDosyaAdi(t.tarih)} — Navlun Bildirimi › "Excel indir" ile aynı dosya: bütün limanlar, bütün acente / hatlar, aylık fiyatlar, transit ve free time (yeşil kalın = gerçekleşen navlun).<br>En iyi = son 60 günde her acentenin son 20'DC teklifi içinde en düşüğü (gri = 60 günden eski). YENİ = son haftada gelen teklif. Her Cumartesi 09:00 · müşteriye gitmez.`,
     });
   }
   return raporKabugu({

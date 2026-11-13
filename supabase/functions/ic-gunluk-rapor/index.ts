@@ -36,6 +36,11 @@ const SAYFA = 1000;
 const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 
 const SUPER_ADMIN_EPOSTALARI = ["execution@unex.com.tr", "bbt@unex.com.tr"];
+// 13.11.2026 TEST ADRESINE ({"test_adresine": true}): "[TEST]" rapor YALNIZ bu adrese (sirket alicilarina DEGIL); yeni gorunumu
+// (tedarikci / musteri ozeti + Irsaliye Evreni) onaydan once gostermek icin. Anon da cagirabilir (adres sabit, 3 / 24 saat).
+const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "mesensei282@gmail.com").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)).slice(0, 2);
+// Yeni gorunum zamanlanmis raporda: kullanici onayina kadar KAPALI (yalniz test_adresine).
+const GRUPLU_CANLI = false;
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 
 const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
@@ -109,11 +114,14 @@ async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
 
 type EmirHam = Omit<RaporIsEmri, "musteri" | "musteri_kisa"> & { ic_musteriler: { unvan: string; kisa_ad: string | null } | null };
 type AlisHam = Omit<RaporAlis, "tedarikci" | "tedarikci_kisa"> & { ic_tedarikciler: { unvan: string; kisa_ad: string | null } | null };
+// 13.11.2026: musteri_id / tedarikci_id -> rapordaki musteri / tedarikci bazinda ozet ve Irsaliye Evreni baglantisi
+const EMIR_KOLON = "id,is_emri_no,durum,urun,ambalaj,teslim,hedef_tur,hedef_kg,hedef_arac,devir_kg,kapanis_zamani,olusturma,musteri_id,ic_musteriler(unvan,kisa_ad)";
+const ALIS_KOLON = "id,alis_no,durum,urun,depo,miktar_kg,kapanis_zamani,tedarikci_id,ic_tedarikciler(unvan,kisa_ad)";
 
 async function sirketRaporu(companyId: string, tarih: string) {
   // Acik + bugun kapanan satis siparisleri (kapanis gunu TR; genis aralik, hesap gunu suzer)
   const emirHam = await hepsiniCek<EmirHam>(
-    `ic_is_emirleri?select=id,is_emri_no,durum,urun,ambalaj,teslim,hedef_tur,hedef_kg,hedef_arac,devir_kg,kapanis_zamani,olusturma,ic_musteriler(unvan,kisa_ad)&company_id=eq.${companyId}&or=(durum.eq.acik,kapanis_zamani.gte.${tarih}T00:00:00%2B03:00)&order=id`
+    `ic_is_emirleri?select=${EMIR_KOLON}&company_id=eq.${companyId}&or=(durum.eq.acik,kapanis_zamani.gte.${tarih}T00:00:00%2B03:00)&order=id`
   );
   const emirler: RaporIsEmri[] = emirHam.map(({ ic_musteriler, ...e }) => ({ ...e, musteri: ic_musteriler?.unvan || "-", musteri_kisa: ic_musteriler?.kisa_ad || null }));
   const sevkKolon = "id,is_emri_id,plaka,dorse_plaka,net_kg,irsaliye_no,irsaliye_tarihi,olusturma,cikis_durumu,cikis_zamani,gecmis,irsaliye_dosya_yolu";
@@ -128,7 +136,7 @@ async function sirketRaporu(companyId: string, tarih: string) {
   // Bugun yuklenen ama listede olmayan siparisler (orn. bugun kapanmamis eski siparis) - adlari icin
   const eksikEmir = Array.from(new Set(gunSevk.map((s) => s.is_emri_id).filter((id) => !emirler.some((e) => e.id === id))));
   if (eksikEmir.length) {
-    const ek = await hepsiniCek<EmirHam>(`ic_is_emirleri?select=id,is_emri_no,durum,urun,ambalaj,teslim,hedef_tur,hedef_kg,hedef_arac,devir_kg,kapanis_zamani,olusturma,ic_musteriler(unvan,kisa_ad)&company_id=eq.${companyId}&id=in.${inListe(eksikEmir)}&order=id`);
+    const ek = await hepsiniCek<EmirHam>(`ic_is_emirleri?select=${EMIR_KOLON}&company_id=eq.${companyId}&id=in.${inListe(eksikEmir)}&order=id`);
     // durum "bilgi" olarak isaretlenir: acik / kapanan listelerine girmesin, yalniz ad icin
     ek.forEach(({ ic_musteriler, ...e }) => emirler.push({ ...e, durum: `_${e.durum}`, musteri: ic_musteriler?.unvan || "-", musteri_kisa: ic_musteriler?.kisa_ad || null }));
   }
@@ -137,7 +145,7 @@ async function sirketRaporu(companyId: string, tarih: string) {
   let alislar: RaporAlis[] = [];
   let teslimler: RaporTeslim[] = [];
   try {
-    const alisHam = await hepsiniCek<AlisHam>(`ic_alis_siparisleri?select=id,alis_no,durum,urun,depo,miktar_kg,kapanis_zamani,ic_tedarikciler(unvan,kisa_ad)&company_id=eq.${companyId}&durum=eq.acik&order=id`);
+    const alisHam = await hepsiniCek<AlisHam>(`ic_alis_siparisleri?select=${ALIS_KOLON}&company_id=eq.${companyId}&durum=eq.acik&order=id`);
     alislar = alisHam.map(({ ic_tedarikciler, ...a }) => ({ ...a, tedarikci: ic_tedarikciler?.unvan || "-", tedarikci_kisa: ic_tedarikciler?.kisa_ad || null }));
     const tKolon = "id,alis_id,plaka,dorse_plaka,net_kg,teslim_zamani,irsaliye_no,irsaliye_tarihi,olusturma,sevk_id,gecmis,irsaliye_dosya_yolu";
     const [acikTeslim, gunTeslim] = await Promise.all([
@@ -149,7 +157,7 @@ async function sirketRaporu(companyId: string, tarih: string) {
     teslimler = Array.from(tMap.values());
     const eksikAlis = Array.from(new Set(gunTeslim.map((t) => t.alis_id).filter((id) => !alislar.some((a) => a.id === id))));
     if (eksikAlis.length) {
-      const ek = await hepsiniCek<AlisHam>(`ic_alis_siparisleri?select=id,alis_no,durum,urun,depo,miktar_kg,kapanis_zamani,ic_tedarikciler(unvan,kisa_ad)&company_id=eq.${companyId}&id=in.${inListe(eksikAlis)}&order=id`);
+      const ek = await hepsiniCek<AlisHam>(`ic_alis_siparisleri?select=${ALIS_KOLON}&company_id=eq.${companyId}&id=in.${inListe(eksikAlis)}&order=id`);
       ek.forEach(({ ic_tedarikciler, ...a }) => alislar.push({ ...a, durum: `_${a.durum}`, tedarikci: ic_tedarikciler?.unvan || "-", tedarikci_kisa: ic_tedarikciler?.kisa_ad || null }));
     }
   } catch (e) {
@@ -164,23 +172,25 @@ function json(veri: unknown, status = 200): Response {
 
 Deno.serve(async (req: Request) => {
   try {
-    const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean; tarih?: string; oturum?: string };
+    const govde = (await req.json().catch(() => ({}))) as { deneme?: boolean; test?: boolean; test_adresine?: boolean; tarih?: string; oturum?: string };
+    const testAdresine = govde.test_adresine === true && govde.deneme !== true;
     const yetkiliSirket = await yetkiliKullaniciSirketi(req);
     const yetkili = yetkiliSirket !== null;
     const simdi = Date.now();
     let oturum: IcRaporOturumu;
     if (!yetkili) {
-      if (govde.deneme || govde.tarih || govde.oturum) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
+      if (govde.deneme || ((govde.tarih || govde.oturum) && !testAdresine)) return json({ ok: false, hata: "Deneme yalnızca yetkili kullanıcılar içindir." }, 403);
       const p = penceredekiOturum(simdi);
-      if (govde.test !== true && !p) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
-      oturum = p ?? saateGoreOturum(simdi);
+      if (govde.test !== true && !testAdresine && !p) return json({ ok: false, hata: "Şu an zamanlanmış rapor saati değil." }, 403);
+      oturum = testAdresine && IC_RAPOR_OTURUMLARI.includes(govde.oturum as IcRaporOturumu) ? (govde.oturum as IcRaporOturumu) : (p ?? saateGoreOturum(simdi));
     } else {
       oturum = IC_RAPOR_OTURUMLARI.includes(govde.oturum as IcRaporOturumu) ? (govde.oturum as IcRaporOturumu) : (penceredekiOturum(simdi) ?? saateGoreOturum(simdi));
     }
     const deneme = yetkili && govde.deneme === true;
-    const test = !deneme && govde.test === true;
+    const test = !deneme && (govde.test === true || testAdresine);
+    const gruplu = testAdresine || GRUPLU_CANLI;
     // Sabah raporu DUNU anlatir
-    const tarih = yetkili && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : oturum === "sabah" ? gunEkle(trBugun(), -1) : trBugun();
+    const tarih = (yetkili || testAdresine) && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : oturum === "sabah" ? gunEkle(trBugun(), -1) : trBugun();
 
     // Sirketler: alici tanimli olanlar (yetkili kullanicida yalniz kendi sirketi)
     const ayarlar = await hepsiniCek<{ company_id: string; gunluk_rapor_eposta: string | null }>(`ic_piyasa_ayarlari?select=company_id,gunluk_rapor_eposta&order=company_id`);
@@ -190,10 +200,10 @@ Deno.serve(async (req: Request) => {
     const sonuclar: Record<string, unknown>[] = [];
     for (const h of hedefler) {
       const sirketAdi = (sirketler.find((s) => s.id === h.company_id)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
-      const alicilar = Array.from(new Set((h.gunluk_rapor_eposta || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)))).slice(0, 5);
+      const alicilar = testAdresine ? TEST_ALICISI : Array.from(new Set((h.gunluk_rapor_eposta || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)))).slice(0, 5);
       const rapor = await sirketRaporu(h.company_id, tarih);
       const konu = `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi, oturum)}`;
-      const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum);
+      const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum, { gruplu: gruplu || (deneme && govde.test_adresine === true) });
       if (deneme) { sonuclar.push({ tarih, oturum, konu, alicilar, ozet: rapor.ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");

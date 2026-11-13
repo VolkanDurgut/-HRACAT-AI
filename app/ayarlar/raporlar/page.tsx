@@ -116,7 +116,7 @@ export default function RaporAlicilariPage() {
     setMesgul(null);
   };
 
-  const ekParam = () => (secili === "musteri_durum" && musteri ? { musteri } : {});
+  const ekParam = () => ({ ...(tanim.govde || {}), ...(secili === "musteri_durum" && musteri ? { musteri } : {}) });
   const onizle = async () => {
     if (!tanim.edge) return;
     setMesgul("onizle");

@@ -391,3 +391,14 @@ kayıtlar "tarih yok", en altta). Edge siparis-rapor v6 (repo ile birebir). Rapo
   yüklenemezse eski yol (ek + uyarı); 30 günden eski zip'ler depodan silinir (kayıt kalır). Yeni edge `yedek-indir`: kullanıcının
   tokeniyle izin RPC'si → 120 sn imzalı link (CORS yalnız ihracatasistanim.com). Sayfa: Ayarlar > Veri Yedekleri (son 60 gece,
   indirme sayısı). Sağlama: deneme modu 72 tablo / uyarısız / düğme var; anonim ve oturumsuz indirme isteği reddedildi.
+
+## 4.11 Haftalık Toplu Navlun Tablosu — Cumartesi 09:00 (13.11.2026)
+Kullanıcı: "Toplu navlun Excel cumartesi günleri gönderilecek 09.00 (navlun satın alma değil; bütün navlunların olduğu, Navlun
+Bildirimi sayfasındaki Excel indir kısmı). İlk önce test gönder, onaylarsam canlıya geçireceğiz."
+- Edge `navlun-tablosu` `{"haftalik": true}`: ek = `navlunTablosuSayfasi` (sayfadaki "Excel indir" ile aynı dosya, ad
+  `Navlun_Tablosu_GG.AA.YYYY.xlsx`), gövde = güncel fiyat tablosu (son 7 günün teklifleri YENİ). Anon yalnız Cumartesi
+  08:55-10:00 TR; tekrar koruması `oturum = 'haftalik'`. Günlük raporun "YENİ" hesabı haftalık gönderimi saymaz.
+- Alıcı: Ayarlar › Rapor Alıcıları "Haftalık Navlun Tablosu" (`rapor_alicilari.rapor = 'navlun_haftalik'`; kurulumda günlük
+  navlun alıcılarının kopyası, CANLI KAPALI → zamanlanmış gönderim de yalnız test adresine "[TEST]"). Önizle / Test o satırdan
+  (`RaporTanimi.govde = {haftalik: true}`).
+- Migration `20261113160000_navlun_haftalik.sql`; pg_cron `navlun-tablosu-haftalik` `0 6 * * 6` (komut günlük işten türetilir).

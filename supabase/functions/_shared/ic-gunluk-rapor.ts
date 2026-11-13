@@ -19,6 +19,8 @@ export type RaporIsEmri = {
   hedef_tur: "kg" | "arac"; hedef_kg: number | string | null; hedef_arac: number | null;
   devir_kg?: number | string | null; kapanis_zamani: string | null; olusturma: string;
   musteri: string; musteri_kisa: string | null;
+  /** 13.11.2026: musteri bazinda ozet + Irsaliye Evreni baglantisi */
+  musteri_id?: string | null;
 };
 export type RaporSevk = {
   id: string; is_emri_id: string; plaka: string; dorse_plaka: string | null; net_kg: number | string;
@@ -30,6 +32,8 @@ export type RaporSevk = {
 export type RaporAlis = {
   id: string; alis_no: string; durum: string; urun: string; depo: string | null; miktar_kg: number | string;
   tedarikci: string; tedarikci_kisa: string | null; kapanis_zamani: string | null;
+  /** 13.11.2026: tedarikci bazinda ozet + Irsaliye Evreni baglantisi */
+  tedarikci_id?: string | null;
 };
 export type RaporTeslim = {
   id: string; alis_id: string; plaka: string | null; dorse_plaka: string | null; net_kg: number | string;
@@ -48,6 +52,51 @@ export function irsaliyeHucresi(no: string | null, sorgu: string | null): string
   if (!sorgu || !/^[sa]=[0-9a-f-]{36}$/i.test(sorgu)) return numara;
   return `${numara}<br><a href="${SITE_ADRESI}/belge/irsaliye?${sorgu}" style="display:inline-block;margin-top:3px;font-size:11px;font-weight:bold;color:#1D4ED8;text-decoration:none;border:1px solid #BFDBFE;background:#EFF6FF;border-radius:3px;padding:1px 6px;white-space:nowrap">İrsaliye İncele &rsaquo;</a>`;
 }
+
+/**
+ * IRSALIYE EVRENI (13.11.2026, kullanici: "Ipsala Ajans toplam gelen, Luleburgaz Ajans toplam gelen tonaj ve arac sayisi ile
+ * belirtilmeli; Irsaliye Incele tikladiginda ilgili irsaliyeleri inceleyebilecegi bir evren karsilamali, tek ekranda").
+ * /belge/irsaliyeler?tur=alis|satis&gun=YYYY-MM-DD[&k=<tedarikci / musteri id>][&odak=<teslim / sevk id>]
+ * k yoksa o gunun tum araclari; odak verilirse ekran o belgeyle acilir. Giris gerekir; belge adresi maile YAZILMAZ.
+ */
+const UUID_DESEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function irsaliyeEvreniYolu(tur: "alis" | "satis", gun: string, k?: string | null, odak?: string | null): string {
+  const q = [`tur=${tur}`, `gun=${/^\d{4}-\d{2}-\d{2}$/.test(gun) ? gun : ""}`];
+  if (k && UUID_DESEN.test(k)) q.push(`k=${k}`);
+  if (odak && UUID_DESEN.test(odak)) q.push(`odak=${odak}`);
+  return `${SITE_ADRESI}/belge/irsaliyeler?${q.join("&")}`;
+}
+const evrenDugmesi = (yol: string, metin: string) =>
+  `<a href="${yol}" style="display:inline-block;margin-top:3px;font-size:11px;font-weight:bold;color:#1D4ED8;text-decoration:none;border:1px solid #BFDBFE;background:#EFF6FF;border-radius:3px;padding:1px 6px;white-space:nowrap">${metin} &rsaquo;</a>`;
+/** Irsaliye No hucresi (evren surumu): numara + Irsaliye Evreni'ni o belgeyle acan dugme. Belge yoksa yalniz numara. */
+export function irsaliyeEvrenHucresi(no: string | null, belgeVar: boolean, yol: string): string {
+  const numara = `<span style="font-family:monospace;font-size:11px">${esc(no || "-")}</span>`;
+  return belgeVar ? `${numara}<br>${evrenDugmesi(yol, "İrsaliye İncele")}` : numara;
+}
+
+/** Tedarikci / musteri bazinda gunluk toplam (araç, kg, belge) - rapordaki ozet tablosu. */
+export type KarsiTarafOzeti = { k: string | null; ad: string; siparisler: string[]; arac: number; kg: number; belge: number; ilkSaat: string };
+function grupla<T>(satirlar: T[], anahtar: (x: T) => { k: string | null; ad: string; siparis: string | null; kg: number; belge: boolean; saat: string }): KarsiTarafOzeti[] {
+  const m = new Map<string, KarsiTarafOzeti>();
+  for (const x of satirlar) {
+    const a = anahtar(x);
+    const key = a.k || `ad:${a.ad}`;
+    const g = m.get(key) || { k: a.k, ad: a.ad, siparisler: [], arac: 0, kg: 0, belge: 0, ilkSaat: a.saat };
+    g.arac += 1; g.kg = yuvarla(g.kg + a.kg); if (a.belge) g.belge += 1;
+    if (a.siparis && !g.siparisler.includes(a.siparis)) g.siparisler.push(a.siparis);
+    if (a.saat < g.ilkSaat) g.ilkSaat = a.saat;
+    m.set(key, g);
+  }
+  return Array.from(m.values()).sort((a, b) => b.kg - a.kg || a.ad.localeCompare(b.ad, "tr"));
+}
+export const gelenTedarikciOzeti = (r: IcGunlukRapor) => grupla(r.gelen, ({ teslim: t, alis: a }) => ({
+  k: a?.tedarikci_id ?? null, ad: a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-", siparis: a?.alis_no ?? null,
+  kg: n(t.net_kg), belge: !!t.irsaliye_dosya_yolu, saat: t.teslim_zamani || t.irsaliye_tarihi || t.olusturma,
+}));
+export const yuklenenMusteriOzeti = (r: IcGunlukRapor) => grupla(r.yuklenen, ({ sevk: s, emir: e }) => ({
+  k: e?.musteri_id ?? null, ad: e ? (e.musteri_kisa || "").trim() || e.musteri : "-", siparis: e?.is_emri_no ?? null,
+  kg: n(s.net_kg), belge: !!s.irsaliye_dosya_yolu, saat: s.irsaliye_tarihi || s.olusturma,
+}));
 
 /** ISO -> Turkiye takvim gunu "YYYY-MM-DD" */
 export function trGun(iso: string | null | undefined): string {
@@ -168,7 +217,11 @@ const CIKIS: Record<string, [string, string]> = {
   bugun_degil: ["Bugün çıkmayacak", "#B45309"],
 };
 
-export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString(), oturum: IcRaporOturumu = "aksam"): string {
+/** gruplu (13.11.2026): tedarikci / musteri bazinda ozet + Irsaliye Evreni baglantilari (onaya kadar yalniz test maili). */
+export type IcRaporSecenek = { gruplu?: boolean };
+
+export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString(), oturum: IcRaporOturumu = "aksam", secenek: IcRaporSecenek = {}): string {
+  const gruplu = secenek.gruplu === true;
   const G = gunAdi(oturum);
   const g = G === "Dün" ? "dün" : "bugün";
   const th = (t: string, sag = false) => `<th style="background:${LACIVERT};color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;text-align:${sag ? "right" : "left"};font-weight:bold;white-space:nowrap">${t}</th>`;
@@ -194,16 +247,39 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   const yRows = r.yuklenen.map(({ sevk: s, emir: e }, i) => {
     const c = s.cikis_durumu ? CIKIS[s.cikis_durumu] : undefined;
     const durum = c ? `<span style="color:${c[1]};font-weight:bold">${c[0]}</span>${s.cikis_durumu === "cikti" && s.cikis_zamani ? ` <span style="color:#94A3B8">${saat(s.cikis_zamani)}</span>` : ""}` : `<span style="color:#64748B">Çıkış bekliyor</span>`;
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(s.irsaliye_tarihi || s.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(musteriAdi(e))}</b><br><span style="color:#64748B;font-size:11px">${esc(e?.is_emri_no || "-")} · ${esc(e ? urunAdi(e.urun, e.ambalaj) : "-")}</span>`)}${td(`<b>${esc(s.plaka)}</b>${s.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(s.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(irsaliyeHucresi(s.irsaliye_no, s.irsaliye_dosya_yolu ? `s=${s.id}` : null))}${td(durum, "font-size:11px;white-space:nowrap")}${td(sayi(n(s.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(s.irsaliye_tarihi || s.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(musteriAdi(e))}</b><br><span style="color:#64748B;font-size:11px">${esc(e?.is_emri_no || "-")} · ${esc(e ? urunAdi(e.urun, e.ambalaj) : "-")}</span>`)}${td(`<b>${esc(s.plaka)}</b>${s.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(s.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(gruplu ? irsaliyeEvrenHucresi(s.irsaliye_no, !!s.irsaliye_dosya_yolu, irsaliyeEvreniYolu("satis", r.tarih, e?.musteri_id, s.id)) : irsaliyeHucresi(s.irsaliye_no, s.irsaliye_dosya_yolu ? `s=${s.id}` : null))}${td(durum, "font-size:11px;white-space:nowrap")}${td(sayi(n(s.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`;
   }).join("");
   const yTablo = tablo(`${th("Saat")}${th("Müşteri · Sipariş")}${th("Plaka")}${th("İrsaliye No")}${th("Durum")}${th("Net (kg)", true)}`,
     r.yuklenen.length ? yRows + toplam(6, `TOPLAM — ${o.yuklenenArac} araç`, `${sayi(o.yuklenenKg)} kg`) : bos(6, `${G} satış aracı yüklenmedi.`));
 
   // Bugun gelenler (alis)
   const gRows = r.gelen.map(({ teslim: t, alis: a, dogrudanIsEmri }, i) =>
-    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(t.teslim_zamani || t.irsaliye_tarihi || t.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-")}</b><br><span style="color:#64748B;font-size:11px">${esc(a?.alis_no || "-")} · ${esc(a?.urun || "-")}${a?.depo ? ` · ${esc(a.depo)}` : ""}</span>${dogrudanIsEmri ? `<br><span style="color:#B45309;font-size:11px;font-weight:bold">Doğrudan müşteriye · ${esc(dogrudanIsEmri)}</span>` : ""}`)}${td(`<b>${esc(t.plaka || "-")}</b>${t.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(t.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(irsaliyeHucresi(t.irsaliye_no, t.irsaliye_dosya_yolu ? `a=${t.id}` : null))}${td(sayi(n(t.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`).join("");
+    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(t.teslim_zamani || t.irsaliye_tarihi || t.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-")}</b><br><span style="color:#64748B;font-size:11px">${esc(a?.alis_no || "-")} · ${esc(a?.urun || "-")}${a?.depo ? ` · ${esc(a.depo)}` : ""}</span>${dogrudanIsEmri ? `<br><span style="color:#B45309;font-size:11px;font-weight:bold">Doğrudan müşteriye · ${esc(dogrudanIsEmri)}</span>` : ""}`)}${td(`<b>${esc(t.plaka || "-")}</b>${t.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(t.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(gruplu ? irsaliyeEvrenHucresi(t.irsaliye_no, !!t.irsaliye_dosya_yolu, irsaliyeEvreniYolu("alis", r.tarih, a?.tedarikci_id, t.id)) : irsaliyeHucresi(t.irsaliye_no, t.irsaliye_dosya_yolu ? `a=${t.id}` : null))}${td(sayi(n(t.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`).join("");
   const gTablo = tablo(`${th("Saat")}${th("Tedarikçi · Alış")}${th("Plaka")}${th("İrsaliye No")}${th("Net (kg)", true)}`,
     r.gelen.length ? gRows + toplam(5, `TOPLAM — ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, `${G} alış aracı gelmedi.`));
+
+  // Tedarikci / musteri bazinda ozet (13.11.2026). Cubuk = o gunun toplam tonajindaki payi.
+  const ozetTablo = (tur: "alis" | "satis", liste: KarsiTarafOzeti[], toplamKg: number) => {
+    if (!gruplu || !liste.length) return "";
+    const etiket = tur === "alis" ? "Tedarikçi" : "Müşteri";
+    const sip = tur === "alis" ? "Alış" : "Sipariş";
+    const renk = tur === "alis" ? LACIVERT : "#047857";
+    const satirlar = liste.map((x, i) => {
+      const pay = toplamKg > 0 ? Math.max(2, Math.round((x.kg / toplamKg) * 100)) : 0;
+      const cubuk = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;border-collapse:collapse"><tr><td style="width:${pay}%;height:4px;background:${renk};font-size:0;line-height:0">&nbsp;</td><td style="height:4px;background:#E2E8F0;font-size:0;line-height:0">&nbsp;</td></tr></table>`;
+      const dugme = x.belge
+        ? evrenDugmesi(irsaliyeEvreniYolu(tur, r.tarih, x.k), `İrsaliyeleri İncele (${x.belge})`)
+        : `<span style="font-size:11px;color:#94A3B8">belge yok</span>`;
+      return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.ad)}</b>${cubuk}`)}${td(`<span style="color:#64748B;font-size:11px">${esc(x.siparisler.join(", ") || "-")}</span>`)}${td(`<b>${x.arac}</b> araç`, "text-align:right;white-space:nowrap")}${td(`<b style="color:${renk}">${ton(x.kg)}</b>`, "text-align:right;white-space:nowrap")}${td(dugme, "text-align:right;white-space:nowrap")}</tr>`;
+    }).join("");
+    const top = `<tr><td colspan="2" style="padding:8px;font-size:11px;font-weight:bold;color:#475569;border-top:2px solid #CBD5E1">${liste.length} ${etiket.toLowerCase()}</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${liste.reduce((t, x) => t + x.arac, 0)} araç</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${ton(toplamKg)}</td><td style="border-top:2px solid #CBD5E1"></td></tr>`;
+    return `<div style="margin:0 0 10px;border:1px solid #E2E8F0;border-left:4px solid ${MARKA_TURUNCU};border-radius:4px;padding:8px 10px 4px">
+      <div style="font-size:10px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:#64748B;margin-bottom:4px">${etiket} bazında toplam</div>
+      ${tablo(`${th(etiket)}${th(sip)}${th("Araç", true)}${th("Toplam", true)}${th("İrsaliyeler", true)}`, satirlar + top)}
+    </div>`;
+  };
+  const gOzet = ozetTablo("alis", gelenTedarikciOzeti(r), o.gelenKg);
+  const yOzet = ozetTablo("satis", yuklenenMusteriOzeti(r), o.yuklenenKg);
 
   // Acik satis siparisleri
   const KALAN_RENK = { kalan: "#B45309", fazla: LACIVERT, tamam: "#047857" } as const;
@@ -249,9 +325,11 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   ${kutular}
 
   ${bolum(`${G} Yüklenenler — Satış`, `${o.yuklenenArac} araç · ${ton(o.yuklenenKg)}`)}
+  ${yOzet}
   ${yTablo}
 
   ${bolum(`${G} Gelenler — Alış`, `${o.gelenArac} araç · ${ton(o.gelenKg)}`)}
+  ${gOzet}
   ${gTablo}
 
   ${kBolum}
@@ -265,7 +343,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenen miktar: araçların net toplamı + siparişler arası devir. Gün: satışta irsaliye saati, alışta teslim alma saati (Türkiye).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenen miktar: araçların net toplamı + siparişler arası devir. Gün: satışta irsaliye saati, alışta teslim alma saati (Türkiye).${gruplu ? "<br>İrsaliye İncele: o tedarikçinin / müşterinin günün bütün irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir)." : ""}<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

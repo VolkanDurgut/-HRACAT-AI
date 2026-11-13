@@ -19,6 +19,13 @@ export type Belge = {
   karsiTaraf: string; siparisNo: string | null; urun: string | null; depo: string | null; durum: string | null;
 };
 
+/** Siparisin kalani (gunluk raporla ayni hesap; app/belge/irsaliyeler/page.tsx kalanlariOku). */
+export type SiparisKalani = {
+  siparis: string; hedefKg: number | null; hedefArac: number | null; gerceklesenKg: number; arac: number;
+  metin: string; durum: "kalan" | "fazla" | "tamam" | "kapandi"; kalanKg: number;
+};
+const KALAN_RENK: Record<SiparisKalani["durum"], string> = { kalan: "#FBBF24", fazla: "#93C5FD", tamam: "#34D399", kapandi: "#34D399" };
+
 /** ISO -> Turkiye takvim gunu (rapordaki gun ile ayni kural). */
 export const trGun = (iso: string | null | undefined) => {
   if (!iso) return "";
@@ -32,8 +39,9 @@ const kg = (x: number) => `${x.toLocaleString("tr-TR")} kg`;
 const tonYaz = (x: number) => `${(x / 1000).toLocaleString("tr-TR", { maximumFractionDigits: 3 })} ton`;
 
 
-export function IrsaliyeEvreni({ tur, gun, tekTaraf, belgeler, adresler, hata, baslangic }: {
+export function IrsaliyeEvreni({ tur, gun, tekTaraf, belgeler, adresler, hata, baslangic, kalanlar = null }: {
   tur: "alis" | "satis" | null; gun: string; tekTaraf: boolean; belgeler: Belge[] | null; adresler: Record<string, string>; hata: string | null; baslangic: number;
+  kalanlar?: SiparisKalani[] | null;
 }) {
   const [secili, setSecili] = useState(baslangic);
   const [buyuk, setBuyuk] = useState(false);
@@ -78,6 +86,7 @@ export function IrsaliyeEvreni({ tur, gun, tekTaraf, belgeler, adresler, hata, b
   }, [belgeler, secili]);
 
   const b = belgeler?.[secili] ?? null;
+  const kalanToplam = (kalanlar || []).reduce((t, x) => t + x.kalanKg, 0);
   const adres = b?.yol ? adresler[b.yol] : undefined;
   const turAdi = tur === "satis" ? "Yüklenen araçlar · satış" : "Gelen araçlar · alış";
   const tarafEtiketi = tur === "satis" ? "Müşteri" : "Tedarikçi";
@@ -95,10 +104,11 @@ export function IrsaliyeEvreni({ tur, gun, tekTaraf, belgeler, adresler, hata, b
               { ikon: <Truck size={13} />, ad: "Araç", deger: `${toplam.arac}` },
               { ikon: <Scale size={13} />, ad: "Toplam", deger: tonYaz(toplam.kg) },
               { ikon: <FileText size={13} />, ad: "Belge", deger: `${toplam.belge}` },
-            ].map((x) => (
+              ...(kalanlar ? [{ ikon: <Scale size={13} />, ad: "Kalan", deger: kalanToplam > 0 ? tonYaz(kalanToplam) : kalanlar.length && kalanlar.every((x) => x.durum === "kapandi") ? "Kapandı" : "-", renk: "#FBBF24" }] : []),
+            ].map((x: { ikon: React.ReactNode; ad: string; deger: string; renk?: string }) => (
               <div key={x.ad} className="rounded-lg border px-3 py-1.5 min-w-[84px]" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                 <p className="text-[10px] uppercase tracking-wider inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>{x.ikon} {x.ad}</p>
-                <p className="text-sm font-semibold text-white tabular-nums">{x.deger}</p>
+                <p className="text-sm font-semibold tabular-nums" style={{ color: x.renk || "#FFFFFF" }}>{x.deger}</p>
               </div>
             ))}
           </div>
@@ -223,6 +233,30 @@ export function IrsaliyeEvreni({ tur, gun, tekTaraf, belgeler, adresler, hata, b
                 <p className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>Net</p>
                 <p className="text-xl font-bold tabular-nums" style={{ color: ACCENT }}>{kg(b.netKg)}</p>
               </div>
+              {kalanlar && kalanlar.length > 0 && (
+                <div className="space-y-2" data-testid="evren-kalan">
+                  <p className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{tur === "satis" ? "Siparişler · kalan" : "Alış siparişleri · kalan"}</p>
+                  {kalanlar.map((x) => {
+                    const hedef = x.hedefKg ?? null;
+                    const oran = hedef && hedef > 0 ? Math.min(100, Math.round((x.gerceklesenKg / hedef) * 100)) : x.hedefArac ? Math.min(100, Math.round((x.arac / x.hedefArac) * 100)) : 0;
+                    const aktif = x.siparis === b.siparisNo;
+                    return (
+                      <div key={x.siparis} className="rounded-lg border px-2.5 py-2" style={{ borderColor: aktif ? SEFTALI : CARD_BORDER, backgroundColor: aktif ? "rgba(244,160,124,0.08)" : "transparent" }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-white">{x.siparis}</span>
+                          <span className="text-xs font-bold" style={{ color: KALAN_RENK[x.durum] }}>{x.metin}</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(148,163,184,0.2)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${oran}%`, backgroundColor: x.durum === "kalan" ? ACCENT : KALAN_RENK[x.durum] }} />
+                        </div>
+                        <p className="text-[11px] mt-1 tabular-nums" style={{ color: TEXT_MUTED }}>
+                          {tonYaz(x.gerceklesenKg)}{hedef ? ` / ${tonYaz(hedef)}` : x.hedefArac ? ` · ${x.arac} / ${x.hedefArac} araç` : ""} · {x.arac} araç
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="pt-2 border-t text-xs space-y-1" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
                 <p>Günün toplamı: <b className="text-white">{toplam.arac} araç · {tonYaz(toplam.kg)}</b></p>
                 <p>Bu araç payı: <b className="text-white">{toplam.kg ? `%${Math.round((b.netKg / toplam.kg) * 100)}` : "-"}</b></p>

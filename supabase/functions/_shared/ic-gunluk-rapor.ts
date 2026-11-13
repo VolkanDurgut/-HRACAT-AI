@@ -75,13 +75,19 @@ export function irsaliyeEvrenHucresi(no: string | null, belgeVar: boolean, yol: 
 }
 
 /** Tedarikci / musteri bazinda gunluk toplam (araç, kg, belge) - rapordaki ozet tablosu. */
-export type KarsiTarafOzeti = { k: string | null; ad: string; siparisler: string[]; arac: number; kg: number; belge: number; ilkSaat: string };
+export type KarsiTarafOzeti = {
+  k: string | null; ad: string; siparisler: string[]; arac: number; kg: number; belge: number; ilkSaat: string;
+  /** 13.11.2026 (kullanici: "Kalan tonajlar da gozukmeli"): siparis basina kalan (acik siparislerden; kapali = "kapandi") */
+  kalanlar: { siparis: string; metin: string; durum: "kalan" | "fazla" | "tamam" | "kapandi" }[];
+  /** Acik siparislerin toplam kalan tonaji (kg; yalniz kg hedefli ve pozitif kalanlar) */
+  kalanKg: number;
+};
 function grupla<T>(satirlar: T[], anahtar: (x: T) => { k: string | null; ad: string; siparis: string | null; kg: number; belge: boolean; saat: string }): KarsiTarafOzeti[] {
   const m = new Map<string, KarsiTarafOzeti>();
   for (const x of satirlar) {
     const a = anahtar(x);
     const key = a.k || `ad:${a.ad}`;
-    const g = m.get(key) || { k: a.k, ad: a.ad, siparisler: [], arac: 0, kg: 0, belge: 0, ilkSaat: a.saat };
+    const g = m.get(key) || { k: a.k, ad: a.ad, siparisler: [], arac: 0, kg: 0, belge: 0, ilkSaat: a.saat, kalanlar: [], kalanKg: 0 };
     g.arac += 1; g.kg = yuvarla(g.kg + a.kg); if (a.belge) g.belge += 1;
     if (a.siparis && !g.siparisler.includes(a.siparis)) g.siparisler.push(a.siparis);
     if (a.saat < g.ilkSaat) g.ilkSaat = a.saat;
@@ -89,14 +95,42 @@ function grupla<T>(satirlar: T[], anahtar: (x: T) => { k: string | null; ad: str
   }
   return Array.from(m.values()).sort((a, b) => b.kg - a.kg || a.ad.localeCompare(b.ad, "tr"));
 }
-export const gelenTedarikciOzeti = (r: IcGunlukRapor) => grupla(r.gelen, ({ teslim: t, alis: a }) => ({
-  k: a?.tedarikci_id ?? null, ad: a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-", siparis: a?.alis_no ?? null,
-  kg: n(t.net_kg), belge: !!t.irsaliye_dosya_yolu, saat: t.teslim_zamani || t.irsaliye_tarihi || t.olusturma,
-}));
-export const yuklenenMusteriOzeti = (r: IcGunlukRapor) => grupla(r.yuklenen, ({ sevk: s, emir: e }) => ({
-  k: e?.musteri_id ?? null, ad: e ? (e.musteri_kisa || "").trim() || e.musteri : "-", siparis: e?.is_emri_no ?? null,
-  kg: n(s.net_kg), belge: !!s.irsaliye_dosya_yolu, saat: s.irsaliye_tarihi || s.olusturma,
-}));
+export function gelenTedarikciOzeti(r: IcGunlukRapor): KarsiTarafOzeti[] {
+  const acik = new Map(r.acikAlis.map((x) => [x.alis.alis_no, x]));
+  return grupla(r.gelen, ({ teslim: t, alis: a }) => ({
+    k: a?.tedarikci_id ?? null, ad: a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-", siparis: a?.alis_no ?? null,
+    kg: n(t.net_kg), belge: !!t.irsaliye_dosya_yolu, saat: t.teslim_zamani || t.irsaliye_tarihi || t.olusturma,
+  })).map((g) => {
+    // Alis kalani = siparis miktari - teslim alinan (Acik Alis Siparisleri tablosuyla ayni hesap)
+    const kalanlar = g.siparisler.map((no) => {
+      const x = acik.get(no);
+      if (!x) return { siparis: no, metin: "Kapandı", durum: "kapandi" as const };
+      if (x.kalanKg > 0) return { siparis: no, metin: `Kalan ${ton(x.kalanKg)}`, durum: "kalan" as const };
+      if (x.kalanKg < 0) return { siparis: no, metin: `Fazla ${ton(-x.kalanKg)}`, durum: "fazla" as const };
+      return { siparis: no, metin: "Tamam", durum: "tamam" as const };
+    });
+    const kalanKg = yuvarla(g.siparisler.reduce((t, no) => t + Math.max(0, acik.get(no)?.kalanKg ?? 0), 0));
+    return { ...g, kalanlar, kalanKg };
+  });
+}
+export function yuklenenMusteriOzeti(r: IcGunlukRapor): KarsiTarafOzeti[] {
+  const acik = new Map(r.acikSatis.map((x) => [x.emir.is_emri_no, x]));
+  return grupla(r.yuklenen, ({ sevk: s, emir: e }) => ({
+    k: e?.musteri_id ?? null, ad: e ? (e.musteri_kisa || "").trim() || e.musteri : "-", siparis: e?.is_emri_no ?? null,
+    kg: n(s.net_kg), belge: !!s.irsaliye_dosya_yolu, saat: s.irsaliye_tarihi || s.olusturma,
+  })).map((g) => {
+    // Satis kalani = Acik Satis Siparisleri tablosundaki "Durum" (kalanMetni; arac hedefli siparis arac olarak)
+    const kalanlar = g.siparisler.map((no) => {
+      const x = acik.get(no);
+      return x ? { siparis: no, metin: x.kalan.metin, durum: x.kalan.durum } : { siparis: no, metin: "Kapandı", durum: "kapandi" as const };
+    });
+    const kalanKg = yuvarla(g.siparisler.reduce((t, no) => {
+      const x = acik.get(no);
+      return t + (x && x.emir.hedef_tur === "kg" ? Math.max(0, n(x.emir.hedef_kg) - x.yuklenenKg) : 0);
+    }, 0));
+    return { ...g, kalanlar, kalanKg };
+  });
+}
 
 /** ISO -> Turkiye takvim gunu "YYYY-MM-DD" */
 export function trGun(iso: string | null | undefined): string {
@@ -258,7 +292,8 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   const gTablo = tablo(`${th("Saat")}${th("Tedarikçi · Alış")}${th("Plaka")}${th("İrsaliye No")}${th("Net (kg)", true)}`,
     r.gelen.length ? gRows + toplam(5, `TOPLAM — ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, `${G} alış aracı gelmedi.`));
 
-  // Tedarikci / musteri bazinda ozet (13.11.2026). Cubuk = o gunun toplam tonajindaki payi.
+  // Tedarikci / musteri bazinda ozet (13.11.2026). Cubuk = o gunun toplam tonajindaki payi. Kalan = acik siparislerin kalani.
+  const KALAN_RENGI = { kalan: "#B45309", fazla: LACIVERT, tamam: "#047857", kapandi: "#047857" } as const;
   const ozetTablo = (tur: "alis" | "satis", liste: KarsiTarafOzeti[], toplamKg: number) => {
     if (!gruplu || !liste.length) return "";
     const etiket = tur === "alis" ? "Tedarikçi" : "Müşteri";
@@ -270,12 +305,16 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
       const dugme = x.belge
         ? evrenDugmesi(irsaliyeEvreniYolu(tur, r.tarih, x.k), `İrsaliyeleri İncele (${x.belge})`)
         : `<span style="font-size:11px;color:#94A3B8">belge yok</span>`;
-      return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.ad)}</b>${cubuk}`)}${td(`<span style="color:#64748B;font-size:11px">${esc(x.siparisler.join(", ") || "-")}</span>`)}${td(`<b>${x.arac}</b> araç`, "text-align:right;white-space:nowrap")}${td(`<b style="color:${renk}">${ton(x.kg)}</b>`, "text-align:right;white-space:nowrap")}${td(dugme, "text-align:right;white-space:nowrap")}</tr>`;
+      // Siparis + kalani alt alta (birden fazla siparis olabilir)
+      const sipKalan = x.kalanlar.map((k) => `<div style="white-space:nowrap;line-height:1.5"><span style="color:#64748B;font-size:11px">${esc(k.siparis)}</span> <span style="font-size:11px;font-weight:bold;color:${KALAN_RENGI[k.durum]}">${esc(k.metin)}</span></div>`).join("") || `<span style="color:#94A3B8;font-size:11px">-</span>`;
+      const kalanTop = x.kalanKg > 0 ? `<b style="color:#B45309">${ton(x.kalanKg)}</b>` : x.kalanlar.length && x.kalanlar.every((k) => k.durum === "kapandi") ? `<span style="color:#047857;font-weight:bold;font-size:11px">Kapandı</span>` : `<span style="color:#94A3B8">-</span>`;
+      return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(x.ad)}</b>${cubuk}`)}${td(sipKalan)}${td(`<b>${x.arac}</b> araç`, "text-align:right;white-space:nowrap")}${td(`<b style="color:${renk}">${ton(x.kg)}</b>`, "text-align:right;white-space:nowrap")}${td(kalanTop, "text-align:right;white-space:nowrap")}${td(dugme, "text-align:right;white-space:nowrap")}</tr>`;
     }).join("");
-    const top = `<tr><td colspan="2" style="padding:8px;font-size:11px;font-weight:bold;color:#475569;border-top:2px solid #CBD5E1">${liste.length} ${etiket.toLowerCase()}</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${liste.reduce((t, x) => t + x.arac, 0)} araç</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${ton(toplamKg)}</td><td style="border-top:2px solid #CBD5E1"></td></tr>`;
+    const kalanToplam = yuvarla(liste.reduce((t, x) => t + x.kalanKg, 0));
+    const top = `<tr><td colspan="2" style="padding:8px;font-size:11px;font-weight:bold;color:#475569;border-top:2px solid #CBD5E1">${liste.length} ${etiket.toLowerCase()}</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${liste.reduce((t, x) => t + x.arac, 0)} araç</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap">${ton(toplamKg)}</td><td style="padding:8px;font-size:11px;font-weight:bold;text-align:right;border-top:2px solid #CBD5E1;white-space:nowrap;color:#B45309">${kalanToplam > 0 ? ton(kalanToplam) : ""}</td><td style="border-top:2px solid #CBD5E1"></td></tr>`;
     return `<div style="margin:0 0 10px;border:1px solid #E2E8F0;border-left:4px solid ${MARKA_TURUNCU};border-radius:4px;padding:8px 10px 4px">
       <div style="font-size:10px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:#64748B;margin-bottom:4px">${etiket} bazında toplam</div>
-      ${tablo(`${th(etiket)}${th(sip)}${th("Araç", true)}${th("Toplam", true)}${th("İrsaliyeler", true)}`, satirlar + top)}
+      ${tablo(`${th(etiket)}${th(`${sip} · kalan`)}${th("Araç", true)}${th(G === "Dün" ? "Dün" : "Bugün", true)}${th("Kalan", true)}${th("İrsaliyeler", true)}`, satirlar + top)}
     </div>`;
   };
   const gOzet = ozetTablo("alis", gelenTedarikciOzeti(r), o.gelenKg);

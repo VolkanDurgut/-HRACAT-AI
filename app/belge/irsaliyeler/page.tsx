@@ -15,7 +15,8 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import AppShell from "@/components/app-shell";
-import { IrsaliyeEvreni, trGun, type Belge } from "@/components/irsaliye-evreni";
+import { IrsaliyeEvreni, trGun, type Belge, type SiparisKalani } from "@/components/irsaliye-evreni";
+import { kalanMetni } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { IC_BELGE_BUCKET } from "@/lib/ic-piyasa/is-emri";
@@ -80,6 +81,42 @@ async function belgeleriOku(companyId: string, tur: "alis" | "satis", gun: strin
     .sort((a, b) => a.zaman.localeCompare(b.zaman));
 }
 
+/**
+ * Gunun belgelerindeki siparislerin kalani (13.11.2026, kullanici: "Kalan tonajlar da gozukmeli"). Hesap gunluk raporla ayni:
+ * alis = siparis miktari - tum teslimler; satis = kalanMetni(hedef, tum araclar + devir). Kapali siparis "Kapandi".
+ */
+async function kalanlariOku(companyId: string, tur: "alis" | "satis", nolar: string[]): Promise<SiparisKalani[]> {
+  if (!nolar.length) return [];
+  const yuv = (x: number) => Math.round(x * 100) / 100;
+  if (tur === "alis") {
+    const { data, error } = await supabase.from("ic_alis_siparisleri")
+      .select("alis_no, miktar_kg, durum, ic_alis_teslimler(net_kg)").eq("company_id", companyId).in("alis_no", nolar);
+    if (error) throw new Error(error.message);
+    return ((data || []) as unknown as { alis_no: string; miktar_kg: number | string; durum: string; ic_alis_teslimler: { net_kg: number | string }[] | null }[]).map((a) => {
+      const hedef = Number(a.miktar_kg) || 0;
+      const alinan = yuv((a.ic_alis_teslimler || []).reduce((t, x) => t + (Number(x.net_kg) || 0), 0));
+      const k = yuv(hedef - alinan);
+      const durum = a.durum !== "acik" ? "kapandi" as const : k > 0 ? "kalan" as const : k < 0 ? "fazla" as const : "tamam" as const;
+      const metin = durum === "kapandi" ? "Kapandı" : k > 0 ? `Kalan ${(k / 1000).toLocaleString("tr-TR", { maximumFractionDigits: 3 })} ton` : k < 0 ? `Fazla ${(-k / 1000).toLocaleString("tr-TR", { maximumFractionDigits: 3 })} ton` : "Tamam";
+      return { siparis: a.alis_no, hedefKg: hedef, hedefArac: null, gerceklesenKg: alinan, arac: (a.ic_alis_teslimler || []).length, metin, durum, kalanKg: durum === "kalan" ? k : 0 };
+    });
+  }
+  const { data, error } = await supabase.from("ic_is_emirleri")
+    .select("is_emri_no, hedef_tur, hedef_kg, hedef_arac, devir_kg, durum, ic_sevkler(net_kg)").eq("company_id", companyId).in("is_emri_no", nolar);
+  if (error) throw new Error(error.message);
+  return ((data || []) as unknown as { is_emri_no: string; hedef_tur: "kg" | "arac"; hedef_kg: number | string | null; hedef_arac: number | null; devir_kg: number | string | null; durum: string; ic_sevkler: { net_kg: number | string }[] | null }[]).map((e) => {
+    const ss = e.ic_sevkler || [];
+    const kg = yuv(ss.reduce((t, x) => t + (Number(x.net_kg) || 0), 0) + (Number(e.devir_kg) || 0));
+    const hedef = e.hedef_tur === "kg" ? Number(e.hedef_kg) || 0 : Number(e.hedef_arac) || 0;
+    const km = kalanMetni(e.hedef_tur, hedef, kg, ss.length);
+    const acik = e.durum === "acik";
+    return {
+      siparis: e.is_emri_no, hedefKg: e.hedef_tur === "kg" ? hedef : null, hedefArac: e.hedef_tur === "arac" ? hedef : null, gerceklesenKg: kg, arac: ss.length,
+      metin: acik ? km.metin : "Kapandı", durum: acik ? km.durum : "kapandi" as const, kalanKg: acik && e.hedef_tur === "kg" ? Math.max(0, yuv(hedef - kg)) : 0,
+    };
+  });
+}
+
 function EvrenIcerik() {
   const params = useSearchParams();
   const { companyId, loading: authLoading } = useAuth();
@@ -93,6 +130,7 @@ function EvrenIcerik() {
   const [belgeler, setBelgeler] = useState<Belge[] | null>(null);
   const [adresler, setAdresler] = useState<Record<string, string>>({});
   const [baslangic, setBaslangic] = useState(0);
+  const [kalanlar, setKalanlar] = useState<SiparisKalani[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
 
   useEffect(() => { girisSonrasiTemizle(); }, []);
@@ -103,10 +141,14 @@ function EvrenIcerik() {
     let iptal = false;
     (async () => {
       try {
-        setHata(null); setBelgeler(null); setAdresler({});
+        setHata(null); setBelgeler(null); setAdresler({}); setKalanlar(null);
         const liste = await belgeleriOku(companyId, tur, gun, k);
         if (iptal) return;
         setBelgeler(liste);
+        // Kalanlar ayri okunur: okunamazsa belgeler yine gorunur
+        kalanlariOku(companyId, tur, Array.from(new Set(liste.map((b) => b.siparisNo).filter((x): x is string => !!x))))
+          .then((x) => { if (!iptal) setKalanlar(x); })
+          .catch(() => { if (!iptal) setKalanlar([]); });
         const i = odak ? liste.findIndex((b) => b.id === odak) : -1;
         setBaslangic(i >= 0 ? i : Math.max(0, liste.findIndex((b) => !!b.yol)));
         const yollar = liste.map((b) => b.yol).filter((y): y is string => !!y);
@@ -124,7 +166,7 @@ function EvrenIcerik() {
     return () => { iptal = true; };
   }, [authLoading, companyId, tur, gun, k, odak]);
 
-  return <IrsaliyeEvreni tur={tur} gun={gun} tekTaraf={!!k} belgeler={belgeler} adresler={adresler} hata={hata} baslangic={baslangic} />;
+  return <IrsaliyeEvreni tur={tur} gun={gun} tekTaraf={!!k} belgeler={belgeler} adresler={adresler} hata={hata} baslangic={baslangic} kalanlar={kalanlar} />;
 }
 
 export default function IrsaliyeEvreniSayfasi() {

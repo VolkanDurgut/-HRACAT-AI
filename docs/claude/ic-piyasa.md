@@ -745,3 +745,8 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   havada (geçişte 3B gelir, süzülür, üzerine gelince durur; arkada sıradaki belgeler kart yığını), sağda bilgiler; ← → ,
   büyük okuma, yeni sekme, indir. Kayıtlar RLS + company_id; belgeler 15 dk imzalı adres. Seçili belge adreste `odak`.
   Eski tek belge sayfası `/belge/irsaliye?s= / ?a=` eski mailler için durur.
+- **Kalan (13.11.2026, "Kalan tonajlar da gözükmeli"):** özet tablolarda her siparişin yanında kalanı ("Kalan X ton" /
+  "Fazla" / "Tamam" / kapalıysa "Kapandı") ve "Kalan" toplam sütunu; hesap Açık Satış / Açık Alış ile aynı
+  (alış: miktar − tüm teslimler; satış: `kalanMetni`, devir dahil; toplam yalnız pozitif kg kalanlar). Evrende üstte
+  "Kalan" kutucuğu, sağ panelde sipariş başına ilerleme çubuğu + kalan (seçili belgenin siparişi şeftali çerçeveli);
+  kalan okunamazsa belgeler yine görünür.

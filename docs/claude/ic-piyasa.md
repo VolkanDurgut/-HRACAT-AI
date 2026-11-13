@@ -756,3 +756,9 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   gerçekleşen, % çubuğu, kalan) + tablolarda TOPLAM satırı; Kapananlarda TOPLAM + "Eksik kapanan". Araç hedefli
   satış kalanı tonaja çevrilmez, "+ n araç" yazılır. Tek hesap: `alisKalanDurumu`, `acikSatis.kalan` (kalanMetni).
   `gruplu` kapalıyken HTML önceki sürümle bayt bayt aynı (kontrol edildi).
+- **SADE RAPOR (13.11.2026 akşam; yukarıdaki iki maddenin yerini alır):** kullanıcı: "Satış ve alış olarak ikiye
+  ayıracaksın ... Müşteri ismi - kalan, Araç, Bugün, Kalan, İrsaliyeler ... Rapor ip gibi olmalı. Aynı başlıktaki alt
+  alta gözükmeli." `gruplu` artık `icRaporSadeHtml`: yalnız iki bölüm (Satış / Alış), her biri TEK tablo; müşteri /
+  tedarikçi başlık satırı (araç, bugün ton, kalan toplamı, "İrsaliyeleri İncele (n)") ve altında siparişleri
+  (↳ no · ürün, araç, ton, kalan / Kapandı). Günün aracı olan + açık olan bütün siparişler listelenir. Ayrıntı
+  tabloları, kutular, kapananlar sade raporda YOK. Eski görünüm (zamanlanmış rapor) 13.11 öncesi haliyle aynı.

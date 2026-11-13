@@ -39,7 +39,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 const CANLI = (Deno.env.get("VGM_RAPOR_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICI = adresler("VGM_RAPOR_ALICI", ["operation@unex.com.tr"]);
 const CC = adresler("VGM_RAPOR_CC", ["bbt@unex.com.tr", "execution@unex.com.tr", "export@unex.com.tr", "export2@unex.com.tr"]).filter((a) => !ALICI.includes(a));
-const TEST_ALICISI = adresler("VGM_RAPOR_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICISI = adresler("VGM_RAPOR_TEST_ALICISI", []);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { khMail, KH_TEST_ALICISI, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type KhVeri } from "../_shared/konsimento-hatirlatma.ts";
+import { khMail, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type KhVeri } from "../_shared/konsimento-hatirlatma.ts";
 
 // ============================================================================
 // KONSIMENTO TALIMATI HATIRLATMASI (konsimento-hatirlatma) - 27.10.2026
@@ -15,7 +15,7 @@ import { khMail, KH_TEST_ALICISI, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type Kh
 //   KONSIMENTO_HATIRLATMA_CC (varsayilan bbt@, execution@, export@, export2@ - 10.11.2026).
 //  - "ayar"  : (10.11.2026) salt okunur; mod + alici + CC doner (secret degeri / dosya verisi YOK). Canli dogrulama icin.
 // MOD: KONSIMENTO_HATIRLATMA_CANLI = "evet" degilse mail SADECE test adresine
-//   (KONSIMENTO_HATIRLATMA_TEST_ALICISI, varsayilan mesensei282@) "[TEST]" konuyla gider.
+//   (KONSIMENTO_HATIRLATMA_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -32,7 +32,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 const CANLI = (Deno.env.get("KONSIMENTO_HATIRLATMA_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICI = adresler("KONSIMENTO_HATIRLATMA_ALICI", [KH_VARSAYILAN_ALICI]);
 const CC = adresler("KONSIMENTO_HATIRLATMA_CC", KH_VARSAYILAN_CC).filter((a) => !ALICI.includes(a));
-const TEST_ALICISI = adresler("KONSIMENTO_HATIRLATMA_TEST_ALICISI", [KH_TEST_ALICISI]);
+const TEST_ALICISI = adresler("KONSIMENTO_HATIRLATMA_TEST_ALICISI", []);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

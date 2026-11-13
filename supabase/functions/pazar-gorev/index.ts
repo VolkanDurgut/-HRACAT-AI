@@ -15,7 +15,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // KISIYE OZEL (10.11.2026, migration 20261110070000): ekip tablosu pazar_ekip (kod, e-posta, hitap; isimler repoda
 // degil, veritabaninda). Her kisiye AYRI gorev listesi + AYRI mail ("Gunaydin <hitap>"); alici o kisinin adresi,
 // CC: PAZAR_GOREV_CC (varsayilan bbt@, execution@). Ekip bossa eski davranis: tek liste export@'a.
-// Test: PAZAR_GOREV_TEST_ALICISI (varsayilan mesensei282@); her kisi icin ayri [TEST] maili.
+// Test: PAZAR_GOREV_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ); her kisi icin ayri [TEST] maili.
 // GELEN CEVAP (3.5, migration 20261110080000): {"islem": "gelen", "mesajlar": [...]} + baslik x-pazar-anahtar =
 // secret PAZAR_GELEN_ANAHTAR (arsiv Gmail'deki Apps Script: docs/apps-script/pazar-gelen.gs). Secret yoksa kapali.
 // Eslestirme / siniflama / surec etkisi veritabaninda: pazar_gelen_kaydet.
@@ -43,7 +43,7 @@ const CANLI = (Deno.env.get("PAZAR_GOREV_CANLI") || "").trim().toLowerCase() ===
 const CC = adresler("PAZAR_GOREV_CC", ["bbt@unex.com.tr", "execution@unex.com.tr"]);
 type Kisi = { kod: string | null; eposta: string; hitap: string | null };
 const VARSAYILAN_KISI: Kisi = { kod: null, eposta: "export@unex.com.tr", hitap: null };
-const TEST_ALICISI = adresler("PAZAR_GOREV_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICISI = adresler("PAZAR_GOREV_TEST_ALICISI", []);
 const GELEN_ANAHTAR = (Deno.env.get("PAZAR_GELEN_ANAHTAR") || "").trim();
 
 /** Sabit sureli karsilastirma (anahtar tahmini zamanlamadan sizmasin). */

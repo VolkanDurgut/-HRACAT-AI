@@ -9,8 +9,8 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // Siparisi olan her musteriye Ingilizce siparis durumu (_shared/musteri-durum.ts). Kullanici: "Ilk once sensei test olarak
 // ilerleyecegiz." Bu surumde YALNIZ yetkili kullanici (admin / super admin, kendi sirketi) cagirabilir:
 //   {"deneme": true, "musteri"?: "..."} -> mail GITMEZ; musteri listesi + secilen (yoksa ilk) musterinin konu + HTML'i
-//   {"test": true, "musteri"?: "..."}   -> "[TEST]" mail YALNIZ test adresine (MUSTERI_DURUM_TEST_ALICISI, varsayilan
-//                                          mesensei282@gmail.com); her cagri tek musteri, tek mail.
+//   {"test": true, "musteri"?: "..."}   -> "[TEST]" mail YALNIZ test adresine (MUSTERI_DURUM_TEST_ALICISI;
+//                                          secret, kodda varsayilan yok - 13.11.2026); her cagri tek musteri, tek mail.
 // Zamanlanmis / canli gonderim YOK: musterilerin e-posta adresleri sistemde tanimlanip kullanici onayladiktan sonra acilir.
 // CC (canlida) Ayarlar > Rapor Alicilari (rapor = 'musteri_durum'); yanit adresi = CC listesi (ihracat ekibi).
 // ============================================================================
@@ -25,7 +25,7 @@ const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TEST_ALICISI = (() => {
   const l = (Deno.env.get("MUSTERI_DURUM_TEST_ALICISI") || "").split(",").map((a) => a.trim().toLowerCase()).filter((a) => EPOSTA_RE.test(a));
-  return l.length ? l.slice(0, 3) : ["mesensei282@gmail.com"];
+  return l.slice(0, 3);
 })();
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);

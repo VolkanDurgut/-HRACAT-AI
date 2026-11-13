@@ -16,7 +16,7 @@ import { navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTab
 //   Rapor "son rapordan beri gelen teklifler"i ayrica listeler (her raporda en son alinan rakamlar).
 // ALICI: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'navlun'); satir yoksa secret'lar (NAVLUN_TABLOSU_CANLI =
 //   "evet" + NAVLUN_TABLOSU_ALICI). Canli degilse YALNIZ test adresine "[TEST]" (NAVLUN_TABLOSU_TEST_ALICISI,
-//   varsayilan mesensei282@gmail.com). Musteriye GITMEZ.
+//   secret; kodda varsayilan yok - 13.11.2026). Musteriye GITMEZ.
 // MAIL (12.11.2026): "Satin Alinan Navlunlar" (yukleme planindaki booking'li yuklemeler, musteri + odenecek navlun; kaynak dosya /
 //   plan / anlasma maili) + "Rezervasyon Bekleyen Musteriler" + "Navlun Evreni" dugmesi (/navlun).
 //   Ek: "UNEX NAVLUN SATIN ALMA LISTESI · <tarih>.xlsx" (operasyonun navlun tablosu sayfadaki "Excel indir"de).
@@ -46,7 +46,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 }
 const CANLI = (Deno.env.get("NAVLUN_TABLOSU_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICILAR = adresler("NAVLUN_TABLOSU_ALICI", []);
-const TEST_ALICISI = adresler("NAVLUN_TABLOSU_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICISI = adresler("NAVLUN_TABLOSU_TEST_ALICISI", []);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 

@@ -8,7 +8,8 @@ const UNEX_LOGO_URL = "https://ihracatasistanim.com/images/logo.png";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GERI_BILDIRIM_ALICI = Deno.env.get("GERI_BILDIRIM_ALICI") || "volkandurgut.tr@gmail.com";
+// 13.11.2026: koddaki kisisel varsayilan kaldirildi (repo herkese acik); secret tanimli degilse mail GITMEZ, hata doner.
+const GERI_BILDIRIM_ALICI = (Deno.env.get("GERI_BILDIRIM_ALICI") || "").trim();
 
 type GeriBildirimTuru = "sorun" | "oneri" | "sikayet";
 
@@ -183,6 +184,9 @@ async function mailGonder(params: {
 }): Promise<void> {
   if (!RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY ortam değişkeni ayarlanmamış. Lütfen API anahtarını yapılandırın.");
+  }
+  if (!GERI_BILDIRIM_ALICI) {
+    throw new Error("GERI_BILDIRIM_ALICI ortam değişkeni ayarlanmamış (geri bildirim alıcısı).");
   }
   const tarih = new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
   const html = buildEmailHtml({ ...params, tarih });

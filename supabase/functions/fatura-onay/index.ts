@@ -8,7 +8,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // Kullanici: "Butun konteynerler yuklendiginde fatura talimati onaya gonderilmeli (operation, execution, export,
 // export2, bbt). Onay veya revize butonlari olmali. Onaylanirsa onaylanmis fatura talimati dagitim listesine gitmeli."
 // ALICILAR: Ayarlar > Rapor Alicilari: 'fatura_onay' (onaylayanlar) ve 'fatura_dagitim'. Liste canli DEGILSE ilgili
-//   mail YALNIZ test adresine (FATURA_ONAY_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
+//   mail YALNIZ test adresine (FATURA_ONAY_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
 // CAGRILAR:
 //  - Anon / pg_cron 'fatura-onay-tara' ({}): fatura_onay_adaylari() -> ayni modda (test / canli) hic onay kaydi
 //    olmayan dosyalar icin kayit + onay maili. Calisma basina en fazla 5 dosya. Yanitta veri yok.
@@ -28,7 +28,7 @@ const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TEST_ALICISI = (() => {
   const l = (Deno.env.get("FATURA_ONAY_TEST_ALICISI") || "").split(",").map((a) => a.trim().toLowerCase()).filter((a) => EPOSTA_RE.test(a));
-  return l.length ? l.slice(0, 3) : ["mesensei282@gmail.com"];
+  return l.slice(0, 3);
 })();
 const TARAMA_SINIRI = 5;
 const PDF_AZAMI = 6 * 1024 * 1024;

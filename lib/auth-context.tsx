@@ -45,7 +45,7 @@ export type KullaniciYetkileri = {
 // listesiyle yapılır. Değiştirmek isterseniz sadece bu listeyi güncelleyin.
 // ----------------------------------------------------------------------------
 const SUPER_ADMIN_EMAILS = [
-  // Volkan Durgut: giris e-postasi 27.10.2026'da volkandurgut.tr@gmail.com ->
+  // Volkan Durgut: giris e-postasi 27.10.2026'da eski kişisel adres ->
   // execution@unex.com.tr oldu (migration 20261027200000_hesap_eposta_degisimi).
   "execution@unex.com.tr",
   // Burak Tuncay: giris e-postasi 14.10.2026'da buraktuncay@ -> bbt@ oldu

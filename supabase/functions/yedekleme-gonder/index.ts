@@ -77,14 +77,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 // Kisisel adres: TEST maili HER ZAMAN buraya gider (sirket adreslerine test dusmez).
-const KISISEL_ALICI = Deno.env.get("GERI_BILDIRIM_ALICI") || "volkandurgut.tr@gmail.com";
+// 13.11.2026: koddaki kisisel varsayilan kaldirildi; secret yoksa bos (test maili gonderilemez, hata).
+const KISISEL_ALICI = (Deno.env.get("GERI_BILDIRIM_ALICI") || "").trim();
 // Gece yedeginin alicilari (26.10.2026): secret YEDEK_ALICILARI (virgulle). Yoksa / gecerli
 // adres yoksa KISISEL_ALICI. GERI_BILDIRIM_ALICI'yi degistirmek Sorun Bildir maillerini de
 // tasirdi; o yuzden ayri secret.
 const EPOSTA_DESENI = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const YEDEK_ALICILARI = (() => {
   const liste = (Deno.env.get("YEDEK_ALICILARI") || "").split(",").map((a) => a.trim()).filter((a) => EPOSTA_DESENI.test(a));
-  return liste.length ? [...new Set(liste)] : [KISISEL_ALICI];
+  return liste.length ? [...new Set(liste)] : KISISEL_ALICI ? [KISISEL_ALICI] : [];
 })();
 
 // Tum satirlariyla yedeklenen tablolar.

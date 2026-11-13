@@ -16,7 +16,7 @@
   (kategori / birim CHECK listeleri `_shared/satin-alma.ts` ile BİREBİR; karar kalem bazında).
   Tablolar istemciye SADECE OKUNUR (`satin_alma` yetkisi + aynı şirket); yazmalar fonksiyonla.
   Denetim tetikleyicisi 3 tabloda. Başlangıç: ekteki formdaki 5 departman + süper adminlere
-  (volkandurgut.tr@, bbt@) `satin_alma` yetkisi.
+  (eski kişisel adres, bbt@) `satin_alma` yetkisi.
 - Girişsiz sayfa `/talep/[token]` (açık tema, `GenelSayfaCerceve satisSatiri={false}`, noindex):
   ad soyad (localStorage `sa-talep-ad`), kalem ekle / sil (sadece açık taslaktan), "Listeyi
   gönder" (onay kutusu), son 10 gönderilen liste + kalem kararları ve red nedenleri.
@@ -58,7 +58,7 @@
 - Gece yedeği: 3 tablo `YEDEKLENECEK_TABLOLAR` + mail.ts "Satın alma" grubu + geri yükleme
   betiği `TABLO_SIRASI`.
 - CANLI DURUM (27.10.2026 09:50 TR): migration `satin_alma` UYGULANDI (3 tablo, 16 fonksiyon,
-  5 departman, `satin_alma` yetkisi bbt@ + volkandurgut.tr@; RLS açık; token RPC'leri
+  5 departman, `satin_alma` yetkisi bbt@ + eski kişisel adres; RLS açık; token RPC'leri
   anon/authenticated'a KAPALI doğrulandı). Edge function `satin-alma` v1 (canlı duman testi:
   geçersiz token 404, gerçek departman 200, oturumsuz karar 403). `yedekleme-gonder` v19:
   deneme 34 tablo, geri yükleme 32/32, uyarı yok. İlk deneme (26.10) onay penceresi
@@ -70,7 +70,7 @@
 - 27.10.2026 GÜNCELLEME (migration `20261027100000_satin_alma_test_sil.sql`):
   - TEST DEPARTMANI: `satin_alma_departmanlari.test` (varsayılan false). Test departmanının
     talep + sonuç + tekrar gönderim mailleri SADECE `SATIN_ALMA_TEST_ALICISI` (varsayılan
-    mesensei282@gmail.com) adresine gider, konu "[TEST] " ile başlar, mailde sarı test şeridi.
+    test adresi) adresine gider, konu "[TEST] " ile başlar, mailde sarı test şeridi.
     `sa_liste_json` ve `sa_token_bilgi` `test` döner; edge function yanıtlarında `test`.
     Uygulamada Departmanlar tablosunda "E-posta: Gerçek / Test" anahtarı, listelerde TEST
     rozeti; talep formu ve fişte "TEST MODU" şeridi. Kullanıcıya önerilen test yolu: ayrı bir
@@ -131,7 +131,7 @@
   (`sa_token_kalem_ekle`, `sa_token_liste_gonder`, `sa_cek_token_isaretle` sunucuda da
   zorunlu tutar). Uygulama içi işaretleme (e-posta ile) değişmedi. Edge function değişmedi.
 - DİKKAT: `sa_yetki_kontrol` = `satin_alma` sayfa yetkisi → bu yetkisi olan HERKES karar
-  verebilir (27.10 canlı: bbt@, volkandurgut.tr@, operation@, ihracat@).
+  verebilir (27.10 canlı: bbt@, eski kişisel adres, operation@, ihracat@).
 - CANLI (27.10.2026): migration `satin_alma_ad_soyad` uygulandı (3 token fonksiyonu yalnız
   service_role; doğrulama: "Ayşe Yılmaz" geçerli, "Ayşe" geçersiz). Test verisi (SA-2026-0001
   + Laboratuvar taslağı, hepsi "Volkan Durgut") silinmesi için kullanıcıya korumalı SQL

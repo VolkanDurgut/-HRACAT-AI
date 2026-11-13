@@ -31,7 +31,7 @@ import { gonderimMaili, haftalikHatirlatmaMaili, sonucMaili, type HaftalikHatirl
 // Alicilar secret ile degistirilebilir (virgulle):
 //   SATIN_ALMA_ALICILARI       (varsayilan execution@ + bbt@)
 //   SATIN_ALMA_SONUC_ALICILARI (varsayilan execution@)
-//   SATIN_ALMA_TEST_ALICISI    (varsayilan mesensei282@gmail.com)
+//   SATIN_ALMA_TEST_ALICISI    (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)
 // TEST DEPARTMANI (27.10.2026): departmanin "test" bayragi aciksa o departmanin
 // talep ve sonuc mailleri SADECE test alicisina gider, konu "[TEST] " ile baslar.
 // Mail gonderilemezse liste YINE kaydedilir; durum "hata" olarak isaretlenir,
@@ -51,7 +51,7 @@ function alicilar(ad: string, varsayilan: string[]): string[] {
 }
 const GONDERIM_ALICILARI = alicilar("SATIN_ALMA_ALICILARI", ["execution@unex.com.tr", "bbt@unex.com.tr"]);
 const SONUC_ALICILARI = alicilar("SATIN_ALMA_SONUC_ALICILARI", ["execution@unex.com.tr"]);
-const TEST_ALICILARI = alicilar("SATIN_ALMA_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICILARI = alicilar("SATIN_ALMA_TEST_ALICISI", []);
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

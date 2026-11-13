@@ -36,7 +36,7 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
  * "cek_isaretle" (sa_cek_token_isaretle) uzerinden: teslim alanin ADI kaydedilir.
  * 27.10.2026: /cek/[token] "Onayli satin alma fisi" belgesi; "Onayli fisler" sekmesinden
  * fis acilir / baglantisi kopyalanip ilgili departmana iletilir. Departman "Test" bayragi:
- * o departmanin mailleri SADECE test adresine (mesensei282@) gider. Departman silinebilir
+ * o departmanin mailleri SADECE test adresine (test adresi) gider. Departman silinebilir
  * (sa_departman_sil: listeleri + kalemleriyle birlikte, kalici).
  * Tablolar istemciye SADECE okunur; yazmalar RPC / edge function ile.
  * 28.10.2026 karar ekrani notlari (urunEslesme: ayni / benzer ad): kalem baska bir
@@ -101,7 +101,8 @@ const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderi
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
 const girdiStil = { borderColor: CARD_BORDER, backgroundColor: CARD_BG } as React.CSSProperties;
-const TEST_ALICISI = "mesensei282@gmail.com";
+// 13.11.2026: adres repoda yazmaz (herkese acik); gercek adres sunucuda SATIN_ALMA_TEST_ALICISI secret'inda.
+const TEST_ALICISI = "test";
 /** Hizli red nedenleri (tek tik; istenirse elle yazilir). */
 const RED_NEDENLERI = ["Stokta var", "Bütçe dışı", "Gerekli değil", "Ertelendi"];
 

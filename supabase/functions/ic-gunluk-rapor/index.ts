@@ -41,7 +41,7 @@ const SUPER_ADMIN_EPOSTALARI = ["execution@unex.com.tr", "bbt@unex.com.tr"];
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 // 13.11.2026 TEST ADRESINE ({"test_adresine": true}): "[TEST]" rapor YALNIZ bu adrese (sirket alicilarina DEGIL); yeni gorunumu
 // (tedarikci / musteri ozeti + Irsaliye Evreni) onaydan once gostermek icin. Anon da cagirabilir (adres sabit, 3 / 24 saat).
-const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "mesensei282@gmail.com").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)).slice(0, 2);
+const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)).slice(0, 2);
 // Yeni (sade) gorunum zamanlanmis raporda: 13.11.2026 19:01 kullanici onayi ("Ic piyasa raporu onaylidir") -> ACIK.
 const GRUPLU_CANLI = true;
 

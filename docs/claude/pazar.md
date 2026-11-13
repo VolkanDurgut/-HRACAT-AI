@@ -191,7 +191,7 @@ atlamada seçenek olarak gösterilmeli." + "Pazar sayfası çok dağınık; tuta
 
 ## 3.7 Satış Rehberi + duyuru maili (10.11.2026)
 
-Kullanıcı: "Konu ile ilgili bilgilendirici mail iletmeli miyiz? İlk etapta mesensei282'ye test. Kullanım kılavuzu gibi
+Kullanıcı: "Konu ile ilgili bilgilendirici mail iletmeli miyiz? İlk etapta test adresi'ye test. Kullanım kılavuzu gibi
 düşün; aynı UNEX kullanım kılavuzundaki gibi görüntülü animasyonlu bir sunum."
 - Kılavuz sunumu ortak bileşene çıkarıldı: `components/kilavuz/sunum.tsx` → `KilavuzSunum` (konular, noktalar, başlık,
   konum anahtarı, çıkış, kapak/son metinleri prop). `/kilavuz` davranışı DEĞİŞMEDİ (e2e_kilavuz_vgm 44).
@@ -201,7 +201,7 @@ düşün; aynı UNEX kullanım kılavuzundaki gibi görüntülü animasyonlu bir
 - Edge `pazar-gorev` v6: `{"islem":"duyuru","test":true}` → ekipteki her kişi için tanıtım maili YALNIZ test adresine;
   gerçek gönderim `{"islem":"duyuru"}` + `x-pazar-anahtar` zorunlu, kişi başına bir kez (`atanan = duyuru-<kod>`).
   Mail: başlangıç günü, 4 adım, "Sistem sizin için takip eder", "Rehberi izle (3 dakika)" → `/gorev/rehber`.
-- Test: `e2e_rehber.mjs` 22. 10.11 duyuru testi: 2 mail, yalnız mesensei282.
+- Test: `e2e_rehber.mjs` 22. 10.11 duyuru testi: 2 mail, yalnız test adresi.
 
 ## 3.8 Müşteri Özeti raporu — KALDIRILDI (11.11.2026 akşam)
 

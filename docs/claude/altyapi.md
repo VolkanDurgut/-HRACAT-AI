@@ -285,12 +285,12 @@
   `lib/kullanici-hitap.ts` (`HITAPLAR`, e-posta → "Ad Bey/Hanım"; e-posta `toLowerCase`, TR
   locale DEĞİL) ya da ileride `user_metadata.hitap`. Listede yoksa İSİMSİZ "Mesajınız alındı."
   (yanlış isim / Bey-Hanım tahmini yapılmaz). Kayıtlı: bbt@ Burak, ihracat@ Harun, lojistik@
-  Süleyman, volkandurgut.tr@ Volkan. kantar@, mudur@, muhasebe@ isimsiz (kullanıcıdan bekleniyor).
+  Süleyman, eski kişisel adres Volkan. kantar@, mudur@, muhasebe@ isimsiz (kullanıcıdan bekleniyor).
   Yeni kullanıcı eklenince listeye bir satır eklenir. Test scratchpad `destek/test.py` 16/16.
 
 ## Giriş e-postaları değişti (27.10.2026) — GÜNCEL HESAPLAR
 
-- `volkandurgut.tr@gmail.com` → `execution@unex.com.tr` (Volkan Durgut, id 6536cef7…,
+- `eski kişisel adres` → `execution@unex.com.tr` (Volkan Durgut, id 6536cef7…,
   admin + SÜPER ADMİN) ve `ihracat@unex.com.tr` → `export@unex.com.tr` (Harun Bey,
   id 2cb21809…, rol ihracat, `proforma_imza`). Aynı kullanıcı / şifre / rol / yetkiler.
   Migration `20261027200000_hesap_eposta_degisimi.sql` (tek transaction): auth.users +
@@ -304,7 +304,7 @@
   execution@ admin. Bir sonraki deploy'da yeni liste gider.
 - Hitap (`lib/kullanici-hitap.ts`): execution@ "Volkan Bey", export@ "Harun Bey".
 - DEĞİŞMEDİ: geri bildirim / yedek kişisel alıcı varsayılanı (`GERI_BILDIRIM_ALICI`
-  yoksa volkandurgut.tr@gmail.com) — bu bir mail ALICISI, giriş hesabı değil.
+  yoksa eski kişisel adres) — bu bir mail ALICISI, giriş hesabı değil.
 - `mudur@unex.com.tr` silinecek ("artık müdür yok"): iş kaydı yok (yalnız rol + yetki satırı).
   MCP ile DELETE yapılmaz; kullanıcıya korumalı SQL verildi (iş kaydı varsa durur).
 

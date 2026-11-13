@@ -12,7 +12,7 @@ import { diibGunlukRaporHesapla, diibGunlukRaporHtml, diibGunlukRaporKonusu } fr
 // Veri: diib_belgeleri, diib_ihracatlari, ihracat_dosyalari, diib_dosya_bolunmeleri, konteynerler,
 // rezervasyonlar (service_role, yalniz okuma). Musteriye GITMEZ.
 // ALICILAR (secret): DIIB_RAPOR_CANLI = "evet" DEGILSE mail SADECE test adresine
-//   (DIIB_RAPOR_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
+//   (DIIB_RAPOR_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
 //   Canlida: DIIB_RAPOR_ALICI (virgulle, en fazla 6).
 // CAGRI YETKISI (ic-gunluk-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 16:55-18:00 TR penceresinde; sirket + gun icin bir kez (diib_rapor_gonderimleri
@@ -38,7 +38,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 }
 const CANLI = (Deno.env.get("DIIB_RAPOR_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICILAR = adresler("DIIB_RAPOR_ALICI", []);
-const TEST_ALICISI = adresler("DIIB_RAPOR_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICISI = adresler("DIIB_RAPOR_TEST_ALICISI", []);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 const trDakika = (ms: number) => { const tr = new Date(ms + 3 * 3600_000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };

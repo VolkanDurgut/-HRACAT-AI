@@ -173,7 +173,7 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
   sohbette gösterilmez). İlk canlı test 26.10.2026 03:15 TR: 200, 1385 kayıt, 31/31.
 - ALICILAR (26.10.2026, v17): gece yedeği secret `YEDEK_ALICILARI` (virgülle; geçersiz adres
   atlanır, tekrar edilen tek sayılır) adreslerine gider; secret yoksa `GERI_BILDIRIM_ALICI`.
-  TEST maili HER ZAMAN `GERI_BILDIRIM_ALICI`'ya (mesensei282) gider, şirkete test düşmez;
+  TEST maili HER ZAMAN `GERI_BILDIRIM_ALICI`'ya (test adresi) gider, şirkete test düşmez;
   test notunda "Gece yedeğinin alıcıları: …" yazar. `GERI_BILDIRIM_ALICI` DEĞİŞTİRİLMEZ
   (Sorun Bildir mailleri de onu kullanır). Kullanıcı onayıyla (26.10.2026 03:34)
   `YEDEK_ALICILARI` = bbt@unex.com.tr, execution@unex.com.tr panelden girildi; ilk gece
@@ -212,7 +212,7 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
   metin listesi ve "her gün 08:00/17:00 gönderilir" alt notu kullanıcı
   isteğiyle KALDIRILDI — geri eklenmez.
 - Alıcı 07.10.2026: kullanıcının Google Workspace maili askıda olduğu için
-  `GERI_BILDIRIM_ALICI` secret'i mesensei282@gmail.com yapıldı (yedek + rapor +
+  `GERI_BILDIRIM_ALICI` secret'i test adresi yapıldı (yedek + rapor +
   geri bildirim aynı adrese). Mail açılınca secret geri değiştirilir.
 - Revize 2 (07.10.2026): başlık "Güncel İhracat Raporu" (eski: Günlük
   Sevkiyat ve Kantar Raporu; mail konusu da), mailde logo
@@ -266,7 +266,7 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
   bbt@, execution@, operation@, export@ unex.com.tr (kullanıcı panelden girer;
   değer MCP'den geçmez). Gece yedeği hâlâ `GERI_BILDIRIM_ALICI`.
   Rapor artık yedek adresine DÜŞMEZ: secret yoksa mail gitmez, hata döner
-  (mesensei282 kullanıcı isteğiyle rapordan çıkarıldı). Gönderen adı
+  (test adresi kullanıcı isteğiyle rapordan çıkarıldı). Gönderen adı
   "{şirket} İhracat AI" ("Unex Gıda İhracat AI"; eskiden "İhracat AI").
 - Booking no MAİLDE YOK (12.10.2026, kullanıcı kararı): acente maillerinde booking ile
   arama yapılınca günde 3 rapor maili sonuçları gömüyordu. Mailde "Dosya" sütunu sadece
@@ -352,7 +352,7 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
   `DIIB_RAPOR_ALICI` (virgülle, en fazla 6), `DIIB_RAPOR_TEST_ALICISI`.
   CANLI (06.11.2026 10:50 TR, kullanıcı onayı): alıcılar bbt@ + execution@ (unex.com.tr), secret'lar
   kullanıcı tarafından girildi; doğrulama: anon `{"test":true}` → 403 "yalnızca yetkili" (= CANLI açık).
-  İlk deneme sırasında CANLI henüz "evet" değildi, mesensei282@'e 1 adet [TEST] maili gitti.
+  İlk deneme sırasında CANLI henüz "evet" değildi, test adresi'e 1 adet [TEST] maili gitti.
 - Çağrı yetkisi ic-gunluk-rapor ile aynı ilke: anon yalnız 16:55-18:00 TR penceresinde;
   anon `{"test":true}` yalnız test modunda, 24 saatte en fazla 3. Admin: `{"deneme":true}`
   (mail yok, HTML döner) / `{"test":true}`.

@@ -434,7 +434,7 @@
   UYGULANDI 17.10.2026): `ihracat_musterileri` (kod ^[A-Z]{2,6}$ tekil, unvan
   tekil), `ihracat_urunleri` (ad MARKA HARİÇ), `proforma_ayarlari` (NULL =
   varsayılan). RLS: şirket + `ic_sayfa_yetkisi('proformalar')`. Yetki:
-  `proformalar` (sayfa; bbt@, ihracat@, volkandurgut.tr@) + `proforma_imza`
+  `proformalar` (sayfa; bbt@, ihracat@, eski kişisel adres) + `proforma_imza`
   (işlem; SADECE ihracat@ — Harun Bey). Yedekleme v13'te yeni tablolar var
   (deneme: 29 tablo, geri yükleme testi 27/27); geri yükleme betiğine eklendi.
 - Sabit metinler `lib/proforma/sabitler.ts` (taslaktan AYNEN, sadece kesin yazım
@@ -639,7 +639,7 @@
   (`/dosya/<id>?tab=evraklar`). FİYAT YOK. Booking no gövdede (operasyon maili; günlük rapor
   kuralı burada geçerli değil), konuda yok.
 - MOD: secret `KONSIMENTO_HATIRLATMA_CANLI=evet` DEĞİLSE mail SADECE
-  `KONSIMENTO_HATIRLATMA_TEST_ALICISI` (varsayılan mesensei282@gmail.com) adresine, "[TEST]"
+  `KONSIMENTO_HATIRLATMA_TEST_ALICISI` (varsayılan test adresi) adresine, "[TEST]"
   konulu ve sarı şeritte canlı alıcılar yazılı gider. Alıcılar secret ile değişir:
   `KONSIMENTO_HATIRLATMA_ALICI`, `KONSIMENTO_HATIRLATMA_CC` (varsayılanlar
   `_shared/konsimento-hatirlatma-sabitler.ts`).
@@ -658,7 +658,7 @@
   RPC'leri anon/authenticated'a KAPALI, `kh_elle_iste` sadece authenticated doğrulandı).
   Edge `konsimento-hatirlatma` v1 (duman: `isle` 200 `{gonderilen:0}`, anonla `elle` 403).
   pg_cron jobid 6 `konsimento-hatirlatma` `*/2` (anahtar `gunluk-yedek-maili` işinden).
-  MOD: TEST (secret `KONSIMENTO_HATIRLATMA_CANLI` girilmedi) → mailler mesensei282@.
+  MOD: TEST (secret `KONSIMENTO_HATIRLATMA_CANLI` girilmedi) → mailler test adresi.
   05.11.2026 CANLI: kullanıcı onayıyla secret girildi (alıcı operation@, CC execution@ / bbt@ / export@ —
   varsayılanlar; ayrı ALICI/CC secret'ı yok).
 
@@ -1160,7 +1160,7 @@
 - Hatırlatma maili (`_shared/konsimento-hatirlatma.ts`): standart/Akkon'da konu "Konşimento talimatı
   hazır", "Talimatı Gör" + "Dosyayı aç", consignee/notify eksikse uyarı; MSC'de konu "Hatırlatma:
   konşimento talimatı (MSC web)", yalnız "Dosyayı uygulamada aç". Mod değişmedi: CANLI değilse yalnız
-  test adresi (mesensei282@). Mail şablonu override'ı (elle form seçimi) görmez, acenteye bakar.
+  test adresi (test adresi). Mail şablonu override'ı (elle form seçimi) görmez, acenteye bakar.
 - Testler: unit `/home/claude/test/kons/{model,donus,kh,kontrol_gercek}.mts`, e2e `e2e_kons.mjs`
   (mock `FATURA_TEST=1 KONS_TEST=1`) 20/20.
 
@@ -1215,7 +1215,7 @@ gönderimini sağlayalım." Canlı alıcılar (kullanıcı 10.11.2026): **To: op
   benzersiz index; `hata` 3 denemeye kadar tekrar). Mail: PDF eki + "VGM İndir" (depodaki PDF'in 30 günlük imzalı adresi,
   giriş gerekmez) + "Dosyayı aç". Konu: `VGM Raporu · <dosya no> · <alıcı> · Rezervasyon <booking>`; rezervasyon no Acente kutusunda ve
   Sevkiyat Bilgileri tablosunda da var (kullanıcı 10.11.2026; bu mailde booking no İSTENİYOR). Tema: Günlük İhracat Raporu ile aynı.
-- `{"test": true, "dosya_id"}`: "[TEST]" yalnız test adresine (`VGM_RAPOR_TEST_ALICISI`, varsayılan mesensei282@), 24 saatte 5;
+- `{"test": true, "dosya_id"}`: "[TEST]" yalnız test adresine (`VGM_RAPOR_TEST_ALICISI`, varsayılan test adresi), 24 saatte 5;
   gönderilmiş saymaz. `{"onceden_isaretle": true}` (service_role): canlıya geçerken şu an tamam olan açık dosyalar `onceden`
   (geriye dönük mail gitmez).
 - **Anında gönderim** (kullanıcı 10.11.2026: "en geç 10 dakika değil, hemen; konteyner sayısı kadar DBA yüklendiğinde"):

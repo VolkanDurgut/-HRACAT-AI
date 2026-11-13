@@ -101,7 +101,7 @@
   UYGULANDI (bu yüzden `supabase_migrations` geçmişinde görünmez). İki tablo + RLS (6
   politika) + 2 tetikleyici yerinde; yetkiler sadece authenticated (tablolarda
   SELECT/INSERT/UPDATE/DELETE, formlarda SELECT/INSERT; TRUNCATE yok, anon yok).
-  `ic_piyasa` yetkisi buraktuncay@ ve volkandurgut.tr@ için açık. Canlı test: boş
+  `ic_piyasa` yetkisi buraktuncay@ ve eski kişisel adres için açık. Canlı test: boş
   form reddedildi, sayaç harcanmadı (ilk gerçek form FBF-2026-0001 olur).
 - Sıradaki (plan): WhatsApp otomatik gönderim (Meta Cloud API + mevcut numara için
   Coexistence/BSP) ayrı faz; müşteriye sistemden mail ASKIDA kuralı burada da geçerli.
@@ -584,12 +584,12 @@
 ## İç Piyasa — Kapanış raporu, kalan/eksik/fazla takibi, Kantar sadeleştirme (30.10.2026)
 
 - Kullanıcı (lojistikle görüşme sonrası): "Kantar panelinde iç piyasa kısmında kalan tonaj gözükecek;
-  sipariş tamamlandığında otomatik mail (test mesensei282@gmail.com, canlıda execution@, bbt@,
+  sipariş tamamlandığında otomatik mail (test test adresi, canlıda execution@, bbt@,
   lojistik@); eksik / az kapanma takibi, kalan veya fazla giden; müşteriler şifreli gözükmesin; Kantar
   paneli çok karışık, her şey çok büyük, tek ekranda yönetilebilir olmalı."
 - Migration `20261030180000_ic_kapanis_raporu_kantar.sql` (KOD PUSH'UNDAN ÖNCE — Bildirimler ayar
   sorgusu `kapanis_eposta` okur): `ic_piyasa_ayarlari.kapanis_eposta` (virgülle ≤5, CHECK; Unex =
-  mesensei282@gmail.com), `ic_bildirimler.alici` + 'ekip', `ic_bildirim_is_emri` (gövde AYNEN +
+  test adresi), `ic_bildirimler.alici` + 'ekip', `ic_bildirim_is_emri` (gövde AYNEN +
   'tamamlandi'ya HER geçişte `siparis_kapanis` e-postası: hedef = ilk adres, CC = diğerleri; satır
   CC'si `ic_bildirim_eposta_al`'ın else dalıyla korunur; ayar boşsa rapor yok; iptalde yok),
   `kantar_ic_is_emirleri` / `kantar_ic_son_sevkler` `musteri_maskeli` kolonu artık GERÇEK ad (kısa ad,
@@ -663,7 +663,7 @@
   Anon: yalnız 18:55–19:59 penceresi, şirket+gün tek (`ic_gunluk_rapor_gonderimleri`, kısmi benzersiz
   `where not test`); `{"test":true}` (anon veya yetkili) ayarlı alıcılara "[TEST]" gönderir, 24 saatte ≤3, 19:00'u
   ENGELLEMEZ; `{"deneme":true}` yalnız yetkili (HTML döner). Alıcılar `ic_piyasa_ayarlari.gunluk_rapor_eposta`
-  (Bildirimler › Ayarlar "Günlük iç piyasa raporu"; Unex başlangıç mesensei282@gmail.com).
+  (Bildirimler › Ayarlar "Günlük iç piyasa raporu"; Unex başlangıç test adresi).
 - KAPANIŞ E-POSTASI KAPATILDI (kullanıcı: "fazlalık maili kötü, kaldırabiliriz"): `kapanis_eposta` = null
   (tetikleyici ayar boşsa üretmez; Ayarlar'daki alan günlük rapor alanıyla değiştirildi). Kod/şablon duruyor.
 - Gece yedeği: `ic_is_emri_devirleri` eklendi (mail.ts adı). `ic_gunluk_rapor_gonderimleri` iz kaydı, yedekte yok.
@@ -739,7 +739,7 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   ton, payı gösteren çubuk, "İrsaliyeleri İncele (n)"), "Yüklenenler"in başında aynısı **müşteri bazında**. Satırdaki
   "İrsaliye İncele" de evreni o belge seçili açar. Edge `ic-gunluk-rapor` artık `tedarikci_id` / `musteri_id` okur.
 - Onaya kadar zamanlanmış rapor ESKİ görünümde (`GRUPLU_CANLI = false`); yeni görünüm yalnız `{"test_adresine": true}` ile
-  (anon da çağırabilir; "[TEST]" YALNIZ `IC_RAPOR_TEST_ALICISI`, varsayılan mesensei282; isteğe bağlı `tarih`, `oturum`; 3 / 24 saat).
+  (anon da çağırabilir; "[TEST]" YALNIZ `IC_RAPOR_TEST_ALICISI`, varsayılan test adresi; isteğe bağlı `tarih`, `oturum`; 3 / 24 saat).
 - Ekran `/belge/irsaliyeler?tur=alis|satis&gun=YYYY-MM-DD[&k=<tedarikçi / müşteri id>][&odak=<teslim / sevk id>]`
   (`app/belge/irsaliyeler/page.tsx` veri, `components/irsaliye-evreni.tsx` görünüm): solda araçlar, ortada seçili irsaliye
   havada (geçişte 3B gelir, süzülür, üzerine gelince durur; arkada sıradaki belgeler kart yığını), sağda bilgiler; ← → ,

@@ -15,7 +15,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // dosya (_shared/siparis-xlsx.ts). Musteriye GITMEZ.
 // ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar
 //   (SIPARIS_RAPOR_CANLI = "evet" + SIPARIS_RAPOR_ALICI). Canli DEGILSE mail SADECE test adresine
-//   (SIPARIS_RAPOR_TEST_ALICISI, varsayilan mesensei282@gmail.com) "[TEST]" konuyla gider.
+//   (SIPARIS_RAPOR_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
 // MAIL (11.11.2026 2. revize): "Bugun gelen on odemeler" (sabah: dun + bugun) tablosu; tum satirlar ekteki Excel'de.
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
@@ -40,7 +40,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 }
 const CANLI = (Deno.env.get("SIPARIS_RAPOR_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICILAR = adresler("SIPARIS_RAPOR_ALICI", []);
-const TEST_ALICISI = adresler("SIPARIS_RAPOR_TEST_ALICISI", ["mesensei282@gmail.com"]);
+const TEST_ALICISI = adresler("SIPARIS_RAPOR_TEST_ALICISI", []);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 

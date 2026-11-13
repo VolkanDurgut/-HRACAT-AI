@@ -92,12 +92,15 @@ SQL Editor'de (YENİ projenin adresi ve **anon** anahtarıyla):
 select cron.schedule('gunluk-yedek-maili', '0 0 * * *', $cmd$
   select net.http_post(
     url := 'https://<YENI_REF>.supabase.co/functions/v1/yedekleme-gonder',
-    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>'),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer <YENI_ANON_KEY>',
+      'x-cron-anahtar', (select decrypted_secret from vault.decrypted_secrets where name = 'yedek_cron_anahtari' limit 1)),
     body := '{}'::jsonb,
     timeout_milliseconds := 60000
   );
 $cmd$);
 ```
+`x-cron-anahtar` (13.11.2026): yedekleme-gonder bu başlık olmadan 401 döner. Anahtar migration
+`20261113200000_yedek_cron_anahtari.sql` ile Vault'ta rastgele oluşur (değeri repoda yok); elle bir şey girilmez.
 
 Günlük sevkiyat raporu (09:00 dünün raporu, 12:00 ve 17:00 bugünün raporu; UTC 06:00 / 09:00 / 14:00):
 ```sql
@@ -168,7 +171,7 @@ Deploys → "Trigger deploy".
 - Bir dosyanın rezervasyon/konteyner/evrak sekmeleri dolu mu?
 - Yeni bir deneme dosyası aç → numarası beklenen sıradan mı? Sonra sil.
 - Edge function: yedekleme-gonder deneme modu (mail atmaz):
-  `select net.http_post(url:='https://<YENI_REF>.supabase.co/functions/v1/yedekleme-gonder', headers:=jsonb_build_object('Content-Type','application/json','Authorization','Bearer <YENI_ANON_KEY>'), body:='{"deneme": true}'::jsonb, timeout_milliseconds:=60000);`
+  `select net.http_post(url:='https://<YENI_REF>.supabase.co/functions/v1/yedekleme-gonder', headers:=jsonb_build_object('Content-Type','application/json','Authorization','Bearer <YENI_ANON_KEY>','x-cron-anahtar',(select decrypted_secret from vault.decrypted_secrets where name='yedek_cron_anahtari' limit 1)), body:='{"deneme": true}'::jsonb, timeout_milliseconds:=60000);`
   → `select content from net._http_response order by id desc limit 1;`
   içinde `"birebir":19,"tablo_sayisi":19` görülmeli.
 

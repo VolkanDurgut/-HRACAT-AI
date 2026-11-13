@@ -5,6 +5,9 @@
 -- yaziliyordu ve fonksiyonun gercek cevabi kayboluyordu (bir gece gercekten
 -- hata olursa veritabanindan gorulemezdi). Sadece bekleme suresi 60 sn yapildi;
 -- url, baslik ve govde AYNI. Anahtar anon anahtaridir (zaten herkese acik).
+-- 13.11.2026: anahtar bu dosyada <ANON_ANAHTARI> ile gizlendi (repo herkese acik; kural: JWT repoya yazilmaz). Canli
+-- is 20261113200000_yedek_cron_anahtari.sql ile mevcut isten okunarak yeniden kuruldu. Yeni projede bu blok calismaz
+-- (is yoktur); is docs/felaket-kurtarma.md adim 6 ile kurulur.
 --
 -- Geri yukleme provasi (05.10.2026): yeni / bos bir projede bu is henuz yoktur;
 -- o durumda alter_job(NULL) kurulumu durdurmasin diye sadece IS VARSA
@@ -20,7 +23,7 @@ perform cron.alter_job(
     url := 'https://tnzbihsfbhqzkcliicdk.supabase.co/functions/v1/yedekleme-gonder',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuemJpaHNmYmhxemtjbGlpY2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5OTAwNzYsImV4cCI6MjA5NjU2NjA3Nn0.Oh6jrOS86zUpEu0FiPrmF7tXslgXj3w047e1Ld92KIA'
+      'Authorization', 'Bearer <ANON_ANAHTARI>'
     ),
     body := '{}'::jsonb,
     timeout_milliseconds := 60000

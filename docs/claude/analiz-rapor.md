@@ -125,6 +125,11 @@
 
 ## Günlük yedek (`supabase/functions/yedekleme-gonder`)
 
+**Çağrı anahtarı (13.11.2026, güvenlik incelemesi):** her çağrı `x-cron-anahtar` başlığı ister (Vault
+`yedek_cron_anahtari`, migration `20261113200000`; doğrulama `public.yedek_cron_anahtari_dogrula`, yalnız service_role).
+Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme": true}` sınırsızdı). Elle deneme / test: SQL'den
+`'x-cron-anahtar', (select decrypted_secret from vault.decrypted_secrets where name='yedek_cron_anahtari' limit 1)`.
+
 - pg_cron `gunluk-yedek-maili` her gece 00:00 UTC (03:00 TR) fonksiyonu anon
   anahtarla çağırır; fonksiyon veritabanı JSON yedeğini Resend ile
   `GERI_BILDIRIM_ALICI` adresine mail eki olarak gönderir.

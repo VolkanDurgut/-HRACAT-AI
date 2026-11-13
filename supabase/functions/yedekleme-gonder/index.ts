@@ -62,6 +62,13 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //    e-posta, tarihler; SIFRE YOK) - yeni projede ayni kimlikle yeniden
 //    olusturmak icin (docs/felaket-kurtarma.md).
 //
+//  - CAGRI ANAHTARI (13.11.2026, guvenlik incelemesi): anon anahtar herkese acik oldugu icin {"deneme": true} sinirsiz
+//    cagrilip butun tablolar + storage envanteri + geri yukleme testi tekrar tekrar calistirilabiliyordu. Artik HER cagri
+//    "x-cron-anahtar" basligi ister: deger Vault'ta (yedek_cron_anahtari, migration 20261113200000), pg_cron gonderir,
+//    edge public.yedek_cron_anahtari_dogrula() ile dogrular. Gecersiz / yoksa HICBIR SEY okumadan 401. Elle deneme /
+//    test SQL'den ayni basligi Vault'tan okuyarak yapilir (docs/felaket-kurtarma.md). Dogrulama fonksiyonu
+//    calismazsa (or. migration yok): deneme / test REDDEDILIR, gece yedegi 20 saat kilidiyle DEVAM eder (yedek oncelikli).
+//
 // depositors ve contact_messages tablolari BASKA bir projeye ait - bilerek
 // yedege dahil edilmez (bkz. CLAUDE.md).
 // ============================================================================
@@ -460,6 +467,27 @@ function mbYaz(bayt: number): string {
   return `${(bayt / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+/** x-cron-anahtar dogrulamasi: true / false; null = dogrulanamadi (fonksiyon yok / ag hatasi). Anahtar loglanmaz. */
+async function cronAnahtariGecerli(anahtar: string): Promise<boolean | null> {
+  if (!anahtar) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/yedek_cron_anahtari_dogrula`, {
+      method: "POST",
+      headers: { ...servisBasliklari, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_anahtar: anahtar }),
+    });
+    if (!res.ok) {
+      console.error("yedek_cron_anahtari_dogrula:", res.status);
+      await res.body?.cancel();
+      return null;
+    }
+    return (await res.json()) === true;
+  } catch (e) {
+    console.error("yedek_cron_anahtari_dogrula:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 function jsonCevap(veri: unknown, status = 200): Response {
   return new Response(JSON.stringify(veri), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -473,6 +501,16 @@ Deno.serve(async (req: Request) => {
     testMaili = !deneme && govde?.test_maili === true;
   } catch {
     // Govde yok / JSON degil -> normal (gercek) calisma
+  }
+
+  // Cagri anahtari (13.11.2026): veri OKUNMADAN once
+  const anahtarDurumu = await cronAnahtariGecerli((req.headers.get("x-cron-anahtar") || "").trim());
+  if (anahtarDurumu !== true) {
+    const geceYedegi = !deneme && !testMaili;
+    if (!(anahtarDurumu === null && geceYedegi && req.headers.get("x-cron-anahtar"))) {
+      return jsonCevap({ basarili: false, error: "Yetkisiz çağrı." }, 401);
+    }
+    console.error("yedekleme-gonder: anahtar dogrulanamadi; gece yedegi 20 saat kilidiyle devam ediyor");
   }
 
   try {

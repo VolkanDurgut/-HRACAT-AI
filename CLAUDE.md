@@ -48,6 +48,14 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
 - Teslim: her parça bitince HEMEN commit + bundle (02.11.2026: çalışma ortamı sıfırlanınca
   commit'lenmemiş iş kayboldu).
 
+## Testler ve CI (13.11.2026)
+- `npm test` = `tests/*.test.ts` (Node `node:test` + `tsx`; `@/` yolu çalışır). Saf modüller: cut-off saatleri,
+  DİİB hesabı, `sayi-oku`, `liman-anahtari`, evrak hazırlığı. Yaşanarak öğrenilen her ders (saat dilimi kayması,
+  "252,45", eksik konteynerli yüklenen...) testte durur: davranışı bilerek değiştiren aynı committe testi günceller.
+- Commit öncesi: `npm run typecheck && npm run lint && npm test`. GitHub Actions `Kod Kontrolu` aynısını her push'ta
+  çalıştırır (`.github/workflows/kontrol.yml`). Netlify build lint'i atlar (`ignoreDuringBuilds`); lint CI'da zorunlu.
+- Yeni saf modül / yeni hesap kuralı → yanına test. Test verisi uydurmadır (gerçek müşteri / numara yazılmaz).
+
 ## Kapalı kararlar — GERİ EKLENMEZ (ayrıntı ve tarih ilgili dosyada)
 
 - Kök: giriş sayfasındaki pazarlama bölümü.

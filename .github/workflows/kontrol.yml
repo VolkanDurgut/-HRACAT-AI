@@ -1,0 +1,27 @@
+name: Kod Kontrolu
+
+# 13.11.2026: tip kontrolu + lint + saf modul testleri (cut-off, DIIB, sayi-oku, liman-anahtari, evrak hazirligi).
+# Netlify build'i lint'i atlar (next.config.js ignoreDuringBuilds); lint burada zorunlu.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Tip kontrolu
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Testler
+        run: npm test

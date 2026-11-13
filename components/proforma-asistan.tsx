@@ -278,7 +278,6 @@ function metin(v: unknown): string | null {
 }
 
 /** Dosya acilmadan once: proformadan okunanlarin ozeti (salt gosterim). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ProformaOkumaOzeti({ veri, toplamMts, uyari }: { veri: any; toplamMts: number; uyari: string | null }) {
   const kalemSayisi = Array.isArray(veri?.urun_detaylari) ? veri.urun_detaylari.length : 0;
   const yukleme = metin(veri?.yuklenme_limani) || metin(veri?.yukleme_limani);

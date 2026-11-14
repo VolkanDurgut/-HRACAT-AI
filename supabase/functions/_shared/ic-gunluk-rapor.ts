@@ -206,15 +206,19 @@ export type IcRaporSecenek = { gruplu?: boolean };
  * Arac / Bugun = o gunun araclari ve tonaji; Kalan = siparisin kalani (Acik Satis / Alis ile ayni hesap).
  * Gunun araci olan + acik olan butun siparisler listelenir (kalan eksiksiz gorunsun); araci olmayan "-".
  */
-type SadeSiparis = { no: string; urun: string; arac: number; kg: number; belge: number; kalan: KalanDurumu; kalanKg: number; kalanArac: number };
-type SadeGrup = { k: string | null; ad: string; siparisler: SadeSiparis[]; arac: number; kg: number; belge: number; kalanKg: number; kalanArac: number };
+// 14.11.2026 (kullanici: "HEDEF - KALAN GIBI GOZUKMELI"): her sipariste Hedef ve Toplam (yuklenen / alinan) da gorunur; Hedef - Toplam = Kalan.
+// toplamKg null = bilinmiyor (kapanmis / acik listesinde olmayan siparis).
+type SadeSiparis = { no: string; urun: string; arac: number; kg: number; belge: number; kalan: KalanDurumu; kalanKg: number; kalanArac: number; hedefKg: number; hedefArac: number; toplamKg: number | null };
+type SadeGrup = { k: string | null; ad: string; siparisler: SadeSiparis[]; arac: number; kg: number; belge: number; kalanKg: number; kalanArac: number; hedefKg: number; hedefArac: number; toplamKg: number | null };
 
 function sadeGrupla(liste: { k: string | null; ad: string; s: SadeSiparis }[]): SadeGrup[] {
   const m = new Map<string, SadeGrup>();
   for (const { k, ad, s } of liste) {
     const key = k || `ad:${ad}`;
-    const g = m.get(key) || { k, ad, siparisler: [], arac: 0, kg: 0, belge: 0, kalanKg: 0, kalanArac: 0 };
+    const g: SadeGrup = m.get(key) || { k, ad, siparisler: [], arac: 0, kg: 0, belge: 0, kalanKg: 0, kalanArac: 0, hedefKg: 0, hedefArac: 0, toplamKg: 0 };
     g.siparisler.push(s);
+    g.hedefKg = yuvarla(g.hedefKg + s.hedefKg); g.hedefArac += s.hedefArac;
+    g.toplamKg = g.toplamKg === null || s.toplamKg === null ? null : yuvarla(g.toplamKg + s.toplamKg);
     g.arac += s.arac; g.kg = yuvarla(g.kg + s.kg); g.belge += s.belge;
     g.kalanKg = yuvarla(g.kalanKg + s.kalanKg); g.kalanArac += s.kalanArac;
     m.set(key, g);
@@ -238,6 +242,7 @@ export function sadeSatisGruplari(r: IcGunlukRapor): SadeGrup[] {
         kalan: a ? { metin: a.kalan.metin, durum: a.kalan.durum } : KAPANDI,
         kalanKg: a && kgHedef ? Math.max(0, yuvarla(n(e.hedef_kg) - a.yuklenenKg)) : 0,
         kalanArac: a && !kgHedef ? Math.max(0, n(e.hedef_arac) - a.arac) : 0,
+        hedefKg: kgHedef ? n(e.hedef_kg) : 0, hedefArac: kgHedef ? 0 : n(e.hedef_arac), toplamKg: a ? a.yuklenenKg : null,
       },
     };
     sip.set(e.id, x);
@@ -263,6 +268,7 @@ export function sadeAlisGruplari(r: IcGunlukRapor): SadeGrup[] {
       a, s: {
         no: a.alis_no, urun: `${a.urun}${a.depo ? ` · ${a.depo}` : ""}`, arac: 0, kg: 0, belge: 0,
         kalan: x ? alisKalanDurumu(x.kalanKg) : KAPANDI, kalanKg: x ? Math.max(0, x.kalanKg) : 0, kalanArac: 0,
+        hedefKg: n(a.miktar_kg), hedefArac: 0, toplamKg: x ? x.alinanKg : null,
       },
     };
     sip.set(a.id, y);
@@ -291,20 +297,25 @@ function icRaporSadeHtml(r: IcGunlukRapor, sirketAdi: string, olusturmaIso: stri
     const kg = yuvarla(gruplar.reduce((t, x) => t + x.kg, 0));
     const kKg = yuvarla(gruplar.reduce((t, x) => t + x.kalanKg, 0));
     const kAr = gruplar.reduce((t, x) => t + x.kalanArac, 0);
+    const hKg = yuvarla(gruplar.reduce((t, x) => t + x.hedefKg, 0));
+    const hAr = gruplar.reduce((t, x) => t + x.hedefArac, 0);
+    const tKg = gruplar.some((x) => x.toplamKg === null) ? null : yuvarla(gruplar.reduce((t, x) => t + (x.toplamKg || 0), 0));
+    const hedefYazi = (kg: number, ar: number) => kalanYazi(kg, ar) || "-";
+    const toplamYazi = (kg: number | null) => (kg === null ? "-" : ton(kg));
     const satirlar = gruplar.map((x, gi) => {
       const ust = gi ? "border-top:2px solid #CBD5E1;" : "";
       const dugme = x.belge
         ? evrenDugmesi(irsaliyeEvreniYolu(tur, r.tarih, x.k), `İrsaliyeleri İncele (${x.belge})`)
         : `<span style="font-size:11px;color:#94A3B8">-</span>`;
       const kalanTop = kalanYazi(x.kalanKg, x.kalanArac);
-      const baslik = `<tr style="background:#F1F3FA">${hucre(`<b style="color:${LACIVERT};font-size:13px">${esc(x.ad)}</b>`, ust)}${hucre(x.arac ? `<b>${x.arac}</b>` : "-", `${ust}text-align:right;white-space:nowrap`)}${hucre(x.kg ? `<b style="color:${renk}">${ton(x.kg)}</b>` : "-", `${ust}text-align:right;white-space:nowrap`)}${hucre(kalanTop ? `<b style="color:#B45309">${kalanTop}</b>` : `<span style="color:#047857;font-weight:bold">Kapandı</span>`, `${ust}text-align:right;white-space:nowrap`)}${hucre(dugme, `${ust}text-align:right;white-space:nowrap`)}</tr>`;
-      const alt = x.siparisler.map((s) => `<tr>${hucre(`<span style="color:#94A3B8">&#8627;</span> <span style="color:#334155">${esc(s.no)}</span> <span style="color:#94A3B8;font-size:11px">· ${esc(s.urun)}</span>`, "padding-left:18px;border-top:1px solid #EEF0F4")}${hucre(s.arac ? String(s.arac) : `<span style="color:#CBD5E1">-</span>`, "text-align:right;color:#475569;border-top:1px solid #EEF0F4")}${hucre(s.kg ? ton(s.kg) : `<span style="color:#CBD5E1">-</span>`, "text-align:right;white-space:nowrap;color:#475569;border-top:1px solid #EEF0F4")}${hucre(`<span style="color:${RENK[s.kalan.durum]};font-weight:bold;font-size:11px">${esc(s.kalan.metin)}</span>`, "text-align:right;white-space:nowrap;border-top:1px solid #EEF0F4")}${hucre("", "border-top:1px solid #EEF0F4")}</tr>`).join("");
+      const baslik = `<tr style="background:#F1F3FA">${hucre(`<b style="color:${LACIVERT};font-size:13px">${esc(x.ad)}</b>`, ust)}${hucre(`<b>${hedefYazi(x.hedefKg, x.hedefArac)}</b>`, `${ust}text-align:right;white-space:nowrap`)}${hucre(x.arac ? `<b>${x.arac}</b>` : "-", `${ust}text-align:right;white-space:nowrap`)}${hucre(x.kg ? `<b style="color:${renk}">${ton(x.kg)}</b>` : "-", `${ust}text-align:right;white-space:nowrap`)}${hucre(`<b>${toplamYazi(x.toplamKg)}</b>`, `${ust}text-align:right;white-space:nowrap`)}${hucre(kalanTop ? `<b style="color:#B45309">${kalanTop}</b>` : `<span style="color:#047857;font-weight:bold">Kapandı</span>`, `${ust}text-align:right;white-space:nowrap`)}${hucre(dugme, `${ust}text-align:right;white-space:nowrap`)}</tr>`;
+      const alt = x.siparisler.map((s) => `<tr>${hucre(`<span style="color:#94A3B8">&#8627;</span> <span style="color:#334155">${esc(s.no)}</span> <span style="color:#94A3B8;font-size:11px">· ${esc(s.urun)}</span>`, "padding-left:18px;border-top:1px solid #EEF0F4")}${hucre(hedefYazi(s.hedefKg, s.hedefArac), "text-align:right;white-space:nowrap;color:#475569;border-top:1px solid #EEF0F4")}${hucre(s.arac ? String(s.arac) : `<span style="color:#CBD5E1">-</span>`, "text-align:right;color:#475569;border-top:1px solid #EEF0F4")}${hucre(s.kg ? ton(s.kg) : `<span style="color:#CBD5E1">-</span>`, "text-align:right;white-space:nowrap;color:#475569;border-top:1px solid #EEF0F4")}${hucre(toplamYazi(s.toplamKg), "text-align:right;white-space:nowrap;color:#475569;border-top:1px solid #EEF0F4")}${hucre(`<span style="color:${RENK[s.kalan.durum]};font-weight:bold;font-size:11px">${esc(s.kalan.metin)}</span>`, "text-align:right;white-space:nowrap;border-top:1px solid #EEF0F4")}${hucre("", "border-top:1px solid #EEF0F4")}</tr>`).join("");
       return baslik + alt;
     }).join("");
-    const top = `<tr>${hucre(`<b>TOPLAM — ${gruplar.length} ${etiket.toLowerCase()}</b>`, "border-top:3px solid #283474;font-size:11px;color:#475569")}${hucre(`<b>${arac}</b>`, "border-top:3px solid #283474;text-align:right")}${hucre(`<b style="color:${renk}">${ton(kg)}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre(`<b style="color:#B45309">${kalanYazi(kKg, kAr) || "-"}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre("", "border-top:3px solid #283474")}</tr>`;
-    const govde = gruplar.length ? satirlar + top : `<tr><td colspan="5" style="padding:12px 10px;color:#94A3B8;font-style:italic;font-size:12px">${tur === "satis" ? `${G} yükleme yok, açık satış siparişi yok.` : `${G} teslim alma yok, açık alış siparişi yok.`}</td></tr>`;
+    const top = `<tr>${hucre(`<b>TOPLAM — ${gruplar.length} ${etiket.toLowerCase()}</b>`, "border-top:3px solid #283474;font-size:11px;color:#475569")}${hucre(`<b>${hedefYazi(hKg, hAr)}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre(`<b>${arac}</b>`, "border-top:3px solid #283474;text-align:right")}${hucre(`<b style="color:${renk}">${ton(kg)}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre(`<b>${toplamYazi(tKg)}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre(`<b style="color:#B45309">${kalanYazi(kKg, kAr) || "-"}</b>`, "border-top:3px solid #283474;text-align:right;white-space:nowrap")}${hucre("", "border-top:3px solid #283474")}</tr>`;
+    const govde = gruplar.length ? satirlar + top : `<tr><td colspan="7" style="padding:12px 10px;color:#94A3B8;font-style:italic;font-size:12px">${tur === "satis" ? `${G} yükleme yok, açık satış siparişi yok.` : `${G} teslim alma yok, açık alış siparişi yok.`}</td></tr>`;
     return `<div style="margin:26px 0 8px;font-size:13px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">${tur === "satis" ? "Satış" : "Alış"}<span style="float:right;font-weight:normal;text-transform:none;letter-spacing:0;font-size:12px;color:#64748B">${G.toLowerCase()} ${arac} araç · ${ton(kg)}${kKg > 0 || kAr > 0 ? ` · <b style="color:#B45309">kalan ${kalanYazi(kKg, kAr)}</b>` : ""}</span></div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #E2E8F0"><tr>${th(`${etiket} · sipariş`)}${th("Araç", true)}${th(G, true)}${th("Kalan", true)}${th("İrsaliyeler", true)}</tr>${govde}</table>`;
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #E2E8F0"><tr>${th(`${etiket} · sipariş`)}${th("Hedef", true)}${th("Araç", true)}${th(G, true)}${th(tur === "satis" ? "Yüklenen" : "Alınan", true)}${th("Kalan", true)}${th("İrsaliyeler", true)}</tr>${govde}</table>`;
   };
 
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>İç Piyasa Günlük Rapor</title></head>
@@ -325,7 +336,7 @@ function icRaporSadeHtml(r: IcGunlukRapor, sirketAdi: string, olusturmaIso: stri
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Araç / ${G}: ${G.toLowerCase()} yüklenen (satış) ve teslim alınan (alış) araçlar. Kalan: siparişin kalanı (yüklenen = araçlar + siparişler arası devir).<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${G.toLowerCase()}kü bütün irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Araç / ${G}: ${G.toLowerCase()} yüklenen (satış) ve teslim alınan (alış) araçlar. Hedef: sipariş miktarı · Yüklenen / Alınan: siparişe bugüne kadar giden toplam (araçlar + siparişler arası devir) · Kalan = Hedef − Yüklenen / Alınan.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${G.toLowerCase()}kü bütün irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

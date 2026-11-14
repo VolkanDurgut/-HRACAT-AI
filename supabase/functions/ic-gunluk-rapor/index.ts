@@ -43,7 +43,8 @@ const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 // (tedarikci / musteri ozeti + Irsaliye Evreni) onaydan once gostermek icin. Anon da cagirabilir (adres sabit, 3 / 24 saat).
 const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)).slice(0, 2);
 // Yeni (sade) gorunum zamanlanmis raporda: 13.11.2026 19:01 kullanici onayi ("Ic piyasa raporu onaylidir") -> ACIK.
-const GRUPLU_CANLI = true;
+// 14.11.2026 kullanici: "Eski sisteme geri donelim" -> sade gorunum KAPALI; eski gorunum, gunun araclari siparis basina tek satir.
+const GRUPLU_CANLI = false;
 
 const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
 /** Zamanlanmis oturum penceresindeysek oturum, degilse null (saatten 5 dk once - 60 dk sonra). */
@@ -208,7 +209,7 @@ Deno.serve(async (req: Request) => {
     }
     const deneme = yetkili && govde.deneme === true;
     const test = !deneme && (govde.test === true || testAdresine);
-    const gruplu = testAdresine || GRUPLU_CANLI;
+    const gruplu = GRUPLU_CANLI; // test maili de canli gorunumle ayni
     // Sabah raporu DUNU anlatir
     const tarih = (yetkili || testAdresine) && govde.tarih && /^\d{4}-\d{2}-\d{2}$/.test(govde.tarih) ? govde.tarih : oturum === "sabah" ? gunEkle(trBugun(), -1) : trBugun();
 

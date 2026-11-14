@@ -341,6 +341,40 @@ function icRaporSadeHtml(r: IcGunlukRapor, sirketAdi: string, olusturmaIso: stri
 </td></tr></table></body></html>`;
 }
 
+/**
+ * GUNUN ARACLARI SIPARIS BAZINDA (14.11.2026, kullanici: "Tedarikci alis tek bir satir gozuksun, plaka yerine arac sayisi,
+ * net yerine toplam net ve irsaliyeleri incele. Alis ve satis bu sekilde olmali."). Eski gorunum korunur; yalniz
+ * "Yuklenenler" / "Gelenler" tablolari arac arac degil, siparis (alis / is emri) basina TEK satir.
+ * Siralama: ilk aracin saatine gore. belge = irsaliye dosyasi olan arac sayisi (Irsaliyeleri Incele dugmesi).
+ */
+export type GunSatiri = { anahtar: string; k: string | null; ad: string; no: string; urun: string; arac: number; kg: number; belge: number; ilk: string; son: string; cikti: number; dogrudan: string[] };
+function gunGrupla(liste: { anahtar: string; k: string | null; ad: string; no: string; urun: string; kg: number; belge: boolean; zaman: string; cikti: boolean; dogrudan: string | null }[]): GunSatiri[] {
+  const m = new Map<string, GunSatiri>();
+  for (const x of liste) {
+    const g = m.get(x.anahtar) || { anahtar: x.anahtar, k: x.k, ad: x.ad, no: x.no, urun: x.urun, arac: 0, kg: 0, belge: 0, ilk: x.zaman, son: x.zaman, cikti: 0, dogrudan: [] };
+    g.arac += 1; g.kg = yuvarla(g.kg + x.kg); if (x.belge) g.belge += 1; if (x.cikti) g.cikti += 1;
+    if (x.zaman < g.ilk) g.ilk = x.zaman;
+    if (x.zaman > g.son) g.son = x.zaman;
+    if (x.dogrudan && !g.dogrudan.includes(x.dogrudan)) g.dogrudan.push(x.dogrudan);
+    m.set(x.anahtar, g);
+  }
+  return Array.from(m.values()).sort((a, b) => a.ilk.localeCompare(b.ilk) || a.no.localeCompare(b.no));
+}
+export function yuklenenSiparisSatirlari(r: IcGunlukRapor): GunSatiri[] {
+  return gunGrupla(r.yuklenen.map(({ sevk: s, emir: e }) => ({
+    anahtar: e?.id || `sevk:${s.is_emri_id}`, k: e?.musteri_id ?? null, ad: musteriAdi(e), no: e?.is_emri_no || "-",
+    urun: e ? urunAdi(e.urun, e.ambalaj) : "-", kg: n(s.net_kg), belge: !!s.irsaliye_dosya_yolu,
+    zaman: s.irsaliye_tarihi || s.olusturma, cikti: s.cikis_durumu === "cikti", dogrudan: null,
+  })));
+}
+export function gelenSiparisSatirlari(r: IcGunlukRapor): GunSatiri[] {
+  return gunGrupla(r.gelen.map(({ teslim: t, alis: a, dogrudanIsEmri }) => ({
+    anahtar: a?.id || `alis:${t.alis_id}`, k: a?.tedarikci_id ?? null, ad: a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-",
+    no: a?.alis_no || "-", urun: a ? `${a.urun}${a.depo ? ` · ${a.depo}` : ""}` : "-", kg: n(t.net_kg), belge: !!t.irsaliye_dosya_yolu,
+    zaman: t.teslim_zamani || t.irsaliye_tarihi || t.olusturma, cikti: false, dogrudan: dogrudanIsEmri,
+  })));
+}
+
 export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", olusturmaIso = new Date().toISOString(), oturum: IcRaporOturumu = "aksam", secenek: IcRaporSecenek = {}): string {
   // gruplu (test, onaya kadar): sade rapor. Asagisi ESKI gorunum, degismedi (zamanlanmis rapor).
   if (secenek.gruplu === true) return icRaporSadeHtml(r, sirketAdi, olusturmaIso, oturum);
@@ -365,20 +399,30 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     ${kutu("Açık Alış", `${o.acikAlis} sipariş`, `teslim alınacak ${ton(o.acikAlisKalanKg)}`, "#475569")}
   </tr></table>`;
 
+  // Gunun araclari: siparis basina TEK satir (14.11.2026) - arac sayisi, toplam net, Irsaliyeleri Incele
+  const saatAraligi = (x: GunSatiri) => (saat(x.ilk) === saat(x.son) ? saat(x.ilk) : `${saat(x.ilk)}–${saat(x.son)}`);
+  const dugme = (tur: "satis" | "alis", x: GunSatiri) => (x.belge
+    ? evrenDugmesi(irsaliyeEvreniYolu(tur, r.tarih, x.k), `İrsaliyeleri İncele (${x.belge})`)
+    : `<span style="color:#94A3B8;font-size:11px">İrsaliye yüklenmedi</span>`);
+  const ad = (x: GunSatiri) => `<b>${esc(x.ad)}</b><br><span style="color:#64748B;font-size:11px">${esc(x.no)} · ${esc(x.urun)}</span>`;
+
   // Bugun yuklenenler (satis)
-  const yRows = r.yuklenen.map(({ sevk: s, emir: e }, i) => {
-    const c = s.cikis_durumu ? CIKIS[s.cikis_durumu] : undefined;
-    const durum = c ? `<span style="color:${c[1]};font-weight:bold">${c[0]}</span>${s.cikis_durumu === "cikti" && s.cikis_zamani ? ` <span style="color:#94A3B8">${saat(s.cikis_zamani)}</span>` : ""}` : `<span style="color:#64748B">Çıkış bekliyor</span>`;
-    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(s.irsaliye_tarihi || s.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(musteriAdi(e))}</b><br><span style="color:#64748B;font-size:11px">${esc(e?.is_emri_no || "-")} · ${esc(e ? urunAdi(e.urun, e.ambalaj) : "-")}</span>`)}${td(`<b>${esc(s.plaka)}</b>${s.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(s.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(irsaliyeHucresi(s.irsaliye_no, s.irsaliye_dosya_yolu ? `s=${s.id}` : null))}${td(durum, "font-size:11px;white-space:nowrap")}${td(sayi(n(s.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`;
+  const yGrup = yuklenenSiparisSatirlari(r);
+  const yRows = yGrup.map((x, i) => {
+    const durum = x.cikti === x.arac ? `<span style="color:#047857;font-weight:bold">Yola çıktı</span>`
+      : x.cikti ? `<span style="color:#047857;font-weight:bold">${x.cikti} çıktı</span> <span style="color:#64748B">· ${x.arac - x.cikti} bekliyor</span>`
+      : `<span style="color:#64748B">Çıkış bekliyor</span>`;
+    return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saatAraligi(x), "color:#64748B;white-space:nowrap")}${td(ad(x))}${td(`<b>${x.arac}</b>`, "text-align:right;white-space:nowrap")}${td(dugme("satis", x), "white-space:nowrap")}${td(durum, "font-size:11px;white-space:nowrap")}${td(sayi(x.kg), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`;
   }).join("");
-  const yTablo = tablo(`${th("Saat")}${th("Müşteri · Sipariş")}${th("Plaka")}${th("İrsaliye No")}${th("Durum")}${th("Net (kg)", true)}`,
-    r.yuklenen.length ? yRows + toplam(6, `TOPLAM — ${o.yuklenenArac} araç`, `${sayi(o.yuklenenKg)} kg`) : bos(6, `${G} satış aracı yüklenmedi.`));
+  const yTablo = tablo(`${th("Saat")}${th("Müşteri · Sipariş")}${th("Araç", true)}${th("İrsaliyeler")}${th("Durum")}${th("Toplam Net (kg)", true)}`,
+    yGrup.length ? yRows + toplam(6, `TOPLAM — ${yGrup.length} sipariş · ${o.yuklenenArac} araç`, `${sayi(o.yuklenenKg)} kg`) : bos(6, `${G} satış aracı yüklenmedi.`));
 
   // Bugun gelenler (alis)
-  const gRows = r.gelen.map(({ teslim: t, alis: a, dogrudanIsEmri }, i) =>
-    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saat(t.teslim_zamani || t.irsaliye_tarihi || t.olusturma), "color:#64748B;white-space:nowrap")}${td(`<b>${esc(a ? (a.tedarikci_kisa || "").trim() || a.tedarikci : "-")}</b><br><span style="color:#64748B;font-size:11px">${esc(a?.alis_no || "-")} · ${esc(a?.urun || "-")}${a?.depo ? ` · ${esc(a.depo)}` : ""}</span>${dogrudanIsEmri ? `<br><span style="color:#B45309;font-size:11px;font-weight:bold">Doğrudan müşteriye · ${esc(dogrudanIsEmri)}</span>` : ""}`)}${td(`<b>${esc(t.plaka || "-")}</b>${t.dorse_plaka ? `<br><span style="color:#64748B;font-size:11px">Dorse ${esc(t.dorse_plaka)}</span>` : ""}`, "white-space:nowrap")}${td(irsaliyeHucresi(t.irsaliye_no, t.irsaliye_dosya_yolu ? `a=${t.id}` : null))}${td(sayi(n(t.net_kg)), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`).join("");
-  const gTablo = tablo(`${th("Saat")}${th("Tedarikçi · Alış")}${th("Plaka")}${th("İrsaliye No")}${th("Net (kg)", true)}`,
-    r.gelen.length ? gRows + toplam(5, `TOPLAM — ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, `${G} alış aracı gelmedi.`));
+  const gGrup = gelenSiparisSatirlari(r);
+  const gRows = gGrup.map((x, i) =>
+    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(saatAraligi(x), "color:#64748B;white-space:nowrap")}${td(`${ad(x)}${x.dogrudan.length ? `<br><span style="color:#B45309;font-size:11px;font-weight:bold">Doğrudan müşteriye · ${esc(x.dogrudan.join(", "))}</span>` : ""}`)}${td(`<b>${x.arac}</b>`, "text-align:right;white-space:nowrap")}${td(dugme("alis", x), "white-space:nowrap")}${td(sayi(x.kg), "text-align:right;font-weight:bold;white-space:nowrap")}</tr>`).join("");
+  const gTablo = tablo(`${th("Saat")}${th("Tedarikçi · Alış")}${th("Araç", true)}${th("İrsaliyeler")}${th("Toplam Net (kg)", true)}`,
+    gGrup.length ? gRows + toplam(5, `TOPLAM — ${gGrup.length} alış · ${o.gelenArac} araç`, `${sayi(o.gelenKg)} kg`) : bos(5, `${G} alış aracı gelmedi.`));
 
   // Acik satis siparisleri
   const KALAN_RENK = { kalan: "#B45309", fazla: LACIVERT, tamam: "#047857" } as const;
@@ -440,7 +484,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenen miktar: araçların net toplamı + siparişler arası devir. Gün: satışta irsaliye saati, alışta teslim alma saati (Türkiye).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenenler / Gelenler: her sipariş tek satır · Araç: o siparişe ${g} giden araç sayısı · Toplam Net: araçların net toplamı · Saat: ilk–son araç.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${g}kü irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir). Yüklenen miktar: araçların net toplamı + siparişler arası devir.<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

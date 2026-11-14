@@ -1,11 +1,12 @@
 /**
- * FATURA TALIMATI ONAYI - istemci (11.11.2026). Edge: fatura-onay; tablo: fatura_talimati_onaylari (salt okunur).
- * Kullanici: "Butun konteynerler yuklendiginde fatura talimati onaya gonderilmeli. Onay veya revize butonlari olmali.
- * Onaylanirsa onaylanmis fatura talimati dagitim listesine mail gitmeli."
- *  - Rezervasyondaki konteynerlerin hepsi girilince pg_cron (10 dk) onay grubuna "Incele ve Onayla" maili atar.
- *  - /fatura-onay?id=... sayfasi talimatin PDF'ini dosya sayfasiyla AYNI ureticiyle (lib/fatura-talimati-pdf-builder)
- *    tarayicida olusturur; Onayla -> PDF edge'e gider, dagitim maili PDF ekli gider.
- *  - Dosya sayfasinda (Konteynerler) son durum + "Onaya gonder / Tekrar onaya gonder".
+ * FATURA TALIMATI MAILI - istemci. Edge: fatura-onay; tablo: fatura_talimati_onaylari (salt okunur).
+ * 11.11.2026: onay akisi. 14.11.2026 (kullanici): onay adimi kaldirildi; "Harun Bey merhaba" talimat maili dogrudan
+ * gider (Ayarlar > Rapor Alicilari > Fatura Talimati), mailde "Fatura Talimatini Indir (PDF)" dugmesi.
+ *  - Rezervasyondaki konteynerlerin hepsi girilince pg_cron (10 dk) talimat mailini atar (kayit durumu 'gonderildi').
+ *  - /fatura-onay?id=...&indir=1 sayfasi talimatin PDF'ini dosya sayfasiyla AYNI ureticiyle
+ *    (lib/fatura-talimati-pdf-builder) tarayicida olusturur, onizler ve indirir.
+ *  - Dosya sayfasinda (Konteynerler) son durum + "Simdi gonder / Tekrar gonder".
+ * Eski kayitlarda 'bekliyor' / 'onaylandi' / 'revize' durumlari kalabilir (yalniz gosterim).
  */
 import { supabase, type Dosya, type Konteyner, type Rezervasyon } from "@/lib/supabase";
 import { faturaTalimatiPdfOlustur } from "@/lib/fatura-talimati-pdf-builder";
@@ -13,7 +14,7 @@ import { bayrakPng } from "@/lib/bayraklar";
 import { ticaretYapilanUlke } from "@/lib/ulke-bul";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
-export type FaturaOnayDurumu = "bekliyor" | "onaylandi" | "revize";
+export type FaturaOnayDurumu = "gonderildi" | "bekliyor" | "onaylandi" | "revize";
 export type FaturaOnayKaydi = {
   id: string;
   dosya_id: string;
@@ -32,7 +33,7 @@ export type FaturaOnayKaydi = {
 };
 const ALANLAR = "id,dosya_id,durum,test,kaynak,gonderen,onay_alicilari,gonderilen,karar_veren,karar_zamani,revize_notu,dagitim_konusu,dagitim_alicilari,olusturma";
 
-export const ONAY_DURUM_ADI: Record<FaturaOnayDurumu, string> = { bekliyor: "Onay bekliyor", onaylandi: "Onaylandı", revize: "Revize istendi" };
+export const ONAY_DURUM_ADI: Record<FaturaOnayDurumu, string> = { gonderildi: "Gönderildi", bekliyor: "Onay bekliyor (eski)", onaylandi: "Onaylandı (eski)", revize: "Revize istendi (eski)" };
 
 /** Dosyanin en son onay kaydi (yoksa null). */
 export async function sonFaturaOnayi(dosyaId: string): Promise<FaturaOnayKaydi | null> {
@@ -45,12 +46,6 @@ export async function faturaOnayiGetir(id: string): Promise<FaturaOnayKaydi | nu
   const { data, error } = await supabase.from("fatura_talimati_onaylari").select(ALANLAR).eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   return (data as FaturaOnayKaydi | null) || null;
-}
-
-/** Onaylayabilir mi: onay listesinde ya da onay maili ona gittiyse (test modunda test adresi). */
-export function onaylayabilir(k: Pick<FaturaOnayKaydi, "onay_alicilari" | "gonderilen">, eposta: string | null | undefined): boolean {
-  const e = (eposta || "").toLowerCase();
-  return !!e && [...(k.onay_alicilari || []), ...(k.gonderilen || [])].some((a) => a.toLowerCase() === e);
 }
 
 async function edge(govde: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -67,30 +62,19 @@ async function edge(govde: Record<string, unknown>): Promise<Record<string, unkn
   return veri;
 }
 
-/** Elle onaya gonder (konteynerler tam olmali). */
-export async function onayaGonder(dosyaId: string): Promise<{ test: boolean }> {
+/** Talimat mailini simdi / tekrar gonder (konteynerler tam olmali). */
+export async function talimatMailiGonder(dosyaId: string): Promise<{ test: boolean; alicilar: string[] }> {
   const v = await edge({ gonder: dosyaId });
-  return { test: v.test === true };
-}
-
-export async function revizeIste(id: string, not: string): Promise<{ mailHatasi: string | null }> {
-  const v = await edge({ karar: "revize", id, not });
-  return { mailHatasi: (v.mailHatasi as string | null) || null };
-}
-
-export async function onayla(id: string, pdfBase64: string, pdfAdi: string): Promise<{ test: boolean; konu: string; alicilar: string[] }> {
-  const v = await edge({ karar: "onay", id, pdf: pdfBase64, pdf_adi: pdfAdi });
-  return { test: v.test === true, konu: String(v.konu || ""), alicilar: (v.alicilar as string[]) || [] };
+  return { test: v.test === true, alicilar: Array.isArray(v.alicilar) ? (v.alicilar as string[]) : [] };
 }
 
 export const talimatPdfAdi = (dosyaNo: string | null | undefined) => `Fatura_Talimati_${(dosyaNo || "dosya").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
 
-/** Dosya sayfasindaki "Fatura Talimati Indir" ile AYNI PDF (bayrak dahil): onizleme blob'u + edge icin base64. */
-export async function talimatPdfUret(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], bolunme: TalimatParcaGirdisi[]): Promise<{ blob: Blob; base64: string; ad: string }> {
+/** Dosya sayfasindaki "Fatura Talimati Indir" ile AYNI PDF (bayrak dahil): onizleme / indirme blob'u. */
+export async function talimatPdfUret(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], bolunme: TalimatParcaGirdisi[]): Promise<{ blob: Blob; ad: string }> {
   const bayrak = await bayrakPng(ticaretYapilanUlke(dosya.alici_adresi));
   const doc = faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, false, bolunme, bayrak);
-  const uri = doc.output("datauristring");
-  return { blob: doc.output("blob"), base64: uri.slice(uri.indexOf(",") + 1), ad: talimatPdfAdi(dosya.dosya_no) };
+  return { blob: doc.output("blob"), ad: talimatPdfAdi(dosya.dosya_no) };
 }
 
 export const trZaman = (iso: string | null | undefined) =>

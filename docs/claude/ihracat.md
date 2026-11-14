@@ -1278,6 +1278,19 @@ gitmeli. Konu: FATURA VE BEYANNAME TALİMATI HAKKINDA // ALICI // 6 * 20 DC // L
 - Dosya sayfası > Konteynerler: `components/fatura-onay-durumu.tsx` son durum + "Onaya gönder" / "Tekrar onaya gönder".
 - Mail kalıpları: `supabase/functions/_shared/fatura-onay.ts` (dağıtım metni kullanıcının verdiği metin, aynen).
 
+- **14.11.2026 ONAY ADIMI KALDIRILDI** (kullanıcı: "Onayla gönder kısmını kaldırmalıyız. Sadece fatura talimatı gönderilsin:
+  Harun Bey merhaba, fatura talimatı ektedir gibi; müşteri, konteyner adedi, varış limanı. PDF indir butonu eklenecek." Alıcı:
+  export@, execution@, bbt@, operation@, export2@). Konteynerler tamamlanınca (pg_cron 10 dk) edge `fatura-onay` doğrudan
+  talimat mailini atar: konu aynı kalıp, gövde `talimatMailiHtml` ("Harun Bey merhaba," + müşteri / konteyner / varış limanı /
+  dosya + "Fatura Talimatını İndir (PDF)" → `/fatura-onay?id=…&indir=1`; sayfa PDF'i tarayıcıda üretip bir kez kendiliğinden
+  indirir, giriş gerekir). PDF sunucuda üretilmez (üretici tarayıcıya bağlı: bayrak `canvas`), mailde ek yok. Kayıt durumu
+  `gonderildi` (migration `20261114100000_fatura_talimati_onaysiz.sql`; eski `bekliyor/onaylandi/revize` yalnız geçmiş).
+  Alıcılar: Ayarlar > Rapor Alıcıları > "Fatura Talimatı" (`fatura_onay`, Alıcı + CC); `fatura_dagitim` KULLANILMIYOR
+  (satırı duruyor, ekrandan kalktı). `{karar}` çağrıları 410. Dosyadaki `fatura_talimati_gonderildi` işaretine DOKUNULMAZ
+  (konşimento beklentisini başlatır; dosya sayfasındaki "Fatura Talimatı" maili işaretler). Dosya sayfası: "Şimdi gönder" /
+  "Tekrar gönder". Canlıya geçiş: Ayarlar'da listeyi Canlı yap; o an adaylar (konteynerleri tam, talimatı işaretlenmemiş açık
+  dosyalar) 10 dk içinde canlı mail alır. Test: `tests/fatura-talimati-mail.test.ts`.
+
 ## Fatura kontrolünde ağırlık payı kaldırıldı (12.11.2026)
 
 Kullanıcı: "Net kg faturada yanlış yazılmış, neden uyarı göstermedi? Bu büyük bir güvensizlik." Sebep: `lib/fatura-oku.ts`

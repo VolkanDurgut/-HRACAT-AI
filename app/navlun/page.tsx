@@ -144,8 +144,10 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>
                 <th className="px-4 py-2 font-medium">Acente</th><th className="px-3 py-2 font-medium">Armatör</th>
-                <th className="px-3 py-2 font-medium">Ekipman</th><th className="px-3 py-2 font-medium text-right">Navlun</th>
+                {/* 14.11.2026 (kullanici: "Beyrut hala 340 gozukuyor"): once lokal dahil toplam, sonra acentenin yazdigi tutar */}
+                <th className="px-3 py-2 font-medium">Ekipman</th>
                 <th className="px-3 py-2 font-medium text-right" title="Navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç)">Lokal dahil</th>
+                <th className="px-3 py-2 font-medium text-right" title="Acentenin mailde yazdığı tutar (lokal hariç olabilir)">Acente teklifi</th>
                 <th className="px-3 py-2 font-medium">Free time</th><th className="px-3 py-2 font-medium">Transit</th><th className="px-3 py-2 font-medium">Geçerlilik</th>
                 <th className="px-3 py-2 font-medium">Tarih</th><th className="px-3 py-2 font-medium"></th>
               </tr>
@@ -158,9 +160,10 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
                     <td className="px-4 py-2 text-white whitespace-nowrap">{f.acente}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.armator || "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.ekipman}</td>
-                    <td className="px-3 py-2 text-right tabular-nums" style={{ color: "#C9D1DC" }} data-tutar>{usd(f.tutar)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: enIyi ? "#6EE7B7" : f.karsi.kesin ? "#FFFFFF" : "#C4B5FD" }}
                       data-toplam title={`${f.karsi.metin} · ${f.karsi.dayanak}`}>{f.karsi.kesin ? usd(f.karsi.toplam) : "?"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }} data-tutar
+                      title={f.karsi.metin}>{usd(f.tutar)}{f.karsi.kesin && f.karsi.toplam !== f.tutar ? " + lokal" : ""}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-ft>{f.free_time_gun != null ? `${f.free_time_gun} gün` : "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-transit>{f.transit_gun ? `${f.transit_gun} gün` : "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.gecerlilik || "—"}</td>

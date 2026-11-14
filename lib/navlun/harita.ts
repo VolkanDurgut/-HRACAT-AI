@@ -104,9 +104,13 @@ export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: {
       if (s.transit_gun) ayrinti.push(`Transit ${s.transit_gun} gün`);
       if (s.gecerlilik) ayrinti.push(`Geçerlilik ${s.gecerlilik}`);
       // 13.11.2026: lokal durumu ve karsilastirma tutari (mail + acente hafizasi + rezervasyon)
+      // 14.11.2026 (kullanici: "Navlun bildiriminde Beyrut hala 340 gozukuyor"): balonun buyuk rakami lokal dahil TOPLAM
+      // (kesinse); acentenin yazdigi tutar dokumde kalir ("340 + lokal 356 = 696").
+      let buyukTutar: number | null = s.tutar;
       if ((s.tur === "teklif" || s.tur === "karsi_teklif") && s.tutar) {
         const k = karsilastir({ acente: s.acente, tutar: s.tutar, ekipman: s.ekipman, lokal_dahil: s.lokal_dahil, liman_anahtar: s.liman_anahtar }, baglam);
         ayrinti.push(k.kesin ? k.metin : `⚠ ${k.metin}`);
+        if (k.kesin) buyukTutar = k.toplam;
       }
       if (s.kaynak === "pdf") ayrinti.push("PDF'ten okundu");
       if (s.kaynak === "gorsel") ayrinti.push("görselden okundu");
@@ -117,7 +121,7 @@ export function limanSohbeti(satirlar: NavlunSatiri[], anahtar: string, enIyi: {
         case "teklif":
         case "karsi_teklif": {
           const enIyiMi = !!enIyi && s.acente === enIyi.acente && s.tutar === enIyi.tutar && s.tarih === enIyi.tarih;
-          return { ...ortak, taraf: "acente", metin: s.tur === "karsi_teklif" ? "Karşı teklif" : `Teklif${s.armator && s.armator !== s.acente ? ` · ${s.armator}` : ""}`, tutar: `${para(s.tutar, s.para_birimi)} · ${ekipmanAdi(s.ekipman)}`, ayrinti, enIyi: enIyiMi };
+          return { ...ortak, taraf: "acente", metin: s.tur === "karsi_teklif" ? "Karşı teklif" : `Teklif${s.armator && s.armator !== s.acente ? ` · ${s.armator}` : ""}`, tutar: `${para(buyukTutar, s.para_birimi)} · ${ekipmanAdi(s.ekipman)}`, ayrinti, enIyi: enIyiMi };
         }
         case "hedef_kabul": return { ...ortak, taraf: "acente", metin: "Hedefiniz uygundur ✓", tutar: null, ayrinti, enIyi: false };
         case "hedef_soru": return { ...ortak, taraf: "acente", metin: "Hedefiniz nedir?", tutar: null, ayrinti: [], enIyi: false };

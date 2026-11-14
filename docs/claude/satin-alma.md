@@ -242,3 +242,30 @@
   edildi"; geri al ConfirmDialog. Departman geçmişinde "x teslim edildi · y bekliyor" + Teslim
   sütunu. `/talep` onaylanan alımlarda Teslim sütunu, form durumu "Tamamlandı · tümü teslim".
 - Fiş mailinin metni DEĞİŞMEDİ (edge deploy yok). Test: e2e_teslim 24 + e2e 46.
+
+### Haftalık liste kolaylıkları (14.11.2026)
+- Kullanıcı: "Burak Bey bir sürü kalemi tek tek onaylayacak… her cumartesi zahmetli. Kendi
+  şablonumuza uyarlatamaz mıyız?" Plan onaylandı (Faz 1 + 2). Faz 3 (standart liste /
+  otomatik onay) ONAYLANMADI: Burak Bey'in kararı bekleniyor, YAPILMADI.
+- Excel okuyucu ÇOKLU BLOK (`lib/satin-alma/excel.ts`): her "Miktar" başlık hücresi bir blok
+  (yan yana + alt alta). Blok başlığı ("ALIŞVERİŞ LİSTESİ (30.10.2026) CEM MARKET") ve bant
+  satırı ("TAKOZLAR · 12 kalem") → tedarikçi (`baslikTedarikcisi`; "GENEL İHTİYAÇLAR", tarih,
+  "Alışveriş Listesi" tedarikçi sayılmaz). Satırdaki tedarikçi önce gelir. Hiçbir bloğa
+  girmeyen dolu hücre UYARI ile listelenir (eskiden 30.10 dosyasında SÖNMEZ ET + TOPTANCI
+  sessizce düşüyordu: 46 kalemin 32'si okunuyordu; şimdi 46/46). "20 kg" tek hücre → miktar +
+  birim. Diğer dolu sayfa varsa uyarı. Önizleme anahtarı hücre adresi (`hucre`, ör. "I3").
+- TEKRAR KURALI ürün + TEDARİKÇİ (`kalemAnahtari`; DB `sa_token_kalem_ekle`, migration
+  20261114120000). Patates hem TAKOZLAR'dan hem CEM MARKET'ten eklenebilir.
+- Karar ekranı (`/satin-alma`): tedarikçi grupları (aç/kapa, "Bu grubu onayla"), "geçen
+  haftaya göre" rozetleri (`lib/satin-alma/karsilastir.ts`: Yeni / Miktar arttı / Birim
+  değişti / Geçen sefer reddedildi / Miktar azaldı / Geçen sefer de vardı / Her hafta;
+  karşılaştırma aynı departmanın önceki SONUÇLANAN listesiyle, onaylanan miktarla),
+  "Yalnız değişenleri göster" (gizlenen kalemler "Kalanları onayla" ile onaylanır).
+- DEĞİŞTİREREK ONAYLA: `satin_alma_kalemleri.onay_miktar` (null = talep edilen) + `onay_notu`
+  (migration 20261114130000; `sa_karar_ver`, `sa_liste_json`, `sa_token_bilgi`). Edge
+  "karar" alanları geçirir. Fiş (/cek), sonuç maili, /talep ve Onaylı fişler onaylanan
+  miktarı + "Talep: X" + onay notunu gösterir. Eski istemci alanları göndermezse davranış aynı.
+- `/talep` "Haftalık şablonu indir": son gönderilen liste, okuyucunun okuduğu bant düzeninde
+  (`lib/satin-alma/sablon.ts`; reddedilenler yok, onaylanan miktar). Gidiş-dönüş testli.
+- Testler: tests/satin-alma-excel.test.ts, tests/satin-alma-karsilastir.test.ts. DB testleri
+  geri alınan işlemde (kalıcı veri yok). Gerçek mail GÖNDERİLMEDİ.

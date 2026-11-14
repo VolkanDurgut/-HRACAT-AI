@@ -21,7 +21,7 @@ import { gonderimMaili, haftalikHatirlatmaMaili, sonucMaili, type HaftalikHatirl
 //  - "cek_bilgi"     : onaylanan kalemler + alindi durumlari
 //  - "cek_isaretle"  : { token, kalem_id, alindi, ad }
 // Uygulama ici (oturum JWT'si, "satin_alma" yetkisi DB'de kontrol edilir):
-//  - "karar"       : { liste_id, kararlar, not } -> onay varsa AKTIF cek listesi;
+//  - "karar"       : { liste_id, kararlar[{id, karar, red_nedeni, onay_miktar?, onay_notu?}], not } -> onay varsa AKTIF cek listesi;
 //                    execution@'ye "[Departman] Onayli satin alma cek listesi" maili
 //  - "mail_tekrar" : { liste_id, tur: "gonderim" | "sonuc" }
 //
@@ -235,6 +235,9 @@ Deno.serve(async (req: Request) => {
         if (!Array.isArray(govde.kararlar)) return json({ hata: "Karar listesi geçersiz." }, 400);
         const kararlar = (govde.kararlar as Record<string, unknown>[]).map((r) => ({
           id: r?.id, karar: r?.karar, red_nedeni: metin(r?.red_nedeni, 300),
+          // 14.11.2026 "Degistirerek onayla": onaylanan miktar (null = talep edilen) + onay notu
+          onay_miktar: typeof r?.onay_miktar === "number" && Number.isFinite(r.onay_miktar) ? r.onay_miktar : null,
+          onay_notu: metin(r?.onay_notu, 300),
         }));
         const liste = await rpc<SaListe>("sa_karar_ver", { p_liste_id: govde.liste_id, p_kararlar: kararlar, p_not: metin(govde.not, 500) || null }, yetki);
         const sonuc = await mailGonderVeKaydet("sonuc", liste);

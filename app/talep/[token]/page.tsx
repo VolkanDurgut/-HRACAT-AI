@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, FileSpreadsheet, History, Info, ListChecks, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, FileSpreadsheet, History, Info, ListChecks, Loader2, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import {
   AcilEtiketi, B, BelgeSayfasi, BilgiAlani, DurumEtiketi, Panel, TestSeridi,
   dugmeAna, dugmeIkincil, girdiSinifi, girdiStil, tdSinifi, thSinifi,
@@ -14,7 +14,7 @@ import {
 } from "@/components/satin-alma-toplu";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
 import {
-  BIRIMLER, HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarBirim, miktarYaz, saTarih, urunEslesme, urunNorm,
+  BIRIMLER, HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, kalemAnahtari, adSoyadGecerli, listeOzeti, miktarBirim, miktarDegisti, miktarYaz, onayliMiktar, saTarih, urunEslesme, urunNorm,
   type Birim, type Kategori, type SaKalem, type SaListe, type SaUrun,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -36,7 +36,7 @@ import {
  */
 
 // 03.11.2026: teslim takibi geri geldi (alindi / alinma_zamani sa_token_bilgi'de zaten var).
-type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden" | "alindi" | "alinma_zamani"> & { liste_no: string; karar_zamani: string };
+type OnayliAlim = Pick<SaKalem, "id" | "kategori" | "urun" | "miktar" | "birim" | "talep_eden" | "alindi" | "alinma_zamani" | "onay_miktar" | "onay_notu"> & { liste_no: string; karar_zamani: string };
 type Bilgi = { departman: string; test?: boolean; haftalik_gun?: number | null; sirket: string | null; taslak: SaListe | null; gecmis: SaListe[]; onaylananlar?: OnayliAlim[] };
 
 // 27.10.2026: ad tarayicida HATIRLANMAZ (kullanici: "her departman isim belirtmeli,
@@ -57,13 +57,14 @@ type UrunKontrolu = {
   bekleyen: { liste_no: string | null; kalem: SaKalem }[];
   onaylanan: OnayliAlim[];
 };
-function urunKontrolu(urun: string, bilgi: Bilgi | null): UrunKontrolu | null {
+function urunKontrolu(urun: string, tedarikci: string, bilgi: Bilgi | null): UrunKontrolu | null {
   if (!bilgi || urunNorm(urun).length < 2) return null;
   let mukerrer: SaKalem | null = null;
   const benzer: SaKalem[] = [];
   for (const k of bilgi.taslak?.kalemler ?? []) {
     const e = urunEslesme(urun, k.urun);
-    if (e === "ayni" && !mukerrer) mukerrer = k;
+    // 14.11.2026: tekrar = ayni urun + ayni tedarikci; farkli tedarikciden ayni urun "benzer" bilgisi olur
+    if (e === "ayni" && !mukerrer && kalemAnahtari(urun, tedarikci) === kalemAnahtari(k.urun, k.tedarikci)) mukerrer = k;
     else if (e) benzer.push(k);
   }
   const bekleyen = bilgi.gecmis.filter((l) => l.durum === "bekliyor")
@@ -126,7 +127,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
   }, [params.token]);
   useEffect(() => { urunleriGetir(); }, [urunleriGetir]);
 
-  const kontrol = useMemo(() => urunKontrolu(form.urun, bilgi), [form.urun, bilgi]);
+  const kontrol = useMemo(() => urunKontrolu(form.urun, form.tedarikci, bilgi), [form.urun, form.tedarikci, bilgi]);
 
   const alan = <K extends keyof Form>(k: K, v: Form[K]) => { setFormBilgisi(null); setForm((f) => ({ ...f, [k]: v })); };
 
@@ -208,11 +209,35 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
     try {
       const s = await excelDosyasiOku(dosya);
       if (!s.satirlar.length) { setFormHatasi(s.uyarilar[0] || "Excel'de kalem bulunamadı."); return; }
-      setToplu({ kaynak: "excel", satirlar: excelSatirlari(s.satirlar), altBaslik: `${dosya.name}${s.baslik ? ` · ${s.baslik}` : ""}`, uyarilar: s.uyarilar, surum: Date.now() });
+      const bloklar = s.bloklar.length > 1 ? ` · ${s.bloklar.length} blok: ${s.bloklar.map((b) => `${b.ad || b.hucre} (${b.kalem})`).join(", ")}` : "";
+      setToplu({ kaynak: "excel", satirlar: excelSatirlari(s.satirlar), altBaslik: `${dosya.name}${s.baslik && s.bloklar.length < 2 ? ` · ${s.baslik}` : ""}${bloklar}`, uyarilar: s.uyarilar, surum: Date.now() });
     } catch (e) {
       setFormHatasi(e instanceof Error ? e.message : "Excel dosyası okunamadı.");
     } finally {
       setExcelOkunuyor(false);
+    }
+  };
+  // 14.11.2026 "Haftalik sablonu indir": son gonderilen liste, Excel'den yukle'nin okudugu duzende
+  const [sablonHazirlaniyor, setSablonHazirlaniyor] = useState(false);
+  const sablonIndir = async (l: SaListe) => {
+    setFormHatasi(null);
+    setSablonHazirlaniyor(true);
+    try {
+      const [{ xlsxOlustur }, { haftalikSablonSayfasi }] = await Promise.all([import("@/lib/xlsx-yaz"), import("@/lib/satin-alma/sablon")]);
+      const tarih = bugun();
+      const blob = await xlsxOlustur([haftalikSablonSayfasi(l, tarih)]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${tarih} Alışveriş Listesi - ${l.departman}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setFormHatasi("Şablon hazırlanamadı. Sayfayı yenileyip tekrar deneyin.");
+    } finally {
+      setSablonHazirlaniyor(false);
     }
   };
   const topluEkle = async (secilen: TopluSatir[]) => {
@@ -343,12 +368,18 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
               title="Alışveriş listesi Excel dosyası (.xlsx): Miktar, Birim, Ürün, Kategori, Tedarikçi">
               {excelOkunuyor ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} {"Excel'den yükle"}
             </button>
+            {sonGonderim && (
+              <button type="button" onClick={() => sablonIndir(sonGonderim)} disabled={sablonHazirlaniyor} className={`${dugmeIkincil} h-8 text-[13px]`} style={{ borderColor: B.cizgi }}
+                title={`${sonGonderim.liste_no} listesini tedarikçilere göre Excel şablonu olarak indirir (reddedilenler hariç). Miktarları düzeltip “Excel'den yükle” ile geri yükleyin.`} data-testid="sablon-indir">
+                {sablonHazirlaniyor ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Haftalık şablonu indir
+              </button>
+            )}
             <input ref={excelGirdi} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden"
               data-testid="excel-girdi" onChange={(e) => excelSec(e.target.files?.[0])} />
           </div>
           {toplu && (
             <TopluEklemePaneli key={toplu.surum} kaynak={toplu.kaynak} altBaslik={toplu.altBaslik} ilkSatirlar={toplu.satirlar}
-              formdakiler={taslakKalemleri.map((k) => k.urun)} uyarilar={toplu.uyarilar} ekleniyor={topluEkleniyor} hata={topluHata}
+              formdakiler={taslakKalemleri} uyarilar={toplu.uyarilar} ekleniyor={topluEkleniyor} hata={topluHata}
               onEkle={topluEkle} onKapat={() => { setToplu(null); setTopluHata(null); }} />
           )}
           {topluSonuc && !toplu && <TopluSonucNotu sonuc={topluSonuc} />}
@@ -538,8 +569,8 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
                     <tr key={a.id} className="border-b last:border-0" style={{ borderColor: B.cizgiAcik }}>
                       <td className={`${tdSinifi} whitespace-nowrap`} style={{ color: B.soluk }}>{saTarih(a.karar_zamani).slice(0, 10)}</td>
                       <td className={`${tdSinifi} font-mono whitespace-nowrap`} style={{ color: B.soluk }}>{a.liste_no}</td>
-                      <td className={tdSinifi}><span className="font-medium">{a.urun}</span><span className="block text-[11px]" style={{ color: B.soluk }}>{KATEGORILER[a.kategori] ?? a.kategori}</span></td>
-                      <td className={`${tdSinifi} text-right whitespace-nowrap tabular-nums font-semibold`}>{miktarYaz(a.miktar)} <span className="font-normal" style={{ color: B.soluk }}>{BIRIMLER[a.birim] ?? a.birim}</span></td>
+                      <td className={tdSinifi}><span className="font-medium">{a.urun}</span><span className="block text-[11px]" style={{ color: B.soluk }}>{KATEGORILER[a.kategori] ?? a.kategori}</span>{a.onay_notu && <span className="block text-[11px] font-semibold" style={{ color: B.yesil }}>Onay notu: {a.onay_notu}</span>}</td>
+                      <td className={`${tdSinifi} text-right whitespace-nowrap tabular-nums font-semibold`}>{miktarYaz(onayliMiktar(a))} <span className="font-normal" style={{ color: B.soluk }}>{BIRIMLER[a.birim] ?? a.birim}</span>{miktarDegisti(a) && <span className="block text-[11px] font-normal" style={{ color: B.turuncu }}>Talep: {miktarYaz(a.miktar)}</span>}</td>
                       <td className={`${tdSinifi} whitespace-nowrap`}>{a.talep_eden}</td>
                       <td className={`${tdSinifi} whitespace-nowrap`}>{a.alindi ? <DurumEtiketi renk={B.yesil}>Teslim alındı · {saTarih(a.alinma_zamani).slice(0, 10)}</DurumEtiketi> : <DurumEtiketi renk={B.turuncu}>Teslim bekliyor</DurumEtiketi>}</td>
                     </tr>
@@ -648,15 +679,15 @@ function KontrolNotlari({ kontrol, miktar, birim, birlesiyor, onBirlestir }: {
   onBirlestir: (mevcut: SaKalem, eklenecek: number) => void;
 }) {
   const m = kontrol.mukerrer;
-  const kalemMetni = (k: Pick<SaKalem, "urun" | "miktar" | "birim">) => `${k.urun} · ${miktarBirim(k)}`;
+  const kalemMetni = (k: Pick<SaKalem, "urun" | "miktar" | "birim"> & { tedarikci?: string | null }) => `${k.urun} · ${miktarBirim(k)}${k.tedarikci ? ` · ${k.tedarikci}` : ""}`;
   return (
     <div className="mt-3 space-y-1.5" aria-live="polite">
       {m && (
         <div className="border-l-[3px] rounded-[3px] px-3 py-2.5 text-[13px]" style={{ borderColor: B.turuncu, backgroundColor: B.turuncuZemin }}>
           <p className="font-semibold flex items-start gap-1.5" style={{ color: B.turuncu }}>
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" /> Bu ürün formda zaten var: {kalemMetni(m)} ({m.talep_eden})
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" /> Bu ürün {m.tedarikci ? "bu tedarikçiden " : ""}formda zaten var: {kalemMetni(m)} ({m.talep_eden})
           </p>
-          <p className="mt-0.5 sm:ml-5" style={{ color: B.metin }}>Aynı ürün ikinci satır olarak eklenmez; mevcut kalemin miktarını artırın.</p>
+          <p className="mt-0.5 sm:ml-5" style={{ color: B.metin }}>Aynı ürün aynı tedarikçiden ikinci satır olarak eklenmez; mevcut kalemin miktarını artırın. Başka tedarikçiden alınacaksa Tedarikçi alanını değiştirin.</p>
           <div className="mt-2 sm:ml-5">
             {miktar === null ? (
               <p className="text-xs" style={{ color: B.soluk }}>Eklemek istediğiniz miktarı yazın; mevcut kaleme eklenir.</p>
@@ -689,6 +720,18 @@ function KontrolNotlari({ kontrol, miktar, birim, birlesiyor, onBirlestir }: {
         <p className="text-xs pl-3" style={{ color: B.soluk }}>Ve {Math.max(0, kontrol.benzer.length - 2) + Math.max(0, kontrol.bekleyen.length - 2) + Math.max(0, kontrol.onaylanan.length - 2)} kayıt daha.</p>
       )}
     </div>
+  );
+}
+
+/** 14.11.2026 "Degistirerek onayla": onaylanan miktar talep edilenden farkliysa ya da onay notu varsa */
+function OnayDegisikligi({ k }: { k: SaKalem }) {
+  if (!miktarDegisti(k) && !k.onay_notu) return null;
+  return (
+    <span className="block text-xs mt-0.5 font-medium" style={{ color: B.yesil }} data-testid="onay-degisikligi">
+      {miktarDegisti(k) ? <>Onaylanan: {miktarBirim({ miktar: onayliMiktar(k), birim: k.birim })}</> : null}
+      {miktarDegisti(k) && k.onay_notu ? " · " : null}
+      {k.onay_notu ? <>Onay notu: {k.onay_notu}</> : null}
+    </span>
   );
 }
 
@@ -740,6 +783,7 @@ function KalemTablosu({ kalemler, karar = false, sikistir = false, sonIslem }: {
                   {k.aciklama && <span className="block text-xs mt-0.5 break-words" style={{ color: B.soluk }}>{k.aciklama}</span>}
                   {k.tedarikci && <span className="block text-xs mt-0.5" style={{ color: B.soluk }}>Tedarikçi: {k.tedarikci}</span>}
                   {karar && k.karar === "reddedildi" && k.red_nedeni && <span className="block text-xs mt-0.5" style={{ color: B.kirmizi }}>Red nedeni: {k.red_nedeni}</span>}
+                  {karar && k.karar === "onaylandi" && <OnayDegisikligi k={k} />}
                 </td>
                 <td className={`${tdSinifi} text-right tabular-nums font-semibold whitespace-nowrap`}>{miktarYaz(k.miktar)}</td>
                 <td className={`${tdSinifi} whitespace-nowrap`}>{BIRIMLER[k.birim] ?? k.birim}</td>
@@ -765,6 +809,7 @@ function KalemTablosu({ kalemler, karar = false, sikistir = false, sonIslem }: {
               {k.tedarikci && <p className="text-xs mt-0.5" style={{ color: B.soluk }}>Tedarikçi: {k.tedarikci}</p>}
               {karar && <div className="mt-1"><KalemKarari k={k} /></div>}
               {karar && k.karar === "reddedildi" && k.red_nedeni && <p className="text-xs mt-0.5" style={{ color: B.kirmizi }}>Red nedeni: {k.red_nedeni}</p>}
+              {karar && k.karar === "onaylandi" && <OnayDegisikligi k={k} />}
             </div>
             {sonIslem && <div className="shrink-0">{sonIslem(k)}</div>}
           </li>

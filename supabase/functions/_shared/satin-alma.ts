@@ -57,6 +57,9 @@ export type SaKalem = {
   alan_ad?: string | null;
   /** 31.10.2026: nereden alinacak (ops.); onayli fiste gruplama */
   tedarikci?: string | null;
+  /** 14.11.2026 "Degistirerek onayla": onaylanan miktar (null = talep edilen miktar) + onay notu */
+  onay_miktar?: number | string | null;
+  onay_notu?: string | null;
 };
 
 export type SaListe = {
@@ -135,6 +138,13 @@ export function tedarikciDuzelt(s: string | null | undefined): string | null {
   return t ? t.toLocaleUpperCase("tr-TR") : null;
 }
 
+/** 14.11.2026: Ayni formda TEKRAR kurali URUN + TEDARIKCI. "Patates" hem TAKOZLAR'dan hem CEM MARKET'ten
+ * alinabilir; ayni urun ayni tedarikciden (ya da ikisi de tedarikcisiz) ikinci satir olamaz.
+ * Veritabanindaki sa_token_kalem_ekle kontrolu ile AYNI. */
+export function kalemAnahtari(urun: string | null | undefined, tedarikci: string | null | undefined): string {
+  return `${urunNorm(urun)}|${urunNorm(tedarikci)}`;
+}
+
 /** Kalemleri tedarikciye gore gruplar (girdi sirasi korunur; tedarikcisizler EN SONDA "Belirtilmemiş"). */
 export function tedarikciGruplari<T extends { tedarikci?: string | null }>(kalemler: T[]): { tedarikci: string | null; kalemler: T[] }[] {
   const gruplar = new Map<string, { tedarikci: string | null; kalemler: T[] }>();
@@ -156,6 +166,14 @@ export function miktarYaz(m: number | string): string {
 }
 
 export const miktarBirim = (k: Pick<SaKalem, "miktar" | "birim">) => `${miktarYaz(k.miktar)} ${BIRIMLER[k.birim] ?? k.birim}`;
+
+/** 14.11.2026: onaylanan kalemde gecerli miktar (degistirerek onaylandiysa onay_miktar). */
+export const onayliMiktar = (k: Pick<SaKalem, "miktar" | "onay_miktar">): number | string =>
+  k.onay_miktar != null && k.onay_miktar !== "" ? k.onay_miktar : k.miktar;
+/** Onaylanan miktar talep edilenden farkli mi */
+export const miktarDegisti = (k: Pick<SaKalem, "miktar" | "onay_miktar">) =>
+  k.onay_miktar != null && k.onay_miktar !== "" && Number(k.onay_miktar) !== Number(k.miktar);
+export const onayliMiktarBirim = (k: Pick<SaKalem, "miktar" | "birim" | "onay_miktar">) => miktarBirim({ miktar: onayliMiktar(k), birim: k.birim });
 
 /** "26.10.2026 14:05" (Turkiye saati) */
 export function saTarih(iso: string | null | undefined): string {
@@ -238,7 +256,9 @@ function bilgiTablosu(alanlar: [string, string][]): string {
   return `<table role="presentation" class="b" width="100%" cellpadding="7" border="1" style="border-collapse:collapse;border-color:#D5D9E0;">${satirlar.join("")}</table>`;
 }
 
-const urunHucresi = (k: SaKalem, tedarikciGoster = true) => `<td>${kacis(k.urun)}${k.aciklama ? `<span class="a">${kacis(k.aciklama)}</span>` : ""}${tedarikciGoster && k.tedarikci ? `<span class="a">Tedarikçi: ${kacis(k.tedarikci)}</span>` : ""}</td>`;
+const urunHucresi = (k: SaKalem, tedarikciGoster = true, onayNotu = false) => `<td>${kacis(k.urun)}${k.aciklama ? `<span class="a">${kacis(k.aciklama)}</span>` : ""}${tedarikciGoster && k.tedarikci ? `<span class="a">Tedarikçi: ${kacis(k.tedarikci)}</span>` : ""}${onayNotu && k.onay_notu ? `<span class="a" style="color:#17704A;font-weight:bold;">Onay notu: ${kacis(k.onay_notu)}</span>` : ""}</td>`;
+/** Onaylanan miktar; degistirerek onaylandiysa altinda talep edilen miktar */
+const onayMiktarHucresi = (k: SaKalem) => `<td class="r"><b>${kacis(onayliMiktarBirim(k))}</b>${miktarDegisti(k) ? `<span class="a" style="color:#B54708;">Talep: ${kacis(miktarBirim(k))}</span>` : ""}</td>`;
 const oncelik = (k: SaKalem) => (k.aciliyet === "acil" ? `<span class="acil">ACİL</span>` : `<span class="s">Normal</span>`);
 
 /** Kalem tablosu. tur: talep (karar oncesi) | onay (onaylananlar) | red (reddedilenler). */
@@ -248,7 +268,7 @@ function kalemTablosu(kalemler: SaKalem[], tur: "talep" | "onay" | "red", tedari
     : `<th>#</th><th>Ürün / hizmet</th><th>Kategori</th><th class="r">Miktar</th><th>Öncelik</th><th>Talep eden</th>`;
   const satirlar = kalemler.map((k, i) => tur === "red"
     ? `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, tedarikciGoster)}<td class="r">${kacis(miktarBirim(k))}</td><td>${kacis(k.talep_eden)}</td><td class="red">${kacis(k.red_nedeni || "Belirtilmedi")}</td></tr>`
-    : `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, tedarikciGoster)}<td class="s">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</td><td class="r"><b>${kacis(miktarBirim(k))}</b></td><td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
+    : `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, tedarikciGoster, tur === "onay")}<td class="s">${kacis(KATEGORILER[k.kategori] ?? k.kategori)}</td>${tur === "onay" ? onayMiktarHucresi(k) : `<td class="r"><b>${kacis(miktarBirim(k))}</b></td>`}<td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
   return `<table role="presentation" class="t" width="100%" cellpadding="7" style="border-collapse:collapse;border:1px solid #D5D9E0;table-layout:auto;"><tr>${bas}</tr>\n${satirlar}</table>`;
 }
 
@@ -288,7 +308,8 @@ export function sonucMaili(l: SaListe): { konu: string; html: string } {
   const konu = o.onay
     ? `[${l.departman}] Onaylı satın alma fişi · ${l.liste_no} (${o.onay} kalem${o.red ? `, ${o.red} reddedildi` : ""})`
     : `[${l.departman}] Satın alma talebi reddedildi · ${l.liste_no}`;
-  const alanlar: [string, string][] = [["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay tarihi", saTarih(l.karar_zamani)], ["Kalem durumu", `${o.onay} onaylı${o.red ? ` · ${o.red} reddedildi` : ""}`]];
+  const degisen = onaylar.filter((k) => miktarDegisti(k)).length;
+  const alanlar: [string, string][] = [["Departman", l.departman], ["Fiş / talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Onaylayan", l.karar_veren_email || "-"], ["Onay tarihi", saTarih(l.karar_zamani)], ["Kalem durumu", `${o.onay} onaylı${degisen ? ` (${degisen} miktarı değiştirilerek)` : ""}${o.red ? ` · ${o.red} reddedildi` : ""}`]];
   const govde = `${giris(o.onay
     ? `<b>${kacis(l.departman)}</b> departmanının talebinde <b>${o.onay} kalem onaylandı</b>. Onaylı satın alma fişini bağlantıyla ya da yazdırarak ilgili departmana iletebilirsiniz.`
     : `<b>${kacis(l.departman)}</b> departmanının talebindeki kalemlerin hiçbiri onaylanmadı.`)}

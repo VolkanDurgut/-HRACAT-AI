@@ -13,11 +13,12 @@ import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { supabase } from "@/lib/supabase";
-import { satinAlmaCagir } from "@/lib/satin-alma/api";
+import { miktarOku, satinAlmaCagir } from "@/lib/satin-alma/api";
+import { haftaKarsilastir, oncekiListeler, type HaftaRozeti } from "@/lib/satin-alma/karsilastir";
 import { YaziAnimasyonu } from "@/components/yazi-animasyonu";
 import { ACCENT, CARD_BG, CARD_BORDER, PAGE_BG, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, cekAdresi, listeOzeti, miktarBirim, saTarih, talepAdresi, urunEslesme,
+  BIRIMLER, HAFTA_GUNLERI, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, cekAdresi, listeOzeti, miktarBirim, miktarDegisti, miktarYaz, onayliMiktarBirim, saTarih, tedarikciGruplari, talepAdresi, urunEslesme,
   type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
@@ -55,7 +56,8 @@ type ListeSatiri = Omit<SaListe, "departman" | "sirket" | "kalemler"> & {
   satin_alma_kalemleri: SaKalem[];
 };
 type Liste = SaListe & { departman_id: string; gonderim_maili_hata: string | null; sonuc_maili_hata: string | null };
-type KararSecimi = { karar: "onaylandi" | "reddedildi"; red_nedeni: string };
+/** 14.11.2026: degistir = "Degistirerek onayla" (onay_miktar + onay_notu gonderilir) */
+type KararSecimi = { karar: "onaylandi" | "reddedildi"; red_nedeni: string; degistir: boolean; onay_miktar: string; onay_notu: string };
 type Sekme = "bekleyen" | "cek" | "gecmis" | "departmanlar";
 /** Karar ekraninda kalem notlari (28.10.2026). */
 type KalemNotlari = {
@@ -96,7 +98,7 @@ function kalemNotlariHesapla(bekleyenler: Liste[], sonuclananlar: Liste[]): Map<
   return sonuc;
 }
 
-const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad, tedarikci)";
+const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad, tedarikci, onay_miktar, onay_notu)";
 
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -222,7 +224,7 @@ function SatinAlmaIcerik() {
         bekleyenler.length === 0
           ? <EmptyState icon={<Inbox size={40} />} title="Onay bekleyen liste yok" description="Departmanlar listelerini gönderdiğinde burada görünür ve e-posta gelir." />
           : <div className="space-y-5">{bekleyenler.map((l) => (
-              <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar} notlar={kalemNotlari}
+              <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar} notlar={kalemNotlari} onceki={oncekiListeler(l, listeler)}
                 onKaydedildi={(mesaj, tur) => { showToast(mesaj, tur); getir(true); }} />
             ))}</div>
       )}
@@ -239,8 +241,8 @@ function SatinAlmaIcerik() {
 // ---------------------------------------------------------------------------
 // Onay bekleyen liste: kalem bazinda karar
 // ---------------------------------------------------------------------------
-function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
-  liste: Liste; vurgulu: boolean; notlar: Map<string, KalemNotlari>;
+function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki }: {
+  liste: Liste; vurgulu: boolean; notlar: Map<string, KalemNotlari>; onceki: Liste[];
   onKaydedildi: (mesaj: string, tur: "success" | "error") => void;
   onMailTekrar: (l: Liste, tur: "gonderim" | "sonuc") => Promise<void>;
 }) {
@@ -250,27 +252,60 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [mailGonderiliyor, setMailGonderiliyor] = useState(false);
+  const [kapali, setKapali] = useState<Set<string>>(() => new Set());
+  const [yalnizDegisen, setYalnizDegisen] = useState(false);
   const o = listeOzeti(liste);
   const onaySayisi = liste.kalemler.filter((k) => secim[k.id]?.karar === "onaylandi").length;
   const redSayisi = liste.kalemler.filter((k) => secim[k.id]?.karar === "reddedildi").length;
   const kalan = liste.kalemler.length - onaySayisi - redSayisi;
   const notluKalem = liste.kalemler.filter((k) => notlar.has(k.id)).length;
+  // 14.11.2026 "Degistirerek onayla": gecerli miktar girilmemis satir kaydi engeller
+  const degisenOnay = liste.kalemler.filter((k) => secim[k.id]?.karar === "onaylandi" && secim[k.id]?.degistir);
+  const gecersizDegisiklik = degisenOnay.filter((k) => miktarOku(secim[k.id].onay_miktar) === null).length;
+  const miktariDegisen = degisenOnay.filter((k) => { const m = miktarOku(secim[k.id].onay_miktar); return m !== null && m !== Number(k.miktar); }).length;
 
-  const sec = (id: string, karar: KararSecimi["karar"]) =>
-    setSecim((s) => ({ ...s, [id]: { karar, red_nedeni: s[id]?.red_nedeni || "" } }));
-  const tumunu = (karar: KararSecimi["karar"]) =>
-    setSecim(Object.fromEntries(liste.kalemler.map((k) => [k.id, { karar, red_nedeni: secim[k.id]?.red_nedeni || "" }])));
+  // 14.11.2026: gecen haftaya gore rozetler + tedarikci gruplari
+  const rozetler = useMemo(() => new Map(liste.kalemler.map((k) => [k.id, haftaKarsilastir(k, onceki)])), [liste.kalemler, onceki]);
+  const karsilastirmaVar = onceki.length > 0;
+  const dikkat = (k: SaKalem) => k.aciliyet === "acil" || notlar.has(k.id) || !!rozetler.get(k.id)?.degisti;
+  const degisenSayisi = liste.kalemler.filter(dikkat).length;
+  const gruplar = useMemo(() => tedarikciGruplari(liste.kalemler), [liste.kalemler]);
+  const gruplu = gruplar.some((g) => g.tedarikci);
+  const sira = useMemo(() => new Map(gruplar.flatMap((g) => g.kalemler).map((k, i) => [k.id, i + 1])), [gruplar]);
+
+  const sec = (id: string, karar: KararSecimi["karar"], degistir = false) =>
+    setSecim((s) => {
+      const once = s[id];
+      const k = liste.kalemler.find((x) => x.id === id);
+      return { ...s, [id]: {
+        karar, red_nedeni: once?.red_nedeni || "", degistir: karar === "onaylandi" && degistir,
+        onay_miktar: once?.onay_miktar ?? (k ? miktarYaz(k.miktar) : ""), onay_notu: once?.onay_notu || "",
+      } };
+    });
+  const kararSec = (k: SaKalem): KararSecimi => ({ karar: "onaylandi", red_nedeni: "", degistir: false, onay_miktar: miktarYaz(k.miktar), onay_notu: "" });
+  const tumunu = () => setSecim(Object.fromEntries(liste.kalemler.map((k) => [k.id, kararSec(k)])));
   // Hizli akis: once reddedilecekler isaretlenir, sonra karar verilmemis tum kalemler tek tikla onaylanir
-  const kalanlariOnayla = () =>
-    setSecim((s) => ({ ...s, ...Object.fromEntries(liste.kalemler.filter((k) => !s[k.id]).map((k) => [k.id, { karar: "onaylandi" as const, red_nedeni: "" }])) }));
-  const nedenYaz = (id: string, red_nedeni: string) => setSecim((x) => ({ ...x, [id]: { karar: "reddedildi", red_nedeni } }));
+  const kalanlariOnayla = (kalemler: SaKalem[] = liste.kalemler) =>
+    setSecim((s) => ({ ...s, ...Object.fromEntries(kalemler.filter((k) => !s[k.id]).map((k) => [k.id, kararSec(k)])) }));
+  const nedenYaz = (id: string, red_nedeni: string) => setSecim((x) => ({ ...x, [id]: { ...x[id], karar: "reddedildi", red_nedeni, degistir: false } }));
+  const onayAlani = (id: string, alanlar: Partial<Pick<KararSecimi, "onay_miktar" | "onay_notu">>) => setSecim((x) => ({ ...x, [id]: { ...x[id], ...alanlar } }));
+  const grupAc = (anahtar: string) => setKapali((s) => { const y = new Set(s); if (y.has(anahtar)) y.delete(anahtar); else y.add(anahtar); return y; });
 
   const kaydet = async () => {
     setHata(null);
     setKaydediliyor(true);
     const r = await satinAlmaCagir<{ mail: string; alicilar: string[] }>({
       islem: "karar", liste_id: liste.id, not: not.trim(),
-      kararlar: liste.kalemler.map((k) => ({ id: k.id, karar: secim[k.id]?.karar, red_nedeni: secim[k.id]?.karar === "reddedildi" ? secim[k.id].red_nedeni.trim() : "" })),
+      kararlar: liste.kalemler.map((k) => {
+        const s = secim[k.id];
+        const onaylandi = s?.karar === "onaylandi";
+        return {
+          id: k.id, karar: s?.karar,
+          red_nedeni: s?.karar === "reddedildi" ? s.red_nedeni.trim() : "",
+          onay_miktar: onaylandi && s.degistir ? miktarOku(s.onay_miktar) : null,
+          onay_notu: onaylandi && s.degistir ? s.onay_notu.trim() : "",
+        };
+      }),
     }, true);
     setKaydediliyor(false);
     setOnay(false);
@@ -283,6 +318,88 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
     );
   };
 
+  const kalemSatiri = (k: SaKalem) => {
+    const s = secim[k.id];
+    const rozet = rozetler.get(k.id);
+    const degistir = s?.karar === "onaylandi" && s.degistir;
+    const yeniMiktar = degistir ? miktarOku(s.onay_miktar) : null;
+    return (
+      <li key={k.id} className="px-4 sm:px-5 py-2" data-testid="karar-kalem"
+        style={{ borderColor: CARD_BORDER, backgroundColor: s?.karar === "reddedildi" ? "rgba(239,68,68,0.05)" : s?.karar === "onaylandi" ? "rgba(16,185,129,0.04)" : undefined }}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[28px_minmax(0,1fr)_120px_150px_236px] gap-x-3 gap-y-1 items-center">
+          <span className="hidden sm:block text-xs text-right tabular-nums" style={{ color: TEXT_MUTED }}>{sira.get(k.id)}</span>
+          <div className="min-w-0">
+            <p className="text-sm text-white break-words leading-snug">
+              <span className="font-semibold">{k.urun}</span>
+              {k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}
+              {rozet && <HaftaRozetiEtiketi r={rozet} />}
+            </p>
+            <p className="text-[11px] leading-snug break-words" style={{ color: TEXT_MUTED }}>
+              {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}{!gruplu && k.tedarikci ? ` · Tedarikçi: ${k.tedarikci}` : ""}
+              <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {k.talep_eden}</span>
+            </p>
+          </div>
+          <span className="hidden sm:block text-sm text-right font-semibold text-white whitespace-nowrap tabular-nums">
+            {degistir && yeniMiktar !== null && yeniMiktar !== Number(k.miktar)
+              ? <><span className="line-through font-normal mr-1.5" style={{ color: TEXT_MUTED }}>{miktarYaz(k.miktar)}</span><span className="text-emerald-400">{miktarBirim({ miktar: yeniMiktar, birim: k.birim })}</span></>
+              : miktarBirim(k)}
+          </span>
+          <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }} title={k.talep_eden}>{k.talep_eden}</span>
+          <div className="flex justify-end" role="group" aria-label={`${k.urun} kararı`}>
+            <div className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
+              <button onClick={() => sec(k.id, "onaylandi")} aria-pressed={s?.karar === "onaylandi" && !s.degistir}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                style={s?.karar === "onaylandi" && !s.degistir ? { backgroundColor: "rgba(16,185,129,0.2)", color: "#34D399" } : { color: TEXT_MUTED }}>
+                <CheckCircle2 size={13} /> Onayla
+              </button>
+              <button onClick={() => sec(k.id, "onaylandi", true)} aria-pressed={!!degistir} title="Miktarı ya da kapsamı değiştirerek onayla"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border-l transition-colors"
+                style={{ borderColor: CARD_BORDER, ...(degistir ? { backgroundColor: "rgba(245,158,11,0.18)", color: "#FBBF24" } : { color: TEXT_MUTED }) }}>
+                <Pencil size={12} /> Değiştir
+              </button>
+              <button onClick={() => sec(k.id, "reddedildi")} aria-pressed={s?.karar === "reddedildi"}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border-l transition-colors"
+                style={{ borderColor: CARD_BORDER, ...(s?.karar === "reddedildi" ? { backgroundColor: "rgba(239,68,68,0.18)", color: "#F87171" } : { color: TEXT_MUTED }) }}>
+                <XCircle size={13} /> Reddet
+              </button>
+            </div>
+          </div>
+        </div>
+        {notlar.has(k.id) && <KalemNotSatirlari n={notlar.get(k.id) as KalemNotlari} />}
+        {degistir && (
+          <div className="mt-1.5 sm:ml-[40px] flex flex-wrap items-center gap-2" data-testid="degistir-alani">
+            <label className="inline-flex items-center gap-1.5 text-[11px] font-medium" style={{ color: TEXT_MUTED }}>
+              Onaylanan miktar
+              <input value={s.onay_miktar} inputMode="decimal" maxLength={12} aria-label={`${k.urun} onaylanan miktar`}
+                onChange={(e) => onayAlani(k.id, { onay_miktar: e.target.value })}
+                className="w-20 px-2 py-1 border rounded-md text-xs text-right tabular-nums text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                style={{ ...girdiStil, ...(yeniMiktar === null ? { borderColor: "rgba(239,68,68,0.6)" } : {}) }} />
+              <span>{BIRIMLER[k.birim] ?? k.birim}</span>
+            </label>
+            <input value={s.onay_notu} maxLength={300} aria-label={`${k.urun} onay notu`}
+              onChange={(e) => onayAlani(k.id, { onay_notu: e.target.value })}
+              placeholder="Onay notu (ör. Yalnız çay alınsın)" className="flex-1 min-w-[200px] px-2.5 py-1 border rounded-md text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30" style={girdiStil} />
+            {yeniMiktar === null && <span className="text-[11px] text-red-400">Miktarı sayı olarak yazın</span>}
+          </div>
+        )}
+        {s?.karar === "reddedildi" && (
+          <div className="mt-1.5 sm:ml-[40px] flex flex-wrap items-center gap-1.5">
+            {RED_NEDENLERI.map((n) => (
+              <button key={n} onClick={() => nedenYaz(k.id, s.red_nedeni === n ? "" : n)} aria-pressed={s.red_nedeni === n}
+                className="px-2 py-1 rounded-md border text-[11px] font-medium transition-colors"
+                style={s.red_nedeni === n ? { borderColor: "rgba(239,68,68,0.55)", backgroundColor: "rgba(239,68,68,0.12)", color: "#F87171" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                {n}
+              </button>
+            ))}
+            <input value={s.red_nedeni} maxLength={300} aria-label={`${k.urun} red nedeni`}
+              onChange={(e) => nedenYaz(k.id, e.target.value)}
+              placeholder="ya da red nedenini yazın (isteğe bağlı)" className="flex-1 min-w-[200px] px-2.5 py-1 border rounded-md text-xs text-white focus:outline-none focus:ring-2 focus:ring-red-500/30" style={girdiStil} />
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <section id={`liste-${liste.id}`} className="rounded-xl border overflow-hidden scroll-mt-4"
       style={{ ...kartStil, ...(vurgulu ? { borderColor: ACCENT, boxShadow: `0 0 0 1px ${ACCENT}` } : {}) }}>
@@ -290,10 +407,15 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-white">{liste.departman} <span className="font-mono text-sm font-medium whitespace-nowrap" style={{ color: TEXT_MUTED }}>· {liste.liste_no}</span>{liste.test && <TestRozeti />}</p>
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-            {liste.gonderen_ad} · {saTarih(liste.gonderim_zamani)} · {o.toplam} kalem
+            {liste.gonderen_ad} · {saTarih(liste.gonderim_zamani)} · {o.toplam} kalem{gruplu ? ` · ${gruplar.length} tedarikçi` : ""}
             {o.acil > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">{o.acil} ACİL</span>}
             {notluKalem > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400" title="Başka departmanda bekleyen, son 30 günde onaylanan ya da formda tekrar eden kalemler">{notluKalem} kalemde not</span>}
           </p>
+          {karsilastirmaVar && (
+            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }} data-testid="karar-karsilastirma">
+              Önceki listeye ({onceki[0].liste_no}) göre <b className="text-white font-semibold">{degisenSayisi}</b> kalem dikkat istiyor (yeni, miktarı artan, geçen sefer reddedilen, acil ya da notlu); {o.toplam - degisenSayisi} kalem aynı.
+            </p>
+          )}
         </div>
         {liste.gonderim_maili === "hata" && (
           <button disabled={mailGonderiliyor} onClick={async () => { setMailGonderiliyor(true); await onMailTekrar(liste, "gonderim"); setMailGonderiliyor(false); }}
@@ -304,11 +426,11 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
         )}
         <div className="flex flex-wrap gap-1.5">
           {kalan > 0 && kalan < liste.kalemler.length && (
-            <button onClick={kalanlariOnayla} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+            <button onClick={() => kalanlariOnayla()} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
               <Check size={12} /> Kalanları onayla ({kalan})
             </button>
           )}
-          <button onClick={() => tumunu("onaylandi")} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          <button onClick={tumunu} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
             <Check size={12} /> Tümünü onayla
           </button>
           {Object.keys(secim).length > 0 && (
@@ -319,69 +441,71 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
         </div>
       </header>
 
-      {liste.kalemler.length > 3 && Object.keys(secim).length === 0 && (
-        <p className="px-4 sm:px-5 py-2 text-xs border-b" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-          Hızlı karar: yalnızca reddedeceğiniz kalemlerde <b className="text-white font-semibold">Reddet</b>&apos;e basın, sonra <b className="text-white font-semibold">Kalanları onayla</b> ile gerisini tek seferde onaylayın.
-        </p>
+      {(liste.kalemler.length > 3 || karsilastirmaVar) && (
+        <div className="px-4 sm:px-5 py-2 text-xs border-b flex flex-wrap items-center gap-x-4 gap-y-1.5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          {liste.kalemler.length > 3 && Object.keys(secim).length === 0 && (
+            <span className="flex-1 min-w-[260px]">
+              Hızlı karar: yalnızca reddedeceğiniz kalemlerde <b className="text-white font-semibold">Reddet</b>&apos;e, miktarı azaltacaklarınızda <b className="text-white font-semibold">Değiştir</b>&apos;e basın; sonra <b className="text-white font-semibold">Kalanları onayla</b>.
+            </span>
+          )}
+          {karsilastirmaVar && degisenSayisi < liste.kalemler.length && (
+            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none ml-auto">
+              <input type="checkbox" checked={yalnizDegisen} onChange={(e) => setYalnizDegisen(e.target.checked)} className="w-4 h-4 accent-emerald-500" data-testid="yalniz-degisen" />
+              <span className="text-white">Yalnız değişenleri göster</span> ({degisenSayisi})
+            </label>
+          )}
+        </div>
       )}
 
-      {/* Kalem tablosu: tek satir = tek kalem */}
-      <div className="hidden sm:grid grid-cols-[28px_minmax(0,1fr)_120px_160px_176px] gap-x-3 px-4 sm:px-5 py-2 border-b text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.015)" }}>
+      {/* Kalem tablosu: tek satir = tek kalem; tedarikci varsa tedarikci gruplari */}
+      <div className="hidden sm:grid grid-cols-[28px_minmax(0,1fr)_120px_150px_236px] gap-x-3 px-4 sm:px-5 py-2 border-b text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.015)" }}>
         <span className="text-right">#</span><span>Ürün / hizmet</span><span className="text-right">Miktar</span><span>Talep eden</span><span className="text-right">Karar</span>
       </div>
-      <ul className="divide-y" style={{ borderColor: CARD_BORDER }}>
-        {liste.kalemler.map((k, i) => {
-          const s = secim[k.id];
-          return (
-            <li key={k.id} className="px-4 sm:px-5 py-2" style={{ borderColor: CARD_BORDER, backgroundColor: s?.karar === "reddedildi" ? "rgba(239,68,68,0.05)" : s?.karar === "onaylandi" ? "rgba(16,185,129,0.04)" : undefined }}>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[28px_minmax(0,1fr)_120px_160px_176px] gap-x-3 gap-y-1 items-center">
-                <span className="hidden sm:block text-xs text-right tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</span>
-                <div className="min-w-0">
-                  <p className="text-sm text-white break-words leading-snug">
-                    <span className="font-semibold">{k.urun}</span>
-                    {k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}
-                  </p>
-                  <p className="text-[11px] leading-snug break-words" style={{ color: TEXT_MUTED }}>
-                    {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}{k.tedarikci ? ` · Tedarikçi: ${k.tedarikci}` : ""}
-                    <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {k.talep_eden}</span>
-                  </p>
-                </div>
-                <span className="hidden sm:block text-sm text-right font-semibold text-white whitespace-nowrap tabular-nums">{miktarBirim(k)}</span>
-                <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }} title={k.talep_eden}>{k.talep_eden}</span>
-                <div className="flex justify-end" role="group" aria-label={`${k.urun} kararı`}>
-                  <div className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
-                    <button onClick={() => sec(k.id, "onaylandi")} aria-pressed={s?.karar === "onaylandi"}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold transition-colors"
-                      style={s?.karar === "onaylandi" ? { backgroundColor: "rgba(16,185,129,0.2)", color: "#34D399" } : { color: TEXT_MUTED }}>
-                      <CheckCircle2 size={13} /> Onayla
-                    </button>
-                    <button onClick={() => sec(k.id, "reddedildi")} aria-pressed={s?.karar === "reddedildi"}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold border-l transition-colors"
-                      style={{ borderColor: CARD_BORDER, ...(s?.karar === "reddedildi" ? { backgroundColor: "rgba(239,68,68,0.18)", color: "#F87171" } : { color: TEXT_MUTED }) }}>
-                      <XCircle size={13} /> Reddet
-                    </button>
-                  </div>
-                </div>
+      {gruplar.map((g) => {
+        const anahtar = g.tedarikci ?? "-";
+        const acik = !kapali.has(anahtar);
+        const gorunen = yalnizDegisen ? g.kalemler.filter(dikkat) : g.kalemler;
+        const gizli = g.kalemler.length - gorunen.length;
+        const gOnay = g.kalemler.filter((k) => secim[k.id]?.karar === "onaylandi").length;
+        const gRed = g.kalemler.filter((k) => secim[k.id]?.karar === "reddedildi").length;
+        const gKalan = g.kalemler.length - gOnay - gRed;
+        return (
+          <div key={anahtar} data-testid="karar-grup">
+            {gruplu && (
+              <div className="px-4 sm:px-5 py-2 border-b flex flex-wrap items-center gap-x-3 gap-y-1.5" style={{ borderColor: CARD_BORDER, backgroundColor: "rgba(255,255,255,0.03)" }}>
+                <button onClick={() => grupAc(anahtar)} aria-expanded={acik} className="inline-flex items-center gap-1.5 min-w-0 text-left">
+                  <ChevronDown size={14} className={`shrink-0 transition-transform ${acik ? "" : "-rotate-90"}`} style={{ color: TEXT_MUTED }} />
+                  <span className="text-sm font-bold text-white truncate">{g.tedarikci ?? "Tedarikçi belirtilmemiş"}</span>
+                  <span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>· {g.kalemler.length} kalem</span>
+                </button>
+                <span className="text-[11px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+                  {gOnay > 0 && <span className="text-emerald-400 font-semibold">{gOnay} onay</span>}
+                  {gOnay > 0 && gRed > 0 && " · "}
+                  {gRed > 0 && <span className="text-red-400 font-semibold">{gRed} red</span>}
+                  {(gOnay > 0 || gRed > 0) && gKalan > 0 && " · "}
+                  {gKalan > 0 && <span className="text-amber-400">{gKalan} bekliyor</span>}
+                </span>
+                {gKalan > 0 && (
+                  <button onClick={() => kalanlariOnayla(g.kalemler)} data-testid="grubu-onayla"
+                    className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+                    <Check size={12} /> Bu grubu onayla{gOnay + gRed > 0 ? ` (kalan ${gKalan})` : ""}
+                  </button>
+                )}
               </div>
-              {notlar.has(k.id) && <KalemNotSatirlari n={notlar.get(k.id) as KalemNotlari} />}
-              {s?.karar === "reddedildi" && (
-                <div className="mt-1.5 sm:ml-[40px] flex flex-wrap items-center gap-1.5">
-                  {RED_NEDENLERI.map((n) => (
-                    <button key={n} onClick={() => nedenYaz(k.id, s.red_nedeni === n ? "" : n)} aria-pressed={s.red_nedeni === n}
-                      className="px-2 py-1 rounded-md border text-[11px] font-medium transition-colors"
-                      style={s.red_nedeni === n ? { borderColor: "rgba(239,68,68,0.55)", backgroundColor: "rgba(239,68,68,0.12)", color: "#F87171" } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-                      {n}
-                    </button>
-                  ))}
-                  <input value={s.red_nedeni} maxLength={300} aria-label={`${k.urun} red nedeni`}
-                    onChange={(e) => nedenYaz(k.id, e.target.value)}
-                    placeholder="ya da red nedenini yazın (isteğe bağlı)" className="flex-1 min-w-[200px] px-2.5 py-1 border rounded-md text-xs text-white focus:outline-none focus:ring-2 focus:ring-red-500/30" style={girdiStil} />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+            )}
+            {acik && (
+              <ul className="divide-y border-b last:border-b-0" style={{ borderColor: CARD_BORDER }}>
+                {gorunen.map(kalemSatiri)}
+                {gizli > 0 && (
+                  <li className="px-4 sm:px-5 py-1.5 text-[11px] sm:pl-[60px]" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                    {gizli} değişmeyen kalem gizli{g.kalemler.filter((k) => !dikkat(k) && !secim[k.id]).length > 0 ? " · “Bu grubu onayla” ya da “Kalanları onayla” bunları da onaylar" : ""}
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        );
+      })}
 
       <footer className="px-4 sm:px-5 py-4 border-t space-y-3" style={{ borderColor: CARD_BORDER }}>
         <div>
@@ -391,11 +515,12 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm" style={{ color: TEXT_MUTED }}>
-            <span className="text-emerald-400 font-semibold">{onaySayisi} onay</span> · <span className="text-red-400 font-semibold">{redSayisi} red</span>
+            <span className="text-emerald-400 font-semibold">{onaySayisi} onay</span>{degisenOnay.length > 0 && <span className="text-amber-400"> ({degisenOnay.length} değiştirilerek)</span>} · <span className="text-red-400 font-semibold">{redSayisi} red</span>
             {kalan > 0 && <> · <span className="text-amber-400 font-semibold">{kalan} karar bekliyor</span></>}
+            {gecersizDegisiklik > 0 && <> · <span className="text-red-400 font-semibold">{gecersizDegisiklik} kalemde onaylanan miktar eksik</span></>}
           </p>
-          <button onClick={() => setOnay(true)} disabled={kalan > 0 || kaydediliyor}
-            title={kalan > 0 ? "Her kalem için Onayla ya da Reddet seçin" : undefined}
+          <button onClick={() => setOnay(true)} disabled={kalan > 0 || gecersizDegisiklik > 0 || kaydediliyor}
+            title={kalan > 0 ? "Her kalem için Onayla, Değiştir ya da Reddet seçin" : gecersizDegisiklik > 0 ? "Değiştirilen kalemlerde onaylanan miktarı yazın" : undefined}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110"
             style={{ backgroundColor: ACCENT }}>
             {kaydediliyor ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Kararı kaydet ve gönder
@@ -408,12 +533,21 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar }: {
         open={onay}
         onOpenChange={(a) => { if (!a) setOnay(false); }}
         title={`${liste.liste_no} kararı kaydedilsin mi?`}
-        description={`${onaySayisi} kalem onaylanacak, ${redSayisi} kalem reddedilecek.${onaySayisi ? " Onaylananlardan satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} e-postayla gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
+        description={`${onaySayisi} kalem onaylanacak${miktariDegisen ? ` (${miktariDegisen} kalemin miktarı değiştirildi)` : ""}, ${redSayisi} kalem reddedilecek.${onaySayisi ? " Onaylananlardan satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} e-postayla gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
         confirmLabel="Evet, kaydet" cancelLabel="Vazgeç"
         onConfirm={kaydet} loading={kaydediliyor} loadingLabel="Kaydediliyor..."
       />
     </section>
   );
+}
+
+/** Gecen haftaya gore rozet (14.11.2026) */
+function HaftaRozetiEtiketi({ r }: { r: HaftaRozeti }) {
+  const renk: Record<HaftaRozeti["tur"], string> = {
+    yeni: "bg-sky-500/15 text-sky-300", artti: "bg-amber-500/15 text-amber-300", birim: "bg-amber-500/15 text-amber-300",
+    red: "bg-red-500/15 text-red-300", azaldi: "bg-white/5 text-slate-300", ayni: "bg-white/5 text-slate-400", her_hafta: "bg-emerald-500/10 text-emerald-300",
+  };
+  return <span className={`ml-1.5 align-middle text-[10px] font-semibold px-1.5 py-px rounded whitespace-nowrap ${renk[r.tur]}`} data-testid="hafta-rozeti" data-tur={r.tur}>{r.metin}</span>;
 }
 
 /** Karar ekrani kalem notlari: form ici tekrar, diger departman, son 30 gun. */
@@ -456,7 +590,8 @@ function KalemBilgisi({ k }: { k: SaKalem }) {
         {k.urun}
         {k.aciliyet === "acil" && <span className="ml-2 align-middle text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">ACİL</span>}
       </p>
-      <p className="text-sm" style={{ color: TEXT_MUTED }}><span className="font-semibold text-white">{miktarBirim(k)}</span> · {k.talep_eden}</p>
+      <p className="text-sm" style={{ color: TEXT_MUTED }}><span className="font-semibold text-white">{onayliMiktarBirim(k)}</span>{miktarDegisti(k) && <span className="text-amber-400"> (talep {miktarBirim(k)})</span>} · {k.talep_eden}</p>
+      {k.onay_notu && <p className="text-xs mt-0.5 font-semibold text-emerald-400 break-words">Onay notu: {k.onay_notu}</p>}
       {k.aciklama && <p className="text-xs mt-0.5 break-words" style={{ color: TEXT_MUTED }}>{k.aciklama}</p>}
       {k.tedarikci && <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Tedarikçi: {k.tedarikci}</p>}
     </div>
@@ -663,7 +798,7 @@ function TeslimPaneli({ l, onDegisti }: { l: Liste; onDegisti: () => void }) {
         open={!!geriAlinacak}
         onOpenChange={(a) => { if (!a && isleniyor === null) setGeriAlinacak(null); }}
         title="Teslim geri alınsın mı?"
-        description={geriAlinacak ? `${geriAlinacak.urun} (${miktarBirim(geriAlinacak)}) yeniden "Teslim bekliyor" olur; teslim alan bilgisi (${geriAlinacak.alan_ad || "-"}) silinir.` : ""}
+        description={geriAlinacak ? `${geriAlinacak.urun} (${onayliMiktarBirim(geriAlinacak)}) yeniden "Teslim bekliyor" olur; teslim alan bilgisi (${geriAlinacak.alan_ad || "-"}) silinir.` : ""}
         confirmLabel="Evet, geri al" cancelLabel="Vazgeç" destructive
         onConfirm={geriAl} loading={isleniyor !== null} loadingLabel="Geri alınıyor..."
       />
@@ -737,9 +872,9 @@ function DepartmanGecmisi({ listeler, departmanlar }: { listeler: Liste[]; depar
                           <td className="px-4 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.liste_no}</td>
                           <td className="px-4 py-2.5 text-sm">
                             <span className="text-white font-medium">{k.urun}</span>
-                            <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}</span>
+                            <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}{k.onay_notu ? ` · Onay notu: ${k.onay_notu}` : ""}</span>
                           </td>
-                          <td className="px-4 py-2.5 text-sm text-right text-white font-semibold whitespace-nowrap">{miktarBirim(k)}</td>
+                          <td className="px-4 py-2.5 text-sm text-right text-white font-semibold whitespace-nowrap">{onayliMiktarBirim(k)}{miktarDegisti(k) && <span className="block text-[11px] font-normal text-amber-400">talep {miktarBirim(k)}</span>}</td>
                           <td className="px-4 py-2.5 text-sm whitespace-nowrap" style={{ color: TEXT_MUTED }}>{k.talep_eden}</td>
                           <td className="px-4 py-2.5 text-xs whitespace-nowrap">
                             {k.alindi

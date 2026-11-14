@@ -8,7 +8,7 @@ import {
 import { satinAlmaCagir } from "@/lib/satin-alma/api";
 import { tokenBicimiGecerli } from "@/lib/ic-piyasa/genel-api";
 import {
-  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarYaz, saTarih, tedarikciDuzelt, tedarikciGruplari, type SaKalem, type SaListe,
+  BIRIMLER, KATEGORILER, adSoyadDuzelt, adSoyadGecerli, listeOzeti, miktarDegisti, miktarYaz, onayliMiktar, saTarih, tedarikciDuzelt, tedarikciGruplari, type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 
 /**
@@ -218,9 +218,13 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
                   <td className={tdSinifi}>
                     <span className="font-semibold break-words">{k.urun}</span> {k.aciliyet === "acil" && <AcilEtiketi />}
                     {k.aciklama && <span className="block text-[11.5px] mt-0.5 break-words" style={{ color: B.soluk }}>{k.aciklama}</span>}
+                    {k.onay_notu && <span className="block text-[11.5px] mt-0.5 font-semibold break-words" style={{ color: B.yesil }} data-testid="cek-onay-notu">Onay notu: {k.onay_notu}</span>}
                   </td>
                   <td className={`${tdSinifi} whitespace-nowrap`} style={{ color: B.soluk }}>{KATEGORILER[k.kategori] ?? k.kategori}</td>
-                  <td className={`${tdSinifi} text-right tabular-nums font-bold whitespace-nowrap`}>{miktarYaz(k.miktar)}</td>
+                  <td className={`${tdSinifi} text-right tabular-nums font-bold whitespace-nowrap`}>
+                    {miktarYaz(onayliMiktar(k))}
+                    {miktarDegisti(k) && <span className="block text-[11px] font-normal" style={{ color: B.turuncu }} title="Onaylayan miktarı değiştirdi">Talep: {miktarYaz(k.miktar)}</span>}
+                  </td>
                   <td className={`${tdSinifi} whitespace-nowrap`}>{BIRIMLER[k.birim] ?? k.birim}</td>
                   <td className={`${tdSinifi} whitespace-nowrap`}>{k.talep_eden}</td>
                   <td className={`${tdSinifi} py-2`}>

@@ -6,7 +6,7 @@ import { B, dugmeAna, dugmeIkincil, girdiSinifi, girdiStil, thSinifi } from "@/c
 import { miktarOku } from "@/lib/satin-alma/api";
 import type { ExcelSatiri } from "@/lib/satin-alma/excel";
 import {
-  BIRIMLER, KATEGORILER, miktarYaz, saTarih, tedarikciDuzelt, urunNorm,
+  BIRIMLER, KATEGORILER, kalemAnahtari, miktarYaz, saTarih, tedarikciDuzelt, urunNorm,
   type Birim, type Kategori, type SaKalem, type SaUrun,
 } from "@/supabase/functions/_shared/satin-alma";
 
@@ -71,22 +71,25 @@ export function kopyaSatirlari(kalemler: SaKalem[]): TopluSatir[] {
 
 export function excelSatirlari(satirlar: ExcelSatiri[]): TopluSatir[] {
   return satirlar.map((x) => ({
-    anahtar: `e${x.sira}`, secili: true, urun: x.urun, kategori: x.kategori, miktar: x.miktar == null ? "" : miktarYaz(x.miktar),
+    anahtar: `e${x.hucre || x.sira}`, secili: true, urun: x.urun, kategori: x.kategori, miktar: x.miktar == null ? "" : miktarYaz(x.miktar),
     birim: x.birim ?? "", tedarikci: x.tedarikci || "", aciklama: x.aciklama, aciliyet: "normal",
-    bilgi: `Excel satır ${x.sira}${x.kategoriHam ? ` · ${x.kategoriHam}` : ""}`, sorun: x.sorun,
+    bilgi: `Excel ${x.hucre ? `hücre ${x.hucre}` : `satır ${x.sira}`}${x.blok ? ` · ${x.blok} bloğu` : ""}${x.kategoriHam ? ` · ${x.kategoriHam}` : ""}`, sorun: x.sorun,
   }));
 }
 
-/** Formda zaten olan (ayni anahtar) ve listede daha once gecen urunleri isaretler. */
-export function engelleriIsaretle(satirlar: TopluSatir[], formdakiler: string[]): TopluSatir[] {
-  const form = new Set(formdakiler.map((u) => urunNorm(u)).filter(Boolean));
+/** Formda zaten olan ve listede daha once gecen kalemleri isaretler.
+ * 14.11.2026: anahtar URUN + TEDARIKCI (ayni urun farkli tedarikciden ayri satir olabilir). */
+export type FormdakiKalem = { urun: string; tedarikci?: string | null };
+export function engelleriIsaretle(satirlar: TopluSatir[], formdakiler: FormdakiKalem[]): TopluSatir[] {
+  const form = new Set(formdakiler.filter((f) => urunNorm(f.urun)).map((f) => kalemAnahtari(f.urun, f.tedarikci)));
   const gorulen = new Set<string>();
   return satirlar.map((s) => {
-    const n = urunNorm(s.urun);
+    const dolu = !!urunNorm(s.urun);
+    const n = kalemAnahtari(s.urun, s.tedarikci);
     let engel: string | null = null;
-    if (n && form.has(n)) engel = "Formda var";
-    else if (n && gorulen.has(n)) engel = "Listede tekrar";
-    if (n && !engel) gorulen.add(n);
+    if (dolu && form.has(n)) engel = s.tedarikci.trim() ? "Bu tedarikçiden formda var" : "Formda var";
+    else if (dolu && gorulen.has(n)) engel = "Listede tekrar";
+    if (dolu && !engel) gorulen.add(n);
     return { ...s, engel, secili: engel ? false : s.secili };
   });
 }
@@ -110,7 +113,7 @@ const BASLIK: Record<TopluKaynak, string> = {
 };
 
 export function TopluEklemePaneli({ kaynak, altBaslik, ilkSatirlar, formdakiler, uyarilar, ekleniyor, hata, onEkle, onKapat }: {
-  kaynak: TopluKaynak; altBaslik?: string; ilkSatirlar: TopluSatir[]; formdakiler: string[]; uyarilar?: string[];
+  kaynak: TopluKaynak; altBaslik?: string; ilkSatirlar: TopluSatir[]; formdakiler: FormdakiKalem[]; uyarilar?: string[];
   ekleniyor: boolean; hata: string | null;
   onEkle: (satirlar: TopluSatir[]) => void; onKapat: () => void;
 }) {
@@ -121,8 +124,9 @@ export function TopluEklemePaneli({ kaynak, altBaslik, ilkSatirlar, formdakiler,
 
   const guncelle = (anahtar: string, alanlar: Partial<TopluSatir>) => setSatirlar((liste) => {
     const yeni = liste.map((s) => (s.anahtar === anahtar ? { ...s, ...alanlar, ...(alanlar.urun !== undefined || alanlar.miktar !== undefined || alanlar.birim !== undefined ? { sorun: null } : {}) } : s));
-    // Urun adi degisirse engeller yeniden hesaplanir (secim korunur)
-    if (alanlar.urun === undefined) return yeni;
+    // Urun adi ya da tedarikci degisirse engeller yeniden hesaplanir (secim korunur;
+    // engeli kalkan satir kendiliginden secilmez)
+    if (alanlar.urun === undefined && alanlar.tedarikci === undefined) return yeni;
     const secimler = new Map(yeni.map((s) => [s.anahtar, s.secili]));
     return engelleriIsaretle(yeni, formdakiler).map((s) => ({ ...s, secili: s.engel ? false : secimler.get(s.anahtar) ?? s.secili }));
   });

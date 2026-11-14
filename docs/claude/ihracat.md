@@ -1307,3 +1307,9 @@ yazılmış) pay içinde kaldı. Fatura, sistemdeki konteyner (kantar) ağırlı
 - 12.11.2026 (revize-1112c): kontrol kartlarındaki "Metinden okundu · ücretsiz" etiketi ve özet metnindeki "Fatura metninden
   okundu (yapay zekâ kullanılmadı)" ifadesi kaldırıldı (kullanıcı: "programı ucuz gösteriyor"). Kayıtlı eski özetler ekranda
   `ozetTemizle` ile temizlenir (kayıt değişmez).
+
+### 14.11.2026 FATURA TALİMATI MAİLİ CANLIDA
+- Ayarlar > Rapor Alıcıları > Fatura Talimatı canlı: bbt@, execution@, operation@, export@, export2@.
+- Geçiş anında hazır olan eski dosyalar (IHR-2026-0110 / 0112 / 0113 / 0114) için kullanıcı mail İSTEMEDİ:
+  `fatura_talimati_onaylari` durum 'atlandi' (test=false) kaydı yazıldı (migration 20261114140000); dosya
+  sayfasında "gönderilmedi (canlıya geçişte atlandı)" + "Şimdi gönder". IHR-2026-0115 ilk taramada gerçek gitti.

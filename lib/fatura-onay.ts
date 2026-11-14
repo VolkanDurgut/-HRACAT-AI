@@ -14,7 +14,8 @@ import { bayrakPng } from "@/lib/bayraklar";
 import { ticaretYapilanUlke } from "@/lib/ulke-bul";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
-export type FaturaOnayDurumu = "gonderildi" | "bekliyor" | "onaylandi" | "revize";
+/** 14.11.2026 atlandi: canliya geciste mail istenmeyen eski hazir dosya (mail GITMEDI). */
+export type FaturaOnayDurumu = "gonderildi" | "atlandi" | "bekliyor" | "onaylandi" | "revize";
 export type FaturaOnayKaydi = {
   id: string;
   dosya_id: string;
@@ -33,7 +34,7 @@ export type FaturaOnayKaydi = {
 };
 const ALANLAR = "id,dosya_id,durum,test,kaynak,gonderen,onay_alicilari,gonderilen,karar_veren,karar_zamani,revize_notu,dagitim_konusu,dagitim_alicilari,olusturma";
 
-export const ONAY_DURUM_ADI: Record<FaturaOnayDurumu, string> = { gonderildi: "Gönderildi", bekliyor: "Onay bekliyor (eski)", onaylandi: "Onaylandı (eski)", revize: "Revize istendi (eski)" };
+export const ONAY_DURUM_ADI: Record<FaturaOnayDurumu, string> = { gonderildi: "Gönderildi", atlandi: "Gönderilmedi (canlıya geçişte atlandı)", bekliyor: "Onay bekliyor (eski)", onaylandi: "Onaylandı (eski)", revize: "Revize istendi (eski)" };
 
 /** Dosyanin en son onay kaydi (yoksa null). */
 export async function sonFaturaOnayi(dosyaId: string): Promise<FaturaOnayKaydi | null> {

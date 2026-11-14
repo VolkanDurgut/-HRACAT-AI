@@ -46,16 +46,20 @@ export function FaturaOnayDurumu({ dosyaId, tam }: { dosyaId: string; tam: boole
   return (
     <div className="flex flex-wrap items-center justify-end gap-2 text-[11px]" data-testid="fatura-onay-durumu" data-durum={kayit?.durum || "yok"}>
       {!kayit && <><span style={{ color: TEXT_MUTED }}>Fatura talimatı maili henüz gönderilmedi (otomatik 10 dk içinde).</span>{dugme("Şimdi gönder", false)}</>}
-      {kayit && <>
+      {kayit?.durum === "atlandi" && <>
+        <span style={{ color: TEXT_MUTED }} title="14.11.2026 canlıya geçişte bu dosya için talimat maili gönderilmedi.">Fatura talimatı maili gönderilmedi (canlıya geçişte atlandı).</span>
+        {tam && dugme("Şimdi gönder", true)}
+      </>}
+      {kayit && kayit.durum !== "atlandi" && <>
         <span className="inline-flex items-center gap-1" style={{ color: "#6EE7B7" }}>
           <CheckCircle2 size={12} /> Fatura talimatı maili gönderildi{kayit.test ? " (test)" : ""} · {trZaman(kayit.karar_zamani || kayit.olusturma)} ·{" "}
           <Link href={`/fatura-onay?id=${kayit.id}`} className="underline" style={{ color: TEXT_MUTED }}>talimat sayfası</Link>
         </span>
         {tam && dugme("Tekrar gönder", true)}
       </>}
-      <ConfirmDialog open={tekrarAc} onOpenChange={setTekrarAc} title="Fatura talimatı maili tekrar gönderilsin mi?"
-        description="Talimat maili (PDF indirme düğmesiyle) Ayarlar > Rapor Alıcıları > Fatura Talimatı listesine yeniden gönderilir."
-        confirmLabel="Tekrar gönder" cancelLabel="Vazgeç" onConfirm={() => { setTekrarAc(false); gonder(); }} />
+      <ConfirmDialog open={tekrarAc} onOpenChange={setTekrarAc} title={kayit?.durum === "atlandi" ? "Fatura talimatı maili gönderilsin mi?" : "Fatura talimatı maili tekrar gönderilsin mi?"}
+        description="Talimat maili (PDF indirme düğmesiyle) Ayarlar > Rapor Alıcıları > Fatura Talimatı listesine gönderilir."
+        confirmLabel={kayit?.durum === "atlandi" ? "Gönder" : "Tekrar gönder"} cancelLabel="Vazgeç" onConfirm={() => { setTekrarAc(false); gonder(); }} />
     </div>
   );
 }

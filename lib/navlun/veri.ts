@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { NavlunSatiri } from "@/lib/navlun/ozet";
 import { baglamKur, type AcenteHafizasi, type GerceklesenKanit, type KarsilastirmaBaglami, type LimanKurali } from "@/lib/navlun/karsilastirma";
 import { limanAnahtari } from "@/lib/liman-anahtari";
+import { esleriYukle, type AdEsi } from "@/supabase/functions/_shared/navlun-tablosu";
 
 export type OkunamayanMesaj = {
   id: string;
@@ -77,6 +78,9 @@ export async function navlunVerisiOku(gun = 120): Promise<NavlunVerisi> {
   if (e2) throw new Error(e2.message);
   const { data: son, error: e3 } = await supabase.from("navlun_mesajlari").select("updated_at").order("updated_at", { ascending: false }).limit(1);
   if (e3) throw new Error(e3.message);
+  // 16.11.2026 liman / firma es sozlugu (Excel indir tablosu edge raporuyla ayni eslesmeyi kullansin); okunamazsa sabit esler
+  const { data: esler } = await supabase.from("ad_esleri").select("tur,kaynak,hedef");
+  esleriYukle((esler || []) as AdEsi[]);
   // Baglam okunamazsa sayfa yine acilir; lokali belirsiz teklifler en iyi sayilmaz (guvenli taraf) ve uyari gosterilir
   let baglam: KarsilastirmaBaglami | null = null;
   let baglamHatasi: string | null = null;

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup, Link2 } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -64,6 +64,7 @@ const ayarlarAltMenu = [
   { label: "Yetkilendirme", href: "/ayarlar/yetkilendirme", icon: <ShieldCheck size={15} /> },
   { label: "Rapor Alıcıları", href: "/ayarlar/raporlar", icon: <Mail size={15} /> },
   { label: "Veri Yedekleri", href: "/ayarlar/yedekler", icon: <DatabaseBackup size={15} /> },
+  { label: "Liman ve Firma Eşleri", href: "/ayarlar/esler", icon: <Link2 size={15} /> },
 ];
 
 const NAVY = "#10B981";

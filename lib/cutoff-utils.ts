@@ -222,17 +222,28 @@ export function formatCurrency(amount: number | null, currency: string | null): 
  * kullanilmaz.
  */
 /**
- * Kalem bazinda FOB birim fiyati (MT basina) - 03.11.2026.
- * Muhasebe programi (Logo) faturada navlunu kalemlere FOB TUTARIYLA ORANTILI dagitir
- * (IHR-2026-0110 faturasinda her satirda oran 2.400 / 65.308,68 = %3,67486). Eskiden
- * talimat KG basina ESIT tutar dusuyordu (0,450 -> 0,434 / 0,470 -> 0,454); Logo bunu
- * oranla geri dagitinca CIF birim 0,44994888 / 0,47068385 cikti, toplam 0,32 USD saptı.
- * Dogrusu: her kalemin CIF birimi AYNI ORANDA dusulur: FOB = CIF x (toplam FOB / toplam CIF).
- * Toplam FOB degismez; Logo navlunu oranla ekleyince CIF birimler tam tutar.
+ * Kalem bazinda FOB birim fiyati (MT basina).
+ * 16.11.2026 (kullanici onayi: "Lutfen gorseldeki yonteme gecelim"): TON BASINA ESIT DUSUM.
+ *   Net navlun (navlun - lokal masraf, konteyner basi) tonlara esit dagilir; her kalemin CIF
+ *   biriminden AYNI tutar dusulur: FOB = CIF - (toplam CIF - toplam FOB) / toplam MT.
+ *   Ornek IHR-2026-0115: navlun 1.850 - lokal 400 = 1.450 / 25 t = 58 $/t ->
+ *   490 CIF -> 432 FOB, 470 CIF -> 412 FOB (ekibin elle hesabi: 490 - 74 + 16). Toplam MT'ye
+ *   bolundugu icin 25 t'dan az yuklenen konteynerde de dogru; kalemler x miktar = toplam FOB.
+ * ONCEKI (03.11-16.11.2026): oransal dusum FOB = CIF x (toplam FOB / toplam CIF) - Logo navlunu
+ *   tutarla orantili dagittigi icin seciliydi. Ton basi yontemde Logo'da navlun MIKTARA (kg) gore
+ *   dagitilmali; yoksa faturadaki CIF birimler proformadan sapar (docs/claude/ihracat.md).
+ * toplamMiktarMt yoksa (0) eski oransal hesaba duser (miktarsiz kalem olmasin diye).
  */
-export function fobBirimFiyati(cifBirimPerMt: number, toplamCif: number, toplamFob: number | null): number | null {
+export function fobBirimFiyati(cifBirimPerMt: number, toplamCif: number, toplamFob: number | null, toplamMiktarMt = 0): number | null {
   if (toplamFob === null || !(toplamCif > 0) || !Number.isFinite(cifBirimPerMt)) return null;
+  if (toplamMiktarMt > 0) return cifBirimPerMt - (toplamCif - toplamFob) / toplamMiktarMt;
   return cifBirimPerMt * (toplamFob / toplamCif);
+}
+
+/** Ton basina dusulen net navlun (USD/MT): (toplam CIF - toplam FOB) / toplam MT. Yoksa null. */
+export function tonBasiNetNavlun(toplamCif: number, toplamFob: number | null, toplamMiktarMt: number): number | null {
+  if (toplamFob === null || !(toplamMiktarMt > 0)) return null;
+  return (toplamCif - toplamFob) / toplamMiktarMt;
 }
 
 /**

@@ -6,7 +6,8 @@
  * Kalemler faturalara SIRAYLA dagitilir (1. fatura once 1. kalemden dolar; bir kalem iki faturaya
  * bolunebilir). Birim fiyatlar degismez. Tutarlar kurusa yuvarlanir; bir kalemin son parcasi kalem
  * toplamindan kalani alir, boylece faturalarin toplami proforma toplamina BIREBIR esit olur.
- * FOB: her faturanin CIF payi oraninda (fatura talimatindaki oransal FOB ile ayni); son fatura kalani alir.
+ * FOB (16.11.2026): her faturanin CIF tutarindan kg payina dusen net navlun cikar (ton basi esit dusum,
+ * fatura talimatindaki fobBirimFiyati ile ayni); son fatura kalani alir.
  */
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 
@@ -61,9 +62,12 @@ export function faturaBolunmesi(urunler: unknown, parcalar: TalimatParcaGirdisi[
   });
   if (toplamFob !== null) {
     const toplamCif = sonuc.reduce((t, p) => t + p.tutar, 0);
+    const toplamKg = sonuc.reduce((t, p) => t + p.kg, 0);
+    // Kg basina net navlun (toplam CIF - toplam FOB) / toplam kg; FOB teslimde 0
+    const navlunKg = toplamKg > 0 ? (toplamCif - toplamFob) / toplamKg : 0;
     let kalan = yuvarla(toplamFob);
     sonuc.forEach((p, i) => {
-      p.fobTutar = i === sonuc.length - 1 ? yuvarla(kalan) : (toplamCif > 0 ? yuvarla(toplamFob * p.tutar / toplamCif) : 0);
+      p.fobTutar = i === sonuc.length - 1 ? yuvarla(kalan) : yuvarla(p.tutar - navlunKg * p.kg);
       kalan = yuvarla(kalan - p.fobTutar);
     });
   }

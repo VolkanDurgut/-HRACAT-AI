@@ -198,7 +198,7 @@ function ciz(
   const urunler = (dosya.urun_detaylari as any[]) || [];
   const toplamMiktar = urunler.reduce((s, u) => s + kalemMiktari(u), 0);
   // Kalem FOB birimi: toplamCif/toplamFob yukarida hesaplaFobFreightCifToplamlari'ndan geldi;
-  // her kalemin CIF birimi AYNI ORANDA dusulur (fobBirimFiyati, 03.11.2026 - Logo ile ayni).
+  // 16.11.2026: her kalemin CIF biriminden TON BASINA AYNI net navlun dusulur (fobBirimFiyati).
 
   // Muhasebe talebi (14.10.2026): hangi urunden kac konteyner yuklendi.
   const dagilim = urunKonteynerDagilimi(urunler, konteynerler as any[]);
@@ -218,7 +218,7 @@ function ciz(
     // FOB teslimde proforma fiyati FOB'dur: FOB sutununa yazilir, CIF bos kalir.
     if (fiyatlarFob) return [ad, ambalajBoyutu, konteynerHucresi(i), miktarHucresi(u), "-", formatBirimFiyatKg(proformaBirim)];
     const cifBirim = proformaBirim;
-    const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
+    const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob, toplamMiktar);
     // Muhasebe talebi: birim fiyatlar burada KG basina, virgullu ve para birimi
     // sembolsuz (CIF "0,450"; FOB 8 ondalik "0,43404939" - Logo'ya aynen girilir).
     // Sistemde TON (MT) basina tutulan deger degismez, sadece goruntuleme boyle.
@@ -289,7 +289,7 @@ function ciz(
     const agirliklar = parcaAgirliklari(parcalar, toplamNetKg, toplamBrutKg);
     parcalar.forEach((p, pi) => {
       p.kalemler.forEach((k, i) => {
-        const fobBirim = fobSutunu ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob) : null;
+        const fobBirim = fobSutunu ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob, toplamMiktar) : null;
         govde.push([
           i === 0 ? `${p.sira}. FATURA` : "", i === 0 ? p.belgeNo : "", k.ad, k.ambalaj || "-",
           k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 }), formatBirimFiyatKg(k.birimKg * 1000),

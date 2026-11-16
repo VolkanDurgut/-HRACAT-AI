@@ -1313,3 +1313,13 @@ yazılmış) pay içinde kaldı. Fatura, sistemdeki konteyner (kantar) ağırlı
 - Geçiş anında hazır olan eski dosyalar (IHR-2026-0110 / 0112 / 0113 / 0114) için kullanıcı mail İSTEMEDİ:
   `fatura_talimati_onaylari` durum 'atlandi' (test=false) kaydı yazıldı (migration 20261114140000); dosya
   sayfasında "gönderilmedi (canlıya geçişte atlandı)" + "Şimdi gönder". IHR-2026-0115 ilk taramada gerçek gitti.
+
+### 16.11.2026 FOB BİRİM FİYATI: TON BAŞINA EŞİT DÜŞÜM
+- Kullanıcı (ekibin elle hesabı, IHR-2026-0115): navlun 1.850 / 25 t = 74, lokal 400 / 25 t = 16 →
+  490 − 74 + 16 = 432, 470 − 74 + 16 = 412 FOB. "Lütfen görseldeki yönteme geçelim."
+- `fobBirimFiyati(cif, toplamCif, toplamFob, toplamMiktarMt)`: FOB = CIF − (toplamCif − toplamFob) / toplam MT
+  (sabit 25 değil: toplam tonaja bölünür). Toplam FOB değişmedi (CIF − net navlun × konteyner).
+  Talimat PDF'i, metin talimat, Ek Bilgiler kartı ve fatura bölünmesi (`faturaBolunmesi`: kg payı) aynı hesap.
+- ÖNCEKİ (03.11): oransal FOB = CIF × toplamFob/toplamCif (Logo navlunu tutarla orantılı dağıttığı için).
+  Ton başı yöntemde Logo'da navlun MİKTARA (kg) göre dağıtılmalı; yoksa faturadaki CIF birimler sapar
+  (0115'te oransal dağıtımda 491,85 / 469,08). Test: tests/fob-ton-basi.test.ts.

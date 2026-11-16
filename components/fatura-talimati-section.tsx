@@ -86,6 +86,8 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     // CIF yazilmaz (PDF ile ayni kural: hesaplaFobFreightCifToplamlari).
     const fiyatlarFob = navlunAliciyaAitMi(dosya.teslim_sekli);
     const toplamFob = fiyatlarFob ? toplamCif : dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+    // 16.11.2026: ton basi FOB icin toplam miktar (MT) - PDF ile ayni (kalemMiktari)
+    const toplamMiktarMt = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
     // Muhasebe talebi (14.10.2026): her urunden kac konteyner / kac MTS (PDF ile ayni hesap).
     const dagilim = urunKonteynerDagilimi(urunler as any[], konteynerler as any[]);
     const adetEki = (u: any, i: number) => {
@@ -101,8 +103,8 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       // fazla kalem olabilir - ayirt edilebilmesi icin ambalaj boyutu da yazilir.
       const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size;
       const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-      // FOB: CIF birimi toplam FOB / toplam CIF oraninda (Logo ile ayni, 03.11.2026)
-      const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
+      // FOB: CIF biriminden ton basina ayni net navlun dusulur (16.11.2026, PDF ile ayni)
+      const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob, toplamMiktarMt);
       // Muhasebe talebi: birim fiyatlar KG basina, virgullu 3 ondalikli, para
       // birimi sembolsuz (orn. "0,460") - PDF versiyonuyla tutarli.
       const birim = dosya.para_birimi || "USD";
@@ -194,7 +196,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       `     ${parcaAgirlikMetni(agirliklar[pi], true)}`,
       // 05.11.2026: CIF fiyatli dosyada FOB birim fiyat da (PDF ile ayni hesap: fobBirimFiyati)
       ...p.kalemler.map((k) => {
-        const fobBirim = !fiyatlarFob ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob) : null;
+        const fobBirim = !fiyatlarFob ? fobBirimFiyati(k.birimKg * 1000, toplamCif, toplamFob, toplamMiktarMt) : null;
         return `     - ${k.ad}${k.ambalaj ? ` (${k.ambalaj})` : ""}: ${k.kg.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} KG x ${fiyatlarFob ? "FOB " : "CIF "}${formatBirimFiyatKg(k.birimKg * 1000)} ${pb}/KG = ${formatCurrency(k.tutar, pb)}${fobBirim !== null ? ` (FOB birim ${formatFobBirimFiyatKg(fobBirim)} ${pb}/KG)` : ""}`;
       }),
     ].join("\n")).join("\n") : null;

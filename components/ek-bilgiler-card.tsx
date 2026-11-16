@@ -6,6 +6,7 @@ import { CopyableField } from "@/components/copyable-field";
 import { CokluNoGirisi, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import { noParcala, noBirlestir } from "@/lib/coklu-no";
 import { formatDateTR, formatCurrency, fobBirimFiyati } from "@/lib/cutoff-utils";
+import { kalemMiktari } from "@/lib/sayi-oku";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -44,6 +45,8 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
   : 0;
   const dusulecekVarMi = navlunToplam !== null || lokalMasrafToplam !== null;
   const toplamFob = dusulecekVarMi ? toplamCif - toplamDusulecek : null;
+  // 16.11.2026: ton basi FOB (fatura talimati ile ayni)
+  const toplamMiktarMt = urunler.reduce((s: number, u: any) => s + kalemMiktari(u), 0);
 
   // FOB kusuratli mi kontrolu - kusuratsiz olmasi icin onerilen lokal masraf degeri
   const toplamFobYuvarlanmis = toplamFob !== null ? Math.round(toplamFob * 100) / 100 : null;
@@ -152,7 +155,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           {urunler.map((u: any, i: number) => {
             const ad = u.urun_adi || u.description || "Ürün";
             const cifBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
-            const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob);
+            const fobBirim = fobBirimFiyati(cifBirim, toplamCif, toplamFob, toplamMiktarMt);
             return (
               <div key={i}>
                 <p className="text-sm font-medium text-white">{ad}</p>

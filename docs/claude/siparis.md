@@ -556,3 +556,14 @@ Migration `20261116210000_veri_tutarliligi.sql` (+ `..210500` aday eşiği), CAN
   `etd_degisimleri`'ne yazılır. Hatırlatmalar (ödeme / konşimento) `gemi_kalkis_tarihi`'ni okuduğu için kendiliğinden
   kayar; ETD değişimi mail TETİKLEMEZ. Hata aktarımı durdurmaz (warning). Kontrol Merkezi: `veri_tutarsizliklari()`
   'etd_degisti' (onem 'bilgi', 7 gün, kartta mavi).
+
+## 4.19 Sipariş Listesi sekmeleri (16.11.2026) — yalnız arayüz, veritabanı değişmedi
+
+Kontrol Merkezi / Pazar / Ana Panel düzeni (`app/siparisler/page.tsx`, saf yardımcılar `lib/siparis/gorunum.ts`, test `tests/siparis-gorunum.test.ts`):
+
+- **Sabit üst:** 6 kart aynı; tıklayınca ilgili sekme açılır ("Olası tekrar" ilk şüpheli satırın sekmesini açar).
+- **Kaynak eski şeridi:** `veri_tutarsizliklari()` içindeki `kaynak_eski` kalemleri (plan / sipariş listesi 3 günden eski — Kontrol Merkezi ile aynı kural). "Plan yükle" / "Liste yükle" mevcut Excel aktarım pencerelerini açar. RPC `analiz` yetkisi ister; okunamazsa şerit görünmez.
+- **Sekmeler (`?sekme=`; varsayılan rezervasyonlu adreste yazılmaz):** `rezervasyonlu` (rezervasyonlu + BL eksik) · `rez_bekleyen` (ön ödeme alındı, rezervasyon yok; turuncu sayı) · `onay` · `sevk` (sevk edilen + iptal) · `plan`. Her durum tam bir sekmede (`sekmeSayilari` toplamı = satır sayısı). Eski "sevk edilenleri göster" düğmesi kalktı.
+- **Arama:** tek kutu, Türkçe harf duyarsız; sekme sayıları aramaya göre daralır, boş sekmede "diğer sekmelerde N sonuç" yazar.
+- **Bağlantılar:** müşteri adı → `/pazar?musteri=` (Pazar yetkisi varsa); rezervasyonlu satırın dosya no'su → `/panel?dosya=` (sevk edilen / kapalı dosya Ana Panel'de olmayabileceği için yalnız rezervasyonlu).
+- "Dosyaya dönüştür" bu sayfada yok: rezervasyon operasyondan gelir, sipariş kendiliğinden sekme değiştirir.

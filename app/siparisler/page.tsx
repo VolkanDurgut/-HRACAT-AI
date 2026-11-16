@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Download, Link2, RefreshCw, Search, Ship, Trash2, Upload } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Download, Hourglass, Link2, PackageCheck, RefreshCw, Search, Ship, Trash2, Truck, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -10,8 +11,12 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import {
   BEKLEYEN_BLOK, BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planGorunumu, planKalemleri, planSirala, saat, siparisBolumleri,
-  siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisDurum, type SiparisSatiri,
+  siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisBolumu, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
+import {
+  aramaNorm, panelBaglantisi, pazarBaglantisi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type SiparisSekme,
+} from "@/lib/siparis/gorunum";
+import { tutarsizliklariOku, type Tutarsizlik } from "@/lib/veri-tutarsizliklari";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
 import { onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
@@ -26,9 +31,11 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  *  - Elle girilen: on odeme (TUTAR + tarih; rezervasyon oncesi siparislerde; "proformalar" yetkisi).
  *  - Siparis listesi export'un Excel'indeki gibi BOLUMLU (lib/siparis/liste.ts BOLUM_BASLIGI); en guncel en altta.
  *  - Excel indir: export'un ve operasyonun Excel'iyle ayni basliklar (lib/siparis/xlsx.ts).
+ *  - 16.11.2026 (Kontrol Merkezi / Pazar / Ana Panel duzeni): sabit ust (6 kart; tiklayinca ilgili sekme) + kaynak eski
+ *    uyari seridi (Kontrol Merkezi'nin ayni kurali, veri_tutarsizliklari) + tek sekme cubugu (?sekme=; lib/siparis/gorunum.ts):
+ *    Rezervasyonlu | Rezervasyon bekleyen | Onay bekleyen | Sevk edilen | Yukleme Plani. Arama sekme sayilarini daraltir.
+ *    Musteri adi -> Pazar karti (/pazar?musteri=), rezervasyonlu dosya no -> Ana Panel satiri (/panel?dosya=).
  */
-
-type Sekme = "siparis" | "plan";
 
 const DURUM_RENK: Record<SiparisDurum, [string, string]> = {
   onay_bekliyor: ["rgba(148,163,184,0.14)", "#CBD5E1"],
@@ -39,7 +46,7 @@ const DURUM_RENK: Record<SiparisDurum, [string, string]> = {
   iptal: ["rgba(148,163,184,0.08)", "#64748B"],
 };
 
-const norm = (s: string) => s.toLocaleUpperCase("tr-TR").replace(/İ/g, "I");
+const norm = aramaNorm;
 const sayiGoster = (n: number | null, k = 0) => (n === null ? "—" : n.toLocaleString("tr-TR", { maximumFractionDigits: k }));
 
 function DurumRozeti({ d }: { d: SiparisDurum }) {
@@ -116,9 +123,9 @@ const SIPARIS_SUTUNLARI: Array<{ basliklar: string[]; genislik: string; sag?: bo
   { basliklar: ["Ön ödeme"], genislik: "9%" },
 ];
 
-function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul }: {
+function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, pazarYetkisi }: {
   satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
-  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null;
+  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null; pazarYetkisi: boolean;
 }) {
   const alt = { color: TEXT_MUTED };
   const h = "px-2 py-2 align-top break-words";
@@ -155,7 +162,11 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir
                 </button>
               )}
             </td>
-            <td className={`${h} text-white`}>{s.firma || "—"}</td>
+            <td className={`${h} text-white`}>
+              {pazarYetkisi && pazarBaglantisi(s.firma) ? (
+                <Link href={pazarBaglantisi(s.firma)!} title="Pazar'da müşteri kartını aç" className="hover:underline decoration-white/40" data-musteri-link>{s.firma}</Link>
+              ) : (s.firma || "—")}
+            </td>
             <td className={h} style={{ color: "#C9D1DC" }}>
               {s.urun || "—"}
               <span className="block text-[11px]" style={alt}>{[s.marka, s.paketleme].filter(Boolean).join(" · ") || "—"}</span>
@@ -177,7 +188,9 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir
               )}
             </td>
             <td className={`${h} text-xs`} style={alt}>
-              {s.dosya_no || (s.durum === "on_odeme_alindi" ? <span className="text-amber-300">Rezervasyon alınmadı</span> : "—")}
+              {panelBaglantisi(s) ? (
+                <Link href={panelBaglantisi(s)!} title="Ana Panel'de dosyayı göster" className="text-white hover:underline decoration-white/40" data-dosya-link>{s.dosya_no}</Link>
+              ) : s.dosya_no || (s.durum === "on_odeme_alindi" ? <span className="text-amber-300">Rezervasyon alınmadı</span> : "—")}
               {s.booking_no ? <span className="block break-all">{s.booking_no}</span> : null}
               {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
             </td>
@@ -190,18 +203,18 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir
 }
 
 /** Excel'deki gibi bölümlü sipariş listesi; her bölümde en güncel en altta. */
-function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, sevkAcik, setSevkAcik }: {
+function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, goster, pazarYetkisi }: {
   liste: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
   onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null;
-  sevkAcik: boolean; setSevkAcik: (v: boolean) => void;
+  /** 16.11.2026 sekmeler: yalniz bu bolumler (sekmenin satirlari zaten suzulmus gelir) */
+  goster: SiparisBolumu[]; pazarYetkisi: boolean;
 }) {
-  const bolumler = useMemo(() => siparisBolumleri(liste), [liste]);
+  const bolumler = useMemo(() => siparisBolumleri(liste).filter((b) => goster.includes(b.bolum)), [liste, goster]);
   return (
     <div className="space-y-4">
       {bolumler.map((b) => {
         if (b.bolum === "iptal" && !b.adet) return null;
-        const sevkler = b.bolum === "rezervasyon" ? b.satirlar.filter((s) => s.durum === "sevk_edildi") : [];
-        const gorunen = b.bolum === "rezervasyon" && !sevkAcik ? b.satirlar.filter((s) => s.durum !== "sevk_edildi") : b.satirlar;
+        const gorunen = b.satirlar;
         const tutarlar = Object.entries(b.tutar).map(([p, t]) => `${sayiGoster(t, 0)} ${paraIsareti(p)}`).join(" + ") || "—";
         const vurgu = b.bolum === "on_odeme" ? "#93C5FD" : b.bolum === "bekleyen" ? "#CBD5E1" : b.bolum === "rezervasyon" ? "#6EE7B7" : "#64748B";
         return (
@@ -228,16 +241,7 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
                     </tr>
                   </thead>
                   <tbody>
-                    {b.bolum === "rezervasyon" && sevkler.length > 0 && (
-                      <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
-                        <td colSpan={11} className="px-3 py-2">
-                          <button type="button" onClick={() => setSevkAcik(!sevkAcik)} className="text-xs font-medium" style={{ color: "#6EE7B7" }} data-sevk-ac>
-                            {sevkAcik ? `Sevk edilen ${sevkler.length} siparişi gizle ▲` : `Sevk edilen ${sevkler.length} sipariş gizli — göster ▼`}
-                          </button>
-                        </td>
-                      </tr>
-                    )}
-                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} onEslestir={onEslestir} onAyir={onAyir} mesgul={mesgul} />
+                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} onEslestir={onEslestir} onAyir={onAyir} mesgul={mesgul} pazarYetkisi={pazarYetkisi} />
                   </tbody>
                 </table>
               </div>
@@ -467,12 +471,26 @@ function SiparisIcerik() {
   const { yetkiler } = useAuth();
   const yetkili = !!(yetkiler.sayfa_yetkileri.proformalar || yetkiler.sayfa_yetkileri.analiz);
   const isaretleyebilir = !!yetkiler.sayfa_yetkileri.proformalar;
-  const [sekme, setSekme] = useState<Sekme>("siparis");
+  const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
+  const [sekme, setSekmeDurumu] = useState<SiparisSekme>(VARSAYILAN_SIPARIS_SEKMESI);
+  // ?sekme= (varsayilan rezervasyonlu adreste yazilmaz); degisince adres guncellenir, gecmis kirletilmez
+  useEffect(() => {
+    try { const v = siparisSekmesi(new URLSearchParams(window.location.search).get("sekme")); if (v) setSekmeDurumu(v); } catch { /* yok */ }
+  }, []);
+  const setSekme = useCallback((v: SiparisSekme) => {
+    setSekmeDurumu(v);
+    try {
+      const u = new URL(window.location.href);
+      if (v === VARSAYILAN_SIPARIS_SEKMESI) u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
+      window.history.replaceState(window.history.state, "", u.toString());
+    } catch { /* yok */ }
+  }, []);
+  // Kaynak eski uyarisi (Kontrol Merkezi ile ayni kural: plan / siparis listesi 3 gunden eski). Okunamazsa serit gorunmez.
+  const [kaynakUyari, setKaynakUyari] = useState<Tutarsizlik[]>([]);
   const [siparisler, setSiparisler] = useState<SiparisSatiri[] | null>(null);
   const [plan, setPlan] = useState<PlanSatiri[] | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
-  const [sevkAcik, setSevkAcik] = useState(false);
   const [onOdemeSatir, setOnOdemeSatir] = useState<SiparisSatiri | null>(null);
   const [planTum, setPlanTum] = useState(false);
   const [arama, setArama] = useState("");
@@ -489,6 +507,9 @@ function SiparisIcerik() {
     try {
       const [s, p] = await Promise.all([siparisListesiOku(), yuklemePlaniOku()]);
       setSiparisler(s); setPlan(p);
+      tutarsizliklariOku()
+        .then((t) => setKaynakUyari(t.kalemler.filter((k) => k.tur === "kaynak_eski" && k.baglanti === "/siparisler")))
+        .catch(() => setKaynakUyari([]));
     } catch (e) { setHata(e instanceof Error ? e.message : "Veri okunamadı."); }
     finally { setYukleniyor(false); }
   }, []);
@@ -505,11 +526,9 @@ function SiparisIcerik() {
 
   const ozet = useMemo(() => siparisOzeti(siparisler || []), [siparisler]);
   const q = norm(arama.trim());
-  const gorunenSiparis = useMemo(() => {
-    let l = siparisler || [];
-    if (q) l = l.filter((s) => [s.proforma_no, s.firma, s.urun, s.liman, s.marka, s.booking_no, s.dosya_no, s.bl_no].some((v) => v && norm(v).includes(q)));
-    return l;
-  }, [siparisler, q]);
+  const aranan = useMemo(() => siparisAra(siparisler || [], arama), [siparisler, arama]);
+  const sayilar = useMemo(() => sekmeSayilari(aranan), [aranan]);
+  const gorunenSiparis = useMemo(() => (sekme === "plan" ? [] : aranan.filter((s) => sekmeyeAit(s, sekme))), [aranan, sekme]);
   const planBloklariGorunen = useMemo((): PlanBlogu[] => {
     let l = plan || [];
     if (q) l = l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no, p.proforma_no].some((v) => v && norm(v).includes(q)));
@@ -556,11 +575,6 @@ function SiparisIcerik() {
     finally { setBekleyen(null); }
   };
 
-  const bolumeGit = (b: string, sevk = false) => {
-    setSekme("siparis");
-    if (sevk) setSevkAcik(true);
-    setTimeout(() => document.getElementById(`bolum-${b}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-  };
 
   const excelIndir = async () => {
     if (!siparisler || !plan) return;
@@ -578,10 +592,18 @@ function SiparisIcerik() {
   };
 
   if (!yetkili) return null;
-  const sekmeBtn = (k: Sekme, ad: string) => (
-    <button type="button" onClick={() => setSekme(k)} role="tab" aria-selected={sekme === k}
-      className="h-9 px-4 rounded-lg text-sm font-medium" style={sekme === k ? { backgroundColor: ACCENT, color: "#FFFFFF" } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>{ad}</button>
-  );
+  // Sekme cubugu (Pazar / Ana Panel ile ayni stil). Rezervasyon bekleyen: aksiyon gerektirir, turuncu sayi rozeti.
+  const SEKMELER: [SiparisSekme, string, React.ReactNode, number | null, boolean][] = [
+    ["rezervasyonlu", "Rezervasyonlu", <PackageCheck key="i" size={14} />, sayilar.rezervasyonlu, false],
+    ["rez_bekleyen", "Rezervasyon bekleyen", <Hourglass key="i" size={14} />, sayilar.rez_bekleyen, true],
+    ["onay", "Onay bekleyen", <Clock key="i" size={14} />, sayilar.onay, false],
+    ["sevk", "Sevk edilen", <Truck key="i" size={14} />, sayilar.sevk, false],
+    ["plan", "Yükleme Planı", <Ship key="i" size={14} />, null, false],
+  ];
+  const SEKME_BOLUMLERI: Record<Exclude<SiparisSekme, "plan">, SiparisBolumu[]> = {
+    rezervasyonlu: ["rezervasyon"], rez_bekleyen: ["on_odeme"], onay: ["bekleyen"], sevk: ["rezervasyon", "iptal"],
+  };
+  const digerSonuc = q && sekme !== "plan" ? aranan.length - gorunenSiparis.length : 0;
   return (
     <div className="max-w-[1400px]">
       <SayfaBasligi
@@ -607,17 +629,48 @@ function SiparisIcerik() {
       {!siparisler && yukleniyor ? <SayfaYukleniyor /> : siparisler && plan ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
-            <OzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => bolumeGit("rezervasyon")} />
-            <OzetKarti testId="ozet-onay" etiket="Ön ödeme / onay bekliyor" deger={ozet.onay} onClick={() => bolumeGit("bekleyen")} />
-            <OzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı · rez. yok" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => bolumeGit("on_odeme")} />
-            <OzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => bolumeGit("rezervasyon")} />
-            <OzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => bolumeGit("rezervasyon", true)} />
-            <OzetKarti testId="ozet-tekrar" etiket="Olası tekrar" deger={ozet.olasiTekrar} renk={ozet.olasiTekrar ? "#FCD34D" : undefined} alt="yeniden kesilmiş proforma?" />
+            <OzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => setSekme("rezervasyonlu")} />
+            <OzetKarti testId="ozet-onay" etiket="Ön ödeme / onay bekliyor" deger={ozet.onay} onClick={() => setSekme("onay")} secili={sekme === "onay"} />
+            <OzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı · rez. yok" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => setSekme("rez_bekleyen")} secili={sekme === "rez_bekleyen"} />
+            <OzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => setSekme("rezervasyonlu")} secili={sekme === "rezervasyonlu"} />
+            <OzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => setSekme("rezervasyonlu")} />
+            <OzetKarti testId="ozet-tekrar" etiket="Olası tekrar" deger={ozet.olasiTekrar} renk={ozet.olasiTekrar ? "#FCD34D" : undefined} alt="yeniden kesilmiş proforma?" onClick={ozet.olasiTekrar ? () => setSekme(tekrarSekmesi(siparisler)) : undefined} />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mb-3" role="tablist">
-            {sekmeBtn("siparis", "Sipariş Listesi")}
-            {sekmeBtn("plan", "Yükleme Planı")}
+          {kaynakUyari.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 mb-4 text-xs" role="status" data-testid="kaynak-uyari"
+              style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.08)", color: "#FCD34D" }}>
+              <AlertTriangle size={14} className="shrink-0" />
+              {kaynakUyari.map((k) => (
+                <span key={k.baslik}><b>{k.baslik}</b>{k.ayrinti ? <span style={{ color: "#E2C76B" }}> · {k.ayrinti}</span> : null}</span>
+              ))}
+              {isaretleyebilir && (
+                <span className="ml-auto flex gap-2">
+                  {kaynakUyari.some((k) => k.baslik.startsWith("Yükleme")) && (
+                    <button type="button" onClick={() => { setSekme("plan"); setAktarAcik(true); }} className="h-7 px-2.5 rounded-md border font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: "rgba(245,158,11,0.45)" }} data-plan-yukle>Plan yükle</button>
+                  )}
+                  {kaynakUyari.some((k) => k.baslik.startsWith("Sipariş")) && (
+                    <button type="button" onClick={() => { if (sekme === "plan") setSekme(VARSAYILAN_SIPARIS_SEKMESI); setSiparisAktarAcik(true); }} className="h-7 px-2.5 rounded-md border font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: "rgba(245,158,11,0.45)" }} data-liste-yukle>Liste yükle</button>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="flex w-full lg:w-auto lg:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="siparis-sekmeler">
+              {SEKMELER.map(([k, etiket, ikon, adet, vurgu]) => (
+                <button key={k} type="button" role="tab" aria-selected={sekme === k} onClick={() => setSekme(k)} data-sekme={k}
+                  className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
+                  style={sekme === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
+                  {ikon} {etiket}
+                  {adet !== null && (
+                    <span className="ml-0.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full text-[11px] font-semibold tabular-nums" data-sekme-sayi
+                      style={vurgu && adet > 0 ? { backgroundColor: ACCENT, color: "#FFFFFF" } : { backgroundColor: "rgba(148,163,184,0.14)", color: sekme === k ? "#FFFFFF" : TEXT_MUTED }}>{adet}</span>
+                  )}
+                </button>
+              ))}
+            </div>
             <div className="relative ml-auto w-full sm:w-72">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
               <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Proforma, firma, booking, liman ara" aria-label="Ara"
@@ -625,11 +678,11 @@ function SiparisIcerik() {
             </div>
           </div>
 
-          {sekme === "siparis" ? (
+          {sekme !== "plan" ? (
             <>
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <p className="text-xs" style={{ color: TEXT_MUTED }}>
-                  Yeni proforma &quot;Ön ödemesi veya onayı alınmamış&quot; bölümüne düşer → ön ödeme girilince rezervasyon bekleyenlere ve yükleme planına geçer → rezervasyonla üst bölüme taşınır. Her bölümde en güncel en altta.
+                  Yeni proforma &quot;Onay bekleyen&quot; sekmesine düşer → ön ödeme girilince &quot;Rezervasyon bekleyen&quot;e ve yükleme planına geçer → rezervasyonla &quot;Rezervasyonlu&quot;ya, sevkle &quot;Sevk edilen&quot;e taşınır. Her sekmede en güncel en altta.
                 </p>
                 {isaretleyebilir && (
                   <button type="button" onClick={() => setSiparisAktarAcik(true)} data-testid="siparis-aktar-ac"
@@ -662,8 +715,11 @@ function SiparisIcerik() {
               {gorunenSiparis.length ? (
                 <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek}
                   onEslestir={setEslestirilecek} onAyir={eslesmeAyir} mesgul={bekleyen}
-                  sevkAcik={sevkAcik || !!q} setSevkAcik={setSevkAcik} />
-              ) : <EmptyState icon={<ClipboardList size={40} />} title={q ? "Aramayla eşleşen sipariş yok" : "Sipariş yok"} />}
+                  goster={SEKME_BOLUMLERI[sekme]} pazarYetkisi={pazarYetkisi} />
+              ) : (
+                <EmptyState icon={<ClipboardList size={40} />} title={q ? "Bu sekmede aramayla eşleşen sipariş yok" : "Bu sekmede sipariş yok"}
+                  description={digerSonuc ? `Diğer sekmelerde ${digerSonuc} sonuç var; sekme sayılarına bakın.` : undefined} />
+              )}
             </>
           ) : (
             <>

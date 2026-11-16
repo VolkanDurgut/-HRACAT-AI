@@ -62,6 +62,7 @@ const ARMATORLER: Array<[RegExp, string]> = [
   [/\bzim\b/i, "ZIM"],
   [/\batako\b/i, "Atako"],
   [/\badmiral\b/i, "Admiral"],
+  [/\bmarguisa\b/i, "Marguisa"],
 ];
 
 // Konudan atilacak kelimeler
@@ -273,6 +274,22 @@ const EK_KALEM_ONCE = /fark[ıi]?\s*[:\-]?\s*(?:usd|\$)?\s*$|\b(?:imo|pss|gri|vg
 const EK_KALEM_SONRA = /^\s*(?:[.,]\s*-)?\s*(?:\+\s*kdv\s*)?(?:pss|gri|art[ıi][şs]|zam\b|fark)/i;
 const EGIK = /^\s*(?:[.,]\s*-?\s*|-\s*)?\//;
 
+const MASRAF = /masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i;
+// Kalem siniri: baska bir tutar ("+ USD 30", "USD", "$") ya da satir sonu. Tek basina "+" sinir DEGIL ("USD 50+Kdv").
+const KALEM_SINIRI = /\+\s*(?=(?:usd|\$|\d))|\busd\b|\$|\n/gi;
+
+/** Tutarin kendi kalem cevresi: once en fazla 60, sonra 30 karakter; araya giren baska kalem (yeni tutar, satir) keser. */
+export function kalemCevresi(s: string, bas: number, son: number): string {
+  let once = s.slice(Math.max(0, bas - 60), bas);
+  const sinirlar = Array.from(once.matchAll(KALEM_SINIRI));
+  if (sinirlar.length) { const x = sinirlar[sinirlar.length - 1]; once = once.slice((x.index ?? 0) + x[0].length); }
+  // "masraflari dahil" pencere sinirinda bolunmesin: once genis dilimde temizle, sonra 30 karaktere kirp
+  let sonra = s.slice(son, son + 60).replace(/masraf(?:lar)?[ıi]?\s+dahil/gi, "").slice(0, 30);
+  const k = sonra.search(/\+\s*(?=(?:usd|\$|\d))|\busd\b|\$|\n/i);
+  if (k >= 0) sonra = sonra.slice(0, k);
+  return (once + s.slice(bas, son) + sonra).replace(/masraf(?:lar)?[ıi]?\s+dahil/gi, "");
+}
+
 /** USD'ye bitisik tum tutarlari bul (her biri icin ekipman). */
 function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: string | null; i: number }> {
   const sonuc: Array<{ tutar: number; ekipman: string | null; i: number }> = [];
@@ -282,8 +299,10 @@ function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: stri
     const n = sayi(m[1] || m[2]);
     if (!makulMu(n)) continue;
     const cevre = s.slice(Math.max(0, m.index - 25), m.index + m[0].length + 25);
-    // masraf / ceza / kdv'li kalemler navlun degildir
-    if (/masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i.test(s.slice(Math.max(0, m.index - 60), m.index + m[0].length + 30))) continue;
+    // masraf / ceza / kdv'li kalemler navlun degildir. 16.11.2026 (Imagesa Malabo teklifi okunmadi): bakilan cevre
+    // BU tutarla sinirli -> sonraki kalem ("USD 3350 / 20'DC + USD 30 ENS FEE / BL") ya da onceki kalem bu tutari
+    // masraf yapmaz; "liman masraflari dahil" bir masraf kalemi degil, lokal dahil bilgisidir.
+    if (MASRAF.test(kalemCevresi(s, m.index, m.index + m[0].length))) continue;
     // 13.11.2026: ek kalem / artis navlun degildir ("IMO lokal farki USD 165", "$200 PSS artisi", "VGM USD 45")
     if (EK_KALEM_ONCE.test(s.slice(Math.max(0, m.index - 25), m.index)) || EK_KALEM_SONRA.test(s.slice(m.index + m[0].length, m.index + m[0].length + 20))) continue;
     if (siki) {
@@ -489,7 +508,11 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   }
 
   const ft = freeTimeBul(duz), gec = gecerlilikBul(duz), pol = polBul(yeni);
-  const lokal = /lokaller(?:i)?\s*dahil|all\s*in|pol lokaller dahil/i.test(duz) ? true : (/\+\s*lokaller/i.test(duz) ? false : null);
+  // 16.11.2026: "liman masraflari dahil" / "local charges included" da lokal dahil demektir
+  const lokalHaric = /(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/i.test(duz);
+  const lokal = lokalHaric ? false
+    : /lokaller(?:i)?\s*dahil|all\s*in|pol lokaller dahil|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil|local\s*charges\s*incl/i.test(duz) ? true
+    : (/\+\s*lokaller/i.test(duz) ? false : null);
   const destek = /destek ol(?:abil|uyor)/i.test(duz);
 
   // Satir bazli coklu liman: "Istanbul – Jakarta :USD340/20all in"
@@ -508,17 +531,25 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   const pod = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-z .]{2,25}?)(?:\s+(?:FREE|VALIDITY|Hat)|\n|$)/) || [])[1];
   // Konudaki liman esas; govdedeki POD yalniz konu limansizsa. Liman yoksa (genel tarife) fiyat yazilmaz.
   const limanSec = liman0 ?? (pod && !/AMBARLI|ASYAPORT|KUMPORT|FREE|TIME|VALIDITY/i.test(pod) ? buyukTr(pod.trim()) : null);
-  if (t.length && limanSec) {
+  // 16.11.2026: "POD : BATA & MALABO" -> ayni fiyat her iki liman icin (konudaki liman listede ise ya da konuda liman yoksa)
+  const podCoklu = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ .]{1,25}(?:\s*(?:&|\/|,)\s*[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ .]{1,25})+)\s*(?:\n|$)/) || [])[1];
+  const podListesi = podCoklu ? podCoklu.split(/\s*(?:&|\/|,)\s*/).map((x) => buyukTr(x.trim())).filter((x) => x && !/AMBARLI|ASYAPORT|KUMPORT/.test(x)) : [];
+  const limanlar = podListesi.length > 1 && (!liman0 || podListesi.includes(buyukTr(liman0))) ? podListesi : limanSec ? [limanSec] : [];
+  // Armator mail metninde yoksa imzadaki tek armator ("As agent for Marguisa Shipping Lines")
+  const imzaArmator = tekArmator(yeniKisim(m.govde || "", true).slice(yeni.length));
+  if (t.length && limanlar.length) {
     // ayni mesajda 20 ve 40 ayri fiyatlar olabilir; ekipman basina ilkini al
     const gor = new Set<string>();
     for (const x of t) {
       const ekip = x.ekipman ?? "20DC";
       if (gor.has(ekip)) continue;
       gor.add(ekip);
-      ekle(destek ? "karsi_teklif" : "teklif", {
-        liman: limanSec,
-        tutar: x.tutar, ekipman: ekip, armator: armatorBul(duz, x.i), free_time_gun: ft, gecerlilik: gec, lokal_dahil: lokal, pol,
-      });
+      for (const l of limanlar) {
+        ekle(destek ? "karsi_teklif" : "teklif", {
+          liman: l,
+          tutar: x.tutar, ekipman: ekip, armator: armatorBul(duz, x.i) ?? imzaArmator, free_time_gun: ft, gecerlilik: gec, lokal_dahil: lokal, pol,
+        });
+      }
     }
     return olaylar;
   }

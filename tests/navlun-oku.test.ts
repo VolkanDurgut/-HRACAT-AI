@@ -1,0 +1,104 @@
+/**
+ * Navlun mail okuyucu (supabase/functions/_shared/navlun-oku.ts + navlun-isle.ts).
+ * Ders (16.11.2026): "USD 3350 / 20'DC" satirinin hemen altindaki "+ USD 30 ENS FEE / BL" yuzunden 3350 "masraf"
+ * sayildi; teklif bulunamayinca yeni acente ogrenilmedi ve mail hic kaydedilmedi.
+ * Veriler kurgusaldir (alan adlari, kisi ve liman adlari yalniz bicim icin).
+ */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+// Edge (Deno) kodu es2018+ kullaniyor; Next typecheck'i (target es5) bu dosyalari izlemesin diye calisma aninda yuklenir.
+type Olay = { tur: string; liman: string | null; tutar: number | null; ekipman: string | null; armator: string | null;
+  free_time_gun: number | null; lokal_dahil: boolean | null; pol: string | null };
+type NavlunGirdi = { mesaj_id: string; gonderen: string; konu: string; govde: string; tarih: string; ek_metin: string; ek_kaynak: string };
+const yukle = (ad: string) => import(new URL(`../supabase/functions/_shared/${ad}.ts`, import.meta.url).href);
+type OkuMod = {
+  kalemCevresi: (s: string, bas: number, son: number) => string;
+  navlunMesajOku: (m: { konu: string; gonderen: string; govde: string }, a: Record<string, string>) => Olay[];
+};
+type IsleMod = {
+  acenteOgren: (g: NavlunGirdi, a: Record<string, string>) => { alan: string; ad: string; kayit: { olaylar: Olay[] } } | null;
+};
+const okuMod = (): Promise<OkuMod> => yukle("navlun-oku");
+const isleMod = (): Promise<IsleMod> => yukle("navlun-isle");
+
+const ACENTE = { "ornek-acente.example": "Ornek Acente" };
+const KONU = "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.";
+const oku = async (govde: string, konu = KONU) =>
+  (await okuMod()).navlunMesajOku({ konu, gonderen: "satis@ornek-acente.example", govde }, ACENTE);
+
+const COKLU_POD = `Merhabalar,
+
+Dış dolum bazlı olarak liman masrafları dahil teklifimizi aşağıdaki gibi bilginize sunarız.
+
+POL : AMBARLI
+POD : ORNEKKENT & ORNEKPORT
+USD 2100 / 20’DC
++ USD 30 ENS FEE / BL
+TRANSIT TIME : APPROX. 40 DAYS VIA VALENCIA
+FREE TIME : 14 DAYS
+
+Ali Örnek
+Sales Manager
+As agent for Marguisa Shipping Lines
+
+From: Operation <operation@ornek.example>
+Subject: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.
+
+Merhaba, 20'DC navlun teklifinizi rica ederiz.`;
+
+test("kalemCevresi: sonraki kalem (+ USD 30 ENS FEE) navlunun cevresine girmez", async () => {
+  const { kalemCevresi } = await okuMod();
+  const s = "USD 2100 / 20'DC\n+ USD 30 ENS FEE / BL";
+  const i = s.indexOf("2100");
+  assert.equal(/fee/i.test(kalemCevresi(s, i, i + 4)), false);
+  const j = s.indexOf("30 ENS");
+  assert.equal(/fee/i.test(kalemCevresi(s, j, j + 2)), true);
+});
+
+test("ek kalem ayni satirda olsa da navlun tutari masraf sayilmaz", async () => {
+  const o = await oku("Merhaba,\nUSD 2100 / 20'DC + USD 30 ENS FEE / BL\nFREE TIME : 14 DAYS");
+  assert.equal(o.length, 1);
+  assert.equal(o[0].tutar, 2100);
+  assert.equal(o[0].ekipman, "20DC");
+});
+
+test("gercek masraf satirlari hala navlun degildir", async () => {
+  assert.deepEqual(await oku("Merhaba, Usd 50+Kdv VGM geç bildirim ücreti uygulanacaktır."), []);
+  assert.deepEqual(await oku("Merhaba, ceza bedeli USD 900 olarak yansıtılacaktır."), []);
+});
+
+test("coklu POD (X & Y): her liman icin ayri teklif, imzadaki armator ve lokal dahil", async () => {
+  const o = await oku(COKLU_POD);
+  assert.deepEqual(o.map((x) => x.liman).sort(), ["ORNEKKENT", "ORNEKPORT"]);
+  for (const x of o) {
+    assert.equal(x.tur, "teklif");
+    assert.equal(x.tutar, 2100);
+    assert.equal(x.armator, "Marguisa");
+    assert.equal(x.free_time_gun, 14);
+    assert.equal(x.lokal_dahil, true);
+    assert.equal(x.pol, "AMBARLI");
+  }
+});
+
+test("POD listesi konudaki limani icermiyorsa tek teklif (konu limani) kalir", async () => {
+  const o = await oku("Merhaba,\nPOL : AMBARLI\nPOD : FARKLIPORT & BASKAPORT\nUSD 2100 / 20'DC");
+  assert.deepEqual(o.map((x) => x.liman), ["ORNEKPORT"]);
+});
+
+test("'masraflari dahil degildir' lokal dahil sayilmaz", async () => {
+  const o = await oku("Merhaba, USD 1450/20DC. Liman masrafları dahil değildir.");
+  assert.equal(o.length, 1);
+  assert.equal(o[0].lokal_dahil, false);
+});
+
+test("bilinmeyen alan adindan gelen NAVLUN TALEBI cevabi acente olarak ogrenilir", async () => {
+  const g: NavlunGirdi = {
+    mesaj_id: "<t1@ornek>", gonderen: "ali@yeni-acente.example", konu: KONU, govde: COKLU_POD,
+    tarih: "2026-11-11T11:54:00Z", ek_metin: "", ek_kaynak: "",
+  };
+  const r = (await isleMod()).acenteOgren(g, {});
+  assert.ok(r, "acente ogrenilmeli");
+  assert.equal(r!.alan, "yeni-acente.example");
+  assert.equal(r!.kayit.olaylar.length, 2);
+});

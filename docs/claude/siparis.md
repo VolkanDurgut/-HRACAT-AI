@@ -435,3 +435,19 @@ ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı.
 - **Açık veri sorunu (dokunulmadı, kullanıcıya bildirildi):** Singapur rezervasyonlarında navlun 100–175, lokal 100–400
   girilmiş; net navlun = navlun − lokal eksiye düşüyor (fatura talimatı FOB'u etkileyebilir).
 - Testler: `tests/navlun-karsilastirma.test.ts` (Beyrut 696, belirsiz en iyi seçilmez, öğrenme, mail tarafı).
+
+## 4.13 Navlun okuyucu: "+ USD 30 ENS FEE" navlunu masraf saydırıyordu (16.11.2026)
+- Kullanıcı: Imagesa'nın (Marguisa acentesi) 11.11 Malabo teklifi Navlun Bildirimi'nde yok. Kök neden (canlıda doğrulandı:
+  `navlun_mesajlari` ve `navlun_acenteler`'de Imagesa kaydı 0): `tutarlar()` masraf filtresi tutarın 60 karakter öncesi /
+  30 karakter sonrasına bakıyordu; "USD 3350 / 20’DC" satırının altındaki "+ USD 30 ENS FEE / BL" pencereye girdi → 3350
+  "fee" sayıldı → teklif çıkmadı → bilinmeyen alan adı (imagesa-tr.com) otomatik öğrenilmedi → mail hiç kaydedilmedi.
+- Düzeltme (`_shared/navlun-oku.ts`): `kalemCevresi()` pencereyi tutarın KENDİ kalemine daraltır (yeni tutar "+ USD",
+  "USD", "$" ya da satır sonu keser; "USD 50+Kdv" gibi tek "+" kesmez). "Liman masrafları dahil" pencere sınırında
+  bölünmeden temizlenir. Ayrıca: `POD : X & Y` (ya da virgül) çoklu varış → konu limanı listedeyse her liman için ayrı
+  teklif; armatör gövdede yoksa imzadan ("As agent for Marguisa…"); Marguisa armatör listesine eklendi; "liman/lokal
+  masrafları dahil", "local charges incl." lokal dahil; "dahil değildir" / "not incl." lokal HARİÇ.
+- Yalnız `navlun-bildirimi` edge'i bu dosyaları kullanır (deploy bu). Mail yeniden beslenmeli: Apps Script
+  `NAVLUN_SON` = 1794344400000 (11.11.2026 00:00 TSİ) → 15 dk'lık `navlunTara` 11.11'den beri yeniden okur
+  (Message-ID ile idempotent, tekrar kayıt olmaz).
+- Testler: `tests/navlun-oku.test.ts` (kurgusal; edge kodu es2018+ olduğu için çalışma anında yüklenir, Next
+  typecheck'i izlemez).

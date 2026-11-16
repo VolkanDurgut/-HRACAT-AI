@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +16,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { KantarSevkiyatDurumu } from "@/components/kantar-sevkiyat-durumu";
 import { musteriKodu, sevkiyatOzetleri, type KantarDosya } from "@/lib/kantar-sevkiyat";
+import { eksikDolumlar, kantarSekmesi, panelDosyaYolu, VARSAYILAN_KANTAR_SEKMESI, type KantarSekme } from "@/lib/kantar-gorunum";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type KonteynerRow = {
@@ -53,6 +55,28 @@ export default function KantarPage() {
   const [dosyalar, setDosyalar] = useState<KantarDosya[]>([]);
   const [rezerveAdet, setRezerveAdet] = useState<Record<string, number>>({});
   const [secilenGun, setSecilenGun] = useState<string | null>(null);
+  // 16.11.2026: Ihracat sutunu iki sekme (?sekme=aktif|tamamlanan) + ?dosya= (Ana Panel DBA adimindan gelis: o dosya suzulur)
+  const [ihSekme, setIhSekmeDurumu] = useState<KantarSekme>(VARSAYILAN_KANTAR_SEKMESI);
+  const adresGuncelle = useCallback((degisim: Record<string, string | null>) => {
+    try {
+      const u = new URL(window.location.href);
+      Object.entries(degisim).forEach(([k, v]) => { if (v) u.searchParams.set(k, v); else u.searchParams.delete(k); });
+      window.history.replaceState(window.history.state, "", u.toString());
+    } catch { /* yok */ }
+  }, []);
+  const setIhSekme = useCallback((v: KantarSekme) => {
+    setIhSekmeDurumu(v);
+    adresGuncelle({ sekme: v === VARSAYILAN_KANTAR_SEKMESI ? null : v });
+  }, [adresGuncelle]);
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const sk = kantarSekmesi(p.get("sekme"));
+      if (sk) setIhSekmeDurumu(sk);
+      const d = (p.get("dosya") || "").trim();
+      if (d) { setArama(d); adresGuncelle({ dosya: null }); } // bir kez: arama kutusuna yazilir, kullanici silebilir
+    } catch { /* yok */ }
+  }, [adresGuncelle]);
   // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
   // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
   // baslatmasi) aradaki degisiklikler kacirilmasin diye yeniden baglaninca,
@@ -286,6 +310,9 @@ export default function KantarPage() {
   const tamamlananlarFiltreli = gunFiltre(aramaFiltre(tamamlananlar));
 
   const sevkiyatlar = sevkiyatOzetleri(dosyalar, konteynerler, rezerveAdet);
+  const eksikler = eksikDolumlar(sevkiyatlar);
+  // Ana Panel baglantilari yalniz Ana Panel yetkisi olana (kantar operatorunde duz yazi)
+  const panelYetkisi = !!yetkiler.sayfa_yetkileri.panel;
 
   // Bu sayfa kantar terminali icin BILEREK kenar cubugu (AppShell) olmadan
   // calisir; bu yuzden AppShell'in yaptigi oturum/yetki kapisi burada
@@ -408,6 +435,7 @@ export default function KantarPage() {
         <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
         <BolumBasligi id="kantar-ihracat" ikon={<Ship size={15} />} baslik="İhracat · DBA" aciklama="Konteyner tartımı · DBA belgesi"
           sag={<>
+            <Sayac etiket="Aktif dosya" deger={eksikler.length} renk="text-white" />
             <Sayac etiket="DBA bekleyen" deger={bekleyenler.length} renk="text-amber-400" />
             <Sayac etiket="Tamamlanan" deger={tamamlananlar.length} renk="text-emerald-400" />
           </>} />
@@ -427,14 +455,42 @@ export default function KantarPage() {
         {/* Otomatik DBA durumu + elle kontrol gereken belgeler (cihaz tanimli degilse gorunmez) */}
         <KantarDbaOtomasyon yenileTetik={dbaOtoYenile} />
 
+        {/* Eksik dolum seridi (16.11.2026): dolumu bitmemis dosyalar; tiklayinca o dosya suzulur. Hepsi tamamsa gizli. */}
+        {eksikler.length > 0 && (
+          <div className="shrink-0 flex items-center gap-2 overflow-x-auto rounded-lg border px-2.5 py-1.5 text-[11px]" role="status" data-testid="eksik-dolum"
+            style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.07)", color: "#FCD34D", scrollbarWidth: "thin" }}>
+            <AlertTriangle size={13} className="shrink-0" />
+            <span className="shrink-0 font-semibold">Dolum sürüyor</span>
+            {eksikler.map((e) => (
+              <button key={e.dosya_id} type="button" onClick={() => { setArama(e.dosya_no); setIhSekme("aktif"); }}
+                className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-white/5 whitespace-nowrap" style={{ borderColor: "rgba(245,158,11,0.35)" }}
+                title={`${e.dosya_no}: ${e.dolu}/${e.toplam} dolu, ${e.bekleyen} bekliyor — konteynerlerini göster`}>
+                <span className="font-mono font-semibold text-white">{e.dosya_no}</span> · {e.dolu}/{e.toplam} dolu
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Ihracat sekmeleri (?sekme=) */}
+        <div className="shrink-0 flex w-full sm:w-auto sm:self-start max-w-full overflow-x-auto rounded-lg border p-0.5" role="tablist" aria-label="İhracat bölümleri"
+          style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }} data-testid="kantar-ihracat-sekmeler">
+          {([["aktif", "Aktif dolumlar", bekleyenler.length, "DBA bekleyen"], ["tamamlanan", "DBA tamamlanan", tamamlananlar.length, "konteyner"]] as const).map(([k, etiket, sayi, ipucu]) => (
+            <button key={k} type="button" role="tab" aria-selected={ihSekme === k} onClick={() => setIhSekme(k)} data-sekme={k} title={`${sayi} ${ipucu}`}
+              className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
+              style={ihSekme === k ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>
+              {etiket} <span className="font-normal opacity-80">({sayi})</span>
+            </button>
+          ))}
+        </div>
+
         {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
         <div className="xl:flex-1 xl:overflow-y-auto xl:min-h-0 pb-4 xl:pb-6 xl:pr-1 space-y-4" style={{ scrollbarWidth: "thin" }}>
           
           {/* Sevkiyat Durumu (28.10.2026): hangi sevkiyattan kac konteyner dolu */}
-          <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} />
+          {ihSekme === "aktif" && <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} panelYetkisi={panelYetkisi} />}
 
-          {/* Bekleyen DBA'lar - tek liste */}
-          {bekleyenlerFiltreli.length > 0 && (
+          {/* Bekleyen DBA'lar - tek liste (Aktif dolumlar sekmesi; DBA yukleme burada) */}
+          {ihSekme === "aktif" && bekleyenlerFiltreli.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-xs font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span> DBA Bekleyen İhracatlar
@@ -509,8 +565,8 @@ export default function KantarPage() {
             </div>
           )}
 
-          {/* Tamamlanan DBA'lar - tek liste */}
-          {tamamlananlar.length > 0 && (
+          {/* Tamamlanan DBA'lar - tek liste (DBA tamamlanan sekmesi) */}
+          {ihSekme === "tamamlanan" && tamamlananlar.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-xs font-bold flex items-center gap-2 text-white">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> DBA Tamamlanan Konteynerler
@@ -568,7 +624,11 @@ export default function KantarPage() {
                           </td>
                           <td className="px-3 py-2">
                             <div className="text-xs font-medium text-white truncate max-w-[140px]" title={k.marka || "-"}>{k.marka || "-"}</div>
-                            <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
+                            {panelYetkisi && panelDosyaYolu(k.dosya_no) ? (
+                              <Link href={panelDosyaYolu(k.dosya_no)!} className="block text-[10px] mt-0.5 hover:underline" style={{ color: "#93C5FD" }} title="Ana Panel'de bu dosyayı göster" data-panel-link>{k.dosya_no}</Link>
+                            ) : (
+                              <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.dosya_no}</div>
+                            )}
                           </td>
                           <td className="px-3 py-2 text-xs text-white"><span className="font-mono font-semibold tracking-wide" title="Müşteri kodu (proformadaki)">{k.musteri_kodu}</span></td>
                           <td className="px-3 py-2 text-right">
@@ -619,6 +679,18 @@ export default function KantarPage() {
             <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <Weight size={40} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
               <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>Aktif dosyada konteyner bulunamadı.</p>
+            </div>
+          )}
+
+          {ihSekme === "aktif" && konteynerler.length > 0 && bekleyenlerFiltreli.length === 0 && !arama.trim() && (
+            <div className="rounded-xl border p-4 text-center text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="dba-bekleyen-yok">
+              DBA bekleyen konteyner yok.{tamamlananlar.length > 0 && <> <button type="button" onClick={() => setIhSekme("tamamlanan")} className="underline" style={{ color: ACCENT }}>Tamamlanan {tamamlananlar.length} konteyner</button></>}
+            </div>
+          )}
+
+          {ihSekme === "tamamlanan" && konteynerler.length > 0 && tamamlananlar.length === 0 && (
+            <div className="rounded-xl border p-4 text-center text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              Henüz DBA&apos;sı tamamlanan konteyner yok.
             </div>
           )}
 

@@ -1369,3 +1369,14 @@ markaları (yoksa dosya.marka; "UNEX (KRAFT)" → UNEX). Gerçek marka TEK ve me
 → "(GERÇEK BRAND)". Birden fazla marka ya da birden fazla parantez: belirsiz, dokunulmaz. Uygulanan yerler: Commercial
 Invoice (ürün satırları + PACKAGING), Packing List (açıklama sütunu konteynerin kendi markasıyla + PACKAGING), Quality,
 Fumigation, Fatura Talimatı PDF (ürün adı + ambalaj). Test: `tests/marka-uyumu.test.ts`.
+
+## Kantar Paneli · İhracat sekmeleri (16.11.2026) — yalnız arayüz
+
+`app/kantar/page.tsx` (İhracat sütunu; Yurt İçi sütunu değişmedi), `components/kantar-sevkiyat-durumu.tsx`, saf yardımcılar `lib/kantar-gorunum.ts` (test `tests/kantar-gorunum.test.ts`):
+
+- **Başlık sayaçları:** Aktif dosya (dolumu bitmemiş, rezervasyonlu) · DBA bekleyen · Tamamlanan.
+- **Eksik dolum şeridi:** "Dolum sürüyor · IHR-… 3/8 dolu"; tıklayınca o dosya aramaya yazılır. Hepsi tamamsa görünmez.
+- **Sekmeler (`?sekme=aktif|tamamlanan`, varsayılan aktif):** Aktif dolumlar = bitmemiş sevkiyat kartları ("Tamamlanan N dosyayı göster" anahtarı; arama varken hepsi) + DBA bekleyen tablo (DBA yükleme burada, değişmedi). DBA tamamlanan = tamamlanan konteyner tablosu, gün düğmeleri (zaten yalnız kaydı olan günler) + arama.
+- **`?dosya=`:** sayfa açılırken dosya no arama kutusuna yazılır (kartlar ve tablolar süzülür), adresten silinir.
+- **Bağlantılar (yetkiye bağlı):** dosya no → `/panel?dosya=` yalnız Ana Panel yetkisi olana (kantar operatöründe düz yazı; müşteri adı kantara hâlâ gelmez). Ana Panel detay satırındaki "DBA x/y" adımı → `/kantar?dosya=` yalnız Kantar yetkisi olana.
+- Dokunulmayan: DBA yükleme / otomatik DBA, canlı yenileme, sayım kuralı (`lib/kantar-sevkiyat.ts`).

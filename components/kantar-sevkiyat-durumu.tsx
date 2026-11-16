@@ -1,15 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronDown, Package } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ExternalLink, Package } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG } from "@/lib/theme";
 import { DURUM_ETIKETI, type SevkiyatOzeti, type SevkiyatDurumu } from "@/lib/kantar-sevkiyat";
+import { gorunenSevkiyatlar, panelDosyaYolu } from "@/lib/kantar-gorunum";
 
 /**
  * Kantar Paneli · Sevkiyat Durumu (28.10.2026). Her acik sevkiyat icin musteri KODU, dosya no,
  * cuval (marka) ve "Dolu x / y" + uc renkli cubuk (dolu · ekipmani alinmis bos · alinmamis).
  * Karta tiklayinca konteyner listesi (konteyner no · muhur no · cuval · durum). Hesap:
  * lib/kantar-sevkiyat.ts (gunluk rapor ile ayni kural). Musteri adi kantara hic gelmez.
+ * 16.11.2026: "Aktif dolumlar" sekmesinde tamamlanan dosyalar gizli ("Tamamlanan N dosyayi goster"; arama varken hepsi);
+ * dosya no Ana Panel yetkisi olana /panel?dosya= baglantisi (kantar operatorunde duz yazi).
  */
 
 const RENK = { dolu: "#10B981", bos: "#F59E0B", alinmayan: "#2A3343" };
@@ -27,14 +31,16 @@ function eslesir(s: SevkiyatOzeti, q: string) {
   return ic(s.dosya_no) || ic(s.musteri_kodu) || ic(s.cuval) || s.konteynerler.some((k) => ic(k.konteyner_no) || ic(k.muhur_no));
 }
 
-export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: SevkiyatOzeti[]; arama: string }) {
+export function KantarSevkiyatDurumu({ sevkiyatlar, arama, panelYetkisi = false }: { sevkiyatlar: SevkiyatOzeti[]; arama: string; panelYetkisi?: boolean }) {
   const [acik, setAcik] = useState<Record<string, boolean>>({});
+  const [tamamlananlar, setTamamlananlar] = useState(false);
   // Bolum gizlenebilir (telefonda DBA listesine hizli inmek icin); tercih bu cihazda hatirlanir
   const [gizli, setGizli] = useState(false);
   useEffect(() => { try { setGizli(window.localStorage.getItem("kantar-sevkiyat-gizli") === "1"); } catch { /* depolama kapali */ } }, []);
   const gizliDegistir = () => setGizli((g) => { try { window.localStorage.setItem("kantar-sevkiyat-gizli", g ? "0" : "1"); } catch { /* depolama kapali */ } return !g; });
   const q = arama.trim().toLowerCase();
-  const liste = sevkiyatlar.filter((s) => eslesir(s, q));
+  const liste = gorunenSevkiyatlar(sevkiyatlar.filter((s) => eslesir(s, q)), tamamlananlar, !!q);
+  const tamamSayisi = sevkiyatlar.filter((s) => s.durum === "tamamlandi").length;
   if (sevkiyatlar.length === 0) return null;
 
   const toplam = sevkiyatlar.reduce((t, s) => t + s.toplam, 0);
@@ -60,8 +66,8 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
       </div>
 
       {gizli ? null : liste.length === 0 ? (
-        <div className="rounded-xl border p-4 text-center text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }}>
-          Aramayla eşleşen sevkiyat yok.
+        <div className="rounded-xl border p-4 text-center text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="sevkiyat-bos">
+          {q ? "Aramayla eşleşen sevkiyat yok." : "Dolumu süren sevkiyat yok — hepsi tamamlandı."}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-start">
@@ -83,7 +89,7 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold font-mono text-white">{s.dosya_no}</span>
+                        <span className="text-xs font-bold font-mono text-white" data-dosya-no>{s.dosya_no}</span>
                         <span className="px-1.5 py-0.5 rounded border text-[10px] font-mono font-bold tracking-wider text-white"
                           style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} title="Müşteri kodu (proformadaki)">
                           {s.musteri_kodu}
@@ -123,6 +129,13 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
                     </span>
                   </div>
                 </button>
+
+                {panelYetkisi && panelDosyaYolu(s.dosya_no) && (
+                  <Link href={panelDosyaYolu(s.dosya_no)!} className="flex items-center justify-end gap-1 border-t px-3 py-1 text-[10.5px] font-medium hover:bg-white/[0.03]"
+                    style={{ borderColor: CARD_BORDER, color: "#93C5FD" }} title="Ana Panel'de bu dosyayı göster" data-panel-link>
+                    Ana Panel&apos;de aç <ExternalLink size={11} />
+                  </Link>
+                )}
 
                 {acikMi && s.eklenen > 0 && (
                   <div id={`sevkiyat-${s.dosya_id}`} className="border-t" style={{ borderColor: CARD_BORDER }}>
@@ -164,6 +177,14 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama }: { sevkiyatlar: Sevk
             );
           })}
         </div>
+      )}
+      {!gizli && !q && tamamSayisi > 0 && (
+        <button type="button" onClick={() => setTamamlananlar((v) => !v)} aria-pressed={tamamlananlar} data-tamamlanan-anahtar
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium hover:bg-white/5 transition-colors"
+          style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          {tamamlananlar ? `Tamamlanan ${tamamSayisi} dosyayı gizle` : `Tamamlanan ${tamamSayisi} dosyayı göster`}
+          <ChevronDown size={12} className={`transition-transform ${tamamlananlar ? "rotate-180" : ""}`} />
+        </button>
       )}
     </div>
   );

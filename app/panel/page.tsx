@@ -19,6 +19,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, FileCheck2 } from "lucide-react";
 import { CutoffCubugu } from "@/components/panel/cutoff-cubugu";
 import { cutoffUyarilari, dosyaEslesir, EVRAK_KISA, PANEL_FILTRELERI, panelFiltrele, panelFiltresi, type PanelFiltre } from "@/lib/panel-gorunum";
+import { kantarDosyaYolu } from "@/lib/kantar-gorunum";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
@@ -247,6 +248,7 @@ function PanelContent() {
   const filteredDosyalar = useMemo(() => panelFiltrele(dosyalar, activeFilter), [dosyalar, activeFilter]);
   const uyarilar = useMemo(() => cutoffUyarilari(dosyalar), [dosyalar]);
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
+  const kantarYetkisi = !!yetkiler.sayfa_yetkileri.kantar;
 
   // ?dosya= / cut-off cubugu: satir bulunur, filtre gizliyorsa "Tumu"ye donulur, satira kaydirilir ve vurgulanir.
   // Acik dosyalarda yoksa (kapali dosya) ve deger dosya kimligiyse eskisi gibi dosya sayfasina gidilir.
@@ -345,7 +347,9 @@ function PanelContent() {
                   { label: "Fatura Kesildi", done: !!dosya.fatura_no },
                   // DBA rozeti artik sayisal - kac konteynerin doldugunu ("dolu")
                   // eklenen konteyner sayisina oranla gosterir (talep: 26.09.2026).
-                  { label: eklenenKont > 0 ? `DBA ${dbaTamamlanan}/${eklenenKont}` : "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont },
+                  // 16.11.2026: Kantar yetkisi olana DBA adimi Kantar Paneli'ni o dosya suzulmus acar (/kantar?dosya=)
+                  { label: eklenenKont > 0 ? `DBA ${dbaTamamlanan}/${eklenenKont}` : "DBA", done: dbaTamamlanan > 0 && dbaTamamlanan >= eklenenKont,
+                    href: kantarYetkisi && eklenenKont > 0 ? kantarDosyaYolu(dosya.dosya_no) : null },
                   { label: "VGM", done: dosya.konteynerler.some((k) => !!k.vgm_kg) },
                 ];
 
@@ -465,16 +469,22 @@ function PanelContent() {
                       <td colSpan={9} className="px-4 py-2.5">
                         <EvrakDurumu dosya={dosya} />
                         <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                          {akisAdimlari.map((adim) => (
-                            <span
-                              key={adim.label}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-500/10 text-green-400" : ""}`}
-                              style={!adim.done ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : ""}`} style={!adim.done ? { backgroundColor: "#4A5262" } : undefined} />
-                              {adim.label}
-                            </span>
-                          ))}
+                          {akisAdimlari.map((adim) => {
+                            const ic = (
+                              <>
+                                <span className={`w-1.5 h-1.5 rounded-full ${adim.done ? "bg-green-500" : ""}`} style={!adim.done ? { backgroundColor: "#4A5262" } : undefined} />
+                                {adim.label}
+                              </>
+                            );
+                            const sinif = `inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${adim.done ? "bg-green-500/10 text-green-400" : ""}`;
+                            const stil = !adim.done ? { backgroundColor: CARD_BORDER, color: TEXT_MUTED } : undefined;
+                            const href = "href" in adim ? adim.href : null;
+                            return href ? (
+                              <Link key={adim.label} href={href} className={`${sinif} hover:underline`} style={stil} title="Kantar Paneli'nde bu dosyanın konteynerlerini aç" data-kantar-link>{ic}</Link>
+                            ) : (
+                              <span key={adim.label} className={sinif} style={stil}>{ic}</span>
+                            );
+                          })}
                           <span className="text-[10px] truncate max-w-full sm:max-w-[420px]" style={{ color: TEXT_MUTED }} title={dosya.urun_tanimi || undefined}>
                             {dosya.urun_tanimi || "—"} · {latestRez?.gemi_adi || "Gemi adı yok"}{dosya.rezervasyonlar.length > 1 ? ` · ${dosya.rezervasyonlar.length} rezervasyon` : ""}
                           </span>

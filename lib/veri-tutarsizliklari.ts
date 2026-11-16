@@ -4,7 +4,7 @@
  */
 import { supabase } from "@/lib/supabase";
 
-export type TutarsizlikTuru = "etd_farki" | "cift_siparis" | "navlunsuz_booking" | "bekleyen_siparis" | "kaynak_eski";
+export type TutarsizlikTuru = "etd_farki" | "cift_siparis" | "navlunsuz_booking" | "bekleyen_siparis" | "kaynak_eski" | "etd_degisti";
 export type Tutarsizlik = { tur: TutarsizlikTuru; onem: "yuksek" | "orta" | "bilgi"; baslik: string; ayrinti: string; baglanti: string | null };
 export type TutarsizlikOzeti = { tarih: string; plan_son: string | null; siparis_son: string | null; navlun_son: string | null; kalemler: Tutarsizlik[] };
 
@@ -14,8 +14,10 @@ export const TUR_BASLIGI: Record<TutarsizlikTuru, string> = {
   cift_siparis: "Aynı sipariş iki numarayla",
   navlunsuz_booking: "Navlunu bilinmeyen booking",
   bekleyen_siparis: "Uzun süredir booking bekleyen",
+  // 16.11.2026: yükleme planında ETD değişti; rezervasyon ETD/ETA ve hatırlatmalar kendiliğinden kaydırıldı (bilgi, 7 gün)
+  etd_degisti: "ETD değişti",
 };
-const SIRA: TutarsizlikTuru[] = ["kaynak_eski", "bekleyen_siparis", "navlunsuz_booking", "etd_farki", "cift_siparis"];
+const SIRA: TutarsizlikTuru[] = ["kaynak_eski", "bekleyen_siparis", "navlunsuz_booking", "etd_farki", "cift_siparis", "etd_degisti"];
 
 export async function tutarsizliklariOku(): Promise<TutarsizlikOzeti> {
   const { data, error } = await supabase.rpc("veri_tutarsizliklari");

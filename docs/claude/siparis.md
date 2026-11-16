@@ -532,3 +532,23 @@ Migration `20261116210000_veri_tutarliligi.sql` (+ `..210500` aday eşiği), CAN
 - Sağlık taraması dersi (16.11.2026): "kesim saati geçti, fatura talimatı işaretli değil" kontrolü YANLIŞ alarm verdi;
   faturası kesilmiş/yüklenmiş dosyada talimat gönderilmiş demektir (IHR-2026-0112). Bu kontrol yapılırken
   `fatura_no` / `fatura_dosya_url` dolu dosya "talimat tamam" sayılır.
+
+## 4.18 Operasyon bağlantıları (16.11.2026, kullanıcı onayı) — migration 20261116230000_operasyon_baglantilari.sql
+- **Fatura → talimat işareti**: `trg_fatura_talimat_isaretle` (BEFORE INSERT / UPDATE OF fatura_no, fatura_dosya_url):
+  fatura no ya da fatura PDF'i İLK girildiğinde `fatura_talimati_gonderildi=true`. Elle kaldırılan işarete sonradan
+  dokunulmaz (yalnız boştan dolana geçişte). Geçiş: faturası olup işareti boş 5 açık dosya işaretlendi
+  (IHR-2026-0112..0116). Sonuç: bu dosyalara otomatik fatura talimatı maili gitmez (fatura zaten kesilmiş).
+- **Rezervasyon formu önerisi** `rezervasyon_onerisi(booking, varış, etd, konteyner)` + `components/rezervasyon-onerisi.tsx`:
+  booking yükleme planındaysa gemi / sefer / acente / ETD / kesimler / ekipman / ardiyesiz / konteyner / plan navlunu
+  YALNIZ boş alanlara ("Boş alanları doldur"). Navlun anlaşması (navlun_teklifleri tur='kabul', aynı liman, ETD−90 gün;
+  sıra: booking no konuda > REZERVASYON TALEBİ > liman) "Kullan" ile navlun alanına. Varış limanı plandan doldurulmaz
+  (dosyanın alanı). FOB grubunda navlun önerilmez; para birimi dosyanınkinden farklıysa önerilmez.
+  Booking onay mailleri (konusunda "navlun" yok) navlun.gs'e gelmiyor; kaynak şimdilik yükleme planı.
+- **Proforma navlun referansı** `navlun_liman_referansi(liman)` + `components/navlun/liman-referansi.tsx`: CFR/CIF teslim
+  ifadesinden liman (`teslimdenVarisLimani`, SQL ile aynı kural), son 60 gün acente başına son 20'DC USD teklif ve son
+  anlaşma. Yalnız bilgi; proformaya yazılmaz. Tek teklifte "ikinci acenteden teyit" notu.
+- **ETD değişimi** `trg_plan_etd` (AFTER UPDATE OF etd ON sevkiyat_plani, yalnız değiştiyse): bağlı rezervasyon
+  (`rezervasyon_id` ya da `booking_anahtar`) ETD'si plana eşitlenir, ETA planın kaydığı gün kadar kayar; olay
+  `etd_degisimleri`'ne yazılır. Hatırlatmalar (ödeme / konşimento) `gemi_kalkis_tarihi`'ni okuduğu için kendiliğinden
+  kayar; ETD değişimi mail TETİKLEMEZ. Hata aktarımı durdurmaz (warning). Kontrol Merkezi: `veri_tutarsizliklari()`
+  'etd_degisti' (onem 'bilgi', 7 gün, kartta mavi).

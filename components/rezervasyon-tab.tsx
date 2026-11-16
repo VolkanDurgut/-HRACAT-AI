@@ -11,6 +11,7 @@ import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { oransalYenidenYazilabilirMi } from "@/lib/siparis-takip";
 import { varisLimaniSorunu, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
+import { RezervasyonOnerisi } from "@/components/rezervasyon-onerisi";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -251,6 +252,8 @@ function RezervasyonFormFields({ form, update, updateSaat, errors, dosya }: {
   const maliyetEtiketSoneki = navlunOpsiyonel ? "" : " *";
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Yukleme plani + navlun anlasmasi onerisi (16.11.2026); yalniz bos alanlar, kullanici onayiyla */}
+      <RezervasyonOnerisi form={form} dosya={dosya} update={update} />
       <div>
         <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Booking No *</label>
         <input value={form.booking_no} onChange={(e) => update("booking_no", e.target.value.toUpperCase())} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} maxLength={50} />

@@ -44,9 +44,11 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
             const hepsi = acik[g.tur];
             const gorunen = hepsi ? g.kalemler : g.kalemler.slice(0, GOSTER);
             const yuksek = g.kalemler.some((k) => k.onem === "yuksek");
+            // Yalniz bilgi (ör. ETD değişti, 16.11.2026): uyarı değil, mavi gösterilir
+            const bilgi = g.kalemler.every((k) => k.onem === "bilgi");
             return (
               <div key={g.tur} className="px-4 py-3" style={{ backgroundColor: CARD_BG }} data-testid={`tutarsizlik-${g.tur}`}>
-                <p className="flex items-center gap-1.5 text-xs font-semibold mb-2" style={{ color: yuksek ? "#FCA5A5" : "#FCD34D" }}>
+                <p className="flex items-center gap-1.5 text-xs font-semibold mb-2" style={{ color: yuksek ? "#FCA5A5" : bilgi ? "#7DD3FC" : "#FCD34D" }}>
                   <AlertTriangle size={13} /> {TUR_BASLIGI[g.tur]} <span className="tabular-nums" style={{ color: TEXT_MUTED }}>({g.kalemler.length})</span>
                 </p>
                 <ul className="space-y-1.5">
@@ -59,7 +61,7 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
                     );
                     return (
                       <li key={i} className="flex items-start gap-1.5">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: k.onem === "yuksek" ? "#F87171" : "#FBBF24" }} />
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: k.onem === "yuksek" ? "#F87171" : k.onem === "bilgi" ? "#38BDF8" : "#FBBF24" }} />
                         {k.baglanti ? <Link href={k.baglanti} className="min-w-0 hover:underline decoration-white/30">{icerik}</Link> : <span className="min-w-0">{icerik}</span>}
                       </li>
                     );

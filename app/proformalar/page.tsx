@@ -9,6 +9,7 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { MetinListesiEditor } from "@/components/metin-listesi-editor";
 import { FileSignature, Plus, Trash2, Loader2, Download, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { NavlunLimanReferansi } from "@/components/navlun/liman-referansi";
 import { yazmaHatasi } from "@/lib/supabase";
 import { KAYIT_LISTE_KOLONLARI, kayitEksigi, kayitHataMesaji, kayitSatiri, kayitZamani, type ProformaKaydi } from "@/lib/proforma/kayitli";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -466,6 +467,8 @@ export default function YeniProformaPage() {
               <Alan etiket="Sevkiyat (SHIPMENT METHOD)">
                 <input value={t.sevkiyat} onChange={(e) => alan("sevkiyat", e.target.value)} placeholder="OCTOBER SHIPPING VIA CUL LINE" className={inp} style={inpStil} />
               </Alan>
+              {/* CFR / CIF: limanin guncel navlunu ve son anlasma (16.11.2026; yalniz bilgi, proformaya yazilmaz) */}
+              <NavlunLimanReferansi teslim={t.teslimIfadesi} />
               <Alan etiket="Ödeme (PAYMENT TERMS)" tam>
                 <textarea value={t.odeme} onChange={(e) => alan("odeme", e.target.value)} rows={2} placeholder="%30 ADVANCE PAYMENT, BALANCE WITHIN 3 DAYS AGAINST SCANNED SHIPMENT DOCUMENTS E-MAIL MESSAGE" className={inp} style={inpStil} />
               </Alan>

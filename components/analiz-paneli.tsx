@@ -126,13 +126,15 @@ function guzelOlcek(max: number, adet = 4): { ust: number; adim: number } {
   return { ust: Math.ceil(max / adim) * adim, adim };
 }
 
-export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi, ikon }: {
+export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi, ikon, className = "xl:col-span-8" }: {
   veri: AylikVeri[];
   buAy: string;
   tutarKisa: (n: number) => string;
   tutarTam: (n: number) => string;
   paraBirimi: string;
   ikon?: React.ReactNode;
+  /** Izgaradaki yeri (16.11.2026 sekmeli duzen: harita ile 50/50) */
+  className?: string;
 }) {
   const [olcu, setOlcu] = useState<Olcu>("tutar");
   const bicim = (v: number, kisa = true) =>
@@ -154,7 +156,7 @@ export function AylikGrafik({ veri, buAy, tutarKisa, tutarTam, paraBirimi, ikon 
     <Panel
       baslik="Aylık Sevkiyat"
       ikon={ikon}
-      className="xl:col-span-8"
+      className={className}
       data-aylik-grafik=""
       sag={
         <div role="group" aria-label="Grafik ölçüsü" className="flex rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>

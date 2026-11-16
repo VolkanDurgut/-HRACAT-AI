@@ -338,6 +338,23 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
   yönlendirmesi, kantar kullanıcısı).
 
 
+## Kontrol Merkezi sadeleştirme: 3 sekme (16.11.2026)
+
+- Kullanıcı: "13 bileşen tek ekranda, bilişsel aşırı yük; tekrar eden liman verisi; acente kartları sıkışık".
+  HESAPLAR DEĞİŞMEDİ (yalnız yerleşim). Sabit üst: filtreler + 6 gösterge + Veri Tutarsızlıkları çubuğu.
+- Sekmeler (`?sekme=` adreste; genel'de parametre yok, `history.replaceState`):
+  1. **Genel Bakış**: Aylık Sevkiyat + Sevkiyat Haritası (50/50), Otomatik Özet + Müşteri Dağılımı.
+  2. **Lojistik & Rotalar** (`lojistik`): `LimanPerformansTablosu` (components/analiz/liman-performans.tsx) = eski
+     Varış Limanları + Birim Fiyat (Liman) + Ortalama Transit Süresi; tüm limanlar (eskiden ilk 8), başlığa tıkla sırala
+     (`limanSirala`: boş değer her yönde en altta). Altında Gemi Başına Konteyner (modal aynen) + Son Tamamlanan.
+  3. **Maliyet & Acenteler** (`maliyet`): `AcenteNavlunTablosu` (components/analiz/acente-navlun-tablosu.tsx) — acente
+     başlık satırı (konteyner · pay · rez.) + liman satırları; filtre acente + liman arama (`acenteFiltrele`; başlık
+     toplamları filtreyle değişmez). Tüm acenteler (eskiden ilk 8).
+- Veri Tutarsızlıkları: kalem yoksa HİÇ görünmez; tek satır çubuk (tür sayıları), tıklayınca ayrıntı. Açık/kapalı
+  `localStorage["kontrol-merkezi:tutarsizlik-acik"]`; tercih yoksa "yüksek" kalem varsa açık başlar.
+- Saf yardımcılar `lib/analiz-tablolar.ts`, test `tests/analiz-tablolar.test.ts`. `AylikGrafik` `className` aldı
+  (varsayılan `xl:col-span-8`, eski kullanım aynı).
+
 ## DİİB günlük raporu (06.11.2026)
 
 - Edge function `diib-gunluk-rapor`, pg_cron `diib-gunluk-rapor` `0 14 * * *` (17:00 TR).

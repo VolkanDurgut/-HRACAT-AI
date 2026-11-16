@@ -13,11 +13,11 @@ import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
 import AppShell from "@/components/app-shell";
-import { Users, Package, Ship, Globe2, X, Clock, BarChart3, Anchor, AlertTriangle, Lightbulb, LayoutDashboard } from "lucide-react";
+import { Users, Package, Ship, X, BarChart3, AlertTriangle, Lightbulb, LayoutDashboard, Truck, Wallet } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
-import { acenteLimanNavlunlari, BELIRSIZ_LIMAN, type LimanNavlunu } from "@/lib/analiz-acente-navlun";
+import { acenteLimanNavlunlari, BELIRSIZ_LIMAN } from "@/lib/analiz-acente-navlun";
 import { analizOzeti } from "@/lib/analiz-ozet";
 import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni, KATEGORI_RENKLERI, DIGER_RENGI } from "@/components/analiz-paneli";
 import { SevkiyatHaritasi, type HaritaHatti, type HaritaLimani } from "@/components/analiz-harita";
@@ -26,6 +26,9 @@ import { limanAktiflikleri } from "@/lib/sevkiyat-aktif";
 import { ayAdi } from "@/lib/analiz-ozet";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { TutarsizliklarKarti } from "@/components/analiz/tutarsizliklar-karti";
+import { LimanPerformansTablosu } from "@/components/analiz/liman-performans";
+import { AcenteNavlunTablosu } from "@/components/analiz/acente-navlun-tablosu";
+import { limanPerformansi, type AcenteOzeti, type TransitToplami } from "@/lib/analiz-tablolar";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -105,52 +108,6 @@ function gemiAnahtari(ham: string | null | undefined): string | null {
 /** Tek bicim: components/analiz-paneli.tsx yuzdeMetni. */
 const yuzde = yuzdeMetni;
 
-function HBar({ value, max }: { value: number; max: number }) {
-  const pct = max > 0 ? Math.max((value / max) * 100, 1) : 0;
-  return (
-    <div className="w-full rounded-full h-1 mt-1" style={{ backgroundColor: CARD_BORDER }}>
-      <div className="h-1 rounded-full" style={{ width: `${pct}%`, backgroundColor: ACCENT }} />
-    </div>
-  );
-}
-
-function ListeKarti({ ikon, baslik, olcuEtiketi, satirlar, bosMetin = "Veri yok", className = "" }: {
-  ikon: React.ReactNode;
-  baslik: string;
-  olcuEtiketi: string;
-  satirlar: ListeSatiri[];
-  bosMetin?: string;
-  className?: string;
-}) {
-  const max = Math.max(...satirlar.map((s) => s.olcu), 0);
-  return (
-    <Panel ikon={ikon} baslik={baslik} sag={olcuEtiketi} className={className} data-liste={baslik}>
-      {satirlar.length === 0 ? (
-        <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>{bosMetin}</p>
-      ) : (
-        <div className="divide-y divide-white/[0.04]">
-          {satirlar.map((s, i) => (
-            <div key={s.anahtar} className="px-4 py-2.5 hover:bg-white/[0.03] transition-colors" title={s.ipucu}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-bold w-3 shrink-0 tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</span>
-                  <span className="text-xs text-white truncate">{s.ad}</span>
-                </div>
-                <span className="text-xs font-semibold text-white shrink-0 tabular-nums">
-                  {s.deger}
-                  {s.pay !== undefined && <span className="font-normal" style={{ color: TEXT_MUTED }}> · {yuzde(s.pay)}</span>}
-                </span>
-              </div>
-              <HBar value={s.olcu} max={max} />
-              <p className="text-[10px] mt-1 truncate" style={{ color: TEXT_MUTED }}>{s.alt}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </Panel>
-  );
-}
-
 /** Dosya tutari kurussuz ("$118.750"): sayfadaki diger tutarlarla ayni bicim. */
 function tutarKurussuz(tutar: number | null | undefined, para: string | null | undefined): string {
   if (tutar === null || tutar === undefined) return "—";
@@ -170,72 +127,14 @@ function navlunYazi(tutar: number, para: string): string {
   }
 }
 
-type AcenteSatiri = ListeSatiri & { limanlar: LimanNavlunu[] };
-
-/**
- * Acenteler karti (25.10.2026): ust kisim eskisiyle AYNI (konteyner · pay, cubuk,
- * rezervasyon sayisi); altinda acentenin gittigi her liman icin konteyner basi navlun
- * (son fiyat; degistiyse aralik), lokal masraf ve dosya/konteyner sayisi.
- */
-function AcenteNavlunKarti({ satirlar }: { satirlar: AcenteSatiri[] }) {
-  const max = Math.max(...satirlar.map((s) => s.olcu), 0);
-  return (
-    <Panel ikon={<Ship size={12} />} baslik="Acenteler ve Navlun Fiyatları" sag="Konteyner · pay · navlun / kont." data-acente-karti="">
-      {satirlar.length === 0 ? (
-        <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
-      ) : (
-        // Tam genislik (26.10.2026): acenteler yan yana sutunlarda; uzun tek sutun sayfayi bosluklu birakiyordu.
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-6 px-4 -mt-px">
-          {satirlar.map((s, i) => (
-            <div key={s.anahtar} className="py-3 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }} data-acente={s.ad}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-bold w-3 shrink-0 tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</span>
-                  <span className="text-xs text-white truncate">{s.ad}</span>
-                </div>
-                <span className="text-xs font-semibold text-white shrink-0 tabular-nums">
-                  {s.deger}
-                  {s.pay !== undefined && <span className="font-normal" style={{ color: TEXT_MUTED }}> · {yuzde(s.pay)}</span>}
-                </span>
-              </div>
-              <HBar value={s.olcu} max={max} />
-              <p className="text-[10px] mt-1 truncate" style={{ color: TEXT_MUTED }}>{s.alt}</p>
-              {s.limanlar.length > 0 && (
-                <ul className="mt-2 space-y-1.5 border-l pl-2.5 ml-1" style={{ borderColor: CARD_BORDER }} aria-label={`${s.ad} liman navlunları`}>
-                  {s.limanlar.map((l) => {
-                    const aralik = l.enAz !== null && l.enCok !== null && l.enAz !== l.enCok;
-                    const ayrinti = [
-                      `${l.dosya} dosya · ${l.konteyner} kont.`,
-                      aralik ? `${navlunYazi(l.enAz!, l.paraBirimi)}–${navlunYazi(l.enCok!, l.paraBirimi)}` : null,
-                      l.lokalSon !== null ? `lokal ${navlunYazi(l.lokalSon, l.paraBirimi)}` : null,
-                      l.son !== null && l.navlunsuz > 0 ? `${l.navlunsuz} dosyada navlun yok` : null,
-                    ].filter(Boolean).join(" · ");
-                    return (
-                      <li key={`${l.liman}|${l.paraBirimi}`} data-liman={l.liman}
-                        title={l.son !== null ? `${s.ad} → ${l.liman}\nSon navlun: ${navlunYazi(l.son, l.paraBirimi)} / konteyner (${l.sonDosyaNo})${l.ortalama !== null && aralik ? `\nOrtalama: ${navlunYazi(Math.round(l.ortalama * 100) / 100, l.paraBirimi)}` : ""}` : undefined}>
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className={`text-[11px] truncate ${l.liman === BELIRSIZ_LIMAN ? "italic" : "font-medium"}`} style={{ color: l.liman === BELIRSIZ_LIMAN ? TEXT_MUTED : "#CBD5E1" }}>{l.liman}</span>
-                          {l.son !== null ? (
-                            <span className="text-[11px] font-semibold text-white shrink-0 tabular-nums">
-                              {navlunYazi(l.son, l.paraBirimi)}<span className="font-normal" style={{ color: TEXT_MUTED }}> / kont.</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] shrink-0" style={{ color: TEXT_MUTED }}>{l.aliciOder ? "Navlun alıcıya ait (FOB)" : "Navlun girilmemiş"}</span>
-                          )}
-                        </div>
-                        <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{ayrinti}</p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </Panel>
-  );
-}
+/** Kontrol Merkezi sekmeleri (16.11.2026 sadelestirme). Secili sekme adreste (?sekme=) tutulur. */
+type Sekme = "genel" | "lojistik" | "maliyet";
+const SEKMELER: { deger: Sekme; ad: string; ikon: React.ReactNode }[] = [
+  { deger: "genel", ad: "Genel Bakış", ikon: <LayoutDashboard size={13} /> },
+  { deger: "lojistik", ad: "Lojistik & Rotalar", ikon: <Truck size={13} /> },
+  { deger: "maliyet", ad: "Maliyet & Acenteler", ikon: <Wallet size={13} /> },
+];
+const sekmeMi = (v: string | null): v is Sekme => v === "genel" || v === "lojistik" || v === "maliyet";
 
 function SecimGrubu<T extends string>({ secenekler, deger, onChange, etiket }: {
   secenekler: { deger: T; ad: string }[];
@@ -269,6 +168,19 @@ export default function AnalizPage() {
   const [yilFiltre, setYilFiltre] = useState<string>(TUM_YILLAR);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>("tumu");
   const [gemiModal, setGemiModal] = useState<GemiModal | null>(null);
+  const [sekme, setSekmeDurumu] = useState<Sekme>("genel");
+  // Adresten ilk sekme (?sekme=lojistik); degisince adres guncellenir (geri tusu gecmisi kirletilmez)
+  useEffect(() => {
+    try { const v = new URLSearchParams(window.location.search).get("sekme"); if (sekmeMi(v)) setSekmeDurumu(v); } catch { /* yok */ }
+  }, []);
+  const setSekme = useCallback((v: Sekme) => {
+    setSekmeDurumu(v);
+    try {
+      const u = new URL(window.location.href);
+      if (v === "genel") u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
+      window.history.replaceState(window.history.state, "", u.toString());
+    } catch { /* yok */ }
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (!user?.id || !companyId) return;
@@ -424,18 +336,7 @@ export default function AnalizPage() {
       ipucu: yazimIpucu(ad, v.yazimlar),
     })), [limanlar, toplamKonteyner, tutarKisa]);
 
-  const birimFiyatSatirlari = useMemo<ListeSatiri[]>(() =>
-    Object.entries(limanlar)
-      .filter(([, v]) => v.mts > 0 && v.tutar > 0)
-      .map(([ad, v]) => ({ ad, v, birim: v.tutar / v.mts }))
-      .sort((a, b) => b.birim - a.birim).slice(0, 8)
-      .map(({ ad, v, birim }) => ({
-        anahtar: ad, ad, deger: `${tutarTam(birim)}/MTS`, olcu: birim,
-        alt: `${v.mts.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS${v.teslim.size ? ` · ${Array.from(v.teslim).sort().join(", ")}` : ""}`,
-        ipucu: yazimIpucu(ad, v.yazimlar),
-      })), [limanlar, tutarTam]);
-
-  const acenteSatirlari = useMemo<AcenteSatiri[]>(() => {
+  const acenteSatirlari = useMemo<(AcenteOzeti & { anahtar: string; olcu: number })[]>(() => {
     const s: Record<string, { konteyner: number; adet: number }> = {};
     const navlunGirdileri: Parameters<typeof acenteLimanNavlunlari>[0] = [];
     filtrelenmis.forEach((d) => d.rezervasyonlar.forEach((r) => {
@@ -454,10 +355,11 @@ export default function AnalizPage() {
     }));
     const navlunlar = acenteLimanNavlunlari(navlunGirdileri);
     const toplam = Object.values(s).reduce((t, v) => t + v.konteyner, 0);
-    return Object.entries(s).sort((a, b) => b[1].konteyner - a[1].konteyner).slice(0, 8).map(([ad, v]) => ({
-      anahtar: ad, ad, deger: `${v.konteyner} kont.`, olcu: v.konteyner,
+    // 16.11.2026: tum acenteler (eskiden ilk 8; tablo filtrelenebilir)
+    return Object.entries(s).sort((a, b) => b[1].konteyner - a[1].konteyner || a[0].localeCompare(b[0], "tr")).map(([ad, v]) => ({
+      anahtar: ad, ad, konteyner: v.konteyner, olcu: v.konteyner,
       pay: toplam > 0 ? v.konteyner / toplam : 0,
-      alt: `${v.adet} rezervasyon`,
+      rezervasyon: v.adet,
       limanlar: navlunlar.get(ad) || [],
     }));
   }, [filtrelenmis]);
@@ -477,9 +379,9 @@ export default function AnalizPage() {
     }));
   }, [filtrelenmis]);
 
-  // Transit suresi: ETD -> ETA, liman bazinda ortalama gun (uzundan kisaya).
-  const transitSatirlari = useMemo<ListeSatiri[]>(() => {
-    const s: Record<string, { toplam: number; adet: number; enAz: number; enCok: number }> = {};
+  // Transit suresi: ETD -> ETA, liman bazinda (kural ayni; 16.11.2026: tum limanlar Liman Performansi tablosunda).
+  const transitToplamlari = useMemo<Record<string, TransitToplami>>(() => {
+    const s: Record<string, TransitToplami> = {};
     filtrelenmis.forEach((d) => {
       const liman = analizLimani(d); if (!liman) return;
       d.rezervasyonlar.forEach((r) => {
@@ -491,14 +393,9 @@ export default function AnalizPage() {
         s[liman].enAz = Math.min(s[liman].enAz, gun); s[liman].enCok = Math.max(s[liman].enCok, gun);
       });
     });
-    return Object.entries(s)
-      .map(([ad, v]) => ({ ad, v, ort: Math.round(v.toplam / v.adet) }))
-      .sort((a, b) => b.ort - a.ort).slice(0, 8)
-      .map(({ ad, v, ort }) => ({
-        anahtar: ad, ad, deger: `${ort} gün`, olcu: ort,
-        alt: `${v.adet} rezervasyon${v.adet > 1 && v.enAz !== v.enCok ? ` · ${v.enAz}–${v.enCok} gün` : ""}`,
-      }));
+    return s;
   }, [filtrelenmis]);
+  const limanPerformansSatirlari = useMemo(() => limanPerformansi(limanlar, transitToplamlari), [limanlar, transitToplamlari]);
 
   const gemiler = useMemo(() => {
     const s: Record<string, { konteyner: number; dosyalar: Set<string> }> = {};
@@ -721,104 +618,121 @@ export default function AnalizPage() {
               dipnot={<>Tamamlanma: <span className="text-white font-semibold">{yuzde(filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0)}</span></>} />
           </div>
 
-          {/* 16.11.2026: veri tutarsizliklari (salt okunur; plan / siparis / navlun kontrolleri) */}
+          {/* 16.11.2026: veri tutarsizliklari (salt okunur). Sadelestirme: yalniz kalem varsa ince, acilir-kapanir cubuk */}
           <TutarsizliklarKarti className="mb-4" />
 
-          {/* Grafik + ozet (ornek paneldeki gibi ozet grafigin yaninda) */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4">
-            {aylikTrend.length > 0 && (
-              <AylikGrafik veri={aylikTrend} buAy={buAy} tutarKisa={tutarKisa} tutarTam={tutarTam} paraBirimi={paraBirimi} ikon={<BarChart3 size={12} />} />
-            )}
-            <div className={aylikTrend.length > 0 ? "xl:col-span-4 grid" : "xl:col-span-12 grid"}>
-              <OzetKarti cumleler={ozetCumleleri} ikon={<Lightbulb size={12} />} />
+          {/* 16.11.2026 sadelestirme (kullanici): 13 bilesen tek sayfada yerine 3 sekme; hesaplar AYNI, yalniz yerlesim.
+              Ustteki filtreler, gosterge kartlari ve tutarsizlik cubugu her sekmede gorunur. */}
+          <div role="tablist" aria-label="Kontrol Merkezi bölümleri" className="flex gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: CARD_BORDER }}>
+            {SEKMELER.map((x) => {
+              const secili = sekme === x.deger;
+              return (
+                <button key={x.deger} type="button" role="tab" id={`sekme-${x.deger}`} aria-selected={secili} aria-controls={`panel-${x.deger}`}
+                  onClick={() => setSekme(x.deger)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap border-b-2 -mb-px transition-colors"
+                  style={{ borderColor: secili ? ACCENT : "transparent", color: secili ? "white" : TEXT_MUTED }}>
+                  {x.ikon} {x.ad}
+                </button>
+              );
+            })}
+          </div>
+
+          {sekme === "genel" && (
+            <div role="tabpanel" id="panel-genel" aria-labelledby="sekme-genel">
+              {/* Grafik + harita yan yana (50/50) */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+                {aylikTrend.length > 0 && (
+                  <AylikGrafik className="" veri={aylikTrend} buAy={buAy} tutarKisa={tutarKisa} tutarTam={tutarTam} paraBirimi={paraBirimi} ikon={<BarChart3 size={12} />} />
+                )}
+                <SevkiyatHaritasi className={aylikTrend.length > 0 ? "" : "xl:col-span-2"} limanlar={haritaLimanlari} hatlar={haritaHatlari} />
+              </div>
+              {/* Ozet + musteri dagilimi */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <OzetKarti cumleler={ozetCumleleri} ikon={<Lightbulb size={12} />} />
+                <DagilimKarti
+                  ikon={<Users size={12} />}
+                  baslik="Müşteri Dağılımı"
+                  olcuEtiketi={`${musteriSatirlari.length} müşteri · hacim payı`}
+                  satirlar={musteriSatirlari.map((m) => ({ anahtar: m.anahtar, ad: m.ad, deger: m.deger, pay: m.pay, alt: m.alt, ipucu: m.ipucu }))}
+                  altBilgi={<><span>Toplam {musteriSatirlari.length} müşteri</span><span className="text-white font-semibold">{tutarKisa(toplamHacim)}</span></>}
+                  data-musteri-dagilimi=""
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Harita + varis limanlari listesi (ornek paneldeki harita fikri, gercek veriyle) */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4">
-            <SevkiyatHaritasi className="xl:col-span-8" limanlar={haritaLimanlari} hatlar={haritaHatlari} />
-            <ListeKarti className="xl:col-span-4" ikon={<Globe2 size={12} />} baslik="Varış Limanları" olcuEtiketi="Konteyner · pay" satirlar={limanSatirlari} />
-          </div>
+          {sekme === "lojistik" && (
+            <div role="tabpanel" id="panel-lojistik" aria-labelledby="sekme-lojistik">
+              {/* Varis Limanlari + Birim Fiyat + Transit Suresi tek tabloda */}
+              <LimanPerformansTablosu className="mb-4" satirlar={limanPerformansSatirlari} tutarKisa={tutarKisa} tutarTam={tutarTam} paraBirimi={paraBirimi} />
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+                <Panel className="xl:col-span-5" ikon={<Ship size={12} />} baslik="Gemi Başına Konteyner" sag="Detay için tıklayın">
+                  {gemiler.length === 0 ? (
+                    <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                            <th className={`text-left ${thSinifi} w-8`} style={{ color: TEXT_MUTED }}>#</th>
+                            <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Gemi Adı</th>
+                            <th className={`text-center ${thSinifi}`} style={{ color: TEXT_MUTED }}>Dosya</th>
+                            <th className={`text-right ${thSinifi}`} style={{ color: TEXT_MUTED }}>Konteyner</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gemiler.map((g, i) => (
+                            <tr key={g.ad} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }} onClick={() => handleGemiClick(g.ad)}>
+                              <td className="px-4 py-2.5 text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
+                              <td className="px-4 py-2.5 text-xs font-medium text-white leading-snug">{g.ad}</td>
+                              <td className="px-4 py-2.5 text-xs text-center tabular-nums" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
+                              <td className="px-4 py-2.5 text-xs text-right font-semibold text-white tabular-nums">{g.konteyner}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Panel>
+                <Panel className="xl:col-span-7" ikon={<Package size={12} />} baslik="Son Tamamlanan Sevkiyatlar" sag="Dosyayı açmak için tıklayın">
+                  {sonSevkiyatlar.length === 0 ? (
+                    <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Tamamlanan sevkiyat yok</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                            <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Dosya</th>
+                            <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Müşteri</th>
+                            <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>ETD</th>
+                            <th className={`text-center ${thSinifi}`} style={{ color: TEXT_MUTED }}>Kont.</th>
+                            <th className={`text-right ${thSinifi}`} style={{ color: TEXT_MUTED }}>Tutar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sonSevkiyatlar.map(({ d, tarih }) => (
+                            <tr key={d.id} onClick={() => gecisliGit(`/dosya/${d.id}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }}>
+                              <td className="px-4 py-2.5 text-xs font-medium text-white whitespace-nowrap">{d.dosya_no}</td>
+                              <td className="px-4 py-2.5 text-xs max-w-[160px] truncate" style={{ color: TEXT_MUTED }} title={`${d.alici_firma || "—"} · ${limanAnahtari(d.varis_limani) || "—"}`}>{d.alici_firma || "—"}</td>
+                              <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarih ? formatDateTR(tarih) : "—"}</td>
+                              <td className="px-4 py-2.5 text-xs text-center font-medium text-white tabular-nums">{konteynerSayisi(d)}</td>
+                              <td className="px-4 py-2.5 text-xs text-right font-semibold text-white whitespace-nowrap tabular-nums">{tutarKurussuz(d.toplam_tutar, d.para_birimi)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Panel>
+              </div>
+            </div>
+          )}
 
-          {/* Uc siralama karti: en fazla 8 satir (+ Diger), ayni yukseklik */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-4">
-            <DagilimKarti
-              ikon={<Users size={12} />}
-              baslik="Müşteri Dağılımı"
-              olcuEtiketi={`${musteriSatirlari.length} müşteri · hacim payı`}
-              satirlar={musteriSatirlari.map((m) => ({ anahtar: m.anahtar, ad: m.ad, deger: m.deger, pay: m.pay, alt: m.alt, ipucu: m.ipucu }))}
-              altBilgi={<><span>Toplam {musteriSatirlari.length} müşteri</span><span className="text-white font-semibold">{tutarKisa(toplamHacim)}</span></>}
-              data-musteri-dagilimi=""
-            />
-            <ListeKarti ikon={<Anchor size={12} />} baslik="Birim Fiyat (Liman)" olcuEtiketi={`Ortalama ${paraBirimi}/MTS`} satirlar={birimFiyatSatirlari} />
-            <ListeKarti className="md:col-span-2 xl:col-span-1" ikon={<Clock size={12} />} baslik="Ortalama Transit Süresi" olcuEtiketi="ETD → ETA, gün" satirlar={transitSatirlari} bosMetin="ETA girilince hesaplanır" />
-          </div>
-
-          <div className="mb-4">
-            <AcenteNavlunKarti satirlar={acenteSatirlari} />
-          </div>
-
-          {/* Tablolar: genis sutunlar (26.10.2026, 1492 px'te tablolar kesilip yatay kaydirma cikiyordu) */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-            <Panel className="xl:col-span-5" ikon={<Ship size={12} />} baslik="Gemi Başına Konteyner" sag="Detay için tıklayın">
-              {gemiler.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Veri yok</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                        <th className={`text-left ${thSinifi} w-8`} style={{ color: TEXT_MUTED }}>#</th>
-                        <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Gemi Adı</th>
-                        <th className={`text-center ${thSinifi}`} style={{ color: TEXT_MUTED }}>Dosya</th>
-                        <th className={`text-right ${thSinifi}`} style={{ color: TEXT_MUTED }}>Konteyner</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gemiler.map((g, i) => (
-                        <tr key={g.ad} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }} onClick={() => handleGemiClick(g.ad)}>
-                          <td className="px-4 py-2.5 text-[10px] font-bold tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
-                          <td className="px-4 py-2.5 text-xs font-medium text-white leading-snug">{g.ad}</td>
-                          <td className="px-4 py-2.5 text-xs text-center tabular-nums" style={{ color: TEXT_MUTED }}>{g.dosyaSayisi}</td>
-                          <td className="px-4 py-2.5 text-xs text-right font-semibold text-white tabular-nums">{g.konteyner}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Panel>
-            <Panel className="xl:col-span-7" ikon={<Package size={12} />} baslik="Son Tamamlanan Sevkiyatlar" sag="Dosyayı açmak için tıklayın">
-              {sonSevkiyatlar.length === 0 ? (
-                <p className="px-4 py-6 text-xs text-center" style={{ color: TEXT_MUTED }}>Tamamlanan sevkiyat yok</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full">
-                    <thead>
-                      <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                        <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Dosya</th>
-                        <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>Müşteri</th>
-                        <th className={`text-left ${thSinifi}`} style={{ color: TEXT_MUTED }}>ETD</th>
-                        <th className={`text-center ${thSinifi}`} style={{ color: TEXT_MUTED }}>Kont.</th>
-                        <th className={`text-right ${thSinifi}`} style={{ color: TEXT_MUTED }}>Tutar</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sonSevkiyatlar.map(({ d, tarih }) => (
-                        <tr key={d.id} onClick={() => gecisliGit(`/dosya/${d.id}`)} className="border-b last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors" style={{ borderColor: CARD_BORDER }}>
-                          <td className="px-4 py-2.5 text-xs font-medium text-white whitespace-nowrap">{d.dosya_no}</td>
-                          <td className="px-4 py-2.5 text-xs max-w-[160px] truncate" style={{ color: TEXT_MUTED }} title={`${d.alici_firma || "—"} · ${limanAnahtari(d.varis_limani) || "—"}`}>{d.alici_firma || "—"}</td>
-                          <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarih ? formatDateTR(tarih) : "—"}</td>
-                          <td className="px-4 py-2.5 text-xs text-center font-medium text-white tabular-nums">{konteynerSayisi(d)}</td>
-                          <td className="px-4 py-2.5 text-xs text-right font-semibold text-white whitespace-nowrap tabular-nums">{tutarKurussuz(d.toplam_tutar, d.para_birimi)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Panel>
-          </div>
+          {sekme === "maliyet" && (
+            <div role="tabpanel" id="panel-maliyet" aria-labelledby="sekme-maliyet">
+              <AcenteNavlunTablosu acenteler={acenteSatirlari} />
+            </div>
+          )}
         </>
       )}
     </AppShell>

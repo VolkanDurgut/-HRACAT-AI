@@ -484,7 +484,9 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
     if (h && /hedef/i.test(duz) && makulMu(sayi(h[1]))) ekle("hedef", { tutar: sayi(h[1]), ekipman: ekipmanBul(duz) ?? "20DC" });
     // Kabul: "Navlun bedeli X olmak uzere ... booking" ya da (12.11.2026) "Anlasma fiyatimiz X usd all in"
     const k = duz.match(/navlun\s*(?:bedeli|rakam(?:ı|i))\s*([\d][\d.,]*)\s*(?:usd|\$)?\s*olmak üzere/i)
-      || duz.match(/anla[şs]ma\s*(?:fiyat(?:ımız|imiz|ı|i)?|navlun(?:umuz)?|rakam(?:ımız|imiz)?)\s*[:\-]?\s*([\d][\d.,]*)\s*(?:usd|\$)/i);
+      || duz.match(/anla[şs]ma\s*(?:fiyat(?:ımız|imiz|ı|i)?|navlun(?:umuz)?|rakam(?:ımız|imiz)?)\s*[:\-]?\s*([\d][\d.,]*)\s*(?:usd|\$)/i)
+      // 16.11.2026: "Konu booking icin navlun bedelini 1780 usd olarak dikkate aliyoruz" (Dar es Salaam, raporda "bilgi yok" kaldi)
+      || duz.match(/navlun\s*(?:bedel(?:i|ini)|rakam(?:ı|i|ını|ini)|fiyat(?:ı|i|ını|ini))\s*([\d][\d.,]*)\s*(?:usd|\$)\s*olarak\s*(?:dikkate\s*al|kabul\s*ed|onayl)/i);
     if (k && makulMu(sayi(k[1]))) ekle("kabul", { tutar: sayi(k[1]), ekipman: "20DC", armator: armatorBul(duz) });
     return olaylar;
   }

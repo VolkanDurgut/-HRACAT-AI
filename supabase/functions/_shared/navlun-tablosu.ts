@@ -90,7 +90,10 @@ const AD_ESLER: [RegExp, string][] = [
   [/^EVERGREEN/, "EVERGREEN"],
 ];
 /** Ayni limanin plan / mail yazimlari (limanAnahtari'na ek; yalniz bu tablo icin) */
-const LIMAN_ESLER: Record<string, string> = { MALDIVES: "MALE", "DAR ES SELAM": "DAR ES SALAAM" };
+// 16.11.2026: sistem proformasi "DAR SALAAM" yaziyor (rapor "teklif yok" dedi); SQL siparis_liman_anahtar ile ayni esler.
+const LIMAN_ESLER: Record<string, string> = {
+  MALDIVES: "MALE", "DAR ES SELAM": "DAR ES SALAAM", "DAR SALAAM": "DAR ES SALAAM", "DAR ES SALAM": "DAR ES SALAAM", "DARESSALAAM": "DAR ES SALAAM",
+};
 
 const buyuk = (s: string) => s.trim().replace(/\s+/g, " ").toLocaleUpperCase("tr-TR");
 /** Acente / hat adlari Latin: Ingilizce buyuk harf (13.11.2026: "Link" -> "LINK", "LİNK" degil). */
@@ -427,7 +430,9 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
     const bad = bk ? adlar.get(bk) || (p.varis_limani || bk).toLocaleUpperCase("tr-TR") : (p.varis_limani || "-").toLocaleUpperCase("tr-TR");
     const be = enIyiler.get(bad);
     // Ayni musteri + ayni liman tek satir (orn. 11 ayri siparis -> "11 sipariş")
-    const var_ = bekleyenler.find((b) => b.limanAnahtar === bk && b.liman === bad && musteriAnahtari(b.musteri) === musteriAnahtari(p.musteri));
+    // 16.11.2026: ayni firmanin kisa / uzun yazimi ("COOL LINK" / "COOL LINK& MARKETING PTE LTD") tek satir: biri digerinin basi
+    const ayniFirma = (x: string, y: string) => x === y || (Math.min(x.length, y.length) >= 6 && (x.startsWith(y) || y.startsWith(x)));
+    const var_ = bekleyenler.find((b) => b.limanAnahtar === bk && b.liman === bad && ayniFirma(musteriAnahtari(b.musteri), musteriAnahtari(p.musteri)));
     if (var_) { var_.konteyner += kont; var_.siparis++; continue; }
     const kb = bk ? t.limanlar.find((l) => l.anahtar === bk)?.kabul : null;
     bekleyenler.push({ musteri: p.musteri, liman: bad, limanAnahtar: bk, konteyner: kont, siparis: 1, enIyi: be ? { tutar: be.tutar, blok: be.blok } : null,

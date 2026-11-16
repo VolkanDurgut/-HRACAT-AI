@@ -475,3 +475,19 @@ ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı.
   alan boşaltılırsa otomatiğe döner). Siparişe devam et: avans kopyalanmaz; başlangıç = tutar × ödeme şartı yüzdesi.
 - RPC: `siparis_on_odeme_kaydet(+p_oran, p_karsilik)` (eski 5 parametreli sürüm kaldırıldı; istemci isimli parametreyle
   çağırır), `siparis_on_odeme_dagilimi(proforma)` (okuma). Testler: `tests/on-odeme.test.ts`.
+
+## 4.15 Navlun raporu kontrolü (16.11.2026 akşam raporu)
+- Kullanıcı: "Bu raporun doğruluğunu kontrol et; eksik kısımlar var." Canlı veri + mail kutusuyla satır satır karşılaştırıldı.
+- HATA 1 (BAKEBS, Dar es Salaam): sistem proforması `UNEXBSC061126` limanı "DAR SALAAM", plan Excel'i "DAR ES SELAM" →
+  müşteri + liman eşleşmesi tutmadı; booking'i planda olan sipariş "Rezervasyon Bekleyen"de 0 konteyner ve "teklif yok"
+  göründü. Düzeltme: `siparis_liman_anahtar` DAR ES SALAAM yazımlarını birleştirir (migration
+  `20261116180000_siparis_liman_konteyner.sql`, CANLIDA) + `navlun-tablosu.ts LIMAN_ESLER`.
+- HATA 2: sistem proformalarında konteyner boş (0 sayılıyordu). `siparis_listesi_veri` gösterimde MT / 25'ten türetir;
+  plan eşleşmesindeki birikimli kural değişmedi (kuru çalıştırma: yalnız BAKEBS rezervasyonlu oldu, 4 proformaya adet geldi).
+- HATA 3: "navlun bedelini 1780 usd olarak dikkate alıyoruz" (ESNA, 12.11) kabul okunmuyordu → booking "bilgi yok".
+  `navlun-oku.ts` kabul kalıbı eklendi (yalnız dikkate al / kabul et / onayla ile; "rica ederiz" kabul değil).
+- HATA 4: "COOL LINK" / "COOL LINK& MARKETING PTE LTD" ayrı satır → biri diğerinin başıysa (≥ 6 harf) tek satır.
+- Doğru bulunanlar: 17 booking / 70 kont / 159.750 $ toplamı; Cibuti'de güncel teklif yok (yalnız Akkon 1.850 kabulleri);
+  Riviera (Beyrut, 23 kont) sistem rezervasyonunda ETD 14.11 ve 23 konteynerin DBA'sı yüklü → raporda yok (plan Excel'i 18.11
+  diyor; kullanıcıya soruldu).
+- Testler: `navlun-oku.test.ts` (kabul), `navlun-karsilastirma.test.ts` (bekleyen birleştirme + DAR SALAAM).

@@ -139,3 +139,21 @@ test("17:00 navlun maili (limanSatirlari): Beyrut en iyi 696, hafizasiz lokal be
   assert.equal(s2.enIyi, null);          // hafiza okunamazsa hicbiri "en iyi" degil
   assert.equal(s2.belirsiz?.tutar, 340);  // ama lokali belirsiz teklif kaybolmaz
 });
+
+test("rezervasyon bekleyen: ayni firmanin kisa / uzun yazimi tek satir; DAR SALAAM teklifi bulunur (16.11.2026)", async () => {
+  const { navlunTablosuHesapla, navlunSatinAlma } = await import("@/supabase/functions/_shared/navlun-tablosu");
+  const olaylar = [{ tur: "teklif", liman: "DAR ES SELAM", liman_anahtar: "DAR ES SELAM", acente: "Akkon", armator: "Akkon", tutar: 3250,
+    para_birimi: "USD", ekipman: "20DC", free_time_gun: null, tarih: "2026-11-12T08:00:00Z", lokal_dahil: true }];
+  const t = navlunTablosuHesapla(olaylar, [], "2026-11-16");
+  const sip = (musteri: string, liman: string, konteyner: number) => ({ kaynak: "siparis", booking_no: null, musteri, konteyner, dosya_no: null,
+    varis_limani: liman, acente: null, navlun: null, navlun_para: null, etd: null });
+  const sa = navlunSatinAlma(t, [sip("ORNEK LINK", "Singapore", 2), sip("ORNEK LINK", "Singapore", 2), sip("ORNEK LINK& MARKETING PTE LTD", "Singapore", 2),
+    sip("ORNEK BAKERY", "DAR SALAAM", 5)], olaylar);
+  const sg = sa.bekleyenler.filter((b) => b.limanAnahtar === "SINGAPORE");
+  assert.equal(sg.length, 1);
+  assert.equal(sg[0].siparis, 3);
+  assert.equal(sg[0].konteyner, 6);
+  const dar = sa.bekleyenler.find((b) => b.musteri === "ORNEK BAKERY")!;
+  assert.equal(dar.limanAnahtar, "DAR ES SALAAM");
+  assert.equal(dar.enIyi?.tutar, 3250);
+});

@@ -102,3 +102,19 @@ test("bilinmeyen alan adindan gelen NAVLUN TALEBI cevabi acente olarak ogrenilir
   assert.equal(r!.alan, "yeni-acente.example");
   assert.equal(r!.kayit.olaylar.length, 2);
 });
+
+test("bizden kabul: 'navlun bedelini X usd olarak dikkate aliyoruz' (rezervasyon talebi)", async () => {
+  const { navlunMesajOku } = await okuMod();
+  const o = navlunMesajOku({
+    konu: "RE: UNEX // ORNEKPORT // 5*20 DC // REZERVASYON TALEBİ HK.", gonderen: "operation@unex.com.tr",
+    govde: "Bey merhaba,\n\nKonu booking için navlun bedelini 1780 usd olarak dikkate alıyoruz.\n\nBuna istinaden free time ve transit süre bilgisi rica ederim.",
+  }, ACENTE);
+  assert.equal(o.length, 1);
+  assert.equal(o[0].tur, "kabul");
+  assert.equal(o[0].tutar, 1780);
+  // talep / hedef cumlesi kabul sayilmaz
+  const h = navlunMesajOku({ konu: "UNEX // ORNEKPORT // NAVLUN TALEBİ HK.", gonderen: "operation@unex.com.tr",
+    govde: "Merhaba, navlun bedelini 1500 usd olarak rica ederiz." }, ACENTE);
+  assert.equal(h.filter((x) => x.tur === "kabul").length, 0);
+});
+

@@ -28,6 +28,8 @@ export type SiparisSatiri = {
   on_odeme_tarihi: string | null;
   /** Export'un girdigi on odeme tutari (Excel'den gelen eski siparislerde yok) */
   on_odeme_tutar: number | null;
+  /** 16.11.2026: bu Excel satirina "ayni siparis" diye baglanmis sistem proformasi (yoksa null) */
+  eslesik_proforma?: string | null;
   on_odeme_para: string | null;
   dosya_no: string | null;
   booking_no: string | null;
@@ -94,6 +96,7 @@ export function siparisNormalize(r: Record<string, unknown>): SiparisSatiri {
     ...(r as unknown as SiparisSatiri),
     sira: sayi(r.sira), birim_fiyat: sayi(r.birim_fiyat), miktar_mt: sayi(r.miktar_mt), tutar: sayi(r.tutar), konteyner: sayi(r.konteyner),
     on_odeme: r.on_odeme === true, on_odeme_tutar: sayi(r.on_odeme_tutar), on_odeme_para: typeof r.on_odeme_para === "string" ? r.on_odeme_para : null,
+    eslesik_proforma: typeof r.eslesik_proforma === "string" && r.eslesik_proforma ? r.eslesik_proforma : null,
   };
 }
 

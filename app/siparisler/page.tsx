@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Download, RefreshCw, Search, Ship, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, Link2, RefreshCw, Search, Ship, Trash2, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -13,7 +13,8 @@ import {
   siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
-import { onOdemeDagilimiOku, onOdemeKaydet, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
@@ -115,8 +116,9 @@ const SIPARIS_SUTUNLARI: Array<{ basliklar: string[]; genislik: string; sag?: bo
   { basliklar: ["Ön ödeme"], genislik: "9%" },
 ];
 
-function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, mesgul }: {
-  satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void; mesgul: string | null;
+function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul }: {
+  satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
+  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null;
 }) {
   const alt = { color: TEXT_MUTED };
   const h = "px-2 py-2 align-top break-words";
@@ -138,6 +140,20 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, mesgul }: 
                 )}
               </span>
               <span className="block text-[11px]" style={alt}>{trTarih(s.proforma_tarihi)}{s.kaynak === "sistem" ? " · sistemden" : ""}</span>
+              {/* 16.11.2026 "ayni siparis" eslestirmesi: sistem proformasi <-> Excel satiri */}
+              {s.eslesik_proforma && (
+                <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px]" style={{ color: "#93C5FD" }} data-eslesik>
+                  <Link2 size={11} className="shrink-0" /> Sistem: {s.eslesik_proforma}
+                  {yetkili && (
+                    <button type="button" onClick={() => onAyir(s)} disabled={mesgul === s.anahtar} className="underline disabled:opacity-40" style={{ color: TEXT_MUTED }}>ayır</button>
+                  )}
+                </span>
+              )}
+              {yetkili && s.kaynak === "sistem" && s.anahtar.startsWith("proforma:") && (
+                <button type="button" onClick={() => onEslestir(s)} className="mt-0.5 flex items-center gap-1 text-[11px] hover:underline" style={{ color: "#93C5FD" }} data-siparis-eslestir>
+                  <Link2 size={11} /> Excel&apos;de aynı sipariş var mı?
+                </button>
+              )}
             </td>
             <td className={`${h} text-white`}>{s.firma || "—"}</td>
             <td className={h} style={{ color: "#C9D1DC" }}>
@@ -174,8 +190,9 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, mesgul }: 
 }
 
 /** Excel'deki gibi bölümlü sipariş listesi; her bölümde en güncel en altta. */
-function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, mesgul, sevkAcik, setSevkAcik }: {
-  liste: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void; mesgul: string | null;
+function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, sevkAcik, setSevkAcik }: {
+  liste: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
+  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null;
   sevkAcik: boolean; setSevkAcik: (v: boolean) => void;
 }) {
   const bolumler = useMemo(() => siparisBolumleri(liste), [liste]);
@@ -220,7 +237,7 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, mesgul, sevkA
                         </td>
                       </tr>
                     )}
-                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} mesgul={mesgul} />
+                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} onEslestir={onEslestir} onAyir={onAyir} mesgul={mesgul} />
                   </tbody>
                 </table>
               </div>
@@ -464,6 +481,7 @@ function SiparisIcerik() {
   const [aktarAcik, setAktarAcik] = useState(false);
   const [siparisAktarAcik, setSiparisAktarAcik] = useState(false);
   const [bilgi, setBilgi] = useState<string | null>(null);
+  const [eslestirilecek, setEslestirilecek] = useState<SiparisSatiri | null>(null);
   const bugun = bugunIst();
 
   const yukle = useCallback(async () => {
@@ -475,6 +493,15 @@ function SiparisIcerik() {
     finally { setYukleniyor(false); }
   }, []);
   useEffect(() => { if (yetkili) yukle(); }, [yetkili, yukle]);
+
+  // 16.11.2026: "ayni siparis" eslestirmesini geri al (sistem proformasi listede yeniden ayri satir olur)
+  const eslesmeAyir = async (s: SiparisSatiri) => {
+    if (!s.eslesik_proforma) return;
+    setBekleyen(s.anahtar);
+    try { await siparisEslesmeKaldir(s.eslesik_proforma); setBilgi(`${s.eslesik_proforma} eşleştirmesi kaldırıldı; listede yine ayrı satır.`); await yukle(); }
+    catch (e) { setHata(e instanceof Error ? e.message : "Eşleştirme kaldırılamadı."); }
+    finally { setBekleyen(null); }
+  };
 
   const ozet = useMemo(() => siparisOzeti(siparisler || []), [siparisler]);
   const q = norm(arama.trim());
@@ -626,11 +653,15 @@ function SiparisIcerik() {
               {siparisAktarAcik && (
                 <SiparisExcelAktar onKapat={() => setSiparisAktarAcik(false)} onAktarildi={(m) => { setSiparisAktarAcik(false); setBilgi(m); yukle(); }} />
               )}
+              {eslestirilecek && (
+                <SiparisEslestirFormu s={eslestirilecek} onKapat={() => setEslestirilecek(null)} onEslesti={(m) => { setEslestirilecek(null); setBilgi(m); yukle(); }} />
+              )}
               {onOdemeSatir && (
                 <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d, ek) => onOdemeKaydetFn(onOdemeSatir, t, p, d, ek)} />
               )}
               {gorunenSiparis.length ? (
-                <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek} mesgul={bekleyen}
+                <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek}
+                  onEslestir={setEslestirilecek} onAyir={eslesmeAyir} mesgul={bekleyen}
                   sevkAcik={sevkAcik || !!q} setSevkAcik={setSevkAcik} />
               ) : <EmptyState icon={<ClipboardList size={40} />} title={q ? "Aramayla eşleşen sipariş yok" : "Sipariş yok"} />}
             </>

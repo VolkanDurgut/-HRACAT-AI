@@ -93,3 +93,24 @@ export async function siparisAktar(dosyaAdi: string, satirlar: SiparisAktarimSat
   if (error) throw new Error(error.message);
   return data as { eklenen: number; guncellenen: number; ayni: number };
 }
+
+/** 16.11.2026 "Ayni siparis" eslestirmesi: sistem proformasi <-> Excel satiri (siparis_eslesmeleri). */
+export type EslesmeAdayi = { anahtar: string; proforma_no: string | null; proforma_tarihi: string | null; firma: string | null; miktar_mt: number | null;
+  tutar: number | null; para_birimi: string | null; konteyner: number | null; liman: string | null; durum: string | null; bl_no: string | null; puan: number };
+
+export async function eslesmeAdaylariOku(proformaNo: string): Promise<EslesmeAdayi[]> {
+  const { data, error } = await supabase.rpc("siparis_eslesme_adaylari", { p_proforma_no: proformaNo });
+  if (error) throw new Error(error.message);
+  const sayi = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+  return ((data || []) as Record<string, unknown>[]).map((r) => ({
+    ...(r as unknown as EslesmeAdayi), miktar_mt: sayi(r.miktar_mt), tutar: sayi(r.tutar), konteyner: sayi(r.konteyner), puan: Number(r.puan || 0),
+  }));
+}
+export async function siparisEslestir(proformaNo: string, defterAnahtar: string): Promise<void> {
+  const { error } = await supabase.rpc("siparis_eslestir", { p_proforma_no: proformaNo, p_defter_anahtar: defterAnahtar });
+  if (error) throw new Error(error.message);
+}
+export async function siparisEslesmeKaldir(proformaNo: string): Promise<void> {
+  const { error } = await supabase.rpc("siparis_eslesme_kaldir", { p_proforma_no: proformaNo });
+  if (error) throw new Error(error.message);
+}

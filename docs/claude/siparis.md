@@ -524,3 +524,11 @@ Migration `20261116210000_veri_tutarliligi.sql` (+ `..210500` aday eşiği), CAN
 - **Yeniden oku** `navlun_yeniden_okuma` (şirket başına tek aktif), RPC `navlun_yeniden_oku_iste/_iptal`; edge işlemleri
   `yeniden_oku_al` / `yeniden_oku_ilerle` (service role fonksiyonları). Apps Script `navlunTara`: normal okuma ilk 60 sn'de
   biterse `navlunYenidenOku` (20 yazışma, 3 dk bütçe, Gmail sırası `konum`); NAVLUN_SON'a dokunmaz. navlun.gs yeniden yapıştırılmalı.
+
+## 4.17 Navlun raporu: "Tek Teklifle Karar Verilen Limanlar" (16.11.2026, kullanıcı onayı)
+- Talebi olan liman (rezervasyon bekleyen sipariş ya da ETD'si bugün/ileride booking) son 30 günde en fazla TEK acente /
+  hat bloğundan 20'DC USD teklif almışsa raporda üçüncü bölüm + bekleyen tablosunda "tek teklif" etiketi ("yeni navlun
+  talebi açın"). Teklif hiç yoksa "teklif yok · son <tarih>". Hesap: `navlunSatinAlma().tekTeklif`, `limanTeklifVerenleri`.
+- Sağlık taraması dersi (16.11.2026): "kesim saati geçti, fatura talimatı işaretli değil" kontrolü YANLIŞ alarm verdi;
+  faturası kesilmiş/yüklenmiş dosyada talimat gönderilmiş demektir (IHR-2026-0112). Bu kontrol yapılırken
+  `fatura_no` / `fatura_dosya_url` dolu dosya "talimat tamam" sayılır.

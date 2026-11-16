@@ -358,7 +358,26 @@ export type NavlunSatinAlma = {
   bekleyen: { siparis: number; konteyner: number };
   /** 12.11.2026 kullanici: "Rezervasyon bekleyen musteriler alt kisimda kendi basligi altinda" */
   bekleyenler: BekleyenSatiri[];
+  /** 16.11.2026: navlun alinacak / alinmis limanlardan son 30 gunde en fazla TEK acenteden teklif olanlar ("yeni talep acin") */
+  tekTeklif: TekTeklifLimani[];
 };
+export type TekTeklifLimani = {
+  liman: string; limanAnahtar: string; bekleyenKont: number; bookingKont: number;
+  /** Son 30 gunde 20'DC USD teklif veren acente / hat bloklari (0 ya da 1) */
+  acenteler: string[]; enIyi: { tutar: number; blok: string } | null; sonTeklif: string | null;
+};
+/** Bir limanda son `gun` gunde 20'DC USD teklif veren bloklar (acente / hat) ve en son teklif tarihi. */
+export function limanTeklifVerenleri(t: NavlunTablosu, anahtar: string, gun = 30): { bloklar: string[]; son: string | null } {
+  const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
+  const bloklar: string[] = [];
+  let son: string | null = null;
+  for (const b of t.bloklar) {
+    const h = (b.teklifler.get(anahtar) || []).filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD");
+    for (const x of h) if (!son || x.tarih > son) son = x.tarih;
+    if (h.some((x) => x.tarih.slice(0, 10) >= sinir)) bloklar.push(b.ad);
+  }
+  return { bloklar, son };
+}
 
 /** Konudaki booking numaralari ("123456789 + 987654321", "ABC1234567", "XYZAB12345678"). */
 export function konuBookingleri(konu: string | null | undefined): string[] {
@@ -452,12 +471,31 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
       anlasma: kb && kb.para === "USD" ? { tutar: kb.tutar, tarih: kb.tarih } : null });
   }
   satirlar.sort((a, b) => (a.etd || "9999").localeCompare(b.etd || "9999") || a.liman.localeCompare(b.liman, "tr") || a.booking.localeCompare(b.booking));
+  // 16.11.2026 (CEO onerisi, kullanici onayi): talebi olan limanda (rezervasyon bekleyen ya da yaklasan booking) son 30 gunde
+  // en fazla tek acenteden teklif varsa uyari: karar tek teklifle veriliyor, yeni navlun talebi acilmali.
+  const talep = new Map<string, { liman: string; bekleyen: number; booking: number }>();
+  for (const b of bekleyenler) if (b.limanAnahtar) {
+    const x = talep.get(b.limanAnahtar) || { liman: b.liman, bekleyen: 0, booking: 0 }; x.bekleyen += b.konteyner; talep.set(b.limanAnahtar, x);
+  }
+  for (const x of satirlar) {
+    const y = talep.get(x.limanAnahtar) || { liman: x.liman, bekleyen: 0, booking: 0 }; y.booking += x.konteyner; talep.set(x.limanAnahtar, y);
+  }
+  const tekTeklif: TekTeklifLimani[] = [];
+  for (const [k, v] of Array.from(talep.entries())) {
+    const tv = limanTeklifVerenleri(t, k, 30);
+    if (tv.bloklar.length > 1) continue;
+    const e = enIyiler.get(v.liman);
+    tekTeklif.push({ liman: v.liman, limanAnahtar: k, bekleyenKont: v.bekleyen, bookingKont: v.booking, acenteler: tv.bloklar,
+      enIyi: e ? { tutar: e.tutar, blok: e.blok } : null, sonTeklif: tv.son });
+  }
+  tekTeklif.sort((a, b) => (b.bekleyenKont + b.bookingKont) - (a.bekleyenKont + a.bookingKont) || a.liman.localeCompare(b.liman, "tr"));
   const toplam: Record<string, number> = {};
   for (const x of satirlar) if (x.toplam !== null) toplam[x.para] = (toplam[x.para] || 0) + x.toplam;
   return {
     satirlar, toplam, konteyner: satirlar.reduce((a, x) => a + x.konteyner, 0), belirsiz: satirlar.filter((x) => x.kaynak === "belirsiz").length,
     bekleyen: { siparis: bekleyenSiparis, konteyner: bekleyenKont },
     bekleyenler: bekleyenler.sort((a, b) => a.liman.localeCompare(b.liman, "tr") || (a.musteri || "").localeCompare(b.musteri || "", "tr")),
+    tekTeklif,
   };
 }
 
@@ -651,16 +689,29 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
     ) : `<div style="font-size:12px;color:#64748B">Yükleme planında ETD'si bugün / ileride booking yok.</div>`)
     + (sa.belirsiz ? `<div style="margin-top:5px;font-size:11.5px;color:#B45309">${sa.belirsiz} booking'in navlunu sistemde yok (dosya / yükleme planı / anlaşma maili).</div>` : "");
 
+  const tekSet = new Set((sa.tekTeklif || []).map((x) => x.limanAnahtar));
   const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı`, "#F4A07C")
     + (sa.bekleyenler.length ? sikiTablo(
       [{ ad: "Müşteri" }, { ad: "Varış limanı" }, { ad: "Kont", sag: true }, { ad: "Güncel en iyi 20'DC", sag: true }, { ad: "Acente / Hat" }],
       sa.bekleyenler.map((b) => [
         `${esc(kes(b.musteri || "-", 28))}${b.siparis > 1 ? ` <span style="color:#94A3B8;font-size:9.5px">${b.siparis} sipariş</span>` : ""}`,
-        limanLink(b.liman, b.limanAnahtar),
+        limanLink(b.liman, b.limanAnahtar) + (tekSet.has(b.limanAnahtar || "") ? ` <span style="color:#B45309;font-size:9.5px">tek teklif</span>` : ""),
         `${b.konteyner}`,
         b.enIyi ? `<b style="color:#047857">${usd(b.enIyi.tutar)}</b>` : b.anlasma ? `<span style="color:#283474">${usd(b.anlasma.tutar)}</span>` : gri("teklif yok"),
         b.enIyi ? esc(kes(b.enIyi.blok, 18)) : b.anlasma ? `<span style="color:#64748B">son anlaşma · ${kisa(b.anlasma.tarih.slice(0, 10))}</span>` : gri("-"),
       ]),
     ) : `<div style="font-size:12px;color:#64748B">Rezervasyon bekleyen sipariş yok.</div>`);
-  return ust + alt;
+  const tek = sa.tekTeklif || [];
+  const uc = tek.length ? bolum("Tek Teklifle Karar Verilen Limanlar", `${tek.length} liman · son 30 günde en fazla bir acenteden 20'DC teklif var — yeni navlun talebi açın`, "#F59E0B")
+    + sikiTablo(
+      [{ ad: "Varış limanı" }, { ad: "Bekleyen kont", sag: true }, { ad: "Yaklaşan booking kont", sag: true }, { ad: "Teklif veren (30 gün)" }, { ad: "Güncel en iyi", sag: true }],
+      tek.map((x) => [
+        limanLink(x.liman, x.limanAnahtar),
+        x.bekleyenKont ? `<b>${x.bekleyenKont}</b>` : gri("-"),
+        x.bookingKont ? `${x.bookingKont}` : gri("-"),
+        x.acenteler.length ? esc(kes(x.acenteler[0], 18)) : `<span style="color:#B45309">teklif yok${x.sonTeklif ? ` · son ${kisa(x.sonTeklif.slice(0, 10))}` : ""}</span>`,
+        x.enIyi ? usd(x.enIyi.tutar) : gri("-"),
+      ]),
+    ) : "";
+  return ust + alt + uc;
 }

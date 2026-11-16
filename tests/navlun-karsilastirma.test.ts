@@ -175,3 +175,26 @@ test("es sozlugu (ad_esleri): liman ve firma eslesmesi; bos sozlukte sabit esler
   esleriYukle([]);
   assert.equal(firmaAnahtari("Ornek Firma S.A."), "ORNEKFIRMASA");
 });
+
+test("tek teklifle karar verilen limanlar: talebi olan limanda son 30 gunde <= 1 acente (16.11.2026)", async () => {
+  const { navlunTablosuHesapla, navlunSatinAlma, satinAlmaHtml } = await import("@/supabase/functions/_shared/navlun-tablosu");
+  const teklif = (liman: string, acente: string, tutar: number, tarih: string) => ({ tur: "teklif", liman, liman_anahtar: liman, acente, armator: acente, tutar,
+    para_birimi: "USD", ekipman: "20DC", free_time_gun: null, tarih, lokal_dahil: true });
+  const olaylar = [teklif("ORNEKPORT", "Akkon", 1800, "2026-11-10T08:00:00Z"), teklif("IKIPORT", "Akkon", 900, "2026-11-10T08:00:00Z"),
+    teklif("IKIPORT", "Msc", 950, "2026-11-11T08:00:00Z"), teklif("ESKIPORT", "Msc", 700, "2026-09-01T08:00:00Z")];
+  const t = navlunTablosuHesapla(olaylar, [], "2026-11-16");
+  const sip = (musteri: string, liman: string, konteyner: number) => ({ kaynak: "siparis", booking_no: null, musteri, konteyner, dosya_no: null,
+    varis_limani: liman, acente: null, navlun: null, navlun_para: null, etd: null });
+  const bk = (liman: string, konteyner: number) => ({ kaynak: "excel", booking_no: "BKG123456789", musteri: "ORNEK", konteyner, dosya_no: null,
+    varis_limani: liman, acente: "AKKON", navlun: 1850, navlun_para: "USD", etd: "2026-11-20" });
+  const sa = navlunSatinAlma(t, [sip("A", "ORNEKPORT", 4), sip("B", "IKIPORT", 2), sip("C", "ESKIPORT", 1), bk("YOKPORT", 5)], olaylar);
+  const k = Object.fromEntries(sa.tekTeklif.map((x) => [x.limanAnahtar, x]));
+  assert.deepEqual(k["ORNEKPORT"].acenteler, ["AKKON"]);
+  assert.equal(k["ORNEKPORT"].bekleyenKont, 4);
+  assert.equal(k["IKIPORT"], undefined);                       // iki acente: uyari yok
+  assert.deepEqual(k["ESKIPORT"].acenteler, []);               // teklif 30 gunden eski
+  assert.equal(k["YOKPORT"].bookingKont, 5);                   // yaklasan booking, hic teklif yok
+  const html = satinAlmaHtml(sa);
+  assert.ok(html.includes("Tek Teklifle Karar Verilen Limanlar"));
+  assert.ok(html.includes("tek teklif"));
+});

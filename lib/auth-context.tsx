@@ -22,6 +22,7 @@ export type SayfaYetkileri = {
   satin_alma: boolean; // Satin alma talepleri: departman listelerini onaylama (26.10.2026)
   ic_alis: boolean; // Ic piyasa ALIS siparisleri + tedarikciler + alis fiyatlari (30.10.2026)
   pazar: boolean; // PAZAR (UNEX Satis) CRM: potansiyel / musteri, fuar listeleri (10.11.2026)
+  navlun: boolean; // Navlun Bildirimi (16.11.2026: ayri yetki; once Kontrol Merkezi "analiz"e bagliydi)
 };
 
 export type SekmeYetkileri = {
@@ -78,6 +79,7 @@ const VARSAYILAN_YETKILER: KullaniciYetkileri = {
     satin_alma: false,
     ic_alis: false,
     pazar: false,
+    navlun: false,
   },
   sekme_yetkileri: {
     proforma: false,
@@ -139,8 +141,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRol((rolRes.data?.rol as Rol) ?? null);
       setCompanyId(rolRes.data?.company_id ?? null); // Şirket ID'si state'e yazıldı
       if (yetkiRes.data) {
+        const dbSayfa = (yetkiRes.data.sayfa_yetkileri || {}) as Partial<SayfaYetkileri>;
         setYetkiler({
-          sayfa_yetkileri: { ...VARSAYILAN_YETKILER.sayfa_yetkileri, ...yetkiRes.data.sayfa_yetkileri },
+          sayfa_yetkileri: {
+            ...VARSAYILAN_YETKILER.sayfa_yetkileri, ...dbSayfa,
+            // 16.11.2026: "navlun" anahtari olmayan eski kayitta Navlun Bildirimi eskisi gibi Kontrol Merkezi'ni izler
+            navlun: dbSayfa.navlun ?? !!dbSayfa.analiz,
+          },
           sekme_yetkileri: { ...VARSAYILAN_YETKILER.sekme_yetkileri, ...yetkiRes.data.sekme_yetkileri },
         });
       } else {
@@ -153,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sayfa_yetkileri: {
             dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
             kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
-            proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false,
+            proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false, navlun: false,
           },
           sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
         });
@@ -165,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sayfa_yetkileri: {
           dashboard: false, panel: false, yeni_dosya: false, ihracatlar: false,
           kantar: false, analiz: false, ayarlar: false, etd_eta: false, draft_onay: false, ic_piyasa: false,
-          proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false,
+          proformalar: false, proforma_imza: false, satin_alma: false, ic_alis: false, pazar: false, navlun: false,
         },
         sekme_yetkileri: { proforma: false, evraklar: false, rezervasyon: false, konteynerler: false },
       });

@@ -1,5 +1,5 @@
 /**
- * NAVLUN BILDIRIMI - veri erisimi (10.11.2026). Okuma RLS ile ("analiz" ya da "proformalar" yetkisi);
+ * NAVLUN BILDIRIMI - veri erisimi (10.11.2026). Okuma RLS ile ("navlun", "analiz" ya da "proformalar" yetkisi);
  * tek yazma: hata kuyrugu cozumu (navlun_hata_coz RPC). Migration: 20261110150000_navlun_bildirimi.sql
  */
 import { supabase } from "@/lib/supabase";

@@ -23,7 +23,7 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  * karsilasinca mudahale edebilecegimiz bir alan olmali."
  *  - Veri: arsiv Gmail -> Apps Script (docs/apps-script/navlun.gs) -> edge navlun-bildirimi -> navlun_teklifleri.
  *  - Sayfa SALT OKUNUR; tek mudahale "Okunamayan teklifler" (fiyat ekte / gorselde ve okunamadi): elle fiyat ya da yoksay.
- *  - Yetki: "analiz" (Kontrol Merkezi). RLS "analiz" veya "proformalar".
+ *  - Yetki: "navlun" (16.11.2026; once "analiz"). RLS "navlun", "analiz" veya "proformalar".
  *  - Excel indir / Test maili (11.11.2026): operasyonun navlun tablosuyla AYNI duzen (lib/navlun/tablo.ts ->
  *    _shared/navlun-tablosu.ts); test maili edge navlun-tablosu, yalniz test adresine.
  *  - Canli Navlun Haritasi + Liman Masasi (11.11.2026): sayfa haritayla acilir (components/navlun/navlun-haritasi.tsx);
@@ -291,7 +291,8 @@ function YeniBilgiPaneli({ bilgiler, oncekiGorulme, onOkundu }: { bilgiler: Yeni
 
 function NavlunIcerik() {
   const { yetkiler } = useAuth();
-  const yetkili = !!yetkiler.sayfa_yetkileri.analiz;
+  // 16.11.2026: kendi yetkisi "navlun" (Yetkilendirme > Operasyon > Navlun Bildirimi); once "analiz"di
+  const yetkili = !!yetkiler.sayfa_yetkileri.navlun;
   const [veri, setVeri] = useState<NavlunVerisi | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);

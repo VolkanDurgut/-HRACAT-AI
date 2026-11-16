@@ -52,6 +52,7 @@ const SAYFA_ETIKETLER: Record<string, string> = {
   satin_alma: "Satın Alma (talep onayı)",
   ic_alis:    "İç Piyasa Alış (tedarikçi ve alış fiyatları)",
   pazar:      "Pazar (UNEX Satış CRM)",
+  navlun:     "Navlun Bildirimi",
 };
 
 /**
@@ -61,8 +62,9 @@ const SAYFA_ETIKETLER: Record<string, string> = {
  */
 const ACIKLAMALAR: Record<string, string> = {
   analiz:        "Göstergeler, sevkiyat haritası, liman / acente analizleri",
+  navlun:        "Acente navlun teklifleri, liman karşılaştırması, navlun tablosu (Excel)",
   panel:         "Dosya listesi ve günlük iş takibi",
-  proformalar:   "Proforma hazırlama ve PDF",
+  proformalar:   "Proforma hazırlama ve PDF + Sipariş Listesi / Yükleme Planı",
   proforma_imza: "Hazırlanan proformayı onaylayıp imzalama",
   yeni_dosya:    "Proforma PDF'inden yeni ihracat dosyası açma",
   ihracatlar:    "İhracat dosyaları + DİİB Takibi (beyanname no, DİİB bölünmesi)",
@@ -100,7 +102,7 @@ const DOSYA_GOREN_ROLLER = ["admin", "ihracat", "muhasebe"];
 /** Kenar cubugu bolumleriyle ayni gruplama (components/sidebar.tsx). Her sayfa anahtari TAM bir grupta. */
 const YETKI_GRUPLARI: { baslik: string; tip: "sayfa" | "sekme"; anahtarlar: string[] }[] = [
   { baslik: "İhracat", tip: "sayfa", anahtarlar: ["analiz", "pazar", "panel", "proformalar", "proforma_imza", "yeni_dosya", "ihracatlar", "draft_onay"] },
-  { baslik: "Operasyon", tip: "sayfa", anahtarlar: ["etd_eta", "kantar"] },
+  { baslik: "Operasyon", tip: "sayfa", anahtarlar: ["etd_eta", "kantar", "navlun"] },
   { baslik: "Yurt İçi", tip: "sayfa", anahtarlar: ["ic_piyasa", "ic_alis"] },
   { baslik: "Şirket İçi", tip: "sayfa", anahtarlar: ["satin_alma"] },
   { baslik: "Dosya sekmeleri", tip: "sekme", anahtarlar: ["proforma", "evraklar", "rezervasyon", "konteynerler"] },

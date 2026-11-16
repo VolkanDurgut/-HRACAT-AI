@@ -30,8 +30,8 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   "/proformalar": "proformalar",
   "/satin-alma": "satin_alma",
   "/pazar": "pazar", // PAZAR CRM (10.11.2026)
-  "/navlun": "analiz",
-  "/siparisler": "proformalar", // Siparis Listesi + Yukleme Plani (11.11.2026): proforma/dosya/rezervasyondan otomatik // Navlun Bildirimi (10.11.2026): maillerden okunan acente teklifleri
+  "/navlun": "navlun", // Navlun Bildirimi (10.11.2026); 16.11.2026: kendi yetkisi (once "analiz")
+  "/siparisler": "proformalar", // Siparis Listesi + Yukleme Plani (11.11.2026): proforma/dosya/rezervasyondan otomatik
 };
 
 // "/ayarlar" (ve alt sayfaları, örn. /ayarlar/yetkilendirme) BİLEREK yukarıdaki

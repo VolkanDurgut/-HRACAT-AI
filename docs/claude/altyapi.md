@@ -447,3 +447,12 @@
   simgelerine ve müşteriye açık token sayfalarına (takip / talep / çek / çıkış / rapor) DOKUNULMADI.
   Giriş başarılı olunca da logolu geçiş ("Hoş geldiniz"; hedef yetkiye göre değişebildiği için genel
   ad — `sayfaGecisiBaslat(hedef, ad)`). testid `sayfa-yukleniyor`.
+
+## Navlun Bildirimi ayrı sayfa yetkisi "navlun" (16.11.2026)
+- Kullanıcı: "operation hesabı navlun bildirimi sayfasına ulaşamıyor". Kök neden: /navlun menü, sayfa kapısı
+  (app-shell) ve sayfanın kendisi Kontrol Merkezi yetkisine ("analiz") bağlıydı; Yetkilendirme'de anahtar yoktu.
+- Yeni anahtar `navlun` (Yetkilendirme > Operasyon > Navlun Bildirimi). Migration `20261116100000_navlun_sayfa_yetkisi.sql`
+  (CANLIDA): navlun_* tabloları + sevkiyat_plani okuma politikaları ve `navlun_hata_coz` / `yukleme_plani` RPC'leri
+  `proformalar OR analiz OR navlun`; mevcut kayıtlara navlun = analiz (erişim değişmedi); operation@ navlun = true.
+- auth-context: anahtarı olmayan eski kayıtta navlun = analiz (geri uyum). Proforma Oluştur açıklamasına
+  Sipariş Listesi / Yükleme Planı eklendi (aynı anahtar).

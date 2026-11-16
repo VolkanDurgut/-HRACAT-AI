@@ -194,7 +194,15 @@ test("tek teklifle karar verilen limanlar: talebi olan limanda son 30 gunde <= 1
   assert.equal(k["IKIPORT"], undefined);                       // iki acente: uyari yok
   assert.deepEqual(k["ESKIPORT"].acenteler, []);               // teklif 30 gunden eski
   assert.equal(k["YOKPORT"].bookingKont, 5);                   // yaklasan booking, hic teklif yok
-  const html = satinAlmaHtml(sa);
+  // Penceredeki teklifin kendisi (60 gunluk "en iyi" degil)
+  assert.deepEqual(k["ORNEKPORT"].teklif, { blok: "AKKON", tutar: 1800, tarih: "2026-11-10T08:00:00Z" });
+  assert.equal(k["ESKIPORT"].teklif, null);
+  // Kullanici onayina kadar kapali: varsayilan raporda bolum ve etiket YOK
+  const kapali = satinAlmaHtml(sa);
+  assert.ok(!kapali.includes("Tek Teklifle Karar Verilen Limanlar"));
+  assert.ok(!kapali.includes("tek teklif"));
+  const html = satinAlmaHtml(sa, { tekTeklif: true });
   assert.ok(html.includes("Tek Teklifle Karar Verilen Limanlar"));
   assert.ok(html.includes("tek teklif"));
+  assert.ok(html.includes("Son anlaşma"));
 });

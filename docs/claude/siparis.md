@@ -529,6 +529,10 @@ Migration `20261116210000_veri_tutarliligi.sql` (+ `..210500` aday eşiği), CAN
 - Talebi olan liman (rezervasyon bekleyen sipariş ya da ETD'si bugün/ileride booking) son 30 günde en fazla TEK acente /
   hat bloğundan 20'DC USD teklif almışsa raporda üçüncü bölüm + bekleyen tablosunda "tek teklif" etiketi ("yeni navlun
   talebi açın"). Teklif hiç yoksa "teklif yok · son <tarih>". Hesap: `navlunSatinAlma().tekTeklif`, `limanTeklifVerenleri`.
+- 16.11.2026 gece (kullanıcı: "benim onayım olmadan canlıya mail almak yok"): bölüm ve "tek teklif" etiketi varsayılan
+  KAPALI; yalnız secret `NAVLUN_TEK_TEKLIF=evet` iken rapora girer (açmak için kod deploy gerekmez). Önizlemede bulunan
+  karışıklık düzeltildi: "Güncel en iyi" 60 günlük penceredendi (TEMA'da 46 günlük başka acente teklifi) → yerine
+  penceredeki teklifin kendisi (`teklif`) + limandaki son anlaşma (`anlasma`; ör. DAR ES SALAAM tek teklif 3.250, anlaşma 1.780).
 - Sağlık taraması dersi (16.11.2026): "kesim saati geçti, fatura talimatı işaretli değil" kontrolü YANLIŞ alarm verdi;
   faturası kesilmiş/yüklenmiş dosyada talimat gönderilmiş demektir (IHR-2026-0112). Bu kontrol yapılırken
   `fatura_no` / `fatura_dosya_url` dolu dosya "talimat tamam" sayılır.

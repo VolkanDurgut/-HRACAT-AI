@@ -47,6 +47,9 @@ function adresler(ad: string, varsayilan: string[]): string[] {
   return liste.length ? Array.from(new Set(liste)).slice(0, 6) : varsayilan;
 }
 const CANLI = (Deno.env.get("NAVLUN_TABLOSU_CANLI") || "").trim().toLowerCase() === "evet";
+// 16.11.2026 kullanici: "benim onayim olmadan canliya mail almak yok" -> yeni "Tek Teklifle Karar Verilen Limanlar" bolumu
+// yalniz bu secret "evet" iken rapora girer (onay: supabase secrets set NAVLUN_TEK_TEKLIF=evet; kod deploy gerekmez).
+const TEK_TEKLIF = (Deno.env.get("NAVLUN_TEK_TEKLIF") || "").trim().toLowerCase() === "evet";
 const ALICILAR = adresler("NAVLUN_TABLOSU_ALICI", []);
 const TEST_ALICISI = adresler("NAVLUN_TABLOSU_TEST_ALICISI", []);
 
@@ -231,7 +234,7 @@ Deno.serve(async (req: Request) => {
       const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
       // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Eski haftalik kayitlar haric.
       const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&oturum=neq.haftalik&order=gonderim_zamani.desc.nullslast&limit=1`);
-      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma });
+      const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma, tekTeklif: TEK_TEKLIF });
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");

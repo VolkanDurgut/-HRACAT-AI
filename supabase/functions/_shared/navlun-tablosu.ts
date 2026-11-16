@@ -365,18 +365,26 @@ export type TekTeklifLimani = {
   liman: string; limanAnahtar: string; bekleyenKont: number; bookingKont: number;
   /** Son 30 gunde 20'DC USD teklif veren acente / hat bloklari (0 ya da 1) */
   acenteler: string[]; enIyi: { tutar: number; blok: string } | null; sonTeklif: string | null;
+  /** 16.11.2026 onizleme duzeltmesi: penceredeki (30 gun) tek teklifin kendisi; "en iyi" 60 gunluk penceredendi, karisiyordu */
+  teklif: { blok: string; tutar: number; tarih: string } | null;
+  /** Limandaki son anlasma (acenteye yazdigimiz kabul, USD): tek teklif disinda bilinen fiyat (orn. baska acenteyle anlasma) */
+  anlasma: { tutar: number; tarih: string } | null;
 };
 /** Bir limanda son `gun` gunde 20'DC USD teklif veren bloklar (acente / hat) ve en son teklif tarihi. */
-export function limanTeklifVerenleri(t: NavlunTablosu, anahtar: string, gun = 30): { bloklar: string[]; son: string | null } {
+export function limanTeklifVerenleri(t: NavlunTablosu, anahtar: string, gun = 30): { bloklar: string[]; son: string | null; teklif: { blok: string; tutar: number; tarih: string } | null } {
   const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
   const bloklar: string[] = [];
   let son: string | null = null;
+  let teklif: { blok: string; tutar: number; tarih: string } | null = null;
   for (const b of t.bloklar) {
     const h = (b.teklifler.get(anahtar) || []).filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD");
     for (const x of h) if (!son || x.tarih > son) son = x.tarih;
-    if (h.some((x) => x.tarih.slice(0, 10) >= sinir)) bloklar.push(b.ad);
+    const pencere = h.filter((x) => x.tarih.slice(0, 10) >= sinir);
+    if (pencere.length) bloklar.push(b.ad);
+    // Penceredeki en son teklif (bloklar <= 1 iken tek teklifin kendisi)
+    for (const x of pencere) if (!teklif || x.tarih > teklif.tarih) teklif = { blok: b.ad, tutar: x.tutar, tarih: x.tarih };
   }
-  return { bloklar, son };
+  return { bloklar, son, teklif };
 }
 
 /** Konudaki booking numaralari ("123456789 + 987654321", "ABC1234567", "XYZAB12345678"). */
@@ -485,8 +493,10 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
     const tv = limanTeklifVerenleri(t, k, 30);
     if (tv.bloklar.length > 1) continue;
     const e = enIyiler.get(v.liman);
+    const kb = t.limanlar.find((l) => l.anahtar === k)?.kabul;
     tekTeklif.push({ liman: v.liman, limanAnahtar: k, bekleyenKont: v.bekleyen, bookingKont: v.booking, acenteler: tv.bloklar,
-      enIyi: e ? { tutar: e.tutar, blok: e.blok } : null, sonTeklif: tv.son });
+      enIyi: e ? { tutar: e.tutar, blok: e.blok } : null, sonTeklif: tv.son, teklif: tv.teklif,
+      anlasma: kb && kb.para === "USD" ? { tutar: kb.tutar, tarih: kb.tarih } : null });
   }
   tekTeklif.sort((a, b) => (b.bekleyenKont + b.bookingKont) - (a.bekleyenKont + a.bookingKont) || a.liman.localeCompare(b.liman, "tr"));
   const toplam: Record<string, number> = {};
@@ -561,6 +571,8 @@ export type NavlunRaporSecenek = {
   oturumEtiketi?: string | null;
   /** 12.11.2026: navlun satin alma listesi (verilirse mailin ana bolumu budur; tum fiyatlar "Diger navlun fiyatlari" ile sayfada) */
   satinAlma?: NavlunSatinAlma | null;
+  /** 16.11.2026: "Tek Teklifle Karar Verilen Limanlar" bolumu; kullanici onayina kadar kapali (secret NAVLUN_TEK_TEKLIF=evet) */
+  tekTeklif?: boolean;
 };
 
 /**
@@ -641,7 +653,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
     // 12.11.2026: mailin ana bolumu navlun satin alma listesi; tum limanlarin fiyatlari "Diger navlun fiyatlari" ile sayfada
     return raporKabugu({
       sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
-      ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa),
+      ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa, { tekTeklif: secenek.tekTeklif === true }),
       dugme: { metin: "Navlun Evreni", yol: "/navlun" },
       dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi; karşılaştırma lokal dahil (navlun + çıkış lokali + VGM / mühür, KDV hariç; acente hafızası), lokali belirsiz teklif en iyi sayılmaz.<br>Ekte iki Excel: ${satinAlmaBasligi(t.tarih)} ve ${navlunTablosuDosyaAdi(t.tarih)} (bütün navlunlar; Navlun Bildirimi › Excel indir ile aynı). Her gün 17:00 · müşteriye gitmez.`,
     });
@@ -659,7 +671,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
  * Mail: iki bolum (12.11.2026 kullanici): ustte "Satin Alinan Navlunlar" (musteri dahil), altta "Rezervasyon Bekleyen Musteriler".
  * Liman adi /navlun?liman= baglantisi (o limanin masasi acilir).
  */
-export function satinAlmaHtml(sa: NavlunSatinAlma): string {
+export function satinAlmaHtml(sa: NavlunSatinAlma, secenek: { tekTeklif?: boolean } = {}): string {
   const kisa = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
   const kes = (x: string, n: number) => (x.length > n ? `${x.slice(0, n - 1)}…` : x);
   const para = (v: number, p: string) => (p === "USD" ? usd(v) : `${v.toLocaleString("tr-TR")} ${p}`);
@@ -689,7 +701,9 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
     ) : `<div style="font-size:12px;color:#64748B">Yükleme planında ETD'si bugün / ileride booking yok.</div>`)
     + (sa.belirsiz ? `<div style="margin-top:5px;font-size:11.5px;color:#B45309">${sa.belirsiz} booking'in navlunu sistemde yok (dosya / yükleme planı / anlaşma maili).</div>` : "");
 
-  const tekSet = new Set((sa.tekTeklif || []).map((x) => x.limanAnahtar));
+  // 16.11.2026 kullanici: "benim onayim olmadan canliya mail almak yok" -> tek teklif bolumu + etiketi yalniz acikca istenirse
+  const tekListe = secenek.tekTeklif ? sa.tekTeklif || [] : [];
+  const tekSet = new Set(tekListe.map((x) => x.limanAnahtar));
   const alt = bolum("Rezervasyon Bekleyen Müşteriler", `${sa.bekleyen.siparis} sipariş · ${sa.bekleyen.konteyner} konteyner · ön ödemesi alındı, navlunu henüz satın alınmadı`, "#F4A07C")
     + (sa.bekleyenler.length ? sikiTablo(
       [{ ad: "Müşteri" }, { ad: "Varış limanı" }, { ad: "Kont", sag: true }, { ad: "Güncel en iyi 20'DC", sag: true }, { ad: "Acente / Hat" }],
@@ -701,16 +715,19 @@ export function satinAlmaHtml(sa: NavlunSatinAlma): string {
         b.enIyi ? esc(kes(b.enIyi.blok, 18)) : b.anlasma ? `<span style="color:#64748B">son anlaşma · ${kisa(b.anlasma.tarih.slice(0, 10))}</span>` : gri("-"),
       ]),
     ) : `<div style="font-size:12px;color:#64748B">Rezervasyon bekleyen sipariş yok.</div>`);
-  const tek = sa.tekTeklif || [];
-  const uc = tek.length ? bolum("Tek Teklifle Karar Verilen Limanlar", `${tek.length} liman · son 30 günde en fazla bir acenteden 20'DC teklif var — yeni navlun talebi açın`, "#F59E0B")
+  const tek = tekListe;
+  // Onizleme duzeltmesi (16.11.2026): "Guncel en iyi" 60 gunluk penceredendi (TEMA'da 46 gunluk teklif, baska acente) ->
+  // yerine penceredeki teklifin kendisi + limandaki son anlasma (DAR ES SALAAM 1.780 anlasma, tek teklif 3.250).
+  const uc = tek.length ? bolum("Tek Teklifle Karar Verilen Limanlar", `${tek.length} liman · son 30 günde en fazla bir acenteden 20'DC teklif var — karşılaştırma için yeni navlun talebi açın`, "#F59E0B")
     + sikiTablo(
-      [{ ad: "Varış limanı" }, { ad: "Bekleyen kont", sag: true }, { ad: "Yaklaşan booking kont", sag: true }, { ad: "Teklif veren (30 gün)" }, { ad: "Güncel en iyi", sag: true }],
+      [{ ad: "Varış limanı" }, { ad: "Bekleyen kont", sag: true }, { ad: "Yaklaşan booking kont", sag: true }, { ad: "Son 30 gündeki teklif" }, { ad: "Son anlaşma", sag: true }],
       tek.map((x) => [
         limanLink(x.liman, x.limanAnahtar),
         x.bekleyenKont ? `<b>${x.bekleyenKont}</b>` : gri("-"),
         x.bookingKont ? `${x.bookingKont}` : gri("-"),
-        x.acenteler.length ? esc(kes(x.acenteler[0], 18)) : `<span style="color:#B45309">teklif yok${x.sonTeklif ? ` · son ${kisa(x.sonTeklif.slice(0, 10))}` : ""}</span>`,
-        x.enIyi ? usd(x.enIyi.tutar) : gri("-"),
+        x.teklif ? `${esc(kes(x.teklif.blok, 18))} · <b>${usd(x.teklif.tutar)}</b> <span style="color:#94A3B8;font-size:9.5px">${kisa(x.teklif.tarih.slice(0, 10))}</span>`
+          : `<span style="color:#B45309">teklif yok${x.sonTeklif ? ` · son ${kisa(x.sonTeklif.slice(0, 10))}` : ""}</span>`,
+        x.anlasma ? `${usd(x.anlasma.tutar)} <span style="color:#94A3B8;font-size:9.5px">${kisa(x.anlasma.tarih.slice(0, 10))}</span>` : gri("-"),
       ]),
     ) : "";
   return ust + alt + uc;

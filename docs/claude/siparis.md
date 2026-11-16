@@ -491,3 +491,10 @@ ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı.
   Riviera (Beyrut, 23 kont) sistem rezervasyonunda ETD 14.11 ve 23 konteynerin DBA'sı yüklü → raporda yok (plan Excel'i 18.11
   diyor; kullanıcıya soruldu).
 - Testler: `navlun-oku.test.ts` (kabul), `navlun-karsilastirma.test.ts` (bekleyen birleştirme + DAR SALAAM).
+- 16.11.2026 kullanıcı cevabı: "Riviera ETD 18.11" ve BAKEBS kalan 3 konteyner için "Güncel yükleme planı işte bu yüzden
+  var" → YÜKLEME PLANI ESASTIR (migration `20261116200000_plan_etd_kismi_booking.sql`, CANLIDA):
+  `yukleme_plani_veri` ETD = plan Excel'i, boşsa rezervasyon (eskiden tersi; fark eden 3 booking: Riviera 14→18.11,
+  Black Stallion 19→26.11, OM General kapalı). `siparis_listesi_veri` kısmi booking: booking siparişin bir kısmını
+  karşılıyorsa sipariş "ön ödeme alındı" kalır (booking no yazılır), yeni kolon `bekleyen_konteyner` = kalan; navlun
+  raporu / yükleme planı "rezervasyon bekleyen" bunu kullanır (BAKEBS: 5 sipariş, 2 booking → 3 bekliyor). Kuru
+  çalıştırmada başka fark yok. ESNA 1.780 $ kabulü yeniden okumayla kaydedildi (+ Paramaribo 3.330 $ kabulü).

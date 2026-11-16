@@ -8,6 +8,10 @@ import {
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
 import { Hash, Users, Container, Anchor, Scale } from "lucide-react";
+import { beyannameMetniCikar } from "@/lib/beyanname-oku";
+import { talimatModeli } from "@/lib/konsimento/talimat";
+import { draftBlMetniniKontrolEt, type KonsimentoKontrolSatiri } from "@/lib/konsimento/kontrol";
+import { BelgeKontrolListesi, YenidenKontrolDugmesi } from "@/components/belge-kontrol-listesi";
 
 // 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
 const DRAFT_BL_YETENEKLERI = [
@@ -18,7 +22,12 @@ const DRAFT_BL_YETENEKLERI = [
   { ikon: <Scale size={11} />, metin: "Ağırlık ve kap" },
 ];
 
+// 16.11.2026: karsilastirma YAPAY ZEKASIZ (lib/konsimento/kontrol.ts draftBlMetniniKontrolEt; eski yapay zeka kontrolu
+// 16 dosyanin 14'unde yanlis alarm verdi). Yapay zeka yalniz BL no / consignee / notify OKUMAK icin calisir; PDF'te
+// metin yoksa (taranmis) ya da konteyner bulunamazsa eski yapay zeka kontrolu yedek olarak kullanilir.
 type DraftBlKontrolSonucu = {
+  kaynak?: "metin";
+  kontroller?: KonsimentoKontrolSatiri[];
   uyumlu: boolean;
   uyusmazliklar: { alan: string; sistemde: string; dosyada: string }[];
   ozet: string;
@@ -78,11 +87,41 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
     };
   };
 
+  const yerelKontrol = (metin: string | null) => {
+    if (!metin) return null;
+    try { return draftBlMetniniKontrolEt(metin, talimatModeli({ dosya, rezervasyonlar, konteynerler })); } catch { return null; }
+  };
+  const [yenileniyor, setYenileniyor] = useState(false);
+  /** Yuklu Draft BL yeniden okunur ve yapay zekasiz karsilastirilir (okunan BL no / consignee / notify korunur). */
+  const handleYenidenKontrol = async () => {
+    if (!draftBlUrl) return;
+    setYenileniyor(true);
+    setHata(null);
+    try {
+      const res = await fetch(draftBlUrl);
+      const yerel = res.ok ? yerelKontrol(await beyannameMetniCikar(await res.arrayBuffer())) : null;
+      if (!yerel) { setHata("Draft BL metni okunamadı (taranmış PDF olabilir) ya da konteyner numarası bulunamadı; yapay zekâsız kontrol yapılamadı."); return; }
+      const sonuc = { ...yerel, consignee: kontrolSonucu?.consignee, notify: kontrolSonucu?.notify, bl_no: kontrolSonucu?.bl_no };
+      const { data, error } = await supabase.from("ihracat_dosyalari").update({ draft_bl_kontrol_sonucu: sonuc })
+        .eq("id", dosya.id).eq("company_id", companyId).select("id");
+      const sorun = yazmaHatasi(error, data);
+      if (sorun) { setHata(`Kaydedilemedi: ${sorun}`); return; }
+      onRefresh();
+      cutoffUyarilariniYenile();
+    } catch {
+      setHata("Draft BL okunamadı.");
+    } finally {
+      setYenileniyor(false);
+    }
+  };
+
   const handleYukle = async (file: File) => {
     setYukleniyor(true);
     setHata(null);
     let yuklenenYol: string | null = null;
     try {
+      // Yapay zekasiz karsilastirma (metin katmani varsa); dosya depoya gitmeden once okunur
+      const yerel = yerelKontrol(await beyannameMetniCikar(await file.arrayBuffer()));
       const guvenliAd = file.name
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .replace(/ş/gi, "s").replace(/ğ/gi, "g").replace(/ı/gi, "i")
@@ -102,13 +141,20 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
 
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch(`${supabaseUrl}/functions/v1/konsimento-kontrol`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-        body: formData,
-      });
-      const data: DraftBlKontrolSonucu & { error?: string } = await response.json();
-      if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
+      // Yapay zeka: BL no / consignee / notify okuma (+ metin yoksa karsilastirma). Yerel kontrol varsa hatasi isi durdurmaz.
+      let data: DraftBlKontrolSonucu & { error?: string } = { uyumlu: true, uyusmazliklar: [], ozet: "" };
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/konsimento-kontrol`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+          body: formData,
+        });
+        data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Kontrol sırasında hata oluştu.");
+      } catch (e) {
+        if (!yerel) throw e;
+        data = { uyumlu: true, uyusmazliklar: [], ozet: "" };
+      }
 
       // Liman/gemi adi gibi alanlarda birbirini iceren degerleri kod seviyesinde filtrele
       // (orn. "MARPORT" / "ISTANBUL-MARPORT" ayni limandir).
@@ -121,7 +167,7 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
         if (sis.includes(dos) || dos.includes(sis)) return false;
         return true;
       });
-      const filtrelenmisData = {
+      const filtrelenmisData = yerel ? { ...yerel, consignee: data.consignee, notify: data.notify, bl_no: data.bl_no } : {
         ...data,
         uyusmazliklar: gercekUyusmazliklar,
         uyumlu: gercekUyusmazliklar.length === 0,
@@ -273,6 +319,9 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
                   <p className="text-sm font-semibold text-green-400">Draft BL sistemle uyumlu.</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs mt-1 ml-6" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
+                {kontrolSonucu.kontroller
+                  ? <BelgeKontrolListesi satirlar={kontrolSonucu.kontroller} belgeEtiketi="Draft BL" yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} testId="draft-bl-kontrol" />
+                  : <p className="ml-6 mt-1"><YenidenKontrolDugmesi yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} metin="Yapay zekâsız yeniden kontrol et" /></p>}
                 <div className="mt-2 ml-6 flex flex-wrap gap-4 text-xs" style={{ color: TEXT_MUTED }}>
                   {(kontrolSonucu.bl_no || dosya.bl_no) && (
                     <span>BL No: <strong className="text-white">{kontrolSonucu.bl_no || dosya.bl_no}</strong></span>
@@ -289,7 +338,8 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
                   <p className="text-sm font-semibold text-red-400">Draft BL&apos;de uyuşmazlık tespit edildi</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
-                {kontrolSonucu.uyusmazliklar?.length > 0 && (
+                {kontrolSonucu.kontroller && <BelgeKontrolListesi satirlar={kontrolSonucu.kontroller} belgeEtiketi="Draft BL" yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} testId="draft-bl-kontrol" />}
+                {!kontrolSonucu.kontroller && kontrolSonucu.uyusmazliklar?.length > 0 && (
                   <div className="space-y-1.5">
                     {kontrolSonucu.uyusmazliklar.map((u, idx) => (
                       <div key={idx} className="text-xs p-2 rounded bg-red-500/10 border border-red-500/20">
@@ -300,9 +350,12 @@ export default function DraftBlSection({ dosya, konteynerler, rezervasyonlar, on
                     ))}
                   </div>
                 )}
-                <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20">
-                  <RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={handleYenidenYukle} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                    <RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle
+                  </button>
+                  {!kontrolSonucu.kontroller && <YenidenKontrolDugmesi yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} metin="Yapay zekâsız yeniden kontrol et" />}
+                </div>
               </div>
             )}
           </div>

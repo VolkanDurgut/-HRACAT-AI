@@ -1323,3 +1323,32 @@ yazılmış) pay içinde kaldı. Fatura, sistemdeki konteyner (kantar) ağırlı
 - ÖNCEKİ (03.11): oransal FOB = CIF × toplamFob/toplamCif (Logo navlunu tutarla orantılı dağıttığı için).
   Ton başı yöntemde Logo'da navlun MİKTARA (kg) göre dağıtılmalı; yoksa faturadaki CIF birimler sapar
   (0115'te oransal dağıtımda 491,85 / 469,08). Test: tests/fob-ton-basi.test.ts.
+
+## Belge kontrolleri: konteyner no + Draft BL yapay zekâsız (16.11.2026)
+Kullanıcı (IHR-2026-0116 Akkon talimatı): "İlgili konteyner orada var fakat yine de yanlış gösteriyor. Fatura / konşimento
+talimatı / Draft BL / beyanname kontrolleri en doğru şekilde yapılmalı."
+- Neden: PSRU2219194 belgede ve sistemde AYNI, ama ISO 6346 kontrol hanesi tutmuyor (son hane 2 olmalı). Talimat ve
+  beyanname okuyucuları kontrol hanesi tutmayan numarayı atıyordu → "Belgede yok" (yanlış alarm).
+- `lib/konteyner-no.ts` (tek kaynak): `belgedekiKonteynerler(metin, sistemdekiler)` — sistemdeki numara kontrol hanesine
+  bakılmadan eşleşir; sistemde olmayan aday yalnız ISO geçerliyse sayılır. `kontrolHanesiHatalari` → ayrı
+  "Konteyner no (ISO)" satırı (durum `bilgi` = elle bakın; uyuşmazlık SAYILMAZ, özet sonuna not). Kullananlar:
+  `lib/konsimento/kontrol.ts` (talimat + Draft BL), `lib/beyanname-kontrol.ts` (`konteynerAdaylari`).
+  Fatura okuyucusu zaten kontrol hanesine bakmıyordu. Konteyner sekmesinde girişte / tabloda uyarı (kayıt engellenmez).
+  DBA otomatik okuyucu (`_shared/dba-metin.ts`) kontrol hanesi tutmayan numarayı hâlâ reddeder (bilinçli; elle yükleme).
+- Draft BL: eski kontrol yalnız yapay zekâydı (16 dosyanın 14'ünde "uyumsuz": BL no, dara, tip, MARPORT/AMBARLI).
+  Yeni `draftBlMetniniKontrolEt` şablondan bağımsız: değer belgede GEÇİYOR MU (booking, gemi/sefer, yükleme limanı eşdeğer
+  yazımlar [Ambarlı terminalleri, Asyaport=Tekirdağ], tahliye limanı anahtarı, konteyner seti, mühürler, konteyner brütü,
+  toplam brüt/net/kap [25050 / 25.050 / 25,050.000], consignee/notify unvanı). Dara ve tip karşılaştırılmaz. Metin yoksa /
+  konteyner bulunamazsa null → yapay zekâ yedeği. Yapay zekâ yalnız BL no / consignee / notify okur (hata verirse yerel sonuç
+  kaydedilir). "Yeniden kontrol et" (eski yapay zekâ sonuçlarında "Yapay zekâsız yeniden kontrol et") yüklü PDF'i yeniden okur.
+- Ortak görünüm: `components/belge-kontrol-listesi.tsx` (talimat + Draft BL). Test: `tests/belge-kontrol.test.ts`.
+
+## Sevkiyat haritası: aktif limanlar yeşil + Tekirdağ çıkışı (16.11.2026)
+Kullanıcı: "Sevkiyat haritası en doğru hali ile güncellenmeli ve şu an sevkiyatı olan limanlar yeşil olarak belirtilmeli."
+- `lib/sevkiyat-aktif.ts`: dosya durumu ("Kapalı" = evrak tamam; gemi denizde olabilir) yerine rezervasyon tarihleri:
+  YOLDA (ETD ≤ bugün, ETA ≥ bugün; ETA yoksa kalkıştan ≤ 45 gün), YÜKLEMEDE (ileri ETD ya da açık dosya ETD'siz),
+  TAMAMLANDI. Aktiflik TÜM dosyalardan (filtreden bağımsız). Harita: yeşil + nabız = aktif, gri = tamamlanmış; rotalar aynı
+  renk; ipucunda "Yolda / Yüklemede … en yakın varış / kalkış". Başlıkta "N aktif".
+- Çıkış: Asyaport Tekirdağ/Barbaros'ta (40°54'N 27°28'E) — artık İstanbul'dan çizilmez (`lib/liman-koordinat.ts` CIKISLAR,
+  `lib/deniz-rotasi.ts` "Tekirdağ" → MARMARA_G). Mardaş Ambarlı'dadır (İstanbul). Varış limanlarının koordinatları canlı
+  verideki 12 limanda kontrol edildi (hepsi birebir, yaklaşık konum yok). Test: `tests/sevkiyat-haritasi.test.ts`.

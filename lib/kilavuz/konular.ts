@@ -186,7 +186,7 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { nokta: "kpi", baslik: "Göstergeler", metin: "Toplam hacim, konteyner, miktar, ortalama birim fiyat, teslim şekli ve tamamlanma oranı." },
       { nokta: "grafik", baslik: "Aylık sevkiyat", metin: "Gemi kalkış ayına göre hacim, konteyner ya da MTS. Kesikli çubuk planlanan sevkiyattır." },
       { nokta: "ozet", baslik: "Otomatik özet", metin: "Seçili filtreye göre öne çıkan bulgular cümle cümle yazılır." },
-      { nokta: "harita", baslik: "Sevkiyat haritası", metin: "Mersin'den varış limanlarına rotalar; aşağıda limanlar, müşteriler, acente ve navlun, transit süreleri." },
+      { nokta: "harita", baslik: "Sevkiyat haritası", metin: "Çıkış limanlarından (İstanbul / Tekirdağ) varış limanlarına deniz rotaları. Yeşil: şu an sevkiyatı olan liman (yolda ya da yüklemede); gri: sevkiyatı tamamlanmış liman. Aşağıda limanlar, müşteriler, acente ve navlun, transit süreleri." },
     ],
   },
   {

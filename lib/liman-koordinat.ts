@@ -135,13 +135,17 @@ export const ULKE_ANA_LIMAN: Record<string, string> = {
 
 export type CikisMerkezi = { ad: string; enlem: number; boylam: number };
 
-/** Turkiye cikis limanlari (yukleme limani metnine gore). Ambarli terminalleri = Istanbul. */
+/**
+ * Turkiye cikis limanlari (yukleme limani metnine gore). Ambarli terminalleri (Marport, Kumport, Mardas) = Istanbul.
+ * 16.11.2026: Asyaport Tekirdag / Barbaros'tadir (40°54'N 27°28'E), Istanbul'a cizilmez; Martas = Marmara Ereglisi.
+ */
 const CIKISLAR: { anahtarlar: string[]; merkez: CikisMerkezi }[] = [
+  { anahtarlar: ["ASYAPORT", "TEKIRDAG", "BARBAROS", "MARTAS", "EREGLISI", "CEYPORT", "AKPORT"], merkez: { ad: "Tekirdağ", enlem: 40.9, boylam: 27.47 } },
   { anahtarlar: ["MERSIN"], merkez: { ad: "Mersin", enlem: 36.79, boylam: 34.63 } },
   { anahtarlar: ["IZMIR", "ALIAGA", "ALSANCAK", "NEMPORT"], merkez: { ad: "İzmir", enlem: 38.44, boylam: 27.14 } },
   { anahtarlar: ["ISKENDERUN", "LIMAK"], merkez: { ad: "İskenderun", enlem: 36.6, boylam: 36.17 } },
   { anahtarlar: ["GEMLIK", "GEMPORT", "BORUSAN"], merkez: { ad: "Gemlik", enlem: 40.43, boylam: 29.15 } },
-  { anahtarlar: ["AMBARLI", "MARPORT", "KUMPORT", "MARDAS", "ASYAPORT", "ISTANBUL", "HAYDARPASA"], merkez: { ad: "İstanbul", enlem: 40.97, boylam: 28.69 } },
+  { anahtarlar: ["AMBARLI", "MARPORT", "KUMPORT", "MARDAS", "ISTANBUL", "HAYDARPASA"], merkez: { ad: "İstanbul", enlem: 40.97, boylam: 28.69 } },
 ];
 
 const sade = (s: string) =>

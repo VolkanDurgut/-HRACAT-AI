@@ -22,6 +22,7 @@ import { analizOzeti } from "@/lib/analiz-ozet";
 import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni, KATEGORI_RENKLERI, DIGER_RENGI } from "@/components/analiz-paneli";
 import { SevkiyatHaritasi, type HaritaHatti, type HaritaLimani } from "@/components/analiz-harita";
 import { cikisMerkezi, type CikisMerkezi } from "@/lib/liman-koordinat";
+import { limanAktiflikleri } from "@/lib/sevkiyat-aktif";
 import { ayAdi } from "@/lib/analiz-ozet";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
@@ -547,9 +548,15 @@ export default function AnalizPage() {
   }, [limanlar]);
 
   // Sevkiyat haritasi (26.10.2026): varis limani anahtari basina toplamlar + cikis -> varis hatlari.
+  // 16.11.2026: "su an sevkiyati olan" (yolda / yuklemede) limanlar TUM dosyalardan (filtreden bagimsiz) -> yesil.
+  const aktiflik = useMemo(() => {
+    const bugun = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
+    return limanAktiflikleri(dosyalar.map((d) => ({ ...d, kapali: kapaliMi(d), konteyner: konteynerSayisi(d) })), analizLimani, bugun);
+  }, [dosyalar]);
   const haritaLimanlari = useMemo<HaritaLimani[]>(() =>
     Object.entries(limanlar).map(([ad, v]) => ({
       ad,
+      aktif: aktiflik.get(ad) || null,
       ulke: v.ulke,
       konteyner: v.konteyner,
       dosya: v.adet,
@@ -558,7 +565,7 @@ export default function AnalizPage() {
         v.mts > 0 && v.tutar > 0 ? `Ortalama ${tutarTam(v.tutar / v.mts)} / MTS` : null,
         v.teslim.size ? `Teslim: ${Array.from(v.teslim).sort().join(", ")}` : null,
       ].filter((x): x is string => !!x),
-    })), [limanlar, tutarKisa, tutarTam]);
+    })), [limanlar, tutarKisa, tutarTam, aktiflik]);
   const haritaHatlari = useMemo<HaritaHatti[]>(() => {
     const dosyaCikisi = (d: DosyaFull): CikisMerkezi | null =>
       cikisMerkezi(d.rezervasyonlar.map((r) => r.yuklenme_limani).find((y) => !!y?.trim())) || cikisMerkezi(d.yuklenme_limani);

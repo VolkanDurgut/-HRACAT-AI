@@ -1,5 +1,6 @@
 "use client";
 import React, { forwardRef, useImperativeHandle, useRef } from "react";
+import { kontrolHanesi, konteynerGecerli, konteynerSade } from "@/lib/konteyner-no";
 import { Konteyner, Dosya, Rezervasyon, KONTEYNER_TIPLERI, supabase, yazmaHatasi } from "@/lib/supabase";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { useIrsaliyeUpload } from "@/lib/hooks/use-irsaliye-upload";
@@ -273,6 +274,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                           onKopyala={() => handleKopyala(k.konteyner_no, "Konteyner no")}
                           onKaydet={(yeni) => handleKimlikDuzelt(k.id, "konteyner_no", yeni)}
                         />
+                        <KontrolHanesiUyarisi no={k.konteyner_no} kisa />
                       </td>
                       <td className="px-4 py-3">
                         <KimlikHucresi
@@ -483,6 +485,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
               <input value={form.konteyner_no} onChange={(e) => update("konteyner_no", e.target.value.toUpperCase())}
                 className="w-full px-3 py-2 border rounded-lg text-sm uppercase text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="ABCU1234567" />
               {errors.konteyner_no && <p className="text-xs text-red-400 mt-0.5">{errors.konteyner_no}</p>}
+              {!errors.konteyner_no && <KontrolHanesiUyarisi no={form.konteyner_no} />}
             </div>
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Mühür No</label>
@@ -712,5 +715,22 @@ function KimlikHucresi({ deger, etiket, placeholder, vurgulu, kilitNedeni, onKop
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * ISO 6346 kontrol hanesi uyarisi (16.11.2026; IHR-2026-0116 PSRU2219194). Kayit ENGELLENMEZ: numara konteyner
+ * kapisinda gercekten boyle yazili olabilir; yalniz yazim hatasina karsi dikkat ceker.
+ */
+function KontrolHanesiUyarisi({ no, kisa = false }: { no: string | null | undefined; kisa?: boolean }) {
+  const s = konteynerSade(no);
+  if (s.length < 11) return null;
+  const hane = kontrolHanesi(s);
+  if (konteynerGecerli(s)) return null;
+  const metin = hane === null ? "Biçim ISO 6346'ya uymuyor (4 harf + 7 rakam)" : `Kontrol hanesi tutmuyor: son hane ${hane} olmalı`;
+  return (
+    <p className="text-[11px] mt-0.5 text-amber-300" title="Numarayı konteyner kapısı / EIR / acente ile teyit edin" data-kontrol-hanesi={s}>
+      {kisa ? `⚠ ${metin}` : `${metin}. Yazımı konteyner kapısı / EIR ile teyit edin.`}
+    </p>
   );
 }

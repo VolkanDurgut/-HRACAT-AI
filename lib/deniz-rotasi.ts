@@ -167,7 +167,7 @@ export const ROTASIZ_LIMANLAR = new Set<string>([
 
 /** Cikis merkezi adi (lib/liman-koordinat.ts CIKISLAR) -> deniz dugumu. */
 export const CIKIS_GIRISI: Record<string, string> = {
-  "İstanbul": "MARMARA_B", Gemlik: "GEMLIK_OFF", "İzmir": "IZMIR_OFF", Mersin: "MERSIN_OFF", "İskenderun": "MERSIN_OFF",
+  "İstanbul": "MARMARA_B", "Tekirdağ": "MARMARA_G", Gemlik: "GEMLIK_OFF", "İzmir": "IZMIR_OFF", Mersin: "MERSIN_OFF", "İskenderun": "MERSIN_OFF",
 };
 
 /** Rota uzerinde gecildiginde kullaniciya adiyla yazilan noktalar. */

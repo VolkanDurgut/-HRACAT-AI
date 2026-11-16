@@ -9,10 +9,11 @@ import {
 import { KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC } from "@/supabase/functions/_shared/konsimento-hatirlatma-sabitler";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { EvrakAsistanYukleme, EvrakAsistanKilitli, EvrakAsistanIsleniyor } from "@/components/evrak-asistan";
-import { Users, Container, Anchor, Scale, Hash, MinusCircle, Info, RefreshCw } from "lucide-react";
+import { Users, Container, Anchor, Scale, Hash } from "lucide-react";
 import KonsimentoTalimatHazirlik from "@/components/konsimento-talimat-hazirlik";
+import { BelgeKontrolListesi, YenidenKontrolDugmesi } from "@/components/belge-kontrol-listesi";
 import { talimatModeli } from "@/lib/konsimento/talimat";
-import { konsimentoMetniniKontrolEt, type KonsimentoKontrolSatiri, type KonsimentoKontrolDurumu } from "@/lib/konsimento/kontrol";
+import { konsimentoMetniniKontrolEt, type KonsimentoKontrolSatiri } from "@/lib/konsimento/kontrol";
 import { beyannameMetniCikar } from "@/lib/beyanname-oku";
 
 // 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
@@ -378,12 +379,13 @@ export default function KonsimentoTalimatiSection({
                   <p className="text-sm font-semibold text-green-400">Konşimento talimatı sistemle uyumlu.</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs mt-1 ml-6" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
-                {kontrolSonucu.kontroller && <KontrolListesi satirlar={kontrolSonucu.kontroller} yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} />}
+                {kontrolSonucu.kontroller && <BelgeKontrolListesi satirlar={kontrolSonucu.kontroller} belgeEtiketi="Talimat" yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} testId="konsimento-kontrol" />}
                 {!kontrolSonucu.kontroller && kontrolSonucu.consignee && (
                   <p className="text-xs ml-6 mt-1" style={{ color: TEXT_MUTED }}>
                     <span className="font-medium text-white">Consignee:</span> {kontrolSonucu.consignee}
                   </p>
                 )}
+                {!kontrolSonucu.kontroller && <p className="ml-6 mt-1"><YenidenKontrolDugmesi yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} metin="Yapay zekâsız yeniden kontrol et" /></p>}
               </div>
             )}
 
@@ -394,7 +396,7 @@ export default function KonsimentoTalimatiSection({
                   <p className="text-sm font-semibold text-red-400">Konşimento talimatında uyuşmazlık tespit edildi</p>
                 </div>
                 {kontrolSonucu.ozet && <p className="text-xs" style={{ color: TEXT_MUTED }}>{kontrolSonucu.ozet}</p>}
-                {kontrolSonucu.kontroller && <KontrolListesi satirlar={kontrolSonucu.kontroller} yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} />}
+                {kontrolSonucu.kontroller && <BelgeKontrolListesi satirlar={kontrolSonucu.kontroller} belgeEtiketi="Talimat" yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} testId="konsimento-kontrol" />}
                 {!kontrolSonucu.kontroller && kontrolSonucu.uyusmazliklar?.length > 0 && (
                   <div className="space-y-1.5">
                     {kontrolSonucu.uyusmazliklar.map((u, idx) => (
@@ -406,45 +408,14 @@ export default function KonsimentoTalimatiSection({
                     ))}
                   </div>
                 )}
-                <button onClick={handleTekrarDene} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20"><RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle</button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={handleTekrarDene} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20"><RotateCcw size={12} /> Doğru Dosyayı Yeniden Yükle</button>
+                  {!kontrolSonucu.kontroller && <YenidenKontrolDugmesi yenileniyor={yenileniyor} onYenile={handleYenidenKontrol} metin="Yapay zekâsız yeniden kontrol et" />}
+                </div>
               </div>
             )}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-const DURUM: Record<KonsimentoKontrolDurumu, { renk: string; ikon: React.ReactNode; etiket: string }> = {
-  uyumlu: { renk: "text-green-400", ikon: <CheckCircle2 size={13} />, etiket: "Uyumlu" },
-  uyusmuyor: { renk: "text-amber-400", ikon: <AlertTriangle size={13} />, etiket: "Uyuşmuyor" },
-  okunamadi: { renk: "text-slate-400", ikon: <MinusCircle size={13} />, etiket: "Okunamadı" },
-  bilgi: { renk: "text-sky-300", ikon: <Info size={13} />, etiket: "Elle bakın" },
-};
-
-/** Yapay zekasiz kontrol satirlari (beyanname kontrolu ile ayni gorunum). */
-function KontrolListesi({ satirlar, yenileniyor, onYenile }: { satirlar: KonsimentoKontrolSatiri[]; yenileniyor: boolean; onYenile: () => void }) {
-  return (
-    <div className="mt-2" data-testid="konsimento-kontrol">
-      <div className="flex items-center gap-2">
-        <button onClick={onYenile} disabled={yenileniyor} className="ml-auto inline-flex items-center gap-1 text-[11px] hover:text-white disabled:opacity-50" style={{ color: TEXT_MUTED }} title="Sistemdeki bilgiler değiştiyse yeniden karşılaştır" data-testid="konsimento-kontrol-yenile">
-          <RefreshCw size={11} className={yenileniyor ? "animate-spin" : ""} /> Yeniden kontrol et
-        </button>
-      </div>
-      <div className="mt-2 border-t divide-y" style={{ borderColor: CARD_BORDER }}>
-        {satirlar.map((k) => {
-          const d = DURUM[k.durum];
-          return (
-            <div key={k.alan} className="grid grid-cols-[18px_minmax(0,140px)_minmax(0,1fr)] sm:grid-cols-[18px_140px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-0.5 py-1.5 text-xs" style={{ borderColor: CARD_BORDER }} data-testid="konsimento-kontrol-satir">
-              <span className={`${d.renk} pt-0.5`} title={d.etiket}>{d.ikon}</span>
-              <span className="text-slate-300 font-medium">{k.alan}</span>
-              <span className="truncate" style={{ color: TEXT_MUTED }} title={k.sistem}>Sistem: <span className="text-white">{k.sistem}</span></span>
-              <span className="truncate col-start-3 sm:col-start-auto" style={{ color: TEXT_MUTED }} title={k.belge}>Talimat: <span className={k.durum === "uyusmuyor" ? "text-amber-300" : "text-white"}>{k.belge}</span></span>
-              {k.not && <span className="col-start-3 sm:col-span-2 text-[11px] break-words" style={{ color: k.durum === "uyusmuyor" ? "#FCD34D" : TEXT_MUTED }}>{k.not}</span>}
-            </div>
-          );
-        })}
       </div>
     </div>
   );

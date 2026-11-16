@@ -6,6 +6,8 @@
  * kanallar uzerinden en kisa yol, yaklasik; aga bagli olmayan liman icin temsili egri), varis limaninda konteynere gore
  * buyuyen daire, uzerine gelince / odaklaninca ayrinti karti. Harita SVG'si onceden
  * uretilmis yol verisidir (lib/dunya-haritasi.ts), yeni paket yok. Hesap YAPMAZ.
+ * 16.11.2026 (kullanici: "su an sevkiyati olan limanlar yesil olarak belirtilmeli"): YESIL = su an sevkiyati olan
+ * liman (yolda / yuklemede; lib/sevkiyat-aktif.ts), GRI = sevkiyati tamamlanmis liman; rotalar da ayni renkte.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -14,12 +16,16 @@ import { haritaKirpmasi, hatYolu, izdusum, limanKonumu, type CikisMerkezi, type 
 import { denizRotasi, rotaYolu } from "@/lib/deniz-rotasi";
 import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { Panel } from "@/components/analiz-paneli";
+import type { LimanAktifligi } from "@/lib/sevkiyat-aktif";
 
 /** ulke: liman listede yoksa ulkenin ana limanina yaklasik konum icin (05.11.2026). */
-export type HaritaLimani = { ad: string; konteyner: number; dosya: number; satirlar: string[]; ulke?: string | null };
+export type HaritaLimani = { ad: string; konteyner: number; dosya: number; satirlar: string[]; ulke?: string | null; aktif?: LimanAktifligi | null };
 export type HaritaHatti = { cikis: CikisMerkezi; liman: string; konteyner: number };
 
 const MARKA_TURUNCU = "#F4A07C";
+/** Sevkiyati tamamlanmis liman / rota (16.11.2026). */
+const PASIF = "#64748B";
+const tarihKisa = (t: string) => `${t.slice(8, 10)}.${t.slice(5, 7)}`;
 
 type Etiket = { ad: string; x: number; y: number; yon: "sag" | "sol" | "ust" | "alt" };
 
@@ -72,9 +78,11 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
     () => limanlar
       .map((l) => { const kn = konumlar.get(l.ad); return { ...l, k: kn?.k ?? null, yaklasik: !!kn?.yaklasik, vekil: kn?.yaklasik ? kn.anahtar : null }; })
       .filter((l): l is HaritaLimani & { k: [number, number]; yaklasik: boolean; vekil: string | null } => l.k !== null && l.konteyner >= 0)
-      .sort((a, b) => b.konteyner - a.konteyner),
+      // Aktif (su an sevkiyati olan) limanlar once: etiket onceligi; cizimde pasifler alta (asagida ters sira)
+      .sort((a, b) => Number(!!b.aktif) - Number(!!a.aktif) || b.konteyner - a.konteyner),
     [limanlar, konumlar]
   );
+  const aktifLimanlar = useMemo(() => new Set(limanlar.filter((l) => l.aktif).map((l) => l.ad)), [limanlar]);
   const haritadaYok = limanlar.filter((l) => !konumlar.has(l.ad)).map((l) => l.ad);
   const yaklasikVar = cizilenler.some((l) => l.yaklasik);
   const cikislar = useMemo(() => {
@@ -140,7 +148,7 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
     <Panel
       baslik="Sevkiyat Haritası"
       ikon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></svg>}
-      sag={`${cizilenler.length} liman · ${toplamK.toLocaleString("tr-TR")} konteyner`}
+      sag={`${cizilenler.length} liman · ${cizilenler.filter((l) => l.aktif).length} aktif · ${toplamK.toLocaleString("tr-TR")} konteyner`}
       className={className}
       govdeSinifi="flex flex-col"
       data-sevkiyat-haritasi=""
@@ -157,13 +165,14 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
             <path d={SINIR_YOLU} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.6" vectorEffect="non-scaling-stroke" />
             <g className="analiz-harita-hatlar" fill="none" strokeLinecap="round">
               {/* Secili rota en ustte cizilsin: secili olmayanlar once */}
-              {[...rotalar].sort((a, b) => Number(a.hat.liman === secili) - Number(b.hat.liman === secili)).map((r) => {
+              {[...rotalar].sort((a, b) => Number(a.hat.liman === secili) - Number(b.hat.liman === secili) || Number(aktifLimanlar.has(a.hat.liman)) - Number(aktifLimanlar.has(b.hat.liman))).map((r) => {
                 const h = r.hat;
                 const vurgu = secili === null || secili === h.liman;
+                const aktif = aktifLimanlar.has(h.liman);
                 return (
-                  <g key={`${h.cikis.ad}-${h.liman}`} opacity={vurgu ? 1 : 0.15} data-hat={h.liman} data-rota={r.temsili ? "temsili" : "deniz"}>
-                    <path d={r.d} stroke={ACCENT} strokeOpacity={secili === h.liman ? 0.4 : 0.22} strokeWidth={2 + 4 * Math.sqrt(h.konteyner / maxHat)} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                    <path d={r.d} stroke="#6EE7B7" strokeOpacity="0.9" strokeWidth="1.2" strokeDasharray={r.temsili ? "2 6" : "4 6"} strokeLinejoin="round" className="analiz-harita-akis" vectorEffect="non-scaling-stroke" />
+                  <g key={`${h.cikis.ad}-${h.liman}`} opacity={vurgu ? (aktif || secili === h.liman ? 1 : 0.55) : 0.15} data-hat={h.liman} data-rota={r.temsili ? "temsili" : "deniz"} data-aktif={aktif ? "" : undefined}>
+                    <path d={r.d} stroke={aktif ? ACCENT : PASIF} strokeOpacity={secili === h.liman ? 0.4 : aktif ? 0.22 : 0.18} strokeWidth={2 + 4 * Math.sqrt(h.konteyner / maxHat)} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                    <path d={r.d} stroke={aktif ? "#6EE7B7" : "#94A3B8"} strokeOpacity={aktif ? 0.9 : 0.45} strokeWidth="1.2" strokeDasharray={r.temsili ? "2 6" : "4 6"} strokeLinejoin="round" className={aktif ? "analiz-harita-akis" : undefined} vectorEffect="non-scaling-stroke" />
                   </g>
                 );
               })}
@@ -184,27 +193,32 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
         })}
 
         {/* Varis limanlari */}
-        {boyut.w > 0 && noktalar.map((n) => {
+        {boyut.w > 0 && [...noktalar].reverse().map((n) => {
           const e = etiketHaritasi.get(n.ad);
           const aktif = secili === n.ad;
+          const sevk = !!n.aktif;
           return (
             <React.Fragment key={n.ad}>
               <button
                 type="button"
                 className="absolute rounded-full transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                style={{ left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, backgroundColor: aktif ? "rgba(16,185,129,0.45)" : "rgba(16,185,129,0.22)", border: `1.5px ${n.yaklasik ? "dashed" : "solid"} ${ACCENT}`, boxShadow: aktif ? "0 0 0 6px rgba(16,185,129,0.15)" : "0 0 10px rgba(16,185,129,0.35)" }}
+                style={sevk
+                  ? { left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, backgroundColor: aktif ? "rgba(16,185,129,0.55)" : "rgba(16,185,129,0.32)", border: `1.5px ${n.yaklasik ? "dashed" : "solid"} ${ACCENT}`, boxShadow: aktif ? "0 0 0 6px rgba(16,185,129,0.18)" : "0 0 12px rgba(16,185,129,0.55)" }
+                  : { left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, backgroundColor: aktif ? "rgba(100,116,139,0.45)" : "rgba(100,116,139,0.18)", border: `1.5px ${n.yaklasik ? "dashed" : "solid"} ${PASIF}`, boxShadow: aktif ? "0 0 0 6px rgba(100,116,139,0.15)" : "none" }}
                 onMouseEnter={() => setSecili(n.ad)}
                 onFocus={() => setSecili(n.ad)}
                 onBlur={() => setSecili(null)}
-                aria-label={`${n.ad}: ${n.konteyner} konteyner, ${n.dosya} dosya${n.yaklasik ? " (yaklaşık konum)" : ""}`}
+                aria-label={`${n.ad}: ${n.konteyner} konteyner, ${n.dosya} dosya${sevk ? ", şu an sevkiyat var" : ""}${n.yaklasik ? " (yaklaşık konum)" : ""}`}
                 data-liman-noktasi={n.ad}
+                data-sevkiyat={sevk ? "aktif" : "tamamlandi"}
                 data-yaklasik={n.yaklasik ? "" : undefined}
               >
-                <span className="absolute left-1/2 top-1/2 w-1.5 h-1.5 -ml-[3px] -mt-[3px] rounded-full" style={{ backgroundColor: "#D1FAE5" }} />
+                {sevk && <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: "rgba(16,185,129,0.25)", animationDuration: "2.4s" }} aria-hidden />}
+                <span className="absolute left-1/2 top-1/2 w-1.5 h-1.5 -ml-[3px] -mt-[3px] rounded-full" style={{ backgroundColor: sevk ? "#D1FAE5" : "#CBD5E1" }} />
               </button>
               {e && (
                 <span className="absolute text-[10px] whitespace-nowrap px-1.5 rounded pointer-events-none" style={{ left: e.x, top: e.y, lineHeight: "18px", color: "#E2E8F0", backgroundColor: "rgba(11,15,20,0.72)", opacity: secili && !aktif ? 0.35 : 1 }} data-etiket={n.ad}>
-                  <b className="font-semibold">{n.ad}</b> <span style={{ color: TEXT_MUTED }}>· {n.konteyner}</span>
+                  <b className="font-semibold" style={{ color: sevk ? "#A7F3D0" : "#CBD5E1" }}>{n.ad}</b> <span style={{ color: TEXT_MUTED }}>· {n.konteyner}</span>
                 </span>
               )}
             </React.Fragment>
@@ -226,7 +240,15 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
           >
             <p className="text-xs font-semibold text-white">{seciliNokta.ad}</p>
             {seciliNokta.yaklasik && <p className="text-amber-300" data-ipucu-yaklasik="">Yaklaşık konum: {seciliNokta.ulke} · {seciliNokta.vekil} limanı esas alındı</p>}
-            <p className="text-white mt-0.5"><b>{seciliNokta.konteyner.toLocaleString("tr-TR")}</b> konteyner · {seciliNokta.dosya} dosya</p>
+            {seciliNokta.aktif ? (
+              <div className="mt-0.5" data-ipucu-aktif="">
+                {seciliNokta.aktif.yoldaDosya > 0 && <p className="text-emerald-300">● Yolda: <b>{seciliNokta.aktif.yoldaKonteyner}</b> konteyner · {seciliNokta.aktif.yoldaDosya} dosya{seciliNokta.aktif.enYakinEta ? ` · en yakın varış ${tarihKisa(seciliNokta.aktif.enYakinEta)}` : ""}</p>}
+                {seciliNokta.aktif.yuklemedeDosya > 0 && <p className="text-emerald-300">● Yüklemede: <b>{seciliNokta.aktif.yuklemedeKonteyner}</b> konteyner · {seciliNokta.aktif.yuklemedeDosya} dosya{seciliNokta.aktif.enYakinEtd ? ` · kalkış ${tarihKisa(seciliNokta.aktif.enYakinEtd)}` : ""}</p>}
+              </div>
+            ) : (
+              <p className="mt-0.5" style={{ color: TEXT_MUTED }}>Şu an sevkiyat yok (tamamlandı)</p>
+            )}
+            <p className="text-white mt-0.5"><b>{seciliNokta.konteyner.toLocaleString("tr-TR")}</b> konteyner · {seciliNokta.dosya} dosya <span style={{ color: TEXT_MUTED }}>(dönem toplamı)</span></p>
             <div className="w-full h-1 rounded-full mt-1.5 mb-1" style={{ backgroundColor: CARD_BORDER }}>
               <div className="h-1 rounded-full" style={{ width: `${toplamK > 0 ? (seciliNokta.konteyner / toplamK) * 100 : 0}%`, backgroundColor: ACCENT }} />
             </div>
@@ -252,7 +274,8 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
       </div>
       <div className="px-4 py-2 border-t text-[10px] flex flex-wrap gap-x-4 gap-y-1" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
         <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full border-2" style={{ borderColor: MARKA_TURUNCU }} /> Çıkış limanı</span>
-        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.35)", border: `1px solid ${ACCENT}` }} /> Varış limanı · büyüklük = konteyner</span>
+        <span className="inline-flex items-center gap-1.5" data-lejant-aktif=""><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.45)", border: `1px solid ${ACCENT}` }} /> Şu an sevkiyatı olan liman (yolda / yüklemede)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "rgba(100,116,139,0.3)", border: `1px solid ${PASIF}` }} /> Sevkiyatı tamamlanmış liman · büyüklük = konteyner</span>
         <span>Rotalar ana deniz yolları ve boğazlar üzerinden yaklaşık hesaplanır; aktarma limanı ve armatörün güncel rota tercihi farklı olabilir</span>
         {temsiliVar && <span>Kesik ince çizgi: deniz rotası tanımlı olmayan liman (temsili)</span>}
         {yaklasikVar && <span className="inline-flex items-center gap-1.5" data-yaklasik-not=""><span className="w-2.5 h-2.5 rounded-full border border-dashed" style={{ borderColor: ACCENT }} /> Kesik çerçeve: liman listede yok, ülkenin ana limanı esas alındı (yaklaşık konum)</span>}

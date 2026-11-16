@@ -20,6 +20,7 @@
 import { gidecegiUlke } from "@/lib/ulke-bul";
 import { limanAnahtari, sadelestir } from "@/lib/liman-anahtari";
 import { diibAnahtari } from "@/lib/diib/hesap";
+import { konteynerGecerli, kontrolHanesiHatalari, kontrolHanesiNotu } from "@/lib/konteyner-no";
 
 export type BeyannameOkunan = {
   beyannameNo: string | null;
@@ -28,6 +29,8 @@ export type BeyannameOkunan = {
   faturalar: { ham: string; yil: string; sira: number }[];
   faturaTarihi: string | null; // YYYY-MM-DD
   konteynerler: string[];
+  /** Bicime uyan TUM numaralar (kontrol hanesi tutmayanlar dahil; sistemdeki numarayla eslesirse sayilir). */
+  konteynerAdaylari: string[];
   diibler: { anahtar: string; ham: string }[];
   gemi: string | null;
   incoterm: string | null;
@@ -56,24 +59,8 @@ export function belgeSayisi(ham: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** ISO 6346 konteyner no kontrol hanesi (4 harf + 6 hane + kontrol hanesi). */
-export function konteynerGecerli(no: string): boolean {
-  const s = no.toUpperCase();
-  if (!/^[A-Z]{4}\d{7}$/.test(s)) return false;
-  const deger = (c: string) => {
-    if (/\d/.test(c)) return Number(c);
-    let v = 10;
-    for (let k = 65; k <= c.charCodeAt(0); k++) {
-      if (k === c.charCodeAt(0)) return v;
-      v++;
-      if (v % 11 === 0) v++;
-    }
-    return v;
-  };
-  let toplam = 0;
-  for (let i = 0; i < 10; i++) toplam += deger(s[i]) * 2 ** i;
-  return (toplam % 11) % 10 === Number(s[10]);
-}
+/** ISO 6346 kontrol hanesi: tek kaynak lib/konteyner-no.ts (16.11.2026); eski ice aktarimlar icin yeniden disa aktarilir. */
+export { konteynerGecerli };
 
 const INCOTERM = /(?:^|[^A-Z])(CIF|CFR|FOB|CPT|CIP|DAP|DDP|DPU|EXW|FCA|FAS|CNF)(?=GEMI|[^A-Z]|$)/;
 
@@ -97,10 +84,12 @@ export function beyannameMetniOku(metinler: string[]): BeyannameOkunan {
   const ftTarih = /FATURA\s*:[^]*?(\d{2})[./](\d{2})[./](\d{4})/.exec(ust);
 
   const konteynerler = new Set<string>();
+  const adaylar = new Set<string>();
   // 4. harf ekipman kategorisi (U/J/Z); rakamlar arasina bosluk girebilir ("TSTU1 000003", "TSTU 1000019").
   // Yanlis eslesmeyi ISO 6346 kontrol hanesi eler.
   for (const m of Array.from(ust.matchAll(/\b([A-Z]{3}[UJZ])((?:\s?\d){7})(?![0-9])/g))) {
     const no = `${m[1]}${m[2].replace(/\s+/g, "")}`;
+    adaylar.add(no);
     if (konteynerGecerli(no)) konteynerler.add(no);
   }
 
@@ -125,6 +114,7 @@ export function beyannameMetniOku(metinler: string[]): BeyannameOkunan {
     faturalar,
     faturaTarihi: ftTarih ? `${ftTarih[3]}-${ftTarih[2]}-${ftTarih[1]}` : null,
     konteynerler: Array.from(konteynerler),
+    konteynerAdaylari: Array.from(adaylar),
     diibler,
     gemi: gemi ? gemi[1].trim() : null,
     incoterm: inco ? inco[1] : null,
@@ -220,11 +210,14 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
   // Konteynerler
   if (b.konteynerler.length) {
     const sis = new Set(b.konteynerler.map((x) => x.replace(/\s+/g, "").toUpperCase()));
-    const bel = new Set(o.konteynerler);
+    // Sistemdeki numara kontrol hanesi tutmasa da belgede aynen geciyorsa eslesir (16.11.2026)
+    const bel = new Set([...o.konteynerler, ...(o.konteynerAdaylari || []).filter((x) => sis.has(x))]);
     const eksik = Array.from(sis).filter((x) => !bel.has(x));
     const fazla = Array.from(bel).filter((x) => !sis.has(x));
     const not = [eksik.length ? `Beyannamede yok: ${eksik.join(", ")}` : "", fazla.length ? `Sistemde yok: ${fazla.join(", ")}` : ""].filter(Boolean).join(" · ");
     ekle("Konteynerler", !bel.size ? "okunamadi" : eksik.length || fazla.length ? "uyusmuyor" : "uyumlu", `${sis.size} konteyner`, `${bel.size} konteyner`, not || undefined);
+    const hane = kontrolHanesiHatalari(b.konteynerler);
+    if (hane.length) ekle("Konteyner no (ISO)", "bilgi", hane.map((x) => x.no).join(", "), "teyit edin", kontrolHanesiNotu(hane));
   }
 
   // Net kg
@@ -302,8 +295,9 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
   const uyusmayan = k.filter((x) => x.durum === "uyusmuyor");
   const okunamayan = k.filter((x) => x.durum === "okunamadi");
   const notlu = k.filter((x) => x.durum === "uyumlu" && x.not);
-  const ozet = uyusmayan.length
+  const iso = k.some((x) => x.alan === "Konteyner no (ISO)") ? " Konteyner no kontrol hanesi tutmuyor; teyit edin." : "";
+  const ozet = (uyusmayan.length
     ? `${uyusmayan.length} alan sistemle uyuşmuyor: ${uyusmayan.map((x) => x.alan).join(", ")}.`
-    : `${k.filter((x) => x.durum === "uyumlu").length} alan sistemle uyumlu${okunamayan.length ? `; ${okunamayan.length} alan okunamadı (${okunamayan.map((x) => x.alan).join(", ")})` : ""}${notlu.length ? `; ${notlu.length} not var` : ""}.`;
+    : `${k.filter((x) => x.durum === "uyumlu").length} alan sistemle uyumlu${okunamayan.length ? `; ${okunamayan.length} alan okunamadı (${okunamayan.map((x) => x.alan).join(", ")})` : ""}${notlu.length ? `; ${notlu.length} not var` : ""}.`) + iso;
   return { kaynak: "metin", uyumlu: uyusmayan.length === 0, beyanname_no: o.beyannameNo, kontroller: k, ozet, devam_var: o.devamVar, tarih: simdi };
 }

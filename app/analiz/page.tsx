@@ -25,6 +25,7 @@ import { cikisMerkezi, type CikisMerkezi } from "@/lib/liman-koordinat";
 import { limanAktiflikleri } from "@/lib/sevkiyat-aktif";
 import { ayAdi } from "@/lib/analiz-ozet";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { TutarsizliklarKarti } from "@/components/analiz/tutarsizliklar-karti";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -719,6 +720,9 @@ export default function AnalizPage() {
               ilerleme={filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0}
               dipnot={<>Tamamlanma: <span className="text-white font-semibold">{yuzde(filtrelenmis.length > 0 ? kapaliSayisi / filtrelenmis.length : 0)}</span></>} />
           </div>
+
+          {/* 16.11.2026: veri tutarsizliklari (salt okunur; plan / siparis / navlun kontrolleri) */}
+          <TutarsizliklarKarti className="mb-4" />
 
           {/* Grafik + ozet (ornek paneldeki gibi ozet grafigin yaninda) */}
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4">

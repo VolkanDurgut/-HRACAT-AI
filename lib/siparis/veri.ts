@@ -4,6 +4,7 @@
  * Yazma: on odeme isareti - siparis_on_odeme_isaretle; Excel aktarimlari - yukleme_plani_aktar /
  * siparis_listesi_aktar (hepsi "proformalar" yetkisi).
  */
+import { dagitimOku, type OnOdemeDagitimi } from "@/lib/on-odeme";
 import { supabase } from "@/lib/supabase";
 import { planNormalize, siparisNormalize, type PlanSatiri, type SiparisSatiri } from "@/lib/siparis/liste";
 import { aktarimSatiri, type PlanExcelSatiri, type PlanMevcut } from "@/lib/siparis/plan-excel";
@@ -32,12 +33,23 @@ export async function siparisSatiriSil(anahtar: string): Promise<string | null> 
   return ((data || {}) as { proforma_no?: string | null }).proforma_no ?? null;
 }
 
-/** On odeme: alindi=true icin tutar zorunlu (siparis_on_odeme_kaydet). */
-export async function onOdemeKaydet(proformaNo: string, alindi: boolean, tutar?: number, para = "USD", tarih?: string): Promise<void> {
-  const { error } = await supabase.rpc("siparis_on_odeme_kaydet", {
+/** On odeme: alindi=true icin tutar zorunlu (siparis_on_odeme_kaydet). oran = proformadaki on odeme yuzdesi (bossa odeme
+ *  sartindan okunur); karsilik = odeme siparis dovizinden farkli geldiyse siparis dovizindeki tutari (16.11.2026). */
+export async function onOdemeKaydet(proformaNo: string, alindi: boolean, tutar?: number, para = "USD", tarih?: string,
+  ek: { oran?: number | null; karsilik?: number | null } = {}): Promise<OnOdemeDagitimi | null> {
+  const { data, error } = await supabase.rpc("siparis_on_odeme_kaydet", {
     p_proforma_no: proformaNo, p_alindi: alindi, p_tutar: alindi ? tutar ?? null : null, p_para_birimi: para, p_tarih: alindi ? tarih ?? null : null,
+    p_oran: alindi ? ek.oran ?? null : null, p_karsilik: alindi ? ek.karsilik ?? null : null,
   });
   if (error) throw new Error(error.message);
+  return dagitimOku((data as { dagitim?: unknown } | null)?.dagitim);
+}
+
+/** Proformanin on odeme dagilimi (sevkiyat dosyalarina düşen paylar; yazmaz). */
+export async function onOdemeDagilimiOku(proformaNo: string): Promise<OnOdemeDagitimi | null> {
+  const { data, error } = await supabase.rpc("siparis_on_odeme_dagilimi", { p_proforma_no: proformaNo });
+  if (error) throw new Error(error.message);
+  return dagitimOku(data);
 }
 
 /** Excel aktarimi onizlemesi icin sistemdeki plan kayitlari (RLS: "proformalar" veya "analiz"). */

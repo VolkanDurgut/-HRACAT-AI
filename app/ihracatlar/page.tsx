@@ -1,5 +1,6 @@
 "use client";
 
+import { beklenenAvans } from "@/lib/on-odeme";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
@@ -234,8 +235,13 @@ export default function IhracatlarPage() {
           varis_limani: ornekDosya?.varis_limani || null,
           teslim_sekli: ornekDosya?.teslim_sekli || null,
           ambalaj: ornekDosya?.ambalaj || null,
-          // Ilk dosyanin varis limani duzeltme notu yeni dosyaya tasinmaz (03.10.2026)
-          ham_veri: ornekDosya?.ham_veri ? (({ varis_limani_duzeltme: _atla, ...kalan }) => kalan)(ornekDosya.ham_veri as Record<string, unknown>) : null,
+          // Ilk dosyanin varis limani duzeltme notu yeni dosyaya tasinmaz (03.10.2026). Avans da TASINMAZ (16.11.2026):
+          // ilk dosyanin avansi bu sevkiyatin degildir; baslangic = bu sevkiyatin tutari x odeme sartindaki yuzde,
+          // proformaya on odeme girildiyse veritabani (on_odeme_dagit) havuzdan kalan paya gore duzeltir.
+          ham_veri: {
+            ...(ornekDosya?.ham_veri ? (({ varis_limani_duzeltme: _atla, avans_tutari: _a, avans_elle: _e, avans_dagitim: _d, ...kalan }) => kalan)(ornekDosya.ham_veri as Record<string, unknown>) : {}),
+            avans_tutari: onay.kalemler.length > 0 ? beklenenAvans(toplamTutar, ornekDosya?.odeme_sekli) : null,
+          },
           // Marka ve detayli ambalaj SECIMDEN gelir (pencerede onaylandi)
           marka: onay.marka || ornekDosya?.marka || null,
           sevkiyat_evraklari: ornekDosya?.sevkiyat_evraklari || SEVKIYAT_EVRAKLARI,

@@ -12,7 +12,8 @@ import {
   BEKLEYEN_BLOK, BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planGorunumu, planKalemleri, planSirala, saat, siparisBolumleri,
   siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
-import { onOdemeKaydet, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
+import { onOdemeDagilimiOku, onOdemeKaydet, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
@@ -232,20 +233,45 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, mesgul, sevkA
 }
 
 /** "Ön ödeme alındı" penceresi: tutar (zorunlu), para birimi, ödeme tarihi. */
-function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () => void; onKaydet: (tutar: number, para: string, tarih: string) => Promise<string | null> }) {
+function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () => void; onKaydet: (tutar: number, para: string, tarih: string, ek: { oran: number | null; karsilik: number | null }) => Promise<string | null> }) {
   const bugun = bugunIst();
+  // On odeme dagitimi (16.11.2026): siparis takibi yapilan proformada tutar sevkiyatlara yuzdeyle bolunur.
+  const [dagilim, setDagilim] = useState<OnOdemeDagitimi | null>(null);
+  const [oran, setOran] = useState("");
+  const [karsilik, setKarsilik] = useState("");
+  useEffect(() => {
+    let iptal = false;
+    if (!s.proforma_no) return;
+    onOdemeDagilimiOku(s.proforma_no).then((d) => {
+      if (iptal || !d) return;
+      setDagilim(d);
+      if (d.oran !== null) setOran(String(d.oran).replace(".", ","));
+      if (d.karsilik !== null) setKarsilik(String(d.karsilik).replace(".", ","));
+    }).catch(() => undefined);
+    return () => { iptal = true; };
+  }, [s.proforma_no]);
   const [tutar, setTutar] = useState(s.on_odeme_tutar !== null ? String(s.on_odeme_tutar).replace(".", ",") : "");
   const [para, setPara] = useState(s.on_odeme_para || (s.para_birimi === "EUR" ? "EUR" : "USD"));
   const [tarih, setTarih] = useState(s.on_odeme_tarihi || bugun);
   const [hata, setHata] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
-  const sayi = Number(tutar.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+  const oku = (x: string) => Number(x.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+  const sayi = oku(tutar);
+  const takipli = dagilim !== null;   // bolum her zaman gorunur; dagitim yalniz siparis takibinde yapilir (veritabani karar verir)
+  const siparisPara = dagilim?.para || s.para_birimi || "USD";
+  const farkliDoviz = takipli && para !== siparisPara;
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!Number.isFinite(sayi) || sayi <= 0) { setHata("Ön ödeme tutarını girin."); return; }
     if (!tarih || tarih > bugun) { setHata("Ödeme tarihi bugünden ileri olamaz."); return; }
+    const oranSayi = oran.trim() === "" ? null : Number(oran.replace(",", "."));
+    if (oranSayi !== null && (!Number.isFinite(oranSayi) || oranSayi <= 0 || oranSayi > 100)) { setHata("Ön ödeme yüzdesi 0 ile 100 arasında olmalı."); return; }
+    const karsilikSayi = farkliDoviz && karsilik.trim() !== "" ? oku(karsilik) : null;
+    if (karsilikSayi !== null && (!Number.isFinite(karsilikSayi) || karsilikSayi <= 0)) { setHata(`${siparisPara} karşılığını doğru girin.`); return; }
     setKaydediliyor(true); setHata(null);
-    const h = await onKaydet(Math.round(sayi * 100) / 100, para, tarih);
+    const h = await onKaydet(Math.round(sayi * 100) / 100, para, tarih, {
+      oran: takipli ? oranSayi : null, karsilik: karsilikSayi === null ? null : Math.round(karsilikSayi * 100) / 100,
+    });
     setKaydediliyor(false);
     if (h) setHata(h);
   };
@@ -276,6 +302,50 @@ function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () 
             <input type="date" value={tarih} max={bugun} onChange={(e) => setTarih(e.target.value)} aria-label="Ödeme tarihi"
               className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white" style={{ borderColor: CARD_BORDER, colorScheme: "dark" }} />
           </label>
+          {takipli && (
+            <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: CARD_BORDER }} data-testid="onodeme-dagitim">
+              <p className="text-xs font-semibold text-white">Sevkiyatlara dağıtım (yalnız sipariş takibi)</p>
+              <div className={farkliDoviz ? "grid grid-cols-2 gap-2" : ""}>
+                <label className="block text-xs" style={{ color: TEXT_MUTED }}>Ön ödeme yüzdesi (%)
+                  <input inputMode="decimal" value={oran} onChange={(e) => setOran(e.target.value)} placeholder="ör. 30" aria-label="Ön ödeme yüzdesi"
+                    className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white tabular-nums" style={{ borderColor: CARD_BORDER }} />
+                </label>
+                {farkliDoviz && (
+                  <label className="block text-xs" style={{ color: TEXT_MUTED }}>{siparisPara} karşılığı
+                    <input inputMode="decimal" value={karsilik} onChange={(e) => setKarsilik(e.target.value)} placeholder="bankanın çevirdiği tutar" aria-label="Sipariş dövizinde karşılık"
+                      className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white tabular-nums" style={{ borderColor: CARD_BORDER }} />
+                  </label>
+                )}
+              </div>
+              <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+                Her sevkiyata düşen ön ödeme = yüklenen malın fatura tutarı × yüzde; kalan, &quot;Siparişe devam et&quot; ile açılan sonraki sevkiyata otomatik devreder.
+                {dagilim?.oran_kaynak === "odeme_sekli" ? " Yüzde, dosyadaki ödeme şartından okundu." : ""}
+              </p>
+              {dagilim && dagilim.dosyalar.length > 0 && (
+                <table className="w-full text-[11px] tabular-nums" style={{ color: TEXT_MUTED }}>
+                  <thead><tr><th className="text-left font-medium">Dosya</th><th className="text-right font-medium">Fatura</th><th className="text-right font-medium">Ön ödeme (şu an)</th></tr></thead>
+                  <tbody>
+                    {dagilim.dosyalar.map((d) => (
+                      <tr key={d.id}>
+                        <td className="text-white">{d.dosya_no || "—"}{d.kilit ? <span className="ml-1">({KILIT_METNI[d.kilit]})</span> : null}</td>
+                        <td className="text-right">{d.tutar !== null ? sayiGoster(d.tutar, 2) : "—"}</td>
+                        <td className="text-right text-white">{(d.pay ?? d.mevcut) !== null ? sayiGoster((d.pay ?? d.mevcut) as number, 2) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {dagilim && dagilim.durum === "tamam" && dagilim.kalan !== null && (
+                <p className="text-[11px] text-white">Sonraki sevkiyatlara devreden: {sayiGoster(dagilim.kalan, 2)} {paraIsareti(dagilim.para)}</p>
+              )}
+              {dagilim && dagilim.dosyalar.length === 0 && (
+                <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Henüz sevkiyat dosyası yok; sipariş takibiyle dosyalar açıldıkça pay otomatik düşülür.</p>
+              )}
+              {dagilim && dagilim.dosyalar.length > 0 && dagilim.durum !== "tamam" && dagilim.durum !== "havuz_yok" && (
+                <p className="text-[11px] text-amber-300">{DAGITIM_DURUM_METNI[dagilim.durum]}</p>
+              )}
+            </div>
+          )}
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
             Kaydedince sipariş &quot;Ön ödemesi alınmış&quot; bölümüne geçer ve yükleme planında &quot;Rezervasyon alınmadı&quot; olarak görünür.
           </p>
@@ -427,12 +497,15 @@ function SiparisIcerik() {
     ];
   }, [plan, planTum, q, bugun]);
 
-  const onOdemeKaydetFn = async (s: SiparisSatiri, tutar: number, para: string, tarih: string): Promise<string | null> => {
+  const onOdemeKaydetFn = async (s: SiparisSatiri, tutar: number, para: string, tarih: string, ek: { oran: number | null; karsilik: number | null }): Promise<string | null> => {
     if (!s.proforma_no) return "Proforma no yok.";
     try {
-      await onOdemeKaydet(s.proforma_no, true, tutar, para, tarih);
+      const d = await onOdemeKaydet(s.proforma_no, true, tutar, para, tarih, ek);
       setOnOdemeSatir(null);
-      setBilgi(`${s.proforma_no}: ön ödeme kaydedildi (${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}). Sipariş "ön ödemesi alınmış" bölümüne ve yükleme planına eklendi.`);
+      const dagitim = !d || d.durum === "takip_degil" ? "" : d.durum === "tamam"
+        ? ` ${d.dosyalar.length} sevkiyat dosyasına %${String(d.oran).replace(".", ",")} ile dağıtıldı; devreden ${sayiGoster(d.kalan ?? 0, 2)} ${paraIsareti(d.para)}.`
+        : ` ${DAGITIM_DURUM_METNI[d.durum]}`;
+      setBilgi(`${s.proforma_no}: ön ödeme kaydedildi (${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}). Sipariş "ön ödemesi alınmış" bölümüne ve yükleme planına eklendi.${dagitim}`);
       await yukle();
       return null;
     } catch (e) { return e instanceof Error ? e.message : "Ön ödeme kaydedilemedi."; }
@@ -554,7 +627,7 @@ function SiparisIcerik() {
                 <SiparisExcelAktar onKapat={() => setSiparisAktarAcik(false)} onAktarildi={(m) => { setSiparisAktarAcik(false); setBilgi(m); yukle(); }} />
               )}
               {onOdemeSatir && (
-                <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d) => onOdemeKaydetFn(onOdemeSatir, t, p, d)} />
+                <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d, ek) => onOdemeKaydetFn(onOdemeSatir, t, p, d, ek)} />
               )}
               {gorunenSiparis.length ? (
                 <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek} mesgul={bekleyen}

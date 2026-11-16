@@ -451,3 +451,27 @@ ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı.
   (Message-ID ile idempotent, tekrar kayıt olmaz).
 - Testler: `tests/navlun-oku.test.ts` (kurgusal; edge kodu es2018+ olduğu için çalışma anında yüklenir, Next
   typecheck'i izlemez).
+
+## 4.14 Ön ödeme dağıtımı — sipariş takibinde sevkiyatlara yüzdeyle (16.11.2026)
+- Kullanıcı: "Ön ödeme tutarı proformadaki ön ödeme yüzdesine göre evraklara-sevkiyatlara bölünmeli … 10 konteynerlik
+  siparişte 40.000 USD geldi; 5 konteyner yüklendi, kalan siparişe devam et ile açılan sonraki 5'e otomatik devretmeli.
+  Tek seferlik dosya ise sorun yok. Toplam bedel yüklenen konteynere ve anlaşmadaki yüzdeye göre. Euro da gelebilir."
+- Önceki durum (kök sorun): proformadan dosya açılırken avans = proformanın TÜM ön ödemesi; "siparişe devam et" ilk
+  dosyanın avansını AYNEN kopyalıyordu; Harun Bey çok sevkiyatlı proformayı Excel'de -1…-5 satırlarına bölüp her birine
+  ön ödemeyi elle hesaplıyordu.
+- Kural (veritabanı, migration `20261116170000_on_odeme_dagitimi.sql`, CANLIDA; kurgusal proformayla geri alınan testte havuz, devreden, yükleme farkı, kapalı / elle kilit, EUR karşılık, geri al ve tek seferlik doğrulandı): yalnız SİPARİŞ TAKİBİ (proformanın en az bir
+  dosyası `ana_siparisler`'e bağlı). Havuz = `siparis_on_odemeler.tutar` (farklı dövizse `karsilik_tutar`, sipariş
+  dövizinde); oran = `siparis_on_odemeler.oran`, boşsa dosyanın ödeme şartından (`on_odeme_orani_oku`, TS eşi
+  `lib/on-odeme.ts onOdemeOrani`). Dosyalar açılış sırasıyla: pay = fatura `toplam_tutar` × oran, en fazla havuzda
+  kalan; kilitli dosya (Kapalı / fatura talimatı gönderildi / `ham_veri.avans_elle`) mevcut avansını korur ve havuzdan
+  düşer. Yazılan: `ham_veri.avans_tutari` (+ iz `ham_veri.avans_dagitim`) → faturadaki ÖDENECEK TUTAR. Havuz geri
+  alınırsa dağıtımla yazılan avans temizlenir. Eksik ön ödeme: önce açılan dosya önce alır, sonrakiler 0.
+  Fazla: "devreden" olarak görünür (elle karar).
+- Tetikler: `siparis_on_odemeler` (tutar / döviz / oran / karşılık) ve `ihracat_dosyalari` (açılış, toplam_tutar,
+  proforma, sipariş, durum, fatura talimatı). Tek seferlik dosyaya, havuzu olmayan proformaya DOKUNMAZ (canlıda
+  geçişte değişen kayıt yok: ön ödemesi girilmiş 16 proformanın hiçbiri sipariş takibinde değildi).
+- Ekran: Siparişler → "Ön ödeme alındı" penceresinde yüzde, farklı dövizde karşılık ve dosya bazında dağılım
+  önizlemesi; Ödeme kartında "otomatik dağıtıldı" / "elle girildi" notu (elle değiştirilen avans dağıtımdan çıkar,
+  alan boşaltılırsa otomatiğe döner). Siparişe devam et: avans kopyalanmaz; başlangıç = tutar × ödeme şartı yüzdesi.
+- RPC: `siparis_on_odeme_kaydet(+p_oran, p_karsilik)` (eski 5 parametreli sürüm kaldırıldı; istemci isimli parametreyle
+  çağırır), `siparis_on_odeme_dagilimi(proforma)` (okuma). Testler: `tests/on-odeme.test.ts`.

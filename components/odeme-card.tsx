@@ -43,7 +43,13 @@ export default function OdemeCard({ dosya, onRefresh, companyId }: Props) {
   const handleSave = async () => {
     setSaving(true);
     const avansSayi = form.avans_tutari.trim() === "" ? null : sayiOku(form.avans_tutari);
-    const guncelHamVeri = { ...(dosya.ham_veri as any || {}), avans_tutari: avansSayi };
+    // On odeme dagitimi (16.11.2026): avans elle DEGISTIRILDIYSE dosya dagitimdan cikar (avans_elle); alan bosaltilirsa
+    // otomatige doner (siparis takibinde veritabani payi yeniden yazar). Degismediyse onceki durum korunur.
+    const hv = (dosya.ham_veri as any) || {};
+    const onceki = hv.avans_tutari != null ? Number(hv.avans_tutari) : null;
+    const degisti = (avansSayi ?? null) !== (onceki ?? null);
+    const avansElle = degisti ? avansSayi !== null : hv.avans_elle === true;
+    const guncelHamVeri = { ...hv, avans_tutari: avansSayi, avans_elle: avansElle };
     const payload = {
       toplam_tutar: form.toplam_tutar.trim() === "" ? null : sayiOku(form.toplam_tutar),
       odeme_sekli: form.odeme_sekli || null,
@@ -78,6 +84,22 @@ export default function OdemeCard({ dosya, onRefresh, companyId }: Props) {
         <CopyableField dark label="Avans Tutarı" value={formatCurrency((dosya.ham_veri as any)?.avans_tutari, dosya.para_birimi)} />
         <CopyableField dark label="Ödeme Şekli" value={dosya.odeme_sekli} />
       </div>
+      {(() => {
+        const hv = (dosya.ham_veri as any) || {};
+        if (hv.avans_elle === true && hv.avans_dagitim) {
+          return <p className="mt-2 text-[11px]" style={{ color: TEXT_MUTED }} data-testid="avans-elle">Avans elle girildi; sipariş ön ödemesi dağıtımı bu dosyayı değiştirmez (alanı boşaltırsanız otomatiğe döner).</p>;
+        }
+        if (hv.avans_dagitim && hv.avans_elle !== true) {
+          const g = hv.avans_dagitim;
+          return (
+            <p className="mt-2 text-[11px]" style={{ color: TEXT_MUTED }} data-testid="avans-dagitim">
+              Avans, sipariş ön ödemesinden otomatik dağıtıldı: fatura tutarı × %{String(g.oran ?? "").replace(".", ",")}
+              {g.havuz != null ? ` (alınan ön ödeme ${formatCurrency(g.havuz, g.para || dosya.para_birimi)})` : ""}.
+            </p>
+          );
+        }
+        return null;
+      })()}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditing(false)}>

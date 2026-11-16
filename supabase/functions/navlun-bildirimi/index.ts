@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { AcenteTablosu } from "../_shared/navlun-oku.ts";
 import { bizdenMi, tutarAdaylari } from "../_shared/navlun-oku.ts";
-import { acenteOgren, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
+import { acenteOgren, adayKaydi, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
 import { alintiKimligi, alintiMesajlari, genelTarifeMi, govdeImzasi } from "../_shared/navlun-alinti.ts";
 
 // ============================================================================
@@ -176,6 +176,21 @@ Deno.serve(async (req: Request) => {
 
     const acenteler: AcenteTablosu = Object.fromEntries(satirlar.map((s) => [s.alan_adi.toLowerCase(), s.ad]));
 
+    // 16.11.2026 "Yeniden oku": uygulamadan istenen tarih (betik her calismada sorar, sayfa sayfa ilerletir)
+    if (govde.islem === "yeniden_oku_al") {
+      const r = await rpc<Record<string, unknown>>("navlun_yeniden_oku_al", { p_company: sirket });
+      return r.ok ? json(r.veri || {}) : json({ hata: r.hata || "Okunamadı." }, 500);
+    }
+    if (govde.islem === "yeniden_oku_ilerle") {
+      const sayi = (v: unknown) => Math.max(0, Math.min(100000, Math.floor(Number(v) || 0)));
+      const id = typeof govde.id === "string" && /^[0-9a-f-]{36}$/i.test(govde.id) ? govde.id : null;
+      if (!id) return json({ hata: "Geçersiz istek." }, 400);
+      const r = await rpc<Record<string, unknown>>("navlun_yeniden_oku_ilerle", {
+        p_company: sirket, p_id: id, p_islenen: sayi(govde.islenen), p_gonderilen: sayi(govde.gonderilen), p_yeni: sayi(govde.yeni), p_bitti: govde.bitti === true,
+      });
+      return r.ok ? json(r.veri || {}) : json({ hata: r.hata || "Kaydedilemedi." }, 500);
+    }
+
     // 11.11.2026: saklanan ham metinden yeniden okuma (okuyucu gelistikce betigi yeniden calistirmadan). Sayfa basina 50.
     if (govde.islem === "yeniden_isle") {
       const sayfa = Math.max(0, Math.floor(Number(govde.sayfa) || 0));
@@ -209,6 +224,7 @@ Deno.serve(async (req: Request) => {
     const ogrenilen: string[] = [];
     const girdiler: { g: NavlunGirdi; alinti: string }[] = [];
     let atlanan = 0;
+    let aday = 0;
     for (const m of liste) {
       if (!m || typeof m !== "object") { atlanan++; continue; }
       const r = m as Record<string, unknown>;
@@ -223,6 +239,8 @@ Deno.serve(async (req: Request) => {
         // Tabloda olmayan alan adi navlun teklifi veriyorsa acente olarak ogrenilir (elle tablo bakimi gerekmez)
         const o = acenteOgren(g, acenteler);
         if (o && !pasif.has(o.alan) && (await acenteEkle(sirket, o.alan, o.ad))) { acenteler[o.alan] = o.ad; ogrenilen.push(o.ad); k = o.kayit; }
+        // 16.11.2026: ogrenilemeyen cevap atilmaz; "teklif olabilir" listesi icin olaysiz saklanir (pasif alan adi haric)
+        if (!k) { const a = adayKaydi(g, acenteler); if (a && !pasif.has((g.gonderen.split("@")[1] || "").toLowerCase())) { k = a; aday++; } }
       }
       girdiler.push({ g, alinti: kirp(r.alinti, 30000) });
       if (!k) { atlanan++; continue; }
@@ -243,7 +261,7 @@ Deno.serve(async (req: Request) => {
     if (!s.ok) return json({ hata: s.hata || "Kaydedilemedi." }, 500);
     const tamamlanan = await bilgiTamamla(sirket, kayitlar).catch((e) => { console.error("navlun bilgi tamamlama", e); return 0; });
     const v = s.veri || {};
-    return json({ ...v, atlanan: (v.atlanan || 0) + atlanan, okunamadi: kayitlar.filter((k) => k.durum === "okunamadi").length, ogrenilen, kurtarilan: kurtarilan.length, tamamlanan });
+    return json({ ...v, atlanan: (v.atlanan || 0) + atlanan, okunamadi: kayitlar.filter((k) => k.durum === "okunamadi").length, ogrenilen, kurtarilan: kurtarilan.length, tamamlanan, aday });
   } catch (e) {
     console.error("navlun-bildirimi", e);
     return json({ hata: "Beklenmeyen hata." }, 500);

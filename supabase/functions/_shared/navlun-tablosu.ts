@@ -113,9 +113,22 @@ export function planBlokAdi(acente: string): string {
   const [a, ...b] = acente.split("/");
   return blokAdi(a, b.join("/") || null);
 }
+/** 16.11.2026: liman / firma es sozlugu (ad_esleri tablosu). Bos kalirsa yukaridaki sabit esler aynen calisir. */
+const SOZLUK: { liman: Record<string, string>; firma: Record<string, string> } = { liman: {}, firma: {} };
+export type AdEsi = { tur: string; kaynak: string; hedef: string };
+export function esleriYukle(esler: AdEsi[]): void {
+  SOZLUK.liman = {}; SOZLUK.firma = {};
+  for (const e of esler) if ((e.tur === "liman" || e.tur === "firma") && e.kaynak && e.hedef) SOZLUK[e.tur][e.kaynak] = e.hedef;
+}
+/** SQL siparis_firma_anahtar ile ayni: Turkce harf sadelestirme, harf/rakam disi atilir, buyuk harf. */
+export function firmaAnahtari(m: string | null | undefined): string {
+  const tr: Record<string, string> = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", Ç: "C", Ğ: "G", İ: "I", Ö: "O", Ş: "S", Ü: "U", â: "a", Â: "A", î: "i", Î: "I", û: "u", Û: "U", é: "e", É: "E" };
+  const k = (m || "").replace(/[çğıöşüÇĞİÖŞÜâÂîÎûÛéÉ]/g, (h) => tr[h] || h).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return SOZLUK.firma[k] || k;
+}
 function limanKey(liman: string | null, anahtar?: string | null): string | null {
   const k = anahtar || limanAnahtari(liman);
-  return k ? LIMAN_ESLER[k] || k : null;
+  return k ? SOZLUK.liman[k] || LIMAN_ESLER[k] || k : null;
 }
 /** Istanbul saatiyle "YYYY-MM" */
 const ayAnahtari = (iso: string) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(0, 7) : new Date(Date.parse(iso) + 3 * 3600000).toISOString().slice(0, 7));
@@ -419,7 +432,7 @@ export function navlunSatinAlma(t: NavlunTablosu, plan: PlanNavlunSatiri[], olay
   // 13.11.2026: booking'i planda olan siparis VERITABANINDA "rezervasyonlu" sayilir (migration 20261113010000; sayfa, siparis
   // raporu ve bu rapor ayni kurali gorur). 12.11'deki rapor ici musteri+liman dusumu kaldirildi (ayni proformadaki baska
   // siparisin booking'ini de sayiyordu).
-  const musteriAnahtari = (m: string | null) => buyuk(m || "").replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
+  const musteriAnahtari = (m: string | null) => firmaAnahtari(m);   // 16.11.2026: SQL ile ayni anahtar + es sozlugu
   let bekleyenSiparis = 0, bekleyenKont = 0;
   const bekleyenler: BekleyenSatiri[] = [];
   for (const p of plan) {

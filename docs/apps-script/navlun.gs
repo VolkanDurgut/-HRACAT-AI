@@ -20,6 +20,10 @@
  * GUNCELLEME 13.11.2026 (alintidan kurtarma): bu dosyanin yeni halini projeye yapistirip kaydedin, sonra
  *   NAVLUN_GECMIS_I satirini silip navlunGecmis'i "BITTI" yazana kadar calistirin (gecmis alintilar bir kez taranir).
  *
+ * GUNCELLEME 16.11.2026 ("Yeniden oku" dugmesi): bu dosyanin yeni halini projeye yapistirip kaydedin; baska adim yok.
+ *   Navlun sayfasinda tarih secilince 15 dk'lik navlunTara, normal okumadan sonra o tarihten itibaren yazismalari sayfa
+ *   sayfa yeniden okur (NAVLUN_SON'u elle degistirmeye gerek kalmaz).
+ *
  * Ne gonderilir: konusu "NAVLUN" gecen maillerin gonderen, konu, tarih, Message-ID, alintisiz metni ve (13.11.2026) tam metni (alinti);
  * fiyat metinde yoksa ekteki PDF'in (yoksa en buyuk gorselin) Google Drive OCR metni. Okuma ve
  * siniflama sunucuda (edge "navlun-bildirimi", kural tabanli). Gecici OCR belgesi hemen silinir.
@@ -51,6 +55,7 @@ function navlunKaldir() {
 function navlunTara() {
   var kilit = LockService.getScriptLock();
   if (!kilit.tryLock(5000)) return;
+  var t0 = Date.now();
   try {
     var p = PropertiesService.getScriptProperties();
     var son = Number(p.getProperty('NAVLUN_SON') || (Date.now() - 2 * 24 * 3600 * 1000));
@@ -59,6 +64,10 @@ function navlunTara() {
     var sonuc = navlunIsle(konular, baslangic);
     p.setProperty('NAVLUN_SON', String(Math.max(sonuc.enYeni, son)));
     console.log(JSON.stringify(sonuc.ozet));
+    // 16.11.2026: uygulamadan "Yeniden oku" istendiyse kalan surede bir sayfa daha (normal okumayi asla engellemez)
+    if (Date.now() - t0 < 60 * 1000) {
+      try { navlunYenidenOku(); } catch (e) { console.log('Yeniden okuma atlandi: ' + e); }
+    }
   } finally {
     kilit.releaseLock();
   }
@@ -81,7 +90,40 @@ function navlunGecmis() {
   }
 }
 
-function navlunIsle(konular, baslangic) {
+/**
+ * 16.11.2026 "Yeniden oku" (Navlun sayfasi): istenen tarihten itibaren yazismalari 20'ser 20'ser yeniden gonderir.
+ * NAVLUN_SON'a dokunmaz; sunucu ayni maili Message-ID ile tekrar kaydetmez. Ilerleme sayfada gorunur.
+ */
+function navlunYenidenOku() {
+  var istek = navlunCagir({ islem: 'yeniden_oku_al' });
+  if (!istek || !istek.id || !istek.baslangic) return;
+  var tarihMs = Date.parse(istek.baslangic + 'T00:00:00+03:00');
+  if (!(tarihMs > 0)) return;
+  var konum = Number(istek.konum || 0);
+  var konular = GmailApp.search('subject:(navlun OR "rezervasyon talebi") after:' + Math.floor((tarihMs - 3600 * 1000) / 1000) + ' -in:trash', konum, 20);
+  var sonuc = konular.length ? navlunIsle(konular, tarihMs, 3 * 60 * 1000) : { islenenKonu: 0, ozet: { gonderilen: 0, yeni: 0 } };
+  var bitti = konular.length < 20 && sonuc.islenenKonu === konular.length;
+  navlunCagir({ islem: 'yeniden_oku_ilerle', id: istek.id, islenen: sonuc.islenenKonu, gonderilen: sonuc.ozet.gonderilen || 0, yeni: sonuc.ozet.yeni || 0, bitti: bitti });
+  console.log('Yeniden okuma (' + istek.baslangic + '): ' + (konum + sonuc.islenenKonu) + ' yazisma' + (bitti ? ' - BITTI' : ''));
+}
+
+function navlunCagir(govde) {
+  var p = PropertiesService.getScriptProperties();
+  var anahtar = p.getProperty('ANAHTAR');
+  var anon = p.getProperty('ANON');
+  var cevap = UrlFetchApp.fetch(NAVLUN_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + anon, apikey: anon, 'x-pazar-anahtar': anahtar },
+    payload: JSON.stringify(govde),
+    muteHttpExceptions: true,
+  });
+  if (cevap.getResponseCode() !== 200) throw new Error('Ihracat AI ' + cevap.getResponseCode() + ': ' + cevap.getContentText().slice(0, 200));
+  return JSON.parse(cevap.getContentText() || '{}');
+}
+
+function navlunIsle(konular, baslangic, sureMs) {
+  var sure = sureMs || NAVLUN_SURE_MS;
   var p = PropertiesService.getScriptProperties();
   var anahtar = p.getProperty('ANAHTAR');
   var anon = p.getProperty('ANON');
@@ -91,7 +133,7 @@ function navlunIsle(konular, baslangic) {
   var enYeni = 0;
   var islenenKonu = 0;
   for (var k = 0; k < konular.length; k++) {
-    if (Date.now() - bas > NAVLUN_SURE_MS) break;
+    if (Date.now() - bas > sure) break;
     var liste = konular[k].getMessages();
     for (var j = 0; j < liste.length; j++) {
       var m = liste[j];

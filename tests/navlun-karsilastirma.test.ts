@@ -157,3 +157,21 @@ test("rezervasyon bekleyen: ayni firmanin kisa / uzun yazimi tek satir; DAR SALA
   assert.equal(dar.limanAnahtar, "DAR ES SALAAM");
   assert.equal(dar.enIyi?.tutar, 3250);
 });
+
+test("es sozlugu (ad_esleri): liman ve firma eslesmesi; bos sozlukte sabit esler", async () => {
+  const { esleriYukle, firmaAnahtari, navlunTablosuHesapla, navlunSatinAlma } = await import("@/supabase/functions/_shared/navlun-tablosu");
+  assert.equal(firmaAnahtari("Örnek Gıda & Co. Ltd"), "ORNEKGIDACOLTD");
+  esleriYukle([{ tur: "firma", kaynak: "ORNEKFIRMASA", hedef: "ORNEKGRUP" }, { tur: "liman", kaynak: "ORNEK YAZIM", hedef: "ORNEKPORT" }]);
+  assert.equal(firmaAnahtari("Ornek Firma S.A."), "ORNEKGRUP");
+  const olaylar = [{ tur: "teklif", liman: "ORNEKPORT", liman_anahtar: "ORNEKPORT", acente: "Akkon", armator: "Akkon", tutar: 900,
+    para_birimi: "USD", ekipman: "20DC", free_time_gun: null, tarih: "2026-11-12T08:00:00Z", lokal_dahil: true }];
+  const t = navlunTablosuHesapla(olaylar, [], "2026-11-16");
+  const sip = (musteri: string, liman: string) => ({ kaynak: "siparis", booking_no: null, musteri, konteyner: 2, dosya_no: null,
+    varis_limani: liman, acente: null, navlun: null, navlun_para: null, etd: null });
+  const sa = navlunSatinAlma(t, [sip("Ornek Firma S.A.", "Ornek Yazım"), sip("ORNEK GRUP", "ORNEKPORT")], olaylar);
+  assert.equal(sa.bekleyenler.length, 1);
+  assert.equal(sa.bekleyenler[0].siparis, 2);
+  assert.equal(sa.bekleyenler[0].enIyi?.tutar, 900);
+  esleriYukle([]);
+  assert.equal(firmaAnahtari("Ornek Firma S.A."), "ORNEKFIRMASA");
+});

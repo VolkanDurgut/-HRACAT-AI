@@ -5,7 +5,7 @@ import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-otur
 import { raporAyari } from "../_shared/rapor-alici.ts";
 import { baglamKur, type AcenteHafizasi, type LimanKurali } from "../_shared/navlun-karsilastirma.ts";
 import { limanAnahtari } from "../_shared/liman-anahtari.ts";
-import { navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { esleriYukle, type AdEsi, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -134,6 +134,9 @@ async function sirketTablosu(companyId: string, tarih: string) {
     konteyner: p.konteyner == null || p.konteyner === "" ? null : Number(p.konteyner) || null, dosya_no: metin(p.dosya_no),
     hafta: p.hafta == null ? null : Number(p.hafta) || null, yil: p.yil == null ? null : Number(p.yil) || null,
   }));
+  // 16.11.2026 liman / firma es sozlugu; okunamazsa sabit eslerle devam (rapor durmaz)
+  try { esleriYukle(await hepsiniCek<AdEsi>(`ad_esleri?select=tur,kaynak,hedef&company_id=eq.${companyId}&order=id`)); }
+  catch (e) { esleriYukle([]); console.error("navlun-tablosu: es sozlugu okunamadi:", e instanceof Error ? e.message : e); }
   const tablo = navlunTablosuHesapla(olaylar, plan.filter((p) => p.kaynak !== "siparis"), tarih);
   tablo.baglam = await karsilastirmaBaglami(companyId, olaylar);
   return { tablo, satinAlma: navlunSatinAlma(tablo, plan, olaylar, Array.from(konular.values())) };

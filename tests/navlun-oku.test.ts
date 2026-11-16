@@ -17,6 +17,7 @@ type OkuMod = {
   navlunMesajOku: (m: { konu: string; gonderen: string; govde: string }, a: Record<string, string>) => Olay[];
 };
 type IsleMod = {
+  adayKaydi: (g: NavlunGirdi, a: Record<string, string>) => { acente: string | null; durum: string; olaylar: Olay[]; liman: string | null } | null;
   acenteOgren: (g: NavlunGirdi, a: Record<string, string>) => { alan: string; ad: string; kayit: { olaylar: Olay[] } } | null;
 };
 const okuMod = (): Promise<OkuMod> => yukle("navlun-oku");
@@ -118,3 +119,19 @@ test("bizden kabul: 'navlun bedelini X usd olarak dikkate aliyoruz' (rezervasyon
   assert.equal(h.filter((x) => x.tur === "kabul").length, 0);
 });
 
+
+test("taninmayan alan adindan NAVLUN TALEBI cevabi: ogrenilemese de olaysiz 'bilgi' adayi olarak saklanir", async () => {
+  const { adayKaydi } = await isleMod();
+  const g = (gonderen: string, konu = KONU, govde = "Merhaba, konteynerler Tanzanya dışına çıkacak mıdır?"): NavlunGirdi =>
+    ({ mesaj_id: "<t2@ornek>", gonderen, konu, govde, tarih: "2026-11-12T08:00:00Z", ek_metin: "", ek_kaynak: "" });
+  const a = adayKaydi(g("satis@yeni-hat.example"), {});
+  assert.ok(a);
+  assert.equal(a!.acente, null);
+  assert.equal(a!.durum, "bilgi");
+  assert.deepEqual(a!.olaylar, []);
+  assert.equal(a!.liman, "ORNEKPORT");
+  assert.equal(adayKaydi(g("satis@ornek-acente.example"), ACENTE), null);          // bilinen acente: normal yol
+  assert.equal(adayKaydi(g("biri@gmail.com"), {}), null);                         // kisisel posta
+  assert.equal(adayKaydi(g("operation@unex.com.tr"), {}), null);                  // bizden
+  assert.equal(adayKaydi(g("satis@yeni-hat.example", "UNEX // ORNEKPORT // 5*20 DC // REZERVASYON TALEBİ HK."), {}), null); // navlun talebi degil
+});

@@ -125,6 +125,21 @@ export function acenteOgren(g: NavlunGirdi, acenteler: AcenteTablosu): { alan: s
   return { alan, ad, kayit };
 }
 
+/**
+ * 16.11.2026 (Imagesa dersi): tanimadigimiz bir alan adindan "NAVLUN TALEBI" yazismasina gelen ve acente olarak
+ * ogrenilemeyen cevap artik atilmaz; olaysiz "bilgi" kaydi olarak saklanir (acente bos). Navlun sayfasindaki
+ * "Teklif olabilecek mailler" listesinde gorunur; kullanici tutari girince alan adi acente olarak ogrenilir.
+ */
+export function adayKaydi(g: NavlunGirdi, acenteler: AcenteTablosu): NonNullable<ReturnType<typeof mesajIsle>> | null {
+  if (bizdenMi(g.gonderen) || acenteAdi(g.gonderen, acenteler)) return null;
+  const alan = (g.gonderen.split("@")[1] || "").toLowerCase().trim();
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(alan) || KISISEL.test(alan) || /ihracatasistanim/.test(alan)) return null;
+  if (!/NAVLUN\s*TALEB|NAVLUN\s*TAELB/i.test(buyukHarf(g.konu))) return null;
+  const k = mesajIsle(g, { ...acenteler, [alan]: alandanAd(alan) });
+  if (!k) return null;
+  return { ...k, acente: null, durum: "bilgi", olaylar: [], ozet: null };
+}
+
 function buyukHarf(s: string): string {
   return s.replace(/i/g, "İ").replace(/ı/g, "I").toUpperCase().replace(/İ/g, "I");
 }

@@ -88,9 +88,35 @@ export async function navlunVerisiOku(gun = 120): Promise<NavlunVerisi> {
   return { satirlar, okunamayanlar: (ok || []) as OkunamayanMesaj[], sonOkuma: (son && son[0]?.updated_at) || null, baglam, baglamHatasi };
 }
 
-export async function navlunHataCoz(id: string, islem: "duzelt" | "yoksay", tutar?: number, ekipman?: string, armator?: string): Promise<void> {
+export async function navlunHataCoz(id: string, islem: "duzelt" | "yoksay", tutar?: number, ekipman?: string, armator?: string, acente?: string): Promise<void> {
   const { error } = await supabase.rpc("navlun_hata_coz", {
-    p_id: id, p_islem: islem, p_tutar: tutar ?? null, p_ekipman: ekipman || "20DC", p_armator: armator || null,
+    p_id: id, p_islem: islem, p_tutar: tutar ?? null, p_ekipman: ekipman || "20DC", p_armator: armator || null, p_acente: acente || null,
   });
+  if (error) throw new Error(error.message);
+}
+
+/** 16.11.2026: fiyati okunamamis acente cevaplari (metninde tutar gecen ya da tanimadigimiz alan adindan gelen). */
+export type TeklifAdayi = { id: string; konu: string | null; acente: string | null; alan: string; liman: string | null; tarih: string; metin: string };
+export async function teklifAdaylariOku(): Promise<TeklifAdayi[]> {
+  const { data, error } = await supabase.rpc("navlun_teklif_adaylari");
+  if (error) throw new Error(error.message);
+  return (data || []) as TeklifAdayi[];
+}
+
+/** 16.11.2026 "Yeniden oku": Apps Script bir sonraki calismasinda bu tarihten itibaren yazismalari sayfa sayfa yeniden okur. */
+export type YenidenOkuma = { id: string; baslangic: string; durum: "bekliyor" | "isleniyor" | "tamam" | "iptal"; konum: number; gonderilen: number; yeni: number;
+  istek_zamani: string; son_ilerleme: string | null; isteyen: string | null };
+export async function yenidenOkumaDurumu(): Promise<YenidenOkuma | null> {
+  const { data, error } = await supabase.from("navlun_yeniden_okuma")
+    .select("id,baslangic,durum,konum,gonderilen,yeni,istek_zamani,son_ilerleme,isteyen").order("istek_zamani", { ascending: false }).limit(1);
+  if (error) throw new Error(error.message);
+  return ((data || [])[0] as YenidenOkuma | undefined) || null;
+}
+export async function yenidenOkumaIste(tarih: string): Promise<void> {
+  const { error } = await supabase.rpc("navlun_yeniden_oku_iste", { p_tarih: tarih });
+  if (error) throw new Error(error.message);
+}
+export async function yenidenOkumaIptal(): Promise<void> {
+  const { error } = await supabase.rpc("navlun_yeniden_oku_iptal");
   if (error) throw new Error(error.message);
 }

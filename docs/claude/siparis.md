@@ -498,3 +498,29 @@ ilettiği mesajları hafızaya al. Kendi kendini geliştiren bir sistem olmalı.
   karşılıyorsa sipariş "ön ödeme alındı" kalır (booking no yazılır), yeni kolon `bekleyen_konteyner` = kalan; navlun
   raporu / yükleme planı "rezervasyon bekleyen" bunu kullanır (BAKEBS: 5 sipariş, 2 booking → 3 bekliyor). Kuru
   çalıştırmada başka fark yok. ESNA 1.780 $ kabulü yeniden okumayla kaydedildi (+ Paramaribo 3.330 $ kabulü).
+
+## 4.16 Veri tutarlılığı paketi (16.11.2026, kullanıcı onayı)
+Migration `20261116210000_veri_tutarliligi.sql` (+ `..210500` aday eşiği), CANLIDA. Geçişte `siparis_listesi_veri` ve
+`yukleme_plani_veri` çıktısı md5 ile karşılaştırıldı: birebir aynı (194 / 234 satır).
+- **Liman / firma eş sözlüğü** `ad_esleri` (tur liman|firma, kaynak/hedef = eşleşme anahtarı, *_ad = ekranda yazılan).
+  `ad_esi(company, tur, anahtar)`; yazma yalnız RPC `ad_esi_kaydet` / `ad_esi_sil` (analiz|proformalar). Kullananlar:
+  `siparis_listesi_veri` (plan eşleşmesi fkey/lkey), edge `navlun-tablosu` (`esleriYukle` + `firmaAnahtari`; okunamazsa
+  sabit eşler), Navlun sayfası Excel indir, `veri_tutarsizliklari`. Evrak kontrolleri BİLEREK bağlı değil (birebir yazım).
+  Koddaki sabit eşler (SINGAPUR, CIBUTI, MALDIVES, DAR ES …) yedek olarak durur ve tabloya tohumlandı. Ekran:
+  Ayarlar > Liman ve Firma Eşleri (`/ayarlar/esler`, süper admin).
+- **Aynı sipariş eşleştirmesi** `siparis_eslesmeleri` (proforma_anahtar ↔ defter_id, ikisi de tekil). Sistem proforması
+  listeden gizlenir, ön ödemesi Excel satırına geçer (Excel satırının kendi kaydı varsa o önceliklidir); çıktıda
+  `eslesik_proforma`. RPC: `siparis_eslesme_adaylari` (aynı firma 3 / önek 2 + miktar 2 + tutar 2; eşik 3),
+  `siparis_eslestir`, `siparis_eslesme_kaldir`. Ekran: Siparişler'de sistem satırında "Excel'de aynı sipariş var mı?",
+  Excel satırında "Sistem: … · ayır". Eşleşen Excel satırının durumu Excel'deki gibi (ör. "rezervasyonlu") sayılır.
+- **Kontrol Merkezi "Veri Tutarsızlıkları"** `veri_tutarsizliklari()` (salt okunur, analiz): plan/rezervasyon ETD farkı,
+  iki numarayla sipariş (firma + miktar, 45 gün), 30 gün içinde ETD'li navlunsuz booking (dosya/plan navlunu yok ve
+  aynı limanda ETD'den 90 gün önceye kadar kabul maili yok), 7+ gün booking bekleyen ön ödemeli sipariş (14+ yüksek),
+  yükleme planı / sipariş listesi 3 günden eski, navlun maili 1 günden uzun okunmadı. Kart: `components/analiz/tutarsizliklar-karti.tsx`.
+- **Navlun teklif adayları** `navlun_teklif_adaylari()`: son 45 gün "bilgi" + olaysız + bizden değil + (metinde tutar
+  ya da acente boş). Edge `navlun-bildirimi`: tanımadığımız alan adından NAVLUN TALEBİ cevabı öğrenilemezse artık
+  `adayKaydi` ile olaysız "bilgi" (acente boş) saklanır. `navlun_hata_coz` "bilgi" kayıtlarını da çözer; acentesi boşsa
+  `p_acente` ister ve alan adını `navlun_acenteler`'e ekler (pasif kayda dokunmaz). Ekran: Navlun > "Teklif olabilecek mailler".
+- **Yeniden oku** `navlun_yeniden_okuma` (şirket başına tek aktif), RPC `navlun_yeniden_oku_iste/_iptal`; edge işlemleri
+  `yeniden_oku_al` / `yeniden_oku_ilerle` (service role fonksiyonları). Apps Script `navlunTara`: normal okuma ilk 60 sn'de
+  biterse `navlunYenidenOku` (20 yazışma, 3 dk bütçe, Gmail sırası `konum`); NAVLUN_SON'a dokunmaz. navlun.gs yeniden yapıştırılmalı.

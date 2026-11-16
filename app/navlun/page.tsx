@@ -10,6 +10,8 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import { DURUM_ETIKETI, YENI_TUR_ADI, limanOzetleri, yeniBilgiler, type LimanOzeti, type YeniBilgi } from "@/lib/navlun/ozet";
 import { navlunHataCoz, navlunVerisiOku, type NavlunVerisi, type OkunamayanMesaj } from "@/lib/navlun/veri";
+import { TeklifAdaylari } from "@/components/navlun/teklif-adaylari";
+import { YenidenOku } from "@/components/navlun/yeniden-oku";
 import { navlunTablosuExcel, navlunTablosuTestMaili } from "@/lib/navlun/tablo";
 import { navlunNoktalari } from "@/lib/navlun/harita";
 import { NavlunHaritasi } from "@/components/navlun/navlun-haritasi";
@@ -303,8 +305,9 @@ function NavlunIcerik() {
   const [tabloBilgi, setTabloBilgi] = useState<string | null>(null);
   const [masa, setMasa] = useState<string | null>(null);
 
+  const [adayYenile, setAdayYenile] = useState(0);
   const yukle = useCallback(async () => {
-    setYukleniyor(true); setHata(null);
+    setYukleniyor(true); setHata(null); setAdayYenile((n) => n + 1);
     try { setVeri(await navlunVerisiOku()); } catch (e) { setHata(e instanceof Error ? e.message : "Veri okunamadı."); }
     finally { setYukleniyor(false); }
   }, []);
@@ -381,6 +384,7 @@ function NavlunIcerik() {
               className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }}>
               <Send size={14} /> {tabloIslem === "mail" ? "Gönderiliyor…" : "Test maili"}
             </button>
+            <YenidenOku onBitti={yukle} />
             <button type="button" onClick={yukle} disabled={yukleniyor} aria-label="Yenile" className="h-9 w-9 inline-flex items-center justify-center rounded-lg border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               <RefreshCw size={15} className={yukleniyor ? "animate-spin" : ""} />
             </button>
@@ -421,6 +425,9 @@ function NavlunIcerik() {
               {veri.okunamayanlar.map((m) => <OkunamayanSatir key={m.id} m={m} onCozuldu={yukle} />)}
             </div>
           )}
+
+          {/* 16.11.2026: fiyati okunamamis acente cevaplari (tanimadigimiz gonderen dahil) */}
+          <TeklifAdaylari yenile={adayYenile} onDegisti={yukle} />
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
           <div className="min-w-0">

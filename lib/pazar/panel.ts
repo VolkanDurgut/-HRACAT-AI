@@ -128,7 +128,12 @@ export function ekipOzeti(g: { bugun: string; ekip: PazarEkip[]; firmalar: Pazar
   const cevap = cevapVerenler(g.gelenler, ilkUlasma);
   const firma = new Map(g.firmalar.map((f) => [f.id, f]));
   const sonucTur = new Map<string, Set<string>>();
-  for (const t of g.temaslar) if (t.adim === "sonuc" && t.sonuc) sonucTur.set(t.firma_id, new Set([...(sonucTur.get(t.firma_id) || []), t.sonuc]));
+  for (const t of g.temaslar) {
+    if (t.adim !== "sonuc" || !t.sonuc) continue;
+    const kume = sonucTur.get(t.firma_id) || new Set<string>();
+    kume.add(t.sonuc);
+    sonucTur.set(t.firma_id, kume);
+  }
   const kisiler = g.ekip.length ? g.ekip : [{ kod: "", eposta: "", hitap: "Ekip", sira: 1, aktif: true }];
   return kisiler.map((k) => {
     const liste = g.gorevler.filter((x) => (k.kod ? x.atanan === k.kod : true));

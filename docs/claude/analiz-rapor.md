@@ -355,6 +355,21 @@ Başlık yok / yanlış → hiçbir şey okunmadan 401 (eskiden anon `{"deneme":
 - Saf yardımcılar `lib/analiz-tablolar.ts`, test `tests/analiz-tablolar.test.ts`. `AylikGrafik` `className` aldı
   (varsayılan `xl:col-span-8`, eski kullanım aynı).
 
+## Ana Panel sadeleştirme (16.11.2026 gece)
+
+- Kontrol Merkezi / Pazar ile aynı mimari; HESAPLAR AYNI. Saf modül `lib/panel-gorunum.ts` (test `tests/panel-gorunum.test.ts`):
+  `panelFiltrele` (eski sayfa içi filtre), `cutoffUyarilari` (eski özet kartı hesabı; `CUTOFF_UYARI_GUN` 2), `dosyaEslesir`.
+- Sabit üst: 4 kart (Cut-off kartı yalnız sayaç "n uyarı · m dosya") + `components/panel/cutoff-cubugu.tsx` (yoksa gizli;
+  `localStorage["panel:cutoff-acik"]`, varsayılan açık; satıra tıklayınca tablo satırı vurgulanır) + filtre sekme çubuğu
+  (sayılarla). Adres: `?filtre=cutoff|rezervasyon|acik` (eski `?filter=` okunur, yazılırken silinir).
+- Tablo tek satır: yeni "Evraklar" sütunu `EvrakRozetleri` (n/4 + KT · FT · BL · BY; tamam yeşil/belge, bölünmüş fatura
+  eksikse amber, yoksa soluk). "Eksik: …" metni kaldırıldı. ▾ detay satırı: tam evrak rozetleri + adımlar (Rezervasyon,
+  Konteynerler, Fatura, DBA, VGM) + mal cinsi / gemi.
+- Bağlantılar: müşteri adı → `/pazar?musteri=<alıcı>` (yalnız pazar yetkisi; Pazar `pazar_anahtarlar` ile firmayı bulup
+  kartı açar); evrak ikonu → `/dosya/<id>?tab=evraklar`; `?dosya=<id | dosya no | proforma no>` satırı vurgular, filtre
+  gizliyorsa "Tümü"; açık dosyalarda yoksa ve kimlikse `/dosya/<id>`. Kontrol Merkezi "ETD farkı" / "ETD değişti"
+  bağlantıları `/panel?dosya=<id>` (tutarsizliklar-karti `hedefBaglanti`).
+
 ## DİİB günlük raporu (06.11.2026)
 
 - Edge function `diib-gunluk-rapor`, pg_cron `diib-gunluk-rapor` `0 14 * * *` (17:00 TR).

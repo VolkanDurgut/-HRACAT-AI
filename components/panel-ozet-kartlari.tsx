@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { CheckCircle2, Container, FileText, Timer } from "lucide-react";
 import { supabase, type Dosya, type Konteyner, type Rezervasyon } from "@/lib/supabase";
 import { bugunTarihIstanbul, efektifTartimBilgisi, formatDateTR } from "@/lib/cutoff-utils";
 import { dosyaAkisiHesapla, rezervasyonlariSirala } from "@/lib/dashboard-akis";
+import { cutoffUyarilari as cutoffUyarilariHesapla } from "@/lib/panel-gorunum";
 import InfoTooltip from "@/components/info-tooltip";
 import { ACCENT, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 
@@ -21,12 +21,10 @@ import { ACCENT, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
  *  - Cut-off Uyarisi: <= 2 takvim gunu kalan / gecen ve ilgili adimi bitmemis
  * Veri: Ana Panelin zaten cektigi acik dosyalar + rezervasyon + konteynerler; yalniz
  * "bugun yuklenen" icin son 2 gunde DBA'si yuklenen konteynerler ayrica okunur.
+ * 16.11.2026 gece (kullanici: standart uyari cubugu): Cut-off karti YALNIZ sayac; liste kartlarin altindaki
+ * "Cut-off uyarisi" cubugunda (components/panel/cutoff-cubugu.tsx). Hesap tek yerde: lib/panel-gorunum.ts cutoffUyarilari.
  */
 type PanelDosyasi = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
-type CutoffUyarisi = { dosyaId: string; dosyaNo: string; tur: "Talimat" | "Beyanname"; gun: number };
-
-const CUTOFF_UYARI_GUN = 2;
-const gunMetni = (gun: number) => (gun < 0 ? `${-gun}g geçti` : gun === 0 ? "bugün" : `${gun}g`);
 
 export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar: PanelDosyasi[]; companyId: string | null; yenileme: number }) {
   const [bugunYuklenen, setBugunYuklenen] = useState<number | null>(null);
@@ -65,16 +63,13 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
   const bekleyenRez = aciklar.filter((x) => x.dosya.rezervasyonlar.length === 0).length;
   const yuklenecekDosyalar = aciklar.map((x) => ({ x, kalan: Math.max(0, x.akis.adet - x.akis.dbaYuklenen) })).filter((y) => y.kalan > 0);
   const yuklenecekToplam = yuklenecekDosyalar.reduce((t, y) => t + y.kalan, 0);
-  const cutoffUyarilari: CutoffUyarisi[] = aciklar.flatMap(({ dosya, akis }) =>
-    ([["Talimat", akis.talimat], ["Beyanname", akis.beyanname]] as const)
-      .filter(([, c]) => !c.tamam && c.gun !== null && c.gun <= CUTOFF_UYARI_GUN)
-      .map(([tur, c]) => ({ dosyaId: dosya.id, dosyaNo: dosya.dosya_no || "-", tur, gun: c.gun as number }))
-  ).sort((a, b) => a.gun - b.gun);
+  const cutoffUyarilari = useMemo(() => cutoffUyarilariHesapla(dosyalar), [dosyalar]);
+  const cutoffDosya = new Set(cutoffUyarilari.map((u) => u.dosyaId)).size;
   const acilCutoff = cutoffUyarilari.some((u) => u.gun <= 1);
 
   const kart = "rounded-xl border shadow-sm p-4 animate-fade-up";
   return (
-    <section aria-label="Operasyon özeti" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    <section aria-label="Operasyon özeti" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
       {/* 1) Aktif Dosya (tiklanamaz: zaten Ana Paneldeyiz; liste asagida) */}
       <div className={`${kart} stagger-1`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex items-center gap-2 mb-2">
@@ -161,14 +156,7 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
         </div>
         <p className={`text-2xl font-bold ${cutoffUyarilari.length > 0 ? "text-red-400" : "text-white"}`}>{cutoffUyarilari.length}</p>
         {cutoffUyarilari.length > 0 ? (
-          <div className="mt-0.5 space-y-0.5">
-            {cutoffUyarilari.slice(0, 2).map((u) => (
-              <Link key={`${u.dosyaId}-${u.tur}`} href={`/dosya/${u.dosyaId}`} className="block text-[11px] text-red-300 hover:text-red-200 truncate">
-                {u.dosyaNo} · {u.tur} {gunMetni(u.gun)}
-              </Link>
-            ))}
-            {cutoffUyarilari.length > 2 && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>+{cutoffUyarilari.length - 2} uyarı daha</p>}
-          </div>
+          <p className="text-[11px] mt-0.5 text-red-300" data-cutoff-ozet>{cutoffUyarilari.length} uyarı · {cutoffDosya} dosya · ayrıntı aşağıdaki çubukta</p>
         ) : (
           <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>48 saat içinde bekleyen cut-off yok</p>
         )}

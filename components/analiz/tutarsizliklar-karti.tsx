@@ -19,6 +19,10 @@ import { TUR_BASLIGI, tutarsizlikGruplari, tutarsizliklariOku, type TutarsizlikO
 
 const saat = (iso: string | null) => (iso ? new Date(iso).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const GOSTER = 4;
+/** 16.11.2026: ETD farki / ETD degisti kalemleri dosya sayfasi yerine Ana Panel'de satiri vurgulayarak acilir
+ *  (/panel?dosya=<id>; dosya kapaliysa Ana Panel eskisi gibi dosya sayfasina yonlendirir). */
+const hedefBaglanti = (tur: string, baglanti: string | null) =>
+  baglanti && (tur === "etd_farki" || tur === "etd_degisti") && baglanti.startsWith("/dosya/") ? `/panel?dosya=${encodeURIComponent(baglanti.slice(7))}` : baglanti;
 const ACIK_ANAHTARI = "kontrol-merkezi:tutarsizlik-acik";
 
 function tercihOku(): boolean | null {
@@ -111,7 +115,7 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
                     return (
                       <li key={i} className="flex items-start gap-1.5">
                         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: k.onem === "yuksek" ? "#F87171" : k.onem === "bilgi" ? "#38BDF8" : "#FBBF24" }} />
-                        {k.baglanti ? <Link href={k.baglanti} className="min-w-0 hover:underline decoration-white/30">{icerik}</Link> : <span className="min-w-0">{icerik}</span>}
+                        {k.baglanti ? <Link href={hedefBaglanti(k.tur, k.baglanti)!} className="min-w-0 hover:underline decoration-white/30">{icerik}</Link> : <span className="min-w-0">{icerik}</span>}
                       </li>
                     );
                   })}

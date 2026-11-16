@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, BellRing, BookUser, Building2, Globe2, Mail, MessageCircle, RefreshCw, Search, Send, Store, Upload, Users } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -15,7 +15,7 @@ import { aksiyonlar, cevapVerenler, huni, temasIndeksi, ulkeOzeti } from "@/lib/
 import { hacimMetni, pazarSekmesi, potansiyelFiltrele, VARSAYILAN_SEKME, type PazarSekme } from "@/lib/pazar/gorunum";
 import { useAuth } from "@/lib/auth-context";
 import {
-  pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
+  pazarAnahtarlari, pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
   type MusteriSiparisVerisi, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarVerisi, type TakipVerisi,
 } from "@/lib/pazar/veri";
 import { musteriDurumu, type MusteriDurumu } from "@/lib/pazar/musteri";
@@ -231,6 +231,29 @@ function PazarIcerik() {
     const aksiyon = takip ? aksiyonlar({ bugun: takip.bugun, firmalar, temaslar, gelenler: takip.gelenler, gorevler: takip.gorevler }) : [];
     return { ulasilan: ulasilan.size, cevap, aksiyonListesi: aksiyon, aksiyon: aksiyon.length, aksiyonCevap: aksiyon.filter((a) => a.tur === "cevap" || a.tur === "oneri").length };
   }, [veri, takip, firmalar]);
+  // 16.11.2026: Ana Panel'den gelen ?musteri=<alici firma> -> firma karti (birlestirme anahtari sunucudan, pazar_anahtar)
+  const musteriParam = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!veri) return;
+    if (musteriParam.current === undefined) {
+      try { musteriParam.current = new URLSearchParams(window.location.search).get("musteri"); } catch { musteriParam.current = null; }
+    }
+    const ad = musteriParam.current;
+    if (!ad) return;
+    let iptal = false;
+    pazarAnahtarlari([ad]).then(([anahtar]) => {
+      if (iptal) return;
+      musteriParam.current = null; // bir kez
+      if (!anahtar) return;
+      const f = firmalar.find((x) => x.anahtar === anahtar || (x.ek_anahtarlar || []).includes(anahtar));
+      if (!f) return;
+      if (f.durum === "musteri") { setMusteriFiltre("hepsi"); setSekme("musteriler"); }
+      setAcikFirma(f.id);
+      try { const u = new URL(window.location.href); u.searchParams.delete("musteri"); window.history.replaceState(window.history.state, "", u.toString()); } catch { /* yok */ }
+    }).catch(() => { /* bulunamazsa sayfa normal acilir */ });
+    return () => { iptal = true; };
+  }, [veri, firmalar, setSekme]);
+
   const ulkeyeGit = useCallback((u: string) => {
     if (u === "-" || potansiyeller.some((f) => f.ulke === u)) { setUlke(u); setArama(""); setKaynakFiltre(""); setAsama(null); setSekme("potansiyel"); }
     else { setMusteriFiltre("hepsi"); setSekme("musteriler"); }

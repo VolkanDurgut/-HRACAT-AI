@@ -30,9 +30,23 @@ export type MusteriDurumu = {
   /** Kartta ulke yoksa siparislerden bulunan ulke. */
   ulke: string | null;
   dosyalar: { id: string; dosya_no: string; durum: string; tarih: string | null; konteyner: number; varis: string | null }[];
+  /** 16.11.2026: tum dosyalarin toplam tutari, para birimine gore (kur cevrimi yok; Kontrol Merkezi ile ayni kaynak) */
+  hacim: { para: string; tutar: number }[];
 };
 
 const GUN = 86400000;
+
+/** Dosya tutarlari para birimine gore (buyukten kucuge). Tutar yok / 0 olan dosya sayilmaz. */
+export function dosyaHacmi(dosyalar: { toplam_tutar?: number | string | null; para_birimi?: string | null }[]): { para: string; tutar: number }[] {
+  const m = new Map<string, number>();
+  for (const d of dosyalar) {
+    const t = typeof d.toplam_tutar === "number" ? d.toplam_tutar : d.toplam_tutar ? Number(d.toplam_tutar) : 0;
+    if (!Number.isFinite(t) || t <= 0) continue;
+    const p = (d.para_birimi || "USD").trim().toUpperCase() || "USD";
+    m.set(p, (m.get(p) || 0) + t);
+  }
+  return Array.from(m.entries()).map(([para, tutar]) => ({ para, tutar })).sort((a, b) => b.tutar - a.tutar);
+}
 
 export function firmaAnahtarlari(f: Pick<PazarFirma, "anahtar" | "ek_anahtarlar">): string[] {
   return [f.anahtar, ...(f.ek_anahtarlar || [])].filter(Boolean);
@@ -92,5 +106,6 @@ export function musteriDurumu(firma: PazarFirma, v: MusteriSiparisVerisi, bugun:
     toplamKonteyner: Array.from(rezKont.values()).reduce((t, n) => t + n, 0),
     ulke,
     dosyalar: dosyalar.map((d) => ({ id: d.id, dosya_no: d.dosya_no || "-", durum: d.durum || "", tarih: d.olusturma_tarihi, konteyner: rezKont.get(d.id) || 0, varis: d.varis_limani })),
+    hacim: dosyaHacmi(dosyalar),
   };
 }

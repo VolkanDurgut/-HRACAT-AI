@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, BellRing, BookUser, Building2, Mail, MessageCircle, RefreshCw, Search, Send, Store, Upload, Users } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, BookUser, Building2, Globe2, Mail, MessageCircle, RefreshCw, Search, Send, Store, Upload, Users } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -9,9 +9,10 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { FuarYukle } from "@/components/pazar/fuar-yukle";
 import { FirmaKarti } from "@/components/pazar/firma-karti";
-import { PazarTakip } from "@/components/pazar/takip";
+import { AksiyonCubugu, EkipPaneli, SurecHunisi, UlkeTablosu } from "@/components/pazar/takip";
 import { ListeYukle } from "@/components/pazar/liste-yukle";
-import { aksiyonlar, cevapVerenler, temasIndeksi } from "@/lib/pazar/panel";
+import { aksiyonlar, cevapVerenler, huni, temasIndeksi, ulkeOzeti } from "@/lib/pazar/panel";
+import { hacimMetni, pazarSekmesi, potansiyelFiltrele, VARSAYILAN_SEKME, type PazarSekme } from "@/lib/pazar/gorunum";
 import { useAuth } from "@/lib/auth-context";
 import {
   pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
@@ -36,10 +37,14 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  * yonetici paneli oldu (components/pazar/takip.tsx + lib/pazar/panel.ts). Ust kartlar: aksiyon bekleyen, son 30 gun
  * ulasilan firma, donus orani, siparissiz musteri. "Rehber listesi yukle" (Safak Bey listesi; components/pazar/liste-yukle.tsx);
  * Potansiyel tablosunda "Kaynak" (fuar donemleri / liste adi) + kaynak filtresi.
+ * 16.11.2026 gece (kullanici: Kontrol Merkezi standart mimarisi): sabit ust = dugmeler + 4 kart + Aksiyon Bekleyenler
+ * cubugu (yoksa gizli). 4 sekme, adreste ?sekme= (varsayilan operasyon; eski "takip" -> operasyon):
+ * Gunluk Operasyon (ekip gorevleri) | Musterilerimiz (+ son siparis, toplam hacim; "Siparissiz" karti bu sekmeyi
+ * siparissiz filtresiyle acar) | Potansiyel & Surec (huni ustte, asama tabloyu filtreler) | Pazar Analizi (tum ulkeler,
+ * arama + siralama). HESAPLAR AYNI (lib/pazar/panel.ts); filtre / siralama lib/pazar/gorunum.ts.
  */
 
 type MusteriFiltre = "siparissiz" | "aktif" | "hepsi";
-type Sekme = "takip" | "musteriler" | "potansiyel";
 const SUREC_ASAMA = new Set(["sorgulandi", "hatirlatma1", "hatirlatma2", "cevap", "teklif", "siparis"]);
 const OTUZ_GUN = 30 * 86400000;
 const ASAMA_KISA: Record<string, string> = {
@@ -53,13 +58,19 @@ function Rozet({ tur }: { tur: "aktif" | "siparissiz" | "potansiyel" }) {
   return <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: s.bg, color: s.c }} data-durum={tur}>{s.t}</span>;
 }
 
-function OzetKarti({ ikon, etiket, deger, alt, testId }: { ikon: React.ReactNode; etiket: string; deger: number | string; alt?: string; testId: string }) {
-  return (
-    <div className="rounded-xl border px-4 py-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>
+function OzetKarti({ ikon, etiket, deger, alt, testId, onClick, ipucu }: { ikon: React.ReactNode; etiket: string; deger: number | string; alt?: string; testId: string; onClick?: () => void; ipucu?: string }) {
+  const icerik = (
+    <>
       <div className="flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }}>{ikon}<span>{etiket}</span></div>
       <p className="text-2xl font-semibold text-white tabular-nums mt-1" data-deger>{deger}</p>
       {alt && <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{alt}</p>}
-    </div>
+    </>
+  );
+  // Tiklanabilir kart (16.11.2026: "Siparissiz musteri" -> Musterilerimiz, siparissiz filtresi)
+  return onClick ? (
+    <button type="button" onClick={onClick} title={ipucu} className="rounded-xl border px-4 py-3 text-left transition-colors hover:border-emerald-500/50 hover:bg-white/[0.02]" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>{icerik}</button>
+  ) : (
+    <div className="rounded-xl border px-4 py-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>{icerik}</div>
   );
 }
 
@@ -87,6 +98,7 @@ function YetkiliHucresi({ kisiler }: { kisiler: PazarKisi[] }) {
   );
 }
 
+const gunKisa = (t: string) => new Date(t.length === 10 ? `${t}T12:00:00` : t).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", timeZone: "Europe/Istanbul" });
 const tarihTR = (t: string | null) => (t ? new Date(t).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : "—");
 
 function PazarIcerik() {
@@ -104,7 +116,20 @@ function PazarIcerik() {
   const [ulke, setUlke] = useState("");
   const [goster, setGoster] = useState(SAYFA_BOYU);
   const [acikFirma, setAcikFirma] = useState<string | null>(null);
-  const [sekme, setSekme] = useState<Sekme>("takip");
+  const [sekme, setSekmeDurumu] = useState<PazarSekme>(VARSAYILAN_SEKME);
+  const [asama, setAsama] = useState<string | null>(null);
+  // Adresten ilk sekme (?sekme=ulkeler); degisince adres guncellenir (gecmis kirletilmez)
+  useEffect(() => {
+    try { const v = pazarSekmesi(new URLSearchParams(window.location.search).get("sekme")); if (v) setSekmeDurumu(v); } catch { /* yok */ }
+  }, []);
+  const setSekme = useCallback((v: PazarSekme) => {
+    setSekmeDurumu(v);
+    try {
+      const u = new URL(window.location.href);
+      if (v === VARSAYILAN_SEKME) u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
+      window.history.replaceState(window.history.state, "", u.toString());
+    } catch { /* yok */ }
+  }, []);
   const [takip, setTakip] = useState<TakipVerisi | null>(null);
   const [takipHata, setTakipHata] = useState<string | null>(null);
 
@@ -128,7 +153,7 @@ function PazarIcerik() {
   }, []);
 
   useEffect(() => { if (yetkili) yukle(); }, [yetkili, yukle]);
-  useEffect(() => { setGoster(SAYFA_BOYU); }, [arama, ulke, kaynakFiltre]);
+  useEffect(() => { setGoster(SAYFA_BOYU); }, [arama, ulke, kaynakFiltre, asama]);
 
   const kisiHarita = useMemo(() => {
     const m = new Map<string, PazarKisi[]>();
@@ -178,19 +203,16 @@ function PazarIcerik() {
   }, [potansiyeller]);
   const tumUlkeler = useMemo(() => Array.from(new Set(firmalar.map((f) => f.ulke).filter((u): u is string => !!u))).sort((a, b) => a.localeCompare(b, "tr")), [firmalar]);
 
-  const potansiyelListesi = useMemo(() => {
-    const q = arama.trim().toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
-    return potansiyeller
-      .filter((f) => !ulke || (ulke === "-" ? !f.ulke : f.ulke === ulke))
-      .filter((f) => !kaynakFiltre || (kaynakFiltre === "fuar" ? f.kaynak === "fuar" : f.kaynak === "liste" && f.kaynak_etiket === kaynakFiltre))
-      .filter((f) => {
-        if (!q) return true;
-        if (f.ad.toLocaleLowerCase("tr-TR").replace(/ı/g, "i").includes(q)) return true;
-        const qRakam = q.replace(/\D/g, "");
-        return (kisiHarita.get(f.id) || []).some((k) => (k.ad || "").toLocaleLowerCase("tr-TR").replace(/ı/g, "i").includes(q) || (k.eposta || "").includes(q) || (qRakam.length >= 4 && k.telefonlar.some((t) => t.includes(qRakam))));
-      })
-      .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
-  }, [potansiyeller, ulke, arama, kisiHarita, kaynakFiltre]);
+  // Surec hunisi + ulke ozeti (hesap lib/pazar/panel.ts; eskiden Takip sekmesinin icindeydi)
+  const epostali = useMemo(() => new Set((veri?.kisiler || []).filter((k) => k.eposta && k.eposta_gecerli).map((k) => k.firma_id)), [veri]);
+  const asamalar = useMemo(() => huni(firmalar, epostali), [firmalar, epostali]);
+  const ulkeSatirlari = useMemo(() => ulkeOzeti({ firmalar, temaslar: veri?.temaslar || [], gelenler: takip?.gelenler || [], epostali }), [firmalar, veri, takip, epostali]);
+  const seciliAsama = asama ? asamalar.find((a) => a.kod === asama) || null : null;
+  const asamaKumesi = useMemo(() => (seciliAsama ? new Set(seciliAsama.firmaIdleri) : null), [seciliAsama]);
+  const potansiyelListesi = useMemo(
+    // Asama secilince o asamadaki TUM firmalar (huni sayisi ile ayni; musteri olanlar rozetle); secili degilse potansiyeller
+    () => potansiyelFiltrele(asamaKumesi ? firmalar : potansiyeller, { ulke, kaynak: kaynakFiltre, arama, asama: asamaKumesi }, kisiHarita),
+    [asamaKumesi, firmalar, potansiyeller, ulke, kaynakFiltre, arama, kisiHarita]);
   const listeEtiketleri = useMemo(() => {
     const m = new Map<string, number>();
     for (const f of potansiyeller) if (f.kaynak === "liste" && f.kaynak_etiket) m.set(f.kaynak_etiket, (m.get(f.kaynak_etiket) || 0) + 1);
@@ -198,6 +220,7 @@ function PazarIcerik() {
   }, [potansiyeller]);
 
   const acik = acikFirma ? firmalar.find((f) => f.id === acikFirma) || null : null;
+  const bugunIso = takip?.bugun || new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
   // Ust kartlar (yonetici paneliyle ayni hesap: lib/pazar/panel.ts)
   const ozet = useMemo(() => {
     const temaslar = veri?.temaslar || [];
@@ -206,12 +229,12 @@ function PazarIcerik() {
     const ulasilan = new Set(temaslar.filter((t) => ["sorgulama", "hatirlatma1", "hatirlatma2"].includes(t.adim) && Date.parse(t.olusturma) >= sinir).map((t) => t.firma_id));
     const cevap = takip ? Array.from(cevapVerenler(takip.gelenler, ilkUlasma)).filter((id) => ulasilan.has(id)).length : 0;
     const aksiyon = takip ? aksiyonlar({ bugun: takip.bugun, firmalar, temaslar, gelenler: takip.gelenler, gorevler: takip.gorevler }) : [];
-    return { ulasilan: ulasilan.size, cevap, aksiyon: aksiyon.length, aksiyonCevap: aksiyon.filter((a) => a.tur === "cevap" || a.tur === "oneri").length };
+    return { ulasilan: ulasilan.size, cevap, aksiyonListesi: aksiyon, aksiyon: aksiyon.length, aksiyonCevap: aksiyon.filter((a) => a.tur === "cevap" || a.tur === "oneri").length };
   }, [veri, takip, firmalar]);
   const ulkeyeGit = useCallback((u: string) => {
-    if (u === "-" || potansiyeller.some((f) => f.ulke === u)) { setUlke(u); setArama(""); setKaynakFiltre(""); setSekme("potansiyel"); }
+    if (u === "-" || potansiyeller.some((f) => f.ulke === u)) { setUlke(u); setArama(""); setKaynakFiltre(""); setAsama(null); setSekme("potansiyel"); }
     else { setMusteriFiltre("hepsi"); setSekme("musteriler"); }
-  }, [potansiyeller]);
+  }, [potansiyeller, setSekme]);
 
   if (!yetkili) return null;
 
@@ -255,11 +278,24 @@ function PazarIcerik() {
             <OzetKarti testId="ozet-aksiyon" ikon={<BellRing size={14} />} etiket="Aksiyon bekleyen" deger={takip ? ozet.aksiyon : "—"} alt={takip ? `${ozet.aksiyonCevap} cevap / sinyal` : "takip okunamadı"} />
             <OzetKarti testId="ozet-ulasilan" ikon={<Send size={14} />} etiket="Ulaşılan firma" deger={ozet.ulasilan} alt="son 30 gün · mail / WhatsApp" />
             <OzetKarti testId="ozet-donus" ikon={<Mail size={14} />} etiket="Dönüş" deger={takip ? ozet.cevap : "—"} alt={ozet.ulasilan ? `dönüş oranı %${Math.round((ozet.cevap / ozet.ulasilan) * 100)}` : "henüz ulaşılan yok"} />
-            <OzetKarti testId="ozet-siparissiz" ikon={<Building2 size={14} />} etiket="Siparişsiz müşteri" deger={siparissizSay} alt={`${aktifSay} aktif · ${musteriler.length} müşteri`} />
+            <OzetKarti testId="ozet-siparissiz" ikon={<Building2 size={14} />} etiket="Siparişsiz müşteri" deger={siparissizSay} alt={`${aktifSay} aktif · ${musteriler.length} müşteri`}
+              ipucu="Müşterilerimiz sekmesini siparişsiz filtresiyle aç" onClick={() => { setMusteriFiltre("siparissiz"); setSekme("musteriler"); }} />
           </div>
 
+          {/* Sabit ust: aksiyon bekleyenler (yoksa gizli; acilir-kapanir) */}
+          {takip ? (
+            <AksiyonCubugu aksiyon={ozet.aksiyonListesi} firmalar={firmalar} ekip={takip.ekip} onFirma={setAcikFirma} />
+          ) : (
+            <div className="rounded-xl border px-4 py-2.5 mb-4 text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: "#FCA5A5" }} data-testid="takip-hata">{takipHata || "Takip bilgisi okunamadı."}</div>
+          )}
+
           <div className="flex w-full sm:w-auto sm:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5 mb-4" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="pazar-sekmeler">
-            {([["takip", "Takip", <Activity key="i" size={14} />], ["musteriler", `Müşterilerimiz (${musteriler.length})`, <Building2 key="i" size={14} />], ["potansiyel", `Potansiyel (${potansiyeller.length})`, <Users key="i" size={14} />]] as [Sekme, string, React.ReactNode][]).map(([k, etiket, ikon]) => (
+            {([
+              ["operasyon", "Günlük Operasyon", <Activity key="i" size={14} />],
+              ["musteriler", `Müşterilerimiz (${musteriler.length})`, <Building2 key="i" size={14} />],
+              ["potansiyel", `Potansiyel & Süreç (${potansiyeller.length})`, <Users key="i" size={14} />],
+              ["ulkeler", `Pazar Analizi (${ulkeSatirlari.filter((u) => u.ulke !== "—").length} ülke)`, <Globe2 key="i" size={14} />],
+            ] as [PazarSekme, string, React.ReactNode][]).map(([k, etiket, ikon]) => (
               <button key={k} type="button" role="tab" aria-selected={sekme === k} onClick={() => setSekme(k)} data-sekme={k}
                 className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 sm:px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
                 style={sekme === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
@@ -268,11 +304,13 @@ function PazarIcerik() {
             ))}
           </div>
 
-          {sekme === "takip" && (takip ? (
-            <PazarTakip takip={takip} firmalar={firmalar} kisiler={veri.kisiler} temaslar={veri.temaslar || []} onFirma={setAcikFirma} onUlke={ulkeyeGit} />
-          ) : (
-            <div className="rounded-xl border p-4 text-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: "#FCA5A5" }} data-testid="takip-hata">{takipHata || "Takip bilgisi okunamadı."}</div>
-          ))}
+          {/* ---- Gunluk Operasyon ---- */}
+          {sekme === "operasyon" && takip && (
+            <EkipPaneli takip={takip} firmalar={firmalar} temaslar={veri.temaslar || []} onFirma={setAcikFirma} />
+          )}
+
+          {/* ---- Pazar Analizi (ulkeler) ---- */}
+          {sekme === "ulkeler" && <UlkeTablosu ulkeler={ulkeSatirlari} onUlke={ulkeyeGit} />}
 
           {/* ---- Musterilerimiz ---- */}
           {sekme === "musteriler" && <section className="rounded-xl border mb-6" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="musterilerimiz">
@@ -302,6 +340,8 @@ function PazarIcerik() {
                       <th className="text-left font-medium px-3 py-2">Firma</th>
                       <th className="text-left font-medium px-3 py-2 hidden sm:table-cell">Ülke</th>
                       <th className="text-left font-medium px-3 py-2">Sipariş</th>
+                      <th className="text-left font-medium px-3 py-2 whitespace-nowrap">Son sipariş</th>
+                      <th className="text-right font-medium px-3 py-2 whitespace-nowrap">Toplam hacim</th>
                       <th className="text-left font-medium px-3 py-2 hidden md:table-cell">Yetkili</th>
                     </tr>
                   </thead>
@@ -326,9 +366,14 @@ function PazarIcerik() {
                               </div>
                             ) : (
                               <p style={{ color: "#FCD34D" }}>
-                                {d?.sonSiparis ? <>Son sipariş {tarihTR(d.sonSiparis)} · <b>{d.siparissizGun} gün</b> önce</> : "Sipariş kaydı yok"}
+                                {d?.sonSiparis ? <>Açık sipariş yok · <b>{d.siparissizGun} gündür</b></> : "Sipariş kaydı yok"}
                               </p>
                             )}
+                          </td>
+                          <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: "#C9D1DC" }} data-son-siparis>{d?.sonSiparis ? tarihTR(d.sonSiparis) : "—"}</td>
+                          <td className="px-3 py-2 text-xs text-right whitespace-nowrap tabular-nums" data-toplam-hacim title={d ? `${d.toplamDosya} dosya · ${d.toplamKonteyner} konteyner` : undefined}>
+                            <span className="text-white font-medium">{d ? hacimMetni(d.hacim) : "—"}</span>
+                            {d && d.toplamDosya > 0 && <p className="text-[10.5px]" style={{ color: TEXT_MUTED }}>{d.toplamDosya} dosya · {d.toplamKonteyner} kont.</p>}
                           </td>
                           <td className="px-3 py-2 hidden md:table-cell min-w-[200px]"><YetkiliHucresi kisiler={kisiHarita.get(f.id) || []} /></td>
                         </tr>
@@ -340,13 +385,19 @@ function PazarIcerik() {
             )}
           </section>}
 
-          {/* ---- Potansiyel musteriler (fuar) ---- */}
-          {sekme === "potansiyel" && <section className="rounded-xl border" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="potansiyeller">
+          {/* ---- Potansiyel & Surec: huni ustte, secili asama tabloyu filtreler ---- */}
+          {sekme === "potansiyel" && <SurecHunisi asamalar={asamalar} secili={asama} onSec={setAsama} />}
+          {sekme === "potansiyel" && <section className="rounded-xl border mt-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="potansiyeller">
             <div className="flex flex-wrap items-center gap-2 p-3 border-b" style={{ borderColor: CARD_BORDER }}>
               <div className="flex items-center gap-2 mr-2">
                 <Users size={16} style={{ color: "#93C5FD" }} />
-                <h2 className="text-sm font-semibold text-white">Potansiyel müşteriler</h2>
-                <span className="text-xs" style={{ color: TEXT_MUTED }}>{potansiyeller.length} firma</span>
+                <h2 className="text-sm font-semibold text-white">{seciliAsama ? `Süreç: ${seciliAsama.ad}` : "Potansiyel müşteriler"}</h2>
+                <span className="text-xs" style={{ color: TEXT_MUTED }}>{seciliAsama ? `${seciliAsama.adet} firma` : `${potansiyeller.length} firma`}</span>
+                {seciliAsama && (
+                  <button type="button" onClick={() => setAsama(null)} className="inline-flex h-6 items-center gap-1 px-2 rounded-full text-[11px]" style={{ backgroundColor: "rgba(16,185,129,0.14)", color: "#6EE7B7" }} data-asama-temizle>
+                    {seciliAsama.ad} ✕
+                  </button>
+                )}
               </div>
               <div className="relative flex-1 min-w-[180px]">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
@@ -371,7 +422,7 @@ function PazarIcerik() {
 
             {potansiyelListesi.length === 0 ? (
               <div className="p-4">
-                <EmptyState icon={<Store size={36} />} title={potansiyeller.length ? "Eşleşen firma yok" : "Henüz potansiyel müşteri yok"}
+                <EmptyState icon={<Store size={36} />} title={seciliAsama ? "Bu aşamada eşleşen firma yok" : potansiyeller.length ? "Eşleşen firma yok" : "Henüz potansiyel müşteri yok"}
                   description={potansiyeller.length ? "Aramayı veya filtreyi değiştirin." : "Fuar ya da rehber listesini yükleyerek başlayın."} />
               </div>
             ) : (
@@ -382,6 +433,7 @@ function PazarIcerik() {
                       <tr className="text-xs">
                         <th className="text-left font-medium px-3 py-2">Firma</th>
                         <th className="text-left font-medium px-3 py-2">Ülke</th>
+                        <th className="text-left font-medium px-3 py-2 whitespace-nowrap">Süreç</th>
                         <th className="text-left font-medium px-3 py-2 hidden md:table-cell">Yetkili</th>
                         <th className="text-left font-medium px-3 py-2 hidden lg:table-cell">Kaynak</th>
                       </tr>
@@ -393,8 +445,19 @@ function PazarIcerik() {
                           <tr key={f.id} className="border-t align-top cursor-pointer hover:bg-white/[0.02]" style={{ borderColor: CARD_BORDER }} data-firma={f.ad} onClick={() => setAcikFirma(f.id)}>
                             <td className="px-3 py-2">
                               <button type="button" className="text-left text-white font-medium leading-snug hover:underline" onClick={(e) => { e.stopPropagation(); setAcikFirma(f.id); }}>{f.ad}</button>
+                              {f.durum === "musteri" && <div className="mt-1"><Rozet tur={durumlar.get(f.id)?.aktif ? "aktif" : "siparissiz"} /></div>}
                             </td>
                             <td className="px-3 py-2 whitespace-nowrap"><UlkeHucresi ulke={f.ulke} kaynak={f.ulke_kaynagi} /></td>
+                            <td className="px-3 py-2 text-xs whitespace-nowrap" data-surec-hucre>
+                              <p style={{ color: SUREC_ASAMA.has(f.crm_asama) ? "#93C5FD" : f.crm_asama === "yeni" ? TEXT_MUTED : "#C9D1DC" }}>{f.crm_asama === "yeni" ? "Yeni" : ASAMA_KISA[f.crm_asama]}</p>
+                              {(f.son_temas || f.sonraki_adim || f.bekleme_bitis) && (
+                                <p className="text-[10.5px]" style={{ color: TEXT_MUTED }}>
+                                  {f.son_temas ? `son ${gunKisa(f.son_temas)}` : ""}
+                                  {f.sonraki_adim ? <span style={{ color: f.sonraki_adim < bugunIso ? "#FCA5A5" : undefined }}>{f.son_temas ? " · " : ""}sonraki {gunKisa(f.sonraki_adim)}</span>
+                                    : f.bekleme_bitis ? `${f.son_temas ? " · " : ""}${gunKisa(f.bekleme_bitis)} sonra yeniden` : ""}
+                                </p>
+                              )}
+                            </td>
                             <td className="px-3 py-2 hidden md:table-cell min-w-[220px]"><YetkiliHucresi kisiler={kisiHarita.get(f.id) || []} /></td>
                             <td className="px-3 py-2 hidden lg:table-cell">
                               <div className="flex flex-wrap gap-1">

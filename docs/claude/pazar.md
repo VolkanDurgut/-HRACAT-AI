@@ -248,3 +248,17 @@ Kod:
   tablosunun yerine) 4) Ülkelere göre pazar (müşteri / potansiyel / e-postalı / ulaşılan / dönüş); ülkeye tıklayınca Potansiyel o ülkeyle.
   Üst kartlar: Aksiyon bekleyen · Ulaşılan firma (30 gün) · Dönüş · Siparişsiz müşteri. `pazar_takip` 30 gün okunur.
 - Test: `tests/pazar-liste.test.ts` (kurgusal veri).
+
+## 3.10 Sayfa düzeni: sabit üst + 4 sekme (16.11.2026 gece, kullanıcı onayı)
+- Kontrol Merkezi ile aynı mimari. HESAPLAR AYNI (lib/pazar/panel.ts, lib/pazar/musteri.ts); görev işleme, mail /
+  WhatsApp, firma kartı, liste / fuar yükleme bileşenlerine dokunulmadı.
+- Sabit üst: düğmeler + 4 kart ("Siparişsiz müşteri" tıklanır → Müşterilerimiz, siparişsiz filtresi) + `AksiyonCubugu`
+  (aksiyon yoksa gizli; açık/kapalı `localStorage["pazar:aksiyon-acik"]`, varsayılan açık).
+- Sekmeler `?sekme=` (`lib/pazar/gorunum.ts` `pazarSekmesi`; varsayılan `operasyon` adreste yok; eski `takip` → operasyon):
+  `operasyon` = `EkipPaneli` (kart başlığında Bugün x/y · 30 gün ulaşılan · Teklif/Sipariş; 6'lı mini ölçüler kaldırıldı,
+  işlenmeyen görev uyarısı durur) | `musteriler` (+ Son sipariş, Toplam hacim = dosya `toplam_tutar` para birimine göre,
+  `dosyaHacmi`) | `potansiyel` = `SurecHunisi` üstte; aşama seçilince tablo `potansiyelFiltrele(..., asama)` ile O AŞAMADAKİ
+  TÜM firmalar (huni sayısıyla aynı; müşteriler rozetli), + "Süreç" sütunu (aşama, son temas, sonraki adım) | `ulkeler` =
+  `UlkeTablosu` (tüm ülkeler, arama + başlıkla sıralama `ulkeTablosu`; "Ülkesi bilinmeyen" hep en altta).
+- DB: migration `20261116240000_pazar_musteri_hacim.sql` — `pazar_musteri_siparisleri()` dosya satırlarına yalnız
+  `toplam_tutar`, `para_birimi` (deneme: eski alanlar md5 aynı, 42/42 dosya). Test `tests/pazar-gorunum.test.ts`.

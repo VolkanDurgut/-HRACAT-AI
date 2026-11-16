@@ -145,6 +145,9 @@ export type MusteriDosyasi = {
   urun_detaylari: unknown;
   toplam_konteyner: number | null;
   proforma_no: string | null;
+  /** 16.11.2026 (migration 20261116240000): Musterilerimiz "Toplam hacim" (Kontrol Merkezi ile ayni kaynak) */
+  toplam_tutar?: number | string | null;
+  para_birimi?: string | null;
 };
 export type MusteriAnaSiparisi = {
   id: string;

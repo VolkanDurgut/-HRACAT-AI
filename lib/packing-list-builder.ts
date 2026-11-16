@@ -1,7 +1,7 @@
-import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatDateTR, detayliAmbalajCokluSegmentli } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
-import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { gercekMarkalar, markayaUyarla, urunTanimiTekil } from "@/lib/urun-tanimi";
 import { kalemleriOku } from "@/lib/konteyner-icerik";
 
 /** HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi). */
@@ -311,7 +311,10 @@ const PACKING_LIST_TEMPLATE = `<!DOCTYPE html>
 
 function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { rows: string; totalPieces: number; totalNett: number; totalGross: number } {
   // Ayni urun tek sefer (50 KG + 25 KG ayni urun -> tek ad; lib/urun-tanimi.ts)
-  const varsayilanUrunAdi = safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri), "-");
+  // 16.11.2026: aciklamadaki "(X BRAND)" gercek markaya uyarlanir (dosya geneli tek marka / konteynerin kendi markasi)
+  const markalar = gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka));
+  const tanimTekil = urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri);
+  const varsayilanUrunAdi = safe(markayaUyarla(tanimTekil, markalar), "-");
   const varsayilanMarka = safe(dosya.marka, "-");
   const urunler = (dosya.urun_detaylari as any[]) || [];
 
@@ -319,13 +322,13 @@ function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { row
   // konteyner setinde). Her konteyner KENDI yukledigi markaya gore dogru urun
   // aciklamasini gostermeli - hepsine tek bir sabit deger basilmamali.
   const konteynerUrunAciklamasi = (konteynerMarka: string | null | undefined): string => {
-    if (!konteynerMarka || urunler.length === 0) return varsayilanUrunAdi;
+    if (!konteynerMarka || urunler.length === 0) return konteynerMarka ? safe(markayaUyarla(tanimTekil, [String(konteynerMarka).toLocaleUpperCase("en-US")]), "-") : varsayilanUrunAdi;
     const eslesen = urunler.find((u) => {
       const ad = String(u.urun_adi || u.description || "").toUpperCase();
       return ad.includes(String(konteynerMarka).toUpperCase());
     });
     const urunAdi = eslesen?.urun_adi || eslesen?.description;
-    return urunAdi ? escapeHtml(String(urunAdi)) : varsayilanUrunAdi;
+    return urunAdi ? escapeHtml(String(urunAdi)) : safe(markayaUyarla(tanimTekil, [String(konteynerMarka).toLocaleUpperCase("en-US")]), "-");
   };
 
   let totalPieces = 0;
@@ -361,7 +364,7 @@ function buildKonteynerSatirlari(dosya: Dosya, konteynerler: Konteyner[]): { row
           const rs = n > 1 ? ` rowspan="${n}"` : "";
           return `<tr class="kont-satir${n > 1 ? " kont-kalem" : ""}">
         ${ilk ? `<td style="text-align:center;"${rs}>${idx + 1}</td>` : ""}
-        <td>${escapeHtml(x.urun)}</td>
+        <td>${escapeHtml(markayaUyarla(x.urun, (x.marka || (k as any).marka) ? [String(x.marka || (k as any).marka).toLocaleUpperCase("en-US")] : markalar) || "")}</td>
         <td style="text-align:center;">${marka}</td>
         ${ilk ? `<td class="num"${rs}>${safe(k.konteyner_no)}</td>
         <td class="num"${rs}>${safe(k.muhur_no)}</td>` : ""}
@@ -429,8 +432,9 @@ export function buildPackingListHtml(
     URETIM_TARIHI: dosya.uretim_tarihi ? escapeHtml(formatDateTR(dosya.uretim_tarihi)) : safe(null),
     SON_KULLANIM_TARIHI: dosya.son_kullanim_tarihi ? escapeHtml(formatDateTR(dosya.son_kullanim_tarihi)) : safe(null),
     DETAYLI_AMBALAJ: (() => {
-      const raw = dosya.detayli_ambalaj || dosya.ambalaj;
-      if (!raw) return safe(null);
+      const ham = dosya.detayli_ambalaj || dosya.ambalaj;
+      if (!ham) return safe(null);
+      const raw = markayaUyarla(ham, gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka))) || ham;
       // Coklu ambalaj/urun segmenti iceren metinlerde toplam kap adedini
       // metnin basina yapistirmak YANLIS sonuc uretir - bkz.
       // lib/invoice-builder.ts buildDetayliAmbalaj (kok neden incelemesi:

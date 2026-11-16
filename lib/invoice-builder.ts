@@ -1,7 +1,8 @@
-import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, limanAdiAyikla, detayliAmbalajCokluSegmentli, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, LOGO_UNEX } from "@/lib/imzalar";
 import { teslimSekliLimani } from "@/lib/teslim-sekli";
+import { gercekMarkalar, markayaUyarla } from "@/lib/urun-tanimi";
 
 /**
  * HTML ozel karakterlerini kacisliyor (XSS / goruntu bozulmasi onlemi).
@@ -214,14 +215,15 @@ const COMMERCIAL_INVOICE_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function buildUrunSatirlari(dosya: Dosya): string {
+// 16.11.2026: aciklamadaki "(X BRAND)" dosyanin tek gercek markasina uyarlanir (lib/urun-tanimi.ts markayaUyarla)
+function buildUrunSatirlari(dosya: Dosya, markalar: string[] = []): string {
   const urunler = (dosya.urun_detaylari as any[]) || [];
   if (urunler.length === 0) {
     return `<tr><td colspan="5" style="text-align:center; color:#999;">Urun bilgisi bulunmuyor</td></tr>`;
   }
   return urunler
     .map((u: any) => {
-      const ad = safe(u.urun_adi || u.description, "-");
+      const ad = safe(markayaUyarla(u.urun_adi || u.description, markalar), "-");
       const ambalajBoyutu = safe(u.ambalaj_boyutu || u.packaging_size, "-");
       const miktar = u.miktar_mts || u.quantity || 0;
       const birimFiyat = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
@@ -276,8 +278,9 @@ function buildMarkaListesi(dosya: Dosya, konteynerler: Konteyner[]): string {
 }
 
 function buildDetayliAmbalaj(dosya: Dosya, konteynerler: Konteyner[]): string {
-  const raw = dosya.detayli_ambalaj || dosya.ambalaj;
-  if (!raw) return safe(null);
+  const ham = dosya.detayli_ambalaj || dosya.ambalaj;
+  if (!ham) return safe(null);
+  const raw = markayaUyarla(ham, gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka))) || ham;
   // Coklu ambalaj/urun segmenti iceren metinlerde (ör. "2.000 PIECES 25 KG...,
   // 1.000 PIECES OF 50 KG...") konteynerlerin TOPLAM kap adedini metnin
   // basina yapistirmak YANLIS sonuc uretir - sistemde hangi konteynerin hangi
@@ -491,7 +494,7 @@ export function buildCommercialInvoiceHtml(
   for (const [key, value] of Object.entries(replacements)) {
     html = html.split(`__${key}__`).join(value);
   }
-  html = html.replace("__URUN_SATIRLARI__", buildUrunSatirlari(dosya));
+  html = html.replace("__URUN_SATIRLARI__", buildUrunSatirlari(dosya, gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka))));
   html = html.replace("__ECTN_SATIRLARI__", buildEctnSatirlari(dosya, rezervasyonlar));
 
   return html;

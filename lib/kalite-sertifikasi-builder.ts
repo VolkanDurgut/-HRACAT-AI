@@ -28,7 +28,7 @@
 import { Dosya, Rezervasyon, Konteyner, KaliteParametresi, KaliteSertifikasiAyari } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, IMZA_CIGDEM_KALITE, LOGO_UNEX } from "@/lib/imzalar";
-import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { gercekMarkalar, markayaUyarla, urunTanimiTekil } from "@/lib/urun-tanimi";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -281,7 +281,7 @@ export function buildKaliteSertifikasiHtml(
                              ? escapeHtml(formatDateTR(dosya.fatura_tarihi))
                              : safe(null),
     REPORT_NR:             safe(dosya.proforma_no),
-    DESCRIPTION_OF_GOODS:  safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri)),
+    DESCRIPTION_OF_GOODS:  safe(markayaUyarla(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri), gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka)))),
     CONSIGNEE:             safe(dosya.consignee),
     NOTIFY:                escapeHtml(
                              (() => {

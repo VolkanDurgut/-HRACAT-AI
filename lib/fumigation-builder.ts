@@ -14,7 +14,7 @@
 import { Dosya, Rezervasyon, Konteyner, FumigationAyari } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { IMZA_HARUN, IMZA_CIGDEM, LOGO_UNEX } from "@/lib/imzalar";
-import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { gercekMarkalar, markayaUyarla, urunTanimiTekil } from "@/lib/urun-tanimi";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -290,7 +290,7 @@ export function buildFumigationHtml(
     VOYAGE_NUMBER:         safe(rez?.sefer_no),
     PORT_OF_LOADING:       safe(rez?.yuklenme_limani || dosya.yuklenme_limani),
     PORT_OF_DISCHARGE:     safe(dosya.varis_limani),
-    DESCRIPTION_OF_GOODS:  safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri) || dosya.ambalaj),
+    DESCRIPTION_OF_GOODS:  safe(markayaUyarla(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri), gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka))) || dosya.ambalaj),
     NET_WEIGHT:            buildNetAgirlikToplam(konteynerler),
     GROSS_WEIGHT:          buildBrutAgirlikToplam(konteynerler),
     TEMPERATURE:           escapeHtml(sicaklik),

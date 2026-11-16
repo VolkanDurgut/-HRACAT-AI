@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
@@ -10,6 +10,7 @@ import { bayrakPng } from "@/lib/bayraklar";
 import { faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
+import { gercekMarkalar, markayaUyarla } from "@/lib/urun-tanimi";
 
 const LACIVERT: [number, number, number] = [30, 42, 74];
 const GRI: [number, number, number] = [110, 110, 110];
@@ -152,7 +153,7 @@ function ciz(
     ["Satici Firma", dosya.satici_firma],
     ["Marka", dosya.marka],
     ["Proforma No", dosya.proforma_no],
-    ["Ambalaj", dosya.detayli_ambalaj || dosya.ambalaj],
+    ["Ambalaj", markayaUyarla(dosya.detayli_ambalaj || dosya.ambalaj, gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka)))],
     // Muhasebe talebi: Net/Brut agirlik, konteyner tablosuna girmeden de tek
     // bakista gorulebilsin diye burada ayrica ozetlenir.
     ["Net Agirlik", toplamNetKg ? `${toplamNetKg.toLocaleString("tr-TR")} KG` : null],
@@ -212,7 +213,7 @@ function ciz(
     return m ? m.toLocaleString("tr-TR", { maximumFractionDigits: 3 }) : "-";
   };
   const urunRows = urunler.map((u, i) => {
-    const ad = u.urun_adi || u.description || "Urun";
+    const ad = markayaUyarla(u.urun_adi || u.description, gercekMarkalar(dosya.marka, (konteynerler || []).map((k) => (k as any).marka))) || "Urun";
     const ambalajBoyutu = u.ambalaj_boyutu || u.packaging_size || "-";
     const proformaBirim = parseFloat(String(u.birim_fiyat_usd || u.unit_price || 0));
     // FOB teslimde proforma fiyati FOB'dur: FOB sutununa yazilir, CIF bos kalir.

@@ -1359,3 +1359,13 @@ Kullanıcı (IHR-2026-0112 taslakları): COO'da "sadece WHEAT FLOUR", Phyto'da "
 `lib/konsimento/talimat.ts` `resmiMalAdiEn(ham_veri)` = konşimento talimatındaki İngilizce mal adı (dosyaya özel, Konşimento
 talimatı > "Mal tanımı (EN) · BL, Menşe, Phyto") yoksa `WHEAT FLOUR`. Ambalaj / NET-GROSS / LOT / REF satırları aynı.
 Fatura, çeki listesi, Health, Fumigation, Quality eskisi gibi ürün tanımını yazar. Test: `tests/resmi-mal-adi.test.ts`.
+
+## Belgelerde marka uyumu (16.11.2026)
+Kullanıcı (IHR-2026-0113): "Çuval/marka bilgisi LAILA; packing ve invoice gibi belgelerde 'PREMIUM QUALITY WHEAT FLOUR
+(BLACKSTALLION BRAND)' ve 'PP BAGS (BLACKSTALLION BRAND' yazıyor." Neden: ürün açıklaması proformadan gelir ve markayı
+parantezle taşır; sevkiyatta marka değişince eski marka belgelere aynen basılıyordu.
+Kural (`lib/urun-tanimi.ts` `gercekMarkalar` + `markayaUyarla`; VERİ DEĞİŞMEZ, yalnız belgede): gerçek marka = konteyner
+markaları (yoksa dosya.marka; "UNEX (KRAFT)" → UNEX). Gerçek marka TEK ve metinde TEK bir "(X BRAND)" varsa ve X farklıysa
+→ "(GERÇEK BRAND)". Birden fazla marka ya da birden fazla parantez: belirsiz, dokunulmaz. Uygulanan yerler: Commercial
+Invoice (ürün satırları + PACKAGING), Packing List (açıklama sütunu konteynerin kendi markasıyla + PACKAGING), Quality,
+Fumigation, Fatura Talimatı PDF (ürün adı + ambalaj). Test: `tests/marka-uyumu.test.ts`.

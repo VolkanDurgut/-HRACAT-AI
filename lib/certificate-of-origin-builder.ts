@@ -19,17 +19,18 @@
  * 2. Alıcı        = dosya.consignee; TO ORDER ise NOTIFY (lib/tarim-alici.ts)
  * 3. Menşe Ülkesi = "Türkiye" - ZATEN gorselin icinde basili, ayrica yazilmaz
  * 4. Taşıma       = "BY VESSEL" (sabit)
- * 6. Esya tanimi  = dosya.urun_tanimi (ayni urun tek sefer, lib/urun-tanimi.ts) + ambalaj + NET/GROSS (konteyner toplami)
+ * 6. Esya tanimi  = resmi mal adi (16.11.2026: "WHEAT FLOUR"; ticari ad / spesifikasyon / marka yazilmaz,
+ *                   lib/konsimento/talimat.ts resmiMalAdiEn) + ambalaj + NET/GROSS (konteyner toplami)
  *                   + LOT NR (dosya.lot_no) + REF NR (rezervasyon booking_no)
  * 7. Miktar       = Toplam GROSS agirlik (KGS)
  * 1. İhracatçı ve "1" sira no, gorselde zaten YOK/VAR - Ihracatci bos oldugu
  *    icin yaziliyor, "1" zaten gorselde basili oldugu icin yazilmiyor.
  */
 
-import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { COO_BACKGROUND_BASE64 } from "@/lib/images/coo-background-base64";
 import { tarimBelgesiAlicisi } from "@/lib/tarim-alici";
-import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { resmiMalAdiEn } from "@/lib/konsimento/talimat";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -155,7 +156,7 @@ export function buildCertificateOfOriginHtml(
   const replacements: Record<string, string> = {
     CONSIGNOR:    escapeHtml(`${COMPANY_NAME}\n${COMPANY_ADDRESS}`),
     CONSIGNEE:    safe(tarimBelgesiAlicisi(dosya)),
-    URUN_TANIMI:  safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri)),
+    URUN_TANIMI:  escapeHtml(resmiMalAdiEn(dosya.ham_veri)),
     AMBALAJ:      safe(dosya.detayli_ambalaj || dosya.ambalaj),
     NET:          buildNetAgirlikToplam(konteynerler),
     GROSS:        buildBrutAgirlikToplam(konteynerler),

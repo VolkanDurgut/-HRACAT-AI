@@ -115,6 +115,16 @@ export function talimatAyari(hamVeri: Record<string, unknown> | null | undefined
   return a && typeof a === "object" && !Array.isArray(a) ? (a as TalimatAyari) : {};
 }
 
+/**
+ * Resmi belgelerde (Mense Sahadetnamesi, Phytosanitary) mal adi (16.11.2026). Kullanici: "4 numarali evrakta (COO)
+ * sadece WHEAT FLOUR, 5 numarali evrakta (Phyto) sadece WHEAT FLOUR /Triticum sp. yazmali" -> ticari ad, kullanim
+ * amaci ("FOR BISCUIT"), spesifikasyon (nem / protein...) ve marka YAZILMAZ; konsimento talimatindaki Ingilizce mal adi
+ * (dosyaya ozel degistirilebilir: Konsimento talimati > Mal tanimi) ya da varsayilan WHEAT FLOUR. Tek kaynak.
+ */
+export function resmiMalAdiEn(hamVeri: Record<string, unknown> | null | undefined): string {
+  return buyuk(temiz(talimatAyari(hamVeri).mal_en)) || VARSAYILAN_MAL_EN;
+}
+
 export function dosyaNotifyListesi(hamVeri: Record<string, unknown> | null | undefined): string[] {
   const n = (hamVeri as { notify?: unknown } | null)?.notify;
   return Array.isArray(n) ? n.map((x) => temiz(x)).filter(Boolean) : [];

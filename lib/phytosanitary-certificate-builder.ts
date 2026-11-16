@@ -15,17 +15,18 @@
  * 5. Place of origin   = "TÜRKİYE" (sabit)
  * 6. Means of conveyance = "BY SHIP / CONTAINERS <adet>" (konteyner sayisi eklenir)
  * 7. Point of entry    = Gemi Adi + " / " + Sefer No
- * 8. Esya tanimi       = dosya.urun_tanimi (ayni urun tek sefer) + " /Triticum sp." (sabit botanik ek)
+ * 8. Esya tanimi       = resmi mal adi (16.11.2026: "WHEAT FLOUR"; ticari ad / spesifikasyon / marka yazilmaz,
+ *                        lib/konsimento/talimat.ts resmiMalAdiEn) + " /Triticum sp." (sabit botanik ek)
  *                        + ambalaj + LOT NR (dosya.lot_no) + REF NR (rezervasyon booking_no)
  * 9. Miktar            = Toplam GROSS agirlik (konteyner toplami)
  * 11-17 (NONE) ve 18 (imza/muhur alani) = form gorselinin kendisinde zaten
  *   basili / bos - biz hic dokunmuyoruz (Bakanligin kendi degerlendirme alani).
  */
 
-import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
+import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { PHYTO_BACKGROUND_BASE64 } from "@/lib/images/phyto-background-base64";
 import { tarimBelgesiAlicisi } from "@/lib/tarim-alici";
-import { urunTanimiTekil } from "@/lib/urun-tanimi";
+import { resmiMalAdiEn } from "@/lib/konsimento/talimat";
 
 function escapeHtml(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
@@ -180,7 +181,7 @@ export function buildPhytosanitaryCertificateHtml(
     KONTEYNER_ADEDI: safe(konteynerler.length || null, ""),
     GEMI_ADI:        safe(rez?.gemi_adi),
     SEFER_NO:        safe(rez?.sefer_no),
-    URUN_TANIMI:     safe(urunTanimiTekil(dosya.urun_tanimi, dosya.ham_veri)),
+    URUN_TANIMI:     escapeHtml(resmiMalAdiEn(dosya.ham_veri)),
     AMBALAJ:         safe(dosya.detayli_ambalaj || dosya.ambalaj),
     LOT_NR:          safe(dosya.lot_no),
     REF_NR:          safe(rez?.booking_no),

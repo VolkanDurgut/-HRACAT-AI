@@ -1352,3 +1352,10 @@ Kullanıcı: "Sevkiyat haritası en doğru hali ile güncellenmeli ve şu an sev
 - Çıkış: Asyaport Tekirdağ/Barbaros'ta (40°54'N 27°28'E) — artık İstanbul'dan çizilmez (`lib/liman-koordinat.ts` CIKISLAR,
   `lib/deniz-rotasi.ts` "Tekirdağ" → MARMARA_G). Mardaş Ambarlı'dadır (İstanbul). Varış limanlarının koordinatları canlı
   verideki 12 limanda kontrol edildi (hepsi birebir, yaklaşık konum yok). Test: `tests/sevkiyat-haritasi.test.ts`.
+
+## Menşe Şahadetnamesi + Phytosanitary: yalnız resmi mal adı (16.11.2026)
+Kullanıcı (IHR-2026-0112 taslakları): COO'da "sadece WHEAT FLOUR", Phyto'da "sadece WHEAT FLOUR /Triticum sp." yazmalı
+(ticari ad, "FOR BISCUIT / FOR WAFER", nem / protein spesifikasyonu, marka yazılmaz). Genel kural: iki belgenin eşya tanımı
+`lib/konsimento/talimat.ts` `resmiMalAdiEn(ham_veri)` = konşimento talimatındaki İngilizce mal adı (dosyaya özel, Konşimento
+talimatı > "Mal tanımı (EN) · BL, Menşe, Phyto") yoksa `WHEAT FLOUR`. Ambalaj / NET-GROSS / LOT / REF satırları aynı.
+Fatura, çeki listesi, Health, Fumigation, Quality eskisi gibi ürün tanımını yazar. Test: `tests/resmi-mal-adi.test.ts`.

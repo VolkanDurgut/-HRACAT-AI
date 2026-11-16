@@ -217,7 +217,7 @@ function TarafDuzenle({ dosya, companyId, sablon, onKapat, onKaydedildi }: { dos
 
       <div className="grid gap-2 sm:grid-cols-2">
         <div>{etiket("Shipper ek satırı")}<input value={shipperEk} onChange={(e) => setShipperEk(e.target.value)} className={girdi} style={stil} placeholder="ON BEHALF OF ..." data-testid="konsimento-shipper-ek" /></div>
-        <div>{etiket("Mal tanımı (EN)")}<input value={malEn} onChange={(e) => setMalEn(e.target.value)} className={girdi} style={stil} placeholder={VARSAYILAN_MAL_EN} /></div>
+        <div title="Menşe Şahadetnamesi ve Phytosanitary belgelerinde de bu ad yazılır (16.11.2026)">{etiket("Mal tanımı (EN) · BL, Menşe, Phyto")}<input value={malEn} onChange={(e) => setMalEn(e.target.value)} className={girdi} style={stil} placeholder={VARSAYILAN_MAL_EN} /></div>
         <div>{etiket("Konşimento tipi")}
           <select value={blTipi} onChange={(e) => setBlTipi(e.target.value)} className={girdi} style={stil}>
             <option value="">BILL OF LADING (varsayılan)</option>

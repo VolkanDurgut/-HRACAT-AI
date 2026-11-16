@@ -29,6 +29,8 @@ import { TutarsizliklarKarti } from "@/components/analiz/tutarsizliklar-karti";
 import { LimanPerformansTablosu } from "@/components/analiz/liman-performans";
 import { AcenteNavlunTablosu } from "@/components/analiz/acente-navlun-tablosu";
 import { limanPerformansi, type AcenteOzeti, type TransitToplami } from "@/lib/analiz-tablolar";
+import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
+import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
 
 /**
  * Analiz sayfasi - genel duzenleme (01.10.2026).
@@ -135,6 +137,7 @@ const SEKMELER: { deger: Sekme; ad: string; ikon: React.ReactNode }[] = [
   { deger: "maliyet", ad: "Maliyet & Acenteler", ikon: <Wallet size={13} /> },
 ];
 const sekmeMi = (v: string | null): v is Sekme => v === "genel" || v === "lojistik" || v === "maliyet";
+const sekmeOku = (v: string | null): Sekme | null => (sekmeMi(v) ? v : null);
 
 function SecimGrubu<T extends string>({ secenekler, deger, onChange, etiket }: {
   secenekler: { deger: T; ad: string }[];
@@ -168,19 +171,8 @@ export default function AnalizPage() {
   const [yilFiltre, setYilFiltre] = useState<string>(TUM_YILLAR);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>("tumu");
   const [gemiModal, setGemiModal] = useState<GemiModal | null>(null);
-  const [sekme, setSekmeDurumu] = useState<Sekme>("genel");
-  // Adresten ilk sekme (?sekme=lojistik); degisince adres guncellenir (geri tusu gecmisi kirletilmez)
-  useEffect(() => {
-    try { const v = new URLSearchParams(window.location.search).get("sekme"); if (sekmeMi(v)) setSekmeDurumu(v); } catch { /* yok */ }
-  }, []);
-  const setSekme = useCallback((v: Sekme) => {
-    setSekmeDurumu(v);
-    try {
-      const u = new URL(window.location.href);
-      if (v === "genel") u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
-      window.history.replaceState(window.history.state, "", u.toString());
-    } catch { /* yok */ }
-  }, []);
+  // Adresten ilk sekme (?sekme=lojistik); degisince adres guncellenir (geri tusu gecmisi kirletilmez) - ERP ortak kit
+  const [sekme, setSekme] = useUrlSekmesi<Sekme>(sekmeOku, "genel");
 
   const fetchAll = useCallback(async () => {
     if (!user?.id || !companyId) return;
@@ -623,19 +615,8 @@ export default function AnalizPage() {
 
           {/* 16.11.2026 sadelestirme (kullanici): 13 bilesen tek sayfada yerine 3 sekme; hesaplar AYNI, yalniz yerlesim.
               Ustteki filtreler, gosterge kartlari ve tutarsizlik cubugu her sekmede gorunur. */}
-          <div role="tablist" aria-label="Kontrol Merkezi bölümleri" className="flex gap-1 mb-4 border-b overflow-x-auto" style={{ borderColor: CARD_BORDER }}>
-            {SEKMELER.map((x) => {
-              const secili = sekme === x.deger;
-              return (
-                <button key={x.deger} type="button" role="tab" id={`sekme-${x.deger}`} aria-selected={secili} aria-controls={`panel-${x.deger}`}
-                  onClick={() => setSekme(x.deger)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap border-b-2 -mb-px transition-colors"
-                  style={{ borderColor: secili ? ACCENT : "transparent", color: secili ? "white" : TEXT_MUTED }}>
-                  {x.ikon} {x.ad}
-                </button>
-              );
-            })}
-          </div>
+          <SekmeCubugu varyant="alt-cizgi" ariaLabel="Kontrol Merkezi bölümleri" secili={sekme} onSec={setSekme}
+            ogeler={SEKMELER.map((x) => ({ deger: x.deger, etiket: x.ad, ikon: x.ikon }))} />
 
           {sekme === "genel" && (
             <div role="tabpanel" id="panel-genel" aria-labelledby="sekme-genel">

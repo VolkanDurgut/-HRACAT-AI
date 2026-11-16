@@ -10,6 +10,7 @@
  * Merkezi'nin liman koordinatlari (lib/liman-koordinat.ts); navlun okuyucusunun Turkce yazimlari icin es adlar asagida.
  * Cikis: Ambarli / Asyaport (11.11.2026 kullanici: "Biz sadece Ambarli ve Asyaport ile calisiyoruz").
  */
+import { trBuyuk } from "@/lib/tr-arama";
 import { limanKonumu, type LimanKonumu } from "@/lib/liman-koordinat";
 import type { LimanOzeti, NavlunSatiri } from "@/lib/navlun/ozet";
 import { karsilastir, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
@@ -63,7 +64,7 @@ export function navlunNoktalari(limanlar: LimanOzeti[], satirlar: NavlunSatiri[]
 }
 
 /** Turkce buyuk harf + I sadelestirme (arama) */
-export const aramaAnahtari = (s: string) => s.toLocaleUpperCase("tr-TR").replace(/İ/g, "I").replace(/\s+/g, " ").trim();
+export const aramaAnahtari = (s: string) => trBuyuk(s).replace(/\s+/g, " ").trim(); // ortak kural: lib/tr-arama.ts
 
 export function aramayaUyar(n: Pick<NavlunNoktasi, "ad" | "anahtar" | "enIyiAcente">, q: string): boolean {
   const a = aramaAnahtari(q);

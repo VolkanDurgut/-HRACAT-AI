@@ -17,6 +17,9 @@ import {
   aramaNorm, panelBaglantisi, pazarBaglantisi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type SiparisSekme,
 } from "@/lib/siparis/gorunum";
 import { tutarsizliklariOku, type Tutarsizlik } from "@/lib/veri-tutarsizliklari";
+import { SekmeCubugu, type SekmeOgesi } from "@/components/erp/sekme-cubugu";
+import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
+import { SecilebilirOzetKarti } from "@/components/erp/ozet-karti";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
 import { onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
@@ -52,17 +55,6 @@ const sayiGoster = (n: number | null, k = 0) => (n === null ? "—" : n.toLocale
 function DurumRozeti({ d }: { d: SiparisDurum }) {
   const [bg, fg] = DURUM_RENK[d];
   return <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: bg, color: fg }} data-durum={d}>{DURUM_ADI[d]}</span>;
-}
-
-function OzetKarti({ etiket, deger, alt, renk, testId, onClick, secili }: { etiket: string; deger: string | number; alt?: string; renk?: string; testId: string; onClick?: () => void; secili?: boolean }) {
-  return (
-    <button type="button" onClick={onClick} disabled={!onClick} className="text-left rounded-xl border px-4 py-3 disabled:cursor-default"
-      style={{ backgroundColor: CARD_BG, borderColor: secili ? ACCENT : CARD_BORDER }} data-testid={testId}>
-      <p className="text-xs" style={{ color: TEXT_MUTED }}>{etiket}</p>
-      <p className="text-2xl font-semibold tabular-nums mt-1" style={{ color: renk || "#FFFFFF" }} data-deger>{deger}</p>
-      {alt && <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{alt}</p>}
-    </button>
-  );
 }
 
 const paraIsareti = (p: string | null) => (p === "EUR" ? "€" : p === "TRY" ? "₺" : "$");
@@ -472,19 +464,8 @@ function SiparisIcerik() {
   const yetkili = !!(yetkiler.sayfa_yetkileri.proformalar || yetkiler.sayfa_yetkileri.analiz);
   const isaretleyebilir = !!yetkiler.sayfa_yetkileri.proformalar;
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
-  const [sekme, setSekmeDurumu] = useState<SiparisSekme>(VARSAYILAN_SIPARIS_SEKMESI);
-  // ?sekme= (varsayilan rezervasyonlu adreste yazilmaz); degisince adres guncellenir, gecmis kirletilmez
-  useEffect(() => {
-    try { const v = siparisSekmesi(new URLSearchParams(window.location.search).get("sekme")); if (v) setSekmeDurumu(v); } catch { /* yok */ }
-  }, []);
-  const setSekme = useCallback((v: SiparisSekme) => {
-    setSekmeDurumu(v);
-    try {
-      const u = new URL(window.location.href);
-      if (v === VARSAYILAN_SIPARIS_SEKMESI) u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
-      window.history.replaceState(window.history.state, "", u.toString());
-    } catch { /* yok */ }
-  }, []);
+  // ?sekme= (varsayilan rezervasyonlu adreste yazilmaz); degisince adres guncellenir, gecmis kirletilmez - ERP ortak kit
+  const [sekme, setSekme] = useUrlSekmesi<SiparisSekme>(siparisSekmesi, VARSAYILAN_SIPARIS_SEKMESI);
   // Kaynak eski uyarisi (Kontrol Merkezi ile ayni kural: plan / siparis listesi 3 gunden eski). Okunamazsa serit gorunmez.
   const [kaynakUyari, setKaynakUyari] = useState<Tutarsizlik[]>([]);
   const [siparisler, setSiparisler] = useState<SiparisSatiri[] | null>(null);
@@ -593,12 +574,12 @@ function SiparisIcerik() {
 
   if (!yetkili) return null;
   // Sekme cubugu (Pazar / Ana Panel ile ayni stil). Rezervasyon bekleyen: aksiyon gerektirir, turuncu sayi rozeti.
-  const SEKMELER: [SiparisSekme, string, React.ReactNode, number | null, boolean][] = [
-    ["rezervasyonlu", "Rezervasyonlu", <PackageCheck key="i" size={14} />, sayilar.rezervasyonlu, false],
-    ["rez_bekleyen", "Rezervasyon bekleyen", <Hourglass key="i" size={14} />, sayilar.rez_bekleyen, true],
-    ["onay", "Onay bekleyen", <Clock key="i" size={14} />, sayilar.onay, false],
-    ["sevk", "Sevk edilen", <Truck key="i" size={14} />, sayilar.sevk, false],
-    ["plan", "Yükleme Planı", <Ship key="i" size={14} />, null, false],
+  const SEKMELER: SekmeOgesi<SiparisSekme>[] = [
+    { deger: "rezervasyonlu", etiket: "Rezervasyonlu", ikon: <PackageCheck size={14} />, sayi: sayilar.rezervasyonlu },
+    { deger: "rez_bekleyen", etiket: "Rezervasyon bekleyen", ikon: <Hourglass size={14} />, sayi: sayilar.rez_bekleyen, vurgu: true },
+    { deger: "onay", etiket: "Onay bekleyen", ikon: <Clock size={14} />, sayi: sayilar.onay },
+    { deger: "sevk", etiket: "Sevk edilen", ikon: <Truck size={14} />, sayi: sayilar.sevk },
+    { deger: "plan", etiket: "Yükleme Planı", ikon: <Ship size={14} />, sayi: null },
   ];
   const SEKME_BOLUMLERI: Record<Exclude<SiparisSekme, "plan">, SiparisBolumu[]> = {
     rezervasyonlu: ["rezervasyon"], rez_bekleyen: ["on_odeme"], onay: ["bekleyen"], sevk: ["rezervasyon", "iptal"],
@@ -629,12 +610,12 @@ function SiparisIcerik() {
       {!siparisler && yukleniyor ? <SayfaYukleniyor /> : siparisler && plan ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
-            <OzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => setSekme("rezervasyonlu")} />
-            <OzetKarti testId="ozet-onay" etiket="Ön ödeme / onay bekliyor" deger={ozet.onay} onClick={() => setSekme("onay")} secili={sekme === "onay"} />
-            <OzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı · rez. yok" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => setSekme("rez_bekleyen")} secili={sekme === "rez_bekleyen"} />
-            <OzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => setSekme("rezervasyonlu")} secili={sekme === "rezervasyonlu"} />
-            <OzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => setSekme("rezervasyonlu")} />
-            <OzetKarti testId="ozet-tekrar" etiket="Olası tekrar" deger={ozet.olasiTekrar} renk={ozet.olasiTekrar ? "#FCD34D" : undefined} alt="yeniden kesilmiş proforma?" onClick={ozet.olasiTekrar ? () => setSekme(tekrarSekmesi(siparisler)) : undefined} />
+            <SecilebilirOzetKarti testId="ozet-acik" etiket="Açık sipariş" deger={ozet.acikSiparis} alt={`${ozet.acikMt.toLocaleString("tr-TR")} MT · ${ozet.acikKont} kont.`} onClick={() => setSekme("rezervasyonlu")} />
+            <SecilebilirOzetKarti testId="ozet-onay" etiket="Ön ödeme / onay bekliyor" deger={ozet.onay} onClick={() => setSekme("onay")} secili={sekme === "onay"} />
+            <SecilebilirOzetKarti testId="ozet-onodeme" etiket="Ön ödeme alındı · rez. yok" deger={ozet.onOdeme} renk="#93C5FD" onClick={() => setSekme("rez_bekleyen")} secili={sekme === "rez_bekleyen"} />
+            <SecilebilirOzetKarti testId="ozet-rez" etiket="Rezervasyonlu" deger={ozet.rezervasyonlu} renk="#F4A07C" onClick={() => setSekme("rezervasyonlu")} secili={sekme === "rezervasyonlu"} />
+            <SecilebilirOzetKarti testId="ozet-bl" etiket="BL eksik" deger={ozet.blEksik} renk={ozet.blEksik ? "#FCA5A5" : undefined} onClick={() => setSekme("rezervasyonlu")} />
+            <SecilebilirOzetKarti testId="ozet-tekrar" etiket="Olası tekrar" deger={ozet.olasiTekrar} renk={ozet.olasiTekrar ? "#FCD34D" : undefined} alt="yeniden kesilmiş proforma?" onClick={ozet.olasiTekrar ? () => setSekme(tekrarSekmesi(siparisler)) : undefined} />
           </div>
 
           {kaynakUyari.length > 0 && (
@@ -658,19 +639,8 @@ function SiparisIcerik() {
           )}
 
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <div className="flex w-full lg:w-auto lg:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="siparis-sekmeler">
-              {SEKMELER.map(([k, etiket, ikon, adet, vurgu]) => (
-                <button key={k} type="button" role="tab" aria-selected={sekme === k} onClick={() => setSekme(k)} data-sekme={k}
-                  className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-                  style={sekme === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
-                  {ikon} {etiket}
-                  {adet !== null && (
-                    <span className="ml-0.5 min-w-[20px] h-5 px-1.5 inline-flex items-center justify-center rounded-full text-[11px] font-semibold tabular-nums" data-sekme-sayi
-                      style={vurgu && adet > 0 ? { backgroundColor: ACCENT, color: "#FFFFFF" } : { backgroundColor: "rgba(148,163,184,0.14)", color: sekme === k ? "#FFFFFF" : TEXT_MUTED }}>{adet}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            <SekmeCubugu testId="siparis-sekmeler" sayiBicimi="rozet" className="lg:w-auto lg:inline-flex" dugmeBosluk="px-3"
+              secili={sekme} onSec={setSekme} ogeler={SEKMELER} />
             <div className="relative ml-auto w-full sm:w-72">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />
               <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Proforma, firma, booking, liman ara" aria-label="Ara"

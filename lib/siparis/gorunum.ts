@@ -4,6 +4,7 @@
  * Saf fonksiyonlar (veri / ag yok) - tests/siparis-gorunum.test.ts.
  */
 import type { SiparisDurum, SiparisSatiri } from "@/lib/siparis/liste";
+import { trBuyuk } from "@/lib/tr-arama";
 
 export type SiparisSekme = "rezervasyonlu" | "rez_bekleyen" | "onay" | "sevk" | "plan";
 export const VARSAYILAN_SIPARIS_SEKMESI: SiparisSekme = "rezervasyonlu";
@@ -38,8 +39,8 @@ export function sekmeSayilari(liste: Pick<SiparisSatiri, "durum">[]): Record<Exc
   return say;
 }
 
-// Turkce harf duyarsiz arama ("istanbul" = "İSTANBUL", "ı" = "i")
-export const aramaNorm = (s: string) => s.toLocaleUpperCase("tr-TR").replace(/İ/g, "I");
+// Turkce harf duyarsiz arama ("istanbul" = "İSTANBUL", "ı" = "i") - ortak kural: lib/tr-arama.ts
+export const aramaNorm = trBuyuk;
 
 const ARANAN_ALANLAR = ["proforma_no", "firma", "urun", "liman", "marka", "booking_no", "dosya_no", "bl_no", "eslesik_proforma"] as const;
 export function siparisAra<T extends Partial<Pick<SiparisSatiri, (typeof ARANAN_ALANLAR)[number]>>>(liste: T[], arama: string): T[] {

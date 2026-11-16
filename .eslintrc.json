@@ -1,3 +1,17 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["app/**/*.tsx", "app/**/*.ts", "components/**/*.tsx", "components/**/*.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "CallExpression[callee.object.name='supabase'][callee.property.name=/^(from|rpc)$/]",
+            "message": "Veri erisimi lib/ altinda yazilir (CLAUDE.md 'Veri erisimi'). Yeni sorgu arayuze yazilmaz; eski sorgu dokunuldukca lib/<modul>/ altina tasinir."
+          }
+        ]
+      }
+    }
+  ]
 }

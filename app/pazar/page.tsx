@@ -12,6 +12,9 @@ import { FirmaKarti } from "@/components/pazar/firma-karti";
 import { AksiyonCubugu, EkipPaneli, SurecHunisi, UlkeTablosu } from "@/components/pazar/takip";
 import { ListeYukle } from "@/components/pazar/liste-yukle";
 import { aksiyonlar, cevapVerenler, huni, temasIndeksi, ulkeOzeti } from "@/lib/pazar/panel";
+import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
+import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
+import { OzetKarti } from "@/components/erp/ozet-karti";
 import { hacimMetni, pazarSekmesi, potansiyelFiltrele, VARSAYILAN_SEKME, type PazarSekme } from "@/lib/pazar/gorunum";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -58,22 +61,6 @@ function Rozet({ tur }: { tur: "aktif" | "siparissiz" | "potansiyel" }) {
   return <span className="inline-flex items-center h-5 px-2 rounded-full text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: s.bg, color: s.c }} data-durum={tur}>{s.t}</span>;
 }
 
-function OzetKarti({ ikon, etiket, deger, alt, testId, onClick, ipucu }: { ikon: React.ReactNode; etiket: string; deger: number | string; alt?: string; testId: string; onClick?: () => void; ipucu?: string }) {
-  const icerik = (
-    <>
-      <div className="flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }}>{ikon}<span>{etiket}</span></div>
-      <p className="text-2xl font-semibold text-white tabular-nums mt-1" data-deger>{deger}</p>
-      {alt && <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{alt}</p>}
-    </>
-  );
-  // Tiklanabilir kart (16.11.2026: "Siparissiz musteri" -> Musterilerimiz, siparissiz filtresi)
-  return onClick ? (
-    <button type="button" onClick={onClick} title={ipucu} className="rounded-xl border px-4 py-3 text-left transition-colors hover:border-emerald-500/50 hover:bg-white/[0.02]" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>{icerik}</button>
-  ) : (
-    <div className="rounded-xl border px-4 py-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>{icerik}</div>
-  );
-}
-
 function UlkeHucresi({ ulke, kaynak }: { ulke: string | null; kaynak?: string | null }) {
   if (!ulke) return <span style={{ color: "#5B6576" }}>—</span>;
   return (
@@ -116,20 +103,9 @@ function PazarIcerik() {
   const [ulke, setUlke] = useState("");
   const [goster, setGoster] = useState(SAYFA_BOYU);
   const [acikFirma, setAcikFirma] = useState<string | null>(null);
-  const [sekme, setSekmeDurumu] = useState<PazarSekme>(VARSAYILAN_SEKME);
+  const [sekme, setSekme] = useUrlSekmesi<PazarSekme>(pazarSekmesi, VARSAYILAN_SEKME);
   const [asama, setAsama] = useState<string | null>(null);
-  // Adresten ilk sekme (?sekme=ulkeler); degisince adres guncellenir (gecmis kirletilmez)
-  useEffect(() => {
-    try { const v = pazarSekmesi(new URLSearchParams(window.location.search).get("sekme")); if (v) setSekmeDurumu(v); } catch { /* yok */ }
-  }, []);
-  const setSekme = useCallback((v: PazarSekme) => {
-    setSekmeDurumu(v);
-    try {
-      const u = new URL(window.location.href);
-      if (v === VARSAYILAN_SEKME) u.searchParams.delete("sekme"); else u.searchParams.set("sekme", v);
-      window.history.replaceState(window.history.state, "", u.toString());
-    } catch { /* yok */ }
-  }, []);
+  // Adresten ilk sekme (?sekme=ulkeler); degisince adres guncellenir (gecmis kirletilmez) - ERP ortak kit (useUrlSekmesi)
   const [takip, setTakip] = useState<TakipVerisi | null>(null);
   const [takipHata, setTakipHata] = useState<string | null>(null);
 
@@ -312,20 +288,12 @@ function PazarIcerik() {
             <div className="rounded-xl border px-4 py-2.5 mb-4 text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: "#FCA5A5" }} data-testid="takip-hata">{takipHata || "Takip bilgisi okunamadı."}</div>
           )}
 
-          <div className="flex w-full sm:w-auto sm:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5 mb-4" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="pazar-sekmeler">
-            {([
-              ["operasyon", "Günlük Operasyon", <Activity key="i" size={14} />],
-              ["musteriler", `Müşterilerimiz (${musteriler.length})`, <Building2 key="i" size={14} />],
-              ["potansiyel", `Potansiyel & Süreç (${potansiyeller.length})`, <Users key="i" size={14} />],
-              ["ulkeler", `Pazar Analizi (${ulkeSatirlari.filter((u) => u.ulke !== "—").length} ülke)`, <Globe2 key="i" size={14} />],
-            ] as [PazarSekme, string, React.ReactNode][]).map(([k, etiket, ikon]) => (
-              <button key={k} type="button" role="tab" aria-selected={sekme === k} onClick={() => setSekme(k)} data-sekme={k}
-                className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 sm:px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-                style={sekme === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
-                {ikon} {etiket}
-              </button>
-            ))}
-          </div>
+          <SekmeCubugu testId="pazar-sekmeler" secili={sekme} onSec={setSekme} ogeler={[
+            { deger: "operasyon", etiket: "Günlük Operasyon", ikon: <Activity size={14} /> },
+            { deger: "musteriler", etiket: `Müşterilerimiz (${musteriler.length})`, ikon: <Building2 size={14} /> },
+            { deger: "potansiyel", etiket: `Potansiyel & Süreç (${potansiyeller.length})`, ikon: <Users size={14} /> },
+            { deger: "ulkeler", etiket: `Pazar Analizi (${ulkeSatirlari.filter((u) => u.ulke !== "—").length} ülke)`, ikon: <Globe2 size={14} /> },
+          ]} />
 
           {/* ---- Gunluk Operasyon ---- */}
           {sekme === "operasyon" && takip && (

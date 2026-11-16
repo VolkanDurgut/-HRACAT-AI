@@ -3,6 +3,7 @@
  * saf yardımcılar"). HESAPLAR DEĞİŞMEDİ (lib/pazar/panel.ts, lib/pazar/musteri.ts); burada yalnız sekme adı, liste filtresi
  * ve ülke tablosu sıralaması var. Saf modül (test: tests/pazar-gorunum.test.ts).
  */
+import { trKucuk } from "@/lib/tr-arama";
 import type { PazarFirma, PazarKisi } from "@/lib/pazar/veri";
 import type { UlkeSatiri } from "@/lib/pazar/panel";
 
@@ -15,8 +16,8 @@ export function pazarSekmesi(v: string | null | undefined): PazarSekme | null {
   return v === "operasyon" || v === "musteriler" || v === "potansiyel" || v === "ulkeler" ? v : null;
 }
 
-/** Türkçe duyarsız arama anahtarı (sayfadaki eski kuralla aynı: küçük harf + "ı" -> "i"). */
-export const aramaAnahtari = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
+/** Türkçe duyarsız arama anahtarı (sayfadaki eski kuralla aynı: küçük harf + "ı" -> "i"). Ortak kural: lib/tr-arama.ts */
+export const aramaAnahtari = trKucuk;
 
 export type PotansiyelFiltre = {
   /** "" = hepsi, "-" = ülkesi bilinmeyen */

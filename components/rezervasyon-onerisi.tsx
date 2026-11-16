@@ -92,7 +92,7 @@ export function RezervasyonOnerisi({ form, dosya, update }: {
               )}
             </div>
           ))}
-          <p style={{ color: TEXT_MUTED }}>Öneridir; Kaydet'e basmadan hiçbir şey kaydedilmez. Anlaşma rakamı konteyner başı navlundur, lokal masrafı ayrıca kontrol edin.</p>
+          <p style={{ color: TEXT_MUTED }}>Öneridir; Kaydet&apos;e basmadan hiçbir şey kaydedilmez. Anlaşma rakamı konteyner başı navlundur, lokal masrafı ayrıca kontrol edin.</p>
         </div>
       </div>
     </div>

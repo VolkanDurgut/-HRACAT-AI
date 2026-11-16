@@ -17,6 +17,9 @@ import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { KantarSevkiyatDurumu } from "@/components/kantar-sevkiyat-durumu";
 import { musteriKodu, sevkiyatOzetleri, type KantarDosya } from "@/lib/kantar-sevkiyat";
 import { eksikDolumlar, kantarSekmesi, panelDosyaYolu, VARSAYILAN_KANTAR_SEKMESI, type KantarSekme } from "@/lib/kantar-gorunum";
+import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
+import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
+import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
 type KonteynerRow = {
@@ -56,27 +59,12 @@ export default function KantarPage() {
   const [rezerveAdet, setRezerveAdet] = useState<Record<string, number>>({});
   const [secilenGun, setSecilenGun] = useState<string | null>(null);
   // 16.11.2026: Ihracat sutunu iki sekme (?sekme=aktif|tamamlanan) + ?dosya= (Ana Panel DBA adimindan gelis: o dosya suzulur)
-  const [ihSekme, setIhSekmeDurumu] = useState<KantarSekme>(VARSAYILAN_KANTAR_SEKMESI);
-  const adresGuncelle = useCallback((degisim: Record<string, string | null>) => {
-    try {
-      const u = new URL(window.location.href);
-      Object.entries(degisim).forEach(([k, v]) => { if (v) u.searchParams.set(k, v); else u.searchParams.delete(k); });
-      window.history.replaceState(window.history.state, "", u.toString());
-    } catch { /* yok */ }
-  }, []);
-  const setIhSekme = useCallback((v: KantarSekme) => {
-    setIhSekmeDurumu(v);
-    adresGuncelle({ sekme: v === VARSAYILAN_KANTAR_SEKMESI ? null : v });
-  }, [adresGuncelle]);
+  // ERP ortak kit: adresle esli sekme + adres yardimcilari
+  const [ihSekme, setIhSekme] = useUrlSekmesi<KantarSekme>(kantarSekmesi, VARSAYILAN_KANTAR_SEKMESI);
   useEffect(() => {
-    try {
-      const p = new URLSearchParams(window.location.search);
-      const sk = kantarSekmesi(p.get("sekme"));
-      if (sk) setIhSekmeDurumu(sk);
-      const d = (p.get("dosya") || "").trim();
-      if (d) { setArama(d); adresGuncelle({ dosya: null }); } // bir kez: arama kutusuna yazilir, kullanici silebilir
-    } catch { /* yok */ }
-  }, [adresGuncelle]);
+    const d = (adresParametresi("dosya") || "").trim();
+    if (d) { setArama(d); adresiGuncelle({ dosya: null }); } // bir kez: arama kutusuna yazilir, kullanici silebilir
+  }, []);
   // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
   // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
   // baslatmasi) aradaki degisiklikler kacirilmasin diye yeniden baglaninca,
@@ -472,16 +460,10 @@ export default function KantarPage() {
         )}
 
         {/* Ihracat sekmeleri (?sekme=) */}
-        <div className="shrink-0 flex w-full sm:w-auto sm:self-start max-w-full overflow-x-auto rounded-lg border p-0.5" role="tablist" aria-label="İhracat bölümleri"
-          style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }} data-testid="kantar-ihracat-sekmeler">
-          {([["aktif", "Aktif dolumlar", bekleyenler.length, "DBA bekleyen"], ["tamamlanan", "DBA tamamlanan", tamamlananlar.length, "konteyner"]] as const).map(([k, etiket, sayi, ipucu]) => (
-            <button key={k} type="button" role="tab" aria-selected={ihSekme === k} onClick={() => setIhSekme(k)} data-sekme={k} title={`${sayi} ${ipucu}`}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
-              style={ihSekme === k ? { backgroundColor: ACCENT, color: "white" } : { color: TEXT_MUTED }}>
-              {etiket} <span className="font-normal opacity-80">({sayi})</span>
-            </button>
-          ))}
-        </div>
+        <SekmeCubugu varyant="kompakt" ariaLabel="İhracat bölümleri" testId="kantar-ihracat-sekmeler" secili={ihSekme} onSec={setIhSekme} ogeler={[
+          { deger: "aktif", etiket: "Aktif dolumlar", sayi: bekleyenler.length, ipucu: `${bekleyenler.length} DBA bekleyen` },
+          { deger: "tamamlanan", etiket: "DBA tamamlanan", sayi: tamamlananlar.length, ipucu: `${tamamlananlar.length} konteyner` },
+        ]} />
 
         {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
         <div className="xl:flex-1 xl:overflow-y-auto xl:min-h-0 pb-4 xl:pb-6 xl:pr-1 space-y-4" style={{ scrollbarWidth: "thin" }}>

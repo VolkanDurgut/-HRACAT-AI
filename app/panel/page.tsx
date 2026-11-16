@@ -20,6 +20,8 @@ import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, Circ
 import { CutoffCubugu } from "@/components/panel/cutoff-cubugu";
 import { cutoffUyarilari, dosyaEslesir, EVRAK_KISA, PANEL_FILTRELERI, panelFiltrele, panelFiltresi, type PanelFiltre } from "@/lib/panel-gorunum";
 import { kantarDosyaYolu } from "@/lib/kantar-gorunum";
+import { adresiGuncelle } from "@/lib/url-durumu";
+import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
@@ -139,14 +141,8 @@ function PanelContent() {
   const [vurgu, setVurgu] = useState<string | null>(() => searchParams.get("dosya"));
   const [acikDetay, setAcikDetay] = useState<Set<string>>(new Set());
   const vurguKaydirildi = useRef<string | null>(null);
-  const adresGuncelle = useCallback((degis: Record<string, string | null>) => {
-    try {
-      const u = new URL(window.location.href);
-      for (const [k, v] of Object.entries(degis)) { if (v === null) u.searchParams.delete(k); else u.searchParams.set(k, v); }
-      u.searchParams.delete("filter");
-      window.history.replaceState(window.history.state, "", u.toString());
-    } catch { /* yok */ }
-  }, []);
+  // Eski ?filter= her guncellemede silinir - ERP ortak kit (lib/url-durumu.ts)
+  const adresGuncelle = useCallback((degis: Record<string, string | null>) => adresiGuncelle(degis, ["filter"]), []);
   const setActiveFilter = useCallback((f: PanelFiltre) => {
     setActiveFilterDurumu(f);
     adresGuncelle({ filtre: f === "tumu" ? null : f });
@@ -299,16 +295,8 @@ function PanelContent() {
       {/* 16.11.2026: standart uyari cubugu (yoksa gizli) + filtre cubugu (adreste ?filtre=) */}
       {!loading && <CutoffCubugu uyarilar={uyarilar} onDosya={dosyayaGit} />}
       {!loading && (
-        <div className="flex w-full sm:w-auto sm:inline-flex max-w-full overflow-x-auto rounded-lg border p-0.5 mb-4" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} role="tablist" data-testid="panel-filtreler">
-          {PANEL_FILTRELERI.map((f) => (
-            <button key={f.key} type="button" role="tab" aria-selected={activeFilter === f.key} onClick={() => setActiveFilter(f.key)} data-filtre={f.key}
-              className="inline-flex shrink-0 items-center gap-1.5 h-9 px-3 sm:px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors"
-              style={activeFilter === f.key ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>
-              {f.label}
-              <span className="text-[11px] tabular-nums" style={{ color: activeFilter === f.key ? "#6EE7B7" : TEXT_MUTED }}>{panelFiltrele(dosyalar, f.key).length}</span>
-            </button>
-          ))}
-        </div>
+        <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
+          ogeler={PANEL_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: panelFiltrele(dosyalar, f.key).length }))} />
       )}
 
       {loading ? (

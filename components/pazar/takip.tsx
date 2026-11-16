@@ -10,6 +10,7 @@ import { ekipOzeti, type Aksiyon, type HuniAsamasi, type UlkeSatiri } from "@/li
 import { ulkeTablosu, type UlkeSiraAlani } from "@/lib/pazar/gorunum";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
+import { AcilirSerit, SERIT_TONU, useAcikTercihi } from "@/components/erp/acilir-serit";
 
 /**
  * 16.11.2026 gece (kullanici: Kontrol Merkezi'ndeki standart mimari): tek "PazarTakip" bileşeni dört parçaya ayrıldı;
@@ -79,23 +80,19 @@ export function AksiyonCubugu({ aksiyon, firmalar, ekip, onFirma }: {
 }) {
   const firma = useMemo(() => new Map(firmalar.map((f) => [f.id, f])), [firmalar]);
   const ekipAdi = useMemo(() => new Map(ekip.map((e) => [e.kod, e.hitap || e.eposta])), [ekip]);
-  const [acik, setAcik] = useState(true);
+  // Acik / kapali tercihi tarayicida (varsayilan acik) - ERP ortak kit
+  const [tercih, tercihYaz] = useAcikTercihi(AKSIYON_ACIK);
+  const acik = tercih ?? true;
   const [tumu, setTumu] = useState(false);
-  useEffect(() => { try { const v = window.localStorage.getItem(AKSIYON_ACIK); if (v !== null) setAcik(v === "1"); } catch { /* yok */ } }, []);
   if (aksiyon.length === 0) return null;
-  const degistir = () => { const y = !acik; setAcik(y); try { window.localStorage.setItem(AKSIYON_ACIK, y ? "1" : "0"); } catch { /* yok */ } };
+  const degistir = () => tercihYaz(!acik);
   const turler = (Object.keys(AKSIYON) as Aksiyon["tur"][]).map((t) => ({ t, n: aksiyon.filter((a) => a.tur === t).length })).filter((x) => x.n > 0);
   const gosterilen = tumu ? aksiyon : aksiyon.slice(0, 8);
   return (
-    <section className="rounded-xl border mb-4 overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: "rgba(245,158,11,0.3)" }} data-testid="panel-aksiyon">
-      <button type="button" onClick={degistir} aria-expanded={acik} className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-left hover:bg-white/[0.02]" style={{ backgroundColor: "rgba(245,158,11,0.06)" }}>
-        <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "#FCD34D" }}><BellRing size={14} /> Aksiyon bekleyenler · {aksiyon.length} firma</span>
-        <span className="flex flex-wrap gap-1.5">
-          {turler.map(({ t, n }) => <span key={t} className="rounded-full px-2 py-0.5 text-[10.5px]" style={{ backgroundColor: AKSIYON[t].bg, color: AKSIYON[t].renk }}>{AKSIYON[t].etiket} <b className="tabular-nums">{n}</b></span>)}
-        </span>
-        <span className="ml-auto flex items-center gap-1 text-[10px]" style={{ color: TEXT_MUTED }}>{acik ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {acik ? "Gizle" : "Göster"}</span>
-      </button>
-      {acik && (
+    <AcilirSerit acik={acik} onDegistir={degistir} {...SERIT_TONU.amber} className="mb-4" testId="panel-aksiyon"
+      ikon={<BellRing size={14} />} baslik={`Aksiyon bekleyenler · ${aksiyon.length} firma`}
+      rozetler={turler.map(({ t, n }) => <span key={t} className="rounded-full px-2 py-0.5 text-[10.5px]" style={{ backgroundColor: AKSIYON[t].bg, color: AKSIYON[t].renk }}>{AKSIYON[t].etiket} <b className="tabular-nums">{n}</b></span>)}>
+      {(
         <>
           <ul className="divide-y border-t" style={{ borderColor: CARD_BORDER }}>
             {gosterilen.map((a) => {
@@ -125,7 +122,7 @@ export function AksiyonCubugu({ aksiyon, firmalar, ekip, onFirma }: {
           )}
         </>
       )}
-    </section>
+    </AcilirSerit>
   );
 }
 

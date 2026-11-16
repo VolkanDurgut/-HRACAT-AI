@@ -16,6 +16,7 @@ import Link from "next/link";
 import { AlertTriangle, ChevronDown, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { TUR_BASLIGI, tutarsizlikGruplari, tutarsizliklariOku, type TutarsizlikOzeti } from "@/lib/veri-tutarsizliklari";
+import { AcilirSerit, useAcikTercihi } from "@/components/erp/acilir-serit";
 
 const saat = (iso: string | null) => (iso ? new Date(iso).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const GOSTER = 4;
@@ -25,26 +26,18 @@ const hedefBaglanti = (tur: string, baglanti: string | null) =>
   baglanti && (tur === "etd_farki" || tur === "etd_degisti") && baglanti.startsWith("/dosya/") ? `/panel?dosya=${encodeURIComponent(baglanti.slice(7))}` : baglanti;
 const ACIK_ANAHTARI = "kontrol-merkezi:tutarsizlik-acik";
 
-function tercihOku(): boolean | null {
-  try { const v = window.localStorage.getItem(ACIK_ANAHTARI); return v === null ? null : v === "1"; } catch { return null; }
-}
-function tercihYaz(acik: boolean) {
-  try { window.localStorage.setItem(ACIK_ANAHTARI, acik ? "1" : "0"); } catch { /* tarayici depolamasi kapali olabilir */ }
-}
-
 export function TutarsizliklarKarti({ className = "" }: { className?: string }) {
   const [veri, setVeri] = useState<TutarsizlikOzeti | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [acikGrup, setAcikGrup] = useState<Record<string, boolean>>({});
-  const [acik, setAcik] = useState<boolean | null>(null);
+  // Acik / kapali tercihi tarayicida; tercih yoksa "yuksek" onemli kalem varsa acik gelir - ERP ortak kit
+  const [tercih, tercihYaz] = useAcikTercihi(ACIK_ANAHTARI);
 
   useEffect(() => {
     let iptal = false;
     tutarsizliklariOku().then((v) => {
       if (iptal) return;
       setVeri(v);
-      const t = tercihOku();
-      setAcik(t !== null ? t : v.kalemler.some((k) => k.onem === "yuksek"));
     }).catch((e) => { if (!iptal) setHata(e instanceof Error ? e.message : "Okunamadı."); });
     return () => { iptal = true; };
   }, []);
@@ -64,17 +57,15 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
   const renk = yuksek ? "#FCA5A5" : yalnizBilgi ? "#7DD3FC" : "#FCD34D";
   const zemin = yuksek ? "rgba(248,113,113,0.06)" : yalnizBilgi ? "rgba(56,189,248,0.06)" : "rgba(245,158,11,0.06)";
   const kenar = yuksek ? "rgba(248,113,113,0.3)" : yalnizBilgi ? "rgba(56,189,248,0.3)" : "rgba(245,158,11,0.3)";
-  const degistir = () => { const y = !acik; setAcik(y); tercihYaz(y); };
+  const acik = tercih ?? yuksek > 0;
+  const degistir = () => tercihYaz(!acik);
 
   return (
-    <section className={`rounded-xl border overflow-hidden ${className}`} style={{ borderColor: kenar, backgroundColor: CARD_BG }} data-testid="tutarsizliklar-karti">
-      <button type="button" onClick={degistir} aria-expanded={!!acik}
-        className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-left hover:bg-white/[0.02] transition-colors" style={{ backgroundColor: zemin }}>
-        <span className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: renk }}>
-          {yalnizBilgi ? <Info size={14} /> : <AlertTriangle size={14} />}
-          Veri Tutarsızlıkları · {veri.kalemler.length} kalem
-        </span>
-        <span className="flex flex-wrap gap-1.5">
+    <AcilirSerit acik={acik} onDegistir={degistir} renk={renk} zemin={zemin} kenar={kenar} className={className} testId="tutarsizliklar-karti" kapaliEtiket="Ayrıntı"
+      ikon={yalnizBilgi ? <Info size={14} /> : <AlertTriangle size={14} />}
+      baslik={`Veri Tutarsızlıkları · ${veri.kalemler.length} kalem`}
+      sagEk={<span className="hidden md:inline">Plan {saat(veri.plan_son)} · Sipariş listesi {saat(veri.siparis_son)} · Navlun {saat(veri.navlun_son)}</span>}
+      rozetler={<>
           {gruplar.map((g) => {
             const y = g.kalemler.some((k) => k.onem === "yuksek");
             const b = g.kalemler.every((k) => k.onem === "bilgi");
@@ -85,13 +76,7 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
               </span>
             );
           })}
-        </span>
-        <span className="ml-auto flex items-center gap-1 text-[10px]" style={{ color: TEXT_MUTED }}>
-          <span className="hidden md:inline">Plan {saat(veri.plan_son)} · Sipariş listesi {saat(veri.siparis_son)} · Navlun {saat(veri.navlun_son)}</span>
-          {acik ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {acik ? "Gizle" : "Ayrıntı"}
-        </span>
-      </button>
-      {acik && (
+      </>}>
         <div className="grid gap-px md:grid-cols-2 border-t" style={{ backgroundColor: CARD_BORDER, borderColor: CARD_BORDER }}>
           {gruplar.map((g) => {
             const hepsi = acikGrup[g.tur];
@@ -129,7 +114,6 @@ export function TutarsizliklarKarti({ className = "" }: { className?: string }) 
             );
           })}
         </div>
-      )}
-    </section>
+    </AcilirSerit>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { OzetKarti } from "@/components/erp/ozet-karti";
 import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
@@ -94,16 +95,6 @@ function AcenteHafizasiPaneli({ veri }: { veri: NavlunVerisi }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-function OzetKarti({ ikon, etiket, deger, alt, testId }: { ikon: React.ReactNode; etiket: string; deger: number | string; alt?: string; testId: string }) {
-  return (
-    <div className="rounded-xl border px-4 py-3" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={testId}>
-      <div className="flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }}>{ikon}<span>{etiket}</span></div>
-      <p className="text-2xl font-semibold text-white tabular-nums mt-1" data-deger>{deger}</p>
-      {alt && <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>{alt}</p>}
     </div>
   );
 }

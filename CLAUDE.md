@@ -66,6 +66,19 @@ Toplu yeniden düzenleme YAPILMAZ (ekran testi yok; en çok kullanılan ekranlar
    (2 iç bileşen, ~16 DB çağrısı: bileşen taşımak orayı kısaltmaz).
 Rapor gönderim saatlerine yakın (ör. ilk canlı rapordan önceki akşam) çekirdek ekranlara dokunulmaz.
 
+## Veri erişimi ve ERP ortak kit (16.11.2026, kullanıcı onayı)
+- **Yeni veritabanı sorgusu arayüzde yazılmaz:** `supabase.from(...)` / `supabase.rpc(...)` yalnız `lib/<modül>/` altında
+  (örnek: `lib/siparis/veri.ts`, `lib/navlun/veri.ts`); sayfa / bileşen bu fonksiyonları çağırır. Şirket filtresi
+  (`company_id`) ve yetki kontrolü taşınırken AYNEN korunur.
+- Eski sorgular toplu taşınmaz: dosyaya iş için girildiğinde (yukarıdaki "dokunurken düzelt") o dosyanınkiler taşınır.
+- ESLint `no-restricted-syntax` UYARISI (`.eslintrc.json`, `app/` + `components/`): kalan borcu gösterir, CI'ı kırmaz.
+  Uyarı sayısı azalmalı, artmamalı (16.11.2026: 267 uyarı / 61 dosya).
+- **Ortak kit — kopya yazılmaz:** sekme / filtre çubuğu `components/erp/sekme-cubugu.tsx` (hap · alt-cizgi · kompakt),
+  adresle eşli sekme `components/erp/use-url-sekmesi.ts`, adres yardımcıları `lib/url-durumu.ts`, açılır uyarı şeridi
+  `components/erp/acilir-serit.tsx` (+ `useAcikTercihi`), özet kartları `components/erp/ozet-karti.tsx`, Türkçe harf
+  duyarsız arama `lib/tr-arama.ts`. Test: `tests/erp-kit.test.ts` (üretilen HTML eski sınıflarla aynı).
+- Klasör yapısı (`modules/`) ve Server Components'e geçiş ERTELENDİ (yüksek risk; önce Next.js yükseltmesi).
+
 ## Kapalı kararlar — GERİ EKLENMEZ (ayrıntı ve tarih ilgili dosyada)
 
 - Kök: giriş sayfasındaki pazarlama bölümü.

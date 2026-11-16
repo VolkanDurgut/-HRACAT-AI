@@ -219,3 +219,32 @@ Dalga 4 Yönetim Paneli · Dalga 5 Transit.
 Kullanıcı: "export ve export2'nin müşteriye gönderdiği tanışma ve teklif maillerinde bbt çıkarılsın (yalnız müşteri CRM)."
 `lib/pazar/sablonlar.ts` `CC_ADRESLERI` = yalnız execution@ (görev sayfasındaki "Outlook'ta aç" mailto'su). Ekibe giden günlük
 görev maili (edge `pazar-gorev`) değişmedi. Test: e2e_gorev 50.
+
+## 3.9 Rehber listesi (Şafak Bey listesi) + Takip = Yönetici paneli (16.11.2026)
+Kullanıcı: "Elimizde bir müşteri listesi var (Şafak Bey'in listesi). Mükerrer kayıt olmayacak şekilde sisteme entegre etmeliyiz."
+ve "'Süreçteki firmalar 28 firma · sonraki adım tarihine göre' bunu bu şekilde görmek bize ne sağlıyor? Pazar sekmesinin doğru
+çalıştığını düşünmüyorum." Kararlar: Türkiye sayfası hariç; liste potansiyelleri fuarla KARIŞIK; Takip = yönetici paneli.
+
+Migration `20261116110000_pazar_rehber_listesi.sql` (canlıya uygulandı):
+- `pazar_firmalar.kaynak` + `'liste'`, yeni `kaynak_etiket` (liste adı, ör. "Şafak Bey listesi"; gerekirse bununla geri alınır).
+  `pazar_ice_aktarimlari.tur` (fuar | liste) + `kaynak_etiket`.
+- `pazar_liste_aktar(dosya_adi, etiket, firmalar jsonb)`: `pazar_fuar_aktar` kişi kuralları; mükerrer = ad anahtarı / birleştirilmiş
+  adlar, yoksa AYNI e-posta → mevcut firmaya eklenir. Liste notu (sayfa/satır, Not, Adres, ham telefon, faks) firma notuna BİR KEZ yazılır.
+- `pazar_gorev_olustur`: potansiyeller kaynak başına kendi sırasıyla dizilip **sırayla birer** (fuar, liste, fuar…) gelir. Liste firması
+  yokken sıra öncekiyle birebir aynı (canlıda karşılaştırıldı).
+- `pazar_gorev_bilgi.firma` + `kaynak`, `kaynak_etiket`, `notlar` (görev sayfası "Kaynak: …" ve not; temsilci "Erişlerin müşterisi" gibi bilgiyi görür).
+
+Kod:
+- `lib/pazar/liste.ts` (saf): sayfa adı = ülke (`sayfaUlkesi`), başlık Firma/Kişi/Mail/Telefon/Fax/Adres/Not; bölüm başlıkları yalnız
+  bilinen kelimeler (BANKA, DEPO, EV, ARAÇ, SİGORTA, LOJİSTİK, FÜMİGASYON, TÜRKLER, DİĞER, Pirinç, "BAKERY, vb"); hizmet bölümleri,
+  ülke olmayan sayfa ve Türkiye önizlemede varsayılan HARİÇ. Kaymış satır (e-posta Telefon sütununda) düzeltilir; firma adı boşsa kişi adı.
+  E-postalar metnin içinden çıkarılır. Kısa/genel ad ("trader") başka ülke sayfasında ayrı firma ("trader (Benin)").
+- `components/pazar/liste-yukle.tsx` ("Rehber listesi yükle"): liste adı, sayfa/bölüm seçimi, önizleme (yeni / mevcut kayda eklenecek /
+  müşterimizle eşleşen / dosyada tekrar eden / bozuk e-posta). Kısa ad + farklı ülke + ortak e-posta alanı yoksa ayrı firma ("Negoce (Çad)").
+- Potansiyel tablosu "Kaynak" sütunu (liste adı rozeti + fuar dönemleri) ve kaynak filtresi; firma kartında "Kaynak".
+- `lib/pazar/panel.ts` (saf) + `components/pazar/takip.tsx` = yönetici paneli: 1) Aksiyon bekleyenler (ulaşma SONRASI cevap ve sonucu
+  girilmemiş / müşteri mailinde teklif-sipariş sinyali / teklif isteyen / işlenmeden kalan görev) 2) Ekip: bugün x/y + son 30 gün
+  görev → işlenen → ulaşılan → dönüş → teklif → sipariş 3) Süreç: aşama sayıları, tıklayınca firmalar (eski "Süreçteki firmalar"
+  tablosunun yerine) 4) Ülkelere göre pazar (müşteri / potansiyel / e-postalı / ulaşılan / dönüş); ülkeye tıklayınca Potansiyel o ülkeyle.
+  Üst kartlar: Aksiyon bekleyen · Ulaşılan firma (30 gün) · Dönüş · Siparişsiz müşteri. `pazar_takip` 30 gün okunur.
+- Test: `tests/pazar-liste.test.ts` (kurgusal veri).

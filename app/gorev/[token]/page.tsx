@@ -236,8 +236,12 @@ export default function GorevSayfasi() {
                 {bilgi.firma.durum === "musteri" ? (
                   <span>{bilgi.firma.son_siparis ? `Son sipariş ${tarihTR(bilgi.firma.son_siparis)} · ${gunOnce(bilgi.firma.son_siparis)} gün önce` : "Müşterimiz"}</span>
                 ) : bilgi.fuarlar.length > 0 ? <span>Fuar: {bilgi.fuarlar.join(", ")}</span> : null}
+                {bilgi.firma.durum !== "musteri" && bilgi.firma.kaynak === "liste" && bilgi.firma.kaynak_etiket && <span data-testid="gorev-kaynak">Kaynak: {bilgi.firma.kaynak_etiket}</span>}
                 {bilgi.son_urun && bilgi.firma.durum === "musteri" && <span style={{ color: TEXT_MUTED }}>{bilgi.son_urun}</span>}
               </div>
+              {bilgi.firma.notlar && (
+                <p className="mt-2 text-xs whitespace-pre-line break-words line-clamp-6" style={{ color: TEXT_MUTED }} data-testid="gorev-not">{bilgi.firma.notlar}</p>
+              )}
               <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Görüşme adımları">
                 {ADIMLAR.map((a, i) => {
                   const simdi = ADIMLAR.findIndex((x) => x.kod === bilgi.adim);

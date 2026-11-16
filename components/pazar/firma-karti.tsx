@@ -258,9 +258,12 @@ export function FirmaKarti({
             </Bolum>
           )}
 
-          {katilimlar.length > 0 && (
-            <Bolum baslik="Fuarlar">
+          {(katilimlar.length > 0 || (firma.kaynak === "liste" && firma.kaynak_etiket)) && (
+            <Bolum baslik={katilimlar.length > 0 ? "Fuarlar" : "Kaynak"}>
               <div className="flex flex-wrap gap-1.5">
+                {firma.kaynak === "liste" && firma.kaynak_etiket && (
+                  <span className="inline-flex h-6 items-center px-2 rounded text-xs" style={{ backgroundColor: "rgba(167,139,250,0.14)", color: "#C4B5FD" }} data-kart-kaynak>{firma.kaynak_etiket}</span>
+                )}
                 {katilimlar.map((k) => <span key={k.id} className="inline-flex h-6 items-center px-2 rounded text-xs" style={{ backgroundColor: "rgba(255,255,255,0.05)", color: "#C9D1DC" }}>{k.etiket}</span>)}
               </div>
             </Bolum>

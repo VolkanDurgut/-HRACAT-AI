@@ -76,9 +76,10 @@ export const REHBER_KONULARI: KilavuzKonusu[] = [
     hikaye: "Yöneticiler günü İhracat AI'da Pazar sayfasının Takip sekmesinden izler; her adımınız burada görünür.",
     renk: ["#F4A07C", "#283474"], ekran: "pazar-takip", cubuk: "/pazar",
     adimlar: [
-      { nokta: "bugun", baslik: "Bugün", metin: "Herkesin günün görevleri, ne yapıldığı ve atlananların nedeni. İlerleme çubuğu günün ne kadarının bittiğini gösterir." },
-      { nokta: "cevaplar", baslik: "Gelen cevaplar", metin: "Son 14 günün müşteri cevapları ve sistemin önerisi." },
-      { nokta: "surec", baslik: "Süreçteki firmalar", metin: "Sonraki hatırlatma tarihleri: geciken kırmızı, bugünkü sarı. Cevap veren firmalarda takip sizdedir." },
+      // 16.11.2026: Takip sekmesi yonetici paneli oldu; ekran goruntusu yenilenene kadar isaret noktasi yok.
+      { baslik: "Aksiyon bekleyenler", metin: "Cevap veren ama sonucu girilmemiş firmalar, teklif isteyenler ve işlenmeden kalan görevler burada listelenir. Cevap gelince sonucu kaydetmeyi unutmayın." },
+      { baslik: "Ekip", metin: "Herkesin bugünkü görevleri ve son 30 günde ulaştığı firma, aldığı dönüş, teklif ve sipariş sayısı." },
+      { baslik: "Süreç ve ülkeler", metin: "Firmaların hangi aşamada olduğu ve ülke ülke kaç müşterimiz, potansiyelimiz ve dönüşümüz olduğu." },
     ],
   },
 ];

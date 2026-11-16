@@ -8,7 +8,11 @@ export type GorevBilgisi = {
   /** Gorevin atandigi satisci (pazar_ekip); eski gorevlerde null. */
   ekip?: { kod: string; eposta: string; hitap: string | null } | null;
   adim: "sorgulama" | "hatirlatma1" | "hatirlatma2";
-  firma: { ad: string; ulke: string | null; durum: "musteri" | "potansiyel"; crm_asama: string; alici_adi: string | null; son_siparis: string | null; aktif: boolean };
+  firma: {
+    ad: string; ulke: string | null; durum: "musteri" | "potansiyel"; crm_asama: string; alici_adi: string | null; son_siparis: string | null; aktif: boolean;
+    /** 16.11.2026 (migration 20261116110000): rehber listesi kaynagi + firma notu (ör. "Erişlerin müşterisi"). */
+    kaynak?: string | null; kaynak_etiket?: string | null; notlar?: string | null;
+  };
   kisiler: { id: string; ad: string | null; eposta: string | null; eposta_gecerli: boolean; telefonlar: string[]; whatsapp: string | null }[];
   fuarlar: string[];
   /** Arsivden tespit edilen son cevaplar (3.5; son 30 gun). */

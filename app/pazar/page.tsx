@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Building2, CalendarClock, Inbox, Mail, MessageCircle, RefreshCw, Search, Store, Upload, Users } from "lucide-react";
+import { Activity, AlertTriangle, BellRing, BookUser, Building2, Mail, MessageCircle, RefreshCw, Search, Send, Store, Upload, Users } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -10,6 +10,8 @@ import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { FuarYukle } from "@/components/pazar/fuar-yukle";
 import { FirmaKarti } from "@/components/pazar/firma-karti";
 import { PazarTakip } from "@/components/pazar/takip";
+import { ListeYukle } from "@/components/pazar/liste-yukle";
+import { aksiyonlar, cevapVerenler, temasIndeksi } from "@/lib/pazar/panel";
 import { useAuth } from "@/lib/auth-context";
 import {
   pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
@@ -30,11 +32,16 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  * 10.11.2026 (kullanici: "cok daginik; tutarli, duzenli, kolay okunabilir olmali; Burak Bey onundeki ekranda takibi
  * yapabilmeli"): uc sekme -> Takip (varsayilan; components/pazar/takip.tsx) | Musterilerimiz | Potansiyel.
  * Ust ozet kartlari surec odakli: bugun islenen, surecteki firma, gelen cevap (14 gun), siparissiz musteri.
+ * 16.11.2026 (kullanici: "Surecteki firmalar 28 firma ... bunu bu sekilde gormek bize ne sagliyor?"): Takip sekmesi
+ * yonetici paneli oldu (components/pazar/takip.tsx + lib/pazar/panel.ts). Ust kartlar: aksiyon bekleyen, son 30 gun
+ * ulasilan firma, donus orani, siparissiz musteri. "Rehber listesi yukle" (Safak Bey listesi; components/pazar/liste-yukle.tsx);
+ * Potansiyel tablosunda "Kaynak" (fuar donemleri / liste adi) + kaynak filtresi.
  */
 
 type MusteriFiltre = "siparissiz" | "aktif" | "hepsi";
 type Sekme = "takip" | "musteriler" | "potansiyel";
 const SUREC_ASAMA = new Set(["sorgulandi", "hatirlatma1", "hatirlatma2", "cevap", "teklif", "siparis"]);
+const OTUZ_GUN = 30 * 86400000;
 const ASAMA_KISA: Record<string, string> = {
   sorgulandi: "Sorgulandı", hatirlatma1: "1. hatırlatma", hatirlatma2: "2. hatırlatma", sessiz: "Sessiz",
   cevap: "Cevap geldi", teklif: "Teklif istedi", siparis: "Sipariş verdi", ilgilenmiyor: "İlgilenmiyor",
@@ -90,6 +97,8 @@ function PazarIcerik() {
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yukleAcik, setYukleAcik] = useState(false);
+  const [listeAcik, setListeAcik] = useState(false);
+  const [kaynakFiltre, setKaynakFiltre] = useState("");
   const [musteriFiltre, setMusteriFiltre] = useState<MusteriFiltre>("siparissiz");
   const [arama, setArama] = useState("");
   const [ulke, setUlke] = useState("");
@@ -119,7 +128,7 @@ function PazarIcerik() {
   }, []);
 
   useEffect(() => { if (yetkili) yukle(); }, [yetkili, yukle]);
-  useEffect(() => { setGoster(SAYFA_BOYU); }, [arama, ulke]);
+  useEffect(() => { setGoster(SAYFA_BOYU); }, [arama, ulke, kaynakFiltre]);
 
   const kisiHarita = useMemo(() => {
     const m = new Map<string, PazarKisi[]>();
@@ -173,6 +182,7 @@ function PazarIcerik() {
     const q = arama.trim().toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
     return potansiyeller
       .filter((f) => !ulke || (ulke === "-" ? !f.ulke : f.ulke === ulke))
+      .filter((f) => !kaynakFiltre || (kaynakFiltre === "fuar" ? f.kaynak === "fuar" : f.kaynak === "liste" && f.kaynak_etiket === kaynakFiltre))
       .filter((f) => {
         if (!q) return true;
         if (f.ad.toLocaleLowerCase("tr-TR").replace(/ı/g, "i").includes(q)) return true;
@@ -180,14 +190,28 @@ function PazarIcerik() {
         return (kisiHarita.get(f.id) || []).some((k) => (k.ad || "").toLocaleLowerCase("tr-TR").replace(/ı/g, "i").includes(q) || (k.eposta || "").includes(q) || (qRakam.length >= 4 && k.telefonlar.some((t) => t.includes(qRakam))));
       })
       .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
-  }, [potansiyeller, ulke, arama, kisiHarita]);
+  }, [potansiyeller, ulke, arama, kisiHarita, kaynakFiltre]);
+  const listeEtiketleri = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of potansiyeller) if (f.kaynak === "liste" && f.kaynak_etiket) m.set(f.kaynak_etiket, (m.get(f.kaynak_etiket) || 0) + 1);
+    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0], "tr"));
+  }, [potansiyeller]);
 
   const acik = acikFirma ? firmalar.find((f) => f.id === acikFirma) || null : null;
-  const bugunGorevleri = takip ? takip.gorevler.filter((g) => g.tarih === takip.bugun) : [];
-  const bugunToplam = bugunGorevleri.length;
-  const bugunIslenen = bugunGorevleri.filter((g) => g.durum !== "bekliyor").length;
-  const surecSay = firmalar.filter((f) => SUREC_ASAMA.has(f.crm_asama)).length;
-  const cevapSay = takip ? takip.gelenler.filter((g) => g.tur === "cevap" && Date.parse(g.tarih) >= Date.now() - 14 * 86400000).length : 0;
+  // Ust kartlar (yonetici paneliyle ayni hesap: lib/pazar/panel.ts)
+  const ozet = useMemo(() => {
+    const temaslar = veri?.temaslar || [];
+    const { ilkUlasma } = temasIndeksi(temaslar);
+    const sinir = Date.now() - OTUZ_GUN;
+    const ulasilan = new Set(temaslar.filter((t) => ["sorgulama", "hatirlatma1", "hatirlatma2"].includes(t.adim) && Date.parse(t.olusturma) >= sinir).map((t) => t.firma_id));
+    const cevap = takip ? Array.from(cevapVerenler(takip.gelenler, ilkUlasma)).filter((id) => ulasilan.has(id)).length : 0;
+    const aksiyon = takip ? aksiyonlar({ bugun: takip.bugun, firmalar, temaslar, gelenler: takip.gelenler, gorevler: takip.gorevler }) : [];
+    return { ulasilan: ulasilan.size, cevap, aksiyon: aksiyon.length, aksiyonCevap: aksiyon.filter((a) => a.tur === "cevap" || a.tur === "oneri").length };
+  }, [veri, takip, firmalar]);
+  const ulkeyeGit = useCallback((u: string) => {
+    if (u === "-" || potansiyeller.some((f) => f.ulke === u)) { setUlke(u); setArama(""); setKaynakFiltre(""); setSekme("potansiyel"); }
+    else { setMusteriFiltre("hepsi"); setSekme("musteriler"); }
+  }, [potansiyeller]);
 
   if (!yetkili) return null;
 
@@ -202,7 +226,11 @@ function PazarIcerik() {
             <button type="button" onClick={yukle} disabled={yukleniyor} aria-label="Yenile" className="h-9 w-9 inline-flex items-center justify-center rounded-lg border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
               <RefreshCw size={15} className={yukleniyor ? "animate-spin" : ""} />
             </button>
-            <button type="button" onClick={() => setYukleAcik(true)} data-testid="fuar-yukle-ac"
+            <button type="button" onClick={() => { setListeAcik(true); setYukleAcik(false); }} data-testid="liste-yukle-ac"
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg text-sm font-medium border hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }}>
+              <BookUser size={16} /> Rehber listesi yükle
+            </button>
+            <button type="button" onClick={() => { setYukleAcik(true); setListeAcik(false); }} data-testid="fuar-yukle-ac"
               className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium text-white" style={{ backgroundColor: ACCENT }}>
               <Upload size={16} /> Fuar listesi yükle
             </button>
@@ -211,6 +239,7 @@ function PazarIcerik() {
       />
 
       {yukleAcik && veri && <FuarYukle mevcutFirmalar={veri.firmalar} onKapat={() => setYukleAcik(false)} onAktarildi={yukle} />}
+      {listeAcik && veri && <ListeYukle mevcutFirmalar={veri.firmalar} mevcutKisiler={veri.kisiler} onKapat={() => setListeAcik(false)} onAktarildi={yukle} />}
 
       {hata && (
         <div className="flex items-start gap-2 rounded-lg border px-3 py-2 mb-4 text-sm" style={{ borderColor: "rgba(239,68,68,0.35)", backgroundColor: "rgba(239,68,68,0.08)", color: "#FCA5A5" }}>
@@ -223,9 +252,9 @@ function PazarIcerik() {
       ) : veri ? (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <OzetKarti testId="ozet-bugun" ikon={<CalendarClock size={14} />} etiket="Bugün işlenen" deger={takip ? `${bugunIslenen}/${bugunToplam}` : "—"} alt="günlük görevler" />
-            <OzetKarti testId="ozet-surec" ikon={<Activity size={14} />} etiket="Süreçteki firma" deger={surecSay} alt="sorgulama · hatırlatma · cevap" />
-            <OzetKarti testId="ozet-cevap" ikon={<Inbox size={14} />} etiket="Gelen cevap" deger={takip ? cevapSay : "—"} alt="son 14 gün" />
+            <OzetKarti testId="ozet-aksiyon" ikon={<BellRing size={14} />} etiket="Aksiyon bekleyen" deger={takip ? ozet.aksiyon : "—"} alt={takip ? `${ozet.aksiyonCevap} cevap / sinyal` : "takip okunamadı"} />
+            <OzetKarti testId="ozet-ulasilan" ikon={<Send size={14} />} etiket="Ulaşılan firma" deger={ozet.ulasilan} alt="son 30 gün · mail / WhatsApp" />
+            <OzetKarti testId="ozet-donus" ikon={<Mail size={14} />} etiket="Dönüş" deger={takip ? ozet.cevap : "—"} alt={ozet.ulasilan ? `dönüş oranı %${Math.round((ozet.cevap / ozet.ulasilan) * 100)}` : "henüz ulaşılan yok"} />
             <OzetKarti testId="ozet-siparissiz" ikon={<Building2 size={14} />} etiket="Siparişsiz müşteri" deger={siparissizSay} alt={`${aktifSay} aktif · ${musteriler.length} müşteri`} />
           </div>
 
@@ -240,7 +269,7 @@ function PazarIcerik() {
           </div>
 
           {sekme === "takip" && (takip ? (
-            <PazarTakip takip={takip} firmalar={firmalar} temaslar={veri.temaslar || []} onFirma={setAcikFirma} />
+            <PazarTakip takip={takip} firmalar={firmalar} kisiler={veri.kisiler} temaslar={veri.temaslar || []} onFirma={setAcikFirma} onUlke={ulkeyeGit} />
           ) : (
             <div className="rounded-xl border p-4 text-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: "#FCA5A5" }} data-testid="takip-hata">{takipHata || "Takip bilgisi okunamadı."}</div>
           ))}
@@ -330,12 +359,20 @@ function PazarIcerik() {
                 {ulkeler.map(([u, n]) => <option key={u} value={u}>{ulkeGosterim(u)} ({n})</option>)}
                 {potansiyeller.some((f) => !f.ulke) && <option value="-">Ülkesi bilinmeyen</option>}
               </select>
+              {listeEtiketleri.length > 0 && (
+                <select value={kaynakFiltre} onChange={(e) => setKaynakFiltre(e.target.value)} data-testid="pazar-kaynak" aria-label="Kaynak"
+                  className="h-9 px-2 rounded-lg border text-sm text-white outline-none max-w-[220px]" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                  <option value="">Tüm kaynaklar</option>
+                  <option value="fuar">Fuar listeleri</option>
+                  {listeEtiketleri.map(([e, n]) => <option key={e} value={e}>{e} ({n})</option>)}
+                </select>
+              )}
             </div>
 
             {potansiyelListesi.length === 0 ? (
               <div className="p-4">
                 <EmptyState icon={<Store size={36} />} title={potansiyeller.length ? "Eşleşen firma yok" : "Henüz potansiyel müşteri yok"}
-                  description={potansiyeller.length ? "Aramayı veya filtreyi değiştirin." : "Fuar listesini yükleyerek başlayın."} />
+                  description={potansiyeller.length ? "Aramayı veya filtreyi değiştirin." : "Fuar ya da rehber listesini yükleyerek başlayın."} />
               </div>
             ) : (
               <>
@@ -346,7 +383,7 @@ function PazarIcerik() {
                         <th className="text-left font-medium px-3 py-2">Firma</th>
                         <th className="text-left font-medium px-3 py-2">Ülke</th>
                         <th className="text-left font-medium px-3 py-2 hidden md:table-cell">Yetkili</th>
-                        <th className="text-left font-medium px-3 py-2 hidden lg:table-cell">Fuar</th>
+                        <th className="text-left font-medium px-3 py-2 hidden lg:table-cell">Kaynak</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -361,6 +398,9 @@ function PazarIcerik() {
                             <td className="px-3 py-2 hidden md:table-cell min-w-[220px]"><YetkiliHucresi kisiler={kisiHarita.get(f.id) || []} /></td>
                             <td className="px-3 py-2 hidden lg:table-cell">
                               <div className="flex flex-wrap gap-1">
+                                {f.kaynak === "liste" && f.kaynak_etiket && (
+                                  <span className="inline-flex h-5 items-center px-1.5 rounded text-[11px] whitespace-nowrap" style={{ backgroundColor: "rgba(167,139,250,0.14)", color: "#C4B5FD" }} title="Rehber listesi" data-kaynak-liste>{f.kaynak_etiket}</span>
+                                )}
                                 {fuarlar.slice(0, 4).map((k) => (
                                   <span key={k.id} className="inline-flex h-5 items-center px-1.5 rounded text-[11px] whitespace-nowrap" style={{ backgroundColor: "rgba(255,255,255,0.05)", color: "#C9D1DC" }} title={k.etiket}>{[k.yil, k.donem].filter(Boolean).join(" ") || k.etiket}</span>
                                 ))}

@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/lib/supabase";
 import type { FuarFirma } from "@/lib/pazar/fuar";
+import type { ListeFirma } from "@/lib/pazar/liste";
 
 export type PazarDurum = "potansiyel" | "musteri";
 export type PazarFirma = {
@@ -14,7 +15,9 @@ export type PazarFirma = {
   ulke: string | null;
   ulke_kaynagi: "excel" | "telefon" | "eposta" | "elle" | null;
   durum: PazarDurum;
-  kaynak: "fuar" | "siparis" | "elle";
+  kaynak: "fuar" | "siparis" | "elle" | "liste";
+  /** Rehber listesi adi ("Şafak Bey listesi"; kaynak = liste, 16.11.2026). */
+  kaynak_etiket: string | null;
   alici_adi: string | null;
   musteri_olma_tarihi: string | null;
   created_at: string;
@@ -67,7 +70,7 @@ async function hepsi<T>(tablo: string, kolonlar: string): Promise<T[]> {
 
 export async function pazarVerisiOku(): Promise<PazarVerisi> {
   const [firmalar, kisiler, katilimlar, temaslar] = await Promise.all([
-    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,alici_adi,musteri_olma_tarihi,created_at,ek_anahtarlar,notlar,crm_asama,sonraki_adim,bekleme_bitis,son_temas"),
+    hepsi<PazarFirma>("pazar_firmalar", "id,ad,anahtar,ulke,ulke_kaynagi,durum,kaynak,kaynak_etiket,alici_adi,musteri_olma_tarihi,created_at,ek_anahtarlar,notlar,crm_asama,sonraki_adim,bekleme_bitis,son_temas"),
     hepsi<PazarKisi>("pazar_kisiler", "id,firma_id,ad,eposta,eposta_gecerli,telefonlar,whatsapp"),
     hepsi<PazarKatilim>("pazar_fuar_katilimlari", "id,firma_id,fuar,yil,donem,etiket"),
     hepsi<PazarTemas>("pazar_temaslar", "id,firma_id,adim,kanal,sonuc,alici,konu,isleyen,olusturma"),
@@ -108,6 +111,14 @@ export async function fuarListesiAktar(dosyaAdi: string, firmalar: FuarFirma[]):
     katilimlar: f.katilimlar,
   }));
   const { data, error } = await supabase.rpc("pazar_fuar_aktar", { p_dosya_adi: dosyaAdi, p_firmalar: govde });
+  if (error) throw new Error(error.message);
+  return data as AktarmaSonucu;
+}
+
+/** Rehber listesi (ulke sayfali; lib/pazar/liste.ts) -> pazar_liste_aktar (migration 20261116110000). */
+export async function rehberListesiAktar(dosyaAdi: string, etiket: string, firmalar: ListeFirma[]): Promise<AktarmaSonucu> {
+  const govde = firmalar.map((f) => ({ ad: f.ad, ulke: f.ulke, ulke_kaynagi: f.ulke_kaynagi, ulke_ham: f.ulke_ham, notlar: f.notlar, kisiler: f.kisiler }));
+  const { data, error } = await supabase.rpc("pazar_liste_aktar", { p_dosya_adi: dosyaAdi, p_etiket: etiket, p_firmalar: govde });
   if (error) throw new Error(error.message);
   return data as AktarmaSonucu;
 }
@@ -191,13 +202,13 @@ export type TakipGorev = {
 };
 export type TakipVerisi = { bugun: string; ekip: PazarEkip[]; gelenler: PazarGelen[]; gorevler: TakipGorev[] };
 
-/** Takip sekmesi: ekip, son 30 gunun gelen cevaplari, son 7 gunun gorevleri (token'siz RPC). */
+/** Takip (yonetici paneli): ekip, son 30 gunun gelen cevaplari ve gorevleri (token'siz RPC; 16.11.2026: 7 -> 30 gun). */
 export async function pazarTakipOku(): Promise<TakipVerisi> {
   const otuzGun = new Date(Date.now() - 30 * 86400000).toISOString();
   const [ekip, gelen, takip] = await Promise.all([
     supabase.from("pazar_ekip").select("kod,eposta,hitap,sira,aktif").order("sira"),
     supabase.from("pazar_gelenler").select("id,firma_id,gonderen,konu,ozet,tarih,tur,oneri").gte("tarih", otuzGun).order("tarih", { ascending: false }).limit(300),
-    supabase.rpc("pazar_takip", { p_gun: 7 }),
+    supabase.rpc("pazar_takip", { p_gun: 30 }),
   ]);
   if (ekip.error) throw new Error(ekip.error.message);
   if (gelen.error) throw new Error(gelen.error.message);

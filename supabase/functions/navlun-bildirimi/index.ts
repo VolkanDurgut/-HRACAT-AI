@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type { AcenteTablosu } from "../_shared/navlun-oku.ts";
-import { bizdenMi, tutarAdaylari } from "../_shared/navlun-oku.ts";
+import { bizdenMi, tarifeSatirlari, tutarAdaylari } from "../_shared/navlun-oku.ts";
 import { acenteOgren, adayKaydi, mesajIsle, type NavlunGirdi } from "../_shared/navlun-isle.ts";
 import { alintiKimligi, alintiMesajlari, genelTarifeMi, govdeImzasi } from "../_shared/navlun-alinti.ts";
 
@@ -91,6 +91,8 @@ async function alintiKontrol(sirket: string, k: Kayit, govde: string, sadeceDogr
   const fiyatli = k.olaylar.filter((o) => FIYATLI.has(o.tur) && o.tutar !== null);
   if (!fiyatli.length) return "fiyat yok";
   if (genelTarifeMi(govde, k.liman, tutarAdaylari(govde))) return "genel tarife (konudaki liman metinde geçmiyor)";
+  // 17.11.2026: cok limanli tarife ("LIMAN (ULKE) USD 1940" satirlari) alintidan alinmaz; eski tarife guncelini ezmesin
+  if (tarifeSatirlari(govde)) return "genel tarife (çok limanlı tablo)";
   if (!k.acente) return null;
   const t = Date.parse(k.tarih);
   const bas = new Date(t - 4 * SAAT).toISOString(), bit = new Date(t + 4 * SAAT).toISOString();
@@ -130,22 +132,26 @@ async function alintidanKurtar(sirket: string, ust: NavlunGirdi, alinti: string,
   return sonuc;
 }
 
-/** Fiyatsiz acente cevabindaki free time / transit: ayni acente + liman, son 7 gundeki teklifin BOS alanlarina. */
+/** Fiyatsiz acente cevabindaki free time / transit / armator: ayni acente + liman, son 7 gundeki teklifin BOS alanlarina (acik free time guncellemesi: son 30 gun, dolu alan da). */
 async function bilgiTamamla(sirket: string, kayitlar: Kayit[]): Promise<number> {
   let n = 0;
   for (const k of kayitlar) {
     if (k.durum !== "bilgi" || !k.acente || !k.liman_anahtar || k.mesaj_id.startsWith("alinti:")) continue;
-    const ft = k.ek_bilgi.free_time_gun, tt = k.ek_bilgi.transit_gun;
-    const alanlar: [string, unknown][] = [];
-    if (ft !== null && ft > 0 && ft <= 60) alanlar.push(["free_time_gun", ft]);
-    if (tt && /^\d{1,3}(-\d{1,3})?$/.test(tt)) alanlar.push(["transit_gun", tt]);
+    const ft = k.ek_bilgi.free_time_gun, tt = k.ek_bilgi.transit_gun, arm = k.ek_bilgi.armator;
+    // [alan, deger, dolu alani da ezer mi]. 17.11.2026: "ft 21 gun olarak devam edilecektir" gibi acik guncelleme dolu free time'i
+    // da degistirir (son 30 gunun teklifleri); kisa cevaptaki armator ("<Armator> 40 gun") yalniz bossa yazilir.
+    const alanlar: [string, unknown, boolean][] = [];
+    if (ft !== null && ft > 0 && ft <= 60) alanlar.push(["free_time_gun", ft, k.ek_bilgi.ft_guncel]);
+    if (tt && /^\d{1,3}(-\d{1,3})?$/.test(tt)) alanlar.push(["transit_gun", tt, false]);
+    if (arm) alanlar.push(["armator", arm, false]);
     const t = Date.parse(k.tarih);
     if (!alanlar.length || !Number.isFinite(t)) continue;
-    const bas = new Date(t - 7 * 24 * SAAT).toISOString(), bit = new Date(t).toISOString();
-    for (const [alan, deger] of alanlar) {
+    const bit = new Date(t).toISOString();
+    for (const [alan, deger, ezer] of alanlar) {
+      const bas = new Date(t - (ezer ? 30 : 7) * 24 * SAAT).toISOString();
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/navlun_teklifleri?company_id=eq.${sirket}&acente=eq.${encodeURIComponent(k.acente)}&liman_anahtar=eq.${encodeURIComponent(k.liman_anahtar)}` +
-        `&tur=in.(teklif,karsi_teklif)&tarih=gte.${encodeURIComponent(bas)}&tarih=lte.${encodeURIComponent(bit)}&${alan}=is.null`,
+        `&tur=in.(teklif,karsi_teklif)&tarih=gte.${encodeURIComponent(bas)}&tarih=lte.${encodeURIComponent(bit)}${ezer ? `&or=(${alan}.is.null,${alan}.neq.${deger})` : `&${alan}=is.null`}`,
         { method: "PATCH", headers: { ...basliklar, "Content-Type": "application/json", Prefer: "return=representation" }, body: JSON.stringify({ [alan]: deger }) });
       if (res.ok) n += ((await res.json()) as unknown[]).length; else console.error("navlun bilgi tamamlanamadi", res.status, (await res.text()).slice(0, 200));
     }

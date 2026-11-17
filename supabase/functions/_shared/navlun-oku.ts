@@ -174,6 +174,8 @@ function armatorBul(s: string, yakin?: number): string | null {
 const FT_DESENLERI: RegExp[] = [
   /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:standa?r[td]\s*)?(?:ft\b|free|frfee)/gi,
   /(\d{1,2})\s*(?:calendar\s*)?days?\s*free/gi,
+  // 17.11.2026 ("Varis limaninda 13 gun DND free time" okunmuyordu): DND / D&D / combined araya girer
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:dnd|d\s*&\s*d|dem\s*\/\s*det|combined|kombine)\s*(?:ft\b|free)/gi,
   /(\d{1,2})\s*free\s*var/gi,
   /(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/gi,
   /(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/gi,
@@ -243,12 +245,14 @@ const TT_SAYI = "(\\d{1,3}(?:\\s*[-–\\/]\\s*\\d{1,3})?)";
 const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:free|ft\\b|dem|det|serbest)))";
 const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt(?![a-zçğıöşü])|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
 const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t)`, "gi");
+// 17.11.2026 ("(ORNEKLIMAN aktarmalı 40-42DAYS )"): aktarma notundaki gun araligi transit suredir
+const TT_AKTARMA = /aktarmal[ıi]\s*(\d{1,3}\s*[-–]\s*\d{1,3})\s*(?:days?|g[üu]n)/gi;
 // "Odeme: TT 30 gun" gibi odeme kosulu transit degildir
 const TT_ODEME = /(?:ödeme|odeme|payment|vade|pe[şs]in|advance)[^\n]{0,20}$/i;
 
 export function transitBul(s: string): string | null {
   const gor = new Set<string>();
-  for (const r of [TT_ACIK, TT_BIRIMLI]) {
+  for (const r of [TT_ACIK, TT_BIRIMLI, TT_AKTARMA]) {
     for (const m of s.matchAll(r)) {
       if (TT_ODEME.test(s.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0))) continue;
       const ham = (m[1] || m[2]).replace(/\s+/g, "").replace(/[–\/]/g, "-");
@@ -297,6 +301,9 @@ const EK_KALEM_SONRA = /^\s*(?:[.,]\s*-)?\s*(?:\+\s*kdv\s*)?(?:pss|gri|art[ıi][
 const EGIK = /^\s*(?:[.,]\s*-?\s*|-\s*)?\//;
 
 const MASRAF = /masraf|ücret|ucret|ceza|kdv|fee\b|demuraj|detention|surcharge/i;
+// 17.11.2026 (acente "armator spot ekrani ... Total Maliyet: N USD" diye kiyas yazdi; maliyet teklif sanildi):
+// acentenin kiyas icin yazdigi maliyet / spot ekrani fiyati kendi teklifi degildir.
+const MALIYET = /maliyet|spot\s*ekran|total\s*cost|cost\s*price/i;
 // Kalem siniri: baska bir tutar ("+ USD 30", "USD", "$") ya da satir sonu. Tek basina "+" sinir DEGIL ("USD 50+Kdv").
 const KALEM_SINIRI = /\+\s*(?=(?:usd|\$|\d))|\busd\b|\$|\n/gi;
 
@@ -325,6 +332,7 @@ function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: stri
     // BU tutarla sinirli -> sonraki kalem ("USD 3350 / 20'DC + USD 30 ENS FEE / BL") ya da onceki kalem bu tutari
     // masraf yapmaz; "liman masraflari dahil" bir masraf kalemi degil, lokal dahil bilgisidir.
     if (MASRAF.test(kalemCevresi(s, m.index, m.index + m[0].length))) continue;
+    if (MALIYET.test(cumle(s, m.index, m.index + m[0].length))) continue;
     // 13.11.2026: ek kalem / artis navlun degildir ("IMO lokal farki USD 165", "$200 PSS artisi", "VGM USD 45")
     if (EK_KALEM_ONCE.test(s.slice(Math.max(0, m.index - 25), m.index)) || EK_KALEM_SONRA.test(s.slice(m.index + m[0].length, m.index + m[0].length + 20))) continue;
     if (siki) {
@@ -335,7 +343,10 @@ function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: stri
     const sonra = s.slice(m.index + m[0].length, m.index + m[0].length + 14);
     const egik = EGIK.test(sonra) ? ekipmanBul(sonra.replace(EGIK, "")) : null;      // "Usd 875/20dc", "USD 2000 .-/20'dv"
     const onceki = ekipmanBul(s.slice(Math.max(0, m.index - 25), m.index));                    // "20DC: 1625 USD"
-    sonuc.push({ tutar: n, ekipman: egik ?? onceki ?? ekipmanBul(cevre), i: m.index });
+    // 17.11.2026 ("Navlun Usd 850.- 20' dv  Navlun Usd 1250.- 40' dv& hc" -> ikinci tutar da 20'lik sanilip atlaniyordu):
+    // fiyatin HEMEN ardindaki ekipman ("1250.- 40' dv") onceki satirin ekipmanindan once gelir
+    const bitisik = /^[\s.,\-–]*\d{2}\s*'/.test(sonra) ? ekipmanBul(sonra.replace(/^[\s.,\-–]*/, "").slice(0, 9)) : null;
+    sonuc.push({ tutar: n, ekipman: egik ?? bitisik ?? onceki ?? ekipmanBul(cevre), i: m.index });
   }
   return sonuc;
 }
@@ -478,6 +489,46 @@ export function ekFormuOku(ekMetin: string, konu: string): NavlunOlay[] | null {
  * Tek mesajdan navlun olaylarini cikar. Fiyatli olaylara (ve "fiyat ekte"ye) mesajdaki transit suresi eklenir
  * (11.11.2026; mesajda tek deger varsa).
  */
+// 17.11.2026 (cok limanli genel tarife okunmuyordu): "LIMAN (ULKE) USD 1234" satirlari.
+// En az 3 satir varsa genel tarife: her liman ayri teklif. Bolum basligindaki "Free time: 14 Days" o bolumun free time'i,
+// "For <Liman> 21 Days" o limana ozel. USD disi (EUR) satirlar yazilmaz (tablo para birimi tasimiyor).
+// Liman adlari sistemdeki yazima cevrilir (DAR ES SALAAM -> DAR ES SELAM ...); yoksa oldugu gibi buyuk harf.
+const TARIFE_ADLARI: Record<string, string> = {
+  "DAR ES SALAAM": "DAR ES SELAM", MOGADISHU: "MOGADİŞU", BENGHAZI: "BİNGAZİ", BEIRUT: "BEYRUT", SINGAPORE: "SİNGAPUR",
+};
+type TarifeSatiri = { liman: string; tutar: number; ekipman: string; ft: number | null; gec: string | null };
+export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
+  const bulunan: TarifeSatiri[] = [];
+  let ft: number | null = null, gec: string | null = null, ekipman = "20DC";
+  let ozel: Record<string, number> = {};
+  let usdDisi = 0;
+  // HTML tablodan gelen metinde hucreler ayri satirdadir ("LIMAN (ULKE)\nUSD\n1940", "Currency\n20DV"): tek satira toplanir
+  const duz = yeni
+    .replace(/\)[ \t]*\r?\n[ \t]*(USD|EUR)[ \t]*\r?\n[ \t]*(\d)/g, ") $1 $2")
+    .replace(/^([ \t]*currency)[ \t]*\r?\n[ \t]*(\d{2}[ \t]*[A-Z]{2})[ \t]*$/gim, "$1 $2");
+  for (const ham of duz.split("\n")) {
+    const s = ham.trim();
+    const bas = s.match(/free\s*time\s*[:\-]?\s*(\d{1,2})\s*days?/i);
+    if (bas) {
+      ft = Number(bas[1]);
+      ozel = {};
+      for (const o of s.matchAll(/for\s+([A-Za-z .]{3,25}?)\s+(\d{1,2})\s*days?/gi)) ozel[buyukTr(o[1].trim()).replace(/İ/g, "I")] = Number(o[2]);
+      const v = s.match(/validity\s*[:\-]?\s*(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/i);
+      if (v) gec = v[1];
+    }
+    const e = s.match(/^currency\s+(.+)$/i);
+    if (e) ekipman = ekipmanBul(e[1]) ?? ekipman;
+    const m = s.match(/^([A-Z][A-Z .'-]{2,30}?)\s*\(([A-Z][A-Z .'-]{2,30})\)\s*(USD|EUR)\s*([\d][\d.,]*)\s*$/);
+    if (!m) continue;
+    if (m[3] !== "USD") { usdDisi++; continue; }
+    const n = sayi(m[4]);
+    if (!makulMu(n)) continue;
+    const ad = buyukTr(m[1].trim());
+    bulunan.push({ liman: TARIFE_ADLARI[ad] ?? ad, tutar: n, ekipman, ft: ozel[ad.replace(/İ/g, "I")] ?? ft, gec });
+  }
+  return bulunan.length + usdDisi >= 3 && bulunan.length ? bulunan : null;
+}
+
 export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
   const olaylar = navlunMesajOkuIc(m, acenteler, secenek);
   if (!olaylar.some((o) => TRANSITLI.has(o.tur))) return olaylar;
@@ -524,6 +575,12 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   if (/gemileri dolu|yer (?:yok|bulunmamakta)|no space/i.test(duz)) ekle("yer_yok");
   if (/hedef(?:iniz)?\s*(?:var\s*m[ıi]|mevcut\s*mu|ifyat|fiyat)/i.test(duz) && !/hedefiniz uygundur/i.test(duz)) ekle("hedef_soru");
   if (/hedef(?:iniz)?\s*uygun/i.test(duz)) { ekle("hedef_kabul"); return olaylar; }
+
+  const tarife = tarifeSatirlari(yeni);
+  if (tarife) {
+    for (const r of tarife) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: null, pol: polBul(yeni) });
+    return olaylar;
+  }
 
   const tablo = dikeyTablo(yeni, siki);
   if (tablo) {

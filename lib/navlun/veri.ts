@@ -96,7 +96,8 @@ export async function navlunHataCoz(id: string, islem: "duzelt" | "yoksay", tuta
 }
 
 /** 16.11.2026: fiyati okunamamis acente cevaplari (metninde tutar gecen ya da tanimadigimiz alan adindan gelen). */
-export type TeklifAdayi = { id: string; konu: string | null; acente: string | null; alan: string; liman: string | null; tarih: string; metin: string };
+/** 17.11.2026: denetim - okunmus mailde kayitli olmayan tutar da listeye duser; neden metni RPC'den gelir. */
+export type TeklifAdayi = { id: string; konu: string | null; acente: string | null; alan: string; liman: string | null; tarih: string; metin: string; neden?: string | null };
 export async function teklifAdaylariOku(): Promise<TeklifAdayi[]> {
   const { data, error } = await supabase.rpc("navlun_teklif_adaylari");
   if (error) throw new Error(error.message);

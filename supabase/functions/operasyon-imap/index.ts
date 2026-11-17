@@ -15,6 +15,9 @@ import { isle, yeniDurum, yeniMetin, type AjanAyar, type Mail } from "../_shared
 //   UID sirasiyla okur (operasyon_imap_durum.son_uid'den devam; ilk calismada "baslangic" gununden), metni cikarir
 //   (_shared/mime-oku.ts), kural motoruyla (_shared/operasyon-ajan.ts) isler ve operasyon_mailleri'ne yazar
 //   (Message-ID ile tekrarsiz). Faz 1 = GOZLEM: is tablolarina yazilmaz, mail gonderilmez.
+//   17.11.2026: konusu "NAVLUN" / "REZERVASYON TALEBI" olan ACENTE mailleri ayrica navlun-bildirimi'ne gider (Navlun sayfasi).
+// {"islem": "navlun_yeniden_isle", "sayfa": n}: Navlun kayitlarini saklanan metinden yeniden okutur (navlun-bildirimi'ne aktarir).
+// {"islem": "navlun_gecmis", "gun": "YYYY-AA-GG"}: kayitli acente navlun maillerini o gunden beri bir kez Navlun sayfasina aktarir.
 // {"islem": "deneme", "alan": "...", "gun": "YYYY-AA-GG"}: yalniz baslik listesi, veritabanina yazmaz.
 //
 // Yetki: "x-cron-anahtar" basligi = Vault operasyon_imap_anahtari (migration 20261117160000), RPC ile dogrulanir.
@@ -33,6 +36,8 @@ const CALISMA_BASINA = 30; // bir taramada en fazla bu kadar yeni mail
 const PAKET = 10; // tek FETCH'te mail
 const GOVDE_SINIRI = 150000; // bayt; ekler bunun otesinde kalir
 const SURE_MS = 40000;
+const NAVLUN_ANAHTAR = (Deno.env.get("PAZAR_GELEN_ANAHTAR") || "").trim();
+const NAVLUN_KONU = /navlun|rezervasyon\s*taleb/i;
 
 const servis = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 const json = (veri: unknown, status = 200) =>
@@ -74,6 +79,51 @@ function adresler(deger: string | undefined): string[] {
   return [...baslikCoz(deger).matchAll(/[^\s<>,;"']+@[^\s<>,;"']+\.[a-z]{2,}/gi)].map((m) => m[0].toLowerCase());
 }
 
+type NavlunAday = { mesaj_id: string; gonderen: string; konu: string; tam: string; tarih: string };
+
+/**
+ * 17.11.2026 (kullanici onayi): arsive ulasmayan acente navlun yazismalari Navlun sayfasina da gider (navlun-bildirimi
+ * "kaydet", Apps Script ile ayni bicim). Ayni Message-ID tekrar kaydedilmez. Ayni gonderenden +-4 saat icinde
+ * alintidan kurtarilmis kayit zaten varsa gonderilmez (ayni teklif iki kez sayilmasin).
+ */
+async function navlunaGonder(adaylar: NavlunAday[]): Promise<{ gonderilen: number; atlanan: number; hata?: string }> {
+  if (!adaylar.length) return { gonderilen: 0, atlanan: 0 };
+  if (!NAVLUN_ANAHTAR) return { gonderilen: 0, atlanan: adaylar.length, hata: "PAZAR_GELEN_ANAHTAR yok" };
+  const gonder: Record<string, unknown>[] = [];
+  let atlanan = 0;
+  for (const a of adaylar) {
+    const t = Date.parse(a.tarih);
+    if (!Number.isFinite(t)) { atlanan++; continue; }
+    const bas = new Date(t - 4 * 3600e3).toISOString(), bit = new Date(t + 4 * 3600e3).toISOString();
+    const alinti = await rest<{ mesaj_id: string }[]>(
+      `navlun_mesajlari?select=mesaj_id&gonderen=eq.${encodeURIComponent(a.gonderen)}&mesaj_id=like.alinti:*` +
+        `&tarih=gte.${encodeURIComponent(bas)}&tarih=lte.${encodeURIComponent(bit)}&limit=1`,
+    );
+    if (alinti.length) { atlanan++; continue; }
+    gonder.push({ mesaj_id: a.mesaj_id, gonderen: a.gonderen, konu: a.konu, tarih: a.tarih, govde: yeniMetin(a.tam).slice(0, 8000), alinti: a.tam.slice(0, 30000) });
+  }
+  for (let i = 0; i < gonder.length; i += 20) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/navlun-bildirimi`, {
+      method: "POST",
+      headers: { ...servis, "Content-Type": "application/json", "x-pazar-anahtar": NAVLUN_ANAHTAR },
+      body: JSON.stringify({ islem: "kaydet", mesajlar: gonder.slice(i, i + 20) }),
+    });
+    if (!res.ok) return { gonderilen: i, atlanan, hata: `navlun-bildirimi ${res.status}: ${(await res.text()).slice(0, 150)}` };
+    await res.body?.cancel();
+  }
+  return { gonderilen: gonder.length, atlanan };
+}
+
+/** Gecmis: operasyon_mailleri'ndeki acente navlun yazismalarini (verilen gunden beri) Navlun sayfasina aktarir. */
+async function navlunGecmis(gun: string): Promise<Record<string, unknown>> {
+  const satirlar = await rest<{ mesaj_id: string; gonderen: string; konu: string; tam_metin: string; tarih: string }[]>(
+    `operasyon_mailleri?select=mesaj_id,gonderen,konu,tam_metin,tarih&yon=eq.gelen&tarih=gte.${gun}T00:00:00Z&order=tarih.asc&limit=500`,
+  );
+  const adaylar = satirlar.filter((r) => NAVLUN_KONU.test(r.konu || "") && r.tam_metin && r.gonderen)
+    .map((r) => ({ mesaj_id: r.mesaj_id, gonderen: r.gonderen, konu: r.konu, tam: r.tam_metin, tarih: r.tarih }));
+  return { ok: true, aday: adaylar.length, ...(await navlunaGonder(adaylar)) };
+}
+
 async function tara(): Promise<Record<string, unknown>> {
   const t0 = Date.now();
   const acenteler = await rest<Acente[]>("operasyon_acenteler?aktif=eq.true&select=id,company_id,alan_adi,booking_deseni");
@@ -94,6 +144,7 @@ async function tara(): Promise<Record<string, unknown>> {
 
   const oturum = await imapOturumu({ sunucu: SUNUCU, kullanici: KULLANICI, sifre: SIFRE, sureMs: SURE_MS + 10000 });
   let yazilan = 0;
+  const navlunAdaylari: NavlunAday[] = [];
   let enBuyukUid = durum.son_uid;
   let uidler: number[] = [];
   let uidvalidity = 0;
@@ -154,6 +205,9 @@ async function tara(): Promise<Record<string, unknown>> {
           kanit: r.kanit,
           motor_surumu: MOTOR_SURUMU,
         });
+        if (yon === "gelen" && NAVLUN_KONU.test(konu) && tarih && kim.eposta) {
+          navlunAdaylari.push({ mesaj_id: mesajId, gonderen: kim.eposta, konu, tam, tarih });
+        }
         if (h.uid > enBuyukUid) enBuyukUid = h.uid;
       }
       if (satirlar.length) {
@@ -180,7 +234,13 @@ async function tara(): Promise<Record<string, unknown>> {
       guncelleme: new Date().toISOString(),
     }),
   });
-  return { ok: true, sure_ms: Date.now() - t0, bulunan: uidler.length, yazilan, son_uid: enBuyukUid };
+  let navlun: Record<string, unknown> = {};
+  try {
+    navlun = await navlunaGonder(navlunAdaylari);
+  } catch (e) {
+    navlun = { hata: e instanceof Error ? e.message.slice(0, 150) : String(e) };
+  }
+  return { ok: true, sure_ms: Date.now() - t0, bulunan: uidler.length, yazilan, son_uid: enBuyukUid, navlun };
 }
 
 async function hataYaz(mesaj: string): Promise<void> {
@@ -202,7 +262,7 @@ Deno.serve(async (req) => {
   if (!(await anahtarGecerli(req.headers.get("x-cron-anahtar") || ""))) return json({ hata: "Yetkisiz." }, 401);
   if (!KULLANICI || !SIFRE) return json({ hata: "EXEC_IMAP_KULLANICI / EXEC_IMAP_SIFRE tanimli degil." }, 503);
 
-  let govde: { islem?: string; alan?: string; gun?: string };
+  let govde: { islem?: string; alan?: string; gun?: string; sayfa?: unknown };
   try {
     govde = await req.json();
   } catch {
@@ -220,7 +280,28 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (govde.islem !== "deneme") return json({ hata: "Bilinmeyen islem ('tara' ya da 'deneme')." }, 400);
+  // 17.11.2026: Navlun okuyucusu gelistikten sonra saklanan metinden yeniden okuma (navlun-bildirimi anahtarini SQL'e
+  // acmadan; yetki yine x-cron-anahtar). {"islem": "navlun_yeniden_isle", "sayfa": n} -> navlun-bildirimi'nin yaniti.
+  if (govde.islem === "navlun_yeniden_isle") {
+    if (!NAVLUN_ANAHTAR) return json({ hata: "PAZAR_GELEN_ANAHTAR yok." }, 503);
+    const sayfa = Math.max(0, Math.min(1000, Math.floor(Number(govde.sayfa) || 0)));
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/navlun-bildirimi`, {
+      method: "POST",
+      headers: { ...servis, "Content-Type": "application/json", "x-pazar-anahtar": NAVLUN_ANAHTAR },
+      body: JSON.stringify({ islem: "yeniden_isle", sayfa }),
+    });
+    return new Response(await res.text(), { status: res.status, headers: { "Content-Type": "application/json" } });
+  }
+  if (govde.islem === "navlun_gecmis") {
+    const g = String(govde.gun || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(g)) return json({ hata: "gun YYYY-AA-GG olmali." }, 400);
+    try {
+      return json(await navlunGecmis(g));
+    } catch (e) {
+      return json({ ok: false, hata: (e instanceof Error ? e.message : String(e)).slice(0, 200) }, 502);
+    }
+  }
+  if (govde.islem !== "deneme") return json({ hata: "Bilinmeyen islem ('tara', 'navlun_gecmis' ya da 'deneme')." }, 400);
   const alan = String(govde.alan || "").trim().toLowerCase();
   const gun = String(govde.gun || "").trim();
   if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(alan)) return json({ hata: "Gecersiz alan." }, 400);

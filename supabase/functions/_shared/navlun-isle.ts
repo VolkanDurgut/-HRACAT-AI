@@ -90,11 +90,35 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
 }
 
 /** Mail metni + ek metninden free time ve transit (elle duzeltilmis teklifi tamamlamak icin). */
-export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): { free_time_gun: number | null; transit_gun: string | null } {
-  const metin = yeniKisim(g.govde || "").replace(/\s+/g, " ");
+export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): {
+  free_time_gun: number | null; transit_gun: string | null; armator: string | null; ft_guncel: boolean;
+} {
+  const yeni = yeniKisim(g.govde || "");
+  const metin = yeni.replace(/\s+/g, " ");
   const ek = (g.ek_metin || "").replace(/\s+/g, " ");
   const imzali = yeniKisim(g.govde || "", true).replace(/\s+/g, " ");
-  return { free_time_gun: freeTimeBul(metin) ?? (ek ? freeTimeBul(ek) : null) ?? freeTimeBul(imzali), transit_gun: transitBul(metin) ?? (ek ? transitBul(ek) : null) };
+  const kisa = kisaTransit(yeni);
+  return {
+    free_time_gun: freeTimeBul(metin) ?? (ek ? freeTimeBul(ek) : null) ?? freeTimeBul(imzali),
+    transit_gun: transitBul(metin) ?? (ek ? transitBul(ek) : null) ?? kisa?.tt ?? null,
+    armator: kisa?.armator ?? null,
+    // 17.11.2026 (acente cevabi: "... ft 21 gun olarak devam edilecektir" - dolu eski free time'in yerine gecmeli)
+    ft_guncel: /(?:ft|free\s*time|serbest)[^.\n]{0,30}olarak\s*(?:devam|g[üu]ncellen|revize|uygulan)/i.test(metin),
+  };
+}
+
+/**
+ * 17.11.2026: transit sorusuna verilen kisa cevap - mailin yeni kisminda yalniz "38-40 gündür" ya da "<Armator> 40 gun".
+ * Free time ile karismasin diye: satir tek basina, "free / ft / dem" gecmez, aralik (38-40) ya da 25 gun ve ustu.
+ */
+export function kisaTransit(yeni: string): { tt: string; armator: string | null } | null {
+  const satirlar = yeni.split("\n").map((x) => x.trim()).filter((x) => x && !/^(merhaba|mehaba|selam|g[üu]nayd[ıi]n|iyi|sayg[ıi]|best|kind|regards|te[şs]ekk[üu]r|thanks)/i.test(x) && !/bey|han[ıi]m/i.test(x));
+  if (satirlar.length !== 1) return null;
+  const m = satirlar[0].match(/^(?:([A-Za-zÇĞİÖŞÜçğıöşü+&. ]{2,25}?)\s+)?(\d{1,3})(?:\s*[-–\/]\s*(\d{1,3}))?\s*(?:g[üu]n|days?)(?:d[üu]r|dir)?\.?$/i);
+  if (!m || /free|ft|dem|det|serbest/i.test(satirlar[0])) return null;
+  const a = Number(m[2]), b = m[3] ? Number(m[3]) : null;
+  if (!(a >= 1 && a <= 150) || (b !== null && !(b > a && b <= 180)) || (b === null && a < 25)) return null;
+  return { tt: b !== null ? `${a}-${b}` : String(a), armator: m[1] ? armatorAdi(m[1]) : null };
 }
 
 

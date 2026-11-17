@@ -4,6 +4,8 @@
  * Navlun > "Teklif olabilecek mailler" (16.11.2026, kullanıcı onayı; Imagesa dersi). Fiyatı okunamamış acente cevapları:
  * metninde tutar geçenler ve tanımadığımız bir alan adından NAVLUN TALEBİ yazışmasına gelenler. Kullanıcı tutarı girince
  * teklif kaydedilir; acentesi bilinmeyen mailde girilen ad ile alan adı acente olarak öğrenilir (sonraki mailler otomatik).
+ * 17.11.2026 denetim: okunmuş ama metnindeki bir tutar kayıtlı tekliflerde olmayan mailler de gelir ("neden" satırı);
+ * "Teklif olarak kaydet" eksik teklifi ekler, "Teklif değil" yalnız denetimi kapatır (okunmuş teklifler korunur).
  */
 import React, { useCallback, useEffect, useState } from "react";
 import { Mail } from "lucide-react";
@@ -41,6 +43,7 @@ function AdaySatiri({ m, onCozuldu }: { m: TeklifAdayi; onCozuldu: () => void })
         <span className="text-xs" style={{ color: TEXT_MUTED }}>{tarihGoster(m.tarih)}</span>
         <button type="button" onClick={() => setAcik(!acik)} className="text-xs underline" style={{ color: TEXT_MUTED }}>{acik ? "metni gizle" : "mail metni"}</button>
       </div>
+      {m.neden && <p className="mt-1 text-xs" style={{ color: "#FCD34D" }} data-testid="aday-neden">{m.neden}</p>}
       {acik && <pre className="mt-2 text-xs whitespace-pre-wrap rounded-lg p-2 max-h-48 overflow-auto" style={{ backgroundColor: ROW_HEADER_BG, color: "#C9D1DC" }}>{m.metin}</pre>}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {bilinmeyen && (
@@ -71,7 +74,7 @@ export function TeklifAdaylari({ yenile, onDegisti }: { yenile: number; onDegist
   return (
     <div className="rounded-xl border mb-4" style={{ backgroundColor: CARD_BG, borderColor: "rgba(147,197,253,0.35)" }} data-testid="teklif-adaylari">
       <div className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: "#93C5FD" }}>
-        <Mail size={16} /> Teklif olabilecek mailler ({liste.length}) — sistem fiyat okuyamadı; teklifse tutarı girin, değilse işaretleyin.
+        <Mail size={16} /> Teklif olabilecek mailler ({liste.length}) — fiyatı okunamayan ya da kayıtla uyuşmayan mailler; teklifse tutarı girin, değilse işaretleyin.
       </div>
       {liste.map((m) => <AdaySatiri key={m.id} m={m} onCozuldu={() => { getir(); onDegisti(); }} />)}
     </div>

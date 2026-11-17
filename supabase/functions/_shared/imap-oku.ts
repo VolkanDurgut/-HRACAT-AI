@@ -12,6 +12,9 @@
 // Bagimlilik yok: Deno TCP/TLS + elle yazilmis kucuk protokol okuyucu (yalniz kullandigimiz komutlar).
 // ============================================================================
 
+import { adresAyir, baslikCoz, basliklariAyir, fetchParcalari, imapTarihi, tirnakla } from "./imap-yardimci.ts";
+export { adresAyir, alanKriteri, baslikCoz, basliklariAyir, fetchParcalari, imapTarihi, tirnakla } from "./imap-yardimci.ts";
+
 export type ImapAyar = {
   sunucu: string;
   port?: number;
@@ -118,64 +121,10 @@ class SaltOkunurImap {
   }
 }
 
-/** IMAP tirnakli dize. Yalniz yazdirilabilir ASCII kabul edilir (aksi literal ister; desteklemiyoruz). */
-export function tirnakla(s: string): string {
-  if (!/^[\x20-\x7e]*$/.test(s)) throw new Error("Kimlik bilgisinde desteklenmeyen karakter (yalniz ASCII)");
-  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-}
 
-const AYLAR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** "2026-11-17" -> "17-Nov-2026" (IMAP SINCE bicimi). */
-export function imapTarihi(gun: string): string {
-  const m = gun.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) throw new Error("Tarih YYYY-AA-GG olmali");
-  return `${Number(m[3])}-${AYLAR[Number(m[2]) - 1]}-${m[1]}`;
-}
 
-/** RFC 2047 kodlu baslik ( =?utf-8?B?...?= / =?iso-8859-9?Q?...?= ) -> duz metin. */
-export function baslikCoz(s: string): string {
-  const birlesik = s.replace(/\?=\s+=\?/g, "?==?");
-  return birlesik.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_t, cs: string, kod: string, veri: string) => {
-    try {
-      let baytlar: Uint8Array;
-      if (kod.toUpperCase() === "B") {
-        baytlar = Uint8Array.from(atob(veri), (c) => c.charCodeAt(0));
-      } else {
-        const q = veri.replace(/_/g, " ");
-        const dizi: number[] = [];
-        for (let i = 0; i < q.length; i++) {
-          if (q[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(q.slice(i + 1, i + 3))) {
-            dizi.push(parseInt(q.slice(i + 1, i + 3), 16));
-            i += 2;
-          } else dizi.push(q.charCodeAt(i));
-        }
-        baytlar = Uint8Array.from(dizi);
-      }
-      return new TextDecoder(cs.toLowerCase()).decode(baytlar);
-    } catch {
-      return veri;
-    }
-  });
-}
 
-/** Ham baslik blogu -> alanlar (katlanmis satirlar acilir). */
-export function basliklariAyir(ham: string): Record<string, string> {
-  const acik = ham.replace(/\r?\n[ \t]+/g, " ");
-  const a: Record<string, string> = {};
-  for (const satir of acik.split(/\r?\n/)) {
-    const m = satir.match(/^([A-Za-z-]+):\s*(.*)$/);
-    if (m) a[m[1].toLowerCase()] = m[2].trim();
-  }
-  return a;
-}
 
-export function adresAyir(s: string): { eposta: string; ad: string } {
-  const c = baslikCoz(s);
-  const m = c.match(/<([^>]+)>/);
-  const eposta = (m ? m[1] : c).trim().toLowerCase();
-  const ad = m ? c.slice(0, m.index).replace(/["']/g, "").trim() : "";
-  return { eposta: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eposta) ? eposta : "", ad: ad.slice(0, 200) };
-}
 
 /** FETCH yanitlarindan UID + baslik literali. */
 export function fetchCoz(yanitlar: { satir: string; literaller: Uint8Array[] }[]): ImapBaslik[] {
@@ -243,3 +192,69 @@ export async function alandanGelenBasliklar(
     imap.kapat();
   }
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// OTURUM (operasyon-imap "tara"): birden cok komut tek baglantida. Yine SALT OKUNUR (EXAMINE + BODY.PEEK).
+// ---------------------------------------------------------------------------------------------------------------
+
+export type HamMail = { uid: number; baslik: string; govde: string }; // baslik/govde: bayt bayt latin1 dize
+
+export type ImapOturum = {
+  /** Gelen Kutusu'nu salt okunur acar; UIDVALIDITY doner. */
+  kutuAc(): Promise<number>;
+  /** UID SEARCH (kriter IMAP sozdizimi; cagiran dogrular). Artan sirali UID listesi. */
+  uidAra(kriter: string): Promise<number[]>;
+  /** Baslik + govdenin ilk `govdeSiniri` bayti. */
+  getir(uidler: number[], govdeSiniri: number): Promise<HamMail[]>;
+  kapat(): Promise<void>;
+};
+
+
+export async function imapOturumu(ayar: ImapAyar): Promise<ImapOturum> {
+  const port = ayar.port ?? 993;
+  const conn = ayar.tls === false
+    ? await Deno.connect({ hostname: ayar.sunucu, port })
+    : await Deno.connectTls({ hostname: ayar.sunucu, port });
+  const imap = new SaltOkunurImap(conn);
+  const zamanlayici = setTimeout(() => imap.kapat(), ayar.sureMs ?? 50000);
+  try {
+    await imap.karsilama();
+    await imap.komut(`LOGIN ${tirnakla(ayar.kullanici)} ${tirnakla(ayar.sifre)}`);
+  } catch (e) {
+    clearTimeout(zamanlayici);
+    imap.kapat();
+    throw e;
+  }
+  return {
+    async kutuAc() {
+      const y = await imap.komut("EXAMINE INBOX");
+      const v = y.map((x) => x.satir.match(/\[UIDVALIDITY (\d+)\]/i)?.[1]).find(Boolean);
+      return Number(v ?? 0);
+    },
+    async uidAra(kriter: string) {
+      const y = await imap.komut(`UID SEARCH ${kriter}`);
+      return y
+        .filter((x) => /^\* SEARCH/i.test(x.satir))
+        .flatMap((x) => x.satir.replace(/^\* SEARCH/i, "").trim().split(/\s+/))
+        .map(Number)
+        .filter((n) => Number.isInteger(n) && n > 0)
+        .sort((a, b) => a - b);
+    },
+    async getir(uidler: number[], govdeSiniri: number) {
+      if (!uidler.length) return [];
+      const n = Math.max(1000, Math.min(400000, Math.floor(govdeSiniri)));
+      const y = await imap.komut(`UID FETCH ${uidler.join(",")} (UID BODY.PEEK[HEADER] BODY.PEEK[TEXT]<0.${n}>)`);
+      return y.filter((x) => /^\* \d+ FETCH /i.test(x.satir)).map(fetchParcalari).sort((a, b) => a.uid - b.uid);
+    },
+    async kapat() {
+      try {
+        await imap.komut("LOGOUT");
+      } catch {
+        /* yok say */
+      }
+      clearTimeout(zamanlayici);
+      imap.kapat();
+    },
+  };
+}
+

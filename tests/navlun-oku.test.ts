@@ -167,6 +167,28 @@ test("ayni ekipmanda farkli armatorlu fiyatlar ayri teklif; fiyata bitisik free 
   }, { "ornek-acente.test": "Ornek" });
   assert.deepEqual(tt.map((x) => [x.tutar, x.armator, x.free_time_gun, (x as { transit_gun?: string | null }).transit_gun]), [[3330, "Maersk", 14, "45"]]);
   assert.equal(oku.transitBul("1980 usd\n-hat / Maersk\n-tt/41 gün\n-14 gün free-time"), "41");
+  // fiyat soru cumlesinde -> teklif degil, hedef sorusu
+  const soru = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "65-70 usd all in mi bu 2X20lik icin ?",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(soru.map((x) => x.tur), ["hedef_soru"]);
+  const cevap = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhaba,\n\nUSD 100/20 all in verebiliriz. Uygun mudur?\n",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(cevap.map((x) => [x.tur, x.tutar]), [["teklif", 100]]);
+  // standart sartlardaki kosullu "belirtilmedigi muddetce ... dahil degildir" acik "lokaller dahildir"i ezmez
+  const kosul = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhabalar,\n\n20' - USD 775\n\nlokaller dahildir.\n\nKurallar\n1 - Ayrıca belirtilmediği müddetçe, teklifimize yükleme ve tahliye limanı lokal masrafları dahil değildir.\n",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(kosul.map((x) => [x.tutar, x.lokal_dahil]), [[775, true]]);
+  const haric = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhabalar,\n\n20' - USD 775\n\nlokaller dahil değildir.\n",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(haric.map((x) => [x.tutar, x.lokal_dahil]), [[775, false]]);
   assert.equal(oku.bitisikFt("USD2020 // FT9 // 24", 0), 9);
   assert.equal(oku.bitisikFt("USD 1800 / FT 21", 0), 21);
   assert.equal(oku.bitisikFt("USD 1800 // 40HC", 0), null);

@@ -201,6 +201,13 @@ function cumle(s: string, bas: number, bit: number): string {
  * hemen ardindaki ilk 30 karakterde ve "/" "//" "-" "," ile ayrilmissa. 20 / 40 / 45 konteyner boyu da olabilir ("1550USD / 20FT"
  * = 20'lik basina) -> okunmaz (null). i: fiyat eslesmesinin basladigi konum.
  */
+/** Konumdaki fiyat, ayni satirda "?" ile biten bir soru cumlesinin icinde mi ("65-70 usd all in mi bu ?"). */
+export function soruCumlesinde(s: string, i: number): boolean {
+  const kalan = s.slice(i);
+  const son = kalan.search(/\n|[.!](?:\s|$)|\?/);
+  return son >= 0 && kalan[son] === "?";
+}
+
 export function bitisikFt(s: string, i: number): number | null {
   const m = s.slice(i, i + 30).match(/^(?:(?:usd|\$)\s*[\d.,]+|[\d.,]+\s*(?:usd|\$))\s*[\/,\-–]{1,2}\s*(?:(\d{1,2})\s*(?:ft|free(?:\s*time)?|gün\s*free|days?\s*free)\b|(?:ft|free\s*time)\s*[:\-]?\s*(\d{1,2})(?![\d.,]))/i);
   if (!m) return null;
@@ -526,7 +533,10 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
 
   const ft = freeTimeBul(duz), gec = gecerlilikBul(duz), pol = polBul(yeni);
   // 16.11.2026: "liman masraflari dahil" / "local charges included" da lokal dahil demektir
-  const lokalHaric = /(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/i.test(duz);
+  // 17.11.2026 (MSC SINGAPUR: "lokaller dahildir" yazmasina ragmen lokal haric gorunuyordu): standart sart metnindeki
+  // "Ayrica belirtilmedigi muddetce ... lokal masraflari dahil degildir" kosullu cumledir; acik ifadeyi ezmez.
+  const lokalHaric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/gi)]
+    .some((x) => !/belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(duz.slice(Math.max(0, (x.index ?? 0) - 120), x.index ?? 0)));
   const lokal = lokalHaric ? false
     : /lokaller(?:i)?\s*dahil|all\s*in|pol lokaller dahil|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil|local\s*charges\s*incl/i.test(duz) ? true
     : (/\+\s*lokaller/i.test(duz) ? false : null);
@@ -544,7 +554,14 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   }
   if (satirdan) return olaylar;
 
-  const t = tutarlar(duz, siki);
+  // 17.11.2026 (OOCL SINGAPUR: "65-70 usd all in mi bu 2X20lik icin ?" teklif 70 sayilip en iyi fiyat gibi gorunuyordu):
+  // fiyat soru cumlesindeyse (ayni satirda "?" ile bitiyor) acente teklif vermiyor, fiyati soruyor -> teklif degil.
+  const tHam = tutarlar(duz, siki);
+  const t = tHam.filter((x) => !soruCumlesinde(duz, x.i));
+  if (tHam.length && !t.length) {
+    if (!olaylar.some((o) => o.tur === "hedef_soru")) ekle("hedef_soru");
+    return olaylar;
+  }
   const pod = (yeni.match(/POD\s*[:\-]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-z .]{2,25}?)(?:\s+(?:FREE|VALIDITY|Hat)|\n|$)/) || [])[1];
   // Konudaki liman esas; govdedeki POD yalniz konu limansizsa. Liman yoksa (genel tarife) fiyat yazilmaz.
   const limanSec = liman0 ?? (pod && !/AMBARLI|ASYAPORT|KUMPORT|FREE|TIME|VALIDITY/i.test(pod) ? buyukTr(pod.trim()) : null);

@@ -135,3 +135,24 @@ test("taninmayan alan adindan NAVLUN TALEBI cevabi: ogrenilemese de olaysiz 'bil
   assert.equal(adayKaydi(g("operation@unex.com.tr"), {}), null);                  // bizden
   assert.equal(adayKaydi(g("satis@yeni-hat.example", "UNEX // ORNEKPORT // 5*20 DC // REZERVASYON TALEBİ HK."), {}), null); // navlun talebi degil
 });
+
+// 17.11.2026 (TEMA: ayni mailde iki armator, ikincisi okunmuyordu; "21FT" free time okunmuyordu)
+test("ayni ekipmanda farkli armatorlu fiyatlar ayri teklif; fiyata bitisik free time", async () => {
+  const oku = (await yukle("navlun-oku")) as OkuMod & { bitisikFt: (s: string, i: number) => number | null };
+  const o = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhaba,\n\nHapag;\n1550USD / 21FT\nMaersk;\n1450USD / 14FT\n\nSaygılarımla",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(o.map((x) => [x.tur, x.tutar, x.ekipman, x.armator, x.free_time_gun]),
+    [["teklif", 1550, "20DC", "Hapag-Lloyd", 21], ["teklif", 1450, "20DC", "Maersk", 14]]);
+  // ayni armatorun tekrar eden fiyati tek teklif kalir (eski davranis)
+  const tek = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhaba,\n\nMaersk ile 1500 USD / 20DC verebiliriz.\nTekrar: Maersk 1500 USD.\n",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.equal(tek.filter((x) => x.tur === "teklif").length, 1);
+  // 20 / 40 / 45 konteyner boyu olabilir -> free time sayilmaz
+  assert.equal(oku.bitisikFt("1550USD / 20FT", 0), null);
+  assert.equal(oku.bitisikFt("USD 1450 / 14 FT", 0), 14);
+  assert.equal(oku.bitisikFt("1450 USD", 0), null);
+});

@@ -196,6 +196,18 @@ function cumle(s: string, bas: number, bit: number): string {
   return s.slice(b, sonra < 0 ? s.length : bit + sonra);
 }
 
+/**
+ * Fiyata bitisik free time (17.11.2026): "1550USD / 21FT", "USD 1450 / 14 FT", "1450$ - 14 free". Yalniz fiyatin hemen
+ * ardindaki ilk 30 karakterde ve "/" "-" "," ile ayrilmissa. 20 / 40 / 45 konteyner boyu da olabilir ("1550USD / 20FT"
+ * = 20'lik basina) -> okunmaz (null). i: fiyat eslesmesinin basladigi konum.
+ */
+export function bitisikFt(s: string, i: number): number | null {
+  const m = s.slice(i, i + 30).match(/^(?:(?:usd|\$)\s*[\d.,]+|[\d.,]+\s*(?:usd|\$))\s*[\/,\-–]\s*(\d{1,2})\s*(?:ft|free(?:\s*time)?|gün\s*free|days?\s*free)\b/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 60 && n !== 20 && n !== 40 && n !== 45 ? n : null;
+}
+
 export function freeTimeBul(s: string): number | null {
   for (const r of FT_DESENLERI) {
     for (const m of s.matchAll(r)) {
@@ -540,16 +552,21 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   // Armator mail metninde yoksa imzadaki tek armator ("As agent for Marguisa Shipping Lines")
   const imzaArmator = tekArmator(yeniKisim(m.govde || "", true).slice(yeni.length));
   if (t.length && limanlar.length) {
-    // ayni mesajda 20 ve 40 ayri fiyatlar olabilir; ekipman basina ilkini al
+    // ayni mesajda 20 ve 40 ayri fiyatlar olabilir; ekipman basina ilkini al.
+    // 17.11.2026 (Esna TEMA: "Hapag; 1550USD / 21FT  Maersk; 1450USD / 14FT" -> yalniz Hapag okunuyordu): ayni ekipmanda
+    // FARKLI armatorlu fiyatlar ayri tekliftir (anahtar = ekipman + fiyatin yanindaki armator). Ayni armatorun tekrar
+    // eden fiyati (ya da armatorsuz) eskisi gibi tek. Fiyata bitisik free time ("USD / 21FT") o teklifin free time'idir.
     const gor = new Set<string>();
     for (const x of t) {
       const ekip = x.ekipman ?? "20DC";
-      if (gor.has(ekip)) continue;
-      gor.add(ekip);
+      const arm = armatorBul(duz, x.i) ?? imzaArmator;
+      const anahtar = `${ekip}|${arm ?? ""}`;
+      if (gor.has(anahtar) || (!arm && [...gor].some((g) => g.startsWith(`${ekip}|`)))) continue;
+      gor.add(anahtar);
       for (const l of limanlar) {
         ekle(destek ? "karsi_teklif" : "teklif", {
           liman: l,
-          tutar: x.tutar, ekipman: ekip, armator: armatorBul(duz, x.i) ?? imzaArmator, free_time_gun: ft, gecerlilik: gec, lokal_dahil: lokal, pol,
+          tutar: x.tutar, ekipman: ekip, armator: arm, free_time_gun: bitisikFt(duz, x.i) ?? ft, gecerlilik: gec, lokal_dahil: lokal, pol,
         });
       }
     }

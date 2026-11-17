@@ -8,11 +8,11 @@
  */
 
 /** Ödeme şartından ön ödeme yüzdesi: "%30 ADVANCE", "30% ADVANCE", "% 20 ADVANCE PAYMENT" -> 30 / 30 / 20.
- *  SQL on_odeme_orani_oku ile AYNI kural. Yüzde ön ödemeye ait değilse ("%100 PAYMENT AGAINST COPY") null. */
+ *  17.11.2026: "%30 PAYMENT ADVANCE PAYMENT" da okunur. SQL on_odeme_orani_oku ile AYNI kural. Yüzde ön ödemeye ait değilse ("%100 PAYMENT AGAINST COPY") null. */
 export function onOdemeOrani(odemeSekli: string | null | undefined): number | null {
   const s = String(odemeSekli || "").toLocaleUpperCase("en-US");
   const tur = "(?:ADVANCE|PRE-?PAYMENT|DEPOSIT|PREPAID|DOWN\\s*PAYMENT)";
-  const m = s.match(new RegExp(`%\\s*(\\d{1,3}(?:[.,]\\d{1,2})?)\\s*${tur}`)) || s.match(new RegExp(`(\\d{1,3}(?:[.,]\\d{1,2})?)\\s*%\\s*${tur}`));
+  const m = s.match(new RegExp(`%\\s*(\\d{1,3}(?:[.,]\\d{1,2})?)\\s*(?:PAYMENT\\s+)?${tur}`)) || s.match(new RegExp(`(\\d{1,3}(?:[.,]\\d{1,2})?)\\s*%\\s*(?:PAYMENT\\s+)?${tur}`));
   if (!m) return null;
   const v = Number(m[1].replace(",", "."));
   return v > 0 && v <= 100 ? v : null;
@@ -47,7 +47,7 @@ export type OnOdemeDagitimi = {
   havuz_para: string | null;
   karsilik: number | null;
   oran: number | null;
-  oran_kaynak: "elle" | "odeme_sekli" | null;
+  oran_kaynak: "elle" | "odeme_sekli" | "proforma" | null;
   dagitilan: number | null;
   kalan: number | null;
   dosyalar: DagitimDosyasi[];

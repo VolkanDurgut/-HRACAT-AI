@@ -84,6 +84,7 @@ export const LIMAN_KOORDINAT: Record<string, [number, number]> = {
   ACAJUTLA: [13.57, -89.83], CARTAGENA: [10.39, -75.53], BARRANQUILLA: [11.0, -74.8], BUENAVENTURA: [3.89, -77.08],
   "LA GUAIRA": [10.6, -66.93], "PUERTO CABELLO": [10.48, -68.01], GUAYAQUIL: [-2.28, -79.91], CALLAO: [-12.05, -77.15],
   "SAN ANTONIO": [-33.59, -71.62], VALPARAISO: [-33.03, -71.63], SANTOS: [-23.97, -46.3], PARANAGUA: [-25.5, -48.52],
+  PARAMARIBO: [5.83, -55.15], GEORGETOWN: [6.81, -58.16], // 17.11.2026: yukleme planindaki Surinam sevkiyatlari
   "RIO DE JANEIRO": [-22.89, -43.18], "BUENOS AIRES": [-34.6, -58.37], MONTEVIDEO: [-34.9, -56.21],
   ALTAMIRA: [22.48, -97.86], "LAZARO CARDENAS": [17.94, -102.18], HOUSTON: [29.73, -95.27], "NEW YORK": [40.67, -74.04],
   "NEW ORLEANS": [29.93, -90.06], MIAMI: [25.77, -80.17], SAVANNAH: [32.08, -81.09], BALTIMORE: [39.26, -76.58],
@@ -124,7 +125,7 @@ export const ULKE_ANA_LIMAN: Record<string, string> = {
   "FRANSA": "MARSEILLE", "İTALYA": "GENOA", "ALMANYA": "HAMBURG", "HOLLANDA": "ROTTERDAM", "BELÇİKA": "ANTWERP",
   "BİRLEŞİK KRALLIK": "FELIXSTOWE", "İRLANDA": "DUBLIN", "İSVİÇRE": "GENOA", "AVUSTURYA": "KOPER",
   "YUNANİSTAN": "PIRAEUS", "KIBRIS": "LIMASSOL", "MALTA": "MARSAXLOKK", "BULGARİSTAN": "VARNA", "ROMANYA": "CONSTANTA",
-  "POLONYA": "GDANSK", "UKRAYNA": "ODESSA", "RUSYA": "NOVOROSSIYSK", "ARNAVUTLUK": "DURRES", "KÜBA": "MARIEL",
+  "POLONYA": "GDANSK", "UKRAYNA": "ODESSA", "RUSYA": "NOVOROSSIYSK", "ARNAVUTLUK": "DURRES", "KÜBA": "MARIEL", "SURİNAM": "PARAMARIBO", "GUYANA": "GEORGETOWN",
   "MEKSİKA": "VERACRUZ", "DOMİNİK CUMHURİYETİ": "CAUCEDO", "HAİTİ": "PORT AU PRINCE", "JAMAİKA": "KINGSTON",
   "PANAMA": "COLON", "KOSTA RİKA": "PUERTO LIMON", "GUATEMALA": "SANTO TOMAS DE CASTILLA", "HONDURAS": "PUERTO CORTES",
   "EL SALVADOR": "ACAJUTLA", "NİKARAGUA": "CORINTO", "KOLOMBİYA": "CARTAGENA", "VENEZUELA": "LA GUAIRA",
@@ -183,8 +184,20 @@ export type LimanKonumu = {
  * bir liman adi kelime olarak geciyor ("NHAVA SHEVA JNPT" -> NHAVA SHEVA), 3) ulkenin ana
  * limani (yaklasik). Hicbiri yoksa null -> kart altinda "Haritada konumu olmayan".
  */
+/**
+ * Turkce / yerel yazim -> koordinat anahtari (17.11.2026: navlun haritasindan ortak kurala tasindi; yukleme plani
+ * "BEYRUT", "DAR ES SELAM", "MALDIVES" yaziyor, dosyalar "BEIRUT PORT" - ikisi de ayni noktaya duser).
+ */
+export const LIMAN_ES_ADLARI: Record<string, string> = {
+  BEYRUT: "BEIRUT", BINGAZI: "BENGHAZI", MISRATA: "MISURATA", TRABLUS: "TRIPOLI", ISKENDERIYE: "ALEXANDRIA",
+  CEZAYIR: "ALGIERS", KAZABLANKA: "CASABLANCA", CIDDE: "JEDDAH", AKABE: "AQABA", "DAR ES SELAM": "DAR ES SALAAM",
+  MALDIVES: "MALE", MALDIVLER: "MALE", TAMATAVE: "TOAMASINA",
+};
+
 export function limanKonumu(anahtar: string | null | undefined, ulke?: string | null): LimanKonumu | null {
   if (!anahtar) return null;
+  const es = LIMAN_ES_ADLARI[anahtar] ?? LIMAN_ES_ADLARI[sade(anahtar).trim()];
+  if (es && LIMAN_KOORDINAT[es]) return { k: LIMAN_KOORDINAT[es], anahtar: es, yaklasik: false, ulke: null };
   const birebir = LIMAN_KOORDINAT[anahtar];
   if (birebir) return { k: birebir, anahtar, yaklasik: false, ulke: null };
   const s = ` ${sade(anahtar).replace(/[^A-Z0-9]+/g, " ")} `;

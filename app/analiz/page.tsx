@@ -21,8 +21,9 @@ import { acenteLimanNavlunlari, BELIRSIZ_LIMAN } from "@/lib/analiz-acente-navlu
 import { analizOzeti } from "@/lib/analiz-ozet";
 import { AylikGrafik, DagilimKarti, GostergeKutusu, OzetKarti, Panel, yuzdeMetni, KATEGORI_RENKLERI, DIGER_RENGI } from "@/components/analiz-paneli";
 import { SevkiyatHaritasi, type HaritaHatti, type HaritaLimani } from "@/components/analiz-harita";
-import { cikisMerkezi, type CikisMerkezi } from "@/lib/liman-koordinat";
-import { limanAktiflikleri } from "@/lib/sevkiyat-aktif";
+import { cikisMerkezi, LIMAN_ES_ADLARI, type CikisMerkezi } from "@/lib/liman-koordinat";
+import { ETA_YOKSA_GUN, TRANSIT_PAYI as TRANSIT_PAYI_GUN, limanAktiflikleri, limanTransitGunleri, planSevkiyatlari, sevkiyatDurumu, type PlanHaritaSatiri } from "@/lib/sevkiyat-aktif";
+import { haritaPlaniOku } from "@/lib/analiz-harita-veri";
 import { ayAdi } from "@/lib/analiz-ozet";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { TutarsizliklarKarti } from "@/components/analiz/tutarsizliklar-karti";
@@ -89,6 +90,13 @@ function analizLimani(d: DosyaFull): string | null {
   const sorun = varisLimaniSorunu(d.varis_limani, [d.yuklenme_limani, ...d.rezervasyonlar.map((r) => r.yuklenme_limani)]);
   if (sorun) return null;
   return limanAnahtari(d.varis_limani);
+}
+
+/** Harita anahtari (17.11.2026): yukleme plani Turkce yazar ("BEYRUT", "DAR ES SELAM") - dosyalarla ayni noktada birlesir. */
+const haritaAnahtari = (a: string | null): string | null => (a ? LIMAN_ES_ADLARI[a] ?? a : null);
+function planHaritaLimani(varis: string | null): string | null {
+  if (!varis?.trim() || varisLimaniSorunu(varis, [])) return null;
+  return haritaAnahtari(limanAnahtari(varis));
 }
 
 function sevkiyatTarihi(d: DosyaFull): string | null {
@@ -167,6 +175,8 @@ export default function AnalizPage() {
   const router = useRouter();
   const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const [dosyalar, setDosyalar] = useState<DosyaFull[]>([]);
+  // Sevkiyat haritasi: yukleme planindaki (dosyasi acilmamis) booking'ler de (17.11.2026)
+  const [plan, setPlan] = useState<PlanHaritaSatiri[]>([]);
   const [loading, setLoading] = useState(true);
   const [yilFiltre, setYilFiltre] = useState<string>(TUM_YILLAR);
   const [durumFiltre, setDurumFiltre] = useState<DurumFiltre>("tumu");
@@ -183,6 +193,7 @@ export default function AnalizPage() {
       .order("olusturma_tarihi", { ascending: true })
       .returns<Dosya[]>();
 
+    haritaPlaniOku().then(setPlan).catch(() => setPlan([]));
     if (!dosyaData || dosyaData.length === 0) { setDosyalar([]); setLoading(false); return; }
     const dosyaIds = dosyaData.map((d: Dosya) => d.id);
     const [{ data: rezData }, { data: kontData }] = await Promise.all([
@@ -439,40 +450,83 @@ export default function AnalizPage() {
 
   // Sevkiyat haritasi (26.10.2026): varis limani anahtari basina toplamlar + cikis -> varis hatlari.
   // 16.11.2026: "su an sevkiyati olan" (yolda / yuklemede) limanlar TUM dosyalardan (filtreden bagimsiz) -> yesil.
-  const aktiflik = useMemo(() => {
-    const bugun = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
-    return limanAktiflikleri(dosyalar.map((d) => ({ ...d, kapali: kapaliMi(d), konteyner: konteynerSayisi(d) })), analizLimani, bugun);
-  }, [dosyalar]);
-  const haritaLimanlari = useMemo<HaritaLimani[]>(() =>
-    Object.entries(limanlar).map(([ad, v]) => ({
+  // 17.11.2026 (kullanici: "En dogru hali ile guncellenmeli ... Butun limanlar gozukmeli"): yukleme planindaki dosyasi
+  // acilmamis booking'ler de sayilir (cift sayim yok: lib/sevkiyat-aktif planSevkiyatlari); ETA'siz sevkiyatta varis
+  // limanin gercek transit ortalamasindan tahmin edilir; su an sevkiyati olan liman donem filtresinde olmasa da gorunur.
+  const bugunIst = useMemo(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" }), []);
+  const dosyaHaritaLimani = useCallback((d: DosyaFull) => haritaAnahtari(analizLimani(d)), []);
+  const planDosyalari = useMemo(() => planSevkiyatlari(plan, dosyalar), [plan, dosyalar]);
+  const transitGunleri = useMemo(() => limanTransitGunleri(dosyalar, dosyaHaritaLimani), [dosyalar, dosyaHaritaLimani]);
+  const etaYoksaGun = useCallback((l: string) => transitGunleri.get(l) ?? ETA_YOKSA_GUN, [transitGunleri]);
+  const aktiflik = useMemo(() => limanAktiflikleri(
+    [
+      ...dosyalar.map((d) => ({ kapali: kapaliMi(d), konteyner: konteynerSayisi(d), rezervasyonlar: d.rezervasyonlar, liman: dosyaHaritaLimani(d) })),
+      ...planDosyalari.map((p) => ({ ...p, liman: planHaritaLimani(p.varis_limani) })),
+    ],
+    (x) => x.liman, bugunIst, etaYoksaGun,
+  ), [dosyalar, planDosyalari, dosyaHaritaLimani, bugunIst, etaYoksaGun]);
+  // Donem / durum filtresi plan satirlarina da (ETD yili; durum tarihlerden)
+  const filtreliPlan = useMemo(() => planDosyalari.filter((p) => {
+    if (!planHaritaLimani(p.varis_limani)) return false;
+    if (yilFiltre !== TUM_YILLAR && !(p.etd || "").startsWith(yilFiltre)) return false;
+    const durum = sevkiyatDurumu(p, bugunIst, etaYoksaGun(planHaritaLimani(p.varis_limani) as string));
+    if (durumFiltre === "tamamlanan" && durum !== "tamamlandi") return false;
+    if (durumFiltre === "acik" && durum === "tamamlandi") return false;
+    return true;
+  }), [planDosyalari, yilFiltre, durumFiltre, bugunIst, etaYoksaGun]);
+  const haritaLimanlari = useMemo<HaritaLimani[]>(() => {
+    type Top = { konteyner: number; dosya: number; booking: number; tutar: number; mts: number; teslim: Set<string>; ulke: string | null };
+    const t = new Map<string, Top>();
+    const al = (ad: string) => { let x = t.get(ad); if (!x) { x = { konteyner: 0, dosya: 0, booking: 0, tutar: 0, mts: 0, teslim: new Set(), ulke: null }; t.set(ad, x); } return x; };
+    Object.entries(limanlar).forEach(([ad0, v]) => {
+      const x = al(haritaAnahtari(ad0) as string);
+      x.konteyner += v.konteyner; x.dosya += v.adet; x.tutar += v.tutar; x.mts += v.mts;
+      v.teslim.forEach((s) => x.teslim.add(s));
+      if (!x.ulke) x.ulke = v.ulke;
+    });
+    filtreliPlan.forEach((p) => {
+      const x = al(planHaritaLimani(p.varis_limani) as string);
+      x.konteyner += p.konteyner; x.booking += 1;
+      if (!x.ulke) x.ulke = gidecegiUlke(p.varis_limani);
+    });
+    // Su an sevkiyati olan liman her zaman haritada (filtre disinda kalsa bile)
+    aktiflik.forEach((_, ad) => { al(ad); });
+    return Array.from(t.entries()).map(([ad, v]) => ({
       ad,
       aktif: aktiflik.get(ad) || null,
       ulke: v.ulke,
       konteyner: v.konteyner,
-      dosya: v.adet,
+      dosya: v.dosya,
       satirlar: [
-        `Hacim ${tutarKisa(v.tutar)}`,
+        v.tutar > 0 ? `Hacim ${tutarKisa(v.tutar)}` : null,
         v.mts > 0 && v.tutar > 0 ? `Ortalama ${tutarTam(v.tutar / v.mts)} / MTS` : null,
+        v.booking > 0 ? `Yükleme planı: ${v.booking} booking (dosyası açılmamış)` : null,
         v.teslim.size ? `Teslim: ${Array.from(v.teslim).sort().join(", ")}` : null,
+        transitGunleri.has(ad) ? `Ortalama transit ≈ ${transitGunleri.get(ad)! - TRANSIT_PAYI_GUN} gün` : null,
       ].filter((x): x is string => !!x),
-    })), [limanlar, tutarKisa, tutarTam, aktiflik]);
+    }));
+  }, [limanlar, filtreliPlan, aktiflik, tutarKisa, tutarTam, transitGunleri]);
   const haritaHatlari = useMemo<HaritaHatti[]>(() => {
     const dosyaCikisi = (d: DosyaFull): CikisMerkezi | null =>
       cikisMerkezi(d.rezervasyonlar.map((r) => r.yuklenme_limani).find((y) => !!y?.trim())) || cikisMerkezi(d.yuklenme_limani);
     // Cikisi taninmayan dosya en cok kullanilan cikistan cizilir (tahmin degil: hat temsili, liman verisi aynen)
     const sayac = new Map<string, { m: CikisMerkezi; n: number }>();
     filtrelenmis.forEach((d) => { const c = dosyaCikisi(d); if (c) sayac.set(c.ad, { m: c, n: (sayac.get(c.ad)?.n || 0) + 1 }); });
+    filtreliPlan.forEach((p) => { const c = cikisMerkezi(p.yukleme); if (c) sayac.set(c.ad, { m: c, n: (sayac.get(c.ad)?.n || 0) + 1 }); });
     const varsayilan = Array.from(sayac.values()).sort((a, b) => b.n - a.n)[0]?.m || null;
     const hat = new Map<string, HaritaHatti>();
-    filtrelenmis.forEach((d) => {
-      const liman = analizLimani(d); if (!liman) return;
-      const c = dosyaCikisi(d) || varsayilan; if (!c) return;
+    const ekle = (liman: string | null, c: CikisMerkezi | null, k: number) => {
+      if (!liman || !c) return;
       const anahtar = `${c.ad}|${liman}`;
       const mevcut = hat.get(anahtar);
-      hat.set(anahtar, { cikis: c, liman, konteyner: (mevcut?.konteyner || 0) + konteynerSayisi(d) });
-    });
+      hat.set(anahtar, { cikis: c, liman, konteyner: (mevcut?.konteyner || 0) + k });
+    };
+    filtrelenmis.forEach((d) => ekle(dosyaHaritaLimani(d), dosyaCikisi(d) || varsayilan, konteynerSayisi(d)));
+    filtreliPlan.forEach((p) => ekle(planHaritaLimani(p.varis_limani), cikisMerkezi(p.yukleme) || varsayilan, p.konteyner));
+    // Filtre disinda kalan aktif limanin da rotasi
+    haritaLimanlari.forEach((l) => { if (!Array.from(hat.values()).some((h) => h.liman === l.ad) && varsayilan) ekle(l.ad, varsayilan, 0); });
     return Array.from(hat.values());
-  }, [filtrelenmis]);
+  }, [filtrelenmis, filtreliPlan, dosyaHaritaLimani, haritaLimanlari]);
   const teslimSeridi = teslimSatirlari.map((t, i) => ({ ad: t.ad, pay: t.pay ?? 0, renk: KATEGORI_RENKLERI[i] ?? DIGER_RENGI }));
 
   // Otomatik Ozet (26.10.2026): ekrandaki kartlarla AYNI toplamlardan kurala gore cumleler.

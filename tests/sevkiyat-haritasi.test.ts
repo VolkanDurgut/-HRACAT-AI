@@ -3,8 +3,9 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { limanAktiflikleri, sevkiyatDurumu } from "@/lib/sevkiyat-aktif";
-import { cikisMerkezi } from "@/lib/liman-koordinat";
+import { ETA_YOKSA_GUN, TRANSIT_PAYI, limanAktiflikleri, limanTransitGunleri, planSevkiyatlari, sevkiyatDurumu } from "@/lib/sevkiyat-aktif";
+import { cikisMerkezi, limanKonumu } from "@/lib/liman-koordinat";
+import { HARITA_ES_ADLARI } from "@/lib/navlun/harita";
 import { denizRotasi } from "@/lib/deniz-rotasi";
 
 const BUGUN = "2026-11-16";
@@ -37,4 +38,43 @@ test("cikis limanlari: Asyaport Tekirdag'dan, Ambarli terminalleri (Mardas dahil
   const r = denizRotasi("Tekirdağ", [40.9, 27.47], "DJIBOUTI", [11.6, 43.14]);
   assert.ok(r);
   assert.deepEqual(r!.gecisler, ["Çanakkale Boğazı", "Süveyş Kanalı", "Bab-el Mandeb"]);
+});
+
+// 17.11.2026 (kullanici: "Butun limanlar gozukmeli"): yukleme plani + Turkce yazimlar + limana gore transit
+test("yukleme plani: dosyaya bagli satir (dosya / rezervasyon / ayni booking) atlanir; ETD'siz satir aktif sayilmaz", () => {
+  const dosyalar = [{ id: "d1", rezervasyonlar: [{ id: "r1", booking_no: "BK 001" }] }];
+  const plan = [
+    { id: "p1", booking_no: "BK001", varis_limani: "ORNEKPORT", etd: "2026-11-20", konteyner: 4, dosya_id: null, rezervasyon_id: null },
+    { id: "p2", booking_no: "BK002", varis_limani: "ORNEKPORT", etd: "2026-11-20", konteyner: 4, dosya_id: "d1", rezervasyon_id: null },
+    { id: "p3", booking_no: "BK003", varis_limani: "ORNEKPORT", etd: "2026-11-20", konteyner: 4, dosya_id: null, rezervasyon_id: "r1" },
+    { id: "p4", booking_no: "BK004", varis_limani: "YENIPORT", etd: "2026-11-24", konteyner: 2, dosya_id: null, rezervasyon_id: null, liman: "MARPORT" },
+    { id: "p5", booking_no: "BK005", varis_limani: "ESKIPORT", etd: null, konteyner: 10, dosya_id: null, rezervasyon_id: null },
+  ];
+  const p = planSevkiyatlari(plan, dosyalar);
+  assert.deepEqual(p.map((x) => x.id), ["p4", "p5"]);
+  assert.equal(p[0].yukleme, "MARPORT");
+  assert.equal(sevkiyatDurumu(p[0], BUGUN), "yuklemede");
+  assert.equal(sevkiyatDurumu(p[1], BUGUN), "tamamlandi", "tarihsiz eski satir limani yesil yapmaz");
+  const m = limanAktiflikleri(p, (x) => x.varis_limani, BUGUN);
+  assert.deepEqual(Array.from(m.keys()), ["YENIPORT"]);
+});
+
+test("ETA'siz sevkiyat: limanin gercek transit ortalamasi (+pay) ile; olcum yoksa varsayilan", () => {
+  const d = [
+    { liman: "UZAKPORT", rezervasyonlar: [rez("2026-08-01", "2026-10-05"), rez("2026-08-10", "2026-10-10")] }, // 65 ve 61 gun
+    { liman: "UZAKPORT", rezervasyonlar: [rez("2026-08-01", "2027-08-01")] },                                // 365: sayilmaz
+  ];
+  const t = limanTransitGunleri(d, (x) => x.liman);
+  assert.equal(t.get("UZAKPORT"), 63 + TRANSIT_PAYI);
+  const yeni = { kapali: true, konteyner: 2, rezervasyonlar: [rez("2026-09-25", null)] }; // 52 gun once kalkti
+  assert.equal(sevkiyatDurumu(yeni, BUGUN), "tamamlandi", `varsayilan ${ETA_YOKSA_GUN} gun`);
+  assert.equal(sevkiyatDurumu(yeni, BUGUN, t.get("UZAKPORT")), "yolda", "uzak limanda hala denizde");
+});
+
+test("harita konumu: plan Turkce yazimlari dosyalarla ayni noktada; Paramaribo tanimli", () => {
+  assert.equal(limanKonumu("BEYRUT")?.anahtar, "BEIRUT");
+  assert.equal(limanKonumu("DAR ES SELAM")?.anahtar, "DAR ES SALAAM");
+  assert.equal(limanKonumu("MALDIVES")?.anahtar, "MALE");
+  assert.equal(limanKonumu("PARAMARIBO")?.yaklasik, false);
+  assert.equal(HARITA_ES_ADLARI.BEYRUT, "BEIRUT", "navlun haritasi ayni tabloyu kullanir");
 });

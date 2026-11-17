@@ -8,6 +8,7 @@
  * uretilmis yol verisidir (lib/dunya-haritasi.ts), yeni paket yok. Hesap YAPMAZ.
  * 16.11.2026 (kullanici: "su an sevkiyati olan limanlar yesil olarak belirtilmeli"): YESIL = su an sevkiyati olan
  * liman (yolda / yuklemede; lib/sevkiyat-aktif.ts), GRI = sevkiyati tamamlanmis liman; rotalar da ayni renkte.
+ * 17.11.2026: yukleme planindaki dosyasi acilmamis booking'ler de (app/analiz haritaLimanlari); aktif sayilar "sevkiyat".
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -208,7 +209,7 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
                 onMouseEnter={() => setSecili(n.ad)}
                 onFocus={() => setSecili(n.ad)}
                 onBlur={() => setSecili(null)}
-                aria-label={`${n.ad}: ${n.konteyner} konteyner, ${n.dosya} dosya${sevk ? ", şu an sevkiyat var" : ""}${n.yaklasik ? " (yaklaşık konum)" : ""}`}
+                aria-label={`${n.ad}: ${n.konteyner} konteyner${n.dosya > 0 ? `, ${n.dosya} dosya` : ""}${sevk ? ", şu an sevkiyat var" : ""}${n.yaklasik ? " (yaklaşık konum)" : ""}`}
                 data-liman-noktasi={n.ad}
                 data-sevkiyat={sevk ? "aktif" : "tamamlandi"}
                 data-yaklasik={n.yaklasik ? "" : undefined}
@@ -242,13 +243,13 @@ export function SevkiyatHaritasi({ limanlar, hatlar, className = "" }: { limanla
             {seciliNokta.yaklasik && <p className="text-amber-300" data-ipucu-yaklasik="">Yaklaşık konum: {seciliNokta.ulke} · {seciliNokta.vekil} limanı esas alındı</p>}
             {seciliNokta.aktif ? (
               <div className="mt-0.5" data-ipucu-aktif="">
-                {seciliNokta.aktif.yoldaDosya > 0 && <p className="text-emerald-300">● Yolda: <b>{seciliNokta.aktif.yoldaKonteyner}</b> konteyner · {seciliNokta.aktif.yoldaDosya} dosya{seciliNokta.aktif.enYakinEta ? ` · en yakın varış ${tarihKisa(seciliNokta.aktif.enYakinEta)}` : ""}</p>}
-                {seciliNokta.aktif.yuklemedeDosya > 0 && <p className="text-emerald-300">● Yüklemede: <b>{seciliNokta.aktif.yuklemedeKonteyner}</b> konteyner · {seciliNokta.aktif.yuklemedeDosya} dosya{seciliNokta.aktif.enYakinEtd ? ` · kalkış ${tarihKisa(seciliNokta.aktif.enYakinEtd)}` : ""}</p>}
+                {seciliNokta.aktif.yoldaDosya > 0 && <p className="text-emerald-300">● Yolda: <b>{seciliNokta.aktif.yoldaKonteyner}</b> konteyner · {seciliNokta.aktif.yoldaDosya} sevkiyat{seciliNokta.aktif.enYakinEta ? ` · en yakın varış ${tarihKisa(seciliNokta.aktif.enYakinEta)}` : ""}</p>}
+                {seciliNokta.aktif.yuklemedeDosya > 0 && <p className="text-emerald-300">● Yüklemede: <b>{seciliNokta.aktif.yuklemedeKonteyner}</b> konteyner · {seciliNokta.aktif.yuklemedeDosya} sevkiyat{seciliNokta.aktif.enYakinEtd ? ` · kalkış ${tarihKisa(seciliNokta.aktif.enYakinEtd)}` : ""}</p>}
               </div>
             ) : (
               <p className="mt-0.5" style={{ color: TEXT_MUTED }}>Şu an sevkiyat yok (tamamlandı)</p>
             )}
-            <p className="text-white mt-0.5"><b>{seciliNokta.konteyner.toLocaleString("tr-TR")}</b> konteyner · {seciliNokta.dosya} dosya <span style={{ color: TEXT_MUTED }}>(dönem toplamı)</span></p>
+            <p className="text-white mt-0.5"><b>{seciliNokta.konteyner.toLocaleString("tr-TR")}</b> konteyner{seciliNokta.dosya > 0 ? ` · ${seciliNokta.dosya} dosya` : ""} <span style={{ color: TEXT_MUTED }}>(dönem toplamı)</span></p>
             <div className="w-full h-1 rounded-full mt-1.5 mb-1" style={{ backgroundColor: CARD_BORDER }}>
               <div className="h-1 rounded-full" style={{ width: `${toplamK > 0 ? (seciliNokta.konteyner / toplamK) * 100 : 0}%`, backgroundColor: ACCENT }} />
             </div>

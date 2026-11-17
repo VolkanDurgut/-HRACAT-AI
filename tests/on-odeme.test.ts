@@ -12,6 +12,7 @@ test("odeme sartindan on odeme yuzdesi", () => {
   assert.equal(onOdemeOrani("30% advance, 70% against documents"), 30);
   assert.equal(onOdemeOrani("%50 ADVANCE PAYMENT&BALANCE 30 DAYS"), 50);
   assert.equal(onOdemeOrani("%25 DEPOSIT"), 25);
+  assert.equal(onOdemeOrani("%30 PAYMENT ADVANCE PAYMENT , BALANCE WITHIN 1 WEEK"), 30); // 17.11.2026
   assert.equal(onOdemeOrani("%12,5 PREPAYMENT"), 12.5);
 });
 

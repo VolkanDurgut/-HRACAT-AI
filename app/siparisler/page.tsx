@@ -370,7 +370,7 @@ function OnOdemeFormu({ s, onKapat, onKaydet, onImzali, dosyaAcilabilir, onDosya
               </div>
               <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
                 Her sevkiyata düşen ön ödeme = yüklenen malın fatura tutarı × yüzde; kalan, &quot;Siparişe devam et&quot; ile açılan sonraki sevkiyata otomatik devreder.
-                {dagilim?.oran_kaynak === "odeme_sekli" ? " Yüzde, dosyadaki ödeme şartından okundu." : ""}
+                {dagilim?.oran_kaynak === "odeme_sekli" ? " Yüzde, dosyadaki ödeme şartından okundu." : dagilim?.oran_kaynak === "proforma" ? " Yüzde, proformadaki ödeme şartından (PAYMENT TERMS) okundu." : ""}
               </p>
               {dagilim && dagilim.dosyalar.length > 0 && (
                 <table className="w-full text-[11px] tabular-nums" style={{ color: TEXT_MUTED }}>

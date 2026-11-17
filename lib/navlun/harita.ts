@@ -11,16 +11,12 @@
  * Cikis: Ambarli / Asyaport (11.11.2026 kullanici: "Biz sadece Ambarli ve Asyaport ile calisiyoruz").
  */
 import { trBuyuk } from "@/lib/tr-arama";
-import { limanKonumu, type LimanKonumu } from "@/lib/liman-koordinat";
+import { LIMAN_ES_ADLARI, limanKonumu, type LimanKonumu } from "@/lib/liman-koordinat";
 import type { LimanOzeti, NavlunSatiri } from "@/lib/navlun/ozet";
 import { karsilastir, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 
-/** Navlun okuyucusunun liman anahtari -> koordinat listesindeki anahtar (yalniz harita icin). */
-export const HARITA_ES_ADLARI: Record<string, string> = {
-  BEYRUT: "BEIRUT", BINGAZI: "BENGHAZI", MISRATA: "MISURATA", TRABLUS: "TRIPOLI", ISKENDERIYE: "ALEXANDRIA",
-  CEZAYIR: "ALGIERS", KAZABLANKA: "CASABLANCA", CIDDE: "JEDDAH", AKABE: "AQABA", "DAR ES SELAM": "DAR ES SALAAM",
-  MALDIVES: "MALE", "TAMATAVE": "TOAMASINA",
-};
+/** Navlun okuyucusunun liman anahtari -> koordinat listesindeki anahtar. 17.11.2026: ortak kural lib/liman-koordinat.ts. */
+export const HARITA_ES_ADLARI: Record<string, string> = LIMAN_ES_ADLARI;
 
 export function navlunLimanKonumu(anahtar: string): LimanKonumu | null {
   return limanKonumu(HARITA_ES_ADLARI[anahtar] || anahtar);

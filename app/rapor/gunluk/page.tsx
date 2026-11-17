@@ -102,7 +102,7 @@ function CutoffSatiri({ c }: { c: CutoffDurumu }) {
   );
 }
 
-/** Ozetin altinda: belgesi yuklenmemis, 48 saatten az kalan / gecen cut-off'lar. */
+/** Ozetin altinda: belgesi yuklenmemis, 24 saatten az kalan / gecen cut-off'lar (17.11.2026: 48 -> 24). */
 function CutoffUyariKutusu({ rapor, olusturma }: { rapor: GunlukRapor; olusturma: string }) {
   if (!rapor.cutoffUyarilari.length) return null;
   const acil = rapor.cutoffUyarilari.some((u) => u.durum.seviye === "kritik" || u.durum.seviye === "gecti");
@@ -111,7 +111,7 @@ function CutoffUyariKutusu({ rapor, olusturma }: { rapor: GunlukRapor; olusturma
     <div className="mb-6 rounded px-3 py-2 sayfa-boleme" style={{ border: `1px solid ${cerceve}`, borderLeft: `4px solid ${cerceve}`, backgroundColor: zemin }}>
       <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: baslikRenk }}>
         Cut-off Uyarısı ({rapor.cutoffUyarilari.length}){" "}
-        <span className="font-normal normal-case tracking-normal text-slate-500">· {olusturma} itibarıyla · belgesi yüklenmemiş, 48 saatten az kalan / geçen</span>
+        <span className="font-normal normal-case tracking-normal text-slate-500">· {olusturma} itibarıyla · belgesi yüklenmemiş, 24 saatten az kalan / geçen</span>
       </p>
       <table className="w-full mt-1 text-xs">
         <tbody>

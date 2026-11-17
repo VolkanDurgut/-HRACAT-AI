@@ -158,7 +158,7 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
         {cutoffUyarilari.length > 0 ? (
           <p className="text-[11px] mt-0.5 text-red-300" data-cutoff-ozet>{cutoffUyarilari.length} uyarı · {cutoffDosya} dosya · ayrıntı aşağıdaki çubukta</p>
         ) : (
-          <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>48 saat içinde bekleyen cut-off yok</p>
+          <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>24 saat içinde bekleyen cut-off yok</p>
         )}
       </div>
     </section>

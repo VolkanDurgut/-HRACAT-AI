@@ -100,6 +100,9 @@ export function cutoffKalanMs(dateStr: string | null, simdi: number = Date.now()
 
 /** Bildirim esigi: cut-off'a bu kadar (ve daha az) kala uyari verilir. */
 export const CUTOFF_UYARI_ESIGI_MS = 10 * 60 * 60 * 1000;
+/** Cut-off UYARISI (17.11.2026, kullanici: "24 saat kala uyari"): son 24 saat amber + Ana Panel seridi + gunluk rapor
+ * uyari kutusu. TEK KAYNAK (uygulama); gunluk rapor ayni degeri _shared/gunluk-rapor.ts CUTOFF_YAKLASIYOR_SAAT'te tutar. */
+export const CUTOFF_YAKLASIYOR_MS = 24 * 60 * 60 * 1000;
 
 /** Kalan sureyi "4g 01:36:12" / "09:59:59" bicimine cevirir (negatifse mutlak deger). */
 export function formatKalanSure(ms: number): string {

@@ -35,7 +35,7 @@ import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slo
 // booking ile yapilan posta aramalarinda gunde 3 rapor acente maillerini
 // gommesin (kullanici karari). Booking /rapor/gunluk sayfasinda gorunmeye devam eder.
 // 19.10.2026: her sevkiyatta talimat / beyanname CUT-OFF (ETD sutununda) + ozetin
-// altinda "Cut-off Uyarisi" kutusu (tamamlanmamis, 48 saatten az kalan / gecen).
+// altinda "Cut-off Uyarisi" kutusu (tamamlanmamis, 24 saatten az kalan / gecen; 17.11.2026: 48 -> 24).
 // Kalan sureler GONDERIM ANINA gore (sabah raporu dunu ozetler ama cut-off guncel).
 //
 // Alici: SADECE GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i.
@@ -196,7 +196,7 @@ function etdCutoffHucresi(s: SevkiyatSatiri): string {
   return `<div style="color:#64748B;font-size:11px;white-space:nowrap">ETD <b style="color:#1E293B">${tarihTR(s.etd)}</b></div>${cutoffSatiri(s.talimatCutoff)}${cutoffSatiri(s.beyannameCutoff)}`;
 }
 
-/** Ozetin altinda: tamamlanmamis ve 48 saatten az kalmis / gecmis cut-off'lar (yoksa bos). */
+/** Ozetin altinda: tamamlanmamis ve 24 saatten az kalmis / gecmis cut-off'lar (yoksa bos). */
 function cutoffUyariKutusu(r: GunlukRapor, olusturma: string): string {
   if (!r.cutoffUyarilari.length) return "";
   const acil = r.cutoffUyarilari.some((u) => u.durum.seviye === "kritik" || u.durum.seviye === "gecti");
@@ -208,7 +208,7 @@ function cutoffUyariKutusu(r: GunlukRapor, olusturma: string): string {
     })
     .join("");
   return `<div style="margin-top:14px;border:1px solid ${cerceve};border-left:4px solid ${cerceve};background:${zemin};border-radius:4px;padding:8px 12px">
-    <div style="font-size:11px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:${baslikRenk}">Cut-off Uyarısı (${r.cutoffUyarilari.length}) <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:#64748B">· ${esc(olusturma)} itibarıyla · belgesi yüklenmemiş, 48 saatten az kalan / geçen</span></div>
+    <div style="font-size:11px;font-weight:bold;letter-spacing:.5px;text-transform:uppercase;color:${baslikRenk}">Cut-off Uyarısı (${r.cutoffUyarilari.length}) <span style="font-weight:normal;text-transform:none;letter-spacing:0;color:#64748B">· ${esc(olusturma)} itibarıyla · belgesi yüklenmemiş, 24 saatten az kalan / geçen</span></div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;border-collapse:collapse">${satirlar}</table>
   </div>`;
 }

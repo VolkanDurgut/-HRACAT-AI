@@ -50,7 +50,7 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
       { baslik: "Her güne buradan başlayın", metin: "Ana Panel açık dosyaların tamamını tek ekranda toplar. Giriş yaptığınızda sizi ilk bu sayfa karşılar." },
       { nokta: "kartlar", baslik: "Dört özet kartı", metin: "Aktif Dosya, Bugün Yüklenen, Yüklenecek Konteyner ve Cut-off Uyarısı. Sayılar her dakika ve sekmeye her dönüşünüzde kendiliğinden yenilenir." },
       { nokta: "filtre", baslik: "Hızlı filtreler", metin: "Tümü, Cut-Off Yaklaşan, Rezervasyon Bekleyen… Listeyi tek tıkla ihtiyacınız olan dosyalara daraltın." },
-      { nokta: "satir", baslik: "Dosya satırı", metin: "Proforma, müşteri, booking, gemi kalkışı, yüklenen konteyner ve canlı cut-off sayaçları. Sayaç 48 saatin altında sarıya, 10 saatin altında kırmızıya döner. Detay ile dosyaya girersiniz." },
+      { nokta: "satir", baslik: "Dosya satırı", metin: "Proforma, müşteri, booking, gemi kalkışı, yüklenen konteyner ve canlı cut-off sayaçları. Sayaç 24 saatin altında sarıya, 10 saatin altında kırmızıya döner. Detay ile dosyaya girersiniz." },
       { nokta: "rapor", baslik: "Günlük Rapor", metin: "Güncel İhracat Raporu'nu açar. Aynı rapor her gün 09:00, 12:00 ve 17:00'de e-postayla da gelir." },
       { nokta: "menu", baslik: "Menü", metin: "Menü yetkinize göre şekillenir: İhracat, Operasyon, Yurt İçi ve Şirket İçi. Soluk görünen bir menü, o sayfa için yetkinizin olmadığını gösterir." },
       { nokta: "sorun", baslik: "Sorun Bildir", metin: "Bir şey ters giderse ya da bir fikriniz varsa sağ alttaki Sorun Bildir'e yazın; ekran görüntüsü ekleyebilirsiniz." },

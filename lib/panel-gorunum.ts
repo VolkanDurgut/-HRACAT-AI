@@ -3,7 +3,7 @@
  * filtre kuralları eski sayfa içi kodun, cut-off uyarıları eski özet kartının (components/panel-ozet-kartlari.tsx)
  * birebir taşınmış hâli. Saf modül (test: tests/panel-gorunum.test.ts).
  */
-import { isCutoffApproaching, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
+import { cutoffKalanMs, CUTOFF_YAKLASIYOR_MS, isCutoffApproaching, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
 import { dosyaAkisiHesapla, rezervasyonlariSirala, type AkisRezervasyonu } from "@/lib/dashboard-akis";
 import { noParcala } from "@/lib/coklu-no";
 
@@ -54,6 +54,7 @@ export function dosyaEslesir(d: { id: string; dosya_no: string | null; proforma_
 
 // ---------------------------------------------------------------------------------------------------------------
 // Cut-off uyarıları (eski özet kartının hesabı; kart artık yalnız sayaç, liste uyarı çubuğunda)
+/** @deprecated 17.11.2026: uyari artik saat bazli (CUTOFF_YAKLASIYOR_MS, son 24 saat + gecenler). */
 export const CUTOFF_UYARI_GUN = 2;
 export type CutoffUyarisi = { dosyaId: string; dosyaNo: string; musteri: string | null; tur: "Talimat" | "Beyanname"; gun: number; saat: string | null };
 export const gunMetni = (gun: number) => (gun < 0 ? `${-gun}g geçti` : gun === 0 ? "bugün" : `${gun}g`);
@@ -68,7 +69,9 @@ type UyariDosyasi = {
 const enErken = (degerler: (string | null)[]) => degerler.filter((x): x is string => !!x).sort()[0] || null;
 
 /** <= 2 takvim günü kalan / geçen ve ilgili adımı bitmemiş cut-off'lar (dashboard-akis ile aynı kural), en acil önce. */
-export function cutoffUyarilari(dosyalar: UyariDosyasi[]): CutoffUyarisi[] {
+/** Cut-off uyarilari (Ana Panel seridi): belgesi yuklenmemis ve son 24 saate girmis / gecmis cut-off'lar
+ * (17.11.2026: 2 takvim gunu -> 24 saat; gunluk rapor ve sayaclarla ayni kural). */
+export function cutoffUyarilari(dosyalar: UyariDosyasi[], simdi: number = Date.now()): CutoffUyarisi[] {
   return dosyalar.flatMap((d) => {
     const rezervasyonlar = rezervasyonlariSirala(d.rezervasyonlar);
     const akis = dosyaAkisiHesapla({
@@ -76,7 +79,7 @@ export function cutoffUyarilari(dosyalar: UyariDosyasi[]): CutoffUyarisi[] {
       draftBlVar: !!d.draft_bl_dosya_url, beyannameVar: !!d.beyanname_dosya_url,
     });
     return ([["Talimat", akis.talimat, enErken(d.rezervasyonlar.map((r) => r.talimat_cutoff))], ["Beyanname", akis.beyanname, enErken(d.rezervasyonlar.map((r) => r.beyanname_cutoff))]] as const)
-      .filter(([, c]) => !c.tamam && c.gun !== null && c.gun <= CUTOFF_UYARI_GUN)
+      .filter(([, c, saat]) => { const k = cutoffKalanMs(saat, simdi); return !c.tamam && c.gun !== null && k !== null && k <= CUTOFF_YAKLASIYOR_MS; })
       .map(([tur, c, saat]) => ({ dosyaId: d.id, dosyaNo: d.dosya_no || "-", musteri: d.alici_firma, tur, gun: c.gun as number, saat }));
   }).sort((a, b) => a.gun - b.gun);
 }

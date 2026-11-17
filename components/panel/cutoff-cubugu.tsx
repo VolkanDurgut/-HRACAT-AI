@@ -32,7 +32,7 @@ export function CutoffCubugu({ uyarilar, onDosya }: { uyarilar: CutoffUyarisi[];
       rozetler={<>
         {gecen > 0 && <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: "rgba(239,68,68,0.15)", color: "#FCA5A5" }}>geçen <b>{gecen}</b></span>}
         {bugun > 0 && <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D" }}>bugün <b>{bugun}</b></span>}
-        <span className="rounded-full px-2 py-0.5 border" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>48 saat içinde</span>
+        <span className="rounded-full px-2 py-0.5 border" style={{ borderColor: CARD_BORDER, color: "#E2E8F0" }}>24 saat içinde</span>
       </>}>
         <ul className="divide-y border-t" style={{ borderColor: CARD_BORDER }}>
           {uyarilar.map((u) => (

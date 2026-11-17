@@ -4,6 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cutoffUyarilari, dosyaEslesir, gunMetni, panelFiltrele, panelFiltresi } from "@/lib/panel-gorunum";
+import { cutoffZamanMs } from "@/lib/cutoff-utils";
 
 /** Bugunden n gun sonrasi, yerel takvim ("YYYY-MM-DDT10:00:00+00:00"; cut-off saatleri yerel saat olarak tutulur). */
 const gun = (n: number) => {
@@ -47,13 +48,18 @@ test("?dosya= eslesmesi: kimlik, dosya no, coklu proforma; bosluk/tire duyarsiz"
   assert.ok(!dosyaEslesir(d, null));
 });
 
-test("cut-off uyarilari: <=2 gun, tamamlanan adim yok, en acil once", () => {
-  const a = dosya("a", { rezervasyonlar: [{ talimat_cutoff: gun(1), beyanname_cutoff: gun(2) }] });
-  const b = dosya("b", { rezervasyonlar: [{ talimat_cutoff: gun(0), beyanname_cutoff: gun(4) }], draft_bl_dosya_url: "x" });
-  const c = dosya("c", { rezervasyonlar: [{ talimat_cutoff: gun(-1), beyanname_cutoff: gun(1) }], beyanname_dosya_url: "x" });
-  const u = cutoffUyarilari([a, b, c]);
-  assert.deepEqual(u.map((x) => `${x.dosyaId}:${x.tur}:${x.gun}`), ["c:Talimat:-1", "a:Talimat:1", "a:Beyanname:2"]);
-  assert.equal(u[1].saat, gun(1));
+test("cut-off uyarilari: son 24 saat + gecenler (17.11.2026), tamamlanan adim yok, en acil once", () => {
+  // Sabit "simdi": bugun 12:00 (yerel; cut-off yerel saat "+00" etiketiyle saklanir)
+  const bugun = gun(0).slice(0, 10);
+  const yarin = gun(1).slice(0, 10);
+  const simdi = cutoffZamanMs(`${bugun}T12:00:00+00:00`)!;
+  const t = (tarih: string, saat: string) => `${tarih}T${saat}:00+00:00`;
+  const a = dosya("a", { rezervasyonlar: [{ talimat_cutoff: t(yarin, "10:00"), beyanname_cutoff: t(yarin, "13:00") }] }); // 22 sa: uyari, 25 sa: yok
+  const b = dosya("b", { rezervasyonlar: [{ talimat_cutoff: t(bugun, "15:00"), beyanname_cutoff: gun(4) }], draft_bl_dosya_url: "x" }); // talimat tamam
+  const c = dosya("c", { rezervasyonlar: [{ talimat_cutoff: gun(-1), beyanname_cutoff: t(yarin, "11:00") }], beyanname_dosya_url: "x" }); // gecti
+  const u = cutoffUyarilari([a, b, c], simdi);
+  assert.deepEqual(u.map((x) => `${x.dosyaId}:${x.tur}:${x.gun}`), ["c:Talimat:-1", "a:Talimat:1"], "25 saat kalan beyanname uyari degil");
+  assert.equal(u[1].saat, t(yarin, "10:00"));
   assert.equal(u[1].musteri, "Ornek a");
   assert.equal(gunMetni(-1), "1g geçti");
   assert.equal(gunMetni(0), "bugün");

@@ -8,17 +8,16 @@ import {
   formatCutoffTarihUzun,
   formatKalanSure,
   CUTOFF_UYARI_ESIGI_MS,
+  CUTOFF_YAKLASIYOR_MS,
 } from "@/lib/cutoff-utils";
 import { TEXT_MUTED } from "@/lib/theme";
-
-const IKI_GUN_MS = 48 * 60 * 60 * 1000;
 
 export type CutoffSeviye = "normal" | "yaklasiyor" | "kritik" | "gecti";
 
 export function cutoffSeviyesi(kalanMs: number): CutoffSeviye {
   if (kalanMs <= 0) return "gecti";
   if (kalanMs <= CUTOFF_UYARI_ESIGI_MS) return "kritik";
-  if (kalanMs <= IKI_GUN_MS) return "yaklasiyor";
+  if (kalanMs <= CUTOFF_YAKLASIYOR_MS) return "yaklasiyor";
   return "normal";
 }
 
@@ -33,8 +32,8 @@ const SEVIYE_STIL: Record<CutoffSeviye, { renk: string; zemin: string; kenar: st
  * Talimat / Beyanname cut-off icin canli geri sayim (talep: 01.10.2026).
  * Ust satir: cut-off tarihi + saati (ham okunur, saat dilimi kaymasi yok).
  * Alt satir: saniye saniye isleyen kalan sure.
- *   > 48 saat  -> notr
- *   48-10 saat -> amber
+ *   > 24 saat  -> notr          (17.11.2026: 48 -> 24 saat, CUTOFF_YAKLASIYOR_MS)
+ *   24-10 saat -> amber
  *   < 10 saat  -> kirmizi + nabiz (uygulama geneli bildirim de bu esikte gelir)
  *   gecmis     -> soluk "Süresi doldu"
  */

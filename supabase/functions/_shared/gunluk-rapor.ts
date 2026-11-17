@@ -19,7 +19,7 @@
  * "Yukleme Baslamadi").
  *
  * Cut-off (19.10.2026): her sevkiyatta talimat ve beyanname cut-off'u (en erken
- * rezervasyon degeri), kalan sure ve durum; tamamlanmamis + 48 saatten az kalan /
+ * rezervasyon degeri), kalan sure ve durum; tamamlanmamis + 24 saatten az kalan /
  * gecen cut-off'lar `cutoffUyarilari` listesinde (sayfa ve mail uyari kutusu).
  */
 
@@ -120,8 +120,8 @@ export type SevkiyatSatiri = {
  * Cut-off seviyesi (uygulamadaki CutoffSayac ile ayni esikler):
  *   tamam   = ilgili belge yuklendi (sayac yok)
  *   yok     = cut-off girilmemis
- *   normal  = 48 saatten fazla var
- *   yaklasiyor = 48 - 10 saat
+ *   normal  = 24 saatten fazla var
+ *   yaklasiyor = 24 - 10 saat
  *   kritik  = 10 saatten az
  *   gecti   = suresi doldu, belge hala yok
  */
@@ -140,7 +140,7 @@ export type CutoffDurumu = {
   kalanMs: number | null;
 };
 
-/** Raporun uyari kutusu: tamamlanmamis ve 48 saatten az kalmis / gecmis cut-off'lar. */
+/** Raporun uyari kutusu: tamamlanmamis ve 24 saatten az kalmis / gecmis cut-off'lar. */
 export type CutoffUyarisi = {
   dosya_no: string;
   musteri: string;
@@ -248,7 +248,8 @@ const DURUM_SIRASI: Record<SevkiyatDurumu, number> = { tamamlandi: 0, yukleniyor
 // ------------------------------------------------------------- cut-off ---
 const TURKIYE_UTC_OFSET_MS = 3 * 60 * 60 * 1000;
 const SAAT_MS = 60 * 60 * 1000;
-export const CUTOFF_YAKLASIYOR_SAAT = 48;
+// 17.11.2026 (kullanici: "gunluk raporda cut-off 24 saat kala uyari"): 48 -> 24. Uygulamada lib/cutoff-utils.ts CUTOFF_YAKLASIYOR_MS.
+export const CUTOFF_YAKLASIYOR_SAAT = 24;
 export const CUTOFF_KRITIK_SAAT = 10;
 
 /**
@@ -300,7 +301,7 @@ function enErkenCutoff(rezler: RaporRezervasyonu[], alan: "talimat_cutoff" | "be
   return degerler.sort((a, b) => a.slice(0, 16).localeCompare(b.slice(0, 16)))[0] || null;
 }
 
-/** Uyari kutusuna girer mi: tamamlanmamis ve 48 saatten az kalmis ya da gecmis. */
+/** Uyari kutusuna girer mi: tamamlanmamis ve 24 saatten az kalmis ya da gecmis. */
 export const cutoffUyarisiMi = (c: CutoffDurumu) => c.seviye === "gecti" || c.seviye === "kritik" || c.seviye === "yaklasiyor";
 
 /**

@@ -23,6 +23,10 @@ Her gece yedek, **gerçekten geri yüklenerek** test edilir
 (`public.yedek_geri_yukleme_testi`): mailde "Geri yükleme testi: 19/19 tablo
 birebir" satırı görünmüyorsa veya konu `[UYARI]` ile başlıyorsa incelenmeli.
 
+17.11.2026 (03:00 çökmesi): `denetim_kayitlari` (7 günlük denetim kaydı) geri yükleme testine **girmez** — yedeğe
+girer. Test zaman aşımında tekrar denenmez ve 100 sn'yi aşarsa kalan tablolar "atlandı" yazılır. Neden: test bu
+tabloda zaman aşımına düşüp 3 kez tekrarlanınca Nano sunucunun disk IO bütçesi bitti, veritabanı kilitlendi.
+
 ## Gerekenler
 
 - En son yedek: `ihracat-ai-yedek-GG-AA-YYYY.zip` (Ayarlar > Veri Yedekleri'nden indirilir; içinde aynı adlı `.json`. Betik `.zip` ve `.json`'u doğrudan kabul eder). **Proje tamamen kaybolursa depo da gider:** bu yüzden zip'i düzenli olarak indirip şirket dışında (bilgisayar / bulut) saklayın.

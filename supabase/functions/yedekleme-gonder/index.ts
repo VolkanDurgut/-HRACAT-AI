@@ -43,6 +43,11 @@ import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
 //    tablolar arasi baglar kontrol edilir. Sonuc mailde yazar; sorun varsa
 //    konu "[UYARI]". Canliya hicbir sey yazilmaz.
 //    10.11.2026: PARCALI calisir (geriYuklemeTestiParcali); tek seferde 8 sn sinirina takiliyordu.
+//    17.11.2026 (03:00 cokmesi): denetim_kayitlari testte zaman asimina dusuyor (16.11 uyari), 5xx "gecici hata"
+//    sayilip 2 kez daha deneniyordu -> Nano sunucuda disk IO butcesi bitti, veritabani kilitlendi (17.11 504).
+//    Artik: (1) denetim_kayitlari geri yukleme testine GIRMEZ (yedege girer; 7 gunluk denetim kaydi),
+//    (2) test RPC'si 5xx'te TEKRAR DENENMEZ (yalniz ag kopmasi), (3) test GERI_YUKLEME_SURE_MS'yi asarsa kalan
+//    parcalar "ATLANDI" (edge 150 sn sinirina carpmaz).
 //  - MAIL GORUNUMU (26.10.2026): gunluk raporla ayni kurumsal tasarim, tablolar
 //    Turkce adlariyla gruplu, kaydi 0 olan tablonun nedeni yazar -> mail.ts (saf).
 //    Deneme yanitinda "html" alani da doner (onizleme; veri icermez, sadece sayilar).
@@ -399,15 +404,16 @@ async function veritabaniBoyutu(): Promise<number> {
   return deger;
 }
 
-/** Service-role RPC cagrisi (gecici hatada tekrar dener). */
-async function rpc(ad: string, govde: unknown): Promise<unknown> {
-  const res = await geciciHatadaTekrarla(() =>
+/** Service-role RPC cagrisi. tekrar=true: 5xx / ag hatasinda tekrar dener (okuma). tekrar=false: TEKRAR YOK
+ * (agir yazan geri yukleme testi - zaman asimini tekrar denemek veritabanini kilitler, 17.11.2026). */
+async function rpc(ad: string, govde: unknown, tekrar = true): Promise<unknown> {
+  const istek = () =>
     fetch(`${SUPABASE_URL}/rest/v1/rpc/${ad}`, {
       method: "POST",
       headers: { ...servisBasliklari, "Content-Type": "application/json" },
       body: JSON.stringify(govde),
-    })
-  );
+    });
+  const res = tekrar ? await geciciHatadaTekrarla(istek) : await istek();
   if (!res.ok) throw new Error(`${ad} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return await res.json();
 }
@@ -426,16 +432,29 @@ type GeriYuklemeSonucu = {
  * diger her tablo kendi parcasinda test edilir; sonuclar birlestirilir. Bir parca hata verirse
  * o parcanin tablolari YUKLENEMEDI sayilir (test durmaz). Fonksiyonun kendisi degismedi. */
 const BAG_TABLOLARI = ["ihracat_dosyalari", "rezervasyonlar", "konteynerler", "dosya_evraklari", "acente_teklifleri", "acenteler", "ana_siparisler", "kullanici_rolleri", "companies"];
+/** Geri yukleme testine GIRMEYEN tablolar (yedege girer). 17.11.2026: denetim kaydi buyuk + yalniz 7 gunluk; test
+ * zaman asimina dusup veritabanini kilitledi. */
+const GERI_YUKLEME_DISI = new Set<string>([DENETIM_TABLOSU]);
+/** Testin toplam sure siniri (edge 150 sn; oncesinde okuma + zip + yukleme + mail var). */
+const GERI_YUKLEME_SURE_MS = 100_000;
 async function geriYuklemeTestiParcali(yedek: Record<string, unknown>): Promise<GeriYuklemeSonucu> {
-  const tablolar = Object.keys(yedek).filter((t) => !t.startsWith("_"));
+  const baslangic = Date.now();
+  const tablolar = Object.keys(yedek).filter((t) => !t.startsWith("_") && !GERI_YUKLEME_DISI.has(t));
   const bagParcasi = tablolar.filter((t) => BAG_TABLOLARI.includes(t));
   const parcalar = [bagParcasi, ...tablolar.filter((t) => !BAG_TABLOLARI.includes(t)).map((t) => [t])].filter((p) => p.length);
   const toplam: GeriYuklemeSonucu = { tablo_sayisi: 0, yuklenemeyen: 0, birebir: 0, bag_sorunlari: [], tablolar: [] };
   for (const parca of parcalar) {
+    if (Date.now() - baslangic > GERI_YUKLEME_SURE_MS) {
+      // Sure doldu: kalan parcalar denenmez (uyari olarak mailde gorunur, fonksiyon cokmez)
+      for (const t of parca) toplam.tablolar.push({ tablo: t, durum: "YUKLENEMEDI", hata: "atlandı: test süresi doldu" });
+      toplam.tablo_sayisi += parca.length;
+      toplam.yuklenemeyen += parca.length;
+      continue;
+    }
     const altPaket: Record<string, unknown> = {};
     for (const t of parca) altPaket[t] = yedek[t];
     try {
-      const s = (await rpc("yedek_geri_yukleme_testi", { paket: altPaket })) as GeriYuklemeSonucu;
+      const s = (await rpc("yedek_geri_yukleme_testi", { paket: altPaket }, false)) as GeriYuklemeSonucu;
       toplam.tablo_sayisi += s.tablo_sayisi;
       toplam.yuklenemeyen += s.yuklenemeyen;
       toplam.birebir += s.birebir;

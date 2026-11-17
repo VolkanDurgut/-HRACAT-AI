@@ -41,3 +41,33 @@ export async function sistemProformasiOku(dosya: File, companyId: string | null)
     return { tur: "sistem_disi" };
   }
 }
+
+/**
+ * "Onay geldi" -> dosya ac (17.11.2026): Proforma Yukle ?proforma=<id>. Kayitli proformanin PDF'i, Proforma Olustur'un
+ * indirdigi PDF'in AYNISI uretilir: sirketin sablonu (proforma_ayarlari; yoksa varsayilan) + IMZALI (app/proformalar
+ * ile ayni kural). PDF bilgisi Title "Proforma <NO>", Creator "Ihracat AI" -> sayfa bu dosyayi yuklenmis gibi isler,
+ * sistemProformasiOku yapay zekasiz okur, dosya acma akisi DEGISMEZ.
+ * Kayit yok / taslak bozuk / yetki yok -> null (cagiran kullaniciya soyler). PDF kutuphanesi (fontlar) gerektiginde yuklenir.
+ */
+export async function kayitliProformaPdf(proformaId: string, companyId: string | null): Promise<{ dosya: File; proformaNo: string } | null> {
+  if (!companyId || !/^[0-9a-f-]{36}$/i.test(proformaId)) return null;
+  const [kayit, ayarlar] = await Promise.all([
+    supabase.from("proformalar").select("proforma_no, taslak").eq("company_id", companyId).eq("id", proformaId).maybeSingle(),
+    supabase.from("proforma_ayarlari").select("ozel_sartlar, alt_bilgi, ust_bilgi_tarih, ust_bilgi_revizyon").eq("company_id", companyId).maybeSingle(),
+  ]);
+  if (kayit.error || !kayit.data) return null;
+  const taslak = taslakNormalle((kayit.data as { taslak: unknown }).taslak);
+  if (!taslak) return null;
+  const ayar = (ayarlar.data || null) as { ozel_sartlar?: string[] | null; alt_bilgi?: string[] | null; ust_bilgi_tarih?: string | null; ust_bilgi_revizyon?: string | null } | null;
+  const [{ belgeOlustur }, { proformaPdf, proformaDosyaAdi }, sabit] = await Promise.all([
+    import("@/lib/proforma/belge"), import("@/lib/proforma/pdf"), import("@/lib/proforma/sabitler"),
+  ]);
+  const sablon = {
+    ozelSartlar: ayar?.ozel_sartlar?.length ? ayar.ozel_sartlar : sabit.VARSAYILAN_OZEL_SARTLAR,
+    altBilgi: ayar?.alt_bilgi?.length ? ayar.alt_bilgi : sabit.VARSAYILAN_ALT_BILGI,
+    ustBilgi: { tarih: ayar?.ust_bilgi_tarih || sabit.VARSAYILAN_UST_BILGI.tarih, revizyon: ayar?.ust_bilgi_revizyon || sabit.VARSAYILAN_UST_BILGI.revizyon },
+  };
+  const belge = belgeOlustur(taslak, sablon, true); // IMZALI: Proforma Olustur'un indirdigi ile ayni
+  const blob = proformaPdf(belge).output("blob");
+  return { dosya: new File([blob], proformaDosyaAdi(belge), { type: "application/pdf" }), proformaNo: (kayit.data as { proforma_no: string }).proforma_no };
+}

@@ -21,7 +21,7 @@ import { SekmeCubugu, type SekmeOgesi } from "@/components/erp/sekme-cubugu";
 import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
 import { SecilebilirOzetKarti } from "@/components/erp/ozet-karti";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
-import { onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
@@ -69,7 +69,7 @@ function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
     return degisir ? (
       <button type="button" onClick={() => onAc(s)} disabled={mesgul} data-onodeme-ac
         className="min-h-7 px-2 py-1 rounded-md text-[11px] leading-tight font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-        Ön ödeme alındı
+        Onay geldi
       </button>
     ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
   }
@@ -246,8 +246,23 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
 }
 
 /** "Ön ödeme alındı" penceresi: tutar (zorunlu), para birimi, ödeme tarihi. */
-function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () => void; onKaydet: (tutar: number, para: string, tarih: string, ek: { oran: number | null; karsilik: number | null }) => Promise<string | null> }) {
+/**
+ * On odeme / onay penceresi. 17.11.2026 "Onay geldi" (onay bekleyen siparis): onay iki yoldan gelir -
+ *  "Ön ödeme geldi" (asagidaki mevcut form, tutar zorunlu) | "İmzalı proforma geldi" (tutarsiz, siparis_onay_imzali).
+ * Sistem proformasinda (dosyasi acilmamis) "Kaydedince dosyayi ac" -> Proforma Yukle ?proforma=<id>.
+ * Onaylanmis satirda ("Tutar gir") pencere eskisi gibi yalniz on odeme formudur.
+ */
+function OnOdemeFormu({ s, onKapat, onKaydet, onImzali, dosyaAcilabilir, onDosyaAc }: {
+  s: SiparisSatiri; onKapat: () => void;
+  onKaydet: (tutar: number, para: string, tarih: string, ek: { oran: number | null; karsilik: number | null }) => Promise<string | null>;
+  onImzali: (tarih: string) => Promise<string | null>;
+  dosyaAcilabilir: boolean;
+  onDosyaAc: () => void;
+}) {
   const bugun = bugunIst();
+  const yeniOnay = s.durum === "onay_bekliyor";
+  const [tur, setTur] = useState<"on_odeme" | "imzali">("on_odeme");
+  const [dosyaAc, setDosyaAc] = useState(true);
   // On odeme dagitimi (16.11.2026): siparis takibi yapilan proformada tutar sevkiyatlara yuzdeyle bolunur.
   const [dagilim, setDagilim] = useState<OnOdemeDagitimi | null>(null);
   const [oran, setOran] = useState("");
@@ -275,6 +290,14 @@ function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () 
   const farkliDoviz = takipli && para !== siparisPara;
   const gonder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (yeniOnay && tur === "imzali") {
+      if (!tarih || tarih > bugun) { setHata("Onay tarihi bugünden ileri olamaz."); return; }
+      setKaydediliyor(true); setHata(null);
+      const h = await onImzali(tarih);
+      setKaydediliyor(false);
+      if (h) setHata(h); else if (dosyaAcilabilir && dosyaAc) onDosyaAc();
+      return;
+    }
     if (!Number.isFinite(sayi) || sayi <= 0) { setHata("Ön ödeme tutarını girin."); return; }
     if (!tarih || tarih > bugun) { setHata("Ödeme tarihi bugünden ileri olamaz."); return; }
     const oranSayi = oran.trim() === "" ? null : Number(oran.replace(",", "."));
@@ -286,19 +309,34 @@ function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () 
       oran: takipli ? oranSayi : null, karsilik: karsilikSayi === null ? null : Math.round(karsilikSayi * 100) / 100,
     });
     setKaydediliyor(false);
-    if (h) setHata(h);
+    if (h) setHata(h); else if (yeniOnay && dosyaAcilabilir && dosyaAc) onDosyaAc();
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true" aria-labelledby="onodeme-baslik"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !kaydediliyor) onKapat(); }} data-testid="onodeme-formu">
       <form onSubmit={gonder} className="w-full max-w-md rounded-xl border shadow-xl" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
-          <p id="onodeme-baslik" className="text-sm font-semibold text-white">Ön ödeme alındı</p>
+          <p id="onodeme-baslik" className="text-sm font-semibold text-white">{yeniOnay ? "Onay geldi" : "Ön ödeme alındı"}</p>
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
             {s.proforma_no} · {s.firma}{s.tutar !== null ? ` · proforma ${sayiGoster(s.tutar, 2)} ${paraIsareti(s.para_birimi)}` : ""}
           </p>
         </div>
         <div className="px-5 py-4 space-y-3">
+          {yeniOnay && (
+            <div className="grid grid-cols-2 gap-1 rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER }} role="radiogroup" aria-label="Onayın türü" data-testid="onay-turu">
+              {([["on_odeme", "Ön ödeme geldi"], ["imzali", "İmzalı proforma geldi"]] as const).map(([k, etiket]) => (
+                <button key={k} type="button" role="radio" aria-checked={tur === k} onClick={() => { setTur(k); setHata(null); }} data-onay-turu={k}
+                  className="h-8 rounded-md text-xs font-semibold transition-colors"
+                  style={tur === k ? { backgroundColor: "rgba(16,185,129,0.16)", color: "#FFFFFF" } : { color: TEXT_MUTED }}>{etiket}</button>
+              ))}
+            </div>
+          )}
+          {yeniOnay && tur === "imzali" ? (
+            <label className="block text-xs" style={{ color: TEXT_MUTED }}>Onay tarihi (imzalı proformanın geldiği gün)
+              <input type="date" value={tarih} max={bugun} onChange={(e) => setTarih(e.target.value)} aria-label="Onay tarihi"
+                className="mt-1 h-9 w-full rounded-lg border bg-transparent px-3 text-sm text-white" style={{ borderColor: CARD_BORDER, colorScheme: "dark" }} />
+            </label>
+          ) : (<>
           <div className="grid grid-cols-[1fr_96px] gap-2">
             <label className="text-xs" style={{ color: TEXT_MUTED }}>Alınan tutar
               <input autoFocus inputMode="decimal" value={tutar} onChange={(e) => setTutar(e.target.value)} placeholder="ör. 14.580" aria-label="Ön ödeme tutarı"
@@ -359,15 +397,22 @@ function OnOdemeFormu({ s, onKapat, onKaydet }: { s: SiparisSatiri; onKapat: () 
               )}
             </div>
           )}
+          </>)}
+          {yeniOnay && dosyaAcilabilir && (
+            <label className="flex items-start gap-2 text-xs text-white cursor-pointer" data-testid="onay-dosya-ac">
+              <input type="checkbox" checked={dosyaAc} onChange={(e) => setDosyaAc(e.target.checked)} className="mt-0.5" />
+              <span>Kaydedince dosyayı aç <span style={{ color: TEXT_MUTED }}>— kayıtlı proformanın imzalı PDF&apos;i hazırlanır, Proforma Yükle&apos;de kontrol edip açarsınız.</span></span>
+            </label>
+          )}
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            Kaydedince sipariş &quot;Ön ödemesi alınmış&quot; bölümüne geçer ve yükleme planında &quot;Rezervasyon alınmadı&quot; olarak görünür.
+            Kaydedince sipariş &quot;Rezervasyon bekleyen&quot; sekmesine geçer ve yükleme planında &quot;Rezervasyon alınmadı&quot; olarak görünür.
           </p>
           {hata && <p className="text-xs text-red-400 flex items-center gap-1.5" role="alert"><AlertTriangle size={13} />{hata}</p>}
         </div>
         <div className="px-5 py-3 border-t flex justify-end gap-2" style={{ borderColor: CARD_BORDER }}>
           <button type="button" onClick={onKapat} disabled={kaydediliyor} className="px-3 py-2 rounded-lg border text-xs font-medium disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Vazgeç</button>
           <button type="submit" disabled={kaydediliyor} data-testid="onodeme-kaydet" className="px-4 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
-            {kaydediliyor ? "Kaydediliyor…" : "Kaydet"}
+            {kaydediliyor ? "Kaydediliyor…" : yeniOnay && dosyaAcilabilir && dosyaAc ? "Kaydet ve dosyayı aç" : "Kaydet"}
           </button>
         </div>
       </form>
@@ -532,11 +577,25 @@ function SiparisIcerik() {
       const dagitim = !d || d.durum === "takip_degil" ? "" : d.durum === "tamam"
         ? ` ${d.dosyalar.length} sevkiyat dosyasına %${String(d.oran).replace(".", ",")} ile dağıtıldı; devreden ${sayiGoster(d.kalan ?? 0, 2)} ${paraIsareti(d.para)}.`
         : ` ${DAGITIM_DURUM_METNI[d.durum]}`;
-      setBilgi(`${s.proforma_no}: ön ödeme kaydedildi (${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}). Sipariş "ön ödemesi alınmış" bölümüne ve yükleme planına eklendi.${dagitim}`);
+      setBilgi(`${s.proforma_no}: ön ödeme kaydedildi (${tutar.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} ${para}). Sipariş "Rezervasyon bekleyen" sekmesine ve yükleme planına eklendi.${dagitim}`);
       await yukle();
       return null;
     } catch (e) { return e instanceof Error ? e.message : "Ön ödeme kaydedilemedi."; }
   };
+  // 17.11.2026 "Onay geldi" - imzali proforma (tutarsiz)
+  const onayImzaliFn = async (s: SiparisSatiri, tarih: string): Promise<string | null> => {
+    if (!s.proforma_no) return "Proforma no yok.";
+    try {
+      await onayImzaliKaydet(s.proforma_no, tarih);
+      setOnOdemeSatir(null);
+      setBilgi(`${s.proforma_no}: imzalı proforma ile onaylandı. Sipariş "Rezervasyon bekleyen" sekmesine geçti; ön ödeme tutarı geldiğinde "Tutar gir" ile eklenir.`);
+      await yukle();
+      return null;
+    } catch (e) { return e instanceof Error ? e.message : "Onay kaydedilemedi."; }
+  };
+  // Dosyasi acilmamis sistem proformasi ("proforma:<id>") -> Proforma Yukle ?proforma=<id>
+  const kayitliProformaId = (s: SiparisSatiri) => (s.anahtar.startsWith("proforma:") ? s.anahtar.slice("proforma:".length) : null);
+  const dosyaAcYetkisi = !!yetkiler.sayfa_yetkileri.yeni_dosya;
   const onOdemeGeriAl = async (s: SiparisSatiri) => {
     if (!s.proforma_no) return;
     setBekleyen(s.anahtar); setHata(null);
@@ -680,7 +739,10 @@ function SiparisIcerik() {
                 <SiparisEslestirFormu s={eslestirilecek} onKapat={() => setEslestirilecek(null)} onEslesti={(m) => { setEslestirilecek(null); setBilgi(m); yukle(); }} />
               )}
               {onOdemeSatir && (
-                <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d, ek) => onOdemeKaydetFn(onOdemeSatir, t, p, d, ek)} />
+                <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d, ek) => onOdemeKaydetFn(onOdemeSatir, t, p, d, ek)}
+                  onImzali={(d) => onayImzaliFn(onOdemeSatir, d)}
+                  dosyaAcilabilir={dosyaAcYetkisi && !!kayitliProformaId(onOdemeSatir)}
+                  onDosyaAc={() => { const id = kayitliProformaId(onOdemeSatir); if (id) window.location.assign(`/yeni-dosya?proforma=${encodeURIComponent(id)}`); }} />
               )}
               {gorunenSiparis.length ? (
                 <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek}

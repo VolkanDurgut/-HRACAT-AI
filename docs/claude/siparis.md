@@ -567,3 +567,20 @@ Kontrol Merkezi / Pazar / Ana Panel düzeni (`app/siparisler/page.tsx`, saf yard
 - **Arama:** tek kutu, Türkçe harf duyarsız; sekme sayıları aramaya göre daralır, boş sekmede "diğer sekmelerde N sonuç" yazar.
 - **Bağlantılar:** müşteri adı → `/pazar?musteri=` (Pazar yetkisi varsa); rezervasyonlu satırın dosya no'su → `/panel?dosya=` (sevk edilen / kapalı dosya Ana Panel'de olmayabileceği için yalnız rezervasyonlu).
 - "Dosyaya dönüştür" bu sayfada yok: rezervasyon operasyondan gelir, sipariş kendiliğinden sekme değiştirir.
+
+## 4.20 "Onay geldi" akışı (17.11.2026)
+
+Kullanıcı: "Harun Bey proforma yapacak, müşteriye atacak, imzalı proforma veya ön ödeme gelirse proforma ön onayı alınmış
+ama rezervasyonu alınmamış olarak düşecek." Akış (yeni ekran yok, mevcut parçalar bağlandı):
+
+1. Proforma Oluştur → kaydet → Sipariş Listesi "Onay bekleyen" (değişmedi).
+2. Satırdaki **"Onay geldi"** (eski "Ön ödeme alındı") penceresi: **Ön ödeme geldi** (mevcut form, tutar zorunlu,
+   `siparis_on_odeme_kaydet` DEĞİŞMEDİ) | **İmzalı proforma geldi** (yalnız onay tarihi; yeni `siparis_onay_imzali`,
+   migration `20261117100000`). İkisi de `siparis_on_odemeler.alindi = true` → sipariş "Rezervasyon bekleyen"e geçer
+   (`siparis_listesi()` değişmedi). `onay_turu` kolonu: `imzali` / `on_odeme` / null. İmzalı onayda tutar boş kalır;
+   satırda "Alındı · Tutar gir" görünür. Daha önce girilmiş tutar imzalı onayda SİLİNMEZ.
+3. Dosyası açılmamış sistem proformasında (`anahtar = proforma:<id>`) ve Proforma Yükle yetkisi varsa
+   **"Kaydedince dosyayı aç"** (varsayılan işaretli) → `/yeni-dosya?proforma=<id>`: `kayitliProformaPdf`
+   (`lib/proforma/okuma-pdf.ts`) Proforma Oluştur'un indirdiği PDF'in aynısını üretir (şirket şablonu + İMZALI),
+   sayfa dosyayı yüklenmiş gibi seçer, kullanıcı "Başlat" ile onaylar → yapay zekâsız okuma + mevcut dosya açma akışı.
+4. Rezervasyon / sevk: değişmedi.

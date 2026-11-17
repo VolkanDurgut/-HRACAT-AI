@@ -19,7 +19,8 @@ import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 import { guncelDiibNoGetir } from "@/lib/diib/veri";
-import { sistemProformasiOku } from "@/lib/proforma/okuma-pdf";
+import { kayitliProformaPdf, sistemProformasiOku } from "@/lib/proforma/okuma-pdf";
+import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
 
 // 25.10.2026: sayfa "Proforma Yukle" (AI asistan gorunumu); adres ve yetki anahtari (yeni_dosya) degismedi.
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -66,6 +67,25 @@ export default function YeniDosyaPage() {
   const [mevcutAnaSiparis, setMevcutAnaSiparis] = useState<AnaSiparis | null>(null);
   const [gonderilmisMts, setGonderilmisMts] = useState<number>(0);
   const [yeniSiparisMts, setYeniSiparisMts] = useState<string>("");
+
+  // 17.11.2026 "Onay geldi" -> dosya ac: Siparis Listesi'nden /yeni-dosya?proforma=<id>. Kayitli proformanin PDF'i
+  // (Proforma Olustur'un indirdigiyle ayni, imzali) hazirlanir ve yuklenmis gibi secilir; kullanici "Baslat" ile onaylar
+  // (otomatik dosya acilmaz). Okuma yapay zekasiz (sistemProformasiOku), dosya acma akisi aynen.
+  const [kayitliNot, setKayitliNot] = useState<string | null>(null);
+  const kayitliIslendi = useRef(false);
+  useEffect(() => {
+    if (authLoading || !companyId || kayitliIslendi.current) return;
+    const id = (adresParametresi("proforma") || "").trim();
+    if (!id) return;
+    kayitliIslendi.current = true;
+    adresiGuncelle({ proforma: null }); // bir kez; yenilemede tekrar hazirlanmaz
+    kayitliProformaPdf(id, companyId).then((k) => {
+      if (!k) { setError("Kayıtlı proforma bulunamadı ya da okunamadı. Proformayı PDF olarak yükleyebilirsiniz."); return; }
+      setPdfFile(k.dosya);
+      setError(null);
+      setKayitliNot(`${k.proformaNo} kayıtlı proformadan hazırlandı (imzalı PDF). Kontrol edip "Başlat" ile dosyayı açın.`);
+    }).catch(() => setError("Kayıtlı proforma hazırlanamadı. Proformayı PDF olarak yükleyebilirsiniz."));
+  }, [authLoading, companyId]);
 
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -406,13 +426,21 @@ export default function YeniDosyaPage() {
           </div>
         )}
 
+        {step === "upload" && kayitliNot && pdfFile && (
+          <div className="flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm mb-4" role="status" data-testid="kayitli-proforma-notu"
+            style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#A7F3D0" }}>
+            <FileUp size={16} className="shrink-0 mt-0.5" />
+            <span>{kayitliNot}</span>
+          </div>
+        )}
+
         {step === "upload" && (
           <ProformaAsistanYukleme
             dosya={pdfFile}
             mesgul={loading}
             onDrop={handleDrop}
             onSec={handleFileSelect}
-            onTemizle={() => { setPdfFile(null); setError(null); const i = document.getElementById("pdf-input") as HTMLInputElement | null; if (i) i.value = ""; }}
+            onTemizle={() => { setPdfFile(null); setError(null); setKayitliNot(null); const i = document.getElementById("pdf-input") as HTMLInputElement | null; if (i) i.value = ""; }}
             onBaslat={handleUpload}
           />
         )}

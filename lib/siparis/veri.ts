@@ -114,3 +114,10 @@ export async function siparisEslesmeKaldir(proformaNo: string): Promise<void> {
   const { error } = await supabase.rpc("siparis_eslesme_kaldir", { p_proforma_no: proformaNo });
   if (error) throw new Error(error.message);
 }
+
+/** "Onay geldi" - imzali proforma ile onay (17.11.2026; siparis_onay_imzali). Tutar yok; siparis "Rezervasyon bekleyen"e
+ *  gecer. Daha once girilmis on odeme tutari veritabaninda korunur. tarih: YYYY-AA-GG (bos = bugun). */
+export async function onayImzaliKaydet(proformaNo: string, tarih?: string): Promise<void> {
+  const { error } = await supabase.rpc("siparis_onay_imzali", { p_proforma_no: proformaNo, p_tarih: tarih || null });
+  if (error) throw new Error(error.message);
+}

@@ -31,7 +31,8 @@ test("mail: Harun Bey selami, musteri / konteyner / liman / dosya, PDF indir dug
   assert.match(m.html, />Konteyner<.*6 \* 20 DC/s);
   assert.match(m.html, />Varış limanı<.*Djibouti/s);
   assert.match(m.html, /IHR-2026-0001/);
-  assert.ok(m.html.includes(`https://ihracatasistanim.com${talimatYolu(ID)}`));
+  // 17.11.2026 ortak kalip: href HTML kacisli (& -> &amp;; mail istemcileri cozer)
+  assert.ok(m.html.includes(`https://ihracatasistanim.com${talimatYolu(ID).replace(/&/g, "&amp;")}`));
   assert.ok(talimatYolu(ID).endsWith("&indir=1"));
   assert.match(m.html, /Fatura Talimatını İndir \(PDF\)/);
   assert.doesNotMatch(m.html, /Onayla|Revize/i);

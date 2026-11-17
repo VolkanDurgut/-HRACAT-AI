@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { operasyonMailHtml, opKacis } from "../_shared/operasyon-mail.ts";
 import { jsPDF } from "npm:jspdf@4.2.1";
 import { autoTable } from "npm:jspdf-autotable@5.0.8";
 import { ROBOTO_VGM_BASE64 } from "../_shared/roboto-vgm-base64.ts";
@@ -137,62 +138,39 @@ async function depolaVeImzala(h: Hazir, pdf: Uint8Array, test: boolean): Promise
   return { yol, adres };
 }
 
-const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-// Ihracat AI mail temasi (Gunluk Ihracat Raporu ile ayni: gunluk-rapor-gonder) - kullanici 10.11.2026
-const LACIVERT = "#283474";
-const MARKA_TURUNCU = "#F4A07C";
-const YESIL = "#10B981";
+const kacis = opKacis;
 
+// 17.11.2026: ortak operasyon mail kalibi (operasyon-mail.ts; konsimento talimati ve fatura talimati ile ayni tarz).
+// Icerik ayni: hitap + metin, dosya / alici / konteyner / toplam VGM / gemi / acente / rezervasyon, VGM Indir + dosya.
 function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: string; html: string } {
   const gemiler = Array.from(new Set(h.rez.map((r) => (r.gemi_adi || "").trim()).filter(Boolean))).join(", ");
   const acente = Array.from(new Set(h.rez.map((r) => (r.acente_ismi || "").trim()).filter(Boolean))).join(", ");
   const toplamVgm = h.kont.reduce((s, k) => s + (sayi(k.vgm_kg) || 0), 0);
-  // Rezervasyon (booking) no: konu + Acente kutusu + tablo (kullanici 10.11.2026)
+  // Rezervasyon (booking) no: konu + bilgi tablosu (kullanici 10.11.2026)
   const rezNo = Array.from(new Set(h.rez.map((r) => (r.booking_no || "").trim()).filter(Boolean))).join(", ");
   const konu = `${test ? "[TEST] " : ""}VGM Raporu · ${h.dosya.dosya_no || "-"} · ${h.dosya.alici_firma || "-"}${rezNo ? ` · Rezervasyon ${rezNo}` : ""}`;
-  const tarih = trZaman().slice(0, 10);
-  const kutu = (etiket: string, deger: string, alt: string, renk: string) =>
-    `<td style="width:32%;vertical-align:top;border:1px solid #E2E8F0;border-top:3px solid ${renk};border-radius:4px;padding:8px 10px"><div style="font-size:10px;font-weight:bold;color:#64748B;text-transform:uppercase">${kacis(etiket)}</div><div style="font-size:20px;font-weight:bold;color:${renk};line-height:1.25">${kacis(deger)}</div><div style="font-size:11px;color:#475569;line-height:1.45">${kacis(alt)}</div></td>`;
-  const kutuArasi = `<td style="width:2%;font-size:0;line-height:0">&nbsp;</td>`;
-  const satir = (etiket: string, deger: string, i: number) =>
-    `<tr style="${i % 2 ? "background:#F8FAFC" : ""}"><td style="padding:7px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#64748B;width:140px">${kacis(etiket)}</td><td style="padding:7px 8px;border-bottom:1px solid #E2E8F0;font-size:12px;color:#1E293B;font-weight:bold">${kacis(deger || "-")}</td></tr>`;
-  const bolumBaslik = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${MARKA_TURUNCU};padding-left:8px">${kacis(t)}</div>`;
-  const testSeridi = test
-    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: <b>${kacis(ALICI.join(", "))}</b> · CC: ${kacis(CC.join(", "))}</div>`
-    : "";
-  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:6px;padding:24px">
-<tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
-    <td style="width:56px;vertical-align:middle"><img src="${SITE}/images/logo.png" width="48" height="48" alt="Unex Gıda" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">Unex Gıda İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">VGM Raporu</div></td>
-    <td style="text-align:right;vertical-align:middle"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${kacis(h.dosya.dosya_no || "-")}</div><div style="font-size:11px;color:#94A3B8">${kacis(tarih)}</div></td>
-  </tr></table>
-  ${testSeridi}
-  <p style="margin:18px 0 4px;color:#1E293B;font-size:14px;line-height:1.55">Kolay gelsin Volkan Bey,</p>
-  <p style="margin:0 0 14px;color:#1E293B;font-size:14px;line-height:1.55">VGM Raporu ektedir. Lütfen ilgili acenteye gönderimini sağlayalım.</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate"><tr>
-    ${kutu("Konteyner", `${h.kont.length}`, "VGM'i girildi", LACIVERT)}${kutuArasi}
-    ${kutu("Toplam VGM", `${toplamVgm.toLocaleString("tr-TR")} kg`, "tüm konteynerler", "#047857")}${kutuArasi}
-    ${kutu("Acente", acente || "-", rezNo ? `Rezervasyon: ${rezNo}` : gemiler || "-", "#B45309")}
-  </tr></table>
-  ${bolumBaslik("Sevkiyat Bilgileri")}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
-    ${satir("Dosya", h.dosya.dosya_no || "-", 0)}
-    ${satir("Alıcı", h.dosya.alici_firma || "-", 1)}
-    ${satir("Gemi", gemiler || "-", 2)}
-    ${satir("Acente", acente || "-", 3)}
-    ${satir("Rezervasyon No", rezNo || "-", 4)}
-  </table>
-  <div style="margin-top:24px;text-align:center">
-    <a href="${kacis(indirAdresi)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 22px;border-radius:6px">VGM İndir</a>
-    <a href="${kacis(`${SITE}/dosya/${h.dosya.id}?tab=konteynerler`)}" style="display:inline-block;margin-left:8px;color:${LACIVERT};text-decoration:none;font-size:13px;font-weight:bold;padding:9px 18px;border:1px solid ${LACIVERT};border-radius:6px">Dosyayı uygulamada aç</a>
-  </div>
-  <div style="margin-top:14px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">PDF bu e-postanın ekinde de var. İndirme bağlantısı 30 gün geçerlidir; giriş gerektirmez.<br>Tüm konteynerlerin VGM'i girildiğinde İhracat AI tarafından otomatik gönderildi.</div>
-</td></tr></table>
-</td></tr></table></body></html>`;
+  const html = operasyonMailHtml({
+    site: SITE,
+    baslik: "VGM raporu hazır",
+    testMetni: test ? `TEST · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: ${ALICI.join(", ")} · CC: ${CC.join(", ")}` : null,
+    hitap: "Kolay gelsin Volkan Bey,",
+    girisHtml: "VGM Raporu ektedir. Lütfen ilgili acenteye gönderimini sağlayalım.",
+    bilgiler: [
+      ["Dosya", `<b>${kacis(h.dosya.dosya_no || "-")}</b>`],
+      ["Alıcı", `<b>${kacis(h.dosya.alici_firma || "-")}</b>`],
+      ["Konteyner", `<b>${h.kont.length}</b> · VGM'i girildi`],
+      ["Toplam VGM", `<b>${kacis(toplamVgm.toLocaleString("tr-TR"))} kg</b>`],
+      ["Gemi", kacis(gemiler || "-")],
+      ["Acente", kacis(acente || "-")],
+      ["Rezervasyon No", `<b>${kacis(rezNo || "-")}</b>`],
+    ],
+    dugmeler: [
+      { metin: "VGM İndir", href: indirAdresi, birincil: true },
+      { metin: "Dosyayı aç", href: `${SITE}/dosya/${h.dosya.id}?tab=konteynerler` },
+    ],
+    dugmeNotuHtml: "PDF bu e-postanın ekinde de var. İndirme bağlantısı 30 gün geçerlidir; giriş gerektirmez.",
+    altNotHtml: "Tüm konteynerlerin VGM'i girildiğinde İhracat AI tarafından otomatik gönderildi.",
+  });
   return { konu, html };
 }
 

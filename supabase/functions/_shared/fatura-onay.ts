@@ -7,9 +7,10 @@
  *   (Ayarlar > Rapor Alicilari > "Fatura Talimati"; rapor anahtari 'fatura_onay' degismedi).
  *   PDF tarayicida uretilir (lib/fatura-talimati-pdf-builder); mail eki yerine "PDF indir" dugmesi talimat sayfasini
  *   (/fatura-onay?id=..&indir=1) acar, sayfa ayni PDF'i olusturup indirir.
- * Tema: lacivert #283474, seftali #F4A07C, yesil #10B981 (acik kurumsal; rapor-kabugu.ts ile ayni dil).
+ * Tema: 17.11.2026'dan beri ortak operasyon mail kalibi (operasyon-mail.ts; konsimento talimati ile ayni).
  */
-import { RAPOR_LACIVERT, RAPOR_SEFTALI, RAPOR_URL, RAPOR_YESIL, esc } from "./rapor-kabugu.ts";
+import { RAPOR_URL, esc } from "./rapor-kabugu.ts";
+import { operasyonMailHtml } from "./operasyon-mail.ts";
 
 export type OnayDosyasi = {
   id: string;
@@ -50,39 +51,32 @@ export function dagitimKonusu(d: OnayDosyasi, konteynerler: OnayKonteyneri[]): s
 /** Talimat sayfasinin baglantisi; indir=1 sayfa acilinca PDF'i kendiliginden indirir. */
 export const talimatYolu = (kayitId: string) => `/fatura-onay?id=${encodeURIComponent(kayitId)}&indir=1`;
 
-const satir = (etiket: string, deger: string) =>
-  `<tr><td style="padding:6px 12px 6px 0;font-size:12px;color:#64748B;white-space:nowrap;vertical-align:top;width:120px;border-bottom:1px solid #EEF2F7">${etiket}</td><td style="padding:6px 0;font-size:13px;color:#1E293B;border-bottom:1px solid #EEF2F7">${deger}</td></tr>`;
-
 /**
  * Fatura talimati maili (14.11.2026): "Harun Bey merhaba," + kisa metin + musteri / konteyner adedi / varis limani /
  * dosya no + "Fatura Talimatini Indir (PDF)" dugmesi. Onay / revize YOK.
+ * 17.11.2026: ortak operasyon mail kalibi (operasyon-mail.ts; konsimento talimati ve VGM raporu ile ayni tarz).
  */
 export function talimatMailiHtml(o: OnayOzeti, kayitId: string, sirketAdi: string): { konu: string; html: string } {
   const d = o.dosya;
   const konu = dagitimKonusu(d, o.konteynerler);
-  const yol = talimatYolu(kayitId);
-  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(konu)}</title></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:16px 0"><tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:6px;padding:20px 22px">
-<tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:3px solid ${RAPOR_LACIVERT};padding-bottom:8px"><tr>
-    <td style="width:46px;vertical-align:middle"><img src="${RAPOR_URL}/images/logo.png" width="38" height="38" alt="" style="display:block;width:38px;height:38px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:17px;font-weight:bold;color:${RAPOR_LACIVERT}">Fatura Talimatı</div><div style="font-size:11px;color:#94A3B8">${esc(sirketAdi)} · İhracat Yönetim</div></td>
-  </tr></table>
-  <p style="margin:18px 0 6px;font-size:14px;line-height:1.6;color:#1E293B">Harun Bey merhaba,</p>
-  <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#1E293B">Fatura talimatı hazırdır. Aşağıdaki düğmeden PDF olarak indirebilirsiniz.</p>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2E8F0;border-left:4px solid ${RAPOR_SEFTALI};border-radius:4px;padding:4px 14px">
-    ${satir("Müşteri", `<b>${esc(d.alici_firma || "-")}</b>`)}
-    ${satir("Konteyner", `<b>${esc(konteynerOzeti(o.konteynerler))}</b>`)}
-    ${satir("Varış limanı", esc(d.varis_limani || "-"))}
-    ${d.dosya_no ? satir("Dosya", esc(d.dosya_no)) : ""}
-  </table>
-  <div style="margin-top:18px">
-    <a href="${RAPOR_URL}${yol}" style="display:inline-block;background:${RAPOR_YESIL};color:#fff;border:1px solid ${RAPOR_YESIL};text-decoration:none;font-size:14px;font-weight:bold;padding:11px 22px;border-radius:5px">Fatura Talimatını İndir (PDF)</a>
-  </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;line-height:1.5">İndirmek için ${esc(sirketAdi)} İhracat AI hesabınızla giriş yapmanız gerekir. Bu e-posta, dosyanın bütün konteynerleri girildiğinde otomatik gönderilir.</div>
-</td></tr></table>
-</td></tr></table></body></html>`;
+  const bilgiler: [string, string][] = [
+    ["Müşteri", `<b>${esc(d.alici_firma || "-")}</b>`],
+    ["Konteyner", `<b>${esc(konteynerOzeti(o.konteynerler))}</b>`],
+    ["Varış limanı", esc(d.varis_limani || "-")],
+  ];
+  if (d.dosya_no) bilgiler.push(["Dosya", esc(d.dosya_no)]);
+  const html = operasyonMailHtml({
+    site: RAPOR_URL,
+    ustEtiket: `${(sirketAdi || "Unex Gıda").toLocaleUpperCase("tr-TR")} · İHRACAT OPERASYON`,
+    baslik: "Fatura talimatı hazır",
+    hitap: "Harun Bey merhaba,",
+    girisHtml: "Fatura talimatı hazırdır. Aşağıdaki düğmeden PDF olarak indirebilirsiniz.",
+    bilgiler,
+    dugmeler: [
+      { metin: "Fatura Talimatını İndir (PDF)", href: `${RAPOR_URL}${talimatYolu(kayitId)}`, birincil: true },
+      { metin: "Dosyayı aç", href: `${RAPOR_URL}/dosya/${d.id}?tab=evraklar` },
+    ],
+    altNotHtml: `İndirmek için ${esc(sirketAdi)} İhracat AI hesabınızla giriş yapmanız gerekir. Bu e-posta, dosyanın bütün konteynerleri girildiğinde otomatik gönderilir.`,
+  });
   return { konu, html };
 }

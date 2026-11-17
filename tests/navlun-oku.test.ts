@@ -138,7 +138,7 @@ test("taninmayan alan adindan NAVLUN TALEBI cevabi: ogrenilemese de olaysiz 'bil
 
 // 17.11.2026 (TEMA: ayni mailde iki armator, ikincisi okunmuyordu; "21FT" free time okunmuyordu)
 test("ayni ekipmanda farkli armatorlu fiyatlar ayri teklif; fiyata bitisik free time", async () => {
-  const oku = (await yukle("navlun-oku")) as OkuMod & { bitisikFt: (s: string, i: number) => number | null };
+  const oku = (await yukle("navlun-oku")) as OkuMod & { bitisikFt: (s: string, i: number) => number | null; transitBul: (s: string) => string | null };
   const o = oku.navlunMesajOku({
     gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
     govde: "Merhaba,\n\nHapag;\n1550USD / 21FT\nMaersk;\n1450USD / 14FT\n\nSaygılarımla",
@@ -155,4 +155,19 @@ test("ayni ekipmanda farkli armatorlu fiyatlar ayri teklif; fiyata bitisik free 
   assert.equal(oku.bitisikFt("1550USD / 20FT", 0), null);
   assert.equal(oku.bitisikFt("USD 1450 / 14 FT", 0), 14);
   assert.equal(oku.bitisikFt("1450 USD", 0), null);
+  // "USD2020 // FT9 // 24": FT once yazili
+  const ft9 = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhaba,\n\nMaersk;\nOrnekport USD2020 // FT9 // 24\n\nSaygılarımla",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(ft9.map((x) => [x.tur, x.tutar, x.armator, x.free_time_gun]), [["teklif", 2020, "Maersk", 9]]);
+  const tt = oku.navlunMesajOku({
+    gonderen: "kisi@ornek-acente.test", konu: "RE: UNEX // ORNEKPORT // NAVLUN TALEBİ HK.",
+    govde: "Merhaba,\n\nMAERSK;\n\nUSD3330 // FT14 // TT45\n\nSaygılarımla",
+  }, { "ornek-acente.test": "Ornek" });
+  assert.deepEqual(tt.map((x) => [x.tutar, x.armator, x.free_time_gun, (x as { transit_gun?: string | null }).transit_gun]), [[3330, "Maersk", 14, "45"]]);
+  assert.equal(oku.transitBul("1980 usd\n-hat / Maersk\n-tt/41 gün\n-14 gün free-time"), "41");
+  assert.equal(oku.bitisikFt("USD2020 // FT9 // 24", 0), 9);
+  assert.equal(oku.bitisikFt("USD 1800 / FT 21", 0), 21);
+  assert.equal(oku.bitisikFt("USD 1800 // 40HC", 0), null);
 });

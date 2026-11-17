@@ -197,13 +197,15 @@ function cumle(s: string, bas: number, bit: number): string {
 }
 
 /**
- * Fiyata bitisik free time (17.11.2026): "1550USD / 21FT", "USD 1450 / 14 FT", "1450$ - 14 free". Yalniz fiyatin hemen
- * ardindaki ilk 30 karakterde ve "/" "-" "," ile ayrilmissa. 20 / 40 / 45 konteyner boyu da olabilir ("1550USD / 20FT"
+ * Fiyata bitisik free time (17.11.2026): "1550USD / 21FT", "USD 1450 / 14 FT", "1450$ - 14 free", "USD2020 // FT9". Yalniz fiyatin
+ * hemen ardindaki ilk 30 karakterde ve "/" "//" "-" "," ile ayrilmissa. 20 / 40 / 45 konteyner boyu da olabilir ("1550USD / 20FT"
  * = 20'lik basina) -> okunmaz (null). i: fiyat eslesmesinin basladigi konum.
  */
 export function bitisikFt(s: string, i: number): number | null {
-  const m = s.slice(i, i + 30).match(/^(?:(?:usd|\$)\s*[\d.,]+|[\d.,]+\s*(?:usd|\$))\s*[\/,\-–]\s*(\d{1,2})\s*(?:ft|free(?:\s*time)?|gün\s*free|days?\s*free)\b/i);
+  const m = s.slice(i, i + 30).match(/^(?:(?:usd|\$)\s*[\d.,]+|[\d.,]+\s*(?:usd|\$))\s*[\/,\-–]{1,2}\s*(?:(\d{1,2})\s*(?:ft|free(?:\s*time)?|gün\s*free|days?\s*free)\b|(?:ft|free\s*time)\s*[:\-]?\s*(\d{1,2})(?![\d.,]))/i);
   if (!m) return null;
+  // 17.11.2026 (Esna MOMBASA: "USD2020 // FT9 // 24"): FT once yazilirsa ("FT9", "FT 21") konteyner boyu karismaz
+  if (m[2]) { const n = Number(m[2]); return n >= 1 && n <= 60 ? n : null; }
   const n = Number(m[1]);
   return n >= 1 && n <= 60 && n !== 20 && n !== 40 && n !== 45 ? n : null;
 }
@@ -227,11 +229,12 @@ export function freeTimeBul(s: string): number | null {
  */
 // 13.11.2026 (kullanici: "Bazi acenteler 'tt' olarak cevap veriyor, onlari da okuyabilmeliyiz"): etiket ile sayi arasinda
 // dolgu kelimeler ("tt ISE 44 gun", "TT TAHMINI OLARAK 60 gibi", "tahmini MINIMUM TT 90") ve "Transit SUREMIZI 50/55 gun".
+// 17.11.2026: "TT45" bitisik yazim ve "tt/41 gün" da okunur (Esna: "USD3330 // FT14 // TT45").
 // Acik etiketlerde (tt, t/t, transit time / sure, seyir suresi) gun birimi ZORUNLU DEGIL; yalniz "transit" kelimesinde zorunlu.
-const TT_DOLGU = "(?:\\s*(?:[:\\-–=~]|ise|da|de|ise\\s+de|tahmini(?:\\s+olarak)?|tahminen|olarak|ortalama|ort\\.?|yakla[şs][ıi]k|approx\\.?|abt\\.?|about|around|est(?:imated)?\\.?|min(?:imum)?\\.?|max(?:imum)?\\.?|en\\s+az|en\\s+fazla|civar[ıi]))*\\s*";
+const TT_DOLGU = "(?:\\s*(?:[:\\-–=~\\/]|ise|da|de|ise\\s+de|tahmini(?:\\s+olarak)?|tahminen|olarak|ortalama|ort\\.?|yakla[şs][ıi]k|approx\\.?|abt\\.?|about|around|est(?:imated)?\\.?|min(?:imum)?\\.?|max(?:imum)?\\.?|en\\s+az|en\\s+fazla|civar[ıi]))*\\s*";
 const TT_SAYI = "(\\d{1,3}(?:\\s*[-–\\/]\\s*\\d{1,3})?)";
 const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:free|ft\\b|dem|det|serbest)))";
-const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt\\b|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
+const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt(?![a-zçğıöşü])|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
 const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t)`, "gi");
 // "Odeme: TT 30 gun" gibi odeme kosulu transit degildir
 const TT_ODEME = /(?:ödeme|odeme|payment|vade|pe[şs]in|advance)[^\n]{0,20}$/i;

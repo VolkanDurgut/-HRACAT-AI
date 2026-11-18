@@ -17,7 +17,11 @@ export type FormHam = {
   adres: string | null;
   temsilci: { ad_soyad?: string | null; hitap?: string | null; eposta?: string | null } | null;
   kalite: unknown;
-  form: { uretim_tarihi?: string | null; skt?: string | null; gorsel_yolu?: string | null; gorsel_adi?: string | null; guncelleyen?: string | null; guncelleme?: string | null } | null;
+  form: {
+    uretim_tarihi?: string | null; skt?: string | null; uretim_metin?: string | null; skt_metin?: string | null; spekler?: string | null;
+    tarih_kaynagi?: string | null;
+    gorsel_yolu?: string | null; gorsel_adi?: string | null; guncelleyen?: string | null; guncelleme?: string | null;
+  } | null;
   gonderim: { zaman?: string | null; alicilar?: string | null; eksikler?: string[] | null } | null;
   test: { zaman?: string | null; alicilar?: string | null } | null;
 };
@@ -51,6 +55,14 @@ export type FormModeli = {
   gonderimGunu: string | null;
   uretimIso: string | null;
   sktIso: string | null;
+  /** Formdaki yazim: cuvaldan okunan ("NOVEMBER 2026" / "12.11.2026"), yoksa dosyanin Ek Bilgiler tarihi (ay-yil). */
+  uretimMetin: string;
+  sktMetin: string;
+  /** Spekler elle girilip kaydedildi mi (degilse formda musteri kalite ayari / varsayilan onerilir). */
+  spekKayitli: boolean;
+  spekOnerisi: string;
+  /** Formda KAYITLI cuval tarihleri (dosyadan gelen yedek haric); kaynak: gorsel (OCR) / elle. */
+  kayitliTarih: { uretimMetin: string; sktMetin: string; uretimIso: string | null; sktIso: string | null; kaynak: string | null };
   gorselYolu: string | null;
   gorselAdi: string | null;
   dosyaId: string | null;
@@ -133,6 +145,77 @@ export function spekMetni(kalite: unknown): string {
   return satirlar.join("\n");
 }
 
+/** Elle girilen spek metni: satirlar korunur, bos satirlar atilir, en fazla 12 satir / 600 karakter. */
+export function spekTemizle(v: unknown): string {
+  return String(typeof v === "string" ? v : "").split(/\r?\n/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 12).join("\n").slice(0, 600);
+}
+
+// ------------------------------------------------------------------ cuval gorselinden tarih (OCR metni)
+const AY_ADLARI: [RegExp, number][] = [
+  [/^(JAN|JANV|ENE|OCA)/, 1], [/^(FEB|FEV|FÉV|SUB|ŞUB)/, 2], [/^(MAR)/, 3], [/^(APR|AVR|ABR|NIS|NİS)/, 4], [/^(MAY|MAI)/, 5],
+  [/^(JUN|JUIN|HAZ)/, 6], [/^(JUL|JUIL|TEM)/, 7], [/^(AUG|AOU|AOÛ|AGO|AĞU)/, 8], [/^(SEP|SET|EYL)/, 9], [/^(OCT|EKI|EKİ)/, 10],
+  [/^(NOV|KAS)/, 11], [/^(DEC|DEZ|DIC|DÉC|ARA)/, 12],
+];
+const AY_DESENI = "(JAN(?:UARY)?|JANV(?:IER)?|FEB(?:RUARY)?|F[EÉ]V(?:RIER)?|MAR(?:CH|S)?|APR(?:IL)?|AVR(?:IL)?|MAY|MAI|JUN(?:E)?|JUIN|JUL(?:Y)?|JUIL(?:LET)?|AUG(?:UST)?|AO[UÛ]T|SEP(?:T(?:EMBER)?)?|SEPTEMBRE|OCT(?:OBER|OBRE)?|NOV(?:EMBER|EMBRE)?|DEC(?:EMBER)?|D[EÉ]C(?:EMBRE)?)";
+const URETIM_ANAHTAR = /(PRODUCTION|PRODUCED|PROD\.?|MFG|MANUFACTUR\w*|FABRICATION|FAB\.?|DATE\s+DE\s+PRODUCTION|PRODUCTION\s+DATE|PACKED|PACKING\s+DATE|ÜRETİM|URETIM)/;
+const SKT_ANAHTAR = /(EXPIRY|EXPIRATION|EXP\.?|BEST\s+BEFORE|USE\s+BEFORE|USE\s+BY|P[EÉ]REMPTION|DLUO|DLC|CONSOMMER|SKT|SON\s+KULLANMA)/;
+
+export type CuvalTarihi = { tur: "ay" | "gun"; metin: string; iso: string | null; yil: number; ay: number };
+export type CuvalTarihleri = { uretim: CuvalTarihi | null; skt: CuvalTarihi | null };
+
+function tarihBul(parca: string): CuvalTarihi | null {
+  const s = parca.toUpperCase().replace(/[|]/g, " ");
+  // Tam tarih: 12.11.2026 / 12/11/2026 / 12-11-26
+  const gun = s.match(/(?:^|[^0-9])(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(20\d{2}|\d{2})(?![0-9])/);
+  if (gun) {
+    const g = Number(gun[1]); const a = Number(gun[2]); const y = gun[3].length === 2 ? 2000 + Number(gun[3]) : Number(gun[3]);
+    if (g >= 1 && g <= 31 && a >= 1 && a <= 12) {
+      const iso = `${y}-${String(a).padStart(2, "0")}-${String(g).padStart(2, "0")}`;
+      return { tur: "gun", metin: `${String(g).padStart(2, "0")}.${String(a).padStart(2, "0")}.${y}`, iso, yil: y, ay: a };
+    }
+  }
+  // Ay adi + yil: NOVEMBER 2026 / NOV. 2026 / NOVEMBRE 2026
+  const ad = s.match(new RegExp(`${AY_DESENI}\\.?\\s*[,/-]?\\s*(20\\d{2})(?![0-9])`));
+  if (ad) {
+    const ay = AY_ADLARI.find(([d]) => d.test(ad[1]))?.[1];
+    if (ay) return { tur: "ay", metin: `${AYLAR[ay - 1]} ${ad[2]}`, iso: null, yil: Number(ad[2]), ay };
+  }
+  // Sayisal ay / yil: 11/2026 / 11.2026
+  const say = s.match(/(?:^|[^0-9])(\d{1,2})\s*[./-]\s*(20\d{2})(?![0-9])/);
+  if (say && Number(say[1]) >= 1 && Number(say[1]) <= 12) {
+    const ay = Number(say[1]);
+    return { tur: "ay", metin: `${AYLAR[ay - 1]} ${say[2]}`, iso: null, yil: Number(say[2]), ay };
+  }
+  return null;
+}
+
+/**
+ * OCR metninden uretim ve son kullanma tarihi. Yalniz anahtar kelimenin (Production / Expiry / Best before / Fabrication ...)
+ * BULUNDUGU satirda, anahtardan SONRA gelen tarih alinir (gorseldeki form tarihi vb. karismaz). Tutarsizsa (SKT <= uretim,
+ * yil 2020-2040 disi) ikisi de reddedilir: yanlis tarih yerine "okunamadi".
+ */
+export function cuvalTarihleriniAyikla(ocrMetni: string): CuvalTarihleri {
+  let uretim: CuvalTarihi | null = null;
+  let skt: CuvalTarihi | null = null;
+  for (const ham of String(ocrMetni || "").split(/\r?\n/)) {
+    const satir = ham.toUpperCase();
+    if (!skt) {
+      const m = satir.match(SKT_ANAHTAR);
+      if (m && m.index !== undefined) skt = tarihBul(satir.slice(m.index + m[0].length));
+    }
+    if (!uretim) {
+      const m = satir.match(URETIM_ANAHTAR);
+      // "PRODUCT OF TURKEY" uretim anahtari degildir
+      if (m && m.index !== undefined && !/^PRODUCT\s+OF/.test(satir.slice(m.index))) uretim = tarihBul(satir.slice(m.index + m[0].length));
+    }
+  }
+  const gecerli = (t: CuvalTarihi | null) => !!t && t.yil >= 2020 && t.yil <= 2040;
+  if (!gecerli(uretim)) uretim = null;
+  if (!gecerli(skt)) skt = null;
+  if (uretim && skt && skt.yil * 12 + skt.ay <= uretim.yil * 12 + uretim.ay) return { uretim: null, skt: null };
+  return { uretim, skt };
+}
+
 export function formModeli(h: FormHam): FormModeli {
   const p = h.plan || {};
   const s = h.siparis || {};
@@ -151,6 +234,12 @@ export function formModeli(h: FormHam): FormModeli {
   const ulke = ticaretYapilanUlke(h.adres) || gidecegiUlke(ilk(d.varis_limani, p.varis_limani)) || "";
   const uretimIso = isoGun(f.uretim_tarihi) || isoGun(d.uretim_tarihi);
   const sktIso = isoGun(f.skt) || isoGun(d.son_kullanim_tarihi);
+  // 18.11.2026 (kullanici): tarihler CUVAL GORSELINDEN okunur. Cuvalda ay-yil yaziyorsa ("NOVEMBER 2026") formda o yazilir,
+  // dosyanin tarihleri degismez; tam tarih yaziyorsa form + dosya o tarihle. Okunmamissa dosyanin Ek Bilgiler tarihi (ay-yil).
+  const uretimMetin = metin(f.uretim_metin) || (isoGun(f.uretim_tarihi) ? trTarih(f.uretim_tarihi) : "") || ayYil(isoGun(d.uretim_tarihi));
+  const sktMetin = metin(f.skt_metin) || (isoGun(f.skt) ? trTarih(f.skt) : "") || ayYil(isoGun(d.son_kullanim_tarihi));
+  const spekKayitli = spekTemizle(f.spekler).length > 0;
+  const spekOnerisi = spekMetni(h.kalite);
   const ekipmanTarihi = isoGun(p.bos_ekipman_tarihi);
 
   const alanlar: FormAlanlari = {
@@ -171,15 +260,17 @@ export function formModeli(h: FormHam): FormModeli {
     rezervasyonNo: ilk(p.booking_no),
     urunTipi: ilk(urunler.join(" / "), s.urun ? urunAdiSade(metin(s.urun)) : "", p.cinsi),
     proformaNo,
-    spekler: spekMetni(h.kalite),
+    spekler: spekKayitli ? spekTemizle(f.spekler) : spekOnerisi,
     siparisTarihi: trTarih(ilk(d.proforma_tarihi, s.proforma_tarihi)),
-    uretimTarihi: ayYil(uretimIso),
-    skt: ayYil(sktIso),
+    uretimTarihi: uretimMetin,
+    skt: sktMetin,
   };
   const etiketler = new Map<string, string>([...SOL_ALANLAR, ...SAG_ALANLAR].map(([k, e]) => [k, e.replace(/:\s*$/, "")]));
   const eksikler = (Object.keys(alanlar) as AlanAnahtari[]).filter((k) => !alanlar[k]).map((k) => etiketler.get(k) || k);
   const gorselYolu = metin(f.gorsel_yolu) || null;
-  const girisEksikleri = [!gorselYolu ? "Çuval görseli" : null, !uretimIso ? "Üretim tarihi" : null, !sktIso ? "SKT" : null].filter((x): x is string => !!x);
+  const girisEksikleri = [
+    !gorselYolu ? "Çuval görseli" : null, !spekKayitli ? "Ürün spekleri" : null, !uretimMetin ? "Üretim tarihi" : null, !sktMetin ? "SKT" : null,
+  ].filter((x): x is string => !!x);
   if (!gorselYolu) eksikler.push("Çuval görseli");
   return {
     anahtar: h.anahtar,
@@ -191,6 +282,11 @@ export function formModeli(h: FormHam): FormModeli {
     gonderimGunu: ekipmanTarihi ? gunEkle(ekipmanTarihi, -1) : null,
     uretimIso,
     sktIso,
+    uretimMetin,
+    sktMetin,
+    spekKayitli,
+    spekOnerisi,
+    kayitliTarih: { uretimMetin: metin(f.uretim_metin), sktMetin: metin(f.skt_metin), uretimIso: isoGun(f.uretim_tarihi), sktIso: isoGun(f.skt), kaynak: metin(f.tarih_kaynagi) || null },
     gorselYolu,
     gorselAdi: metin(f.gorsel_adi) || null,
     dosyaId: metin(d.id) || null,

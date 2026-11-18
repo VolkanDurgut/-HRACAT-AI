@@ -1,20 +1,22 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, ScanText, Send, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselSil, gorselYukle, gunEkle, siparisFormlariOku, testFormuGonder, trTarih,
-  type FormDurumu, type FormModeli,
+  cuvalTarihleriniAyikla, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle, gunEkle, siparisFormlariOku,
+  testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
 } from "@/lib/siparis-formu";
+import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
 
 /**
  * SIPARISLER > SIPARIS FORMLARI (18.11.2026). Yukleme planindaki her booking = 1 Siparis Bildirim Formu; uretime
  * (Ayarlar > Rapor Alicilari > Siparis Bildirim Formu) bos ekipman alimindan 1 gun once 08:00'de otomatik gider.
- * Kullanici yalniz cuval gorseli + uretim / SKT girer (tarihler ayni booking'li dosyanin Ek Bilgiler'ine de yazilir);
- * diger alanlar plan / dosya / siparis listesinden gelir.
+ * 18.11.2026 v2 (kullanici): yalniz CUVAL GORSELI eklenir + URUN SPEKLERI girilir, kaydedilir. Uretim / SKT gorselden
+ * tarayicida ucretsiz OCR ile okunur (lib/cuval-ocr.ts): cuvalda ay-yil ("NOVEMBER 2026") yaziyorsa formda o yazilir ve dosyanin
+ * Ek Bilgiler tarihleri DEGISMEZ; tam tarih yaziyorsa dosya da guncellenir. Okunamazsa elle yazilabilir. Temsilci sabit.
  */
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 
@@ -26,9 +28,23 @@ const DURUM: Record<FormDurumu, { etiket: (m: FormModeli, bugun: string) => stri
   suresi_gecti: { etiket: () => "Ekipman tarihi geçti · gönderilmedi", renk: TEXT_MUTED, zemin: "rgba(148,163,184,0.10)" },
 };
 
+type OcrDurumu = "yok" | "okunuyor" | "tamam" | "eksik" | "hata";
+
+/** Elle yazilan tarih metni -> ayni ayiklayici (ay-yil ya da tam tarih). */
+function elleTarih(metin: string, uretim: boolean): CuvalTarihi | null {
+  const t = cuvalTarihleriniAyikla(`${uretim ? "PRODUCTION DATE" : "EXPIRY DATE"}: ${metin}`);
+  return uretim ? t.uretim : t.skt;
+}
+
 function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: string; companyId: string; onDegisti: (mesaj: string) => void }) {
-  const [uretim, setUretim] = useState(m.uretimIso || "");
-  const [skt, setSkt] = useState(m.sktIso || "");
+  const kt = m.kayitliTarih;
+  const [spek, setSpek] = useState(m.spekKayitli ? m.alanlar.spekler : m.spekOnerisi);
+  const [uretim, setUretim] = useState(kt.uretimMetin);
+  const [skt, setSkt] = useState(kt.sktMetin);
+  const [kaynak, setKaynak] = useState<"gorsel" | "elle" | null>((kt.kaynak as "gorsel" | "elle" | null) || null);
+  const [elleAcik, setElleAcik] = useState(kt.kaynak === "elle");
+  const [ocr, setOcr] = useState<OcrDurumu>(kt.uretimMetin && kt.sktMetin ? "tamam" : "yok");
+  const [ocrMesaj, setOcrMesaj] = useState("");
   const [yeniGorsel, setYeniGorsel] = useState<File | null>(null);
   const [onizleme, setOnizleme] = useState<string | null>(null);
   const [gorselKaldir, setGorselKaldir] = useState(false);
@@ -39,7 +55,13 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
   const d = DURUM[durum];
   const a = m.alanlar;
 
-  useEffect(() => { setUretim(m.uretimIso || ""); setSkt(m.sktIso || ""); setYeniGorsel(null); setGorselKaldir(false); }, [m.uretimIso, m.sktIso, m.gorselYolu]);
+  useEffect(() => {
+    setSpek(m.spekKayitli ? m.alanlar.spekler : m.spekOnerisi);
+    setUretim(m.kayitliTarih.uretimMetin); setSkt(m.kayitliTarih.sktMetin);
+    setKaynak((m.kayitliTarih.kaynak as "gorsel" | "elle" | null) || null);
+    setOcr(m.kayitliTarih.uretimMetin && m.kayitliTarih.sktMetin ? "tamam" : "yok");
+    setYeniGorsel(null); setGorselKaldir(false);
+  }, [m.spekKayitli, m.alanlar.spekler, m.spekOnerisi, m.kayitliTarih.uretimMetin, m.kayitliTarih.sktMetin, m.kayitliTarih.kaynak, m.gorselYolu]);
   useEffect(() => {
     let iptal = false;
     if (yeniGorsel) {
@@ -52,19 +74,55 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     return () => { iptal = true; };
   }, [yeniGorsel, m.gorselYolu, gorselKaldir]);
 
-  const degisti = uretim !== (m.uretimIso || "") || skt !== (m.sktIso || "") || !!yeniGorsel || gorselKaldir;
-  const tarihHatasi = uretim && skt && skt <= uretim ? "SKT üretim tarihinden sonra olmalı." : null;
+  /** Cuval gorselinden tarihleri oku (ucretsiz, tarayicida). */
+  const oku = async (kaynakBlob: Blob) => {
+    setOcr("okunuyor"); setOcrMesaj("OCR hazırlanıyor…"); setHata(null);
+    try {
+      const { cuvalTarihleriniOku } = await import("@/lib/cuval-ocr");
+      const { tarihler } = await cuvalTarihleriniOku(kaynakBlob, setOcrMesaj);
+      setUretim(tarihler.uretim?.metin || ""); setSkt(tarihler.skt?.metin || "");
+      setKaynak("gorsel");
+      const tam = !!(tarihler.uretim && tarihler.skt);
+      setOcr(tam ? "tamam" : "eksik");
+      setElleAcik(!tam);
+    } catch (e) {
+      setOcr("hata"); setElleAcik(true);
+      setOcrMesaj(e instanceof Error ? e.message : "Görsel okunamadı.");
+    }
+  };
+  const gorselSec = (f: File) => { setYeniGorsel(f); setGorselKaldir(false); oku(f); };
+  const kayitliGorseliOku = async () => {
+    if (!m.gorselYolu) return;
+    const b = await gorselBlob(m.gorselYolu);
+    if (b) oku(b); else { setOcr("hata"); setOcrMesaj("Kayıtlı görsel açılamadı."); }
+  };
+
+  const ut = uretim.trim() ? elleTarih(uretim, true) : null;
+  const st = skt.trim() ? elleTarih(skt, false) : null;
+  const tarihHatasi = (uretim.trim() && !ut) || (skt.trim() && !st)
+    ? "Tarih anlaşılamadı. Örnek: NOVEMBER 2026 ya da 12.11.2026"
+    : ut && st && st.yil * 12 + st.ay <= ut.yil * 12 + ut.ay ? "SKT üretim tarihinden sonra olmalı." : null;
+  const spekDegisti = spekTemizle(spek) !== (m.spekKayitli ? m.alanlar.spekler : "");
+  const tarihDegisti = (ut?.metin || "") !== kt.uretimMetin || (st?.metin || "") !== kt.sktMetin;
+  const degisti = spekDegisti || tarihDegisti || !!yeniGorsel || gorselKaldir;
+  const tamTarih = ut?.tur === "gun" || st?.tur === "gun";
 
   const kaydet = async () => {
-    if (!degisti || tarihHatasi) return;
+    if (!degisti || tarihHatasi || ocr === "okunuyor") return;
+    if (!spekTemizle(spek)) { setHata("Ürün spekleri boş olamaz."); return; }
     setMesgul("kaydet"); setHata(null);
     let yuklenen: { yol: string; ad: string } | null = null;
     try {
       if (yeniGorsel) yuklenen = await gorselYukle(companyId, m.anahtar, yeniGorsel);
-      const dosya = await formKaydet(m.bookingNo, uretim || null, skt || null, yuklenen, gorselKaldir && !yuklenen);
-      // Eski gorsel (degistirildi / kaldirildi) depodan silinir; hata kaydi geri almaz
+      const dosya = await formKaydet({
+        booking: m.bookingNo, spekler: spekTemizle(spek),
+        uretimMetin: ut?.metin || null, sktMetin: st?.metin || null,
+        uretimIso: ut?.tur === "gun" ? ut.iso : null, sktIso: st?.tur === "gun" ? st.iso : null,
+        tarihKaynagi: ut || st ? kaynak || "elle" : null,
+        gorsel: yuklenen, gorselKaldir: gorselKaldir && !yuklenen,
+      });
       if (m.gorselYolu && (yuklenen || gorselKaldir)) await gorselSil(m.gorselYolu).catch(() => undefined);
-      onDegisti(`${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Tarihler ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`);
+      onDegisti(`${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`);
     } catch (e) {
       if (yuklenen) await gorselSil(yuklenen.yol).catch(() => undefined);
       setHata(e instanceof Error ? e.message : "Kaydedilemedi.");
@@ -84,7 +142,8 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     <div className="min-w-0"><p className="text-[10px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>{etiket}</p>
       <p className={`text-xs truncate ${deger ? "text-white" : "text-red-300"}`} title={deger}>{deger || "girilmedi"}</p></div>
   );
-  const girdiStil = { borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, colorScheme: "dark" as const };
+  const girdiStil = { borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG };
+  const gorselVar = !!onizleme;
 
   return (
     <div className="rounded-xl border p-4" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} data-testid="siparis-formu" data-booking={m.bookingNo} data-durum={durum}>
@@ -109,39 +168,86 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
         {bilgi("Proforma / Temsilci", [a.proformaNo, a.temsilci].filter(Boolean).join(" · "))}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 pt-3 border-t" style={{ borderColor: CARD_BORDER }}>
-        <div className="flex items-center gap-2">
-          <div className="h-16 w-16 rounded-lg border overflow-hidden flex items-center justify-center shrink-0" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {onizleme ? <img src={onizleme} alt="Çuval görseli" className="h-full w-full object-contain" /> : <ImagePlus size={20} style={{ color: TEXT_MUTED }} />}
-          </div>
-          <div className="flex flex-col gap-1">
-            <button type="button" onClick={() => girdi.current?.click()} disabled={!!mesgul}
-              className="h-8 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-50 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
-              <ImagePlus size={13} style={{ color: ACCENT }} /> {onizleme ? "Görseli değiştir" : "Çuval görseli ekle"}
-            </button>
-            {onizleme && (
-              <button type="button" onClick={() => { setYeniGorsel(null); setGorselKaldir(!!m.gorselYolu); }} disabled={!!mesgul}
-                className="text-[11px] inline-flex items-center gap-1 hover:text-red-300 disabled:opacity-50" style={{ color: TEXT_MUTED }}>
-                <Trash2 size={11} /> Kaldır
-              </button>
-            )}
-            <input ref={girdi} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Çuval görseli"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) { setYeniGorsel(f); setGorselKaldir(false); } e.target.value = ""; }} />
+      <div className="grid gap-4 pt-3 border-t md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ borderColor: CARD_BORDER }}>
+        {/* 1) Cuval gorseli + cuvaldan okunan tarihler */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: TEXT_MUTED }}>1 · Çuval görseli</p>
+          <div className="flex items-start gap-3">
+            <div className="h-24 w-24 rounded-lg border overflow-hidden flex items-center justify-center shrink-0" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {onizleme ? <img src={onizleme} alt="Çuval görseli" className="h-full w-full object-contain" /> : <ImagePlus size={22} style={{ color: TEXT_MUTED }} />}
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => girdi.current?.click()} disabled={!!mesgul || ocr === "okunuyor"}
+                  className="h-8 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-50 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
+                  <ImagePlus size={13} style={{ color: ACCENT }} /> {gorselVar ? "Görseli değiştir" : "Çuval görseli ekle"}
+                </button>
+                {gorselVar && !yeniGorsel && m.gorselYolu && ocr !== "okunuyor" && (
+                  <button type="button" onClick={kayitliGorseliOku} disabled={!!mesgul}
+                    className="h-8 px-3 rounded-lg border text-xs text-white hover:bg-white/[0.04] disabled:opacity-50 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }} data-testid="cuvaldan-oku">
+                    <ScanText size={13} style={{ color: ACCENT }} /> Tarihleri çuvaldan oku
+                  </button>
+                )}
+                {gorselVar && (
+                  <button type="button" onClick={() => { setYeniGorsel(null); setGorselKaldir(!!m.gorselYolu); }} disabled={!!mesgul || ocr === "okunuyor"}
+                    className="h-8 px-2 text-[11px] inline-flex items-center gap-1 hover:text-red-300 disabled:opacity-50" style={{ color: TEXT_MUTED }}>
+                    <Trash2 size={11} /> Kaldır
+                  </button>
+                )}
+              </div>
+              <input ref={girdi} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="Çuval görseli"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) gorselSec(f); e.target.value = ""; }} />
+              {/* Okunan tarihler */}
+              {ocr === "okunuyor" ? (
+                <p className="text-xs inline-flex items-center gap-1.5" style={{ color: TEXT_MUTED }}><Loader2 size={12} className="animate-spin" /> {ocrMesaj}</p>
+              ) : ut || st ? (
+                <div className="text-xs rounded-lg border px-2.5 py-1.5" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.06)" }} data-testid="okunan-tarihler">
+                  <span style={{ color: TEXT_MUTED }}>{kaynak === "elle" ? "Elle girilen" : "Çuvaldan okunan"}: </span>
+                  <span className="text-white">Üretim <b>{ut?.metin || "—"}</b> · SKT <b>{st?.metin || "—"}</b></span>
+                  <span className="block text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>
+                    {tamTarih ? "Tam tarih: kaydedince dosyanın Ek Bilgiler tarihleri de güncellenir." : "Ay-yıl: formda böyle yazılır, dosyanın Ek Bilgiler tarihleri değişmez."}
+                  </span>
+                </div>
+              ) : gorselVar && ocr !== "yok" ? (
+                <p className="text-xs text-amber-300">Görselde üretim / son kullanma tarihi bulunamadı.</p>
+              ) : null}
+              {ocr === "hata" && ocrMesaj && <p className="text-[11px] text-red-300">{ocrMesaj}</p>}
+              {gorselVar && ocr !== "okunuyor" && (
+                elleAcik ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <input value={uretim} onChange={(e) => { setUretim(e.target.value.toUpperCase()); setKaynak("elle"); }} placeholder="Üretim: NOVEMBER 2026"
+                      className="h-8 w-40 rounded-lg border px-2 text-xs text-white" style={girdiStil} aria-label="Üretim tarihi (elle)" />
+                    <input value={skt} onChange={(e) => { setSkt(e.target.value.toUpperCase()); setKaynak("elle"); }} placeholder="SKT: NOVEMBER 2027"
+                      className="h-8 w-40 rounded-lg border px-2 text-xs text-white" style={girdiStil} aria-label="Son kullanma tarihi (elle)" />
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setElleAcik(true)} className="text-[11px] hover:underline" style={{ color: TEXT_MUTED }}>Okunan tarih yanlışsa elle düzelt</button>
+                )
+              )}
+            </div>
           </div>
         </div>
-        <label className="text-[11px]" style={{ color: TEXT_MUTED }}>Üretim tarihi
-          <input type="date" value={uretim} onChange={(e) => { const v = e.target.value; setUretim(v); if (v && !skt) setSkt(gunEkle(v, 365)); }}
-            className="mt-1 block h-9 rounded-lg border px-2 text-sm text-white" style={girdiStil} aria-label="Üretim tarihi" />
-        </label>
-        <label className="text-[11px]" style={{ color: TEXT_MUTED }}>Son kullanma (SKT)
-          <input type="date" value={skt} onChange={(e) => setSkt(e.target.value)}
-            className="mt-1 block h-9 rounded-lg border px-2 text-sm text-white" style={girdiStil} aria-label="Son kullanma tarihi" />
-        </label>
-        <button type="button" onClick={kaydet} disabled={!degisti || !!tarihHatasi || !!mesgul}
+
+        {/* 2) Urun spekleri (elle) */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: TEXT_MUTED }}>2 · Ürün spekleri {!m.spekKayitli && <span className="normal-case font-normal text-amber-300">(öneri, kontrol edip kaydedin)</span>}</p>
+          <textarea value={spek} onChange={(e) => setSpek(e.target.value)} rows={4} aria-label="Ürün spekleri"
+            className="w-full rounded-lg border px-2.5 py-2 text-sm text-white resize-y" style={girdiStil} placeholder={"Protein min 13%\nGluten min 30%"} />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <button type="button" onClick={kaydet} disabled={!degisti || !!tarihHatasi || !!mesgul || ocr === "okunuyor"}
           className="h-9 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 disabled:opacity-40 inline-flex items-center gap-1.5" style={{ backgroundColor: ACCENT }} data-testid="form-kaydet">
           {mesgul === "kaydet" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
         </button>
+        {(tarihHatasi || hata || m.girisEksikleri.length > 0) && (
+          <p className={`text-[11px] inline-flex items-start gap-1 ${tarihHatasi || hata ? "text-red-300" : "text-amber-300"}`}>
+            <AlertTriangle size={12} className="mt-px shrink-0" />
+            {tarihHatasi || hata || `Eksik: ${m.girisEksikleri.join(", ")}. Gönderim günü tamamlanmazsa form eksikler işaretlenerek gider ve temsilciye uyarı gönderilir.`}
+          </p>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <button type="button" onClick={indir} disabled={!!mesgul || degisti} title={degisti ? "Önce kaydedin" : "Üretime gidecek Excel'i indir"}
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
@@ -153,12 +259,6 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
           </button>
         </div>
       </div>
-      {(tarihHatasi || hata || m.girisEksikleri.length > 0) && (
-        <p className={`text-[11px] mt-2 inline-flex items-start gap-1 ${tarihHatasi || hata ? "text-red-300" : "text-amber-300"}`}>
-          <AlertTriangle size={12} className="mt-px shrink-0" />
-          {tarihHatasi || hata || `Eksik: ${m.girisEksikleri.join(", ")}. Gönderim günü tamamlanmazsa form eksik alanlar işaretlenerek gider ve temsilciye uyarı gönderilir.`}
-        </p>
-      )}
     </div>
   );
 }
@@ -189,7 +289,7 @@ export function SiparisFormlari() {
         <FileSpreadsheet size={14} style={{ color: ACCENT }} />
         <span className="flex-1 min-w-[240px]">
           Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>, boş ekipman alımından <b className="text-white">1 gün önce 08:00</b>&apos;de üretime gider.
-          Burada yalnız <b className="text-white">çuval görseli</b> ve <b className="text-white">üretim / SKT</b> girilir; tarihler dosyanın Ek Bilgiler kartına da yazılır. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
+          Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT çuvaldan otomatik okunur. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
         </span>
         {eksikSayisi > 0 && <span className="text-amber-300 font-medium">{eksikSayisi} formda eksik var</span>}
         <button type="button" onClick={() => setGecmis((g) => !g)} className="h-7 px-2.5 rounded-full text-[11px]"

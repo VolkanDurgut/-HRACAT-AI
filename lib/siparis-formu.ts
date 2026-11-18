@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { formModeli, formDosyaAdi, type FormHam, type FormModeli } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
-export { formDurumu, gunEkle, trTarih, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
+export { cuvalTarihleriniAyikla, formDurumu, gunEkle, trTarih, type CuvalTarihi, type CuvalTarihleri, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
 
 const KOVA = "siparis-formlari";
 const AZAMI_PX = 2000;
@@ -59,13 +59,30 @@ export async function gorselAdresi(yol: string): Promise<string | null> {
   return data?.signedUrl || null;
 }
 
-export async function formKaydet(booking: string, uretim: string | null, skt: string | null, gorsel: { yol: string; ad: string } | null, gorselKaldir: boolean): Promise<number> {
+export type FormKaydi = {
+  booking: string;
+  spekler: string;
+  /** Cuvaldaki yazim ("NOVEMBER 2026" / "12.11.2026"); ISO yalniz tam tarihte (dosyanin Ek Bilgiler'i yalniz o zaman guncellenir). */
+  uretimMetin: string | null; sktMetin: string | null; uretimIso: string | null; sktIso: string | null;
+  tarihKaynagi: "gorsel" | "elle" | null;
+  gorsel: { yol: string; ad: string } | null;
+  gorselKaldir: boolean;
+};
+
+export async function formKaydet(k: FormKaydi): Promise<number> {
   const { data, error } = await supabase.rpc("siparis_formu_kaydet", {
-    p_booking: booking, p_uretim: uretim || null, p_skt: skt || null,
-    p_gorsel_yolu: gorsel?.yol || null, p_gorsel_adi: gorsel?.ad || null, p_gorsel_sil: gorselKaldir,
+    p_booking: k.booking, p_spekler: k.spekler || null, p_uretim_metin: k.uretimMetin || null, p_skt_metin: k.sktMetin || null,
+    p_uretim: k.uretimIso || null, p_skt: k.sktIso || null, p_gorsel_yolu: k.gorsel?.yol || null, p_gorsel_adi: k.gorsel?.ad || null,
+    p_gorsel_sil: k.gorselKaldir, p_tarih_kaynagi: k.tarihKaynagi,
   });
   if (error) throw new Error(error.message || "Kaydedilemedi.");
   return Number((data as { dosya?: number } | null)?.dosya || 0);
+}
+
+/** Kayitli gorselin kendisi (OCR icin). */
+export async function gorselBlob(yol: string): Promise<Blob | null> {
+  const { data, error } = await supabase.storage.from(KOVA).download(yol);
+  return error ? null : data;
 }
 
 async function bayt(adres: string): Promise<FormGorseli | null> {

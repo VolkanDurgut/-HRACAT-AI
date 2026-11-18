@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { ayYil, cuvalTipi, formDurumu, formModeli, gonderimZamaniMi, spekMetni, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
+import { ayYil, cuvalTarihleriniAyikla, cuvalTipi, formDurumu, formModeli, gonderimZamaniMi, spekMetni, spekTemizle, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselBoyutu, gorselTuru, siparisFormuXlsx } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
 const ham = (ek: Partial<FormHam> = {}): FormHam => ({
@@ -17,7 +17,7 @@ const ham = (ek: Partial<FormHam> = {}): FormHam => ({
   dosya: null,
   temsilci: { ad_soyad: "AD SOYAD", eposta: "temsilci@kurgu.test", hitap: "Ad Bey" },
   kalite: null,
-  form: { uretim_tarihi: "2026-11-12", skt: "2027-11-12", gorsel_yolu: "sirket/KURGU123/1.jpg" },
+  form: { uretim_metin: "NOVEMBER 2026", skt_metin: "NOVEMBER 2027", tarih_kaynagi: "gorsel", spekler: "Protein min 12%\nNem: max 14%", gorsel_yolu: "sirket/KURGU123/1.jpg" },
   gonderim: null,
   test: null,
   ...ek,
@@ -40,6 +40,7 @@ test("model: sablondaki alanlar plan + siparis listesinden dolar", () => {
   assert.equal(a.uretimTarihi, "NOVEMBER 2026");
   assert.equal(a.skt, "NOVEMBER 2027");
   assert.equal(a.temsilci, "AD SOYAD");
+  assert.equal(m.alanlar.spekler, "Protein min 12%\nNem: max 14%");
   assert.equal(m.gonderimGunu, "2026-11-12");
   assert.deepEqual(m.girisEksikleri, []);
 });
@@ -59,13 +60,48 @@ test("model: dosya varsa dosyanin bilgisi onceliklidir; ekipman yerine yazilmis 
   assert.equal(m.alanlar.lotNo, "LOT-1");
   // Form tarihi yoksa dosyanin Ek Bilgiler tarihi
   assert.equal(m.alanlar.uretimTarihi, "OCTOBER 2026");
-  assert.deepEqual(m.girisEksikleri, ["Çuval görseli"]);
+  assert.deepEqual(m.girisEksikleri, ["Çuval görseli", "Ürün spekleri"]);
   assert.ok(m.eksikler.includes("Boş Ekipman Alımı"));
+  // Spek girilmediyse formda oneri (varsayilan) yazilir
+  assert.equal(m.alanlar.spekler, "Protein min 13%\nGluten min 30%\nKül: max 0,60%\nNem: max 14%");
 });
 
 test("eksik giris listesi", () => {
   const m = formModeli(ham({ form: null }));
-  assert.deepEqual(m.girisEksikleri, ["Çuval görseli", "Üretim tarihi", "SKT"]);
+  assert.deepEqual(m.girisEksikleri, ["Çuval görseli", "Ürün spekleri", "Üretim tarihi", "SKT"]);
+});
+
+test("temsilci sabit: veritabanindan gelen tam ad yazilir", () => {
+  assert.equal(formModeli(ham({ temsilci: { ad_soyad: "SABIT TEMSILCI" } })).alanlar.temsilci, "SABIT TEMSILCI");
+});
+
+test("cuvaldan tarih: gercek OCR ciktilari (ay-yil)", () => {
+  const a = cuvalTarihleriniAyikla("Production Date: NOVEMBER 2026\nExpiry Date : NOVEMBER 2027\nBatch No : KURGU1");
+  assert.deepEqual([a.uretim?.metin, a.uretim?.tur, a.skt?.metin, a.skt?.iso], ["NOVEMBER 2026", "ay", "NOVEMBER 2027", null]);
+  // Buyutulmus gecisin gurultulu satirlari; "PRODUCT OF TURKEY" uretim sayilmaz
+  const b = cuvalTarihleriniAyikla("PRODUCT OF TURKEY x 1 yr\nPRODUCTION DATE : NOVEMBER 2026 tre XN | \\ 4\nEXPIRY DATE . NOVEMBER 2027 Tt NN /");
+  assert.deepEqual([b.uretim?.metin, b.skt?.metin], ["NOVEMBER 2026", "NOVEMBER 2027"]);
+  assert.deepEqual(cuvalTarihleriniAyikla("~_ a PRODUCT OF TURKEY"), { uretim: null, skt: null });
+});
+
+test("cuvaldan tarih: tam tarih, Fransizca, sayisal ay-yil; form tarihi karismaz", () => {
+  const a = cuvalTarihleriniAyikla("Tarih 05,11,2026\nDATE DE FABRICATION : 12/11/2026\nDATE D'EXPIRATION : 12/11/2027");
+  assert.deepEqual([a.uretim?.metin, a.uretim?.iso, a.skt?.iso], ["12.11.2026", "2026-11-12", "2027-11-12"]);
+  const b = cuvalTarihleriniAyikla("MFG: 11.2026  EXP: 11.2027");
+  assert.deepEqual([b.uretim?.metin, b.skt?.metin], ["NOVEMBER 2026", "NOVEMBER 2027"]);
+  const c = cuvalTarihleriniAyikla("PRODUCTION: NOVEMBRE 2026\nBEST BEFORE: NOV. 2027");
+  assert.deepEqual([c.uretim?.metin, c.skt?.metin], ["NOVEMBER 2026", "NOVEMBER 2027"]);
+});
+
+test("cuvaldan tarih: tutarsiz ya da mantiksiz tarih reddedilir (yanlis tarih yerine okunamadi)", () => {
+  assert.deepEqual(cuvalTarihleriniAyikla("Production Date: NOVEMBER 2027\nExpiry Date: NOVEMBER 2026"), { uretim: null, skt: null });
+  assert.equal(cuvalTarihleriniAyikla("Production Date: NOVEMBER 1999").uretim, null);
+  assert.equal(cuvalTarihleriniAyikla("Production Date: 45.13.2026").uretim, null);
+});
+
+test("spek temizleme", () => {
+  assert.equal(spekTemizle("  Protein  min 13%\n\n Nem: max 14% \n"), "Protein min 13%\nNem: max 14%");
+  assert.equal(spekTemizle(null), "");
 });
 
 test("gonderim zamani: ekipman - 1 gun 08:00 TR; ekipman gunu gecmisse gonderilmez", () => {

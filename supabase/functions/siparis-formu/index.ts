@@ -140,6 +140,7 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
 async function ekler(m: FormModeli): Promise<{ filename: string; content: string }[]> {
   const cuvalBayt = m.gorselYolu ? await ikili(`${SUPABASE_URL}/storage/v1/object/${KOVA}/${m.gorselYolu.split("/").map(encodeURIComponent).join("/")}`, basliklar) : null;
   const cuval = gorsel(cuvalBayt);
+  if (m.gorselYolu && !cuval) console.error("siparis-formu: cuval gorseli okunamadi:", m.bookingNo);
   const zip = new JSZip();
   for (const p of siparisFormuXlsx(m, await logo(), cuval)) zip.file(p.yol, p.icerik);
   const liste = [{ filename: formDosyaAdi(m), content: await zip.generateAsync({ type: "base64", compression: "DEFLATE" }) }];

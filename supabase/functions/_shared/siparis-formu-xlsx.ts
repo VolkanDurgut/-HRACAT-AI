@@ -74,7 +74,7 @@ function hucre(ref: string, deger: string | null, stil: number): string {
   return `<c r="${ref}" s="${stil}" t="inlineStr"><is><t xml:space="preserve">${kacis(deger)}</t></is></c>`;
 }
 
-function sayfaXml(m: FormModeli, cizimVar: boolean): string {
+function sayfaXml(m: FormModeli, cizimVar: boolean, cuvalVar: boolean): string {
   const a = m.alanlar;
   const satirlar: string[] = [];
   // 1: logo (A1) + baslik (B1:D1)
@@ -97,9 +97,9 @@ function sayfaXml(m: FormModeli, cizimVar: boolean): string {
     }
     satirlar.push(`<row r="${r}">${hucre(`A${r}`, solE, S.etiket)}${hucre(`B${r}`, solD || EKSIK, solD ? S.deger : S.eksik)}${sag}</row>`);
   }
-  // 14-32: cuval gorseli alani (A14:D32); gorsel yoksa A14'te uyari
+  // 14-32: cuval gorseli alani (A14:D32); gorsel Excel'e GIRMEDIYSE (girilmemis ya da depodan okunamamis) A14'te uyari
   for (let r = GORSEL_ILK_SATIR; r <= GORSEL_SON_SATIR; r++) {
-    const icerik = r === GORSEL_ILK_SATIR && !m.gorselYolu ? `ÇUVAL GÖRSELİ ${EKSIK}` : null;
+    const icerik = r === GORSEL_ILK_SATIR && !cuvalVar ? `ÇUVAL GÖRSELİ ${EKSIK}` : null;
     satirlar.push(`<row r="${r}">${hucre(`A${r}`, icerik, icerik ? S.eksik : S.bos)}${hucre(`B${r}`, null, S.bos)}${hucre(`C${r}`, null, S.bos)}${hucre(`D${r}`, null, S.bos)}</row>`);
   }
   const sutunlar = SUTUNLAR.map((g, i) => `<col min="${i + 1}" max="${i + 1}" width="${g}" customWidth="1"/>`).join("");
@@ -148,6 +148,7 @@ export function siparisFormuXlsx(m: FormModeli, logo: FormGorseli | null, cuval:
     }
   }
   const cizimVar = resimler.length > 0;
+  const cuvalVar = resimler.some((r) => r.gorsel === cuval);
   const parcalar: XlsxParcasi[] = [];
   const turler = new Set(resimler.map((r) => r.gorsel.tur));
   parcalar.push({
@@ -163,7 +164,7 @@ export function siparisFormuXlsx(m: FormModeli, logo: FormGorseli | null, cuval:
   parcalar.push({ yol: "xl/_rels/workbook.xml.rels", icerik: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` });
   parcalar.push({ yol: "xl/styles.xml", icerik: STILLER });
-  parcalar.push({ yol: "xl/worksheets/sheet1.xml", icerik: sayfaXml(m, cizimVar) });
+  parcalar.push({ yol: "xl/worksheets/sheet1.xml", icerik: sayfaXml(m, cizimVar, cuvalVar) });
   if (cizimVar) {
     parcalar.push({ yol: "xl/worksheets/_rels/sheet1.xml.rels", icerik: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>` });

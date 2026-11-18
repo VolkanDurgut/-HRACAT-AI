@@ -133,6 +133,10 @@ test("Excel: sablon duzeni, eksik alan isareti, resimli / resimsiz paket", async
   const resimli = siparisFormuXlsx(formModeli(ham()), { veri: png, tur: "png" }, { veri: png, tur: "png" });
   assert.ok(resimli.some((p) => p.yol === "xl/media/image2.png"));
   assert.ok(String(resimli.find((p) => p.yol === "xl/worksheets/sheet1.xml")!.icerik).includes('<drawing r:id="rId1"/>'));
+  // Gorsel kayitli ama Excel'e girmediyse (depodan okunamadi) uyari yine yazilir; gorsel girdiyse yazilmaz
+  const okunamadi = String(siparisFormuXlsx(formModeli(ham()), null, null).find((p) => p.yol === "xl/worksheets/sheet1.xml")!.icerik);
+  assert.ok(okunamadi.includes("ÇUVAL GÖRSELİ GİRİLMEDİ"));
+  assert.ok(!String(resimli.find((p) => p.yol === "xl/worksheets/sheet1.xml")!.icerik).includes("ÇUVAL GÖRSELİ GİRİLMEDİ"));
   const zip = new JSZip();
   for (const p of resimli) zip.file(p.yol, p.icerik);
   const b = await zip.generateAsync({ type: "uint8array" });

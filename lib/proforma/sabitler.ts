@@ -17,7 +17,10 @@ export const SATICI = {
   adres: "ISTIKLAL MAHALLESI CEMAL UNLU SARAC CADDESI NO: 20 SULEYMANPASA / TEKIRDAG / TURKIYE",
 } as const;
 
-/** SPECIAL CONDITIONS (3. sayfa) - 11 madde. */
+/**
+ * SPECIAL CONDITIONS (3. sayfa) - 12 madde.
+ * 18.11.2026: son madde (GAFTA 81 / 88 genel sartlari + 125/126 tahkim kurallari) yonetim talebiyle eklendi; metin aynen.
+ */
 export const VARSAYILAN_OZEL_SARTLAR: string[] = [
   "All import duties, taxes, levies, present or future in country of destination and certificates which is not mentioned above shipment documents should be for buyer's account.",
   "All export duties, taxes, levies etc. present or future in country of export/origin should be for seller's account.",
@@ -30,6 +33,7 @@ export const VARSAYILAN_OZEL_SARTLAR: string[] = [
   "Demurrage: 10 days free time at discharging port",
   "General conditions:\nAll other terms, conditions and rules, not in contradiction with the above contained in Form 48 of GAFTA of which the parties admit that they have knowledge and notice, apply to this transaction and the details above given shall be taken as having been written into such form in the appropriate places",
   "All the bank charges in all transactions are on sender’s account and must be stated as bank charges: OUR",
+  "GENERAL TERMS: As per GAFTA contract no. 81 and GAFTA contract no. 88 if not in contradiction with above and arbitration rules no 125/126.",
 ];
 
 /**

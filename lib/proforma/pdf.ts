@@ -570,7 +570,8 @@ function sayfa3(doc: jsPDF, b: ProformaBelgesi) {
     hucre(doc, madde, x(0), y, genis, h, { boy: 10, satirCarpani: OZEL_SART_CARPAN });
     y += h;
   }
-  y += 28.2 + 14.4; // 61-62
+  // 61-62. 18.11.2026: bosluk 42,6 -> 10 pt; 12. madde (GAFTA) eklenince banka + imza blogu 3. sayfada kalsin (onceki pay 4,4 pt korunur)
+  y += 10;
 
   // 63-75: banka + imza bolumu bir arada kalsin
   const bankaBlokH = 14.4 + 14.4 + 7 * 14.4 + 14.4 + 15.6 + 28.8 + 70;

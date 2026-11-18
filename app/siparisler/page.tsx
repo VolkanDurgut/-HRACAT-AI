@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Download, Hourglass, Link2, PackageCheck, RefreshCw, Search, Ship, Trash2, Truck, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock, Download, FileSpreadsheet, Hourglass, Link2, PackageCheck, RefreshCw, Search, Ship, Trash2, Truck, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -14,7 +14,7 @@ import {
   siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisBolumu, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import {
-  aramaNorm, panelBaglantisi, pazarBaglantisi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type SiparisSekme,
+  aramaNorm, panelBaglantisi, pazarBaglantisi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type ListeSekmesi, type SiparisSekme,
 } from "@/lib/siparis/gorunum";
 import { tutarsizliklariOku, type Tutarsizlik } from "@/lib/veri-tutarsizliklari";
 import { SekmeCubugu, type SekmeOgesi } from "@/components/erp/sekme-cubugu";
@@ -25,6 +25,7 @@ import { onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKald
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
+import { SiparisFormlari } from "@/components/siparis-formlari";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -554,7 +555,7 @@ function SiparisIcerik() {
   const q = norm(arama.trim());
   const aranan = useMemo(() => siparisAra(siparisler || [], arama), [siparisler, arama]);
   const sayilar = useMemo(() => sekmeSayilari(aranan), [aranan]);
-  const gorunenSiparis = useMemo(() => (sekme === "plan" ? [] : aranan.filter((s) => sekmeyeAit(s, sekme))), [aranan, sekme]);
+  const gorunenSiparis = useMemo(() => (sekme === "plan" || sekme === "formlar" ? [] : aranan.filter((s) => sekmeyeAit(s, sekme))), [aranan, sekme]);
   const planBloklariGorunen = useMemo((): PlanBlogu[] => {
     let l = plan || [];
     if (q) l = l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no, p.proforma_no].some((v) => v && norm(v).includes(q)));
@@ -639,11 +640,13 @@ function SiparisIcerik() {
     { deger: "onay", etiket: "Onay bekleyen", ikon: <Clock size={14} />, sayi: sayilar.onay },
     { deger: "sevk", etiket: "Sevk edilen", ikon: <Truck size={14} />, sayi: sayilar.sevk },
     { deger: "plan", etiket: "Yükleme Planı", ikon: <Ship size={14} />, sayi: null },
+    // 18.11.2026: her booking icin uretime giden Siparis Bildirim Formu (cuval gorseli + uretim / SKT)
+    { deger: "formlar", etiket: "Sipariş Formları", ikon: <FileSpreadsheet size={14} />, sayi: null },
   ];
-  const SEKME_BOLUMLERI: Record<Exclude<SiparisSekme, "plan">, SiparisBolumu[]> = {
+  const SEKME_BOLUMLERI: Record<ListeSekmesi, SiparisBolumu[]> = {
     rezervasyonlu: ["rezervasyon"], rez_bekleyen: ["on_odeme"], onay: ["bekleyen"], sevk: ["rezervasyon", "iptal"],
   };
-  const digerSonuc = q && sekme !== "plan" ? aranan.length - gorunenSiparis.length : 0;
+  const digerSonuc = q && sekme !== "plan" && sekme !== "formlar" ? aranan.length - gorunenSiparis.length : 0;
   return (
     <div className="max-w-[1400px]">
       <SayfaBasligi
@@ -690,7 +693,7 @@ function SiparisIcerik() {
                     <button type="button" onClick={() => { setSekme("plan"); setAktarAcik(true); }} className="h-7 px-2.5 rounded-md border font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: "rgba(245,158,11,0.45)" }} data-plan-yukle>Plan yükle</button>
                   )}
                   {kaynakUyari.some((k) => k.baslik.startsWith("Sipariş")) && (
-                    <button type="button" onClick={() => { if (sekme === "plan") setSekme(VARSAYILAN_SIPARIS_SEKMESI); setSiparisAktarAcik(true); }} className="h-7 px-2.5 rounded-md border font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: "rgba(245,158,11,0.45)" }} data-liste-yukle>Liste yükle</button>
+                    <button type="button" onClick={() => { if (sekme === "plan" || sekme === "formlar") setSekme(VARSAYILAN_SIPARIS_SEKMESI); setSiparisAktarAcik(true); }} className="h-7 px-2.5 rounded-md border font-medium text-white hover:bg-white/[0.04]" style={{ borderColor: "rgba(245,158,11,0.45)" }} data-liste-yukle>Liste yükle</button>
                   )}
                 </span>
               )}
@@ -707,7 +710,9 @@ function SiparisIcerik() {
             </div>
           </div>
 
-          {sekme !== "plan" ? (
+          {sekme === "formlar" ? (
+            <SiparisFormlari />
+          ) : sekme !== "plan" ? (
             <>
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <p className="text-xs" style={{ color: TEXT_MUTED }}>

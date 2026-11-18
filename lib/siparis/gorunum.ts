@@ -6,12 +6,14 @@
 import type { SiparisDurum, SiparisSatiri } from "@/lib/siparis/liste";
 import { trBuyuk } from "@/lib/tr-arama";
 
-export type SiparisSekme = "rezervasyonlu" | "rez_bekleyen" | "onay" | "sevk" | "plan";
+export type SiparisSekme = "rezervasyonlu" | "rez_bekleyen" | "onay" | "sevk" | "plan" | "formlar";
+/** Siparis satiri gosteren sekmeler (plan ve 18.11.2026 Siparis Formlari satir gostermez). */
+export type ListeSekmesi = Exclude<SiparisSekme, "plan" | "formlar">;
 export const VARSAYILAN_SIPARIS_SEKMESI: SiparisSekme = "rezervasyonlu";
-export const SIPARIS_SEKMELERI: SiparisSekme[] = ["rezervasyonlu", "rez_bekleyen", "onay", "sevk", "plan"];
+export const SIPARIS_SEKMELERI: SiparisSekme[] = ["rezervasyonlu", "rez_bekleyen", "onay", "sevk", "plan", "formlar"];
 
 /** Hangi durum hangi sekmede (plan sekmesi siparis satiri gostermez). */
-export const SEKME_DURUMLARI: Record<Exclude<SiparisSekme, "plan">, SiparisDurum[]> = {
+export const SEKME_DURUMLARI: Record<ListeSekmesi, SiparisDurum[]> = {
   rezervasyonlu: ["rezervasyonlu", "bl_eksik"],
   rez_bekleyen: ["on_odeme_alindi"],
   onay: ["onay_bekliyor"],
@@ -25,15 +27,15 @@ export function siparisSekmesi(v: string | null | undefined): SiparisSekme | nul
 }
 
 export function sekmeyeAit(s: Pick<SiparisSatiri, "durum">, sekme: SiparisSekme): boolean {
-  return sekme !== "plan" && SEKME_DURUMLARI[sekme].includes(s.durum);
+  return sekme !== "plan" && sekme !== "formlar" && SEKME_DURUMLARI[sekme].includes(s.durum);
 }
 
 /** Satirin sekmesi (her durum tam olarak bir sekmede). */
-export function satirSekmesi(s: Pick<SiparisSatiri, "durum">): Exclude<SiparisSekme, "plan"> {
-  return (Object.keys(SEKME_DURUMLARI) as Exclude<SiparisSekme, "plan">[]).find((k) => SEKME_DURUMLARI[k].includes(s.durum)) || "onay";
+export function satirSekmesi(s: Pick<SiparisSatiri, "durum">): ListeSekmesi {
+  return (Object.keys(SEKME_DURUMLARI) as ListeSekmesi[]).find((k) => SEKME_DURUMLARI[k].includes(s.durum)) || "onay";
 }
 
-export function sekmeSayilari(liste: Pick<SiparisSatiri, "durum">[]): Record<Exclude<SiparisSekme, "plan">, number> {
+export function sekmeSayilari(liste: Pick<SiparisSatiri, "durum">[]): Record<ListeSekmesi, number> {
   const say = { rezervasyonlu: 0, rez_bekleyen: 0, onay: 0, sevk: 0 };
   for (const s of liste) say[satirSekmesi(s)] += 1;
   return say;
@@ -50,7 +52,7 @@ export function siparisAra<T extends Partial<Pick<SiparisSatiri, (typeof ARANAN_
 }
 
 /** "Olasi tekrar" kartinin acacagi sekme: ilk supheli satirin sekmesi (yoksa onay). */
-export function tekrarSekmesi(liste: Pick<SiparisSatiri, "durum" | "benzer" | "kaynak">[]): Exclude<SiparisSekme, "plan"> {
+export function tekrarSekmesi(liste: Pick<SiparisSatiri, "durum" | "benzer" | "kaynak">[]): ListeSekmesi {
   const s = liste.find((x) => x.benzer && x.kaynak === "sistem");
   return s ? satirSekmesi(s) : "onay";
 }

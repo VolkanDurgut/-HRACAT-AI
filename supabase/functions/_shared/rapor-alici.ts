@@ -9,7 +9,7 @@
  */
 export type RaporTuru =
   | "siparis" | "navlun" | "navlun_haftalik" | "fatura_onay" | "fatura_dagitim" | "musteri_durum"
-  | "gunluk_ihracat" | "diib" | "vgm" | "konsimento_hatirlatma" | "pazar_gorev" | "satin_alma";
+  | "gunluk_ihracat" | "diib" | "vgm" | "konsimento_hatirlatma" | "pazar_gorev" | "satin_alma" | "siparis_formu";
 /** canli: canli VE en az bir alici. canliIsaret: yalniz anahtar (alicisi raporun kendisinden gelen musteri durum raporu icin). */
 export type RaporAyari = { canli: boolean; canliIsaret: boolean; alicilar: string[]; cc: string[]; kaynak: "ayar" | "secret" };
 

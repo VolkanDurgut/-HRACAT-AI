@@ -12,7 +12,7 @@ import { khMail, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type KhVeri } from "../_
 //  - "elle"  : { dosya_id } kullanicinin OTURUMUYLA (kh_elle_iste yetkiyi DB'de kontrol
 //              eder) kuyruga alir ve HEMEN gonderir; sonucu doner.
 // Alicilar (secret, virgulle): KONSIMENTO_HATIRLATMA_ALICI (varsayilan operation@),
-//   KONSIMENTO_HATIRLATMA_CC (varsayilan bbt@, execution@, export@, export2@ - 10.11.2026).
+//   KONSIMENTO_HATIRLATMA_CC (varsayilan bbt@, execution@, export@, sales@ - 10.11.2026; export2@ 18.11.2026 sales@ oldu).
 //  - "ayar"  : (10.11.2026) salt okunur; mod + alici + CC doner (secret degeri / dosya verisi YOK). Canli dogrulama icin.
 // MOD: KONSIMENTO_HATIRLATMA_CANLI = "evet" degilse mail SADECE test adresine
 //   (KONSIMENTO_HATIRLATMA_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.

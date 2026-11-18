@@ -32,7 +32,7 @@ export type RaporTanimi = {
 
 export const RAPORLAR: RaporTanimi[] = [
   { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 09:00, 12:00 ve 17:00", edge: null, testModu: false, etkin: "yakinda" },
-  { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Günün özeti (4 gösterge) + gelen ön ödemeler + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
+  { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Rezervasyon bekleyen (ön ödemeli) siparişler + limanlarının en yeni navlun fiyatları + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
   { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Satın alınan navlunlar + rezervasyon bekleyen müşteriler + 2 Excel (satın alma listesi, bütün navlunlar)", saat: "Her gün 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
   { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "vgm", ad: "VGM Bildirimi", grup: "Operasyon", aciklama: "Konteynerleri tamamlanan dosyanın VGM PDF'i", saat: "Konteynerler tamamlanınca", edge: null, testModu: false, etkin: "yakinda" },
@@ -55,7 +55,7 @@ export function adresAyikla(metin: string): { gecerli: string[]; gecersiz: strin
   return { gecerli, gecersiz: parca.filter((x) => !EPOSTA_RE.test(x)) };
 }
 
-/** Kisa gorunen ad: "export2@unex.com.tr" -> "export2", baska alan adlari tam. */
+/** Kisa gorunen ad: "sales@unex.com.tr" -> "sales", baska alan adlari tam. */
 export function kisaAdres(e: string, alan = "unex.com.tr"): string {
   return e.endsWith(`@${alan}`) ? e.slice(0, -alan.length - 1) : e;
 }

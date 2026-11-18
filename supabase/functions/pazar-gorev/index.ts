@@ -3,7 +3,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // ============================================================================
 // PAZAR GUNLUK GOREV (pazar-gorev) - 10.11.2026 (Dalga 3.3 + 3.4)
 // ============================================================================
-// Kullanici: "Bugunku musteriniz" maili kisiye ozel (export@ / export2@, CC bbt@ + execution@), "Basla" -> girissiz gorev
+// Kullanici: "Bugunku musteriniz" maili kisiye ozel (export@ / sales@ (18.11.2026 oncesi export2@; ekip kodu "export2" ayni kaldi), CC bbt@ + execution@), "Basla" -> girissiz gorev
 // sayfasi (/gorev/[token]). Once hatirlatma zamani gelenler, sonra SIPARISSIZ kendi musterilerimiz, sonra fuar
 // potansiyelleri. Surec + sira kurallari: migration 20261110060000_pazar_gorev.sql (pazar_gorev_olustur / _isle).
 // Govde:

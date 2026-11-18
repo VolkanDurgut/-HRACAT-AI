@@ -5,6 +5,6 @@
 //   KONSIMENTO_HATIRLATMA_CANLI = "evet" -> gercek alicilar; aksi halde SADECE test adresi.
 export const KH_SITE = "https://ihracatasistanim.com";
 export const KH_VARSAYILAN_ALICI = "operation@unex.com.tr";
-// 10.11.2026 kullanici: CC bbt@, execution@, export@, export2@.
-export const KH_VARSAYILAN_CC = ["bbt@unex.com.tr", "execution@unex.com.tr", "export@unex.com.tr", "export2@unex.com.tr"];
+// 10.11.2026 kullanici: CC bbt@, execution@, export@, export2@. 18.11.2026: export2@ adresi sales@ oldu.
+export const KH_VARSAYILAN_CC = ["bbt@unex.com.tr", "execution@unex.com.tr", "export@unex.com.tr", "sales@unex.com.tr"];
 // Test alicisi: secret KONSIMENTO_HATIRLATMA_TEST_ALICISI (13.11.2026: koddaki varsayilan kaldirildi; repo herkese acik).

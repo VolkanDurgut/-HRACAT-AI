@@ -19,7 +19,7 @@ import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "../_shared/vgm-pdf
 //  - {"test": true, "dosya_id": "..."}: "[TEST]" mail YALNIZ test adresine; dosyayi gonderilmis SAYMAZ; 24 saatte en fazla 5.
 //  - {"onceden_isaretle": true}: (service_role) canliya gecerken su an tamam olan acik dosyalari 'onceden' isaretler.
 // Alicilar (secret, virgulle): VGM_RAPOR_ALICI (kullanici 10.11: operation@), VGM_RAPOR_CC (bbt@, execution@, export@,
-//   export2@). Secret yoksa koddaki varsayilan. VGM_RAPOR_CANLI = "evet" degilse otomatik gonderim YOK (yalniz test cagrisi).
+//   export2@; 18.11.2026: export2@ -> sales@). Secret yoksa koddaki varsayilan. VGM_RAPOR_CANLI = "evet" degilse otomatik gonderim YOK (yalniz test cagrisi).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -39,7 +39,7 @@ function adresler(ad: string, varsayilan: string[]): string[] {
 }
 const CANLI = (Deno.env.get("VGM_RAPOR_CANLI") || "").trim().toLowerCase() === "evet";
 const ALICI = adresler("VGM_RAPOR_ALICI", ["operation@unex.com.tr"]);
-const CC = adresler("VGM_RAPOR_CC", ["bbt@unex.com.tr", "execution@unex.com.tr", "export@unex.com.tr", "export2@unex.com.tr"]).filter((a) => !ALICI.includes(a));
+const CC = adresler("VGM_RAPOR_CC", ["bbt@unex.com.tr", "execution@unex.com.tr", "export@unex.com.tr", "sales@unex.com.tr"]).filter((a) => !ALICI.includes(a));
 const TEST_ALICISI = adresler("VGM_RAPOR_TEST_ALICISI", []);
 
 const cors = {

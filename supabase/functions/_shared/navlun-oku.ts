@@ -502,10 +502,10 @@ export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
   let ft: number | null = null, gec: string | null = null, ekipman = "20DC";
   let ozel: Record<string, number> = {};
   let usdDisi = 0;
-  // HTML tablodan gelen metinde hucreler ayri satirdadir ("LIMAN (ULKE)\nUSD\n1940", "Currency\n20DV"): tek satira toplanir
+  // HTML tablodan gelen metinde hucreler ayri satirdadir, arada bos satir da olabilir ("LIMAN (ULKE)\n\nUSD\n\n1940"): tek satira toplanir
   const duz = yeni
-    .replace(/\)[ \t]*\r?\n[ \t]*(USD|EUR)[ \t]*\r?\n[ \t]*(\d)/g, ") $1 $2")
-    .replace(/^([ \t]*currency)[ \t]*\r?\n[ \t]*(\d{2}[ \t]*[A-Z]{2})[ \t]*$/gim, "$1 $2");
+    .replace(/\)[ \t]*(?:\r?\n[ \t]*)+(USD|EUR)[ \t]*(?:\r?\n[ \t]*)+(\d)/g, ") $1 $2")
+    .replace(/^([ \t]*currency)[ \t]*(?:\r?\n[ \t]*)+(\d{2}[ \t]*[A-Z]{2})[ \t]*$/gim, "$1 $2");
   for (const ham of duz.split("\n")) {
     const s = ham.trim();
     const bas = s.match(/free\s*time\s*[:\-]?\s*(\d{1,2})\s*days?/i);

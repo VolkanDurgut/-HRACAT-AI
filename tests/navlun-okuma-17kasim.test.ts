@@ -42,7 +42,7 @@ BESINCILIMAN (BESINCIULKE) USD 1040
 const TARIFE_TABLO = TARIFE_TEK.replace(/ \(([A-Z]+)\) (USD|EUR) (\d+)/g, " ($1)\n$2\n$3").replace("Currency 20DV", "Currency\n20DV");
 
 test("genel tarife: her liman ayri teklif, bolum ve limana ozel free time, EUR yazilmaz", async () => {
-  for (const metin of [TARIFE_TEK, TARIFE_TABLO]) {
+  for (const metin of [TARIFE_TEK, TARIFE_TABLO, TARIFE_TABLO.replace(/\n/g, "\n\n")]) {
     const s = await oku(metin, "RE: ORNEK // UNEX // BOLGE A & BOLGE B // IHRACAT NAVLUN TEKLIFI");
     assert.deepEqual(s.map((o) => [o.liman, o.tutar, o.ekipman, o.free_time_gun]), [
       ["ORNEKLIMAN", 1600, "20DC", 21], ["IKINCILIMAN", 3465, "20DC", 21],

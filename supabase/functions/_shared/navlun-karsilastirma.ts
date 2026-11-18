@@ -8,7 +8,8 @@
  * Sorun: teklifler yalniz TUTARA gore siralaniyordu. Evergreen "USD 340 + lokaller" (lokal 356) Beyrut'ta "en iyi" ve
  * "hedefte" gorundu; gercek maliyet 696 (MSC'nin gerceklesen 700'u ile ayni, hedef 600'un USTUNDE).
  *
- * KARSILASTIRMA TEMELI (kullanici onayi): navlun + cikis lokali + konteyner basi kucuk kalemler (VGM, muhur), KDV haric.
+ * KARSILASTIRMA TEMELI (kullanici onayi): navlun + cikis lokali + konteyner basi kucuk kalemler (muhur vb.), KDV haric.
+ * VGM EKLENMEZ (18.11.2026 kullanici): tartim sirketin kendi yetkili kantarinda yapilir, acentenin VGM hizmeti alinmaz.
  * Hedef de bu temelle okunur. Liman kurali "navlun" olan limanda (bir pazarda teklifler ve hedef yalniz deniz navlunuysa)
  * yalniz navlun karsilastirilir. Not (13.11.2026): Asya hatlarindaki "all in" teklifler yukleme limani lokalini ICERIYOR
  * (ONE: "Navlun, yukleme limani lokal masraflari dahildir"; Horoz: "Vgm, pol lokaller dahildir"); bugun istisna yok.
@@ -35,7 +36,7 @@ export type AcenteHafizasi = {
   /** "haric" icin konteyner basi cikis lokali (KDV haric), ekipmana gore */
   lokal_20: number | null;
   lokal_40: number | null;
-  /** Konteyner basi kucuk kalemler (VGM, muhur ...) - lokal dahil olsa da ayrica yazilanlar */
+  /** Konteyner basi kucuk kalemler (muhur ...) - lokal dahil olsa da ayrica yazilanlar. VGM buraya girmez. */
   ek_kont: number;
   guven: Guven;
   kanit: string;
@@ -182,7 +183,7 @@ export function karsilastir(t: Pick<TeklifGirdisi, "acente" | "tutar" | "ekipman
     durum = o.lokal; kaynak = "rezervasyon"; dayanak = `Rezervasyondan öğrenildi: ${o.kanitlar.join("; ")}`;
   }
   const ek = h && h.ek_kont > 0 ? h.ek_kont : 0;
-  const ekMetin = ek ? ` + ${sayiYaz(ek)} (VGM/mühür)` : "";
+  const ekMetin = ek ? ` + ${sayiYaz(ek)} (mühür vb.)` : "";
   if (durum === "dahil") {
     const toplam = yuvarla(navlun + ek);
     return { navlun, lokal: 0, ek, toplam, kesin: true, lokalDurum: "dahil", temel: "toplam", kaynak, dayanak,

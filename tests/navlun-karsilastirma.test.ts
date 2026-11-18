@@ -68,10 +68,10 @@ test("lokalden hic bahsetmeyen ve hafizasi olmayan acente: belirsiz, en iyi seci
 });
 
 test("mail metni hafizadan once gelir; konteyner basi ek kalemler eklenir", () => {
-  const b = baglamKur([hafiza({ acente_anahtar: "MARTI", lokal: "dahil", ek_kont: 44 })], [], [], []);
+  const b = baglamKur([hafiza({ acente_anahtar: "MARTI", lokal: "dahil", ek_kont: 18 })], [], [], []);
   const c = karsilastir(teklif("Marti", 800, null, "ASHDOD"), b);
-  assert.equal(c.toplam, 844);
-  assert.equal(c.metin, "800 + 44 (VGM/mühür) = 844");
+  assert.equal(c.toplam, 818);
+  assert.equal(c.metin, "800 + 18 (mühür vb.) = 818");
   // metinde "+ lokal" yazan teklif hafizadaki "dahil"i ezer; lokal tutari yoksa kesin degil
   const h = karsilastir(teklif("Marti", 800, false, "ASHDOD"), b);
   assert.equal(h.kaynak, "mail");

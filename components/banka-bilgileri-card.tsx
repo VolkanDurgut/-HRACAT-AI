@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Pencil, Check, X, Banknote, Plus, Loader2 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { BANKA_PRESETLERI, SABIT_HESAP_ADI } from "@/lib/bankalar";
+import { bankaFarki } from "@/lib/proforma-banka";
 
 type Props = {
   dosya: Dosya;
@@ -164,6 +165,27 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
     setOzelPresetler((prev) => prev.filter((p) => p.id !== preset.id));
   };
 
+  // 18.11.2026 (kural: fatura talimatindaki banka = proformadaki banka): dosyadaki banka proformadakinden
+  // farkliysa acik uyari + tek tikla proformadakini uygulama.
+  const proformaFarki = bankaFarki(dosya.banka, dosya.ham_veri);
+  const [farkUygulaniyor, setFarkUygulaniyor] = useState(false);
+  const proformadakiniUygula = async () => {
+    if (!proformaFarki) return;
+    setFarkUygulaniyor(true);
+    const { data, error } = await supabase.from("ihracat_dosyalari").update({
+      hesap_adi: proformaFarki.hesap_adi || dosya.hesap_adi || null,
+      banka: proformaFarki.banka,
+      swift: proformaFarki.swift,
+      hesap_numarasi: proformaFarki.hesap_numarasi,
+      iban: proformaFarki.iban,
+    }).eq("id", dosya.id).eq("company_id", companyId).select("id");
+    setFarkUygulaniyor(false);
+    const hata = yazmaHatasi(error, data);
+    if (hata) { showToast(`Banka bilgileri güncellenemedi: ${hata}`, "error"); return; }
+    showToast("Proformadaki banka bilgileri uygulandı.", "success");
+    onRefresh();
+  };
+
   const handleSave = async () => {
     setSaving(true);
     const payload = {
@@ -216,6 +238,22 @@ export default function BankaBilgileriCard({ dosya, onRefresh, companyId }: Prop
         <CopyableField dark label="Hesap Numarası" value={dosya.hesap_numarasi} monospace />
         <CopyableField dark label="IBAN" value={dosya.iban} monospace />
       </div>
+
+      {proformaFarki && (
+        <div className="mt-3 rounded-lg border px-3 py-2.5 text-xs flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="banka-proforma-farki"
+          style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }}>
+          <span className="text-amber-300 flex-1 min-w-[220px]">
+            <span className="font-semibold text-amber-400">Proformadaki banka farklı:</span>{" "}
+            proformada <span className="font-semibold text-white">{proformaFarki.banka}</span>
+            {proformaFarki.kaynak === "okuma" ? " (proformadan okunan)" : " (kayıtlı proforma)"}, dosyada{" "}
+            <span className="font-semibold text-white">{dosya.banka || "boş"}</span>. Fatura talimatına dosyadaki banka yazılır.
+          </span>
+          <button type="button" onClick={proformadakiniUygula} disabled={farkUygulaniyor}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
+            {farkUygulaniyor ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Proformadakini uygula
+          </button>
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={handleModalKapat}>

@@ -7,6 +7,7 @@ import { CokluNoGirisi, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import { noParcala, noBirlestir } from "@/lib/coklu-no";
 import { formatDateTR, formatCurrency, fobBirimFiyati } from "@/lib/cutoff-utils";
 import { kalemMiktari } from "@/lib/sayi-oku";
+import { markaListesiAyikla, tekMarkaYayilimi } from "@/lib/konteyner-marka";
 import { Pencil, Check, X } from "lucide-react";
 import InfoTooltip from "@/components/info-tooltip";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
@@ -113,6 +114,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
     const consigneeDegisti = (form.consignee || "") !== (consigneeText || "");
     const yeniKaynak = consigneeDegisti ? "manuel" : consigneeKaynak;
 
+    const yeniMarkaListesi = markaListesiAyikla(form.marka_listesi);
     const payload = {
       consignee: form.consignee || null,
       lot_no: noBirlestir(form.lot_nolari),
@@ -128,7 +130,7 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
         ...(dosya.ham_veri as any || {}),
         notify: form.notify ? form.notify.split("\n\n").map(n => n.trim()).filter(Boolean) : [],
         consignee_kaynak: form.consignee ? yeniKaynak : null,
-        marka_listesi: form.marka_listesi ? form.marka_listesi.split("\n").map(m => m.trim()).filter(Boolean) : []
+        marka_listesi: yeniMarkaListesi
       }
     };
 
@@ -141,7 +143,30 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
       showToast(`Ek bilgiler kaydedilemedi: ${yazmaSorunu}`, "error");
       return;
     }
-    showToast("Ek bilgiler güncellendi.", "success");
+    // 18.11.2026: cuval markasi listesinde TEK marka varsa dosyanin tum konteynerleri
+    // (icerik dokumu dahil) o markaya cekilir; birden fazla markada konteyner bazinda elle secilir.
+    let markaMesaji = "";
+    if (yeniMarkaListesi.length === 1) {
+      const { data: kontlar, error: kontHata } = await supabase.from("konteynerler").select("id, marka, kalemler").eq("dosya_id", dosya.id).eq("company_id", companyId);
+      if (kontHata) {
+        markaMesaji = " Konteynerlerin çuval markası güncellenemedi; Konteynerler sekmesinden kontrol edin.";
+      } else {
+        const guncellemeler = tekMarkaYayilimi(yeniMarkaListesi, (kontlar || []) as { id: string; marka: string | null; kalemler: unknown }[]);
+        let basarili = 0;
+        for (const g of guncellemeler) {
+          const { data: y, error: e } = await supabase.from("konteynerler")
+            .update(g.kalemler ? { marka: g.marka, kalemler: g.kalemler } : { marka: g.marka })
+            .eq("id", g.id).eq("company_id", companyId).select("id");
+          if (!yazmaHatasi(e, y)) basarili += 1;
+        }
+        if (guncellemeler.length > 0) {
+          markaMesaji = basarili === guncellemeler.length
+            ? ` ${basarili} konteynerin çuval markası "${yeniMarkaListesi[0]}" olarak güncellendi.`
+            : ` ${guncellemeler.length} konteynerden ${basarili} tanesinin çuval markası güncellendi; kalanları Konteynerler sekmesinden kontrol edin.`;
+        }
+      }
+    }
+    showToast(`Ek bilgiler güncellendi.${markaMesaji}`, markaMesaji.includes("kontrol edin") ? "error" : "success");
     setEditing(false);
     onRefresh();
   };
@@ -298,8 +323,9 @@ export default function EkBilgilerCard({ dosya, rezervasyonlar, onRefresh, compa
           <input value={form.marka} onChange={(e) => update("marka", e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
         </div>
         <div className="col-span-2 md:col-span-3">
-          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Çuval Marka Listesi (her satıra bir marka yazın — konteyner tablosunda seçim listesi olarak çıkar)</label>
+          <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Çuval Marka Listesi (her satıra bir marka yazın)</label>
           <textarea value={form.marka_listesi} onChange={(e) => update("marka_listesi", e.target.value)} rows={3} className="w-full px-3 py-2 border rounded-lg text-sm resize-y text-white" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} placeholder="DIVA BRAND&#10;MILA BRAND" />
+          <p className="text-[11px] mt-1" style={{ color: TEXT_MUTED }}>Tek marka yazılırsa kaydederken bu dosyanın tüm konteynerlerine otomatik uygulanır. Birden fazla markada konteyner tablosunda her konteyner için seçilir.</p>
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: TEXT_MUTED }}>Beyanname No</label>

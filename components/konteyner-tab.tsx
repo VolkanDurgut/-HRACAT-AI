@@ -19,6 +19,7 @@ import { ElleTartimPenceresi } from "@/components/elle-tartim-penceresi";
 import { elleTartimMi, type ElleTartimFormu } from "@/lib/elle-tartim";
 import { KonteynerIcerikHucresi } from "@/components/konteyner-icerik";
 import { urunSecenekleri } from "@/lib/konteyner-icerik";
+import { markaListedeYok } from "@/lib/konteyner-marka";
 
 type TabKey = "proforma" | "evraklar" | "rezervasyon" | "konteynerler";
 
@@ -287,7 +288,7 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
                       </td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.tip}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>
-                        <MarkaHucresi konteynerId={k.id} deger={(k as any).marka} secenekler={markaListesi} companyId={companyId} onKaydedildi={onRefresh} />
+                        <MarkaHucresi konteynerId={k.id} deger={(k as any).marka} secenekler={markaListesi} companyId={companyId} onKaydedildi={onRefresh} listedeYok={markaListedeYok((k as any).marka, markaListesiManuelSatir)} />
                         <div><KonteynerIcerikHucresi konteyner={k} urunler={urunSecenekleri(dosya.urun_detaylari)} markalar={markaListesi} companyId={companyId} onKaydedildi={onRefresh} /></div>
                       </td>
                       <td className="px-4 py-3 text-sm" style={{ color: TEXT_MUTED }}>{k.plaka || <span style={{ color: "#4A5262" }}>-</span>}</td>
@@ -572,8 +573,10 @@ const KonteynerTab = forwardRef<KonteynerTabHandle, Props>(function KonteynerTab
 export default KonteynerTab;
 // Konteyner bazinda cuval markasi hucresi.
 // Marka listesi doluysa acilir liste, bossa serbest metin olarak calisir.
-function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi }: {
+function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi, listedeYok = false }: {
   konteynerId: string; deger: string | null; secenekler: string[]; companyId: string; onKaydedildi: () => void;
+  /** 18.11.2026: markasi Ek Bilgiler'deki cuval listesinde olmayan konteyner (eski / urun adindan dusulmus marka). */
+  listedeYok?: boolean;
 }) {
   const [duzenle, setDuzenle] = React.useState(false);
   const [taslak, setTaslak] = React.useState(deger || "");
@@ -608,8 +611,10 @@ function MarkaHucresi({ konteynerId, deger, secenekler, companyId, onKaydedildi 
 
   if (!duzenle) {
     return (
-      <span className="cursor-pointer hover:text-emerald-400 text-sm" onClick={() => { setTaslak(deger || ""); setDuzenle(true); }} title="Düzenlemek için tıklayın">
+      <span className={`cursor-pointer hover:text-emerald-400 text-sm ${listedeYok ? "text-amber-400" : ""}`} onClick={() => { setTaslak(deger || ""); setDuzenle(true); }}
+        title={listedeYok ? "Bu marka Ek Bilgiler'deki çuval marka listesinde yok. Düzeltmek için tıklayın." : "Düzenlemek için tıklayın"} data-listede-yok={listedeYok || undefined}>
         {deger || <span className="text-amber-400 font-medium">+ Ekle</span>}
+        {listedeYok && <AlertTriangle size={11} className="inline ml-1 -mt-0.5" aria-label="Listede yok" />}
       </span>
     );
   }

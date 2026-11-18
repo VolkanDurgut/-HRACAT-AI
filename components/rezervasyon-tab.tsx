@@ -10,6 +10,7 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { kalemMiktari, sayiOku } from "@/lib/sayi-oku";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
 import { oransalYenidenYazilabilirMi } from "@/lib/siparis-takip";
+import { detayliAmbalajiOlcekle } from "@/lib/siparis-devam";
 import { varisLimaniSorunu, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 import { RezervasyonOnerisi } from "@/components/rezervasyon-onerisi";
 
@@ -160,7 +161,7 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
   if (!companyId) return TAMAM;
   const { data: dosya } = await supabase
     .from("ihracat_dosyalari")
-    .select("ana_siparis_id, urun_detaylari")
+    .select("ana_siparis_id, urun_detaylari, detayli_ambalaj")
     .eq("id", dosyaId)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -212,10 +213,20 @@ async function syncDevamEdenDosyaTutari(dosyaId: string, companyId: string): Pro
   });
 
   const toplamTutar = urunDetaylari.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
+  const toplamMiktar = urunDetaylari.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
+  // 18.11.2026: miktar ve detayli ambalajdaki kap adedi de ayni partiye gore guncellenir (eskiden
+  // proformanin TOPLAM tonaji / kap adedi kaliyor, elle 2 konteynere gore duzeltiliyordu). Detayli
+  // ambalaj yalniz kalemlerle tutarliysa olceklenir; elle yazilmis farkli metne dokunulmaz.
+  const yeniAmbalaj = detayliAmbalajiOlcekle(dosya.detayli_ambalaj, dosya.urun_detaylari, urunDetaylari);
 
   const { data, error } = await supabase
     .from("ihracat_dosyalari")
-    .update({ urun_detaylari: urunDetaylari, toplam_tutar: toplamTutar })
+    .update({
+      urun_detaylari: urunDetaylari,
+      toplam_tutar: toplamTutar,
+      miktar: String(Math.round(toplamMiktar * 100) / 100),
+      ...(yeniAmbalaj ? { detayli_ambalaj: yeniAmbalaj } : {}),
+    })
     .eq("id", dosyaId)
     .eq("company_id", companyId)
     .select("id");

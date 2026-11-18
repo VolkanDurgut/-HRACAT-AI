@@ -15,7 +15,9 @@ import { Check, Loader2, Package, AlertCircle, FileUp } from "lucide-react";
 import { ProformaAsistanYukleme, ProformaAsistanIlerleme, ProformaOkumaOzeti, AsistanAsamasi } from "@/components/proforma-asistan";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kalemMiktari } from "@/lib/sayi-oku";
-import { siparisIlerlemesiHesapla } from "@/lib/siparis-takip";
+import { siparisIlerlemesiHesapla, type SiparisKalemDurumu } from "@/lib/siparis-takip";
+import { SiparisDevamPenceresi, type DevamOnayi } from "@/components/siparis-devam-penceresi";
+import { beklenenAvans } from "@/lib/on-odeme";
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/lib/varis-limani-kontrol";
 import { guncelDiibNoGetir } from "@/lib/diib/veri";
@@ -67,6 +69,11 @@ export default function YeniDosyaPage() {
   const [mevcutAnaSiparis, setMevcutAnaSiparis] = useState<AnaSiparis | null>(null);
   const [gonderilmisMts, setGonderilmisMts] = useState<number>(0);
   const [yeniSiparisMts, setYeniSiparisMts] = useState<string>("");
+  // 18.11.2026 SEVKIYAT SECIMI: siparis takibi baslatilirken / siparise devam edilirken ilk dosya
+  // proformanin TAMAMIYLA degil, BU sevkiyatin miktariyla acilir (eskiden 375 MTS'lik proformanin
+  // tum tonaj / kap adediyle aciliyor, sonra 2 konteynere gore elle duzeltiliyordu).
+  const [mevcutKalemler, setMevcutKalemler] = useState<SiparisKalemDurumu[] | null>(null);
+  const [sevkiyatPenceresi, setSevkiyatPenceresi] = useState<{ tur: "yeni" | "devam"; kalemler: SiparisKalemDurumu[] } | null>(null);
 
   // 17.11.2026 "Onay geldi" -> dosya ac: Siparis Listesi'nden /yeni-dosya?proforma=<id>. Kayitli proformanin PDF'i
   // (Proforma Olustur'un indirdigiyle ayni, imzali) hazirlanir ve yuklenmis gibi secilir; kullanici "Baslat" ile onaylar
@@ -128,6 +135,8 @@ export default function YeniDosyaPage() {
     setProformData(null);
     setVarisLimaniNotu(null);
     setMevcutAnaSiparis(null);
+    setMevcutKalemler(null);
+    setSevkiyatPenceresi(null);
     setGonderilmisMts(0);
     setYeniSiparisMts("");
     const girdi = document.getElementById("pdf-input") as HTMLInputElement | null;
@@ -197,9 +206,9 @@ export default function YeniDosyaPage() {
           // AYNI hesap (marka/kalem bazli, etiketli kalemler dahil:
           // lib/siparis-takip.ts). Okunamazsa 0 gosterilir.
           const veri = await siparisTakipVerisiGetir(companyId!, [existingAnaSiparis]);
-          const toplamGonderilmis = veri
-            ? siparisIlerlemesiHesapla(existingAnaSiparis, veri.dosyalar, veri.konteynerler).toplamSevkMts
-            : 0;
+          const ilerleme = veri ? siparisIlerlemesiHesapla(existingAnaSiparis, veri.dosyalar, veri.konteynerler) : null;
+          const toplamGonderilmis = ilerleme ? ilerleme.toplamSevkMts : 0;
+          setMevcutKalemler(ilerleme ? ilerleme.kalemler : null);
 
           setMevcutAnaSiparis(existingAnaSiparis);
           setGonderilmisMts(toplamGonderilmis);
@@ -272,10 +281,24 @@ export default function YeniDosyaPage() {
     return duzeltilmis;
   };
 
-  const createDosya = async (extracted: any, anaSiparisId: string | null) => {
+  const createDosya = async (extracted: any, anaSiparisId: string | null, sevkiyat: DevamOnayi | null = null) => {
     if (!user) return;
     setLoading(true);
     try {
+      // 18.11.2026: siparis takibinde dosya SECILEN SEVKIYATLA acilir (urun kalemleri, tutar, miktar,
+      // detayli ambalaj, marka). Avans proformadakinin bu sevkiyata dusen payi (tutar orani); proformaya
+      // on odeme girildiyse veritabani (on_odeme_dagitim) havuzdan yine duzeltir. Tek seferlik dosya: aynen.
+      const sevk = sevkiyat && sevkiyat.kalemler.length > 0 ? sevkiyat : null;
+      const sevkTutar = sevk ? Math.round(sevk.kalemler.reduce((t, u) => t + parseFloat(u.toplam_tutar_usd), 0) * 100) / 100 : null;
+      const sevkMts = sevk ? Math.round(sevk.kalemler.reduce((t, u) => t + parseFloat(u.miktar_mts), 0) * 100) / 100 : null;
+      const proformaTutar = parseFloat(String(extracted.toplam_tutar ?? "")) || 0;
+      const proformaAvans = parseFloat(String(extracted.avans_tutari ?? "")) || 0;
+      const sevkAvans = sevk && sevkTutar !== null
+        ? (proformaAvans > 0 && proformaTutar > 0 ? Math.round(proformaAvans * Math.min(1, sevkTutar / proformaTutar) * 100) / 100 : beklenenAvans(sevkTutar, extracted.odeme_sekli))
+        : null;
+      const hamVeri = sevk
+        ? { ...extracted, avans_tutari: sevkAvans, ilk_sevkiyat: { proforma_mts: getProformaMts(extracted), proforma_tutar: proformaTutar || null, proforma_avans: proformaAvans || null, sevkiyat_mts: sevkMts } }
+        : extracted;
       // 05.11.2026: DIIB No, DIIB Takibi'ndeki GUNCEL DIIB'den (kalanı olan ilk aktif DIIB; faturasi
       // kesilmemis yuklemelerin payi dusulmus). Ayarlar > Ihracat Ayarlari'ndaki sabit deger kaldirildi.
       // Okunamazsa bos; dosya yine acilir, Ek Bilgiler'den girilir.
@@ -291,18 +314,18 @@ export default function YeniDosyaPage() {
           proforma_tarihi: extracted.proforma_tarihi,
           gecerlilik_tarihi: extracted.gecerlilik_tarihi,
           lot_no: extracted.lot_no || extracted.proforma_no,
-          marka: extracted.marka || null,
-          toplam_tutar: extracted.toplam_tutar,
+          marka: (sevk ? sevk.marka : "") || extracted.marka || null,
+          toplam_tutar: sevk ? sevkTutar : extracted.toplam_tutar,
           para_birimi: extracted.para_birimi || "USD",
           odeme_sekli: extracted.odeme_sekli,
           yuklenme_limani: extracted.yuklenme_limani || extracted.yukleme_limani,
           varis_limani: extracted.varis_limani,
           teslim_sekli: extracted.teslim_sekli,
-          miktar: String(extracted.toplam_miktar || extracted.miktar || ""),
+          miktar: sevk ? String(sevkMts) : String(extracted.toplam_miktar || extracted.miktar || ""),
           miktar_birimi: extracted.miktar_birimi || "MTS",
           ambalaj: extracted.ambalaj,
           alici_adresi: extracted.alici_adresi || null,
-          detayli_ambalaj: extracted.detayli_ambalaj || null,
+          detayli_ambalaj: (sevk ? sevk.detayliAmbalaj : "") || extracted.detayli_ambalaj || null,
           hesap_adi: extracted.hesap_adi || null,
           banka: extracted.banka || null,
           swift: extracted.swift || null,
@@ -310,8 +333,8 @@ export default function YeniDosyaPage() {
           iban: extracted.iban || null,
           // DIIB Takibi'ndeki guncel DIIB (05.11.2026); Ek Bilgiler'den degistirilebilir.
           diib_no: guncelDiibNo,
-          ham_veri: extracted as unknown as Record<string, unknown>,
-          urun_detaylari: extracted.urun_detaylari || [],
+          ham_veri: hamVeri as unknown as Record<string, unknown>,
+          urun_detaylari: sevk ? sevk.kalemler : extracted.urun_detaylari || [],
           sevkiyat_evraklari: extracted.sevkiyat_evraklari?.length ? extracted.sevkiyat_evraklari : SEVKIYAT_EVRAKLARI,
           durum: "Açık",
           created_by: user.id,
@@ -363,8 +386,10 @@ export default function YeniDosyaPage() {
         showToast("Dosya oluşturuldu ancak proforma PDF'i arşive kaydedilemedi.", "error");
       }
 
+      setSevkiyatPenceresi(null);
       setStep("success");
       showToast("Dosya oluşturuldu!", "success");
+      if (!guncelDiibNo) showToast("Güncel DİİB numarası okunamadı; dosyada Ek Bilgiler'den girin.", "error");
       if (varisLimaniNotuRef.current) showToast(varisLimaniNotuRef.current, "error");
       setTimeout(() => setStep("reservation_choice"), 1500);
     } catch {
@@ -376,12 +401,33 @@ export default function YeniDosyaPage() {
     }
   };
 
-  const handleDevamEt = async () => {
+  const handleDevamEt = async (sevkiyat: DevamOnayi | null = null) => {
     if (!mevcutAnaSiparis || !proformData) return;
-    await createDosya(proformData, mevcutAnaSiparis.id);
+    await createDosya(proformData, mevcutAnaSiparis.id, sevkiyat);
   };
 
-  const handleYeniAnaSiparisOlustur = async () => {
+  /** Yeni siparisin (henuz kaydedilmemis) kalemleri: proformanin tamami dosyalanmamis. */
+  const yeniSiparisKalemleri = (): SiparisKalemDurumu[] => {
+    if (!proformData) return [];
+    const toplamMts = parseFloat(yeniSiparisMts) || getProformaMts(proformData);
+    return siparisIlerlemesiHesapla(
+      { id: "yeni-siparis", proforma_no: proformData.proforma_no, urun_tanimi: null, toplam_mts: toplamMts, urun_detaylari_master: proformData.urun_detaylari || [] },
+      [], []
+    ).kalemler;
+  };
+
+  /** "Siparis Takibini Baslat" / "Evet, Siparisin Devami": once sevkiyat secimi (kalem yoksa eski akis). */
+  const sevkiyatSecimiAc = (tur: "yeni" | "devam") => {
+    const kalemler = tur === "yeni" ? yeniSiparisKalemleri() : mevcutKalemler || [];
+    if (kalemler.length === 0 || kalemler.every((k) => k.siparisMts <= 0)) {
+      if (tur === "yeni") handleYeniAnaSiparisOlustur();
+      else handleDevamEt();
+      return;
+    }
+    setSevkiyatPenceresi({ tur, kalemler });
+  };
+
+  const handleYeniAnaSiparisOlustur = async (sevkiyat: DevamOnayi | null = null) => {
     if (!proformData || !user) return;
     const toplamMts = parseFloat(yeniSiparisMts) || getProformaMts(proformData);
     setLoading(true);
@@ -402,7 +448,7 @@ export default function YeniDosyaPage() {
         .single();
 
       if (anaSiparisError) throw anaSiparisError;
-      await createDosya(proformData, yeniAnaSiparis.id);
+      await createDosya(proformData, yeniAnaSiparis.id, sevkiyat);
     } catch {
       showToast("Ana sipariş oluşturulurken hata oluştu.", "error");
       setLoading(false);
@@ -442,6 +488,20 @@ export default function YeniDosyaPage() {
             onSec={handleFileSelect}
             onTemizle={() => { setPdfFile(null); setError(null); setKayitliNot(null); const i = document.getElementById("pdf-input") as HTMLInputElement | null; if (i) i.value = ""; }}
             onBaslat={handleUpload}
+          />
+        )}
+
+        {step === "ana_siparis_check" && proformData && sevkiyatPenceresi && (
+          <SiparisDevamPenceresi
+            proformaNo={proformData.proforma_no || ""}
+            aliciFirma={proformData.alici_firma || null}
+            paraBirimi={proformData.para_birimi || "USD"}
+            kalemler={sevkiyatPenceresi.kalemler}
+            ornekDetayliAmbalaj={proformData.detayli_ambalaj || null}
+            ornekMarka={proformData.marka || null}
+            olusturuluyor={loading}
+            onKapat={() => { if (!loading) setSevkiyatPenceresi(null); }}
+            onOnayla={(onay) => (sevkiyatPenceresi.tur === "yeni" ? handleYeniAnaSiparisOlustur(onay) : handleDevamEt(onay))}
           />
         )}
 
@@ -490,7 +550,7 @@ export default function YeniDosyaPage() {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={handleDevamEt}
+                    onClick={() => sevkiyatSecimiAc("devam")}
                     disabled={loading}
                     className="flex-1 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                     style={{ backgroundColor: ACCENT }}
@@ -538,7 +598,7 @@ export default function YeniDosyaPage() {
 
                 <div className="flex gap-3">
                   <button
-                    onClick={handleYeniAnaSiparisOlustur}
+                    onClick={() => sevkiyatSecimiAc("yeni")}
                     disabled={loading}
                     className="flex-1 py-2.5 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
                     style={{ backgroundColor: ACCENT }}

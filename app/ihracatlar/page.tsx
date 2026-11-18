@@ -1,6 +1,8 @@
 "use client";
 
 import { beklenenAvans } from "@/lib/on-odeme";
+import { guncelDiibNoGetir } from "@/lib/diib/veri";
+import { sevkiyatBankasi } from "@/lib/proforma-banka";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
@@ -219,6 +221,11 @@ export default function IhracatlarPage() {
     try {
       const toplamTutar = onay.kalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
       const toplamMiktar = onay.kalemler.reduce((s, u) => s + parseFloat(u.miktar_mts), 0);
+      // 18.11.2026: DIIB No, Proforma Yukle'deki gibi DIIB Takibi'ndeki GUNCEL DIIB'den (eskiden bu
+      // yolda hic atanmiyor, 0116 / 0123'te elle giriliyordu). Banka PROFORMADAN (ilk dosyanin kolonu
+      // elle degistirilmis olabilir; 0107 -> 0123): lib/proforma-banka.ts.
+      const guncelDiibNo = await guncelDiibNoGetir(companyId);
+      const banka = sevkiyatBankasi(ornekDosya);
       const { data: yeniDosya, error: dbError } = await supabase
         .from("ihracat_dosyalari")
         .insert({
@@ -248,11 +255,8 @@ export default function IhracatlarPage() {
           alici_adresi: ornekDosya?.alici_adresi || null,
           consignee: ornekDosya?.consignee || null,
           detayli_ambalaj: onay.detayliAmbalaj || null,
-          hesap_adi: ornekDosya?.hesap_adi || null,
-          banka: ornekDosya?.banka || null,
-          swift: ornekDosya?.swift || null,
-          hesap_numarasi: ornekDosya?.hesap_numarasi || null,
-          iban: ornekDosya?.iban || null,
+          ...banka,
+          diib_no: guncelDiibNo,
           urun_detaylari: onay.kalemler.length > 0 ? onay.kalemler : null,
           toplam_tutar: onay.kalemler.length > 0 ? toplamTutar : null,
           miktar: onay.kalemler.length > 0 ? String(Math.round(toplamMiktar * 100) / 100) : null,
@@ -268,6 +272,7 @@ export default function IhracatlarPage() {
       if (dbError) throw dbError;
 
       showToast("Yeni sevkiyat dosyası oluşturuldu. Rezervasyon bilgilerini girin.", "success");
+      if (!guncelDiibNo) showToast("Güncel DİİB numarası okunamadı; dosyada Ek Bilgiler'den girin.", "error");
       gecisliGit(`/dosya/${yeniDosya.id}?tab=rezervasyon&action=new`);
     } catch {
       showToast("Dosya oluşturulurken hata oluştu.", "error");

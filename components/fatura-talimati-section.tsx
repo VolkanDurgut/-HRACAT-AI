@@ -8,6 +8,7 @@ import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { indirFaturaTalimatiPdf } from "@/lib/fatura-talimati-pdf-builder";
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
+import { bankaFarki } from "@/lib/proforma-banka";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi, konteynerAdetYazi } from "@/lib/urun-konteyner-dagilimi";
 import { navlunAliciyaAitMi } from "@/lib/teslim-sekli";
@@ -315,6 +316,15 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
                 DİİB fatura bölünmesi ({bolunme.reduce((t, p) => t + p.kg, 0).toLocaleString("tr-TR")} kg) ürün miktarıyla ({urunToplamKg(dosya.urun_detaylari).toLocaleString("tr-TR")} kg) aynı değil; bölünme talimata YAZILMADI. Önce Proforma sekmesinde ürün miktarını yüklenen miktara göre düzeltin.
               </p>
             )}
+            {(() => {
+              // 18.11.2026: talimata yazilacak banka proformadakinden farkliysa gonderimden once uyar
+              const fark = bankaFarki(faturaTalimatiBankasi(dosya), dosya.ham_veri);
+              return fark ? (
+                <p className="text-xs rounded-lg border px-3 py-2 text-amber-300" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }} data-testid="talimat-banka-farki">
+                  Aracı banka ({faturaTalimatiBankasi(dosya) || "boş"}) proformadaki bankadan ({fark.banka}) farklı. Göndermeden önce Proforma sekmesindeki Banka Bilgileri kartından kontrol edin.
+                </p>
+              ) : null;
+            })()}
             {on && (
               <p className="text-xs rounded-lg border px-3 py-2 text-amber-300" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }} data-testid="on-talimat-notu">
                 Ön talimat: rezervasyon / konteyner bilgileri olmadan hazırlandı. Gönderildi olarak işaretlenmez; konteynerler girilince tam talimatı ayrıca gönderin.

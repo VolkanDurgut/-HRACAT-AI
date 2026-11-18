@@ -15,7 +15,8 @@
  * Saf fonksiyonlar - veritabanina / React'e erismez (tsx ile test edilir).
  */
 import { MTS_PER_KONTEYNER } from "@/lib/supabase/constants";
-import { cuvalAdedi, type SiparisKalemDurumu } from "@/lib/siparis-takip";
+import { ambalajKg, cuvalAdedi, type SiparisKalemDurumu } from "@/lib/siparis-takip";
+import { kalemMiktari } from "@/lib/sayi-oku";
 
 const ESIK = 0.01;
 
@@ -209,4 +210,53 @@ export function kapUyumsuzlugu(
   if (konteynerler.some((k) => !k.pieces || k.pieces <= 0)) return null;
   const konteynerToplami = konteynerler.reduce((t, k) => t + (k.pieces || 0), 0);
   return metinToplami === konteynerToplami ? null : { metinToplami, konteynerToplami };
+}
+
+// ---------------------------------------------------------------- rezervasyonla olcekleme (18.11.2026)
+const KAP_DESENI = /(\d[\d.,]*)(\s*(?:PIECES|PCS|BAGS?|ADET)\b)/gi;
+
+/**
+ * Dosya kalemlerinin cuval toplami (her kalem: MTS x 1000 / ambalaj kg). Ambalaj kg'i
+ * okunamayan kalem varsa null.
+ */
+export function kalemlerinCuvalToplami(kalemler: unknown): number | null {
+  const liste = Array.isArray(kalemler) ? (kalemler as Record<string, unknown>[]) : [];
+  if (liste.length === 0) return null;
+  let toplam = 0;
+  for (const u of liste) {
+    const kg = ambalajKg(String(u.ambalaj_boyutu || u.packaging_size || ""));
+    const adet = cuvalAdedi(kalemMiktari(u as { miktar_mts?: unknown; quantity?: unknown }), kg);
+    if (adet === null) return null;
+    toplam += adet;
+  }
+  return toplam;
+}
+
+/**
+ * Rezervasyon kaydinda kalemler oransal olceklenince detayli ambalaj da ayni oranla
+ * olceklenir ("15.000 PIECES ..." -> "2.000 PIECES ..."). SADECE metindeki kap toplami
+ * mevcut kalemlerin cuval toplamina esitse (metin otomatik/tutarli haldeyse); elle
+ * yazilmis farkli bir metne dokunulmaz (null doner).
+ */
+export function detayliAmbalajiOlcekle(metin: string | null | undefined, eskiKalemler: unknown, yeniKalemler: unknown): string | null {
+  const kapToplami = detayliAmbalajKapToplami(metin);
+  const eski = kalemlerinCuvalToplami(eskiKalemler);
+  const yeni = kalemlerinCuvalToplami(yeniKalemler);
+  if (kapToplami === null || eski === null || yeni === null || eski <= 0 || kapToplami !== eski) return null;
+  if (yeni === eski) return null;
+  const oran = yeni / eski;
+  const segmentSayisi = Array.from(String(metin).matchAll(KAP_DESENI)).length;
+  let kalan = yeni;
+  let sira = 0;
+  let gecersiz = false;
+  const sonuc = String(metin).replace(KAP_DESENI, (_t, sayi: string, ek: string) => {
+    sira += 1;
+    const n = parseInt(sayi.replace(/[.,]/g, ""), 10);
+    // Son segment yuvarlama farkini kapatir: toplam her zaman yeni cuval toplamina esit
+    const adet = sira === segmentSayisi ? kalan : Math.round(n * oran);
+    if (adet < 0) gecersiz = true;
+    kalan -= adet;
+    return `${adet.toLocaleString("tr-TR")}${ek}`;
+  });
+  return gecersiz || kalan !== 0 ? null : sonuc;
 }

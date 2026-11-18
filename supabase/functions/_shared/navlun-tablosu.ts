@@ -303,6 +303,55 @@ export function guncelEnIyiler(t: NavlunTablosu, gun = 60): GuncelEnIyi[] {
   return out.sort((a, b) => a.liman.localeCompare(b.liman, "tr"));
 }
 
+/** Siparis / plan yazimindan navlun liman anahtari (es sozlugu + sabit esler; esleriYukle sonrasi). 18.11.2026 */
+export function limanAnahtariBul(liman: string | null | undefined): string | null {
+  return limanKey(liman ?? null);
+}
+
+/**
+ * Limandaki EN YENI teklifler (18.11.2026, siparis raporu: "rezervasyon bekleyen siparislerle ilgili en yeni navlun fiyatlari").
+ * Her acente / hat blogunun son 20'DC USD teklifi; son `gun` gunde teklif varsa yalniz onlar, yoksa en son teklif (eski = true).
+ * En yeni ustte, en fazla `adet`. Karsilastirma (lokal dahil) Navlun sayfasiyla ayni hesap; en iyi = lokali kesin olanlar
+ * arasinda en dusuk karsilastirma tutari.
+ */
+export type LimanTeklifi = {
+  blok: string; navlun: number; tarih: string; freeTime: number | null; transit: string | null;
+  toplam: number; kesin: boolean; metin: string; enIyi: boolean;
+};
+export function limanSonTeklifleri(t: NavlunTablosu, anahtar: string, gun = 60, adet = 5): { teklifler: LimanTeklifi[]; eski: boolean } {
+  const sinir = new Date(Date.parse(`${t.tarih}T12:00:00Z`) - gun * 86400000).toISOString().slice(0, 10);
+  const sonlar: { b: NavlunBlogu; h: NavlunHucresi }[] = [];
+  for (const b of t.bloklar) {
+    const h = (b.teklifler.get(anahtar) || []).filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD")
+      .sort((x, y) => y.tarih.localeCompare(x.tarih))[0];
+    if (h) sonlar.push({ b, h });
+  }
+  // Ayni acentenin ayni tutari farkli bloklarda (hat yazili / yazisiz: "ACENTE" + "ACENTE - HAT") tek satir:
+  // tarih en yeni kayittan, blok (hat adi, FT, transit) bilgisi daha dolu olandan
+  sonlar.sort((x, y) => y.h.tarih.localeCompare(x.h.tarih));
+  const acenteAd = (x: { b: NavlunBlogu; h: NavlunHucresi }) => (x.h.acente || x.b.ad).trim().toLocaleUpperCase("tr-TR");
+  const tekil: { b: NavlunBlogu; h: NavlunHucresi }[] = [];
+  for (const x of sonlar) {
+    const y = tekil.find((z) => z.h.tutar === x.h.tutar && acenteAd(z) === acenteAd(x));
+    if (!y) { tekil.push({ ...x }); continue; }
+    if (x.b.ad.length > y.b.ad.length) y.b = x.b;
+  }
+  const guncel = tekil.filter((x) => x.h.tarih.slice(0, 10) >= sinir);
+  const havuz = (guncel.length ? guncel : tekil.slice(0, 1))
+    .map((x) => ({ ...x, k: hucreKarsilastir(x.h, anahtar, t.baglam) }));
+  const { enIyi } = enIyiSec(havuz, (x) => x.k);
+  const teklifler = havuz.sort((x, y) => y.h.tarih.localeCompare(x.h.tarih) || x.k.toplam - y.k.toplam).slice(0, adet).map((x) => ({
+    blok: x.b.ad, navlun: x.h.tutar, tarih: x.h.tarih, freeTime: x.b.freeTime.get(anahtar) ?? null, transit: x.b.transit.get(anahtar) ?? null,
+    toplam: x.k.toplam, kesin: x.k.kesin, metin: x.k.metin, enIyi: x === enIyi,
+  }));
+  // En iyi, "adet" sinirina takilip duserse sona eklenir (rapor en iyi teklifi hic kaybetmez)
+  if (enIyi && !teklifler.some((x) => x.enIyi)) {
+    teklifler.push({ blok: enIyi.b.ad, navlun: enIyi.h.tutar, tarih: enIyi.h.tarih, freeTime: enIyi.b.freeTime.get(anahtar) ?? null,
+      transit: enIyi.b.transit.get(anahtar) ?? null, toplam: enIyi.k.toplam, kesin: true, metin: enIyi.k.metin, enIyi: true });
+  }
+  return { teklifler, eski: !guncel.length && tekil.length > 0 };
+}
+
 /** Belirli andan sonra gelen teklifler (en yeni ustte) - raporun "son rapordan beri gelenler" bolumu. */
 export type SonTeklif = { liman: string; blok: string; tutar: number; para: string; ekipman: string; tarih: string; freeTime: number | null; transit: string | null };
 export function sonTeklifler(t: NavlunTablosu, sonraIso: string, adet = 30): SonTeklif[] {

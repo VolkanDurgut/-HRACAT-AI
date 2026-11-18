@@ -3,7 +3,8 @@ import JSZip from "npm:jszip@3.10.1";
 import { planNormalize, siparisNormalize, type PlanSatiri, type SiparisSatiri } from "../_shared/siparis-liste.ts";
 import { planSayfasi, siparisSayfasi } from "../_shared/siparis-xlsx.ts";
 import { xlsxParcalari } from "../_shared/xlsx-yaz.ts";
-import { siparisRaporHesapla, siparisRaporHtml, siparisRaporKonusu } from "../_shared/siparis-rapor.ts";
+import { bekleyenNavlunlari, siparisRaporHesapla, siparisRaporHtml, siparisRaporKonusu, type BekleyenNavlunu } from "../_shared/siparis-rapor.ts";
+import { navlunTablosuOku } from "../_shared/navlun-veri.ts";
 import { oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
 
@@ -16,7 +17,8 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar
 //   (SIPARIS_RAPOR_CANLI = "evet" + SIPARIS_RAPOR_ALICI). Canli DEGILSE mail SADECE test adresine
 //   (SIPARIS_RAPOR_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
-// MAIL (11.11.2026 2. revize): "Bugun gelen on odemeler" (sabah: dun + bugun) tablosu; tum satirlar ekteki Excel'de.
+// MAIL (18.11.2026): ust = on odemesi alinmis / rezervasyonu alinmamis siparisler; alt = bu siparislerin limanlari icin en yeni
+//   navlun fiyatlari (navlun tablosu _shared/navlun-veri.ts ile okunur; okunamazsa rapor yine gider, alt bolumde not). Tum satirlar ekteki Excel'de.
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
 //  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
 //    (siparis_rapor_gonderimleri kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
@@ -154,9 +156,16 @@ Deno.serve(async (req: Request) => {
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const { siparisler, plan } = await sirketVerisi(companyId);
       const rapor = siparisRaporHesapla(siparisler, plan, tarih, oturum);
-      const ozet = { ...rapor.ozet };
+      // 18.11.2026: alt bolum - rezervasyon bekleyen siparislerin limanlarinda en yeni navlunlar (hata raporu durdurmaz)
+      let navlunlar: BekleyenNavlunu[] | null = null;
+      try {
+        navlunlar = bekleyenNavlunlari(rapor, await navlunTablosuOku(hepsiniCek, rpcHepsi, companyId, tarih));
+      } catch (e) {
+        console.error("siparis-rapor: navlun tablosu okunamadi:", e instanceof Error ? e.message : e);
+      }
+      const ozet = { ...rapor.ozet, navlunLiman: navlunlar ? navlunlar.length : null };
       const konu = `${test ? "[TEST] " : ""}${siparisRaporKonusu(rapor, sirketAdi)}`;
-      const html = siparisRaporHtml(rapor, sirketAdi, new Date().toISOString());
+      const html = siparisRaporHtml(rapor, sirketAdi, new Date().toISOString(), navlunlar);
       const alicilar = test ? TEST_ALICISI : ayar.alicilar;
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok (Ayarlar > Rapor Alıcıları)." }); continue; }

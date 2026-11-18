@@ -81,7 +81,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
   return (
     <section className="rounded-xl border overflow-hidden mb-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="navlun-haritasi">
       <div className="flex flex-col lg:flex-row">
-        <div ref={kutuRef} className="relative w-full lg:flex-1 lg:min-w-0 h-[340px] sm:h-[440px] lg:h-[520px] overflow-hidden"
+        <div ref={kutuRef} className="relative w-full lg:flex-1 lg:min-w-0 h-[420px] sm:h-[560px] lg:h-[680px] overflow-hidden"
           style={{ background: "radial-gradient(120% 90% at 50% 40%, rgba(16,185,129,0.07), rgba(0,0,0,0) 70%)" }} onMouseLeave={() => setUzerinde(null)}>
           {boyut.w > 0 && (
             <svg className="absolute inset-0 w-full h-full" viewBox={`${kirpma.x} ${kirpma.y} ${kirpma.g} ${kirpma.y2}`} preserveAspectRatio="none" role="img" aria-label="Navlun haritası: Ambarlı ve Asyaport'tan teklif alınan limanlara deniz rotaları">
@@ -147,6 +147,12 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
             </p>
             <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{noktalar.length} liman · Ambarlı / Asyaport çıkışlı · rotalar yaklaşık</p>
           </div>
+          {/* 18.11.2026: konumu olmayan liman gozden kacmasin (once lejantta 10px gri yaziydi) */}
+          {konumsuz.length > 0 && (
+            <div className="absolute right-3 top-3 z-10 max-w-[60%] rounded-lg border px-3 py-1.5 text-[11px] font-medium" style={{ backgroundColor: "rgba(245,158,11,0.12)", borderColor: "rgba(245,158,11,0.45)", color: "#FCD34D" }} data-konumsuz="">
+              Haritada konumu yok ({konumsuz.length}): {konumsuz.map((n) => n.ad).join(", ")} — listeden açılabilir
+            </div>
+          )}
           {ipucu && (
             <div className="absolute left-3 top-14 z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[180px]" style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }} data-navlun-ipucu="">
               <p className="text-xs font-semibold text-white">{ipucu.ad}</p>
@@ -160,12 +166,11 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
             {(Object.keys(DURUM_RENGI) as NoktaDurumu[]).map((d) => (
               <span key={d} className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: DURUM_RENGI[d] }} />{DURUM_ADI[d]}</span>
             ))}
-            {konumsuz.length > 0 && <span data-konumsuz="">Haritada konumu yok: {konumsuz.map((n) => n.ad).join(", ")}</span>}
           </div>
         </div>
 
         {/* Sag: liman listesi + arama */}
-        <aside className="lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l flex flex-col max-h-[320px] lg:max-h-none lg:h-[520px]" style={{ borderColor: CARD_BORDER }} data-testid="navlun-liman-listesi">
+        <aside className="lg:w-72 shrink-0 border-t lg:border-t-0 lg:border-l flex flex-col max-h-[360px] lg:max-h-none lg:h-[680px]" style={{ borderColor: CARD_BORDER }} data-testid="navlun-liman-listesi">
           <div className="p-3 border-b" style={{ borderColor: CARD_BORDER }}>
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: TEXT_MUTED }} />

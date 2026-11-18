@@ -41,6 +41,9 @@ export function sadelestir(metin: string): string {
 export function limanAnahtari(ham: string | null | undefined): string | null {
   if (!ham || !ham.trim()) return null;
   let s = sadelestir(ham.trim());
+  // 18.11.2026: "PORT OF SPAIN" adin kendisi; "PORT" / "OF" atilinca "SPAIN" kaliyordu (SQL siparis_liman_anahtar ile ayni sonuc)
+  const portOf = s.split(",")[0].replace(/\s*\(.*$/, "").trim().replace(/\s+/g, " ");
+  if (/^PORT OF \S/.test(portOf)) return portOf;
   if (s.includes(",")) {
     s = s.split(",")[0];
   } else {

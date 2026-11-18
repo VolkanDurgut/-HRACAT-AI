@@ -79,3 +79,12 @@ test("rapor: ust bolum basligi aynen, ayni firmanin kisa / uzun yazimi tek satir
   // Navlun okunamadiysa rapor yine olusur, alt bolumde not
   assert.ok(siparisRaporHtml(r, "Ornek", "2026-11-18T14:00:00Z", null).includes("Navlun fiyatları bu raporda okunamadı"));
 });
+
+test("liman anahtari: 'PORT OF' adin parcasi; diger kurallar degismez", async () => {
+  const { limanAnahtari } = await yukle("liman-anahtari");
+  assert.equal(limanAnahtari("PORT OF ORNEK"), "PORT OF ORNEK");
+  assert.equal(limanAnahtari("Port of Ornek, Ornekulke"), "PORT OF ORNEK");
+  assert.equal(limanAnahtari("PORT OF ORNEK (ORNEKULKE)"), "PORT OF ORNEK");
+  assert.equal(limanAnahtari("Ornekport Port, Ornekulke"), "ORNEKPORT");
+  assert.equal(limanAnahtari("ORNEKPORT PORT ORNEKULKE"), "ORNEKPORT");
+});

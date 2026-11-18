@@ -69,7 +69,7 @@ export const LIMAN_KOORDINAT: Record<string, [number, number]> = {
   SYDNEY: [-33.86, 151.2], MELBOURNE: [-37.84, 144.92], AUCKLAND: [-36.84, 174.77],
   // Dogu / Guney Afrika
   TANGA: [-5.07, 39.1], ZANZIBAR: [-6.16, 39.19], NACALA: [-14.54, 40.67], BEIRA: [-19.83, 34.84],
-  MAHAJANGA: [-15.72, 46.31], VICTORIA: [-4.62, 55.45], KISMAYO: [-0.36, 42.55], BOSASO: [11.28, 49.18],
+  MAHAJANGA: [-15.72, 46.31], ANTSIRANANA: [-12.27, 49.29], VICTORIA: [-4.62, 55.45], KISMAYO: [-0.36, 42.55], BOSASO: [11.28, 49.18],
   "RICHARDS BAY": [-28.8, 32.04], "CAPE TOWN": [-33.91, 18.43], "PORT ELIZABETH": [-33.96, 25.63],
   "WALVIS BAY": [-22.95, 14.5], LOBITO: [-12.35, 13.55], MATADI: [-5.82, 13.45],
   // Bati Afrika
@@ -83,7 +83,7 @@ export const LIMAN_KOORDINAT: Record<string, [number, number]> = {
   "SANTO TOMAS DE CASTILLA": [15.7, -88.62], "PUERTO QUETZAL": [13.92, -90.78], CORINTO: [12.48, -87.18],
   ACAJUTLA: [13.57, -89.83], CARTAGENA: [10.39, -75.53], BARRANQUILLA: [11.0, -74.8], BUENAVENTURA: [3.89, -77.08],
   "LA GUAIRA": [10.6, -66.93], "PUERTO CABELLO": [10.48, -68.01], GUAYAQUIL: [-2.28, -79.91], CALLAO: [-12.05, -77.15],
-  "SAN ANTONIO": [-33.59, -71.62], VALPARAISO: [-33.03, -71.63], SANTOS: [-23.97, -46.3], PARANAGUA: [-25.5, -48.52],
+  "SAN ANTONIO": [-33.59, -71.62], IQUIQUE: [-20.21, -70.15], "PORT OF SPAIN": [10.65, -61.52], VALPARAISO: [-33.03, -71.63], SANTOS: [-23.97, -46.3], PARANAGUA: [-25.5, -48.52],
   PARAMARIBO: [5.83, -55.15], GEORGETOWN: [6.81, -58.16], // 17.11.2026: yukleme planindaki Surinam sevkiyatlari
   "RIO DE JANEIRO": [-22.89, -43.18], "BUENOS AIRES": [-34.6, -58.37], MONTEVIDEO: [-34.9, -56.21],
   ALTAMIRA: [22.48, -97.86], "LAZARO CARDENAS": [17.94, -102.18], HOUSTON: [29.73, -95.27], "NEW YORK": [40.67, -74.04],
@@ -192,6 +192,8 @@ export const LIMAN_ES_ADLARI: Record<string, string> = {
   BEYRUT: "BEIRUT", BINGAZI: "BENGHAZI", MISRATA: "MISURATA", TRABLUS: "TRIPOLI", ISKENDERIYE: "ALEXANDRIA",
   CEZAYIR: "ALGIERS", KAZABLANKA: "CASABLANCA", CIDDE: "JEDDAH", AKABE: "AQABA", "DAR ES SELAM": "DAR ES SALAAM",
   MALDIVES: "MALE", MALDIVLER: "MALE", TAMATAVE: "TOAMASINA",
+  // 18.11.2026 navlun haritasinda konumu olmayanlar
+  BAHREYN: "BAHRAIN", MAJUNGA: "MAHAJANGA", "DIEGO SUAREZ": "ANTSIRANANA", MOGADISU: "MOGADISHU", "MOGADİŞU": "MOGADISHU",
 };
 
 export function limanKonumu(anahtar: string | null | undefined, ulke?: string | null): LimanKonumu | null {

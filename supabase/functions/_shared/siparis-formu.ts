@@ -52,6 +52,8 @@ export type FormModeli = {
   /** Kullanicinin girmesi gerekenlerden eksik olanlar (cuval gorseli / uretim / SKT). */
   girisEksikleri: string[];
   ekipmanTarihi: string | null;
+  /** Gemi kalkisi (ETD): ekipman gunu gecmis ama gemi kalkmamis yukleme listede kalir. */
+  etd: string | null;
   gonderimGunu: string | null;
   uretimIso: string | null;
   sktIso: string | null;
@@ -246,7 +248,8 @@ export function formModeli(h: FormHam): FormModeli {
     firma: ilk(d.alici_firma, s.firma, p.musteri),
     temsilci: ilk(h.temsilci?.ad_soyad),
     ulke,
-    planlananYukleme: trTarih(ekipmanTarihi),
+    // 18.11.2026 (kullanici): "Planlanan Yukleme Tarihi her zaman ardiyesiz giris tarihi" (gonderim yine bos ekipman - 1 gun)
+    planlananYukleme: trTarih(isoGun(p.ardiyesiz_giris)),
     adet: konteyner ? `${konteyner}*20 DC` : "",
     gemi: ilk(p.gemi),
     tonaj: konteyner ? `${konteyner * KONTEYNER_TONU} MT` : "",
@@ -279,6 +282,7 @@ export function formModeli(h: FormHam): FormModeli {
     eksikler,
     girisEksikleri,
     ekipmanTarihi,
+    etd: isoGun(p.etd),
     gonderimGunu: ekipmanTarihi ? gunEkle(ekipmanTarihi, -1) : null,
     uretimIso,
     sktIso,
@@ -326,7 +330,7 @@ const esc = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g,
 
 export function formKonusu(m: FormModeli, test: boolean): string {
   const a = m.alanlar;
-  const parca = [a.firma, a.adet, a.cuvalAdi, a.rezervasyonNo ? `Booking ${a.rezervasyonNo}` : "", a.planlananYukleme ? `Ekipman ${a.planlananYukleme}` : ""].filter(Boolean);
+  const parca = [a.firma, a.adet, a.cuvalAdi, a.rezervasyonNo ? `Booking ${a.rezervasyonNo}` : "", m.ekipmanTarihi ? `Ekipman ${trTarih(m.ekipmanTarihi)}` : ""].filter(Boolean);
   return `${test ? "[TEST] " : ""}Sipariş Bildirim Formu · ${parca.join(" · ")}`;
 }
 
@@ -353,7 +357,7 @@ export function formMailHtml(m: FormModeli, sirketAdi: string, test: boolean): s
   <div style="padding:16px 18px;font-size:14px;color:#111827">
     <p style="margin:0 0 10px">Kolay gelsin,</p>
     <p style="margin:0 0 10px"><b>${esc(a.firma)}</b> yüklemesi için sipariş bildirim formu ektedir (Excel${m.gorselYolu ? " + çuval görseli" : ""}).
-      Boş ekipman alımı <b>${esc(a.planlananYukleme || "—")}</b>.</p>
+      Boş ekipman alımı <b>${esc(trTarih(m.ekipmanTarihi) || "—")}</b>${a.planlananYukleme ? `, planlanan yükleme (ardiyesiz giriş) <b>${esc(a.planlananYukleme)}</b>` : ""}.</p>
     ${uyari}
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:6px">${sol}</table>
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:10px">${sag}</table>
@@ -366,7 +370,7 @@ export function uyariMailHtml(m: FormModeli, test: boolean): string {
   const a = m.alanlar;
   return `<!doctype html><html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111827">
 <p>${esc(m.temsilciHitap || "Merhaba")},</p>
-<p>${test ? "[TEST] " : ""}<b>${esc(a.firma)}</b> · Booking <b>${esc(a.rezervasyonNo)}</b> (boş ekipman ${esc(a.planlananYukleme || "—")}) sipariş bildirim formu
+<p>${test ? "[TEST] " : ""}<b>${esc(a.firma)}</b> · Booking <b>${esc(a.rezervasyonNo)}</b> (boş ekipman ${esc(trTarih(m.ekipmanTarihi) || "—")}) sipariş bildirim formu
 üretime <b>eksik bilgiyle</b> gönderildi: <b>${esc(m.girisEksikleri.join(", "))}</b>.</p>
 <p>Lütfen Siparişler &gt; Sipariş Formları sekmesinden tamamlayıp üretimi ayrıca bilgilendirin.</p>
 </body></html>`;

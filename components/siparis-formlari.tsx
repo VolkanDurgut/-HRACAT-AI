@@ -25,7 +25,7 @@ const DURUM: Record<FormDurumu, { etiket: (m: FormModeli, bugun: string) => stri
   bugun: { etiket: () => "Bugün 08:00'den itibaren gider", renk: "#FCD34D", zemin: "rgba(245,158,11,0.14)" },
   bekliyor: { etiket: (m, bugun) => (m.gonderimGunu ? (m.gonderimGunu === gunEkle(bugun, 1) ? "Yarın 08:00'de gider" : `${trTarih(m.gonderimGunu)} 08:00'de gider`) : "Ekipman tarihi yok"), renk: "#93C5FD", zemin: "rgba(59,130,246,0.12)" },
   gecikti: { etiket: () => "Bir sonraki taramada gider (ekipman günü)", renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
-  suresi_gecti: { etiket: () => "Ekipman tarihi geçti · gönderilmedi", renk: TEXT_MUTED, zemin: "rgba(148,163,184,0.10)" },
+  suresi_gecti: { etiket: () => "Ekipman tarihi geçti · otomatik gönderilmez (Test gönder ile gönderin)", renk: "#FCD34D", zemin: "rgba(245,158,11,0.10)" },
 };
 
 type OcrDurumu = "yok" | "okunuyor" | "tamam" | "eksik" | "hata";
@@ -160,7 +160,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 mb-3">
-        {bilgi("Boş ekipman", `${a.planlananYukleme}${a.bosEkipman ? ` · ${a.bosEkipman}` : ""}`)}
+        {bilgi("Boş ekipman / Yükleme", `${trTarih(m.ekipmanTarihi)}${a.bosEkipman ? ` · ${a.bosEkipman}` : ""}${a.planlananYukleme ? ` · yükleme ${a.planlananYukleme}` : ""}`)}
         {bilgi("Gemi / Acenta", [a.gemi, a.acente].filter(Boolean).join(" · "))}
         {bilgi("Liman", [a.yuklemeLimani, a.varisLimani].filter(Boolean).join(" → "))}
         {bilgi("Ürün", a.urunTipi)}
@@ -253,7 +253,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
             {mesgul === "indir" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Excel
           </button>
-          <button type="button" onClick={test} disabled={!!mesgul || degisti} title={degisti ? "Önce kaydedin" : "[TEST] formu test adresine gönder (yönetici)"}
+          <button type="button" onClick={test} disabled={!!mesgul || degisti} title={degisti ? "Önce kaydedin" : "[TEST] formu test adresine gönder"}
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
             {mesgul === "test" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test gönder
           </button>
@@ -280,7 +280,9 @@ export function SiparisFormlari() {
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
-  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= bugun), [liste, gecmis, bugun]);
+  // Varsayilan: ekipman gunu gelmemis + ekipman gunu gecmis ama gemisi kalkmamis ve formu gitmemis yuklemeler
+  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= bugun
+    || (!m.gonderim?.zaman && !!m.etd && m.etd >= bugun)), [liste, gecmis, bugun]);
   const eksikSayisi = gorunen.filter((m) => !m.gonderim?.zaman && m.girisEksikleri.length > 0).length;
 
   return (

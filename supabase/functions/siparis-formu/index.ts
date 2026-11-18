@@ -20,8 +20,9 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // CAGRI:
 //  - Anon (pg_cron 'siparis-formu', her 30 dk 08:00-18:30 TR) {}: gonderim gunu (bos ekipman - 1) 08:00'den itibaren,
 //    ekipman gunu gecmemis bookingler. Yanitta veri yok.
-//  - Yetkili kullanici (admin / super admin), yalniz kendi sirketi: {"test": true, "booking": "..."} -> "[TEST]" form test
-//    adresine (24 saatte en fazla 10), otomatik gonderimi engellemez.
+//  - Siparisler sayfasi yetkili kullanici (proformalar / analiz), yalniz kendi sirketi: {"test": true, "booking": "..."} ->
+//    "[TEST]" form YALNIZ test adresine (24 saatte en fazla 25), otomatik gonderimi engellemez. (18.11.2026: yalniz admin degil;
+//    test maili uretime gitmedigi icin sayfa yetkisi yeterli.)
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -77,7 +78,7 @@ function jwtRolu(token: string | null): string | null {
     return null;
   }
 }
-/** Admin / super admin kullanicinin sirketi; degilse null. */
+/** Siparisler sayfasi yetkisi (proformalar / analiz) olan kullanicinin sirketi; degilse null. */
 async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
   const baslik = req.headers.get("Authorization") || "";
   const token = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null;
@@ -90,7 +91,10 @@ async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
   const kayit = roller.find((r) => !!r.company_id);
   if (!kayit?.company_id) return null;
   const superAdmin = SUPER_ADMIN_EPOSTALARI.includes((k.email || "").toLowerCase());
-  return superAdmin || kayit.rol === "admin" ? kayit.company_id : null;
+  if (superAdmin || kayit.rol === "admin") return kayit.company_id;
+  const yetki = await oku<{ sayfa_yetkileri: Record<string, unknown> | null }>(`kullanici_yetkileri?select=sayfa_yetkileri&user_id=eq.${k.id}`);
+  const s = yetki[0]?.sayfa_yetkileri || {};
+  return s.proformalar === true || s.analiz === true || s.proformalar === "true" || s.analiz === "true" ? kayit.company_id : null;
 }
 
 async function formlar(companyId: string, bas: string, bit: string): Promise<FormModeli[]> {
@@ -206,7 +210,7 @@ Deno.serve(async (req: Request) => {
       if (!TEST_ALICISI.length) return json({ ok: false, hata: "Test adresi tanımlı değil." }, 400);
       const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
       const son = await oku<{ id: string }>(`siparis_formu_gonderimleri?select=id&company_id=eq.${yetkiliSirket}&elle=is.true&olusturma=gte.${encodeURIComponent(esik)}`);
-      if (son.length >= 10) return json({ ok: false, hata: "Son 24 saatte en fazla 10 test formu gönderilebilir." }, 429);
+      if (son.length >= 25) return json({ ok: false, hata: "Son 24 saatte en fazla 25 test formu gönderilebilir." }, 429);
       const anahtar = govde.booking.replace(/\s/g, "").toUpperCase();
       const liste = await formlar(yetkiliSirket, gunKaydir(bugun, -60), gunKaydir(bugun, 120));
       const m = liste.find((x) => x.anahtar === anahtar);
@@ -215,7 +219,7 @@ Deno.serve(async (req: Request) => {
       const sonuc = await gonder(yetkiliSirket, (sirket[0]?.company_name || "Unex Gıda").trim(), m, TEST_ALICISI, [], true, true);
       return json({ ok: true, sonuc, alici: TEST_ALICISI });
     }
-    if (govde.test === true) return json({ ok: false, hata: "Test gönderimi yalnızca yöneticiler içindir." }, 403);
+    if (govde.test === true) return json({ ok: false, hata: "Test gönderimi için Siparişler sayfası yetkisi gerekli." }, 403);
 
     // Zamanlanmis tarama (pg_cron)
     const dakika = trDakika();

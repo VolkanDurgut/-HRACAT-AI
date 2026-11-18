@@ -12,7 +12,8 @@ const ham = (ek: Partial<FormHam> = {}): FormHam => ({
   anahtar: "KURGU123",
   adres: "KURGU SOKAK 5, NIAMEY, NIGER",
   plan: { kaynak: "excel", booking_no: "KURGU123", musteri: "KURGU", konteyner: 5, varis_limani: "TEMA", cuval_markasi: "KRG", ambalaj: "50 KG",
-    acente: "HAT/KURGU", liman: "MARPORT", ekipman: "KURGU DEPO", ekipman_alim_yeri: "13.11.2026", bos_ekipman_tarihi: "2026-11-13", gemi: "KURGU GEMI" },
+    acente: "HAT/KURGU", liman: "MARPORT", ekipman: "KURGU DEPO", ekipman_alim_yeri: "13.11.2026", bos_ekipman_tarihi: "2026-11-13",
+    ardiyesiz_giris: "2026-11-16", etd: "2026-11-22", gemi: "KURGU GEMI" },
   siparis: { proforma_no: "PF-KRG-1", proforma_tarihi: "2026-09-16", firma: "KURGU LTD", urun: "PREMIUM FLOUR (KRG BRAND)" },
   dosya: null,
   temsilci: { ad_soyad: "AD SOYAD", eposta: "temsilci@kurgu.test", hitap: "Ad Bey" },
@@ -30,7 +31,9 @@ test("model: sablondaki alanlar plan + siparis listesinden dolar", () => {
   assert.equal(a.ulke, "NİJER");
   assert.equal(a.adet, "5*20 DC");
   assert.equal(a.tonaj, "125 MT");
-  assert.equal(a.planlananYukleme, "13.11.2026");
+  // Planlanan yukleme = ardiyesiz giris; gonderim gunu = bos ekipman - 1
+  assert.equal(a.planlananYukleme, "16.11.2026");
+  assert.equal(m.etd, "2026-11-22");
   assert.equal(a.bosEkipman, "KURGU DEPO");
   assert.equal(a.ambalajTipi, "50 KG");
   assert.equal(a.urunTipi, "PREMIUM FLOUR");

@@ -197,7 +197,8 @@ const CIKIS: Record<string, [string, string]> = {
 };
 
 /** gruplu (13.11.2026): sade rapor (Satis / Alis; musteri / tedarikci basligi altinda siparisler, kalan, Irsaliye Evreni). Onaya kadar yalniz test maili. */
-export type IcRaporSecenek = { gruplu?: boolean };
+/** toplamlar (19.11.2026): acik satis / alis tablolarinda TOPLAM satiri (kalanlar toplami); onaya kadar yalniz test raporunda. */
+export type IcRaporSecenek = { gruplu?: boolean; toplamlar?: boolean };
 
 /**
  * SADE RAPOR (13.11.2026, kullanici: "Satis ve alis olarak ikiye ayiracaksin. Musteri ismi - kalan, Arac, Bugun, Kalan,
@@ -432,8 +433,18 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     const devir = x.devirKg ? `<br><span style="color:#64748B;font-size:10px">devir ${x.devirKg > 0 ? "+" : "−"}${sayi(Math.abs(x.devirKg))} kg dahil</span>` : "";
     return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(e.is_emri_no)}</b>`, "white-space:nowrap")}${td(`${esc(musteriAdi(e))}<br><span style="color:#64748B;font-size:11px">${esc(urunAdi(e.urun, e.ambalaj))}${e.teslim ? ` · ${esc(e.teslim)}` : ""}</span>`)}${td(hedef, "text-align:right;white-space:nowrap")}${td(`${sayi(x.yuklenenKg)} kg${devir}`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} ${g})</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(`<span style="color:${KALAN_RENK[x.kalan.durum]};font-weight:bold">${esc(x.kalan.metin)}</span>`, "white-space:nowrap")}</tr>`;
   }).join("");
+  // 19.11.2026 (kullanici): "Acik satis ve acik alis siparislerinde toplam gozukmeli; kalanlar toplanacak" -> TOPLAM satiri
+  // (ust kutularla AYNI kalan: hedefi kg olan siparislerin kalani; fazla yuklenen kalani azaltmaz).
+  const toplamHucre = (t: string, sag = false, renk = "#1E293B") => `<td style="padding:8px;font-size:11px;font-weight:bold;color:${renk};border-top:2px solid #CBD5E1;white-space:nowrap;${sag ? "text-align:right" : ""}">${t}</td>`;
+  const sHedefKg = r.acikSatis.filter((x) => x.emir.hedef_tur === "kg").reduce((t, x) => t + n(x.emir.hedef_kg), 0);
+  const sHedefArac = r.acikSatis.filter((x) => x.emir.hedef_tur !== "kg").reduce((t, x) => t + n(x.emir.hedef_arac), 0);
+  const sKalanArac = r.acikSatis.filter((x) => x.emir.hedef_tur !== "kg").reduce((t, x) => t + Math.max(0, n(x.emir.hedef_arac) - x.arac), 0);
+  const sBugun = r.acikSatis.reduce((t, x) => t + x.bugunArac, 0);
+  const sToplam = secenek.toplamlar === true && r.acikSatis.length
+    ? `<tr>${toplamHucre(`TOPLAM — ${r.acikSatis.length} sipariş`, false, "#475569").replace("<td ", '<td colspan="2" ')}${toplamHucre([sHedefKg ? `${sayi(sHedefKg)} kg` : "", sHedefArac ? `${sHedefArac} araç` : ""].filter(Boolean).join(" + ") || "-", true)}${toplamHucre(`${sayi(r.acikSatis.reduce((t, x) => t + x.yuklenenKg, 0))} kg`, true)}${toplamHucre(`${r.acikSatis.reduce((t, x) => t + x.arac, 0)}${sBugun ? ` (+${sBugun} ${g})` : ""}`, true)}${toplamHucre(`Kalan ${ton(o.acikSatisKalanKg)}${sKalanArac ? ` + ${sKalanArac} araç` : ""}`, false, "#B45309")}</tr>`
+    : "";
   const sTablo = tablo(`${th("Sipariş")}${th("Müşteri · Ürün")}${th("Hedef", true)}${th("Yüklenen", true)}${th("Araç", true)}${th("Durum")}`,
-    sRows || bos(6, "Açık satış siparişi yok."));
+    sRows ? sRows + sToplam : bos(6, "Açık satış siparişi yok."));
 
   // Acik alis siparisleri
   const aRows = r.acikAlis.map((x, i) => {
@@ -441,8 +452,12 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
     const kalan = x.kalanKg > 0 ? `<span style="color:#B45309;font-weight:bold">Kalan ${ton(x.kalanKg)}</span>` : x.kalanKg < 0 ? `<span style="color:${LACIVERT};font-weight:bold">Fazla ${ton(-x.kalanKg)}</span>` : `<span style="color:#047857;font-weight:bold">Tamam</span>`;
     return `<tr style="${i % 2 ? "background:#F8FAFC" : ""}">${td(`<b>${esc(a.alis_no)}</b>`, "white-space:nowrap")}${td(`${esc((a.tedarikci_kisa || "").trim() || a.tedarikci)}<br><span style="color:#64748B;font-size:11px">${esc(a.urun)}${a.depo ? ` · ${esc(a.depo)}` : ""}</span>`)}${td(`${sayi(n(a.miktar_kg))} kg`, "text-align:right;white-space:nowrap")}${td(`${sayi(x.alinanKg)} kg`, "text-align:right;white-space:nowrap")}${td(`${x.arac}${x.bugunArac ? ` <span style="color:#047857;font-weight:bold">(+${x.bugunArac} ${g})</span>` : ""}`, "text-align:right;white-space:nowrap")}${td(kalan, "white-space:nowrap")}</tr>`;
   }).join("");
+  const aBugun = r.acikAlis.reduce((t, x) => t + x.bugunArac, 0);
+  const aToplam = secenek.toplamlar === true && r.acikAlis.length
+    ? `<tr>${toplamHucre(`TOPLAM — ${r.acikAlis.length} alış`, false, "#475569").replace("<td ", '<td colspan="2" ')}${toplamHucre(`${sayi(r.acikAlis.reduce((t, x) => t + n(x.alis.miktar_kg), 0))} kg`, true)}${toplamHucre(`${sayi(r.acikAlis.reduce((t, x) => t + x.alinanKg, 0))} kg`, true)}${toplamHucre(`${r.acikAlis.reduce((t, x) => t + x.arac, 0)}${aBugun ? ` (+${aBugun} ${g})` : ""}`, true)}${toplamHucre(`Kalan ${ton(o.acikAlisKalanKg)}`, false, "#B45309")}</tr>`
+    : "";
   const aTablo = tablo(`${th("Alış")}${th("Tedarikçi · Ürün")}${th("Sipariş", true)}${th("Teslim alınan", true)}${th("Araç", true)}${th("Durum")}`,
-    aRows || bos(6, "Açık alış siparişi yok."));
+    aRows ? aRows + aToplam : bos(6, "Açık alış siparişi yok."));
 
   // Bugun kapanan siparisler
   const SONUC_RENK = { tam: "#047857", eksik: "#B45309", fazla: LACIVERT } as const;

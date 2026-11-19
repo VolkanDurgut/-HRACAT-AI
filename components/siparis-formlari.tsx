@@ -25,11 +25,12 @@ const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0,
 
 const DURUM: Record<FormDurumu, { etiket: (m: FormModeli, bugun: string) => string; renk: string; zemin: string }> = {
   eksik: { etiket: (m) => `Eksik · gönderilmez (${m.girisEksikleri.join(", ")})`, renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
-  gonderildi: { etiket: (m) => `Üretime gönderildi · ${m.gonderim?.zaman ? new Date(m.gonderim.zaman).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`, renk: "#6EE7B7", zemin: "rgba(16,185,129,0.12)" },
-  bugun: { etiket: () => "Bugün 08:00'den itibaren gider", renk: "#FCD34D", zemin: "rgba(245,158,11,0.14)" },
-  bekliyor: { etiket: (m, bugun) => (m.gonderimGunu ? (m.gonderimGunu === gunEkle(bugun, 1) ? "Yarın 08:00'de gider" : `${trTarih(m.gonderimGunu)} 08:00'de gider`) : "Ekipman tarihi yok"), renk: "#93C5FD", zemin: "rgba(59,130,246,0.12)" },
-  gecikti: { etiket: () => "Bir sonraki taramada gider (ekipman günü)", renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
-  suresi_gecti: { etiket: () => "Ekipman tarihi geçti · otomatik gönderilmez (elle gönderin)", renk: "#FCD34D", zemin: "rgba(245,158,11,0.10)" },
+  gonderildi: { etiket: (m) => `Gönderildi · ${m.gonderim?.zaman ? new Date(m.gonderim.zaman).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`, renk: "#6EE7B7", zemin: "rgba(16,185,129,0.12)" },
+  // 19.11.2026 (kullanici): otomatik gonderim YOK; form "Gonder" dugmesiyle gider. Etiket gonderim gununu hatirlatir.
+  bugun: { etiket: () => "Gönderime hazır · gönderim günü bugün", renk: "#FCD34D", zemin: "rgba(245,158,11,0.14)" },
+  bekliyor: { etiket: (m, bugun) => (m.gonderimGunu ? `Gönderime hazır · gönderim günü ${m.gonderimGunu === gunEkle(bugun, 1) ? "yarın" : trTarih(m.gonderimGunu)}` : "Gönderime hazır"), renk: "#93C5FD", zemin: "rgba(59,130,246,0.12)" },
+  gecikti: { etiket: () => "Gönderime hazır · boş ekipman bugün", renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
+  suresi_gecti: { etiket: () => "Gönderilmedi · boş ekipman tarihi geçti", renk: "#FCD34D", zemin: "rgba(245,158,11,0.10)" },
 };
 
 type OcrDurumu = "yok" | "okunuyor" | "tamam" | "eksik" | "hata";
@@ -144,7 +145,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     try { await formExcelIndir(m); } catch (e) { setHata(e instanceof Error ? e.message : "Excel oluşturulamadı."); } finally { setMesgul(null); }
   };
   const uretimeGonder = async () => {
-    if (!window.confirm(`${a.firma} · ${m.bookingNo} sipariş bildirim formu ÜRETİME (alıcılar + CC) gönderilsin mi? Bu işlem bir kez yapılır.`)) return;
+    if (!window.confirm(`${a.firma} · ${m.bookingNo} sipariş bildirim formu üretime (Ayarlar > Rapor Alıcıları: alıcı + CC) gönderilsin mi? Form bir kez gönderilir ve "Gönderilenler" listesine düşer.`)) return;
     setMesgul("uretim"); setHata(null);
     try { const alici = await testFormuGonder(m.bookingNo, true); onDegisti(`${a.firma} · ${m.bookingNo}: form üretime gönderildi (${alici}).`); }
     catch (e) { setHata(e instanceof Error ? e.message : "Gönderilemedi."); } finally { setMesgul(null); }
@@ -281,9 +282,9 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
             {mesgul === "indir" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Excel
           </button>
           {!m.gonderim?.zaman && (
-            <button type="button" onClick={uretimeGonder} disabled={gonderimKapali} title={gonderimIpucu || "Formu üretime gönder (canlı mod: alıcılar + CC)"}
+            <button type="button" onClick={uretimeGonder} disabled={gonderimKapali} title={gonderimIpucu || "Formu üretime gönder (alıcı + CC)"}
               className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: ACCENT }} data-testid="uretime-gonder">
-              {mesgul === "uretim" ? <Loader2 size={13} className="animate-spin" /> : <Factory size={13} style={{ color: ACCENT }} />} Üretime gönder
+              {mesgul === "uretim" ? <Loader2 size={13} className="animate-spin" /> : <Factory size={13} style={{ color: ACCENT }} />} Gönder
             </button>
           )}
         </div>
@@ -313,14 +314,19 @@ export function SiparisFormlari() {
   // BU HAFTA (Pazar-Cumartesi, plan basliklari "47.HAFTA (15 KASIM - 21 KASIM)") ve sonrasinin bos ekipman tarihleri.
   const haftaBasi = haftaBasiTr(bugun);
   const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi), [liste, gecmis, haftaBasi]);
-  const eksikSayisi = gorunen.filter((m) => !m.gonderim?.zaman && m.girisEksikleri.length > 0).length;
+  // 19.11.2026 (kullanici): gonderilenler listede "Daha once gonderilenler" bolumune duser
+  const bekleyenler = gorunen.filter((m) => !m.gonderim?.zaman);
+  const gonderilenler = useMemo(() => (liste || []).filter((m) => !!m.gonderim?.zaman)
+    .sort((x, y) => String(y.gonderim?.zaman || "").localeCompare(String(x.gonderim?.zaman || ""))), [liste]);
+  const [gonderilenAcik, setGonderilenAcik] = useState(false);
+  const eksikSayisi = bekleyenler.filter((m) => m.girisEksikleri.length > 0).length;
 
   return (
     <div>
       <div className="rounded-lg border px-3 py-2.5 mb-3 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
         <FileSpreadsheet size={14} style={{ color: ACCENT }} />
         <span className="flex-1 min-w-[240px]">
-          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>, boş ekipman alımından <b className="text-white">1 gün önce 08:00</b>&apos;de üretime gider.
+          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>; form <b className="text-white">Gönder</b> düğmesiyle üretime gider (otomatik gönderim yok, gönderim günü boş ekipman alımından 1 gün öncedir).
           Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT ve lot çuvaldan otomatik okunur.
           Görsel, spek ve tarihler tamamlanmadan form <b className="text-white">gönderilmez</b>. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
         </span>
@@ -339,14 +345,33 @@ export function SiparisFormlari() {
       {hata && <p className="text-sm text-red-300 mb-3">{hata}</p>}
       {liste === null && !hata ? (
         <div className="flex items-center gap-2 text-sm py-8 justify-center" style={{ color: TEXT_MUTED }}><Loader2 size={16} className="animate-spin" /> Yükleniyor…</div>
-      ) : gorunen.length ? (
-        <div className="space-y-3">
-          {gorunen.map((m) => (
-            <FormKarti key={m.anahtar} m={m} bugun={bugun} companyId={companyId || ""} onDegisti={(mesaj) => { setBilgi(mesaj); yukle(); }} />
-          ))}
-        </div>
       ) : (
-        <EmptyState icon={<FileSpreadsheet size={40} />} title="Yaklaşan yükleme yok" description="Yükleme planında boş ekipman tarihi önümüzdeki 45 gün içinde olan booking bulunmuyor." />
+        <>
+          {bekleyenler.length ? (
+            <div className="space-y-3">
+              {bekleyenler.map((m) => (
+                <FormKarti key={m.anahtar} m={m} bugun={bugun} companyId={companyId || ""} onDegisti={(mesaj) => { setBilgi(mesaj); yukle(); }} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={<FileSpreadsheet size={40} />} title="Gönderilecek form yok" description="Bu hafta ve sonrasındaki yüklemelerin formları gönderildi ya da yükleme planında booking yok." />
+          )}
+          {gonderilenler.length > 0 && (
+            <div className="mt-5" data-testid="gonderilen-formlar">
+              <button type="button" onClick={() => setGonderilenAcik((x) => !x)} className="w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold text-white hover:bg-white/[0.03]" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <CheckCircle2 size={14} style={{ color: "#6EE7B7" }} /> Daha önce gönderilenler ({gonderilenler.length})
+                <span className="ml-auto font-normal" style={{ color: TEXT_MUTED }}>{gonderilenAcik ? "Gizle" : "Göster"}</span>
+              </button>
+              {gonderilenAcik && (
+                <div className="space-y-3 mt-3">
+                  {gonderilenler.map((m) => (
+                    <FormKarti key={m.anahtar} m={m} bugun={bugun} companyId={companyId || ""} onDegisti={(mesaj) => { setBilgi(mesaj); yukle(); }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import JSZip from "npm:jszip@3.10.1";
-import { formDosyaAdi, formKonusu, formMailHtml, formModeli, gonderimZamaniMi, LOGO_CID, type FormHam, type FormModeli } from "../_shared/siparis-formu.ts";
+import { formDosyaAdi, formKonusu, formMailHtml, formModeli, LOGO_CID, type FormHam, type FormModeli } from "../_shared/siparis-formu.ts";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "../_shared/siparis-formu-xlsx.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
 
@@ -20,8 +20,8 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 //    tamamlandiginda gonderim penceresi icindeyse bir sonraki taramada gider. (Eski "eksikle gonder + temsilciye uyari" kalkti.)
 //  - Mailin basinda Unex logosu (gomulu, cid) - 19.11.2026.
 // CAGRI:
-//  - Anon (pg_cron 'siparis-formu', her 30 dk 08:00-18:30 TR) {}: gonderim gunu (bos ekipman - 1) 08:00'den itibaren,
-//    ekipman gunu gecmemis bookingler. Yanitta veri yok.
+//  - Anon {}: 19.11.2026'dan beri OTOMATIK GONDERIM YOK (kullanici: "oto mail gonderimi olmasin, Gonder butonu ile");
+//    hicbir sey gondermez. pg_cron isi kaldirildi.
 //  - Siparisler sayfasi yetkili kullanici (proformalar / analiz), yalniz kendi sirketi: {"test": true, "booking": "..."} ->
 //    "[TEST]" form YALNIZ test adresine (24 saatte en fazla 25), otomatik gonderimi engellemez. (18.11.2026: yalniz admin degil;
 //    test maili uretime gitmedigi icin sayfa yetkisi yeterli.)
@@ -46,7 +46,6 @@ const TEST_ALICISI = adresler("SIPARIS_FORMU_TEST_ALICISI").length ? adresler("S
 
 const trSimdi = () => new Date(Date.now() + 3 * 3600_000);
 const trBugun = () => trSimdi().toISOString().slice(0, 10);
-const trDakika = () => { const t = trSimdi(); return t.getUTCHours() * 60 + t.getUTCMinutes(); };
 const gunKaydir = (iso: string, n: number) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
 function json(veri: unknown, status = 200): Response {
@@ -250,32 +249,9 @@ Deno.serve(async (req: Request) => {
     }
     if (govde.test === true || govde.gonder === true) return json({ ok: false, hata: "Gönderim için Siparişler sayfası yetkisi gerekli." }, 403);
 
-    // Zamanlanmis tarama (pg_cron)
-    const dakika = trDakika();
-    const ayarlar = await oku<{ company_id: string }>(`rapor_alicilari?select=company_id&rapor=eq.siparis_formu`);
-    const sonuclar: Record<string, unknown>[] = [];
-    for (const { company_id: companyId } of ayarlar) {
-      const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, "siparis_formu", { canli: false, alicilar: [] });
-      const test = !ayar.canli;
-      const alicilar = test ? TEST_ALICISI : ayar.alicilar;
-      if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
-      const sirket = await oku<{ company_name: string | null }>(`companies?select=company_name&id=eq.${companyId}`);
-      const sirketAdi = (sirket[0]?.company_name || "Unex Gıda").replace(/[<>"]/g, "").trim();
-      // 19.11.2026: girisleri eksik form GONDERILMEZ (tamamlaninca pencere icindeyse sonraki taramada gider)
-      const zamani = (await formlar(companyId, gunKaydir(bugun, -1), gunKaydir(bugun, 2))).filter((m) => m.gonderilebilir && gonderimZamaniMi(m, bugun, dakika));
-      for (const m of zamani) {
-        if (!test && m.gonderim?.zaman) continue;
-        if (test && m.test?.zaman) continue;
-        try {
-          sonuclar.push(await gonder(companyId, sirketAdi, m, alicilar, ayar.cc, test, false));
-        } catch (e) {
-          const mesaj = e instanceof Error ? e.message : String(e);
-          console.error("siparis-formu:", m.bookingNo, mesaj);
-          sonuclar.push({ booking: m.bookingNo, hata: mesaj.slice(0, 160) });
-        }
-      }
-    }
-    return json({ ok: true, tarih: bugun, gonderilen: sonuclar.filter((x) => x.gonderildi).length, hata: sonuclar.filter((x) => x.hata).length });
+    // 19.11.2026 (kullanici): "Siparis bildirim formu icin oto mail gonderimi olmasin. Gonder butonu ile gonderilebilsin."
+    // Zamanlanmis tarama KAPALI (pg_cron 'siparis-formu' kaldirildi: migration 20261119120000); anon cagri hicbir sey gondermez.
+    return json({ ok: true, tarih: bugun, otomatik: false, gonderilen: 0 });
   } catch (e) {
     const mesaj = e instanceof Error ? e.message : String(e);
     console.error("siparis-formu hata:", mesaj);

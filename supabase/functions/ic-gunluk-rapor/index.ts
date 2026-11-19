@@ -45,6 +45,9 @@ const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "").split(",").ma
 // Yeni (sade) gorunum zamanlanmis raporda: 13.11.2026 19:01 kullanici onayi ("Ic piyasa raporu onaylidir") -> ACIK.
 // 14.11.2026 kullanici: "Eski sisteme geri donelim" -> sade gorunum KAPALI; eski gorunum, gunun araclari siparis basina tek satir.
 const GRUPLU_CANLI = false;
+// 19.11.2026 kullanici: "Acik satis ve acik alis siparisleri kisminda toplami gozukmeli (kalanlar toplanacak). Sensei adresine test
+// gonder, onay verdikten sonra canliya alacagiz." -> TOPLAM satiri yalniz test adresi raporunda; onaydan sonra true.
+const TOPLAM_CANLI = false;
 
 const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
 /** Zamanlanmis oturum penceresindeysek oturum, degilse null (saatten 5 dk once - 60 dk sonra). */
@@ -224,7 +227,7 @@ Deno.serve(async (req: Request) => {
       const alicilar = testAdresine ? TEST_ALICISI : Array.from(new Set((h.gunluk_rapor_eposta || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)))).slice(0, 5);
       const rapor = await sirketRaporu(h.company_id, tarih);
       const konu = `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi, oturum)}`;
-      const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum, { gruplu: gruplu || (deneme && govde.test_adresine === true) });
+      const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum, { gruplu: gruplu || (deneme && govde.test_adresine === true), toplamlar: TOPLAM_CANLI || testAdresine || (deneme && govde.test_adresine === true) });
       if (deneme) { sonuclar.push({ tarih, oturum, konu, alicilar, ozet: rapor.ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
       if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");

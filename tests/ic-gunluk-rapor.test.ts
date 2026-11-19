@@ -40,3 +40,14 @@ test("html: plaka satiri yok, Irsaliyeleri Incele ve toplam net var", () => {
   assert.doesNotMatch(html, />Plaka</);
   assert.equal((html.match(/AS-1 ·/g) || []).length, 1);
 });
+
+test("html: acik satis ve acik alis tablolarinda TOPLAM satiri (kalanlar toplanir)", () => {
+  const r = rapor();
+  const html = icGunlukRaporHtml(r, "Firma", "2026-01-11T06:15:00Z", "sabah", { toplamlar: true });
+  assert.equal(r.ozet.acikSatisKalanKg, 54000);
+  // Onaya kadar zamanlanmis raporda (secenek yok) TOPLAM satiri YOK
+  assert.doesNotMatch(icGunlukRaporHtml(r, "Firma", "2026-01-11T06:15:00Z", "sabah"), /TOPLAM — 1 sipariş<\/td>/);
+  assert.equal(r.ozet.acikAlisKalanKg, 921000);
+  assert.match(html, /TOPLAM — 1 sipariş<\/td>.*?100\.000 kg.*?46\.000 kg.*?Kalan 54 ton/s);
+  assert.match(html, /TOPLAM — 2 alış<\/td>.*?1\.000\.000 kg.*?79\.000 kg.*?Kalan 921 ton/s);
+});

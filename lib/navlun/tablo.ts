@@ -1,5 +1,5 @@
 /**
- * NAVLUN TABLOSU - Excel indir + test maili (11.11.2026). Hesap ve Excel duzeni TEK YERDE:
+ * NAVLUN TABLOSU - Excel indir (11.11.2026; sayfadaki test maili 19.11.2026 kaldirildi). Hesap ve Excel duzeni TEK YERDE:
  * supabase/functions/_shared/navlun-tablosu.ts (edge navlun-tablosu ayni dosyayi mail eki olarak uretir).
  */
 import { supabase } from "@/lib/supabase";
@@ -32,25 +32,4 @@ export async function navlunTablosuOku(bugun: string): Promise<{ tablo: NavlunTa
 export async function navlunTablosuExcel(bugun: string): Promise<{ blob: Blob; planOkunamadi: boolean }> {
   const [{ xlsxOlustur }, { tablo, planOkunamadi }] = await Promise.all([import("@/lib/xlsx-yaz"), navlunTablosuOku(bugun)]);
   return { blob: await xlsxOlustur([navlunTablosuSayfasi(tablo)]), planOkunamadi };
-}
-
-/** Edge navlun-tablosu {"test": true}: "[TEST]" mail YALNIZ test adresine (yonetici yetkisi). */
-export async function navlunTablosuTestMaili(): Promise<string> {
-  const { data: oturum } = await supabase.auth.getSession();
-  const token = oturum.session?.access_token;
-  if (!token) throw new Error("Oturum bulunamadı. Lütfen yeniden giriş yapın.");
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const res = await fetch(`${url}/functions/v1/navlun-tablosu`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ test: true }),
-  });
-  const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string; sonuclar?: { gonderildi?: boolean; atlandi?: string }[] };
-  if (!res.ok || !veri.ok) {
-    if (res.status === 401 || res.status === 403) throw new Error(veri.hata && res.status === 403 ? "Test maili yalnızca yöneticiler tarafından gönderilebilir." : "Yetki doğrulanamadı.");
-    throw new Error(veri.hata || "Test maili gönderilemedi.");
-  }
-  const s = veri.sonuclar?.[0];
-  if (s?.atlandi) throw new Error(s.atlandi);
-  return "Test maili gönderildi (test adresine, Excel ekli).";
 }

@@ -588,7 +588,8 @@ export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
  * "pol lokaller & BL ucreti dahil" dahil demektir.
  */
 export function lokalDurumu(duz: string): boolean | null {
-  const haric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/gi)];
+  // 19.11.2026 (ZIM tarifesi: "yukleme limani lokal masraflari haric" okunmuyordu): "lokal(ler) / lokal masraflari haric" da haric
+  const haric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)|lokal(?:ler)?(?:i)?(?:\s*masraf(?:lar)?[ıi]?)?\s*(?:\([^)]{0,30}\)\s*)?(?:olarak\s*)?hari[çc]/gi)];
   const once = (x: RegExpMatchArray, n: number) => duz.slice(Math.max(0, (x.index ?? 0) - n), x.index ?? 0);
   const kosullu = (x: RegExpMatchArray) => /belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(once(x, 120));
   // ayni cumlede tahliye / varis tarafi ya da gumruk anilan haric ifadesi cikis lokali hakkinda degildir

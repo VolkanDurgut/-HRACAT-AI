@@ -3,7 +3,7 @@
 import { OzetKarti } from "@/components/erp/ozet-karti";
 import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Send, Ship, Target } from "lucide-react";
+import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Ship, Target } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -13,7 +13,7 @@ import { DURUM_ETIKETI, YENI_TUR_ADI, limanOzetleri, yeniBilgiler, type LimanOze
 import { navlunHataCoz, navlunVerisiOku, type NavlunVerisi, type OkunamayanMesaj } from "@/lib/navlun/veri";
 import { TeklifAdaylari } from "@/components/navlun/teklif-adaylari";
 import { YenidenOku } from "@/components/navlun/yeniden-oku";
-import { navlunTablosuExcel, navlunTablosuTestMaili } from "@/lib/navlun/tablo";
+import { navlunTablosuExcel } from "@/lib/navlun/tablo";
 import { navlunNoktalari } from "@/lib/navlun/harita";
 import { NavlunHaritasi } from "@/components/navlun/navlun-haritasi";
 import { LimanMasasi } from "@/components/navlun/liman-masasi";
@@ -27,7 +27,7 @@ import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/t
  *  - Veri: arsiv Gmail -> Apps Script (docs/apps-script/navlun.gs) -> edge navlun-bildirimi -> navlun_teklifleri.
  *  - Sayfa SALT OKUNUR; tek mudahale "Okunamayan teklifler" (fiyat ekte / gorselde ve okunamadi): elle fiyat ya da yoksay.
  *  - Yetki: "navlun" (16.11.2026; once "analiz"). RLS "navlun", "analiz" veya "proformalar".
- *  - Excel indir / Test maili (11.11.2026): operasyonun navlun tablosuyla AYNI duzen (lib/navlun/tablo.ts ->
+ *  - Excel indir (11.11.2026; "Test maili" butonu 19.11.2026 kaldirildi, kullanici): operasyonun navlun tablosuyla AYNI duzen (lib/navlun/tablo.ts ->
  *    _shared/navlun-tablosu.ts); test maili edge navlun-tablosu, yalniz test adresine.
  *  - Canli Navlun Haritasi + Liman Masasi (11.11.2026): sayfa haritayla acilir (components/navlun/navlun-haritasi.tsx);
  *    limana tiklayinca rapor + acenteler + sohbet one cikar (components/navlun/liman-masasi.tsx).
@@ -292,7 +292,7 @@ function NavlunIcerik() {
   const [arama, setArama] = useState("");
   // Son görülme (bu tarayıcıda): ondan yeni gelen bilgiler panelde "yeni" işaretlenir
   const [oncekiGorulme, setOncekiGorulme] = useState<string | null>(null);
-  const [tabloIslem, setTabloIslem] = useState<"excel" | "mail" | null>(null);
+  const [tabloIslem, setTabloIslem] = useState<"excel" | null>(null);
   const [tabloBilgi, setTabloBilgi] = useState<string | null>(null);
   const [masa, setMasa] = useState<string | null>(null);
 
@@ -352,11 +352,6 @@ function NavlunIcerik() {
     } catch (e) { setHata(e instanceof Error ? e.message : "Excel oluşturulamadı."); }
     finally { setTabloIslem(null); }
   };
-  const tabloMail = async () => {
-    setTabloIslem("mail"); setHata(null); setTabloBilgi(null);
-    try { setTabloBilgi(await navlunTablosuTestMaili()); } catch (e) { setHata(e instanceof Error ? e.message : "Test maili gönderilemedi."); }
-    finally { setTabloIslem(null); }
-  };
 
   if (!yetkili) return null;
   return (
@@ -370,10 +365,6 @@ function NavlunIcerik() {
             <button type="button" onClick={tabloExcel} disabled={!!tabloIslem} data-testid="navlun-tablosu-excel" title="Operasyonun navlun tablosuyla aynı düzende Excel"
               className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
               <Download size={15} /> {tabloIslem === "excel" ? "Hazırlanıyor…" : "Excel indir"}
-            </button>
-            <button type="button" onClick={tabloMail} disabled={!!tabloIslem} data-testid="navlun-tablosu-mail" title="Navlun tablosunu test adresine gönder"
-              className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: "#C9D1DC" }}>
-              <Send size={14} /> {tabloIslem === "mail" ? "Gönderiliyor…" : "Test maili"}
             </button>
             <YenidenOku onBitti={yukle} />
             <button type="button" onClick={yukle} disabled={yukleniyor} aria-label="Yenile" className="h-9 w-9 inline-flex items-center justify-center rounded-lg border hover:bg-white/[0.04] disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>

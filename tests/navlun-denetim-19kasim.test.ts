@@ -63,6 +63,9 @@ test("genel tarife: EUR satirlar da yazilir; kosullu 'lokal dahil degildir' kara
   assert.equal(lokalDurumu("Teklifimize pol lokaller & BL ücreti dahil olup, Vgm masrafı, tahliye lokal masrafları, gümrük masrafları dahil değildir."), true);
   assert.equal(lokalDurumu("Tahliye limanı lokal masrafları dahil değildir."), null);
   assert.equal(lokalDurumu("Navlun 900 usd. Gümrük masrafları dahil değildir."), null);
+  assert.equal(lokalDurumu("Tarifemiz; yükleme limanı lokal masrafları hariç olarak verilmis olup port to port gecerlidir."), false);
+  assert.equal(lokalDurumu("Vgm, pol lokaller dahildir. Pod lokaller hariçtir."), true);
+  assert.equal(lokalDurumu("Navlun, vgm ve Tr lokaller dahildir."), true);
   assert.equal(lokalDurumu("navlun 900 usd"), null);
 });
 

@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { birlesikFaturaModeli, birlesikKonu, birlesikTalimatMetni, type GrupUyesi } from "@/lib/birlesik-fatura/model";
+import { ambalajToplami, birlesikFaturaModeli, birlesikKonu, birlesikTalimatMetni, type GrupUyesi } from "@/lib/birlesik-fatura/model";
 import { dagitimKonusu, talimatMailiHtml, type OnayOzeti } from "../supabase/functions/_shared/fatura-onay.ts";
 
 const dosya = (no: string, kont: number, mt: number, ek: Record<string, unknown> = {}) => ({
@@ -79,4 +79,16 @@ test("fatura talimati maili: birlesik fatura konusu ve dosya listesi", () => {
   assert.match(html, /IHR-TEST-1, IHR-TEST-2/);
   // Tek dosya: eski konu birebir
   assert.equal(dagitimKonusu(o.dosya, o.konteynerler), "FATURA VE BEYANNAME TALİMATI HAKKINDA // KURGU LTD // 3 * 20 DC // TEMA PORT");
+});
+
+test("birlesik ambalaj: ayni tanimli dosyalarin adetleri toplanir (tekillestirilmez)", () => {
+  const t = ambalajToplami([
+    "2.000 PIECES OF 25 KG PP BAGS (MARKA A)", "3.000 PIECES OF 25 KG PP BAGS (Marka B)",
+    "2.000 PIECES OF 25 KG PP BAGS (MARKA C)", "2.000 PIECES OF 25 KG PP BAGS (MARKA C)", "2,000 pieces of 25 KG PP BAGS (Marka C)",
+  ]);
+  assert.equal(t, "2.000 PIECES OF 25 KG PP BAGS (MARKA A) / 3.000 PIECES OF 25 KG PP BAGS (Marka B) / 6.000 PIECES OF 25 KG PP BAGS (MARKA C) (TOPLAM 11.000 PIECES)");
+  assert.equal(ambalajToplami(["2.000 PIECES OF 25 KG PP BAGS (X)"]), "2.000 PIECES OF 25 KG PP BAGS (X)");
+  assert.equal(ambalajToplami(["25 KG PP BAGS", "25 KG PP BAGS"]), "25 KG PP BAGS (2 dosya)");
+  const m = birlesikFaturaModeli([uye("1", 2, 50, 2, { detayli_ambalaj: "2.000 PIECES OF 25 KG PP BAGS (X)" }), uye("2", 2, 50, 2, { detayli_ambalaj: "2.000 PIECES OF 25 KG PP BAGS (X)" })]);
+  assert.equal(m.ambalaj, "4.000 PIECES OF 25 KG PP BAGS (X)");
 });

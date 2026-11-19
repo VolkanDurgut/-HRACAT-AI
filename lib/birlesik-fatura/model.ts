@@ -69,6 +69,49 @@ const trTarih = (iso: string | null | undefined) => { const m = metin(iso).match
 /** Musteri adlari: en kisa ad (adresi karismis uzun yazim yerine; eslesme kurali bas kismi ayni). */
 const enKisa = (l: unknown[]) => tekil(l).sort((a, b) => a.length - b.length)[0] || "";
 
+/** "2.000" / "2,000" / "2000" -> 2000 (binlik ayirac); gecersizse null. */
+function adetOku(v: string): number | null {
+  const t = v.trim();
+  const n = /^\d{1,3}([.,]\d{3})+$/.test(t) ? Number(t.replace(/[.,]/g, "")) : Number(t.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Birlesik ambalaj metni (19.11.2026, kullanici: "Ambalaj kisminda eksik var"): ayni ambalaj tanimli dosyalar TEKILLESTIRILMEZ,
+ * adetleri TOPLANIR. "2.000 PIECES OF 25 KG BAGS (MARKA)" x 4 dosya -> "8.000 PIECES OF 25 KG BAGS (MARKA)".
+ * Adet okunamayan metin dosya sayisiyla yazilir ("... (2 dosya)"). Birden cok tanim varsa sonuna toplam adet eklenir.
+ */
+export function ambalajToplami(metinler: unknown[]): string {
+  const sira: string[] = [];
+  const adetli = new Map<string, { birim: string; tanim: string; adet: number }>();
+  const adetsiz = new Map<string, number>();
+  for (const m of metinler.map(metin).filter(Boolean)) {
+    const e = m.match(/^([\d.,]+)\s*(PIECES?|PCS|BAGS?|ADET)\s+(?:OF\s+)?(.+)$/i);
+    const adet = e ? adetOku(e[1]) : null;
+    if (e && adet !== null) {
+      const anahtar = `A|${e[2].toUpperCase()}|${e[3].replace(/\s+/g, " ").trim().toUpperCase()}`;
+      const k = adetli.get(anahtar);
+      if (k) k.adet += adet;
+      else { adetli.set(anahtar, { birim: e[2].toUpperCase(), tanim: e[3].replace(/\s+/g, " ").trim(), adet }); sira.push(anahtar); }
+    } else {
+      const anahtar = `M|${m}`;
+      if (!adetsiz.has(anahtar)) sira.push(anahtar);
+      adetsiz.set(anahtar, (adetsiz.get(anahtar) || 0) + 1);
+    }
+  }
+  const tr = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 3 });
+  const parcalar = sira.map((a) => {
+    const k = adetli.get(a);
+    if (k) return `${tr(k.adet)} ${k.birim}${/^(PIECES?|PCS)$/.test(k.birim) ? " OF" : ""} ${k.tanim}`;
+    const n = adetsiz.get(a) || 1;
+    return n > 1 ? `${a.slice(2)} (${n} dosya)` : a.slice(2);
+  });
+  const toplamAdet = Array.from(adetli.values()).reduce((t, k) => t + k.adet, 0);
+  const birimler = new Set(Array.from(adetli.values()).map((k) => k.birim.replace(/S$/, "")));
+  const toplam = parcalar.length > 1 && adetsiz.size === 0 && birimler.size === 1 ? ` (TOPLAM ${tr(toplamAdet)} ${Array.from(adetli.values())[0].birim})` : "";
+  return parcalar.join(" / ") + toplam;
+}
+
 const kontAdedi = (u: GrupUyesi) => u.rezervasyonlar.reduce((t, r) => t + (r.konteyner_adedi || 0), 0);
 
 export function birlesikFaturaModeli(uyelerHam: GrupUyesi[], bolunmeliDosyalar: string[] = []): BirlesikFaturaModeli {
@@ -162,7 +205,7 @@ export function birlesikFaturaModeli(uyelerHam: GrupUyesi[], bolunmeliDosyalar: 
     banka,
     navlunBirim: navlunlar.length === 1 ? formatCurrency(sayi(navlunlar[0]), paraBirimi) : navlunlar.length ? "Dosyaya göre (dağılım tablosu)" : "",
     lokalBirim: lokaller.length === 1 ? formatCurrency(sayi(lokaller[0]), paraBirimi) : lokaller.length ? "Dosyaya göre" : "",
-    ambalaj: birlesik(uyeler.map((u) => u.dosya.detayli_ambalaj || u.dosya.ambalaj)),
+    ambalaj: ambalajToplami(uyeler.map((u) => u.dosya.detayli_ambalaj || u.dosya.ambalaj)),
     markalar: birlesik(uyeler.map((u) => u.dosya.marka)),
     diib: birlesik(uyeler.map((u) => formatDiibBilgisi(u.dosya.diib_no, u.dosya.diib_tarihi))),
     blNo: birlesik(uyeler.map((u) => u.dosya.bl_no)),

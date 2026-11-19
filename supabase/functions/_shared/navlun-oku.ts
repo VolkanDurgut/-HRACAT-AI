@@ -580,17 +580,22 @@ export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
 }
 
 /**
- * Mesajdaki lokal dahil / haric bilgisi. 16.11.2026: "liman masraflari dahil" / "local charges included" dahil demektir.
- * 17.11.2026 (MSC SINGAPUR): standart sart metnindeki kosullu "Ayrica belirtilmedigi muddetce ... dahil degildir" acik
- * "lokaller dahildir"i ezmez. 19.11.2026 (MSC genel listesi): acik ifade YOKSA kosullu cumle varsayilandir -> haric.
+ * Mesajdaki CIKIS (yukleme limani) lokali dahil / haric bilgisi. 16.11.2026: "liman masraflari dahil" / "local charges included"
+ * dahil demektir. 17.11.2026 (MSC SINGAPUR): standart sart metnindeki kosullu "Ayrica belirtilmedigi muddetce ... dahil degildir"
+ * karar vermez (null -> acente hafizasi; MSC tarifesinde lokaller dahil, kullanici onayli hafiza).
+ * 19.11.2026: tahliye / varis tarafinin lokali ("tahliye lokal masraflari ... dahil degildir") cikis lokalini haric yapmaz;
+ * "pol lokaller & BL ucreti dahil" dahil demektir.
  */
 export function lokalDurumu(duz: string): boolean | null {
   const haric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/gi)];
-  const kosullu = (x: RegExpMatchArray) => /belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(duz.slice(Math.max(0, (x.index ?? 0) - 120), x.index ?? 0));
-  if (haric.some((x) => !kosullu(x))) return false;
-  if (/lokaller(?:i)?\s*dahil(?!\s*de[ğg]il)|all\s*in|pol lokaller dahil|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil(?!\s*de[ğg]il)|local\s*charges\s*incl/i.test(duz)) return true;
+  const once = (x: RegExpMatchArray, n: number) => duz.slice(Math.max(0, (x.index ?? 0) - n), x.index ?? 0);
+  const kosullu = (x: RegExpMatchArray) => /belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(once(x, 120));
+  // ayni cumlede tahliye / varis tarafi ya da gumruk anilan haric ifadesi cikis lokali hakkinda degildir
+  const varisTarafi = (x: RegExpMatchArray) => /tahliye|var[ıi][şs]|\bpod\b|destination|dest\b|g[üu]mr[üu]k|customs/i.test(once(x, 60).split(/[.;]\s/).pop() || "");
+  if (haric.some((x) => !kosullu(x) && !varisTarafi(x))) return false;
+  if (/lokaller(?:i)?\s*dahil(?!\s*de[ğg]il)|all\s*in|pol\s*lokaller[^.;]{0,30}?dahil(?!\s*de[ğg]il)|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil(?!\s*de[ğg]il)|local\s*charges\s*incl/i.test(duz)) return true;
   if (/\+\s*lokaller/i.test(duz)) return false;
-  return haric.length ? false : null;
+  return null;
 }
 
 export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
@@ -642,8 +647,7 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
 
   const tarife = tarifeSatirlari(yeni);
   if (tarife) {
-    // 19.11.2026: liste sart metnindeki lokal bilgisi satirlara yazilir (MSC listesi: "Ayrica belirtilmedigi muddetce ... lokal
-    // masraflari dahil degildir" -> haric). Onceden null kaliyor, acente hafizasindaki "MSC lokal dahil" uygulanip ucuz gorunuyordu.
+    // 19.11.2026: liste metnindeki ACIK lokal bilgisi satirlara yazilir; kosullu sart cumlesi karar vermez (acente hafizasi)
     const lokalT = lokalDurumu(yeni.replace(/\s+/g, " "));
     for (const r of tarife) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: lokalT, pol: polBul(yeni), ...(r.para === "EUR" ? { para_birimi: "EUR" as const } : {}) });
     return olaylar;

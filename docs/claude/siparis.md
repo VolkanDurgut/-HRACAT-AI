@@ -593,8 +593,10 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
   "One line", "Ocean Network Express" ONE'dır; fiyata en yakın armatör seçilir ("Msc dışı alternatif ... Hat:ONE" → ONE).
 - **FT10** bitişik free time okunur.
 - **Genel tarife**: EUR satırlar `para_birimi = EUR` ile yazılır (önceden atılıyordu). Şart metnindeki koşullu
-  "Ayrıca belirtilmediği müddetçe ... lokal masrafları dahil değildir" açık "lokaller dahildir" yoksa **hariç** (`lokalDurumu`);
-  "lokal masrafları dahil değildir" artık yanlışlıkla "dahil" sayılmaz.
+  "Ayrıca belirtilmediği müddetçe ... lokal masrafları dahil değildir" KARAR VERMEZ (null → acente hafızası). DERS (19.11.2026
+  17:26): ilk sürüm bunu "hariç" yaptı; MSC hafızası (kullanıcı onaylı, 22.10 tarifesi "lokallerimiz dahil") devre dışı kaldı,
+  MSC-tek limanlar haritada "—" (lokal belirsiz) göründü. Geri alındı. Tahliye / varış / gümrük tarafının "dahil değildir"i
+  çıkış lokalini hariç yapmaz; "pol lokaller & BL ücreti dahil" dahildir. "lokal masrafları dahil değildir" "dahil" sayılmaz.
 - **Sabit yerleşimli teklif formu (knFormu)**: rota sayısı kadar "FT N DAYS - ARMATÖR" çifti varsa sırayla rotalara verilir.
 - **Elle düzeltilen teklif**: armatör boşsa ek formun yorumundaki tek armatör yazılır (`ek_bilgi.ek_armator`, RPC).
 - **RPC `navlun_kaydet`** (migration 20261119140000): para birimi yazılır; aynı mesajda aynı liman + ekipman için ELLE satır

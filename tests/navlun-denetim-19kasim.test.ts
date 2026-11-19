@@ -46,7 +46,7 @@ test("bitisik FT10 free time okunur", async () => {
   assert.equal(t.free_time_gun, 10);
 });
 
-test("genel tarife: EUR satirlar da yazilir; kosullu 'lokal dahil degildir' acik ifade yoksa haric", async () => {
+test("genel tarife: EUR satirlar da yazilir; kosullu 'lokal dahil degildir' karar vermez (acente hafizasi)", async () => {
   const govde = "Merhabalar,\n\nRELAY - Free time: 21 Days (Validity 30.11.2026)\nCurrency\n20DV\nORNEKA (ULKEA)\nUSD\n1600\nORNEKB (ULKEB)\nEUR\n2810\nORNEKC (ULKEC)\nUSD\n1800\n\n"
     + "1 - Navlun teklifimize yukarıda belirttiğimiz kalemler dahildir. Ayrıca belirtilmediği müddetçe, teklifimize yükleme ve tahliye limanı lokal masrafları dahil değildir.";
   const o = (await oku(govde, "RE: ORNEK // BOLGE & BOLGE // IHRACAT NAVLUN TEKLIFI")).filter((x) => x.tur === "teklif");
@@ -55,10 +55,14 @@ test("genel tarife: EUR satirlar da yazilir; kosullu 'lokal dahil degildir' acik
   assert.equal(b.para_birimi, "EUR");
   assert.equal(b.tutar, 2810);
   assert.equal(o.find((x) => x.liman === "ORNEKA")!.para_birimi, undefined);
-  assert.ok(o.every((x) => x.lokal_dahil === false));
+  assert.ok(o.every((x) => x.lokal_dahil === null));
   const { lokalDurumu } = await yukle("navlun-oku");
   assert.equal(lokalDurumu("Ayrıca belirtilmediği müddetçe lokal masrafları dahil değildir. Fiyatımıza lokaller dahildir."), true);
-  assert.equal(lokalDurumu("tahliye limanı lokal masrafları dahil değildir"), false);
+  assert.equal(lokalDurumu("Fiyata lokal masrafları dahil değildir."), false);
+  // varis tarafinin lokali cikis lokalini haric yapmaz; "pol lokaller & BL ucreti dahil" dahildir
+  assert.equal(lokalDurumu("Teklifimize pol lokaller & BL ücreti dahil olup, Vgm masrafı, tahliye lokal masrafları, gümrük masrafları dahil değildir."), true);
+  assert.equal(lokalDurumu("Tahliye limanı lokal masrafları dahil değildir."), null);
+  assert.equal(lokalDurumu("Navlun 900 usd. Gümrük masrafları dahil değildir."), null);
   assert.equal(lokalDurumu("navlun 900 usd"), null);
 });
 

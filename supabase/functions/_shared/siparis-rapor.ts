@@ -12,11 +12,12 @@ import {
   type PlanSatiri, type SiparisOzeti, type SiparisSatiri,
 } from "./siparis-liste.ts";
 import { limanAnahtariBul, limanSonTeklifleri, type LimanTeklifi, type NavlunTablosu } from "./navlun-tablosu.ts";
-import { RAPOR_SAATLERI, oturumAdi } from "./rapor-oturum.ts";
+import { oturumAdi } from "./rapor-oturum.ts";
 import { RAPOR_LACIVERT, esc, raporKabugu } from "./rapor-kabugu.ts";
 
 export const SIPARIS_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
-export const SIPARIS_RAPOR_SAATI = RAPOR_SAATLERI;
+/** 19.11.2026 (kullanici): siparis raporu yalniz her cumartesi 08:00 (pg_cron 0 5 * * 6; aksam isi kapali). */
+export const SIPARIS_RAPOR_SAATI = "her cumartesi 08:00";
 /** Plan bolumunde gosterilecek ileri gun sayisi (ETD bugun .. bugun+14) */
 const PLAN_GUN = 14;
 
@@ -218,6 +219,6 @@ export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olus
     <div style="margin-top:16px">${bolumBasligi(altBaslik)}</div>
     ${bekleyenNavlunTablosu(navlunlar)}`,
     dugme: { metin: "Siparişleri aç", yol: "/siparisler" },
-    dipnot: `Navlun = her acente / hattın son 60 gündeki en yeni 20'DC USD teklifi (yoksa en son teklif, "60 günden eski"). Lokal dahil = navlun + çıkış lokali + mühür vb., KDV hariç (acente hafızası; VGM eklenmez). EN İYİ = lokali kesin teklifler arasında en düşük.<br>Tüm siparişler ve yükleme planı ekteki Excel'de (sayfadaki "Excel indir" ile aynı). Her gün ${SIPARIS_RAPOR_SAATI}'de · müşteriye gitmez.`,
+    dipnot: `Navlun = her acente / hattın son 60 gündeki en yeni 20'DC USD teklifi (yoksa en son teklif, "60 günden eski"). Lokal dahil = navlun + çıkış lokali + mühür vb., KDV hariç (acente hafızası; VGM eklenmez). EN İYİ = lokali kesin teklifler arasında en düşük.<br>Tüm siparişler ve yükleme planı ekteki Excel'de (sayfadaki "Excel indir" ile aynı). ${SIPARIS_RAPOR_SAATI.charAt(0).toUpperCase()}${SIPARIS_RAPOR_SAATI.slice(1)}'de · müşteriye gitmez.`,
   });
 }

@@ -608,3 +608,10 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 - Teklif adayları (migration 20261119150000): aynı gönderen + liman 60 dk içinde "Düzeltme ..." ile başlayan mail attıysa önceki mail listeden düşer. "14 free 28 gun tt" transit okunur.
 - "lokal (masrafları) hariç" de hariç sayılır (varış / POD tarafı hariç). Hafızaya mail kanıtıyla iki acente eklendi (biri dahil, biri hariç + fabrika dolum lokal tutarı; veriler tabloda, repoda değil). Navlun sayfasındaki "Test maili" butonu kaldırıldı.
 - Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.
+
+## 4.22 Rapor saatleri sadeleştirildi (19.11.2026, kullanıcı: "gün içinde çok rapor gidiyor")
+- Günlük ihracat raporu ve iç piyasa raporu: YALNIZ 17:00 (sabah / öğle cron işleri `active=false`, silinmedi).
+- Sipariş raporu: YALNIZ cumartesi 08:00 (`siparis-rapor-sabah` = `0 5 * * 6`, akşam işi kapalı).
+- DİİB raporu: cumartesi 08:00, fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 07:55–09:00; cron
+  değişikliği (migration 20261119170000) yeni edge deploy edildikten SONRA uygulanır.
+- Navlun raporu değişmedi (her gün 17:00).

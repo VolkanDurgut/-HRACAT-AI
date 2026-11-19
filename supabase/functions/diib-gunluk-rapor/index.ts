@@ -15,7 +15,7 @@ import { diibGunlukRaporHesapla, diibGunlukRaporHtml, diibGunlukRaporKonusu } fr
 //   (DIIB_RAPOR_TEST_ALICISI (secret; 13.11.2026 kod varsayilani kaldirildi: tanimli degilse test maili GITMEZ)) "[TEST]" konuyla gider.
 //   Canlida: DIIB_RAPOR_ALICI (virgulle, en fazla 6).
 // CAGRI YETKISI (ic-gunluk-rapor ile ayni ilke):
-//  - Anon (pg_cron): yalniz 16:55-18:00 TR penceresinde; sirket + gun icin bir kez (diib_rapor_gonderimleri
+//  - Anon (pg_cron): yalniz 07:55-09:00 TR penceresinde (19.11.2026: haftalik, cumartesi 08:00; eskiden her gun 17:00); sirket + gun icin bir kez (diib_rapor_gonderimleri
 //    kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
 //    adresi), 24 saatte en fazla 3; zamanlanmis raporu engellemez.
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ,
@@ -42,7 +42,8 @@ const TEST_ALICISI = adresler("DIIB_RAPOR_TEST_ALICISI", []);
 
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 const trDakika = (ms: number) => { const tr = new Date(ms + 3 * 3600_000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
-const penceredeMi = (ms: number) => { const dk = trDakika(ms); return dk >= 17 * 60 - 5 && dk < 18 * 60; };
+// 19.11.2026: haftalik rapor cumartesi 08:00 TR (pg_cron 0 5 * * 6); pencere 07:55-09:00
+const penceredeMi = (ms: number) => { const dk = trDakika(ms); return dk >= 8 * 60 - 5 && dk < 9 * 60; };
 
 async function tekrarla(istek: () => Promise<Response>): Promise<Response> {
   for (let sira = 0; ; sira++) {

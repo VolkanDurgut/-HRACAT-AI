@@ -368,7 +368,7 @@ export default function BildirimlerPage() {
             <Alan etiket="Uyarılar · CC (virgülle)"><input value={ayar.yetkili_cc} onChange={(e) => setAyar({ ...ayar, yetkili_cc: e.target.value })} inputMode="email" placeholder="bbt@unex.com.tr" className={inputSinif} style={inputStil} /></Alan>
             <Alan etiket="Günlük iç piyasa raporu · Alıcılar (virgülle, en fazla 5)"><input value={ayar.gunluk_rapor_eposta} onChange={(e) => setAyar({ ...ayar, gunluk_rapor_eposta: e.target.value })} inputMode="email" placeholder="execution@unex.com.tr, bbt@unex.com.tr, lojistik@unex.com.tr" aria-label="Günlük iç piyasa raporu alıcıları" className={inputSinif} style={inputStil} /></Alan>
           </div>
-          <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }}>Günlük iç piyasa raporu: her gün 09:00 (dünün raporu), 12:00 ve 17:00&apos;de yüklenen (satış) ve gelen (alış) araçlar, açık siparişlerin kalanı ve kapanan siparişler bu adreslere gider. Boş bırakılırsa gönderilmez.</p>
+          <p className="text-[11px] mt-2" style={{ color: TEXT_MUTED }}>Günlük iç piyasa raporu: her gün 17:00&apos;de yüklenen (satış) ve gelen (alış) araçlar, açık siparişlerin kalanı ve kapanan siparişler bu adreslere gider. Boş bırakılırsa gönderilmez.</p>
           <div className="flex justify-end gap-2 mt-3">
             {ayarVar && <button onClick={() => setAyarAcik(false)} className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button>}
             <button onClick={ayarKaydet} disabled={ayarKaydediliyor} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white hover:brightness-110 disabled:opacity-60" style={{ backgroundColor: ACCENT }}>

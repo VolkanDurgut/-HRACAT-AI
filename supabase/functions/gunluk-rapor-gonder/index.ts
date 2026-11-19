@@ -26,6 +26,8 @@ import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slo
 //   "gunluk-rapor-sabah" 06:00 UTC = 09:00 TR -> DUNUN raporu (gunu kapatir; 10.10.2026'dan beri, once 08:00 / 08:45)
 //   "gunluk-rapor-ogle"  09:00 UTC = 12:00 TR -> BUGUNUN ara raporu (09.10.2026)
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
+//   19.11.2026 (kullanici: "gun icinde cok rapor gidiyor"): sabah ve ogle isleri KAPALI (cron.alter_job active=false);
+//   yalniz aksam 17:00 gider. Geri acmak icin migration 20261119160000 notuna bakin.
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
 // ozet kutulari + gun icinde yuklenen konteynerler + sevkiyat tablosu
 // ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔") + tamamlananlarin plaka/tonaji

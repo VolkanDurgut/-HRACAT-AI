@@ -39,7 +39,9 @@ export function diibGunlukRaporHesapla(v: DiibRaporVerisi, sira: Record<string, 
   const ozetler = diibOzetleri(v.belgeler, sonuc);
   const bekleyen = siraliBekleyenler(sonuc, ozetler, v.bolunmeler, sira);
   const guncel = guncelDiib(ozetler, bekleyen);
-  const bugunFatura = sonuc.satirlar.filter((s) => (s.faturaTarihi || "").slice(0, 10) === tarih)
+  // 19.11.2026 (kullanici: DIIB raporu her cumartesi 08:00): "bugun" = rapor gununu de iceren son DIIB_RAPOR_GUN gun
+  const ilkGun = new Date(Date.parse(`${tarih}T00:00:00Z`) - (DIIB_RAPOR_GUN - 1) * 86_400_000).toISOString().slice(0, 10);
+  const bugunFatura = sonuc.satirlar.filter((s) => { const g = (s.faturaTarihi || "").slice(0, 10); return g >= ilkGun && g <= tarih; })
     .sort((a, b) => (a.faturaNo || "").localeCompare(b.faturaNo || ""));
   const aktif = ozetler.filter((o) => o.belge.durum === "aktif");
   return {
@@ -64,7 +66,9 @@ export function diibGunlukRaporHesapla(v: DiibRaporVerisi, sira: Record<string, 
 const LACIVERT = "#283474";
 const MARKA_TURUNCU = "#F4A07C";
 export const DIIB_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
-export const DIIB_RAPOR_SAATI = "17:00";
+/** 19.11.2026: haftalik (cumartesi 08:00 TR); fatura bolumu son 7 gunu kapsar. */
+export const DIIB_RAPOR_SAATI = "her cumartesi 08:00";
+export const DIIB_RAPOR_GUN = 7;
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const sayi = (x: number, en = 0) => x.toLocaleString("tr-TR", { maximumFractionDigits: en });
 const ton = (kg: number) => `${sayi(kg / 1000, 3)} ton`;
@@ -79,7 +83,7 @@ const cutoffYaz = (ham: string | null | undefined) => {
 
 export function diibGunlukRaporKonusu(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"): string {
   const o = r.ozet;
-  const parcalar = [`Kalan ${ton(o.kalanKg)}`, o.bugunFatura ? `bugün ${o.bugunFatura} fatura · ${ton(o.bugunKg)}` : "bugün fatura yok", `bekleyen ${o.bekleyenYukleme} yükleme`];
+  const parcalar = [`Kalan ${ton(o.kalanKg)}`, o.bugunFatura ? `son 7 gün ${o.bugunFatura} fatura · ${ton(o.bugunKg)}` : "son 7 gün fatura yok", `bekleyen ${o.bekleyenYukleme} yükleme`];
   return `${sirketAdi} DİİB Raporu — ${diibTarihTR(r.tarih)} | ${parcalar.join(" | ")}`;
 }
 
@@ -98,7 +102,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
   const kutular = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border-collapse:separate"><tr>
     ${kutu("Kalan İhracat", ton(o.kalanKg), `${o.aktifDiib} aktif DİİB`, "#B45309")}${arasi}
     ${kutu("Gerçekleşen", ton(o.gerceklesenKg), `taahhüt ${ton(o.taahhutKg)}`, "#047857")}${arasi}
-    ${kutu("Bugün Kesilen", `${o.bugunFatura} fatura`, ton(o.bugunKg), LACIVERT)}${arasi}
+    ${kutu("Son 7 Günde Kesilen", `${o.bugunFatura} fatura`, ton(o.bugunKg), LACIVERT)}${arasi}
     ${kutu("Faturası Bekleyen", `${o.bekleyenYukleme} yükleme`, ton(o.bekleyenKg), "#475569")}
   </tr></table>`;
 
@@ -120,7 +124,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
   // Bugun kesilen faturalar
   const belgeNo = new Map(r.ozetler.map((x) => [x.belge.id, x.belge.belge_no]));
   const fRows = r.bugunFatura.map((s, i) => `<tr style="${zebra(i)}">${td(`${s.faturaNo ? `<a href="${DIIB_RAPOR_UYGULAMA_URL}/diib?fatura=${encodeURIComponent(s.faturaNo)}" style="color:${LACIVERT};font-family:monospace;font-weight:bold;text-decoration:underline">${esc(s.faturaNo)}</a>` : "<b>-</b>"}${s.bolunmeSira ? `<br><span style="color:#64748B;font-size:11px">${s.bolunmeSira}. fatura (bölünmüş)</span>` : ""}`, "white-space:nowrap")}${td(`${esc(s.cari)}${s.ulke ? `<br><span style="color:#64748B;font-size:11px">${esc(s.ulke)}</span>` : ""}`)}${td(`<span style="font-family:monospace">${esc(s.dosyaNo || "-")}</span>`, "white-space:nowrap")}${td(`<span style="font-family:monospace">${esc(belgeNo.get(s.diibId) || "-")}</span>`, "white-space:nowrap")}${td(`${sayi(s.miktarKg)} kg`, "text-align:right;white-space:nowrap")}${td(para(s.tutar), "text-align:right;white-space:nowrap")}</tr>`).join("");
-  const fTablo = tablo(`${th("Fatura")}${th("Cari · Ülke")}${th("Dosya")}${th("DİİB")}${th("Miktar", true)}${th("Tutar", true)}`, fRows || bos(6, "Bugün DİİB'e yazılan fatura yok."));
+  const fTablo = tablo(`${th("Fatura")}${th("Cari · Ülke")}${th("Dosya")}${th("DİİB")}${th("Miktar", true)}${th("Tutar", true)}`, fRows || bos(6, "Son 7 günde DİİB'e yazılan fatura yok."));
 
   // Faturasi kesilmemis yuklemeler (siraya gore)
   const payi = (b: SiraliBekleyen): string => {
@@ -153,7 +157,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
   ${dTablo}
   ${eslesmeyen}
 
-  ${bolum("Bugün Kesilen Faturalar", o.bugunFatura ? `${o.bugunFatura} fatura · ${ton(o.bugunKg)}` : "")}
+  ${bolum("Son 7 Günde Kesilen Faturalar", o.bugunFatura ? `${o.bugunFatura} fatura · ${ton(o.bugunKg)}` : "")}
   ${fTablo}
 
   ${bolum("Faturası Kesilmemiş Yüklemeler", `${o.bekleyenYukleme} yükleme · ${ton(o.bekleyenKg)}`)}
@@ -162,7 +166,7 @@ export function diibGunlukRaporHtml(r: DiibGunlukRapor, sirketAdi = "Unex Gıda"
   <div style="margin-top:24px;text-align:center">
     <a href="${DIIB_RAPOR_UYGULAMA_URL}/diib" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">DİİB Takibi'ni uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Fatura numarasına tıklayınca DİİB Takibi'nde ilgili fatura açılır (giriş gerekir).<br>Ekteki Excel, DİİB Takibi sayfasındaki "Excel'e aktar" ile aynı dosyadır (Genel Tablo + her DİİB'in ihracat listesi).<br>Gerçekleşen = sistem öncesi devir (sistem kurulmadan önce Excel'deki DİİB listesinde kesilmiş faturalar, DİİB başına bir kez girilir) + sistemde kesilen faturalar.<br>Bekleyen yüklemeler talimat cut-off sırasına göre DİİB'e dağıtılır; "sonra" kalanı bu yüklemeler faturalanınca kalacak miktardır.<br>Her gün ${DIIB_RAPOR_SAATI}'de gönderilir · müşteriye gitmez.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Fatura numarasına tıklayınca DİİB Takibi'nde ilgili fatura açılır (giriş gerekir).<br>Ekteki Excel, DİİB Takibi sayfasındaki "Excel'e aktar" ile aynı dosyadır (Genel Tablo + her DİİB'in ihracat listesi).<br>Gerçekleşen = sistem öncesi devir (sistem kurulmadan önce Excel'deki DİİB listesinde kesilmiş faturalar, DİİB başına bir kez girilir) + sistemde kesilen faturalar.<br>Bekleyen yüklemeler talimat cut-off sırasına göre DİİB'e dağıtılır; "sonra" kalanı bu yüklemeler faturalanınca kalacak miktardır.<br>${DIIB_RAPOR_SAATI.charAt(0).toUpperCase()}${DIIB_RAPOR_SAATI.slice(1)}'de gönderilir · müşteriye gitmez.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

@@ -11,7 +11,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // ============================================================================
 // SIPARIS RAPORU MAILI (siparis-rapor) - 11.11.2026
 // ============================================================================
-// pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
+// pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). 19.11.2026 (kullanici): yalniz CUMARTESI 08:00 (sabah isi 0 5 * * 6, aksam isi kapali). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
 // ayni veri: siparis_listesi_veri + yukleme_plani_veri, service_role, yalniz okuma). Ek: sayfadaki "Excel indir" ile AYNI
 // dosya (_shared/siparis-xlsx.ts). Musteriye GITMEZ.
 // ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar

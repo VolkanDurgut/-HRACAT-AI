@@ -31,15 +31,15 @@ export type RaporTanimi = {
 };
 
 export const RAPORLAR: RaporTanimi[] = [
-  { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 09:00, 12:00 ve 17:00", edge: null, testModu: false, etkin: "yakinda" },
-  { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Rezervasyon bekleyen (ön ödemeli) siparişler + limanlarının en yeni navlun fiyatları + Excel", saat: "Her gün 08:00 ve 17:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
+  { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Rezervasyon bekleyen (ön ödemeli) siparişler + limanlarının en yeni navlun fiyatları + Excel", saat: "Her cumartesi 08:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
   { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Satın alınan navlunlar + rezervasyon bekleyen müşteriler + 2 Excel (satın alma listesi, bütün navlunlar)", saat: "Her gün 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
-  { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her cumartesi 08:00 (son 7 gün)", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "vgm", ad: "VGM Bildirimi", grup: "Operasyon", aciklama: "Konteynerleri tamamlanan dosyanın VGM PDF'i", saat: "Konteynerler tamamlanınca", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "konsimento_hatirlatma", ad: "Konşimento Hatırlatma", grup: "Operasyon", aciklama: "Fatura talimatından sonra konşimento talimatı bekleyen dosyalar", saat: "Talimat gönderilince", edge: null, testModu: false, etkin: "yakinda" },
   // 14.11.2026: onay adimi kaldirildi; 'fatura_onay' listesi = talimat mailinin alicilari (Alici + CC). 'fatura_dagitim' kullanilmiyor.
   { rapor: "fatura_onay", ad: "Fatura Talimatı", grup: "Operasyon", aciklama: "“FATURA VE BEYANNAME TALİMATI HAKKINDA // …” · Harun Bey merhaba + PDF indir düğmesi", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "tam" },
-  { rapor: "siparis_formu", ad: "Sipariş Bildirim Formu", grup: "Operasyon", aciklama: "Her yükleme için üretime sipariş formu (Excel + çuval görseli); test için Siparişler > Sipariş Formları", saat: "Boş ekipman alımından 1 gün önce 08:00", edge: null, testModu: true, etkin: "tam" },
+  { rapor: "siparis_formu", ad: "Sipariş Bildirim Formu", grup: "Operasyon", aciklama: "Her yükleme için üretime sipariş formu (Excel + çuval görseli); test için Siparişler > Sipariş Formları", saat: "Gönder butonuyla (elle)", edge: null, testModu: true, etkin: "tam" },
   { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },
   { rapor: "musteri_durum", ad: "Müşteri Durum Raporu", grup: "Satış ve müşteri", aciklama: "Siparişi olan her müşteriye İngilizce sipariş durumu", saat: "Canlıya alınınca belirlenecek", edge: "musteri-durum-rapor", testModu: true, otomatikAlici: "Müşterinin kendisi", etkin: "tam" },
   { rapor: "satin_alma", ad: "Satın Alma Talebi", grup: "Satış ve müşteri", aciklama: "Satın alma listesi gönderim maili (sonuç maili ayrı)", saat: "Liste gönderilince", edge: null, testModu: false, etkin: "yakinda" },

@@ -27,6 +27,7 @@ import {
 // 04.11.2026 aksam - GUNDE 3 OTURUM (kullanici: "bundan sonraki gunlerde sabah ogle aksam"; ihracat
 // raporuyla ayni duzen, 15 dk sonra): pg_cron ic-gunluk-rapor-sabah / -ogle / -aksam (06:15 / 09:15 /
 // 14:15 UTC = 09:15 / 12:15 / 17:15 TR; 19.11.2026: 06:00 / 09:00 / 14:00 UTC = 09:00 / 12:00 / 17:00 TR). SABAH = DUNUN raporu, OGLE / AKSAM = bugunun. Anon pencere: her
+// 19.11.2026 aksam (kullanici): sabah ve ogle isleri KAPALI; yalniz aksam 17:00 gider (oturum kodu degismedi).
 // oturumun saatinden 5 dk once - 60 dk sonra; tekrar korumasi (sirket, gun, oturum).
 // ============================================================================
 

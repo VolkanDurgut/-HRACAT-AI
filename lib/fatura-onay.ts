@@ -36,9 +36,15 @@ const ALANLAR = "id,dosya_id,durum,test,kaynak,gonderen,onay_alicilari,gonderile
 
 export const ONAY_DURUM_ADI: Record<FaturaOnayDurumu, string> = { gonderildi: "Gönderildi", atlandi: "Gönderilmedi (canlıya geçişte atlandı)", bekliyor: "Onay bekliyor (eski)", onaylandi: "Onaylandı (eski)", revize: "Revize istendi (eski)" };
 
-/** Dosyanin en son onay kaydi (yoksa null). */
+/** Dosyanin en son onay kaydi (yoksa null). 19.11.2026: dosya birlesik faturadaysa grubun en son kaydi (grup maili tek kayittir). */
 export async function sonFaturaOnayi(dosyaId: string): Promise<FaturaOnayKaydi | null> {
-  const { data, error } = await supabase.from("fatura_talimati_onaylari").select(ALANLAR).eq("dosya_id", dosyaId).order("olusturma", { ascending: false }).limit(1);
+  let ids = [dosyaId];
+  const g = await supabase.from("fatura_grubu_dosyalari").select("grup_id").eq("dosya_id", dosyaId).maybeSingle();
+  if (!g.error && g.data?.grup_id) {
+    const u = await supabase.from("fatura_grubu_dosyalari").select("dosya_id").eq("grup_id", g.data.grup_id);
+    if (!u.error && u.data?.length) ids = u.data.map((x) => x.dosya_id as string);
+  }
+  const { data, error } = await supabase.from("fatura_talimati_onaylari").select(ALANLAR).in("dosya_id", ids).order("olusturma", { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   return ((data || [])[0] as FaturaOnayKaydi | undefined) || null;
 }

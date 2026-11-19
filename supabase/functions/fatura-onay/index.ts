@@ -21,6 +21,9 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 //  - Kullanici (JWT, ayni sirket): {gonder: dosya_id} -> simdi gonder / tekrar gonder (konteynerler tam olmali).
 //  - {karar: ...} (eski onay / revize) -> 410.
 // Yazma YALNIZ bu edge (service_role); tablo sirket kullanicilarina salt okunur.
+// 19.11.2026 BIRLESIK FATURA (fatura_grubu_dosyalari): gruptaki dosya icin talimat GRUBUN tamamini kapsar. Otomatik mail
+//   gruptaki butun dosyalarin konteynerleri tamamlaninca ve grubun hicbir dosyasina (ayni modda) kayit yokken BIR kez gider;
+//   "Simdi / tekrar gonder" de grubu gonderir. Grup tablosu okunamazsa dosya tek basina islenir (eski davranis).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -87,6 +90,34 @@ async function dosyaOzeti(dosyaId: string): Promise<(OnayOzeti & { dosya: DosyaS
   ]);
   return d[0] ? { dosya: d[0], rezervasyonlar: r, konteynerler: k } : null;
 }
+/** Dosya birlesik faturadaysa gruptaki dosya id'leri (en az 2); degilse null. Tablo yoksa / okunamazsa null. */
+async function grupDosyaIdleri(dosyaId: string): Promise<string[] | null> {
+  try {
+    const g = await oku<{ grup_id: string }>(`fatura_grubu_dosyalari?select=grup_id&dosya_id=eq.${dosyaId}`);
+    if (!g[0]?.grup_id) return null;
+    const u = await oku<{ dosya_id: string }>(`fatura_grubu_dosyalari?select=dosya_id&grup_id=eq.${g[0].grup_id}`);
+    const ids = u.map((x) => x.dosya_id).filter((x) => UUID_RE.test(x));
+    return ids.length >= 2 ? ids : null;
+  } catch {
+    return null;
+  }
+}
+type GrupOzeti = OnayOzeti & { dosya: DosyaSatiri; uyeler: (OnayOzeti & { dosya: DosyaSatiri })[] };
+/** Dosyanin talimat ozeti: grupta ise butun dosyalarin rezervasyon + konteynerleri, mail bu dosya uzerinden kaydedilir. */
+async function talimatOzeti(dosyaId: string): Promise<GrupOzeti | null> {
+  const o = await dosyaOzeti(dosyaId);
+  if (!o) return null;
+  const ids = await grupDosyaIdleri(dosyaId);
+  if (!ids) return { ...o, uyeler: [o] };
+  const uyeler = (await Promise.all(ids.map((id) => (id === dosyaId ? Promise.resolve(o) : dosyaOzeti(id))))).filter((x): x is OnayOzeti & { dosya: DosyaSatiri } => !!x && x.dosya.company_id === o.dosya.company_id);
+  uyeler.sort((a, b) => String(a.dosya.dosya_no || "").localeCompare(String(b.dosya.dosya_no || "")));
+  return {
+    dosya: o.dosya, uyeler,
+    rezervasyonlar: uyeler.flatMap((u) => u.rezervasyonlar),
+    konteynerler: uyeler.flatMap((u) => u.konteynerler),
+    grupDosyalari: uyeler.map((u) => u.dosya.dosya_no || u.dosya.id),
+  };
+}
 /** lib/fatura-talimati-durum.ts "tam" kurali: rezervasyondaki konteyner adedinin hepsi girildi. */
 const tamMi = (o: OnayOzeti) => {
   const rk = o.rezervasyonlar.reduce((t, r) => t + (r.konteyner_adedi || 0), 0);
@@ -106,6 +137,7 @@ async function mailGonder(m: { from: string; to: string[]; cc?: string[]; subjec
 
 /** Kayit (durum 'gonderildi') + talimat maili. Mail gitmezse kayit silinir (sonraki taramada tekrar denenir). */
 async function talimatGonder(o: OnayOzeti & { dosya: DosyaSatiri }, kaynak: "otomatik" | "elle", gonderen: string | null) {
+  // Birlesik fatura: grubun ozeti (rezervasyon + konteynerler butun dosyalardan); kayit bu dosyaya yazilir
   const companyId = o.dosya.company_id;
   const ayar = await raporAyari(SUPABASE_URL, basliklar, companyId, "fatura_onay", { canli: false, alicilar: [] });
   const test = !ayar.canli;
@@ -148,8 +180,14 @@ Deno.serve(async (req: Request) => {
         if (gonderilen >= TARAMA_SINIRI) break;
         if (!canliMi.has(a.company_id)) canliMi.set(a.company_id, (await raporAyari(SUPABASE_URL, basliklar, a.company_id, "fatura_onay", { canli: false, alicilar: [] })).canli);
         if (canliMi.get(a.company_id) ? a.canli_kaydi : a.test_kaydi) continue;
-        const o = await dosyaOzeti(a.dosya_id);
-        if (!o || !tamMi(o)) continue;
+        const o = await talimatOzeti(a.dosya_id);
+        if (!o || !o.uyeler.every(tamMi)) continue;
+        // Birlesik fatura: grubun herhangi bir dosyasina ayni modda kayit varsa (grup maili gitti) tekrar gonderilmez
+        if (o.uyeler.length >= 2) {
+          const ids = o.uyeler.map((u) => u.dosya.id).join(",");
+          const onceki = await oku<{ id: string }>(`fatura_talimati_onaylari?select=id&dosya_id=in.(${ids})&test=is.${canliMi.get(a.company_id) ? "false" : "true"}&limit=1`);
+          if (onceki.length) continue;
+        }
         const s = await talimatGonder(o, "otomatik", null);
         if (s.gonderildi) gonderilen++; else atlanan++;
       }
@@ -159,9 +197,10 @@ Deno.serve(async (req: Request) => {
     // --- Simdi gonder / tekrar gonder ---
     if (govde.gonder) {
       if (!UUID_RE.test(govde.gonder)) return json({ ok: false, hata: "Geçersiz dosya." }, 400);
-      const o = await dosyaOzeti(govde.gonder);
+      const o = await talimatOzeti(govde.gonder);
       if (!o || o.dosya.company_id !== k.companyId) return json({ ok: false, hata: "Dosya bulunamadı." }, 404);
-      if (!tamMi(o)) return json({ ok: false, hata: "Rezervasyondaki konteynerlerin hepsi girilmeden fatura talimatı gönderilemez." }, 400);
+      const eksik = o.uyeler.filter((u) => !tamMi(u)).map((u) => u.dosya.dosya_no || "dosya");
+      if (eksik.length) return json({ ok: false, hata: o.uyeler.length >= 2 ? `Birleşik faturadaki dosyaların konteynerleri eksik: ${eksik.join(", ")}.` : "Rezervasyondaki konteynerlerin hepsi girilmeden fatura talimatı gönderilemez." }, 400);
       const s = await talimatGonder(o, "elle", k.eposta);
       if (s.atlandi) return json({ ok: false, hata: s.atlandi }, 409);
       return json({ ok: true, ...s });

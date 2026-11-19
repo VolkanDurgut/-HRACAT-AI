@@ -8,6 +8,8 @@
  *   PDF tarayicida uretilir (lib/fatura-talimati-pdf-builder); mail eki yerine "PDF indir" dugmesi talimat sayfasini
  *   (/fatura-onay?id=..&indir=1) acar, sayfa ayni PDF'i olusturup indirir.
  * Tema: 17.11.2026'dan beri ortak operasyon mail kalibi (operasyon-mail.ts; konsimento talimati ile ayni).
+ * 19.11.2026 BIRLESIK FATURA: ozet bir grubu temsil ediyorsa (grupDosyalari) konteynerler gruptaki butun dosyalarindir;
+ *   konuya "BİRLEŞİK FATURA (N DOSYA)" eklenir, mailde dosya listesi yazar. PDF sayfasi grubun tek talimatini uretir.
  */
 import { RAPOR_URL, esc } from "./rapor-kabugu.ts";
 import { operasyonMailHtml } from "./operasyon-mail.ts";
@@ -22,7 +24,7 @@ export type OnayDosyasi = {
 };
 export type OnayRezervasyonu = { konteyner_adedi: number | null; booking_no: string | null; gemi_adi: string | null; gemi_kalkis_tarihi: string | null };
 export type OnayKonteyneri = { tip: string | null };
-export type OnayOzeti = { dosya: OnayDosyasi; rezervasyonlar: OnayRezervasyonu[]; konteynerler: OnayKonteyneri[] };
+export type OnayOzeti = { dosya: OnayDosyasi; rezervasyonlar: OnayRezervasyonu[]; konteynerler: OnayKonteyneri[]; grupDosyalari?: string[] };
 
 /** Konu ve liman Ingilizce buyuk harf (i -> I; Turkce "İ" uretilmez: "Haifa" -> "HAIFA"). */
 const buyuk = (s: string) => s.normalize("NFC").toUpperCase().replace(/\s+/g, " ").trim();
@@ -44,8 +46,8 @@ export function konteynerOzeti(konteynerler: OnayKonteyneri[]): string {
 }
 
 /** Mail konusu (11.11.2026 kullanicinin verdigi kalip): FATURA VE BEYANNAME TALIMATI HAKKINDA // ALICI // 6 * 20 DC // LIMAN */
-export function dagitimKonusu(d: OnayDosyasi, konteynerler: OnayKonteyneri[]): string {
-  return `FATURA VE BEYANNAME TALİMATI HAKKINDA // ${buyuk(d.alici_firma || "-")} // ${konteynerOzeti(konteynerler)} // ${limanKisa(d.varis_limani)}`;
+export function dagitimKonusu(d: OnayDosyasi, konteynerler: OnayKonteyneri[], grupDosyaSayisi = 0): string {
+  return `FATURA VE BEYANNAME TALİMATI HAKKINDA // ${buyuk(d.alici_firma || "-")} // ${konteynerOzeti(konteynerler)} // ${limanKisa(d.varis_limani)}${grupDosyaSayisi >= 2 ? ` // BİRLEŞİK FATURA (${grupDosyaSayisi} DOSYA)` : ""}`;
 }
 
 /** Talimat sayfasinin baglantisi; indir=1 sayfa acilinca PDF'i kendiliginden indirir. */
@@ -58,19 +60,23 @@ export const talimatYolu = (kayitId: string) => `/fatura-onay?id=${encodeURIComp
  */
 export function talimatMailiHtml(o: OnayOzeti, kayitId: string, sirketAdi: string): { konu: string; html: string } {
   const d = o.dosya;
-  const konu = dagitimKonusu(d, o.konteynerler);
+  const grup = (o.grupDosyalari || []).length >= 2 ? o.grupDosyalari! : null;
+  const konu = dagitimKonusu(d, o.konteynerler, grup?.length || 0);
   const bilgiler: [string, string][] = [
     ["Müşteri", `<b>${esc(d.alici_firma || "-")}</b>`],
     ["Konteyner", `<b>${esc(konteynerOzeti(o.konteynerler))}</b>`],
     ["Varış limanı", esc(d.varis_limani || "-")],
   ];
-  if (d.dosya_no) bilgiler.push(["Dosya", esc(d.dosya_no)]);
+  if (grup) bilgiler.push(["Birleşik fatura", `<b>${grup.length} dosya tek fatura</b>: ${esc(grup.join(", "))}`]);
+  else if (d.dosya_no) bilgiler.push(["Dosya", esc(d.dosya_no)]);
   const html = operasyonMailHtml({
     site: RAPOR_URL,
     ustEtiket: `${(sirketAdi || "Unex Gıda").toLocaleUpperCase("tr-TR")} · İHRACAT OPERASYON`,
-    baslik: "Fatura talimatı hazır",
+    baslik: grup ? "Birleşik fatura talimatı hazır" : "Fatura talimatı hazır",
     hitap: "Harun Bey merhaba,",
-    girisHtml: "Fatura talimatı hazırdır. Aşağıdaki düğmeden PDF olarak indirebilirsiniz.",
+    girisHtml: grup
+      ? "Aynı müşteri ve aynı gemideki dosyalar için <b>tek fatura</b> talimatı hazırdır. Aşağıdaki düğmeden PDF olarak indirebilirsiniz."
+      : "Fatura talimatı hazırdır. Aşağıdaki düğmeden PDF olarak indirebilirsiniz.",
     bilgiler,
     dugmeler: [
       { metin: "Fatura Talimatını İndir (PDF)", href: `${RAPOR_URL}${talimatYolu(kayitId)}`, birincil: true },

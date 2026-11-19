@@ -17,6 +17,9 @@ import { ON_TALIMAT_ISARETI, type FaturaTalimatiDurumu } from "@/lib/fatura-tali
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { bolunmeUyumsuz, faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, urunToplamKg, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 import { DIIB_BOLUNME_OLAYI, dosyaBolunmesiGetir } from "@/lib/diib/veri";
+import { birlesikFaturaModeli, birlesikKonu, birlesikTalimatMetni, type BirlesikFaturaModeli } from "@/lib/birlesik-fatura/model";
+import { grupTalimatiGonderildi, grupUyeleriniGetir } from "@/lib/birlesik-fatura/veri";
+import { beyannameSuresi as birlesikBeyannameSuresi, indirBirlesikTalimatPdf } from "@/lib/birlesik-fatura/pdf";
 
 /** Mail metnindeki bolunme bolumunun basligi (kayitli metinde aranir). */
 const BOLUNME_BASLIGI = "FATURA BOLUNMESI";
@@ -51,6 +54,22 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   const [metin, setMetin] = useState("");
 
   const talimatGonderildi = !!dosya.fatura_talimati_gonderildi;
+
+  // 19.11.2026: BIRLESIK FATURA (ayni musteri + ayni gemi, tek fatura). Dosya bir gruptaysa talimat GRUBUN tamamindan
+  // uretilir (lib/birlesik-fatura); grupta degilse tek dosyalik talimat eskisi gibi.
+  const [grupModu, setGrupModu] = useState<{ model: BirlesikFaturaModeli; on: boolean; ids: string[] } | null>(null);
+  const grupModeli = useCallback(async () => {
+    if (!companyId || !dosya.id) return null;
+    try {
+      const g = await grupUyeleriniGetir(companyId, dosya.id);
+      if (!g) return null;
+      const model = birlesikFaturaModeli(g.uyeler, g.bolunmeliDosyalar);
+      return { model, on: model.eksikDosyalar.length > 0, ids: g.uyeler.map((u) => u.dosya.id) };
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Birleşik fatura okunamadı.", "error");
+      throw e;
+    }
+  }, [companyId, dosya.id, showToast]);
 
   // 04.11.2026: DIIB bolunmesi (iki fatura) - dosyanin DIIB kartinda kaydedilir
   const [bolunme, setBolunme] = useState<TalimatParcaGirdisi[]>([]);
@@ -233,6 +252,21 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   };
 
   const handleFaturaTalimatiAc = async (onaylandi = false) => {
+    const g = await grupModeli().catch(() => undefined);
+    if (g === undefined) return;
+    if (g) {
+      setGrupModu(g);
+      setKonu(birlesikKonu(g.model, g.on));
+      setMetin(birlesikTalimatMetni(g.model, g.on, {
+        gidecegiUlke: asciiYap(gidecegiUlke(g.model.varisLimani) ?? ulkeAyikla(g.model.varisLimani) ?? ""),
+        ticaretUlkesi: asciiYap(ticaretYapilanUlke(g.model.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ),
+        beyannameSuresi: birlesikBeyannameSuresi(g.model) || undefined,
+      }));
+      setTo(""); setCc("");
+      setShowFaturaTalimati(true);
+      return;
+    }
+    setGrupModu(null);
     if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
     if (on && !onaylandi) { setOnayIslemi("ac"); return; }
     const guncelBolunme = await bolunmeGetir();
@@ -252,6 +286,9 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   // dogrudan guncel sistem verisinden (kart tasarimi) uretilir - boylece PDF
   // her zaman en guncel dosya/konteyner bilgisini yansitir.
   const handleFaturaTalimatiIndir = async (onaylandi = false) => {
+    const g = await grupModeli().catch(() => undefined);
+    if (g === undefined) return;
+    if (g) { await indirBirlesikTalimatPdf(g.model, g.on); return; }
     if (durum.tur === "yok") { showToast(durum.neden, "error"); return; }
     if (on && !onaylandi) { setOnayIslemi("indir"); return; }
     await indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir());
@@ -260,6 +297,20 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   const handleMailGonder = async () => {
     const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : "";
     window.open(`mailto:${to}?subject=${encodeURIComponent(konu)}${ccPart}&body=${encodeURIComponent(metin)}`);
+    // Birlesik fatura: gruptaki BUTUN dosyalar gonderildi olarak isaretlenir (on talimat isaretlenmez)
+    if (grupModu) {
+      if (grupModu.on) {
+        setShowFaturaTalimati(false);
+        showToast("Birleşik ön fatura talimatı maili açıldı. Konteynerler girilince tam talimatı ayrıca gönderin.", "success");
+        return;
+      }
+      const sorun = await grupTalimatiGonderildi(companyId, grupModu.ids, metin);
+      if (sorun) { showToast(`Fatura talimatı durumu ${sorun}.`, "error"); return; }
+      setShowFaturaTalimati(false);
+      showToast(`Birleşik fatura talimatı maili gönderildi (${grupModu.ids.length} dosya işaretlendi).`, "success");
+      onRefresh();
+      return;
+    }
     // On talimat "gonderildi" olarak ISARETLENMEZ (konsimento beklentisi / kayitli metin
     // tam talimata aittir); konteynerler girilince tam talimat ayrica gonderilir.
     if (on) {
@@ -301,7 +352,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowFaturaTalimati(false)}>
           <div className="rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-5 space-y-3 animate-fade-up" style={{ backgroundColor: CARD_BG, border: `1px solid ${CARD_BORDER}` }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-white">{on ? "Ön Fatura Talimatı Maili" : "Fatura Talimatı Maili"}</p>
+              <p className="text-sm font-bold text-white">{grupModu ? (grupModu.on ? "Birleşik Ön Fatura Talimatı Maili" : "Birleşik Fatura Talimatı Maili") : on ? "Ön Fatura Talimatı Maili" : "Fatura Talimatı Maili"}</p>
               <button onClick={() => setShowFaturaTalimati(false)} className="hover:text-white transition-colors" style={{ color: TEXT_MUTED }}><X size={18} /></button>
             </div>
             {/* 05.11.2026: ticaret yapilan ulke + bayrak (PDF ile ayni kaynak: alici adresi) */}
@@ -311,12 +362,19 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
                 ? <span className="inline-flex items-center gap-1.5 font-semibold text-white"><UlkeBayrak ulke={ticaretYapilanUlke(dosya.alici_adresi)} yukseklik={13} />{ticaretYapilanUlke(dosya.alici_adresi)}</span>
                 : <span className="text-amber-300">belirlenemedi (alıcı adresini kontrol edin)</span>}
             </p>
-            {bolunmeUyumsuz(urunToplamKg(dosya.urun_detaylari), bolunme) && (
+            {grupModu && (
+              <div className="text-xs rounded-lg border px-3 py-2 space-y-1" style={{ borderColor: "rgba(244,160,124,0.45)", backgroundColor: "rgba(244,160,124,0.08)", color: "#FCD9C6" }} data-testid="birlesik-talimat-notu">
+                <p><b className="text-white">Birleşik fatura:</b> {grupModu.model.dosyaSayisi} dosya ({grupModu.model.dosyalar.map((d) => d.dosyaNo).join(", ")}) tek faturada · {grupModu.model.toplam.konteyner} konteyner · {grupModu.model.toplam.mt.toLocaleString("tr-TR", { maximumFractionDigits: 3 })} MTS</p>
+                {grupModu.on && <p className="text-amber-300">Konteyner bilgileri eksik: {grupModu.model.eksikDosyalar.join(", ")} (ön talimat; gönderildi olarak işaretlenmez).</p>}
+                {grupModu.model.farklar.map((f) => <p key={f} className="text-amber-300">Dikkat: {f}</p>)}
+              </div>
+            )}
+            {!grupModu && bolunmeUyumsuz(urunToplamKg(dosya.urun_detaylari), bolunme) && (
               <p className="text-xs rounded-lg border px-3 py-2 text-red-300" style={{ borderColor: "rgba(239,68,68,0.4)", backgroundColor: "rgba(239,68,68,0.08)" }} data-testid="bolunme-uyumsuz">
                 DİİB fatura bölünmesi ({bolunme.reduce((t, p) => t + p.kg, 0).toLocaleString("tr-TR")} kg) ürün miktarıyla ({urunToplamKg(dosya.urun_detaylari).toLocaleString("tr-TR")} kg) aynı değil; bölünme talimata YAZILMADI. Önce Proforma sekmesinde ürün miktarını yüklenen miktara göre düzeltin.
               </p>
             )}
-            {(() => {
+            {!grupModu && (() => {
               // 18.11.2026: talimata yazilacak banka proformadakinden farkliysa gonderimden once uyar
               const fark = bankaFarki(faturaTalimatiBankasi(dosya), dosya.ham_veri);
               return fark ? (
@@ -325,7 +383,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
                 </p>
               ) : null;
             })()}
-            {on && (
+            {on && !grupModu && (
               <p className="text-xs rounded-lg border px-3 py-2 text-amber-300" style={{ borderColor: "rgba(245,158,11,0.4)", backgroundColor: "rgba(245,158,11,0.08)" }} data-testid="on-talimat-notu">
                 Ön talimat: rezervasyon / konteyner bilgileri olmadan hazırlandı. Gönderildi olarak işaretlenmez; konteynerler girilince tam talimatı ayrıca gönderin.
               </p>
@@ -350,7 +408,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
               <button onClick={handleMailGonder} disabled={!to} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 <Mail size={14} /> Mail Uygulamasını Aç
               </button>
-              <button onClick={async () => indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir())} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
+              <button onClick={async () => (grupModu ? indirBirlesikTalimatPdf(grupModu.model, grupModu.on) : indirFaturaTalimatiPdf(dosya, rezervasyonlar, konteynerler, on, await bolunmeGetir()))} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Fatura talimatını PDF olarak indir">
                 <Download size={14} /> Fatura Talimatı İndir
               </button>
               <button onClick={() => setShowFaturaTalimati(false)} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>İptal</button>

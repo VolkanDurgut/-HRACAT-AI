@@ -14,6 +14,7 @@ import AppShell from "@/components/app-shell";
 import RezervasyonTab from "@/components/rezervasyon-tab";
 import { faturaTalimatiDurumu } from "@/lib/fatura-talimati-durum";
 import { FaturaOnayDurumu } from "@/components/fatura-onay-durumu";
+import { BirlesikFaturaDurumu } from "@/components/birlesik-fatura-durumu";
 import KonteynerTab, { KonteynerTabHandle } from "@/components/konteyner-tab";
 import EkBilgilerCard from "@/components/ek-bilgiler-card";
 import DiibBolunmeKarti from "@/components/diib-bolunme-karti";
@@ -291,6 +292,8 @@ function DosyaDetailContent() {
                 </div>
                 {/* 11.11.2026: konteynerler tamamlaninca fatura talimati onaya gider (lib/fatura-onay.ts) */}
                 <FaturaOnayDurumu dosyaId={dosya.id} tam={faturaDurumu.tur === "tam"} />
+                {/* 19.11.2026: ayni musteri + ayni gemi -> tek fatura (lib/birlesik-fatura) */}
+                <BirlesikFaturaDurumu dosyaId={dosya.id} dosyaNo={dosya.dosya_no} gemi={rezervasyonlar[0]?.gemi_adi || null} />
                 </>
               );
             })()}

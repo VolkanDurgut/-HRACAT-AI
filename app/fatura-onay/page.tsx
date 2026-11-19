@@ -12,6 +12,9 @@ import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import { dosyaBolunmesiGetir } from "@/lib/diib/veri";
 import { ONAY_DURUM_ADI, faturaOnayiGetir, talimatPdfUret, trZaman, type FaturaOnayKaydi } from "@/lib/fatura-onay";
 import { ACCENT, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
+import { grupUyeleriniGetir } from "@/lib/birlesik-fatura/veri";
+import { birlesikFaturaModeli } from "@/lib/birlesik-fatura/model";
+import { birlesikTalimatPdfUret } from "@/lib/birlesik-fatura/pdf";
 
 /**
  * FATURA TALIMATI (talimat maili sayfasi). Mailin "Fatura Talimatini Indir (PDF)" dugmesi buraya baglanir:
@@ -42,6 +45,8 @@ function TalimatIcerik() {
   const [hata, setHata] = useState<string | null>(null);
   const [pdf, setPdf] = useState<{ url: string; ad: string } | null>(null);
   const [pdfHata, setPdfHata] = useState<string | null>(null);
+  /** 19.11.2026: dosya birlesik faturadaysa gruptaki dosya numaralari (PDF grubun tek talimatidir) */
+  const [grupDosyalari, setGrupDosyalari] = useState<string[] | null>(null);
   const indirildi = useRef(false);
   const indirRef = useRef<HTMLAnchorElement>(null);
 
@@ -71,8 +76,16 @@ function TalimatIcerik() {
     let iptal = false; let url: string | null = null;
     (async () => {
       try {
-        const bolunme = await dosyaBolunmesiGetir(companyId, veri.dosya.id);
-        const p = await talimatPdfUret(veri.dosya, veri.rezervasyonlar, veri.konteynerler, bolunme);
+        const grup = await grupUyeleriniGetir(companyId, veri.dosya.id);
+        let p: { blob: Blob; ad: string };
+        if (grup) {
+          const model = birlesikFaturaModeli(grup.uyeler, grup.bolunmeliDosyalar);
+          if (!iptal) setGrupDosyalari(model.dosyalar.map((d) => d.dosyaNo));
+          p = await birlesikTalimatPdfUret(model, model.eksikDosyalar.length > 0);
+        } else {
+          const bolunme = await dosyaBolunmesiGetir(companyId, veri.dosya.id);
+          p = await talimatPdfUret(veri.dosya, veri.rezervasyonlar, veri.konteynerler, bolunme);
+        }
         if (iptal) return;
         url = URL.createObjectURL(p.blob);
         setPdf({ url, ad: p.ad });
@@ -132,6 +145,7 @@ function TalimatIcerik() {
                 <dt style={{ color: TEXT_MUTED }}>Müşteri</dt><dd className="text-white font-medium">{d.alici_firma || "-"}</dd>
                 <dt style={{ color: TEXT_MUTED }}>Varış limanı</dt><dd className="text-white">{d.varis_limani || "-"}</dd>
                 <dt style={{ color: TEXT_MUTED }}>Konteyner</dt><dd className="text-white">{veri.konteynerler.length} / {rezKont} girildi</dd>
+                {grupDosyalari && <><dt style={{ color: TEXT_MUTED }}>Birleşik fatura</dt><dd style={{ color: ACCENT }}>{grupDosyalari.length} dosya tek fatura: {grupDosyalari.join(", ")}</dd></>}
                 <dt style={{ color: TEXT_MUTED }}>Gönderildi</dt><dd style={{ color: "#C9D1DC" }}>{trZaman(k.olusturma)} · {k.kaynak === "elle" ? (k.gonderen || "elle") : "otomatik"}</dd>
                 {(k.gonderilen || []).length > 0 && <><dt style={{ color: TEXT_MUTED }}>Alıcılar</dt><dd className="break-all" style={{ color: "#C9D1DC" }}>{(k.gonderilen || []).join(", ")}</dd></>}
               </dl>

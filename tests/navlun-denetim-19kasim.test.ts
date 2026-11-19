@@ -110,3 +110,18 @@ test("masraf kaleminin '&' ile devam eden tutari navlun degildir", async () => {
   const o = await oku("Merhaba,\n\nUsd 800 /20'DC\n\nTahliyede ek EIS masrafı usd 250.- /20' &  usd 300.- /40' & usd 500.-/40 Reefer collect olarak alıcıdan tahsil edilir.");
   assert.deepEqual(o.filter((x) => x.tur === "teklif").map((x) => x.tutar), [800]);
 });
+
+test("'14 MERGED free time ... Tt/ 46 gun': free time 14, transit 46", async () => {
+  const t = (await oku("Merhaba,\n\nAmbarlı to Ornekport // port to port 5950 USD / 40HQ 14 MERGED free time var Hat / Cma Tt/ 46 gün Navlun, vgm ve Tr lokaller dahildir."))
+    .find((x) => x.tur === "teklif") as Olay & { transit_gun: string | null };
+  assert.equal(t.free_time_gun, 14);
+  assert.equal(t.transit_gun, "46");
+  assert.equal(t.ekipman, "40HC");
+});
+
+test("takip cevabi 'Bu teklife 14 gun verebiliriz. 36 gun via Ornekport': free time 14, transit 36", async () => {
+  const { ekBilgisi } = await yukle("navlun-isle");
+  const b = ekBilgisi({ govde: "Merhaba Volkan bey\n\nBu teklife 14 gun verebiliriz.\n36 gun via Ornekport\n\nOrnek Kisi", ek_metin: "" });
+  assert.equal(b.free_time_gun, 14);
+  assert.equal(b.transit_gun, "36");
+});

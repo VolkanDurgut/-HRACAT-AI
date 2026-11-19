@@ -194,15 +194,20 @@ function armatorBul(s: string, yakin?: number): string | null {
  * "bos alim gununden ... 14 gun free time dusulerek export detention") free time SAYILMAZ; "14 free" yazimi eklendi.
  */
 const FT_DESENLERI: RegExp[] = [
+  // 19.11.2026 (acente: "14 MERGED free time var Hat / Cma Tt/ 46 gün" -> free time 46 yaziliyordu): "N merged / combined free"
+  /(\d{1,2})\s*(?:gün|gun|days?)?\s*(?:merged|combined|kombine)\s*(?:free|ft\b)/gi,
   /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:standa?r[td]\s*)?(?:ft\b|free|frfee)/gi,
   /(\d{1,2})\s*(?:calendar\s*)?days?\s*free/gi,
   // 17.11.2026 ("Varis limaninda 13 gun DND free time" okunmuyordu): DND / D&D / combined araya girer
   /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:dnd|d\s*&\s*d|dem\s*\/\s*det|combined|kombine)\s*(?:ft\b|free)/gi,
   /(\d{1,2})\s*free\s*var/gi,
+  // 19.11.2026 (acente takip cevabi: "Bu teklife 14 gun verebiliriz"): teklife verilen gun free time'dir
+  /teklif(?:e|imize)\s*(\d{1,2})\s*(?:gün|gun|days?)\s*(?:free\s*(?:time)?\s*)?(?:verebil|veriyor|tan[ıi]ml)/gi,
   // 19.11.2026 (acente teklifi "MAERSK USD1850 FT10" free time bos kaldi): bitisik "FT10"
   /\bft(\d{1,2})(?![\d.\/])/gi,
   /(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/gi,
-  /(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/gi,
+  // 19.11.2026: arada transit etiketi (tt / t/t / transit) varsa sayi transit suresidir, free time degil
+  /(?:free\s*time|\bft\b)(?:(?!\btt\b|\bt\/t\b|transit)[^\d\n]){0,25}?(\d{1,2})\s*(?:gün|gun|days?)/gi,
   // 11.11.2026: demuraj / serbest gun yazimlari ("14 DEM + 3 DET", "Demuraj serbest süre: 21", "21 gün serbest", "free days 14")
   /(\d{1,2})\s*(?:gün|gun|days?)?\s*DEM(?:URRAGE|URAJ)?\b(?!\s*tarife)/gi,
   /demura(?:j|ge)\s*(?:serbest\s*s[üu]re(?:si)?)?\s*[:\-–]?\s*(\d{1,2})\s*(?:gün|gun|days?)?(?!\s*saat)\b/gi,
@@ -271,12 +276,14 @@ const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\bt
 const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t)`, "gi");
 // 17.11.2026 ("(ORNEKLIMAN aktarmalı 40-42DAYS )"): aktarma notundaki gun araligi transit suredir
 const TT_AKTARMA = /aktarmal[ıi]\s*(\d{1,3}\s*[-–]\s*\d{1,3})\s*(?:days?|g[üu]n)/gi;
+// 19.11.2026 (acente takip cevabi: "36 gun via Port Klang"): "N gun via <aktarma>" transit suredir
+const TT_VIA = /(?<![\d.,])(\d{1,3}(?:\s*[-–]\s*\d{1,3})?)\s*(?:gün|gun|days?)\s*via\b/gi;
 // "Odeme: TT 30 gun" gibi odeme kosulu transit degildir
 const TT_ODEME = /(?:ödeme|odeme|payment|vade|pe[şs]in|advance)[^\n]{0,20}$/i;
 
 export function transitBul(s: string): string | null {
   const gor = new Set<string>();
-  for (const r of [TT_ACIK, TT_BIRIMLI, TT_AKTARMA]) {
+  for (const r of [TT_ACIK, TT_BIRIMLI, TT_AKTARMA, TT_VIA]) {
     for (const m of s.matchAll(r)) {
       if (TT_ODEME.test(s.slice(Math.max(0, (m.index ?? 0) - 25), m.index ?? 0))) continue;
       const ham = (m[1] || m[2]).replace(/\s+/g, "").replace(/[–\/]/g, "-");

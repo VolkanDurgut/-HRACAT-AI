@@ -602,4 +602,5 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 - **Tablo (acente hafızası)**: armatörsüz teklif, aynı acente + limandaki teklifler TEK armatörlüyse ona bağlanır (ayrı
   "ACENTE" sütunu açılmaz); iki armatör varsa dokunulmaz. TOAMASINA = TAMATAVE.
 - Yeniden okumada bulunan eski hatalar: sonraki satırdaki soru ("Hedef var mıdır?") önceki satırdaki fiyatı soru sayıyordu (satır sonu korunarak bakılır); "masrafı usd 250 /20' & usd 300 /40'" devamındaki tutar navlun sanılıyordu.
+- Sıralı yeniden okumada: "14 MERGED free time ... Tt/ 46 gün" free time 46 okunuyordu (merged deseni + transit etiketi geçilmez); takip cevabı "Bu teklife 14 gun verebiliriz. 36 gun via ..." free time / transit olarak okunur. Yeniden okuma SIRAYLA (sayfa 0,1,2...) çalıştırılmalı; takip mailleri teklifleri ancak kendilerinden önce işlenmişse tamamlar.
 - Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.

@@ -1,13 +1,13 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Download, Factory, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, ScanText, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Factory, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, ScanText, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
   cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle,
-  gunEkle, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
+  gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
 } from "@/lib/siparis-formu";
 import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
 
@@ -54,7 +54,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
   const [gorselKaldir, setGorselKaldir] = useState(false);
   const [lot, setLot] = useState(m.duzeltme.lotNo);
   const [firma, setFirma] = useState(m.duzeltme.firmaAdi);
-  const [mesgul, setMesgul] = useState<null | "kaydet" | "indir" | "test" | "uretim">(null);
+  const [mesgul, setMesgul] = useState<null | "kaydet" | "indir" | "uretim">(null);
   const [hata, setHata] = useState<string | null>(null);
   const girdi = useRef<HTMLInputElement>(null);
   const durum = formDurumu(m, bugun);
@@ -142,11 +142,6 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
   const indir = async () => {
     setMesgul("indir"); setHata(null);
     try { await formExcelIndir(m); } catch (e) { setHata(e instanceof Error ? e.message : "Excel oluşturulamadı."); } finally { setMesgul(null); }
-  };
-  const test = async () => {
-    setMesgul("test"); setHata(null);
-    try { const alici = await testFormuGonder(m.bookingNo); onDegisti(`${a.firma} · ${m.bookingNo}: [TEST] form ${alici} adresine gönderildi.`); }
-    catch (e) { setHata(e instanceof Error ? e.message : "Test gönderilemedi."); } finally { setMesgul(null); }
   };
   const uretimeGonder = async () => {
     if (!window.confirm(`${a.firma} · ${m.bookingNo} sipariş bildirim formu ÜRETİME (alıcılar + CC) gönderilsin mi? Bu işlem bir kez yapılır.`)) return;
@@ -285,10 +280,6 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
             {mesgul === "indir" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Excel
           </button>
-          <button type="button" onClick={test} disabled={gonderimKapali} title={gonderimIpucu || "[TEST] formu test adresine gönder"}
-            className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
-            {mesgul === "test" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test gönder
-          </button>
           {!m.gonderim?.zaman && (
             <button type="button" onClick={uretimeGonder} disabled={gonderimKapali} title={gonderimIpucu || "Formu üretime gönder (canlı mod: alıcılar + CC)"}
               className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: ACCENT }} data-testid="uretime-gonder">
@@ -318,9 +309,10 @@ export function SiparisFormlari() {
   }, []);
   useEffect(() => { yukle(); }, [yukle]);
 
-  // Varsayilan: ekipman gunu gelmemis + ekipman gunu gecmis ama gemisi kalkmamis ve formu gitmemis yuklemeler
-  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= bugun
-    || (!m.gonderim?.zaman && !!m.etd && m.etd >= bugun)), [liste, gecmis, bugun]);
+  // 19.11.2026 (kullanici: "Cok eski yukleme; yuklemesi tamamlanmis, kaldirmaliyiz"): varsayilan liste Yukleme Planindaki gibi
+  // BU HAFTA (Pazar-Cumartesi, plan basliklari "47.HAFTA (15 KASIM - 21 KASIM)") ve sonrasinin bos ekipman tarihleri.
+  const haftaBasi = haftaBasiTr(bugun);
+  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi), [liste, gecmis, haftaBasi]);
   const eksikSayisi = gorunen.filter((m) => !m.gonderim?.zaman && m.girisEksikleri.length > 0).length;
 
   return (
@@ -334,7 +326,7 @@ export function SiparisFormlari() {
         </span>
         {eksikSayisi > 0 && <span className="text-amber-300 font-medium">{eksikSayisi} formda eksik var</span>}
         <button type="button" onClick={() => setGecmis((g) => !g)} className="h-7 px-2.5 rounded-full text-[11px]"
-          style={gecmis ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Son 10 günü de göster</button>
+          style={gecmis ? { backgroundColor: "rgba(244,160,124,0.18)", color: ACCENT, border: `1px solid ${ACCENT}` } : { color: TEXT_MUTED, border: `1px solid ${CARD_BORDER}` }}>Önceki haftaları da göster</button>
         <button type="button" onClick={yukle} disabled={yukleniyor} className="h-7 w-7 inline-flex items-center justify-center rounded-md border hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER }} aria-label="Yenile">
           <RefreshCw size={13} className={yukleniyor ? "animate-spin" : ""} />
         </button>

@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { formModeli, formDosyaAdi, type FormHam, type FormModeli } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
-export { cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, lotTemizle, gunEkle, trTarih, type CuvalTarihi, type CuvalTarihleri, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
+export { cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, haftaBasiTr, lotTemizle, gunEkle, trTarih, type CuvalTarihi, type CuvalTarihleri, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
 
 const KOVA = "siparis-formlari";
 const AZAMI_PX = 2000;

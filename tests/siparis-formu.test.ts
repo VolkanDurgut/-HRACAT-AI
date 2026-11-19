@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { ayYil, cuvalLotunuAyikla, cuvalTarihleriniAyikla, cuvalTipi, formDurumu, formMailHtml, formModeli, gonderimZamaniMi, LOGO_CID, lotTemizle, spekMetni, spekTemizle, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
+import { ayYil, cuvalLotunuAyikla, cuvalTarihleriniAyikla, cuvalTipi, formDurumu, formMailHtml, formModeli, gonderimZamaniMi, haftaBasiTr, LOGO_CID, lotTemizle, spekMetni, spekTemizle, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselBoyutu, gorselTuru, siparisFormuXlsx } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
 const ham = (ek: Partial<FormHam> = {}): FormHam => ({
@@ -218,4 +218,11 @@ test("Excel: sablon duzeni, eksik alan isareti, resimli / resimsiz paket", async
   for (const p of resimli) zip.file(p.yol, p.icerik);
   const b = await zip.generateAsync({ type: "uint8array" });
   assert.ok(b.length > 1000);
+});
+
+test("liste haftasi: Yukleme Plani gibi Pazar baslar", () => {
+  assert.equal(haftaBasiTr("2026-11-19"), "2026-11-15");
+  assert.equal(haftaBasiTr("2026-11-15"), "2026-11-15");
+  assert.equal(haftaBasiTr("2026-11-21"), "2026-11-15");
+  assert.equal(haftaBasiTr("2026-11-22"), "2026-11-22");
 });

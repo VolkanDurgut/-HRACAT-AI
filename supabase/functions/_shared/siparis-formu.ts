@@ -326,6 +326,11 @@ export function formModeli(h: FormHam): FormModeli {
   };
 }
 
+/** Yukleme plani haftasi Pazar baslar ("47.HAFTA (15 KASIM - 21 KASIM)"): ISO gunun haftasinin Pazar'i. */
+export function haftaBasiTr(iso: string): string {
+  return gunEkle(iso, -new Date(`${iso}T00:00:00Z`).getUTCDay());
+}
+
 /** Gonderim saati: TR 08:00 (dakika). */
 export const GONDERIM_DAKIKASI = 8 * 60;
 

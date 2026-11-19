@@ -40,7 +40,10 @@ function evrakDurumlari(d: DosyaWithRelations) {
   const faturaToplam = parca ? parca.length : 1;
   return [
     // durum: tamamlandiginda kullanilan fiil (panel cut-off rozetleriyle ayni dil: "Talimat gönderildi", "Draft BL alındı")
-    { ad: "Konşimento Talimatı", durum: "gönderildi", url: d.konsimento_dosya_url, tamam: !!d.konsimento_dosya_url, ek: null as string | null },
+    // 19.11.2026 (kullanici): "Bir yuklemeye ait draft BL eklenmisse konsimento talimati gecilmis sayilmali."
+    d.konsimento_dosya_url || !d.draft_bl_dosya_url
+      ? { ad: "Konşimento Talimatı", durum: "gönderildi", url: d.konsimento_dosya_url, tamam: !!d.konsimento_dosya_url, ek: null as string | null }
+      : { ad: "Konşimento Talimatı", durum: "geçildi (Draft BL)", url: d.draft_bl_dosya_url, tamam: true, ek: null as string | null },
     { ad: "Fatura", durum: "kesildi", url: d.fatura_dosya_url || parca?.find((p) => p.fatura_dosya_url)?.fatura_dosya_url || null, tamam: faturaYuklu >= faturaToplam, ek: parca ? `${faturaYuklu}/${faturaToplam}` : null },
     { ad: "Draft BL", durum: "alındı", url: d.draft_bl_dosya_url, tamam: !!d.draft_bl_dosya_url, ek: null },
     { ad: "Beyanname", durum: "gönderildi", url: d.beyanname_dosya_url, tamam: !!d.beyanname_dosya_url, ek: null },

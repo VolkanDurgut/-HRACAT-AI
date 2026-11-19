@@ -258,7 +258,8 @@ export function getDosyaAkisDurumu(
   const rezervasyonKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const konteynerlerTamam = rezervasyonKontAdedi > 0 && konteynerler.length === rezervasyonKontAdedi;
   const faturaKesildi = !!dosya.fatura_dosya_url;
-  const konsimentoVar = !!dosya.konsimento_dosya_url;
+  // 19.11.2026: Draft BL eklenmisse konsimento talimati gecilmis sayilir
+  const konsimentoVar = !!(dosya.konsimento_dosya_url || dosya.draft_bl_dosya_url);
   const tumDbaHazir = konteynerler.length > 0 && konteynerler.every(k => !!k.dba_dosya_url);
   const vgmGonderildi = !!dosya.vgm_gonderildi;
 

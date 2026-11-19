@@ -204,7 +204,8 @@ function DosyaDetailContent() {
     );
   }
 
-  const konsimentoBekliyor = !!dosya.fatura_talimati_gonderildi && !dosya.konsimento_dosya_url;
+  // 19.11.2026: Draft BL eklenmisse konsimento talimati gecilmis sayilir
+  const konsimentoBekliyor = !!dosya.fatura_talimati_gonderildi && !dosya.konsimento_dosya_url && !dosya.draft_bl_dosya_url;
 
   return (
     <AppShell>

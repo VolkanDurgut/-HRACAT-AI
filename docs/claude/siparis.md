@@ -584,3 +584,21 @@ ama rezervasyonu alınmamış olarak düşecek." Akış (yeni ekran yok, mevcut 
    (`lib/proforma/okuma-pdf.ts`) Proforma Oluştur'un indirdiği PDF'in aynısını üretir (şirket şablonu + İMZALI),
    sayfa dosyayı yüklenmiş gibi seçer, kullanıcı "Başlat" ile onaylar → yapay zekâsız okuma + mevcut dosya açma akışı.
 4. Rezervasyon / sevk: değişmedi.
+
+## 4.21 Navlun denetimi — tablo ile mailler karşılaştırıldı (19.11.2026)
+Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim.test.ts`, veriler kurgu):
+- **İmza kesimi**: teklif selamlamadaki "Saygılarımla,"dan SONRA yazılınca mail okunamadı sayılıyordu. `imzadanKes`: ardındaki 300
+  karakterde fiyat olan imza kelimesi kesim noktası değildir.
+- **ONE armatörü**: desen yalnız küçük harf "one" yakalıyordu (İngilizce kelime). Büyük harf `ONE` (BİR / TANE / CONTAINER değilse),
+  "One line", "Ocean Network Express" ONE'dır; fiyata en yakın armatör seçilir ("Msc dışı alternatif ... Hat:ONE" → ONE).
+- **FT10** bitişik free time okunur.
+- **Genel tarife**: EUR satırlar `para_birimi = EUR` ile yazılır (önceden atılıyordu). Şart metnindeki koşullu
+  "Ayrıca belirtilmediği müddetçe ... lokal masrafları dahil değildir" açık "lokaller dahildir" yoksa **hariç** (`lokalDurumu`);
+  "lokal masrafları dahil değildir" artık yanlışlıkla "dahil" sayılmaz.
+- **Sabit yerleşimli teklif formu (knFormu)**: rota sayısı kadar "FT N DAYS - ARMATÖR" çifti varsa sırayla rotalara verilir.
+- **Elle düzeltilen teklif**: armatör boşsa ek formun yorumundaki tek armatör yazılır (`ek_bilgi.ek_armator`, RPC).
+- **RPC `navlun_kaydet`** (migration 20261119140000): para birimi yazılır; aynı mesajda aynı liman + ekipman için ELLE satır
+  varsa otomatik satır yazılmaz (çift sayım yok).
+- **Tablo (acente hafızası)**: armatörsüz teklif, aynı acente + limandaki teklifler TEK armatörlüyse ona bağlanır (ayrı
+  "ACENTE" sütunu açılmaz); iki armatör varsa dokunulmaz. TOAMASINA = TAMATAVE.
+- Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.

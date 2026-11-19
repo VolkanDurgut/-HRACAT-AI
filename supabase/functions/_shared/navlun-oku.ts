@@ -32,6 +32,8 @@ export interface NavlunOlay {
   gecerlilik: string | null;   // ham metin (30.11 / 30.11.2026)
   lokal_dahil: boolean | null;
   pol: string | null;
+  /** 19.11.2026: yalniz USD disi (EUR) tarife satirlarinda; yoksa USD */
+  para_birimi?: "USD" | "EUR";
 }
 
 export interface NavlunMesaj {
@@ -52,7 +54,10 @@ const ARMATORLER: Array<[RegExp, string]> = [
   [/\bmsc\b/i, "MSC"],
   [/\bcma(\s*cgm)?\b/i, "CMA CGM"],
   [/\bhapag|\bhapaq/i, "Hapag-Lloyd"],
-  [/\bone(\s*line)?\b(?!\s*(?:bir|tane))/, "ONE"],
+  // 19.11.2026 (acente teklifinde "Hat:ONE" MSC sanildi; form yorumundaki "FT 5 DAYS - ONE" okunmadi): eski desen yalniz kucuk "one" yakaliyordu
+  // (Ingilizce "one" kelimesi). Buyuk harf ONE armatordur (BIR / TANE / CONTAINER degilse); "One line" / "Ocean Network Express" her yazimda.
+  [/\bONE\b(?!\s*(?:B[İI]R|TANE|CONTAINER|CNTR|BL\b|WAY\b))/, "ONE"],
+  [/\bone[\s-]*line\b|\bocean\s*network\s*express\b/i, "ONE"],
   [/\boocl\b/i, "OOCL"],
   [/\bturkon\b/i, "Turkon"],
   [/\bakkon\b/i, "Akkon"],
@@ -81,7 +86,8 @@ export function acenteAdi(gonderen: string, acenteler: AcenteTablosu): string | 
 
 /** Metinde gecen armator (ARMATORLER tablosundan), yoksa null. */
 export function armatorAdi(s: string): string | null {
-  for (const [r, ad] of ARMATORLER) if (new RegExp(r.source, r.flags.includes("i") ? r.flags : r.flags + "i").test(s)) return ad;
+  // 19.11.2026: bayraklar oldugu gibi (buyuk harf ONE deseni bilerek buyuk/kucuk harf duyarli)
+  for (const [r, ad] of ARMATORLER) if (r.test(s)) return ad;
   return null;
 }
 
@@ -121,15 +127,31 @@ export function yeniKisim(govde: string, imzaDahil = false): string {
     /\n\s*Gönderen:\s/i, /\n.{0,120}şunları yazdı/i, /\n.{0,120}wrote:/i,
     /\n\s*>/, /\n_{8,}/,
     /\n\s*Booking onayı verildikten sonra/i,
-    /\n\s*Best Regards|\n\s*Saygılarımla|\n\s*Brgds|\n\s*İyi Çalışmalar\s*&/i,
   ];
-  // imzaDahil (12.11.2026): imzadan SONRA yazilan teklif notu ("Saygilarimla ... ONE LINE, FT 5 DAYS") icin yalniz alinti kesilir
-  if (imzaDahil) kes.pop();
   for (const r of kes) {
     const m = t.search(r);
     if (m > 0) t = t.slice(0, m);
   }
+  // imzaDahil (12.11.2026): imzadan SONRA yazilan teklif notu ("Saygilarimla ... ONE LINE, FT 5 DAYS") icin yalniz alinti kesilir
+  if (!imzaDahil) t = imzadanKes(t);
   return t.replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/[’`´]/g, "'").trim();
+}
+
+const IMZA = /\n\s*(?:Best Regards|Saygılarımla|Brgds|İyi Çalışmalar\s*&)/gi;
+const FIYAT_IZI = /(?:usd|\$|eur|€)\s*[:\-–]?\s*\d|\d[\d.,]*\s*(?:usd|\$|eur|€)/i;
+/**
+ * Imzadan kes. 19.11.2026 (bir acentenin DURBAN teklifi okunamadi): acente teklifi selamlamadaki "Saygılarımla,"dan SONRA yazmis
+ * ("...rica eder, iyi calismalar dilerim. Saygılarımla,\n\nAMBARLI - DURBAN\n20 DC : 750 USD ... Best Regards"). Ardindaki 300
+ * karakterde fiyat olan imza kelimesi kesim noktasi sayilmaz; bir sonraki imza kelimesine bakilir.
+ */
+function imzadanKes(t: string): string {
+  for (const m of t.matchAll(IMZA)) {
+    const i = m.index ?? 0;
+    if (i <= 0) continue;
+    if (FIYAT_IZI.test(t.slice(i + m[0].length, i + m[0].length + 300))) continue;
+    return t.slice(0, i);
+  }
+  return t;
 }
 
 function sayi(s: string): number | null {
@@ -177,6 +199,8 @@ const FT_DESENLERI: RegExp[] = [
   // 17.11.2026 ("Varis limaninda 13 gun DND free time" okunmuyordu): DND / D&D / combined araya girer
   /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:dnd|d\s*&\s*d|dem\s*\/\s*det|combined|kombine)\s*(?:ft\b|free)/gi,
   /(\d{1,2})\s*free\s*var/gi,
+  // 19.11.2026 (acente teklifi "MAERSK USD1850 FT10" free time bos kaldi): bitisik "FT10"
+  /\bft(\d{1,2})(?![\d.\/])/gi,
   /(?:free\s*time|frfee\s*time|\bft\b)(?:\s*[–-]\s*merged)?\s*[:\-–]?\s*(?:bt\s*)?(\d{1,2})(?![.\/\d])/gi,
   /(?:free\s*time|\bft\b)[^\d\n]{0,25}?(\d{1,2})\s*(?:gün|gun|days?)/gi,
   // 11.11.2026: demuraj / serbest gun yazimlari ("14 DEM + 3 DET", "Demuraj serbest süre: 21", "21 gün serbest", "free days 14")
@@ -408,7 +432,7 @@ function ekipmanKod(s: string): string | null {
 }
 
 /** Bir metin parcasindaki tek armator (birden fazla farkli armator varsa null). */
-function tekArmator(s: string): string | null {
+export function tekArmator(s: string): string | null {
   const gor = new Set<string>();
   for (const [r, ad] of ARMATORLER) if (new RegExp(r.source, r.flags).test(s)) gor.add(ad);
   return gor.size === 1 ? [...gor][0] : null;
@@ -434,7 +458,12 @@ function knFormu(d: string): YapisalSatir[] | null {
   const yorumI = d.search(/Pricing Comment/i);
   const yorum = yorumI >= 0 ? d.slice(yorumI, yorumI + 400) : "";
   const ftSay = (yorum.match(/\bFT\s*\d|\d{1,2}\s*days?\s*(?:pod\s*)?free|free\s*time\s*\d/gi) || []).length;
-  const belirsiz = ftSay > 1;                           // rota/armator basina farkli FT: armator ve FT yazilmaz
+  // 19.11.2026 (iki rotali form teklifi: "FT 14 DAYS - MAERSK FT 5 DAYS - ONE" -> armator bos, Jakarta FT 14 yaziliyordu):
+  // rota sayisi kadar "FT N DAYS - ARMATOR" cifti varsa sirayla rotalara verilir. Sayi tutmazsa eskisi gibi yazilmaz.
+  const ciftler = [...yorum.matchAll(/\bFT\s*(\d{1,2})\s*DAYS?\s*[-–]\s*([A-Za-z][A-Za-z\- ]{1,30}?)(?=\s+FT\b|\s+Sayfa\b|\s*$|\s*[.,;])/gi)]
+    .map((x) => ({ ft: Number(x[1]), armator: armatorAdi(x[2]) }));
+  const roteBasina = ciftler.length > 1 && ciftler.length === bas.length && ciftler.every((c) => c.armator);
+  const belirsiz = ftSay > 1 && !roteBasina;            // rota/armator basina farkli FT: armator ve FT yazilmaz
   const gecM = d.match(/Ge[çc]erlilik S[üu]resi\s*\d{1,2}\.\d{1,2}\.\d{4}\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
   const lokal = /Including[:\s]*O?THC\s*\+\s*POL\s*Locals/i.test(yorum) ? true : null;
   const out: YapisalSatir[] = [];
@@ -447,10 +476,21 @@ function knFormu(d: string): YapisalSatir[] | null {
     const tut = [...blok[2].matchAll(/USD\s*([\d.,]+)/gi)].map((x) => sayi(x[1].replace(/\.\d{2}$/, "")));
     if (ekip.length !== tut.length || ekip.some((e) => !e) || tut.some((t) => !makulMu(t))) return null;
     for (let j = 0; j < ekip.length; j++) {
-      out.push({ liman: bas[k].liman, tutar: tut[j] as number, ekipman: ekip[j] as string, armator: belirsiz ? null : tekArmator(yorum), ft: belirsiz ? null : ftYapisal(yorum), gec: gecM ? gecM[1] : null, lokal });
+      const c = roteBasina ? ciftler[k] : null;
+      out.push({ liman: bas[k].liman, tutar: tut[j] as number, ekipman: ekip[j] as string, armator: c ? c.armator : belirsiz ? null : tekArmator(yorum), ft: c ? c.ft : belirsiz ? null : ftYapisal(yorum), gec: gecM ? gecM[1] : null, lokal });
     }
   }
   return out.length ? out : null;
+}
+
+/**
+ * 19.11.2026 (elle duzeltilen form tekliflerinde armator bos, tabloda armatorsuz ayri acente sutunu):
+ * ek teklif formunun yorum alanindaki ("Pricing Comment ... Carrier Hapag", "Hat: CMA", "FT 14 DAYS DETANTION MAERSK") tek armator.
+ */
+export function ekYorumArmatoru(ekMetin: string): string | null {
+  const d = (ekMetin || "").replace(/\s+/g, " ");
+  const i = d.search(/Pricing Comment/i);
+  return i >= 0 ? tekArmator(d.slice(i, i + 400)) : null;
 }
 
 /** Link tipi teklif: "Tahliye Limani : X ... Hat : Y ... 20 Standard Dry ... HERSEY DAHIL TASIMA FIYATI 0 2450 USD". */
@@ -491,17 +531,17 @@ export function ekFormuOku(ekMetin: string, konu: string): NavlunOlay[] | null {
  */
 // 17.11.2026 (cok limanli genel tarife okunmuyordu): "LIMAN (ULKE) USD 1234" satirlari.
 // En az 3 satir varsa genel tarife: her liman ayri teklif. Bolum basligindaki "Free time: 14 Days" o bolumun free time'i,
-// "For <Liman> 21 Days" o limana ozel. USD disi (EUR) satirlar yazilmaz (tablo para birimi tasimiyor).
+// "For <Liman> 21 Days" o limana ozel. 19.11.2026 (MSC listesinde LA GUAIRA / PUERTO CABELLO EUR 2810 kayboluyordu):
+// EUR satirlar da yazilir (para_birimi EUR; tablo hucresi "2810 €", en iyi karsilastirmasi yalniz USD).
 // Liman adlari sistemdeki yazima cevrilir (DAR ES SALAAM -> DAR ES SELAM ...); yoksa oldugu gibi buyuk harf.
 const TARIFE_ADLARI: Record<string, string> = {
   "DAR ES SALAAM": "DAR ES SELAM", MOGADISHU: "MOGADİŞU", BENGHAZI: "BİNGAZİ", BEIRUT: "BEYRUT", SINGAPORE: "SİNGAPUR",
 };
-type TarifeSatiri = { liman: string; tutar: number; ekipman: string; ft: number | null; gec: string | null };
+type TarifeSatiri = { liman: string; tutar: number; ekipman: string; ft: number | null; gec: string | null; para: "USD" | "EUR" };
 export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
   const bulunan: TarifeSatiri[] = [];
   let ft: number | null = null, gec: string | null = null, ekipman = "20DC";
   let ozel: Record<string, number> = {};
-  let usdDisi = 0;
   // HTML tablodan gelen metinde hucreler ayri satirdadir, arada bos satir da olabilir ("LIMAN (ULKE)\n\nUSD\n\n1940"): tek satira toplanir
   const duz = yeni
     .replace(/\)[ \t]*(?:\r?\n[ \t]*)+(USD|EUR)[ \t]*(?:\r?\n[ \t]*)+(\d)/g, ") $1 $2")
@@ -520,13 +560,26 @@ export function tarifeSatirlari(yeni: string): TarifeSatiri[] | null {
     if (e) ekipman = ekipmanBul(e[1]) ?? ekipman;
     const m = s.match(/^([A-Z][A-Z .'-]{2,30}?)\s*\(([A-Z][A-Z .'-]{2,30})\)\s*(USD|EUR)\s*([\d][\d.,]*)\s*$/);
     if (!m) continue;
-    if (m[3] !== "USD") { usdDisi++; continue; }
     const n = sayi(m[4]);
     if (!makulMu(n)) continue;
     const ad = buyukTr(m[1].trim());
-    bulunan.push({ liman: TARIFE_ADLARI[ad] ?? ad, tutar: n, ekipman, ft: ozel[ad.replace(/İ/g, "I")] ?? ft, gec });
+    bulunan.push({ liman: TARIFE_ADLARI[ad] ?? ad, tutar: n, ekipman, ft: ozel[ad.replace(/İ/g, "I")] ?? ft, gec, para: m[3] === "EUR" ? "EUR" : "USD" });
   }
-  return bulunan.length + usdDisi >= 3 && bulunan.length ? bulunan : null;
+  return bulunan.length >= 3 ? bulunan : null;
+}
+
+/**
+ * Mesajdaki lokal dahil / haric bilgisi. 16.11.2026: "liman masraflari dahil" / "local charges included" dahil demektir.
+ * 17.11.2026 (MSC SINGAPUR): standart sart metnindeki kosullu "Ayrica belirtilmedigi muddetce ... dahil degildir" acik
+ * "lokaller dahildir"i ezmez. 19.11.2026 (MSC genel listesi): acik ifade YOKSA kosullu cumle varsayilandir -> haric.
+ */
+export function lokalDurumu(duz: string): boolean | null {
+  const haric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/gi)];
+  const kosullu = (x: RegExpMatchArray) => /belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(duz.slice(Math.max(0, (x.index ?? 0) - 120), x.index ?? 0));
+  if (haric.some((x) => !kosullu(x))) return false;
+  if (/lokaller(?:i)?\s*dahil(?!\s*de[ğg]il)|all\s*in|pol lokaller dahil|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil(?!\s*de[ğg]il)|local\s*charges\s*incl/i.test(duz)) return true;
+  if (/\+\s*lokaller/i.test(duz)) return false;
+  return haric.length ? false : null;
 }
 
 export function navlunMesajOku(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { ek?: boolean } = {}): NavlunOlay[] {
@@ -578,7 +631,10 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
 
   const tarife = tarifeSatirlari(yeni);
   if (tarife) {
-    for (const r of tarife) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: null, pol: polBul(yeni) });
+    // 19.11.2026: liste sart metnindeki lokal bilgisi satirlara yazilir (MSC listesi: "Ayrica belirtilmedigi muddetce ... lokal
+    // masraflari dahil degildir" -> haric). Onceden null kaliyor, acente hafizasindaki "MSC lokal dahil" uygulanip ucuz gorunuyordu.
+    const lokalT = lokalDurumu(yeni.replace(/\s+/g, " "));
+    for (const r of tarife) ekle("teklif", { liman: r.liman, tutar: r.tutar, ekipman: r.ekipman, free_time_gun: r.ft, gecerlilik: r.gec, lokal_dahil: lokalT, pol: polBul(yeni), ...(r.para === "EUR" ? { para_birimi: "EUR" as const } : {}) });
     return olaylar;
   }
 
@@ -592,11 +648,7 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   // 16.11.2026: "liman masraflari dahil" / "local charges included" da lokal dahil demektir
   // 17.11.2026 (MSC SINGAPUR: "lokaller dahildir" yazmasina ragmen lokal haric gorunuyordu): standart sart metnindeki
   // "Ayrica belirtilmedigi muddetce ... lokal masraflari dahil degildir" kosullu cumledir; acik ifadeyi ezmez.
-  const lokalHaric = [...duz.matchAll(/(?:lokaller(?:i)?|masraf(?:lar)?[ıi]?)\s*dahil\s*de[ğg]il|local\s*charges\s*(?:not\s*incl|excl)/gi)]
-    .some((x) => !/belirtilmedi[ğg]i|belirtilmedik[çc]e|aksi\s*belirtil|unless/i.test(duz.slice(Math.max(0, (x.index ?? 0) - 120), x.index ?? 0)));
-  const lokal = lokalHaric ? false
-    : /lokaller(?:i)?\s*dahil|all\s*in|pol lokaller dahil|(?:liman|lokal|pol)\s*masraf(?:lar)?[ıi]?\s*dahil|local\s*charges\s*incl/i.test(duz) ? true
-    : (/\+\s*lokaller/i.test(duz) ? false : null);
+  const lokal = lokalDurumu(duz);
   const destek = /destek ol(?:abil|uyor)/i.test(duz);
 
   // Satir bazli coklu liman: "Istanbul – Jakarta :USD340/20all in"

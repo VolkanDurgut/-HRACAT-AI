@@ -1,5 +1,5 @@
 // Navlun Bildirimi: tek mailin kayda donusturulmesi (edge navlun-bildirimi kullanir; test edilebilir olsun diye ayri).
-import { armatorAdi, ekFormuOku, fiyatAdaylari, freeTimeBul, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, transitBul, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
+import { armatorAdi, ekFormuOku, ekYorumArmatoru, fiyatAdaylari, freeTimeBul, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, transitBul, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
 import { limanAnahtari } from "./liman-anahtari.ts";
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
@@ -92,6 +92,8 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
 /** Mail metni + ek metninden free time ve transit (elle duzeltilmis teklifi tamamlamak icin). */
 export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): {
   free_time_gun: number | null; transit_gun: string | null; armator: string | null; ft_guncel: boolean;
+  /** 19.11.2026: ek teklif formunun yorumundaki tek armator; yalniz elle duzeltilmis mailin armatoru BOS teklifine yazilir (RPC) */
+  ek_armator: string | null;
 } {
   const yeni = yeniKisim(g.govde || "");
   const metin = yeni.replace(/\s+/g, " ");
@@ -104,6 +106,7 @@ export function ekBilgisi(g: Pick<NavlunGirdi, "govde" | "ek_metin">): {
     armator: kisa?.armator ?? null,
     // 17.11.2026 (acente cevabi: "... ft 21 gun olarak devam edilecektir" - dolu eski free time'in yerine gecmeli)
     ft_guncel: /(?:ft|free\s*time|serbest)[^.\n]{0,30}olarak\s*(?:devam|g[üu]ncellen|revize|uygulan)/i.test(metin),
+    ek_armator: g.ek_metin ? ekYorumArmatoru(g.ek_metin) : null,
   };
 }
 

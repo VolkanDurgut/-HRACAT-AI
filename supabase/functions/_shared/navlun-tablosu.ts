@@ -92,6 +92,8 @@ const AD_ESLER: [RegExp, string][] = [
 /** Ayni limanin plan / mail yazimlari (limanAnahtari'na ek; yalniz bu tablo icin) */
 // 16.11.2026: sistem proformasi "DAR SALAAM" yaziyor (rapor "teklif yok" dedi); SQL siparis_liman_anahtar ile ayni esler.
 const LIMAN_ESLER: Record<string, string> = {
+  // 19.11.2026: Toamasina = Tamatave (Madagaskar; MSC listesi TAMATAVE, yukleme plani TOAMASINA yaziyor -> iki satir oluyordu)
+  TOAMASINA: "TAMATAVE",
   MALDIVES: "MALE", "DAR ES SELAM": "DAR ES SALAAM", "DAR SALAAM": "DAR ES SALAAM", "DAR ES SALAM": "DAR ES SALAAM", "DARESSALAAM": "DAR ES SALAAM",
 };
 
@@ -159,6 +161,25 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     if (!e || (yirmi(h) && !yirmi(e)) || (yirmi(h) === yirmi(e) && h.tarih >= e.tarih)) m.set(ay, h);
   };
 
+  // 19.11.2026 ACENTE HAFIZASI - armator: armatorsuz teklif ("Kasim icin navlun seviyemiz 2450 usd'dir") ayni acentenin ayni
+  // limandaki teklifleri TEK armatorluysa o armatora baglanir (ayri armatorsuz acente sutunu acilmaz). Birden fazla armator varsa dokunulmaz.
+  const limanArmatoru = new Map<string, Set<string>>();
+  for (const o of olaylar) {
+    if (!o.acente || !o.armator || (o.tur !== "teklif" && o.tur !== "karsi_teklif")) continue;
+    const k = limanKey(o.liman, o.liman_anahtar);
+    if (!k) continue;
+    const a = `${sirketAdi(o.acente)}|${k}`;
+    if (!limanArmatoru.has(a)) limanArmatoru.set(a, new Set());
+    limanArmatoru.get(a)!.add(o.armator);
+  }
+  const armatorTamamla = (o: NavlunOlayi, k: string): string | null => {
+    if (o.armator || !o.acente) return o.armator;
+    const ad = limanArmatoru.get(`${sirketAdi(o.acente)}|${k}`);
+    if (!ad) return null;
+    const liste = Array.from(ad);
+    return new Set(liste.map(sirketAdi)).size === 1 ? liste[0] : null;
+  };
+
   const sirali = [...olaylar].sort((a, b) => a.tarih.localeCompare(b.tarih));
   for (const o of sirali) {
     const k = limanKey(o.liman, o.liman_anahtar);
@@ -171,7 +192,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     if (o.tur === "hedef_kabul") { const h = hedef.get(k); if (!h) continue; tutar = h.tutar; para = h.para; }
     else if (o.tur !== "teklif" && o.tur !== "karsi_teklif") continue;
     if (!tutar || tutar <= 0) continue;
-    const b = blok(blokAdi(o.acente, o.armator));
+    const b = blok(blokAdi(o.acente, armatorTamamla(o, k)));
     const th: NavlunHucresi = { tutar, para, ekipman: (o.ekipman || "20DC").toUpperCase(), tarih: o.tarih, kaynak: "teklif",
       acente: o.acente, lokal_dahil: o.tur === "hedef_kabul" ? true : o.lokal_dahil ?? null };
     yaz(b, k, th);

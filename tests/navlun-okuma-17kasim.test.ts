@@ -41,12 +41,13 @@ BESINCILIMAN (BESINCIULKE) USD 1040
 `;
 const TARIFE_TABLO = TARIFE_TEK.replace(/ \(([A-Z]+)\) (USD|EUR) (\d+)/g, " ($1)\n$2\n$3").replace("Currency 20DV", "Currency\n20DV");
 
-test("genel tarife: her liman ayri teklif, bolum ve limana ozel free time, EUR yazilmaz", async () => {
+// 19.11.2026: EUR satirlar artik yazilir (para_birimi EUR); onceden atiliyordu ve listedeki EUR limanlar tabloda kayboluyordu
+test("genel tarife: her liman ayri teklif, bolum ve limana ozel free time, EUR satir para birimiyle", async () => {
   for (const metin of [TARIFE_TEK, TARIFE_TABLO, TARIFE_TABLO.replace(/\n/g, "\n\n")]) {
     const s = await oku(metin, "RE: ORNEK // UNEX // BOLGE A & BOLGE B // IHRACAT NAVLUN TEKLIFI");
-    assert.deepEqual(s.map((o) => [o.liman, o.tutar, o.ekipman, o.free_time_gun]), [
-      ["ORNEKLIMAN", 1600, "20DC", 21], ["IKINCILIMAN", 3465, "20DC", 21],
-      ["DORDUNCUPORT", 3950, "20DC", 21], ["BESINCILIMAN", 1040, "20DC", 14],
+    assert.deepEqual(s.map((o) => [o.liman, o.tutar, o.ekipman, o.free_time_gun, (o as { para_birimi?: string }).para_birimi ?? "USD"]), [
+      ["ORNEKLIMAN", 1600, "20DC", 21, "USD"], ["IKINCILIMAN", 3465, "20DC", 21, "USD"], ["UCUNCULIMAN", 2810, "20DC", 21, "EUR"],
+      ["DORDUNCUPORT", 3950, "20DC", 21, "USD"], ["BESINCILIMAN", 1040, "20DC", 14, "USD"],
     ]);
   }
 });

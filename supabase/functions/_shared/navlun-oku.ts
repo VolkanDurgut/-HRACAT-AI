@@ -348,14 +348,18 @@ function tutarlar(s: string, siki = false): Array<{ tutar: number; ekipman: stri
   const sonuc: Array<{ tutar: number; ekipman: string | null; i: number }> = [];
   const r = /(?:usd|\$)\s*[:\-–]?\s*([\d][\d.,]*)|([\d][\d.,]*)\s*(?:usd|\$)/gi;
   let m: RegExpExecArray | null;
+  // 19.11.2026 (acente teklifi: "EIS masrafi usd 250.- /20' & usd 300.- /40'" -> 300 40'lik navlun sanildi): masraf sayilan
+  // tutarin ARDINDAN "&" / "," / "ve" ile siralanan tutar ayni masraf kalemidir.
+  let masrafSonu = -1;
   while ((m = r.exec(s))) {
     const n = sayi(m[1] || m[2]);
     if (!makulMu(n)) continue;
+    if (masrafSonu >= 0 && m.index - masrafSonu <= 25 && /^[^\n]*?(?:&|,|\bve\b)\s*$/i.test(s.slice(masrafSonu, m.index))) { masrafSonu = m.index + m[0].length; continue; }
     const cevre = s.slice(Math.max(0, m.index - 25), m.index + m[0].length + 25);
     // masraf / ceza / kdv'li kalemler navlun degildir. 16.11.2026 (Imagesa Malabo teklifi okunmadi): bakilan cevre
     // BU tutarla sinirli -> sonraki kalem ("USD 3350 / 20'DC + USD 30 ENS FEE / BL") ya da onceki kalem bu tutari
     // masraf yapmaz; "liman masraflari dahil" bir masraf kalemi degil, lokal dahil bilgisidir.
-    if (MASRAF.test(kalemCevresi(s, m.index, m.index + m[0].length))) continue;
+    if (MASRAF.test(kalemCevresi(s, m.index, m.index + m[0].length))) { masrafSonu = m.index + m[0].length; continue; }
     if (MALIYET.test(cumle(s, m.index, m.index + m[0].length))) continue;
     // 13.11.2026: ek kalem / artis navlun degildir ("IMO lokal farki USD 165", "$200 PSS artisi", "VGM USD 45")
     if (EK_KALEM_ONCE.test(s.slice(Math.max(0, m.index - 25), m.index)) || EK_KALEM_SONRA.test(s.slice(m.index + m[0].length, m.index + m[0].length + 20))) continue;
@@ -666,7 +670,10 @@ function navlunMesajOkuIc(m: NavlunMesaj, acenteler: AcenteTablosu, secenek: { e
   // 17.11.2026 (OOCL SINGAPUR: "65-70 usd all in mi bu 2X20lik icin ?" teklif 70 sayilip en iyi fiyat gibi gorunuyordu):
   // fiyat soru cumlesindeyse (ayni satirda "?" ile bitiyor) acente teklif vermiyor, fiyati soruyor -> teklif degil.
   const tHam = tutarlar(duz, siki);
-  const t = tHam.filter((x) => !soruCumlesinde(duz, x.i));
+  // 19.11.2026 (acente: "Usd 425/20dc\n\nMaersk\n\n...\n\nHedef var midir?" teklif kayboluyordu): duz metinde satir sonu yok, sonraki
+  // satirdaki soru fiyatin cumlesi saniliyordu. Ayni uzunlukta, satir sonlarini koruyan kopya (indisler duz ile ayni).
+  const duzSatirli = yeni.replace(/\s+/g, (w) => (w.includes("\n") ? "\n" : " "));
+  const t = tHam.filter((x) => !soruCumlesinde(duzSatirli, x.i));
   if (tHam.length && !t.length) {
     if (!olaylar.some((o) => o.tur === "hedef_soru")) ekle("hedef_soru");
     return olaylar;

@@ -98,3 +98,15 @@ test("tablo: armatorsuz teklif ayni acente + limanin tek armatoruna; iki armator
   assert.ok(adlar.includes("DIGER ACENTE"));           // iki armatorlu limanda armatorsuz teklif ayri kalir
   assert.equal(t.limanlar.filter((l: { anahtar: string }) => l.anahtar === "TAMATAVE" || l.anahtar === "TOAMASINA").length, 1);
 });
+
+test("sonraki satirdaki soru ('Hedef var midir?') onceki satirdaki fiyati soru yapmaz; ayni satirdaki soru yapar", async () => {
+  const o = await oku("Gunaydin\n\nUsd 425/20dc\n\nMaersk\n\nOrnekhattan daha uygun bekliyorum\n\nHedef var midir?");
+  assert.equal(o.find((x) => x.tur === "teklif")?.tutar, 425);
+  const s = await oku("Merhaba,\n\n65-70 usd all in mi bu 2X20lik icin ?");
+  assert.ok(!s.some((x) => x.tur === "teklif"));
+});
+
+test("masraf kaleminin '&' ile devam eden tutari navlun degildir", async () => {
+  const o = await oku("Merhaba,\n\nUsd 800 /20'DC\n\nTahliyede ek EIS masrafı usd 250.- /20' &  usd 300.- /40' & usd 500.-/40 Reefer collect olarak alıcıdan tahsil edilir.");
+  assert.deepEqual(o.filter((x) => x.tur === "teklif").map((x) => x.tutar), [800]);
+});

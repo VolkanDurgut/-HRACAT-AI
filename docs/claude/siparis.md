@@ -601,4 +601,5 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
   varsa otomatik satır yazılmaz (çift sayım yok).
 - **Tablo (acente hafızası)**: armatörsüz teklif, aynı acente + limandaki teklifler TEK armatörlüyse ona bağlanır (ayrı
   "ACENTE" sütunu açılmaz); iki armatör varsa dokunulmaz. TOAMASINA = TAMATAVE.
+- Yeniden okumada bulunan eski hatalar: sonraki satırdaki soru ("Hedef var mıdır?") önceki satırdaki fiyatı soru sayıyordu (satır sonu korunarak bakılır); "masrafı usd 250 /20' & usd 300 /40'" devamındaki tutar navlun sanılıyordu.
 - Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.

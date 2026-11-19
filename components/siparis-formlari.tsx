@@ -25,7 +25,8 @@ const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0,
 
 const DURUM: Record<FormDurumu, { etiket: (m: FormModeli, bugun: string) => string; renk: string; zemin: string }> = {
   eksik: { etiket: (m) => `Eksik · gönderilmez (${m.girisEksikleri.join(", ")})`, renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
-  gonderildi: { etiket: (m) => `Gönderildi · ${m.gonderim?.zaman ? new Date(m.gonderim.zaman).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`, renk: "#6EE7B7", zemin: "rgba(16,185,129,0.12)" },
+  // 19.11.2026: alicisiz "gonderildi" kaydi = mail GITMEDEN kapatildi (kullanici karari, ornegin yukleme baslamisti)
+  gonderildi: { etiket: (m) => `${m.gonderim?.alicilar ? "Gönderildi" : "Kapatıldı · mail gönderilmedi"} · ${m.gonderim?.zaman ? new Date(m.gonderim.zaman).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`, renk: "#6EE7B7", zemin: "rgba(16,185,129,0.12)" },
   // 19.11.2026 (kullanici): otomatik gonderim YOK; form "Gonder" dugmesiyle gider. Etiket gonderim gununu hatirlatir.
   bugun: { etiket: () => "Gönderime hazır · gönderim günü bugün", renk: "#FCD34D", zemin: "rgba(245,158,11,0.14)" },
   bekliyor: { etiket: (m, bugun) => (m.gonderimGunu ? `Gönderime hazır · gönderim günü ${m.gonderimGunu === gunEkle(bugun, 1) ? "yarın" : trTarih(m.gonderimGunu)}` : "Gönderime hazır"), renk: "#93C5FD", zemin: "rgba(59,130,246,0.12)" },

@@ -178,7 +178,8 @@ const urunAdi = (u: string, ambalaj?: string | null) => `${u}${ambalaj ? ` (${am
 export type IcRaporOturumu = "sabah" | "ogle" | "aksam";
 export const IC_RAPOR_OTURUMLARI: IcRaporOturumu[] = ["sabah", "ogle", "aksam"];
 /** Turkiye saati (saat, dakika). Ihracat raporu 09:00 / 12:00 / 17:00 -> ic piyasa 15 dk sonra. */
-export const IC_RAPOR_SAATI: Record<IcRaporOturumu, [number, number]> = { sabah: [9, 15], ogle: [12, 15], aksam: [17, 15] };
+// 19.11.2026 (kullanici): "Ic piyasa raporu gunde 3 defa: sabah 09.00, ogle 12.00, aksam 17.00" (eskiden 09:15 / 12:15 / 17:15).
+export const IC_RAPOR_SAATI: Record<IcRaporOturumu, [number, number]> = { sabah: [9, 0], ogle: [12, 0], aksam: [17, 0] };
 const OTURUM_AD: Record<IcRaporOturumu, string> = { sabah: "Sabah", ogle: "Öğle", aksam: "Akşam" };
 export const icRaporSaatYazi = (o: IcRaporOturumu) => `${String(IC_RAPOR_SAATI[o][0]).padStart(2, "0")}:${String(IC_RAPOR_SAATI[o][1]).padStart(2, "0")}`;
 /** Sabah raporu DUNU anlatir ("Dün"); ogle / aksam bugunu. */

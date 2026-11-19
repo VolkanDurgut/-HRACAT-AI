@@ -13,7 +13,7 @@ import {
 // Musteriye GITMEZ. Fiyat YOK.
 //
 // CAGRI YETKISI (gunluk-rapor-gonder ile ayni ilke):
-//  - Anon anahtar (pg_cron): SADECE oturum penceresinde (09:15 / 12:15 / 17:15 TR, -5 / +60 dk); sirket basina
+//  - Anon anahtar (pg_cron): SADECE oturum penceresinde (09:00 / 12:00 / 17:00 TR, -5 / +60 dk; 19.11.2026'ya kadar :15); sirket basina
 //    oturumda bir kez (ic_gunluk_rapor_gonderimleri benzersiz). Deneme / tarih secimi YOK (test: asagida).
 //    Yanitta sirket adi / ozet yok.
 //  - Yetkili kullanici (gecerli oturum + admin rolu / super admin), yalniz KENDI sirketi:
@@ -26,7 +26,7 @@ import {
 //      {"tarih": "YYYY-MM-DD"} (deneme / test ile) gecmis gun.
 // 04.11.2026 aksam - GUNDE 3 OTURUM (kullanici: "bundan sonraki gunlerde sabah ogle aksam"; ihracat
 // raporuyla ayni duzen, 15 dk sonra): pg_cron ic-gunluk-rapor-sabah / -ogle / -aksam (06:15 / 09:15 /
-// 14:15 UTC = 09:15 / 12:15 / 17:15 TR). SABAH = DUNUN raporu, OGLE / AKSAM = bugunun. Anon pencere: her
+// 14:15 UTC = 09:15 / 12:15 / 17:15 TR; 19.11.2026: 06:00 / 09:00 / 14:00 UTC = 09:00 / 12:00 / 17:00 TR). SABAH = DUNUN raporu, OGLE / AKSAM = bugunun. Anon pencere: her
 // oturumun saatinden 5 dk once - 60 dk sonra; tekrar korumasi (sirket, gun, oturum).
 // ============================================================================
 
@@ -47,7 +47,7 @@ const TEST_ALICISI = (Deno.env.get("IC_RAPOR_TEST_ALICISI") || "").split(",").ma
 const GRUPLU_CANLI = false;
 // 19.11.2026 kullanici: "Acik satis ve acik alis siparisleri kisminda toplami gozukmeli (kalanlar toplanacak). Sensei adresine test
 // gonder, onay verdikten sonra canliya alacagiz." -> TOPLAM satiri yalniz test adresi raporunda; onaydan sonra true.
-const TOPLAM_CANLI = false;
+const TOPLAM_CANLI = true; // 19.11.2026 11:24 kullanici onayi: "Test mail onayliyor. Canliya alalim."
 
 const trDakika = (simdiMs: number) => { const tr = new Date(simdiMs + 3 * 60 * 60 * 1000); return tr.getUTCHours() * 60 + tr.getUTCMinutes(); };
 /** Zamanlanmis oturum penceresindeysek oturum, degilse null (saatten 5 dk once - 60 dk sonra). */

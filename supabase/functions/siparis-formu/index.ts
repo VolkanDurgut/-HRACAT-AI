@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import JSZip from "npm:jszip@3.10.1";
-import { formDosyaAdi, formKonusu, formMailHtml, formModeli, gonderimZamaniMi, uyariMailHtml, type FormHam, type FormModeli } from "../_shared/siparis-formu.ts";
+import { formDosyaAdi, formKonusu, formMailHtml, formModeli, gonderimZamaniMi, LOGO_CID, type FormHam, type FormModeli } from "../_shared/siparis-formu.ts";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "../_shared/siparis-formu-xlsx.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
 
@@ -15,14 +15,18 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 //  - Canli: form alicilara; booking basina BIR kez (siparis_formu_gonderimleri kismi benzersiz index).
 //  - Canli degil: ayni zamanlamayla "[TEST]" form YALNIZ test adresine (SIPARIS_FORMU_TEST_ALICISI, yoksa
 //    SIPARIS_RAPOR_TEST_ALICISI secret'i); booking basina bir otomatik test. Test adresi koda YAZILMAZ.
-//  - Eksik (cuval gorseli / uretim / SKT) varsa form YINE gider, eksik alanlar "GİRİLMEDİ"; temsilciye ayrica uyari
-//    (testte uyari da test adresine).
+//  - 19.11.2026 (kullanici): "Gorseli yuklenmemisse mail gitmemeli; eksik bilgi ile gonderilme durumu ortadan kalkmis olacak."
+//    Girisler (cuval gorseli + urun spekleri + uretim + SKT) tamam DEGILSE form hicbir yoldan (otomatik / elle / test) GITMEZ;
+//    tamamlandiginda gonderim penceresi icindeyse bir sonraki taramada gider. (Eski "eksikle gonder + temsilciye uyari" kalkti.)
+//  - Mailin basinda Unex logosu (gomulu, cid) - 19.11.2026.
 // CAGRI:
 //  - Anon (pg_cron 'siparis-formu', her 30 dk 08:00-18:30 TR) {}: gonderim gunu (bos ekipman - 1) 08:00'den itibaren,
 //    ekipman gunu gecmemis bookingler. Yanitta veri yok.
 //  - Siparisler sayfasi yetkili kullanici (proformalar / analiz), yalniz kendi sirketi: {"test": true, "booking": "..."} ->
 //    "[TEST]" form YALNIZ test adresine (24 saatte en fazla 25), otomatik gonderimi engellemez. (18.11.2026: yalniz admin degil;
 //    test maili uretime gitmedigi icin sayfa yetkisi yeterli.)
+//  - Ayni yetkiyle {"gonder": true, "booking": "..."} -> CANLI modda alicilar + CC'ye (booking basina BIR kez; otomatik
+//    gonderimle ayni tekrar korumasi). Canli kapaliysa reddedilir (Test gonder kullanilir). 19.11.2026.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -78,8 +82,8 @@ function jwtRolu(token: string | null): string | null {
     return null;
   }
 }
-/** Siparisler sayfasi yetkisi (proformalar / analiz) olan kullanicinin sirketi; degilse null. */
-async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
+/** Siparisler sayfasi yetkisi (proformalar / analiz) olan kullanicinin sirketi (+ e-postasi); degilse null. */
+async function yetkiliKullanici(req: Request): Promise<{ sirket: string; eposta: string } | null> {
   const baslik = req.headers.get("Authorization") || "";
   const token = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null;
   if (jwtRolu(token) !== "authenticated") return null;
@@ -87,14 +91,15 @@ async function yetkiliKullaniciSirketi(req: Request): Promise<string | null> {
   if (!kRes.ok) { await kRes.body?.cancel(); return null; }
   const k = (await kRes.json()) as { id?: string; email?: string };
   if (!k.id || !UUID_RE.test(k.id)) return null;
+  const eposta = (k.email || "").toLowerCase().slice(0, 120);
   const roller = await oku<{ company_id: string | null; rol: string | null }>(`kullanici_rolleri?select=company_id,rol&user_id=eq.${k.id}`);
   const kayit = roller.find((r) => !!r.company_id);
   if (!kayit?.company_id) return null;
   const superAdmin = SUPER_ADMIN_EPOSTALARI.includes((k.email || "").toLowerCase());
-  if (superAdmin || kayit.rol === "admin") return kayit.company_id;
+  if (superAdmin || kayit.rol === "admin") return { sirket: kayit.company_id, eposta };
   const yetki = await oku<{ sayfa_yetkileri: Record<string, unknown> | null }>(`kullanici_yetkileri?select=sayfa_yetkileri&user_id=eq.${k.id}`);
   const s = yetki[0]?.sayfa_yetkileri || {};
-  return s.proformalar === true || s.analiz === true || s.proformalar === "true" || s.analiz === "true" ? kayit.company_id : null;
+  return s.proformalar === true || s.analiz === true || s.proformalar === "true" || s.analiz === "true" ? { sirket: kayit.company_id, eposta } : null;
 }
 
 async function formlar(companyId: string, bas: string, bit: string): Promise<FormModeli[]> {
@@ -117,10 +122,19 @@ async function ikili(adres: string, ek: Record<string, string> = {}): Promise<Ui
 }
 const gorsel = (b: Uint8Array | null): FormGorseli | null => { const t = b ? gorselTuru(b) : null; return b && t ? { veri: b, tur: t } : null; };
 
-let logoOnbellek: FormGorseli | null | undefined;
+let logoOnbellek: FormGorseli | null = null;
 async function logo(): Promise<FormGorseli | null> {
-  if (logoOnbellek === undefined) logoOnbellek = gorsel(await ikili(`${SITE}/images/logo.png`));
+  if (!logoOnbellek) logoOnbellek = gorsel(await ikili(`${SITE}/images/logo.png`));
   return logoOnbellek;
+}
+/** Mail ustundeki kucuk logo (144x119 PNG). Yalniz basarili okuma onbelleklenir; okunamazsa mail logosuz gider. */
+let mailLogoOnbellek: Uint8Array | null = null;
+async function mailLogosu(): Promise<Uint8Array | null> {
+  if (!mailLogoOnbellek) {
+    const b = await ikili(`${SITE}/images/logo-mail.png`);
+    if (b && gorselTuru(b) === "png" && b.length < 200_000) mailLogoOnbellek = b;
+  }
+  return mailLogoOnbellek;
 }
 
 function base64(bayt: Uint8Array): string {
@@ -129,7 +143,8 @@ function base64(bayt: Uint8Array): string {
   return btoa(s);
 }
 
-async function mailGonder(to: string[], cc: string[], konu: string, html: string, ekler: { filename: string; content: string }[]): Promise<void> {
+type Ek = { filename: string; content: string; content_id?: string };
+async function mailGonder(to: string[], cc: string[], konu: string, html: string, ekler: Ek[]): Promise<void> {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -141,13 +156,13 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
 }
 
 /** Formun Excel'i (+ cuval gorseli ayri ek). */
-async function ekler(m: FormModeli): Promise<{ filename: string; content: string }[]> {
+async function ekler(m: FormModeli): Promise<Ek[]> {
   const cuvalBayt = m.gorselYolu ? await ikili(`${SUPABASE_URL}/storage/v1/object/${KOVA}/${m.gorselYolu.split("/").map(encodeURIComponent).join("/")}`, basliklar) : null;
   const cuval = gorsel(cuvalBayt);
   if (m.gorselYolu && !cuval) console.error("siparis-formu: cuval gorseli okunamadi:", m.bookingNo);
   const zip = new JSZip();
   for (const p of siparisFormuXlsx(m, await logo(), cuval)) zip.file(p.yol, p.icerik);
-  const liste = [{ filename: formDosyaAdi(m), content: await zip.generateAsync({ type: "base64", compression: "DEFLATE" }) }];
+  const liste: Ek[] = [{ filename: formDosyaAdi(m), content: await zip.generateAsync({ type: "base64", compression: "DEFLATE" }) }];
   if (cuval) liste.push({ filename: formDosyaAdi(m).replace(/\.xlsx$/, `_cuval.${cuval.tur === "png" ? "png" : "jpg"}`), content: base64(cuval.veri) });
   return liste;
 }
@@ -171,55 +186,69 @@ async function kayitSil(id: string): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/siparis_formu_gonderimleri?id=eq.${id}`, { method: "DELETE", headers: basliklar });
 }
 
-/** Tek form: kayit (tekrar korumasi) -> Excel -> mail -> (eksikse) temsilciye uyari. */
-async function gonder(companyId: string, sirketAdi: string, m: FormModeli, alicilar: string[], cc: string[], test: boolean, elle: boolean) {
-  const kayit = await kayitAc(companyId, m, test ? "test" : "gonderiliyor", elle);
+/**
+ * Tek form: kayit (tekrar korumasi) -> Excel -> mail. 19.11.2026: girisler eksikse HICBIR kayit / mail yok.
+ * elle: yalniz test gonderimlerinde (oran siniri); canli elle gonderim otomatikle ayni tekrar korumasini kullanir.
+ */
+async function gonder(companyId: string, sirketAdi: string, m: FormModeli, alicilar: string[], cc: string[], test: boolean, elle: boolean, gonderen = "") {
+  if (!m.gonderilebilir) return { booking: m.bookingNo, atlandi: `eksik: ${m.girisEksikleri.join(", ")}` };
+  const kayit = await kayitAc(companyId, m, test ? "test" : "gonderiliyor", test && elle);
   if (kayit.tekrar) return { booking: m.bookingNo, atlandi: "zaten gönderildi" };
+  const logoBayt = await mailLogosu();
+  const ekListesi = await ekler(m);
+  if (logoBayt) ekListesi.push({ filename: "unex-logo.png", content: base64(logoBayt), content_id: LOGO_CID });
   try {
-    await mailGonder(alicilar, test ? [] : cc, formKonusu(m, test), formMailHtml(m, sirketAdi, test), await ekler(m));
+    await mailGonder(alicilar, test ? [] : cc, formKonusu(m, test), formMailHtml(m, sirketAdi, test, !!logoBayt), ekListesi);
   } catch (e) {
     if (kayit.id) await kayitSil(kayit.id);
     throw e;
   }
-  if (kayit.id) await kayitGuncelle(kayit.id, { durum: test ? "test" : "gonderildi", alicilar: [...alicilar, ...(test ? [] : cc)].join(","), ozet: { konu: formKonusu(m, test), eksik: m.eksikler } });
-  // Eksik giris: temsilciye uyari (testte test adresine). Uyari hatasi formu geri almaz.
-  let uyari: string | null = null;
-  if (m.girisEksikleri.length) {
-    const hedef = test ? TEST_ALICISI : (m.temsilciEposta && EPOSTA_RE.test(m.temsilciEposta) ? [m.temsilciEposta] : []);
-    if (hedef.length) {
-      try {
-        await mailGonder(hedef, [], `${test ? "[TEST] " : ""}Eksik bilgiyle gönderildi · Sipariş Bildirim Formu · ${m.alanlar.firma} · ${m.bookingNo}`, uyariMailHtml(m, test), []);
-        uyari = hedef.join(",");
-      } catch (e) {
-        console.error("siparis-formu: uyari gonderilemedi:", e instanceof Error ? e.message : e);
-      }
-    }
+  if (kayit.id) {
+    await kayitGuncelle(kayit.id, {
+      durum: test ? "test" : "gonderildi", alicilar: [...alicilar, ...(test ? [] : cc)].join(","),
+      ozet: { konu: formKonusu(m, test), eksik: m.eksikler, ...(gonderen ? { elle_gonderen: gonderen } : {}) },
+    });
   }
-  return { booking: m.bookingNo, gonderildi: true, test, eksik: m.girisEksikleri, uyari };
+  return { booking: m.bookingNo, gonderildi: true, test };
 }
 
 Deno.serve(async (req: Request) => {
   try {
-    const govde = (await req.json().catch(() => ({}))) as { test?: boolean; booking?: string };
-    const yetkiliSirket = await yetkiliKullaniciSirketi(req);
+    const govde = (await req.json().catch(() => ({}))) as {
+      test?: boolean; gonder?: boolean; booking?: string;
+    };
     const bugun = trBugun();
 
-    // Elle test (yonetici): tek booking, test adresine
+    const kullanici = await yetkiliKullanici(req);
+    const yetkiliSirket = kullanici?.sirket || null;
+
+    // Elle (sayfa yetkisi): tek booking; test -> test adresine, gonder -> canli alicilar + CC
     if (yetkiliSirket) {
-      if (govde.test !== true || !govde.booking) return json({ ok: false, hata: "Elle yalnızca bir booking için test gönderimi yapılabilir." }, 400);
-      if (!TEST_ALICISI.length) return json({ ok: false, hata: "Test adresi tanımlı değil." }, 400);
-      const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
-      const son = await oku<{ id: string }>(`siparis_formu_gonderimleri?select=id&company_id=eq.${yetkiliSirket}&elle=is.true&olusturma=gte.${encodeURIComponent(esik)}`);
-      if (son.length >= 25) return json({ ok: false, hata: "Son 24 saatte en fazla 25 test formu gönderilebilir." }, 429);
+      const canliIstek = govde.gonder === true;
+      if ((govde.test !== true && !canliIstek) || !govde.booking) return json({ ok: false, hata: "Elle yalnızca bir booking için gönderim yapılabilir." }, 400);
       const anahtar = govde.booking.replace(/\s/g, "").toUpperCase();
       const liste = await formlar(yetkiliSirket, gunKaydir(bugun, -60), gunKaydir(bugun, 120));
       const m = liste.find((x) => x.anahtar === anahtar);
       if (!m) return json({ ok: false, hata: "Booking yükleme planında bulunamadı." }, 404);
+      if (!m.gonderilebilir) return json({ ok: false, hata: `Form gönderilmez, eksik: ${m.girisEksikleri.join(", ")}.` }, 400);
       const sirket = await oku<{ company_name: string | null }>(`companies?select=company_name&id=eq.${yetkiliSirket}`);
-      const sonuc = await gonder(yetkiliSirket, (sirket[0]?.company_name || "Unex Gıda").trim(), m, TEST_ALICISI, [], true, true);
+      const sirketAdi = (sirket[0]?.company_name || "Unex Gıda").replace(/[<>"]/g, "").trim();
+      if (canliIstek) {
+        const ayar = await raporAyari(SUPABASE_URL, basliklar, yetkiliSirket, "siparis_formu", { canli: false, alicilar: [] });
+        if (!ayar.canli) return json({ ok: false, hata: "Sipariş formu canlı modda değil (Ayarlar > Rapor Alıcıları). Test gönder kullanın." }, 400);
+        if (m.gonderim?.zaman) return json({ ok: false, hata: "Bu booking'in formu üretime zaten gönderildi." }, 409);
+        const sonuc = await gonder(yetkiliSirket, sirketAdi, m, ayar.alicilar, ayar.cc, false, true, kullanici?.eposta || "elle");
+        if (!sonuc.gonderildi) return json({ ok: false, hata: sonuc.atlandi === "zaten gönderildi" ? "Bu booking'in formu üretime zaten gönderildi." : "Gönderilemedi." }, 409);
+        return json({ ok: true, sonuc, alici: [...ayar.alicilar, ...ayar.cc] });
+      }
+      if (!TEST_ALICISI.length) return json({ ok: false, hata: "Test adresi tanımlı değil." }, 400);
+      const esik = new Date(Date.now() - 24 * 3600_000).toISOString();
+      const son = await oku<{ id: string }>(`siparis_formu_gonderimleri?select=id&company_id=eq.${yetkiliSirket}&elle=is.true&olusturma=gte.${encodeURIComponent(esik)}`);
+      if (son.length >= 25) return json({ ok: false, hata: "Son 24 saatte en fazla 25 test formu gönderilebilir." }, 429);
+      const sonuc = await gonder(yetkiliSirket, sirketAdi, m, TEST_ALICISI, [], true, true);
       return json({ ok: true, sonuc, alici: TEST_ALICISI });
     }
-    if (govde.test === true) return json({ ok: false, hata: "Test gönderimi için Siparişler sayfası yetkisi gerekli." }, 403);
+    if (govde.test === true || govde.gonder === true) return json({ ok: false, hata: "Gönderim için Siparişler sayfası yetkisi gerekli." }, 403);
 
     // Zamanlanmis tarama (pg_cron)
     const dakika = trDakika();
@@ -232,7 +261,8 @@ Deno.serve(async (req: Request) => {
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
       const sirket = await oku<{ company_name: string | null }>(`companies?select=company_name&id=eq.${companyId}`);
       const sirketAdi = (sirket[0]?.company_name || "Unex Gıda").replace(/[<>"]/g, "").trim();
-      const zamani = (await formlar(companyId, gunKaydir(bugun, -1), gunKaydir(bugun, 2))).filter((m) => gonderimZamaniMi(m, bugun, dakika));
+      // 19.11.2026: girisleri eksik form GONDERILMEZ (tamamlaninca pencere icindeyse sonraki taramada gider)
+      const zamani = (await formlar(companyId, gunKaydir(bugun, -1), gunKaydir(bugun, 2))).filter((m) => m.gonderilebilir && gonderimZamaniMi(m, bugun, dakika));
       for (const m of zamani) {
         if (!test && m.gonderim?.zaman) continue;
         if (test && m.test?.zaman) continue;

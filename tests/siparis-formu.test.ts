@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import JSZip from "jszip";
-import { ayYil, cuvalTarihleriniAyikla, cuvalTipi, formDurumu, formModeli, gonderimZamaniMi, spekMetni, spekTemizle, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
+import { ayYil, cuvalLotunuAyikla, cuvalTarihleriniAyikla, cuvalTipi, formDurumu, formMailHtml, formModeli, gonderimZamaniMi, LOGO_CID, lotTemizle, spekMetni, spekTemizle, trTarih, urunAdiSade, type FormHam } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselBoyutu, gorselTuru, siparisFormuXlsx } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
 const ham = (ek: Partial<FormHam> = {}): FormHam => ({
@@ -118,12 +118,50 @@ test("gonderim zamani: ekipman - 1 gun 08:00 TR; ekipman gunu gecmisse gonderilm
 });
 
 test("form durumu", () => {
-  const m = { gonderimGunu: "2026-11-12", ekipmanTarihi: "2026-11-13", gonderim: null };
+  const m = { gonderimGunu: "2026-11-12", ekipmanTarihi: "2026-11-13", gonderim: null, gonderilebilir: true };
   assert.equal(formDurumu(m, "2026-11-10"), "bekliyor");
   assert.equal(formDurumu(m, "2026-11-12"), "bugun");
   assert.equal(formDurumu(m, "2026-11-13"), "gecikti");
   assert.equal(formDurumu(m, "2026-11-14"), "suresi_gecti");
   assert.equal(formDurumu({ ...m, gonderim: { zaman: "2026-11-12T05:00:00Z" } }, "2026-11-14"), "gonderildi");
+  // 19.11.2026: girisler eksikse gonderilmez
+  assert.equal(formDurumu({ ...m, gonderilebilir: false }, "2026-11-12"), "eksik");
+  assert.equal(formDurumu({ ...m, gonderilebilir: false, gonderim: { zaman: "2026-11-12T05:00:00Z" } }, "2026-11-14"), "gonderildi");
+});
+
+test("gonderim kapisi: gorsel / spek / tarih eksikse form gonderilemez", () => {
+  assert.equal(formModeli(ham()).gonderilebilir, true);
+  assert.equal(formModeli(ham({ form: { ...ham().form, gorsel_yolu: null } })).gonderilebilir, false);
+  assert.equal(formModeli(ham({ form: { ...ham().form, spekler: "" } })).gonderilebilir, false);
+  assert.equal(formModeli(ham({ form: null })).gonderilebilir, false);
+});
+
+test("lot ve firma duzeltmesi: cuvaldaki lot ve formdaki firma adi dosyadakinin onune gecer", () => {
+  const dosya = { id: "d1", dosya_no: "IHR-TEST-2", alici_firma: "KURGU LTDADRES SOKAK", lot_no: "PF-KRG-9R", proforma_no: "PF-KRG-9R" };
+  const m = formModeli(ham({ dosya, form: { ...ham().form, lot_no: "PF-KRG-9", firma_adi: "KURGU LTD" } }));
+  assert.equal(m.alanlar.lotNo, "PF-KRG-9");
+  assert.equal(m.alanlar.firma, "KURGU LTD");
+  assert.equal(m.alanlar.proformaNo, "PF-KRG-9R");
+  assert.deepEqual(m.duzeltme, { lotNo: "PF-KRG-9", firmaAdi: "KURGU LTD" });
+  const bos = formModeli(ham({ dosya }));
+  assert.equal(bos.alanlar.lotNo, "PF-KRG-9R");
+  assert.equal(bos.alanlar.firma, "KURGU LTDADRES SOKAK");
+});
+
+test("cuvaldan lot: LOT NO / Batch No satiri", () => {
+  assert.equal(cuvalLotunuAyikla("EXPIRY DATE : OCTOBER 2027\nLOT NO        : KRGLOT160926-1\nPRODUCT OF TURKEY"), "KRGLOT160926-1");
+  assert.equal(cuvalLotunuAyikla("Batch No: KRGLOT300926\nProduced & packed"), "KRGLOT300926");
+  assert.equal(cuvalLotunuAyikla("LOT NO: KRGLOT160926-4"), "KRGLOT160926-4");
+  assert.equal(cuvalLotunuAyikla("PRODUCT OF TURKEY\nNet 25 kg"), "");
+  assert.equal(lotTemizle(" krglot 160926-2 "), "KRGLOT160926-2");
+});
+
+test("mail: logo gomulu (cid), eksik uyari kutusu yok", () => {
+  const m = formModeli(ham());
+  const html = formMailHtml(m, "Kurgu Gida", true, true);
+  assert.ok(html.includes(`src="cid:${LOGO_CID}"`));
+  assert.ok(!html.includes("Eksik bilgi"));
+  assert.ok(!formMailHtml(m, "Kurgu Gida", true, false).includes("cid:"));
 });
 
 test("spekler: musteri kalite ayarindan, yoksa sablondaki varsayilan", () => {

@@ -4,10 +4,11 @@
  * OCR motoru ve Ingilizce dil verisi (jsdelivr) indirilir, sonra tarayici onbellegindedir.
  * Gecisler: 1) gorsel (gri, en fazla 2000 px)  2) 3 kat buyutulmus (kucuk yazi)  3) ters renk (koyu zemin uzerine acik yazi).
  * Iki tarih de bulununca durur. Tarih ayiklama (anahtar kelime + tutarlilik): _shared/siparis-formu.ts cuvalTarihleriniAyikla.
+ * 19.11.2026: okunan ham metin de dondurulur (cuvaldaki lot: cuvalLotunuAyikla).
  */
 import { cuvalTarihleriniAyikla, type CuvalTarihleri } from "@/supabase/functions/_shared/siparis-formu";
 
-export type CuvalOcrSonucu = { tarihler: CuvalTarihleri; gecis: number };
+export type CuvalOcrSonucu = { tarihler: CuvalTarihleri; gecis: number; metin: string };
 
 async function hazirla(kaynak: Blob, olcek: number, azami: number, ters: boolean): Promise<Blob> {
   const bmp = await createImageBitmap(kaynak);
@@ -47,21 +48,23 @@ export async function cuvalTarihleriniOku(kaynak: Blob, ilerleme?: (mesaj: strin
       { olcek: 3, azami: 4200, ters: true, ad: "Koyu zemin için ters çevriliyor…" },
     ];
     let sonuc: CuvalTarihleri = { uretim: null, skt: null };
+    const metinler: string[] = [];
     for (let i = 0; i < gecisler.length; i++) {
       const g = gecisler[i];
       ilerleme?.(g.ad);
       const { data } = await isci.recognize(await hazirla(kaynak, g.olcek, g.azami, g.ters));
+      metinler.push(data.text || "");
       const t = cuvalTarihleriniAyikla(data.text || "");
       // Bir geciste ikisi birden bulunduysa o gecis esas (ayni satir grubundan, tutarli); degilse eksik olani tamamla
-      if (t.uretim && t.skt) return { tarihler: t, gecis: i + 1 };
+      if (t.uretim && t.skt) return { tarihler: t, gecis: i + 1, metin: metinler.join("\n") };
       sonuc = { uretim: sonuc.uretim || t.uretim, skt: sonuc.skt || t.skt };
     }
     // Farkli gecislerden birlesen sonuc yine tutarlilik kontrolunden gecer
     if (sonuc.uretim && sonuc.skt) {
       const k = cuvalTarihleriniAyikla(`PRODUCTION DATE: ${sonuc.uretim.metin}\nEXPIRY DATE: ${sonuc.skt.metin}`);
-      return { tarihler: k, gecis: gecisler.length };
+      return { tarihler: k, gecis: gecisler.length, metin: metinler.join("\n") };
     }
-    return { tarihler: sonuc, gecis: gecisler.length };
+    return { tarihler: sonuc, gecis: gecisler.length, metin: metinler.join("\n") };
   } finally {
     await isci.terminate();
   }

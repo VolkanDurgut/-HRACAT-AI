@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { formModeli, formDosyaAdi, type FormHam, type FormModeli } from "@/supabase/functions/_shared/siparis-formu";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "@/supabase/functions/_shared/siparis-formu-xlsx";
 
-export { cuvalTarihleriniAyikla, formDurumu, gunEkle, trTarih, type CuvalTarihi, type CuvalTarihleri, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
+export { cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, lotTemizle, gunEkle, trTarih, type CuvalTarihi, type CuvalTarihleri, type FormModeli, type FormDurumu } from "@/supabase/functions/_shared/siparis-formu";
 
 const KOVA = "siparis-formlari";
 const AZAMI_PX = 2000;
@@ -67,13 +67,16 @@ export type FormKaydi = {
   tarihKaynagi: "gorsel" | "elle" | null;
   gorsel: { yol: string; ad: string } | null;
   gorselKaldir: boolean;
+  /** 19.11.2026: cuvaldaki lot (= proforma no) ve formdaki firma adi; bos = dosyadaki. */
+  lotNo: string;
+  firmaAdi: string;
 };
 
 export async function formKaydet(k: FormKaydi): Promise<number> {
   const { data, error } = await supabase.rpc("siparis_formu_kaydet", {
     p_booking: k.booking, p_spekler: k.spekler || null, p_uretim_metin: k.uretimMetin || null, p_skt_metin: k.sktMetin || null,
     p_uretim: k.uretimIso || null, p_skt: k.sktIso || null, p_gorsel_yolu: k.gorsel?.yol || null, p_gorsel_adi: k.gorsel?.ad || null,
-    p_gorsel_sil: k.gorselKaldir, p_tarih_kaynagi: k.tarihKaynagi,
+    p_gorsel_sil: k.gorselKaldir, p_tarih_kaynagi: k.tarihKaynagi, p_lot_no: k.lotNo || null, p_firma_adi: k.firmaAdi || null,
   });
   if (error) throw new Error(error.message || "Kaydedilemedi.");
   return Number((data as { dosya?: number } | null)?.dosya || 0);
@@ -115,9 +118,9 @@ export async function formExcelIndir(m: FormModeli): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-/** "[TEST]" formu test adresine (yalniz yonetici). */
-export async function testFormuGonder(booking: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("siparis-formu", { body: { test: true, booking } });
+/** "[TEST]" formu test adresine; canli: formu uretime (alicilar + CC), booking basina bir kez. */
+export async function testFormuGonder(booking: string, canli = false): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("siparis-formu", { body: canli ? { gonder: true, booking } : { test: true, booking } });
   const yanit = data as { ok?: boolean; hata?: string; alici?: string[] } | null;
   if (error || !yanit?.ok) {
     let mesaj = yanit?.hata || "";
@@ -125,7 +128,7 @@ export async function testFormuGonder(booking: string): Promise<string> {
     if (!mesaj && ctx && typeof ctx.json === "function") {
       try { mesaj = ((await ctx.json()) as { hata?: string }).hata || ""; } catch { /* yanit govdesi okunamadi */ }
     }
-    throw new Error(mesaj || "Test gönderilemedi.");
+    throw new Error(mesaj || "Gönderilemedi.");
   }
   return (yanit.alici || []).join(", ");
 }

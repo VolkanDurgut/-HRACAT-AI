@@ -4,8 +4,12 @@
  *
  * Kaynak: siparis_formu_veri() satiri (migration 20261118160000): yukleme plani + (varsa) dosya + siparis listesi + proforma
  * temsilcisi + musterinin kalite spekleri + girilen cuval gorseli / uretim / SKT + gonderim kaydi.
- * Kullanici kararlari: her booking = 1 form; Planlanan Yukleme Tarihi = bos ekipman alim tarihi; temsilci = proformayi kesen;
- * mail ekipman alim tarihinden 1 gun once (08:00 TR); cuval gorseli / tarih eksikse form yine gider, eksik alan isaretlenir.
+ * Kullanici kararlari: her booking = 1 form; Planlanan Yukleme Tarihi = ardiyesiz giris; temsilci sabit;
+ * mail ekipman alim tarihinden 1 gun once (08:00 TR).
+ * 19.11.2026 (kullanici): "Siparis bildirim formunda gorseli yuklenmemisse mail gitmemeli. Bu sayede eksik bilgi ile gonderilme
+ * durumu ortadan kalkmis olacak." -> form YALNIZ girisler tamamsa (cuval gorseli + urun spekleri + uretim + SKT) gider
+ * (gonderilebilir); eksikse ne otomatik ne elle (test dahil) mail gider. Lot No cuvaldaki lot (= proforma no) ile eslesir:
+ * formda kayitli cuval lotu varsa o yazilir; firma adi formda duzeltilebilir (dosya / evrak degismez).
  */
 import { gidecegiUlke, ticaretYapilanUlke } from "./ulke-bul.ts";
 
@@ -19,7 +23,7 @@ export type FormHam = {
   kalite: unknown;
   form: {
     uretim_tarihi?: string | null; skt?: string | null; uretim_metin?: string | null; skt_metin?: string | null; spekler?: string | null;
-    tarih_kaynagi?: string | null;
+    tarih_kaynagi?: string | null; lot_no?: string | null; firma_adi?: string | null;
     gorsel_yolu?: string | null; gorsel_adi?: string | null; guncelleyen?: string | null; guncelleme?: string | null;
   } | null;
   gonderim: { zaman?: string | null; alicilar?: string | null; eksikler?: string[] | null } | null;
@@ -41,7 +45,7 @@ export const SAG_ALANLAR = [
 export type AlanAnahtari = (typeof SOL_ALANLAR)[number][0] | (typeof SAG_ALANLAR)[number][0];
 export type FormAlanlari = Record<AlanAnahtari, string>;
 
-export type FormDurumu = "gonderildi" | "bekliyor" | "bugun" | "gecikti" | "suresi_gecti";
+export type FormDurumu = "gonderildi" | "eksik" | "bekliyor" | "bugun" | "gecikti" | "suresi_gecti";
 
 export type FormModeli = {
   anahtar: string;
@@ -49,8 +53,12 @@ export type FormModeli = {
   alanlar: FormAlanlari;
   /** Bos kalan alanlarin etiketleri (formda "GİRİLMEDİ"). */
   eksikler: string[];
-  /** Kullanicinin girmesi gerekenlerden eksik olanlar (cuval gorseli / uretim / SKT). */
+  /** Kullanicinin girmesi gerekenlerden eksik olanlar (cuval gorseli / urun spekleri / uretim / SKT). */
   girisEksikleri: string[];
+  /** 19.11.2026: girisler tamam mi; degilse form GONDERILMEZ (otomatik / elle / test). */
+  gonderilebilir: boolean;
+  /** Formda kayitli duzeltmeler (cuvaldaki lot, formdaki firma adi); bos = dosyadan. */
+  duzeltme: { lotNo: string; firmaAdi: string };
   ekipmanTarihi: string | null;
   /** Gemi kalkisi (ETD): ekipman gunu gecmis ama gemi kalkmamis yukleme listede kalir. */
   etd: string | null;
@@ -218,6 +226,18 @@ export function cuvalTarihleriniAyikla(ocrMetni: string): CuvalTarihleri {
   return { uretim, skt };
 }
 
+/** Cuvaldaki lot: "LOT NO: X" / "Batch No: X" satirindan (OCR). Bulunamazsa "". */
+export function cuvalLotunuAyikla(ocrMetni: string): string {
+  for (const ham of String(ocrMetni || "").split(/\r?\n/)) {
+    const m = ham.toUpperCase().match(/\b(?:LOT|BATCH)\s*(?:NO|N[O°º]|NUMBER|#)?\s*\.?\s*[:;.]?\s*([A-Z0-9][A-Z0-9/-]{4,39})/);
+    if (m && /\d/.test(m[1]) && /[A-Z]/.test(m[1])) return m[1].replace(/[-/]+$/, "");
+  }
+  return "";
+}
+/** Elle girilen lot / firma: tek satir, en fazla 60 / 120 karakter. */
+export const lotTemizle = (v: unknown) => metin(v).toUpperCase().replace(/\s+/g, "").slice(0, 60);
+export const firmaTemizle = (v: unknown) => metin(v).slice(0, 120);
+
 export function formModeli(h: FormHam): FormModeli {
   const p = h.plan || {};
   const s = h.siparis || {};
@@ -245,7 +265,7 @@ export function formModeli(h: FormHam): FormModeli {
   const ekipmanTarihi = isoGun(p.bos_ekipman_tarihi);
 
   const alanlar: FormAlanlari = {
-    firma: ilk(d.alici_firma, s.firma, p.musteri),
+    firma: ilk(f.firma_adi, d.alici_firma, s.firma, p.musteri),
     temsilci: ilk(h.temsilci?.ad_soyad),
     ulke,
     // 18.11.2026 (kullanici): "Planlanan Yukleme Tarihi her zaman ardiyesiz giris tarihi" (gonderim yine bos ekipman - 1 gun)
@@ -258,7 +278,8 @@ export function formModeli(h: FormHam): FormModeli {
     yuklemeLimani: ilk(p.liman),
     ambalajTipi: [kgMetni, tip].filter(Boolean).join(" "),
     varisLimani: ilk(d.varis_limani, p.varis_limani),
-    lotNo: ilk(d.lot_no, proformaNo),
+    // 19.11.2026 (kullanici): "Proforma no = lot no; cuvalin ustunde yazan lot ile eslesmeli" -> kayitli cuval lotu once
+    lotNo: ilk(f.lot_no, d.lot_no, proformaNo),
     acente: ilk(p.acente),
     rezervasyonNo: ilk(p.booking_no),
     urunTipi: ilk(urunler.join(" / "), s.urun ? urunAdiSade(metin(s.urun)) : "", p.cinsi),
@@ -281,6 +302,8 @@ export function formModeli(h: FormHam): FormModeli {
     alanlar,
     eksikler,
     girisEksikleri,
+    gonderilebilir: girisEksikleri.length === 0,
+    duzeltme: { lotNo: metin(f.lot_no), firmaAdi: metin(f.firma_adi) },
     ekipmanTarihi,
     etd: isoGun(p.etd),
     gonderimGunu: ekipmanTarihi ? gunEkle(ekipmanTarihi, -1) : null,
@@ -316,8 +339,9 @@ export function gonderimZamaniMi(m: Pick<FormModeli, "gonderimGunu" | "ekipmanTa
   return bugunTr > m.gonderimGunu || dakikaTr >= GONDERIM_DAKIKASI;
 }
 
-export function formDurumu(m: Pick<FormModeli, "gonderim" | "gonderimGunu" | "ekipmanTarihi">, bugunTr: string): FormDurumu {
+export function formDurumu(m: Pick<FormModeli, "gonderim" | "gonderimGunu" | "ekipmanTarihi" | "gonderilebilir">, bugunTr: string): FormDurumu {
   if (m.gonderim?.zaman) return "gonderildi";
+  if (!m.gonderilebilir) return "eksik";
   if (!m.gonderimGunu || !m.ekipmanTarihi) return "bekliyor";
   if (bugunTr > m.ekipmanTarihi) return "suresi_gecti";
   if (bugunTr > m.gonderimGunu) return "gecikti";
@@ -340,38 +364,27 @@ export function formDosyaAdi(m: FormModeli): string {
   return `Siparis_Bildirim_Formu_${sade(m.alanlar.firma) || "Firma"}_${sade(m.bookingNo) || "booking"}.xlsx`;
 }
 
-export function formMailHtml(m: FormModeli, sirketAdi: string, test: boolean): string {
+/** Maildeki logo ekinin Content-ID'si (cid:). */
+export const LOGO_CID = "unex-logo";
+
+export function formMailHtml(m: FormModeli, sirketAdi: string, test: boolean, logo = false): string {
   const a = m.alanlar;
   const satir = (etiket: string, deger: string) =>
     `<tr><td style="padding:6px 10px;border:1px solid #D9DEE8;background:#F5F7FB;font-weight:600;width:42%;color:#283474">${esc(etiket)}</td>` +
     `<td style="padding:6px 10px;border:1px solid #D9DEE8;${deger ? "color:#111827" : "color:#B91C1C;font-weight:700"}">${deger ? esc(deger).replace(/\n/g, "<br>") : EKSIK}</td></tr>`;
   const sol = SOL_ALANLAR.map(([k, e]) => satir(e.replace(/:\s*$/, ""), a[k])).join("");
   const sag = SAG_ALANLAR.map(([k, e]) => satir(e.replace(/:\s*$/, ""), a[k])).join("");
-  const uyari = m.girisEksikleri.length
-    ? `<div style="margin:12px 0;padding:10px 12px;border:1px solid #F59E0B;background:#FFFBEB;color:#92400E;border-radius:6px;font-size:13px">
-        <b>Eksik bilgi:</b> ${esc(m.girisEksikleri.join(", "))}. Form bu haliyle gönderildi; eksikler müşteri temsilcisine bildirildi.</div>`
-    : "";
   return `<!doctype html><html><body style="margin:0;background:#F3F4F6;font-family:Calibri,Arial,sans-serif">
 <div style="max-width:760px;margin:0 auto;background:#fff;border:1px solid #E5E7EB">
+  ${logo ? `<div style="padding:14px 18px 10px;background:#fff"><img src="cid:${LOGO_CID}" alt="${esc(sirketAdi)}" width="72" height="59" style="display:block;border:0;width:72px;height:59px"></div>` : ""}
   <div style="background:#283474;color:#fff;padding:14px 18px;font-size:16px;font-weight:700">${test ? "[TEST] " : ""}SİPARİŞ BİLDİRİM FORMU</div>
   <div style="padding:16px 18px;font-size:14px;color:#111827">
     <p style="margin:0 0 10px">Kolay gelsin,</p>
     <p style="margin:0 0 10px"><b>${esc(a.firma)}</b> yüklemesi için sipariş bildirim formu ektedir (Excel${m.gorselYolu ? " + çuval görseli" : ""}).
       Boş ekipman alımı <b>${esc(trTarih(m.ekipmanTarihi) || "—")}</b>${a.planlananYukleme ? `, planlanan yükleme (ardiyesiz giriş) <b>${esc(a.planlananYukleme)}</b>` : ""}.</p>
-    ${uyari}
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:6px">${sol}</table>
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:10px">${sag}</table>
     <p style="margin:14px 0 0;color:#6B7280;font-size:12px">Bu mail ${esc(sirketAdi)} İhracat Asistanı tarafından otomatik gönderildi${test ? " (TEST - üretime gitmedi)" : ""}.</p>
   </div>
 </div></body></html>`;
-}
-
-export function uyariMailHtml(m: FormModeli, test: boolean): string {
-  const a = m.alanlar;
-  return `<!doctype html><html><body style="font-family:Calibri,Arial,sans-serif;font-size:14px;color:#111827">
-<p>${esc(m.temsilciHitap || "Merhaba")},</p>
-<p>${test ? "[TEST] " : ""}<b>${esc(a.firma)}</b> · Booking <b>${esc(a.rezervasyonNo)}</b> (boş ekipman ${esc(trTarih(m.ekipmanTarihi) || "—")}) sipariş bildirim formu
-üretime <b>eksik bilgiyle</b> gönderildi: <b>${esc(m.girisEksikleri.join(", "))}</b>.</p>
-<p>Lütfen Siparişler &gt; Sipariş Formları sekmesinden tamamlayıp üretimi ayrıca bilgilendirin.</p>
-</body></html>`;
 }

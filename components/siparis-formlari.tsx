@@ -1,13 +1,13 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, ScanText, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Factory, FileSpreadsheet, ImagePlus, Loader2, Mail, RefreshCw, Save, ScanText, Send, Trash2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  cuvalTarihleriniAyikla, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle, gunEkle, siparisFormlariOku,
-  testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
+  cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle,
+  gunEkle, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
 } from "@/lib/siparis-formu";
 import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
 
@@ -17,15 +17,19 @@ import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
  * 18.11.2026 v2 (kullanici): yalniz CUVAL GORSELI eklenir + URUN SPEKLERI girilir, kaydedilir. Uretim / SKT gorselden
  * tarayicida ucretsiz OCR ile okunur (lib/cuval-ocr.ts): cuvalda ay-yil ("NOVEMBER 2026") yaziyorsa formda o yazilir ve dosyanin
  * Ek Bilgiler tarihleri DEGISMEZ; tam tarih yaziyorsa dosya da guncellenir. Okunamazsa elle yazilabilir. Temsilci sabit.
+ * 19.11.2026 (kullanici): gorsel yoksa mail GITMEZ -> girisler (gorsel + spek + uretim + SKT) tamam degilse ne otomatik ne
+ * elle gonderilir. Lot No cuvaldaki lot (OCR'dan da okunur); firma adi formda duzeltilebilir (dosya / evrak degismez).
+ * "Uretime gonder": canli modda alicilar + CC (booking basina bir kez); canli kapaliysa edge reddeder.
  */
 const trBugun = () => new Date(Date.now() + 3 * 3600_000).toISOString().slice(0, 10);
 
 const DURUM: Record<FormDurumu, { etiket: (m: FormModeli, bugun: string) => string; renk: string; zemin: string }> = {
+  eksik: { etiket: (m) => `Eksik · gönderilmez (${m.girisEksikleri.join(", ")})`, renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
   gonderildi: { etiket: (m) => `Üretime gönderildi · ${m.gonderim?.zaman ? new Date(m.gonderim.zaman).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}`, renk: "#6EE7B7", zemin: "rgba(16,185,129,0.12)" },
   bugun: { etiket: () => "Bugün 08:00'den itibaren gider", renk: "#FCD34D", zemin: "rgba(245,158,11,0.14)" },
   bekliyor: { etiket: (m, bugun) => (m.gonderimGunu ? (m.gonderimGunu === gunEkle(bugun, 1) ? "Yarın 08:00'de gider" : `${trTarih(m.gonderimGunu)} 08:00'de gider`) : "Ekipman tarihi yok"), renk: "#93C5FD", zemin: "rgba(59,130,246,0.12)" },
   gecikti: { etiket: () => "Bir sonraki taramada gider (ekipman günü)", renk: "#FCA5A5", zemin: "rgba(239,68,68,0.12)" },
-  suresi_gecti: { etiket: () => "Ekipman tarihi geçti · otomatik gönderilmez (Test gönder ile gönderin)", renk: "#FCD34D", zemin: "rgba(245,158,11,0.10)" },
+  suresi_gecti: { etiket: () => "Ekipman tarihi geçti · otomatik gönderilmez (elle gönderin)", renk: "#FCD34D", zemin: "rgba(245,158,11,0.10)" },
 };
 
 type OcrDurumu = "yok" | "okunuyor" | "tamam" | "eksik" | "hata";
@@ -48,7 +52,9 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
   const [yeniGorsel, setYeniGorsel] = useState<File | null>(null);
   const [onizleme, setOnizleme] = useState<string | null>(null);
   const [gorselKaldir, setGorselKaldir] = useState(false);
-  const [mesgul, setMesgul] = useState<null | "kaydet" | "indir" | "test">(null);
+  const [lot, setLot] = useState(m.duzeltme.lotNo);
+  const [firma, setFirma] = useState(m.duzeltme.firmaAdi);
+  const [mesgul, setMesgul] = useState<null | "kaydet" | "indir" | "test" | "uretim">(null);
   const [hata, setHata] = useState<string | null>(null);
   const girdi = useRef<HTMLInputElement>(null);
   const durum = formDurumu(m, bugun);
@@ -61,7 +67,8 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     setKaynak((m.kayitliTarih.kaynak as "gorsel" | "elle" | null) || null);
     setOcr(m.kayitliTarih.uretimMetin && m.kayitliTarih.sktMetin ? "tamam" : "yok");
     setYeniGorsel(null); setGorselKaldir(false);
-  }, [m.spekKayitli, m.alanlar.spekler, m.spekOnerisi, m.kayitliTarih.uretimMetin, m.kayitliTarih.sktMetin, m.kayitliTarih.kaynak, m.gorselYolu]);
+    setLot(m.duzeltme.lotNo); setFirma(m.duzeltme.firmaAdi);
+  }, [m.duzeltme.lotNo, m.duzeltme.firmaAdi, m.spekKayitli, m.alanlar.spekler, m.spekOnerisi, m.kayitliTarih.uretimMetin, m.kayitliTarih.sktMetin, m.kayitliTarih.kaynak, m.gorselYolu]);
   useEffect(() => {
     let iptal = false;
     if (yeniGorsel) {
@@ -79,7 +86,9 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     setOcr("okunuyor"); setOcrMesaj("OCR hazırlanıyor…"); setHata(null);
     try {
       const { cuvalTarihleriniOku } = await import("@/lib/cuval-ocr");
-      const { tarihler } = await cuvalTarihleriniOku(kaynakBlob, setOcrMesaj);
+      const { tarihler, metin } = await cuvalTarihleriniOku(kaynakBlob, setOcrMesaj);
+      const okunanLot = cuvalLotunuAyikla(metin);
+      if (okunanLot) setLot(okunanLot);
       setUretim(tarihler.uretim?.metin || ""); setSkt(tarihler.skt?.metin || "");
       setKaynak("gorsel");
       const tam = !!(tarihler.uretim && tarihler.skt);
@@ -104,7 +113,8 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     : ut && st && st.yil * 12 + st.ay <= ut.yil * 12 + ut.ay ? "SKT üretim tarihinden sonra olmalı." : null;
   const spekDegisti = spekTemizle(spek) !== (m.spekKayitli ? m.alanlar.spekler : "");
   const tarihDegisti = (ut?.metin || "") !== kt.uretimMetin || (st?.metin || "") !== kt.sktMetin;
-  const degisti = spekDegisti || tarihDegisti || !!yeniGorsel || gorselKaldir;
+  const lotDegisti = lotTemizle(lot) !== m.duzeltme.lotNo || firmaTemizle(firma) !== m.duzeltme.firmaAdi;
+  const degisti = spekDegisti || tarihDegisti || lotDegisti || !!yeniGorsel || gorselKaldir;
   const tamTarih = ut?.tur === "gun" || st?.tur === "gun";
 
   const kaydet = async () => {
@@ -120,6 +130,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
         uretimIso: ut?.tur === "gun" ? ut.iso : null, sktIso: st?.tur === "gun" ? st.iso : null,
         tarihKaynagi: ut || st ? kaynak || "elle" : null,
         gorsel: yuklenen, gorselKaldir: gorselKaldir && !yuklenen,
+        lotNo: lotTemizle(lot), firmaAdi: firmaTemizle(firma),
       });
       if (m.gorselYolu && (yuklenen || gorselKaldir)) await gorselSil(m.gorselYolu).catch(() => undefined);
       onDegisti(`${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`);
@@ -137,6 +148,14 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
     try { const alici = await testFormuGonder(m.bookingNo); onDegisti(`${a.firma} · ${m.bookingNo}: [TEST] form ${alici} adresine gönderildi.`); }
     catch (e) { setHata(e instanceof Error ? e.message : "Test gönderilemedi."); } finally { setMesgul(null); }
   };
+  const uretimeGonder = async () => {
+    if (!window.confirm(`${a.firma} · ${m.bookingNo} sipariş bildirim formu ÜRETİME (alıcılar + CC) gönderilsin mi? Bu işlem bir kez yapılır.`)) return;
+    setMesgul("uretim"); setHata(null);
+    try { const alici = await testFormuGonder(m.bookingNo, true); onDegisti(`${a.firma} · ${m.bookingNo}: form üretime gönderildi (${alici}).`); }
+    catch (e) { setHata(e instanceof Error ? e.message : "Gönderilemedi."); } finally { setMesgul(null); }
+  };
+  const gonderimKapali = !!mesgul || degisti || !m.gonderilebilir;
+  const gonderimIpucu = degisti ? "Önce kaydedin" : !m.gonderilebilir ? `Eksik: ${m.girisEksikleri.join(", ")}` : "";
 
   const bilgi = (etiket: string, deger: string) => (
     <div className="min-w-0"><p className="text-[10px] uppercase tracking-wide" style={{ color: TEXT_MUTED }}>{etiket}</p>
@@ -234,6 +253,19 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
           <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: TEXT_MUTED }}>2 · Ürün spekleri {!m.spekKayitli && <span className="normal-case font-normal text-amber-300">(öneri, kontrol edip kaydedin)</span>}</p>
           <textarea value={spek} onChange={(e) => setSpek(e.target.value)} rows={4} aria-label="Ürün spekleri"
             className="w-full rounded-lg border px-2.5 py-2 text-sm text-white resize-y" style={girdiStil} placeholder={"Protein min 13%\nGluten min 30%"} />
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <label className="min-w-0">
+              <span className="block text-[10px] uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Lot No (çuvaldaki)</span>
+              <input value={lot} onChange={(e) => setLot(e.target.value.toUpperCase())} placeholder={a.lotNo || "Lot No"} aria-label="Lot No (çuvaldaki)"
+                className="h-8 w-full rounded-lg border px-2 text-xs text-white font-mono" style={girdiStil} />
+            </label>
+            <label className="min-w-0">
+              <span className="block text-[10px] uppercase tracking-wide mb-1" style={{ color: TEXT_MUTED }}>Firma adı (formda)</span>
+              <input value={firma} onChange={(e) => setFirma(e.target.value)} placeholder={a.firma || "Firma adı"} aria-label="Firma adı (formda)"
+                className="h-8 w-full rounded-lg border px-2 text-xs text-white" style={girdiStil} />
+            </label>
+          </div>
+          <p className="text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Boş bırakılırsa dosyadaki yazılır; yalnız formu etkiler, dosya ve evraklar değişmez.</p>
         </div>
       </div>
 
@@ -245,7 +277,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
         {(tarihHatasi || hata || m.girisEksikleri.length > 0) && (
           <p className={`text-[11px] inline-flex items-start gap-1 ${tarihHatasi || hata ? "text-red-300" : "text-amber-300"}`}>
             <AlertTriangle size={12} className="mt-px shrink-0" />
-            {tarihHatasi || hata || `Eksik: ${m.girisEksikleri.join(", ")}. Gönderim günü tamamlanmazsa form eksikler işaretlenerek gider ve temsilciye uyarı gönderilir.`}
+            {tarihHatasi || hata || `Eksik: ${m.girisEksikleri.join(", ")}. Tamamlanmadan form gönderilmez (otomatik ya da elle).`}
           </p>
         )}
         <div className="ml-auto flex items-center gap-2">
@@ -253,10 +285,16 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
             {mesgul === "indir" ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Excel
           </button>
-          <button type="button" onClick={test} disabled={!!mesgul || degisti} title={degisti ? "Önce kaydedin" : "[TEST] formu test adresine gönder"}
+          <button type="button" onClick={test} disabled={gonderimKapali} title={gonderimIpucu || "[TEST] formu test adresine gönder"}
             className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: CARD_BORDER }}>
             {mesgul === "test" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test gönder
           </button>
+          {!m.gonderim?.zaman && (
+            <button type="button" onClick={uretimeGonder} disabled={gonderimKapali} title={gonderimIpucu || "Formu üretime gönder (canlı mod: alıcılar + CC)"}
+              className="h-9 px-3 rounded-lg border text-xs font-medium text-white hover:bg-white/[0.04] disabled:opacity-40 inline-flex items-center gap-1.5" style={{ borderColor: ACCENT }} data-testid="uretime-gonder">
+              {mesgul === "uretim" ? <Loader2 size={13} className="animate-spin" /> : <Factory size={13} style={{ color: ACCENT }} />} Üretime gönder
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -291,7 +329,8 @@ export function SiparisFormlari() {
         <FileSpreadsheet size={14} style={{ color: ACCENT }} />
         <span className="flex-1 min-w-[240px]">
           Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>, boş ekipman alımından <b className="text-white">1 gün önce 08:00</b>&apos;de üretime gider.
-          Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT çuvaldan otomatik okunur. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
+          Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT ve lot çuvaldan otomatik okunur.
+          Görsel, spek ve tarihler tamamlanmadan form <b className="text-white">gönderilmez</b>. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
         </span>
         {eksikSayisi > 0 && <span className="text-amber-300 font-medium">{eksikSayisi} formda eksik var</span>}
         <button type="button" onClick={() => setGecmis((g) => !g)} className="h-7 px-2.5 rounded-full text-[11px]"

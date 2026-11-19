@@ -273,7 +273,8 @@ const TT_DOLGU = "(?:\\s*(?:[:\\-–=~\\/]|ise|da|de|ise\\s+de|tahmini(?:\\s+ola
 const TT_SAYI = "(\\d{1,3}(?:\\s*[-–\\/]\\s*\\d{1,3})?)";
 const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:free|ft\\b|dem|det|serbest)))";
 const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt(?![a-zçğıöşü])|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
-const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t)`, "gi");
+const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t|tt\\b)`, "gi");
+// 19.11.2026: "14 free 28 gun tt" (gun + tt) da transit
 // 17.11.2026 ("(ORNEKLIMAN aktarmalı 40-42DAYS )"): aktarma notundaki gun araligi transit suredir
 const TT_AKTARMA = /aktarmal[ıi]\s*(\d{1,3}\s*[-–]\s*\d{1,3})\s*(?:days?|g[üu]n)/gi;
 // 19.11.2026 (acente takip cevabi: "36 gun via Port Klang"): "N gun via <aktarma>" transit suredir

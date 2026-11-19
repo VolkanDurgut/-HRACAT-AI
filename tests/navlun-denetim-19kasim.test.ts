@@ -129,3 +129,10 @@ test("takip cevabi 'Bu teklife 14 gun verebiliriz. 36 gun via Ornekport': free t
   assert.equal(b.free_time_gun, 14);
   assert.equal(b.transit_gun, "36");
 });
+
+test("takip cevabi '14 free 28 gun tt': free time 14, transit 28", async () => {
+  const { ekBilgisi } = await yukle("navlun-isle");
+  const b = ekBilgisi({ govde: "14 free 28 gun tt\n\nBooking onayı verildikten sonra iptal masrafı oluşmaktadır.", ek_metin: "" });
+  assert.equal(b.free_time_gun, 14);
+  assert.equal(b.transit_gun, "28");
+});

@@ -92,3 +92,26 @@ test("birlesik ambalaj: ayni tanimli dosyalarin adetleri toplanir (tekillestiril
   const m = birlesikFaturaModeli([uye("1", 2, 50, 2, { detayli_ambalaj: "2.000 PIECES OF 25 KG PP BAGS (X)" }), uye("2", 2, 50, 2, { detayli_ambalaj: "2.000 PIECES OF 25 KG PP BAGS (X)" })]);
   assert.equal(m.ambalaj, "4.000 PIECES OF 25 KG PP BAGS (X)");
 });
+
+test("grupFaturaToplami: birlesik fatura kontrolu grubun toplamlariyla (kurgu)", async () => {
+  const { grupFaturaToplami } = await import("../lib/birlesik-fatura/model.ts");
+  const uye = (id: string, tutar: number, ks: string[], booking: string, beklenen = ks.length) => ({
+    dosya: { id, dosya_no: id, toplam_tutar: tutar, para_birimi: "USD" },
+    rezervasyonlar: [{ booking_no: booking, gemi_adi: "ORNEK GEMI", yuklenme_limani: "ORNEKPORT", konteyner_adedi: beklenen }],
+    konteynerler: ks.map((k) => ({ konteyner_no: k, net_agirlik_kg: 25000, brut_agirlik_kg: 25200, pieces: 1000 })),
+  });
+  const g = grupFaturaToplami([uye("A", 30750, ["AAAU1111111", "AAAU2222222"], "BKG1"), uye("B", 46125, ["BBBU1111111", "BBBU2222222", "BBBU3333333"], "BKG2")] as any);
+  assert.equal(g.konteynerler.length, 5);
+  assert.equal(g.netKg, 125000);
+  assert.equal(g.brutKg, 126000);
+  assert.equal(g.kap, 5000);
+  assert.equal(g.tutar, 76875);
+  assert.equal(g.paraBirimi, "USD");
+  assert.deepEqual(g.rezervasyonNolari, ["BKG1", "BKG2"]);
+  assert.deepEqual(g.gemiler, ["ORNEK GEMI"]);
+  assert.equal(g.konteynerTamam, true);
+  // bir dosyada konteyner eksikse grup tamam degil
+  const eksik = grupFaturaToplami([uye("A", 1, ["AAAU1111111"], "BKG1", 2), uye("B", 1, ["BBBU1111111"], "BKG2")] as any);
+  assert.equal(eksik.konteynerTamam, false);
+  assert.equal(eksik.konteynerBeklenen, 3);
+});

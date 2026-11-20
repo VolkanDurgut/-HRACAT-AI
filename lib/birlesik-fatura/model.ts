@@ -281,3 +281,39 @@ export function birlesikTalimatMetni(m: BirlesikFaturaModeli, on: boolean, ekBil
     : "";
   return `${onNotu}Sayin Ilgili,\n\nAsagida belirtilen ${m.dosyaSayisi} ihracat dosyasi AYNI MUSTERI ve AYNI GEMIYE ait olup TEK FATURA kesilecektir. Fatura tanzimi icin gerekli bilgiler tarafiniza iletilmistir.\n\n${bolumler}\n\nBilgilerinize arz ederiz.\n\nSaygilarimizla,\nIhracat Departmani`;
 }
+
+/**
+ * 20.11.2026 BIRLESIK FATURA YUKLEME (kullanici: "tek faturayi 6 dosyaya nasil yukleyecegiz"): tek fatura grubun
+ * BUTUN dosyalarini kapsar. Kontrol grubun toplamlariyla yapilir: tum konteynerler, net / brut / kap toplami, tutar toplami,
+ * tum rezervasyon numaralari ve gemiler. Alici, teslim, liman, marka, odeme, banka, DIIB yuklenen dosyadan (grupta ayni).
+ */
+export type GrupFaturaToplami = {
+  konteynerler: string[]; netKg: number; brutKg: number; kap: number; tutar: number; paraBirimi: string | null;
+  rezervasyonNolari: string[]; gemiler: string[]; yuklemeYerleri: string[];
+  konteynerTamam: boolean; konteynerEklenen: number; konteynerBeklenen: number;
+};
+export function grupFaturaToplami(uyeler: GrupUyesi[]): GrupFaturaToplami {
+  const tekil = (xs: (string | null | undefined)[]) => Array.from(new Set(xs.map((x) => (x || "").trim()).filter(Boolean)));
+  const sayi = (x: unknown) => Number(x) || 0;
+  const konts = uyeler.flatMap((u) => u.konteynerler);
+  const rez = uyeler.flatMap((u) => u.rezervasyonlar);
+  const beklenen = rez.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+  const paralar = tekil(uyeler.map((u) => u.dosya.para_birimi));
+  return {
+    konteynerler: tekil(konts.map((k) => k.konteyner_no)),
+    netKg: konts.reduce((s, k) => s + sayi(k.net_agirlik_kg), 0),
+    brutKg: konts.reduce((s, k) => s + sayi((k as unknown as { brut_agirlik_kg?: unknown }).brut_agirlik_kg), 0),
+    kap: konts.reduce((s, k) => s + sayi((k as unknown as { pieces?: unknown }).pieces), 0),
+    tutar: Math.round(uyeler.reduce((s, u) => s + sayi(u.dosya.toplam_tutar), 0) * 100) / 100,
+    paraBirimi: paralar.length === 1 ? paralar[0] : null,
+    rezervasyonNolari: tekil(rez.map((r) => r.booking_no)),
+    gemiler: tekil(rez.map((r) => r.gemi_adi)),
+    yuklemeYerleri: tekil(rez.map((r) => r.yuklenme_limani)),
+    konteynerTamam: uyeler.every((u) => {
+      const b = u.rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+      return b > 0 && u.konteynerler.length >= b;
+    }),
+    konteynerEklenen: konts.length,
+    konteynerBeklenen: beklenen,
+  };
+}

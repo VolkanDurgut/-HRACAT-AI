@@ -71,3 +71,28 @@ export async function grupTalimatiGonderildi(companyId: string, ids: string[], m
   if (error) return `kaydedilemedi: ${error.message}`;
   return (data || []).length === ids.length ? null : `yalnız ${(data || []).length}/${ids.length} dosyada kaydedildi`;
 }
+
+/** 20.11.2026 birlesik fatura yukleme: ayni fatura alanlari gruptaki BUTUN dosyalara yazilir. Sorun metni ya da null. */
+export type GrupFaturaAlanlari = {
+  fatura_dosya_url: string | null; fatura_dosya_adi: string | null; fatura_yukleme_tarihi: string | null;
+  fatura_kontrol_sonucu: unknown; fatura_no?: string | null; fatura_tarihi?: string | null;
+};
+export async function grupFaturasiYaz(companyId: string, ids: string[], alanlar: GrupFaturaAlanlari): Promise<string | null> {
+  const { data, error } = await supabase.from("ihracat_dosyalari").update(alanlar).in("id", ids).eq("company_id", companyId).select("id");
+  if (error) return error.message;
+  return (data || []).length === ids.length ? null : `yalnız ${(data || []).length}/${ids.length} dosyaya yazılabildi`;
+}
+
+/** Gruptaki dosyalarin su anki fatura PDF adresleri (yeniden yuklemede eskiyi silmek icin). */
+export async function grupFaturaAdresleri(companyId: string, ids: string[]): Promise<string[]> {
+  const { data } = await supabase.from("ihracat_dosyalari").select("fatura_dosya_url").in("id", ids).eq("company_id", companyId);
+  return Array.from(new Set((data || []).map((x) => x.fatura_dosya_url as string | null).filter((x): x is string => !!x)));
+}
+
+/** Depodaki fatura PDF'i hala bir dosyada kullaniliyor mu (birlesik faturada ayni PDF birden cok dosyada durur). */
+export async function faturaAdresiKullaniliyor(companyId: string, url: string): Promise<boolean> {
+  const yol = /\/object\/(?:sign|public)\/[^/]+\/([^?]+)/.exec(url)?.[1];
+  if (!yol) return true; // emin degilsek silmeyiz
+  const { data, error } = await supabase.from("ihracat_dosyalari").select("id").eq("company_id", companyId).like("fatura_dosya_url", `%${yol}%`).limit(1);
+  return error ? true : (data || []).length > 0;
+}

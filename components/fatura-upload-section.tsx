@@ -14,6 +14,8 @@ import { VARSAYILAN_GTIP } from "@/lib/konsimento/talimat";
 import { faturaBolunmesi, parcaAgirliklari } from "@/lib/diib/bolunme-talimat";
 import { diibAnahtari } from "@/lib/diib/hesap";
 import { DIIB_BOLUNME_OLAYI } from "@/lib/diib/veri";
+import { BIRLESIK_FATURA_OLAYI, faturaAdresiKullaniliyor, grupFaturaAdresleri, grupFaturasiYaz, grupUyeleriniGetir } from "@/lib/birlesik-fatura/veri";
+import { grupFaturaToplami, type GrupUyesi } from "@/lib/birlesik-fatura/model";
 
 // 28.10.2026: AI asistan gorunumu (components/evrak-asistan.tsx); is mantigi degismedi.
 // 05.11.2026 (kullanici: "masrafsiz ve dogru okutamaz miyiz?"): fatura ONCE PDF metninden kurallarla
@@ -25,6 +27,10 @@ import { DIIB_BOLUNME_OLAYI } from "@/lib/diib/veri";
 // 05.11.2026 (kullanici: "DIIB dagiliminda 2 fatura yuklemek durumundayiz"): bolunmus yuklemede her
 // parcaya AYRI fatura yuklenir (diib_dosya_bolunmeleri.fatura_*); 1. parca dosyanin fatura_* alanlarina
 // da yazilir (panel / raporlar / DIIB eskisi gibi). Bolunmus faturada dosyanin DIIB No'su DEGISMEZ.
+// 20.11.2026 BIRLESIK FATURA (kullanici: tek fatura 6 dosya): dosya bir fatura grubundaysa fatura BIR KEZ yuklenir,
+// grubun toplamlariyla (tum konteynerler, agirlik / kap / tutar toplami, tum rezervasyonlar) kontrol edilir ve ayni
+// PDF / fatura no / tarih / sonuc gruptaki BUTUN dosyalara yazilir. Ayni PDF birden cok dosyada durdugu icin depodan
+// yalniz hicbir dosya kullanmiyorsa silinir. Grupta DIIB bolunmesi olan dosya varsa grup yuklemesi kapali (tekli akis).
 const FATURA_YETENEKLERI = [
   { ikon: <Hash size={11} />, metin: "Fatura no" },
   { ikon: <CalendarDays size={11} />, metin: "Fatura tarihi" },
@@ -72,9 +78,26 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
   // 12.11.2026: kayitli sonuc bugunku agirlik kuraliyla (yalniz 1 kg yuvarlama payi) yeniden degerlendirilir
   const faturaKontrolSonucu = kayitliSonucuDenetle(dosya.fatura_kontrol_sonucu as FaturaKontrolSonucu | null);
 
-  const rezervasyonKontAdedi = rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
-  const eklenenKonteynerAdedi = konteynerler.length;
-  const konteynerlerTamam = rezervasyonKontAdedi > 0 && eklenenKonteynerAdedi >= rezervasyonKontAdedi;
+  // Birlesik fatura grubu (yoksa / okunamazsa null: tek dosya akisi)
+  const [grup, setGrup] = useState<{ uyeler: GrupUyesi[] } | null>(null);
+  const grubuGetir = useCallback(async () => {
+    try {
+      const g = await grupUyeleriniGetir(companyId, dosya.id);
+      setGrup(g && g.bolunmeliDosyalar.length === 0 ? { uyeler: g.uyeler } : null);
+    } catch { setGrup(null); }
+  }, [companyId, dosya.id]);
+  useEffect(() => {
+    grubuGetir();
+    const dinle = () => grubuGetir();
+    window.addEventListener(BIRLESIK_FATURA_OLAYI, dinle);
+    return () => window.removeEventListener(BIRLESIK_FATURA_OLAYI, dinle);
+  }, [grubuGetir, dosya.fatura_dosya_url]);
+  const grupT = grup ? grupFaturaToplami(grup.uyeler) : null;
+  const grupIdleri = grup ? grup.uyeler.map((u) => u.dosya.id) : [dosya.id];
+
+  const rezervasyonKontAdedi = grupT ? grupT.konteynerBeklenen : rezervasyonlar.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
+  const eklenenKonteynerAdedi = grupT ? grupT.konteynerEklenen : konteynerler.length;
+  const konteynerlerTamam = grupT ? grupT.konteynerTamam : rezervasyonKontAdedi > 0 && eklenenKonteynerAdedi >= rezervasyonKontAdedi;
   const toplamNet = konteynerler.reduce((s, k) => s + (Number(k.net_agirlik_kg) || 0), 0);
   const toplamBrut = konteynerler.reduce((s, k) => s + (Number((k as any).brut_agirlik_kg) || 0), 0);
   const toplamKap = konteynerler.reduce((s, k) => s + (Number((k as any).pieces) || 0), 0);
@@ -134,11 +157,24 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     return { path, url: await getGuvenliDosyaUrl("konsimento-talimatlari", path) };
   };
 
-  const dosyaBeklenen = (): FaturaBeklenen => ({
+  const dosyaBeklenen = (): FaturaBeklenen => grupT ? {
+    konteynerler: grupT.konteynerler, netKg: grupT.netKg || null, brutKg: grupT.brutKg || null, kap: grupT.kap || null,
+    tutar: grupT.tutar || null, paraBirimi: grupT.paraBirimi || dosya.para_birimi || null,
+    ek: { ...beklenenEk(false), gemiler: grupT.gemiler, rezervasyonNolari: grupT.rezervasyonNolari,
+      yuklemeYerleri: grupT.yuklemeYerleri.length ? grupT.yuklemeYerleri : beklenenEk(false).yuklemeYerleri },
+  } : {
     konteynerler: konteynerler.map((k) => k.konteyner_no), netKg: toplamNet || null, brutKg: toplamBrut || null,
     kap: toplamKap || null, tutar: Number(dosya.toplam_tutar) || null, paraBirimi: dosya.para_birimi || null,
     ek: beklenenEk(false),
-  });
+  };
+
+  /** Birlesik faturada eski PDF'ler: hicbir dosya kullanmiyorsa depodan silinir. */
+  const kullanilmayanlariSil = async (eskiler: string[], yeni: string | null) => {
+    for (const u of eskiler) {
+      if (u === yeni) continue;
+      if (!(await faturaAdresiKullaniliyor(companyId, u))) await eskiDepoDosyasiniSil(u, yeni);
+    }
+  };
 
   /**
    * 12.11.2026 YENIDEN KONTROL: kayitli faturayi depodan alip bugunku kurallarla yeniden okur ve sonucu gunceller
@@ -158,10 +194,22 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     setYenidenKontrol("dosya"); setFaturaHata(null);
     try {
       const sonuc = await faturaKontrolEt(await depodanFatura(dosya.fatura_dosya_url, dosya.fatura_dosya_adi), dosyaBeklenen());
-      const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({ fatura_kontrol_sonucu: sonuc })
-        .eq("id", dosya.id).eq("company_id", companyId).select("id");
-      const hata = yazmaHatasi(error, yazilan);
-      if (hata) throw new Error(`Kontrol sonucu kaydedilemedi: ${hata}`);
+      if (grup) {
+        // Birlesik: sonuc ve ayni PDF gruptaki butun dosyalara (once yalniz bir dosyaya yuklenmis fatura da boylece yayilir)
+        const eskiler = await grupFaturaAdresleri(companyId, grupIdleri);
+        const sorun = await grupFaturasiYaz(companyId, grupIdleri, {
+          fatura_dosya_url: dosya.fatura_dosya_url, fatura_dosya_adi: dosya.fatura_dosya_adi,
+          fatura_yukleme_tarihi: dosya.fatura_yukleme_tarihi || new Date().toISOString(), fatura_kontrol_sonucu: sonuc,
+          fatura_no: sonuc.fatura_no || dosya.fatura_no, fatura_tarihi: sonuc.fatura_tarihi || dosya.fatura_tarihi,
+        });
+        if (sorun) throw new Error(`Birleşik fatura kaydedilemedi: ${sorun}`);
+        await kullanilmayanlariSil(eskiler, dosya.fatura_dosya_url);
+      } else {
+        const { data: yazilan, error } = await supabase.from("ihracat_dosyalari").update({ fatura_kontrol_sonucu: sonuc })
+          .eq("id", dosya.id).eq("company_id", companyId).select("id");
+        const hata = yazmaHatasi(error, yazilan);
+        if (hata) throw new Error(`Kontrol sonucu kaydedilemedi: ${hata}`);
+      }
       onRefresh();
     } catch (err: any) {
       setFaturaHata(err.message || "Yeniden kontrol yapılamadı.");
@@ -178,6 +226,19 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
       const { path, url: dosyaUrl } = await pdfYukle(file);
       yuklenenYol = path;
       const data = await faturaKontrolEt(file, dosyaBeklenen());
+
+      if (grup) {
+        const eskiler = await grupFaturaAdresleri(companyId, grupIdleri);
+        const sorun = await grupFaturasiYaz(companyId, grupIdleri, {
+          fatura_dosya_url: dosyaUrl, fatura_dosya_adi: file.name, fatura_yukleme_tarihi: new Date().toISOString(),
+          fatura_kontrol_sonucu: data, fatura_no: data.fatura_no || dosya.fatura_no, fatura_tarihi: data.fatura_tarihi || dosya.fatura_tarihi,
+        });
+        if (sorun) throw new Error(`Birleşik fatura kaydedilemedi: ${sorun}`);
+        yuklenenYol = null;
+        await kullanilmayanlariSil(eskiler, dosyaUrl);
+        onRefresh();
+        return;
+      }
 
       // Yeniden yuklemede eski faturanin adresi: kayit basariyla guncellenince
       // depodan silinir (05.10.2026). Taze okunur; okunamazsa hicbir sey silinmez.
@@ -220,6 +281,14 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
     setFaturaHata(null);
     // Kaldirilan PDF, kayit BASARIYLA temizlendikten sonra depodan da silinir (05.10.2026).
     const kaldirilanUrl = dosya.fatura_dosya_url;
+    if (grup) {
+      const eskiler = await grupFaturaAdresleri(companyId, grupIdleri);
+      const sorun = await grupFaturasiYaz(companyId, grupIdleri, { fatura_dosya_url: null, fatura_dosya_adi: null, fatura_yukleme_tarihi: null, fatura_kontrol_sonucu: null });
+      if (sorun) { setFaturaHata(`Fatura sıfırlanamadı: ${sorun}`); return; }
+      await kullanilmayanlariSil(eskiler, null);
+      onRefresh();
+      return;
+    }
     const { data, error } = await supabase.from("ihracat_dosyalari").update({
       fatura_dosya_url: null,
       fatura_dosya_adi: null,
@@ -405,6 +474,12 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
         </div>
       ) : (
       <div className="p-4">
+        {grup && grupT && (
+          <div className="mb-3 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }} data-testid="fatura-birlesik">
+            <p className="text-white font-medium">Birleşik fatura · {grup.uyeler.length} dosya</p>
+            <p className="mt-0.5">Fatura bir kez yüklenir; {grupT.konteynerler.length} konteyner, {grupT.netKg.toLocaleString("tr-TR")} kg net ve {para(grupT.tutar, grupT.paraBirimi)} toplamla kontrol edilip {grup.uyeler.map((u) => u.dosya.dosya_no).filter(Boolean).join(", ")} dosyalarının hepsine işlenir.</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4 mb-2">
           <p className="text-sm font-medium text-white">Fatura</p>
           {dosya.fatura_dosya_url && faturaKontrolSonucu && <DurumRozeti uyumlu={faturaKontrolSonucu.uyumlu} okunamadi={!!faturaKontrolSonucu.okunamadi} />}
@@ -426,7 +501,7 @@ export default function FaturaUploadSection({ dosya, konteynerler, rezervasyonla
           ) : (
             <EvrakAsistanKilitli
               belge="Fatura"
-              mesaj={`Faturayı kontrol edebilmem için önce rezervasyondaki tüm konteynerler eklenmeli (${eklenenKonteynerAdedi}/${rezervasyonKontAdedi || 0}).`}
+              mesaj={`Faturayı kontrol edebilmem için önce ${grup ? "birleşik faturadaki bütün dosyaların" : "rezervasyondaki"} tüm konteynerleri eklenmeli (${eklenenKonteynerAdedi}/${rezervasyonKontAdedi || 0}).`}
             />
           )
         )}

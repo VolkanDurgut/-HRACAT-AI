@@ -615,3 +615,10 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 - DİİB raporu: cumartesi 09:00 (20.11.2026), fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 08:55–10:00; cron
   değişikliği (migration 20261119170000) yeni edge deploy edildikten SONRA uygulanır.
 - Navlun raporu değişmedi (her gün 17:00).
+
+## 4.23 Birleşik fatura yükleme (20.11.2026)
+- Dosya bir fatura grubundaysa (ve grupta DİİB bölünmesi yoksa) Muhasebe › Fatura tek yüklemedir: kontrol grubun toplamlarıyla
+  (`grupFaturaToplami`: tüm konteynerler, net/brüt/kap, tutar, tüm booking'ler, gemiler), aynı PDF / fatura no / tarih / sonuç
+  gruptaki BÜTÜN dosyalara yazılır (`grupFaturasiYaz`). Aynı PDF birden çok dosyada durduğu için depodan yalnız hiçbir dosya
+  kullanmıyorsa silinir (`faturaAdresiKullaniliyor`).
+- Önce tek dosyaya yüklenmiş fatura: o dosyada "Yeniden kontrol" grup kontrolünü yapar ve faturayı bütün dosyalara yayar.

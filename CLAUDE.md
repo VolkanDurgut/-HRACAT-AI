@@ -56,7 +56,10 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   gerek yok, takibi sistemden yapacağım"); geri eklenmez. Kurallar: `_shared/yonetici-asistan.ts`.
 - Sipariş Listesi SİSTEM ESAS (21.11.2026, kullanıcı kararı): Excel satırı yalnız sistemde hiç karşılığı yoksa durum
   belirler. Dosya, Excel'de aynı proforma no'lu satır var diye gizlenmez; dosyaları miktarı karşılayan bağsız aktif Excel
-  satırı gösterilmez (silinmez). Karşılıksız aktif Excel satırları: `siparis_eslesmeyenler()` (Sipariş Listesi şeridi).
+  satırı yalnız HİÇBİR Excel satırına bağlı olmayan dosyalar miktarını karşılıyorsa gösterilmez (silinmez; Excel her
+  SEVKİYATI ayrı satır tutar: 18 kont. sipariş = 6+6+6). Karşılıksız aktif Excel satırları: `siparis_eslesmeyenler()`.
+- Beyanname kontrolü birleşik fatura grubunda grubun TOPLAMIYLA karşılaştırır (`grupBeklenenBirlestir`); sonuçta
+  `grup_dosya_sayisi`. Asistan grup başına tek beyanname görevi açar.
 - Teslim: her parça bitince HEMEN commit + bundle (02.11.2026: çalışma ortamı sıfırlanınca
   commit'lenmemiş iş kayboldu).
 

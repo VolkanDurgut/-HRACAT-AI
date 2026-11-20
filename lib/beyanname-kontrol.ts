@@ -154,7 +154,36 @@ export type BeyannameBeklenen = {
   konteynerler: string[];
   netKg: number | null;            // konteyner netlerinin toplami (hepsi doluysa)
   diibler: { anahtar: string; belgeNo: string }[];
+  /**
+   * 21.11.2026: birlesik fatura grubundaki dosya sayisi (>= 2 ise bedel, konteyner, net agirlik, gemi ve DIIB grubun
+   * TOPLAMI; tek beyanname butun grubu kapsar). Kullanici onayi: "beyanname kontrolu gruba gore karsilastirsin".
+   */
+  grupDosyaSayisi?: number;
 };
+
+/**
+ * Birlesik fatura grubu (21.11.2026): tek fatura + tek beyanname butun grubu kapsar. Dosyanin kendi beklenenine grubun
+ * diger dosyalarini ekler: tutar toplami (para birimleri ayniysa; degilse tutar karsilastirilmaz), konteynerler,
+ * net toplam (hepsi biliniyorsa), gemiler, DIIB'ler, fatura no'lari. Teslim, liman, alici dosyanin kendisinden kalir.
+ */
+export function grupBeklenenBirlestir(ana: BeyannameBeklenen, digerleri: BeyannameBeklenen[]): BeyannameBeklenen {
+  if (!digerleri.length) return ana;
+  const hepsi = [ana, ...digerleri];
+  const tekil = <T>(l: T[], anahtar: (x: T) => string) => { const g = new Set<string>(); return l.filter((x) => { const k = anahtar(x); if (g.has(k)) return false; g.add(k); return true; }); };
+  const paralar = Array.from(new Set(hepsi.map((x) => (x.paraBirimi || "").toUpperCase()).filter(Boolean)));
+  const tutarlar = hepsi.map((x) => x.toplamTutar);
+  const netler = hepsi.map((x) => x.netKg);
+  return {
+    ...ana,
+    faturaNolari: Array.from(new Set(hepsi.flatMap((x) => x.faturaNolari))),
+    toplamTutar: paralar.length <= 1 && tutarlar.every((t) => t !== null) ? Math.round(tutarlar.reduce((a: number, t) => a + (t as number), 0) * 100) / 100 : null,
+    konteynerler: Array.from(new Set(hepsi.flatMap((x) => x.konteynerler))),
+    netKg: netler.every((n) => n !== null) ? Math.round(netler.reduce((a: number, n) => a + (n as number), 0) * 100) / 100 : null,
+    gemiler: Array.from(new Set(hepsi.flatMap((x) => x.gemiler))),
+    diibler: tekil(hepsi.flatMap((x) => x.diibler), (d) => d.anahtar),
+    grupDosyaSayisi: hepsi.length,
+  };
+}
 
 export type KontrolDurumu = "uyumlu" | "uyusmuyor" | "okunamadi" | "bilgi";
 export type BeyannameKontrolu = { alan: string; durum: KontrolDurumu; sistem: string; belge: string; not?: string };
@@ -168,6 +197,8 @@ export type BeyannameKontrolSonucu = {
   /** Devam listesi sonradan eklenince ana sayfa yeniden okunmasin diye ana sayfa metni (yalniz okunan alanlar icin) */
   ana_metin?: string;
   tarih: string;
+  /** 21.11.2026: birlesik fatura grubunun toplamiyla karsilastirildiysa gruptaki dosya sayisi */
+  grup_dosya_sayisi?: number;
 };
 
 const sayiYaz = (n: number | null, en = 2) => (n === null ? "-" : n.toLocaleString("tr-TR", { maximumFractionDigits: en }));
@@ -187,6 +218,8 @@ function basHarfDeseni(unvan: string): RegExp | null {
 export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, simdi = new Date().toISOString()): BeyannameKontrolSonucu {
   const k: BeyannameKontrolu[] = [];
   const ekle = (alan: string, durum: KontrolDurumu, sistem: string, belge: string, not?: string) => k.push({ alan, durum, sistem, belge, ...(not ? { not } : {}) });
+  const grup = b.grupDosyaSayisi && b.grupDosyaSayisi >= 2 ? b.grupDosyaSayisi : 0;
+  if (grup) ekle("Birleşik fatura", "bilgi", `${grup} dosya`, "tek beyanname", `Bedel, konteyner, net ağırlık, gemi ve DİİB grubun ${grup} dosyasının toplamıyla karşılaştırıldı.`);
 
   // Fatura no'lari
   const sistemF = b.faturaNolari.map(faturaParcala).filter((x): x is NonNullable<ReturnType<typeof faturaParcala>> => !!x);
@@ -250,7 +283,8 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
   if (b.gemiler.length) {
     const gemiAdi = (g: string) => sadelestir(g).replace(/^(M\/?V|M\/?S|MT)\s+/, "").replace(/\s+/g, " ").trim();
     const s = gemiAdi(o.gemi || "");
-    const ayni = !!s && b.gemiler.some((g) => gemiAdi(g) === s);
+    // 21.11.2026: beyannamede gemi adinin arkasina sefer kodu yazilabiliyor ("PAOLO BSM" / sistem "PAOLO")
+    const ayni = !!s && b.gemiler.some((g) => { const x = gemiAdi(g); return !!x && (x === s || s.startsWith(`${x} `) || x.startsWith(`${s} `)); });
     ekle("Gemi", !o.gemi ? "okunamadi" : ayni ? "uyumlu" : "uyusmuyor", b.gemiler.join(", "), o.gemi || "-");
   }
 
@@ -279,7 +313,9 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
     const ulke = gidecegiUlke(b.varisLimani);
     if (ulke) {
       const u = sadelestir(ulke);
-      ekle("Gideceği ülke", ` ${o.metin} `.includes(` ${u} `) ? "uyumlu" : "uyusmuyor", ulke, ` ${o.metin} `.includes(` ${u} `) ? ulke : "-");
+      // 21.11.2026: ulke adi bulunamazsa "bilgi" (varis yeri gibi): musavir farkli yazabiliyor (KOMORLAR / KOMOR ADALARI)
+      const bulundu = ` ${o.metin} `.includes(` ${u} `);
+      ekle("Gideceği ülke", bulundu ? "uyumlu" : "bilgi", ulke, bulundu ? ulke : "-", bulundu ? undefined : "Ülke adı beyannamede bulunamadı; elle bakın.");
     }
   }
 
@@ -299,5 +335,6 @@ export function beyannameKarsilastir(o: BeyannameOkunan, b: BeyannameBeklenen, s
   const ozet = (uyusmayan.length
     ? `${uyusmayan.length} alan sistemle uyuşmuyor: ${uyusmayan.map((x) => x.alan).join(", ")}.`
     : `${k.filter((x) => x.durum === "uyumlu").length} alan sistemle uyumlu${okunamayan.length ? `; ${okunamayan.length} alan okunamadı (${okunamayan.map((x) => x.alan).join(", ")})` : ""}${notlu.length ? `; ${notlu.length} not var` : ""}.`) + iso;
-  return { kaynak: "metin", uyumlu: uyusmayan.length === 0, beyanname_no: o.beyannameNo, kontroller: k, ozet, devam_var: o.devamVar, tarih: simdi };
+  return { kaynak: "metin", uyumlu: uyusmayan.length === 0, beyanname_no: o.beyannameNo, kontroller: k, ozet, devam_var: o.devamVar, tarih: simdi,
+    ...(grup ? { grup_dosya_sayisi: grup } : {}) };
 }

@@ -5,9 +5,28 @@
  */
 import { supabase } from "@/lib/supabase";
 import { diibAnahtari } from "@/lib/diib/hesap";
-import type { BeyannameBeklenen } from "@/lib/beyanname-kontrol";
+import { grupBeklenenBirlestir, type BeyannameBeklenen } from "@/lib/beyanname-kontrol";
 
+/**
+ * 21.11.2026: dosya birlesik fatura grubundaysa (fatura_grubu_dosyalari) tek beyanname butun grubu kapsar: grubun diger
+ * dosyalarinin beklenenleri eklenir (grupBeklenenBirlestir). Grup okunamazsa dosyanin kendisi (eski davranis).
+ */
 export async function beyannameBeklenenGetir(dosyaId: string, companyId: string): Promise<BeyannameBeklenen | null> {
+  const ana = await dosyaBeklenenGetir(dosyaId, companyId);
+  if (!ana) return null;
+  const g = await supabase.from("fatura_grubu_dosyalari").select("grup_id").eq("dosya_id", dosyaId).maybeSingle();
+  const grupId = (g.data as { grup_id: string } | null)?.grup_id;
+  if (g.error || !grupId) return ana;
+  const u = await supabase.from("fatura_grubu_dosyalari").select("dosya_id").eq("grup_id", grupId);
+  const digerIdler = ((u.data as { dosya_id: string }[] | null) || []).map((x) => x.dosya_id).filter((id) => id !== dosyaId);
+  if (u.error || !digerIdler.length) return ana;
+  const digerleri = await Promise.all(digerIdler.map((id) => dosyaBeklenenGetir(id, companyId)));
+  // Bir uyenin bilgisi okunamazsa toplam eksik kalir: grup karsilastirmasi yapilmaz, dosyanin kendisi kullanilir
+  if (digerleri.some((x) => !x)) return ana;
+  return grupBeklenenBirlestir(ana, digerleri as BeyannameBeklenen[]);
+}
+
+async function dosyaBeklenenGetir(dosyaId: string, companyId: string): Promise<BeyannameBeklenen | null> {
   const [d, k, r, b] = await Promise.all([
     supabase.from("ihracat_dosyalari").select("fatura_no, fatura_tarihi, toplam_tutar, para_birimi, teslim_sekli, varis_limani, yuklenme_limani, alici_firma, diib_no")
       .eq("id", dosyaId).eq("company_id", companyId).maybeSingle(),

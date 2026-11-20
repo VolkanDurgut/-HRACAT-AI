@@ -54,6 +54,9 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   Görevler kaynaktan hesaplanır (`yonetici_asistan_veri`), tabloda yalnız "Gönderdim" işareti. Hazır mail sistemden
   GİTMEZ (yönetici kopyalayıp kendisi gönderir). Sabah özeti (edge `asistan-ozet`) yalnız yöneticiye; canlı anahtarı
   `ASISTAN_OZET_CANLI=evet` kullanıcı onayı olmadan açılmaz. Kurallar: `_shared/yonetici-asistan.ts`.
+- Sipariş Listesi SİSTEM ESAS (21.11.2026, kullanıcı kararı): Excel satırı yalnız sistemde hiç karşılığı yoksa durum
+  belirler. Dosya, Excel'de aynı proforma no'lu satır var diye gizlenmez; dosyaları miktarı karşılayan bağsız aktif Excel
+  satırı gösterilmez (silinmez). Karşılıksız aktif Excel satırları: `siparis_eslesmeyenler()` (Sipariş Listesi şeridi).
 - Teslim: her parça bitince HEMEN commit + bundle (02.11.2026: çalışma ortamı sıfırlanınca
   commit'lenmemiş iş kayboldu).
 

@@ -121,3 +121,22 @@ export async function onayImzaliKaydet(proformaNo: string, tarih?: string): Prom
   const { error } = await supabase.rpc("siparis_onay_imzali", { p_proforma_no: proformaNo, p_tarih: tarih || null });
   if (error) throw new Error(error.message);
 }
+
+/**
+ * 21.11.2026 (Faz 4, sistem esas): sistemde hic karsiligi olmayan aktif Excel satirlari (proforma, dosya, elle eslesme
+ * yok). Bunlarin durumu yalniz Excel'den gelir; Siparis Listesi seridinde gosterilir. RPC: siparis_eslesmeyenler().
+ */
+export type EslesmeyenSatir = {
+  anahtar: string; proforma_no: string | null; proforma_tarihi: string | null; firma: string | null; miktar_mt: number | null;
+  konteyner: number | null; liman: string | null; durum: SiparisSatiri["durum"]; booking_no: string | null; bl_no: string | null;
+};
+export async function eslesmeyenleriOku(): Promise<EslesmeyenSatir[]> {
+  const { data, error } = await supabase.rpc("siparis_eslesmeyenler");
+  if (error) throw new Error(error.message);
+  return ((data || []) as Record<string, unknown>[]).map((r) => ({
+    anahtar: String(r.anahtar || ""), proforma_no: (r.proforma_no as string) || null, proforma_tarihi: (r.proforma_tarihi as string) || null,
+    firma: (r.firma as string) || null, miktar_mt: r.miktar_mt === null || r.miktar_mt === undefined ? null : Number(r.miktar_mt),
+    konteyner: r.konteyner === null || r.konteyner === undefined ? null : Number(r.konteyner), liman: (r.liman as string) || null,
+    durum: r.durum as SiparisSatiri["durum"], booking_no: (r.booking_no as string) || null, bl_no: (r.bl_no as string) || null,
+  })).filter((r) => r.anahtar);
+}

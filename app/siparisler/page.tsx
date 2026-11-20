@@ -14,14 +14,15 @@ import {
   siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisBolumu, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import {
-  aramaNorm, panelBaglantisi, pazarBaglantisi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type ListeSekmesi, type SiparisSekme,
+  aramaNorm, panelBaglantisi, pazarBaglantisi, satirSekmesi, sekmeSayilari, sekmeyeAit, siparisAra, siparisSekmesi, tekrarSekmesi, VARSAYILAN_SIPARIS_SEKMESI, type ListeSekmesi, type SiparisSekme,
 } from "@/lib/siparis/gorunum";
 import { tutarsizliklariOku, type Tutarsizlik } from "@/lib/veri-tutarsizliklari";
 import { SekmeCubugu, type SekmeOgesi } from "@/components/erp/sekme-cubugu";
 import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
 import { SecilebilirOzetKarti } from "@/components/erp/ozet-karti";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
-import { onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku } from "@/lib/siparis/veri";
+import { eslesmeyenleriOku, onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku, type EslesmeyenSatir } from "@/lib/siparis/veri";
+import { EslesmeyenSerit } from "@/components/siparis/eslesmeyen-serit";
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
@@ -514,6 +515,8 @@ function SiparisIcerik() {
   const [sekme, setSekme] = useUrlSekmesi<SiparisSekme>(siparisSekmesi, VARSAYILAN_SIPARIS_SEKMESI);
   // Kaynak eski uyarisi (Kontrol Merkezi ile ayni kural: plan / siparis listesi 3 gunden eski). Okunamazsa serit gorunmez.
   const [kaynakUyari, setKaynakUyari] = useState<Tutarsizlik[]>([]);
+  // 21.11.2026 (Faz 4): sistemde karsiligi olmayan aktif Excel satirlari (okunamazsa serit gorunmez)
+  const [eslesmeyen, setEslesmeyen] = useState<EslesmeyenSatir[]>([]);
   const [siparisler, setSiparisler] = useState<SiparisSatiri[] | null>(null);
   const [plan, setPlan] = useState<PlanSatiri[] | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -537,6 +540,7 @@ function SiparisIcerik() {
       tutarsizliklariOku()
         .then((t) => setKaynakUyari(t.kalemler.filter((k) => k.tur === "kaynak_eski" && k.baglanti === "/siparisler")))
         .catch(() => setKaynakUyari([]));
+      eslesmeyenleriOku().then(setEslesmeyen).catch(() => setEslesmeyen([]));
     } catch (e) { setHata(e instanceof Error ? e.message : "Veri okunamadı."); }
     finally { setYukleniyor(false); }
   }, []);
@@ -699,6 +703,8 @@ function SiparisIcerik() {
               )}
             </div>
           )}
+
+          <EslesmeyenSerit satirlar={eslesmeyen} onGoster={(e) => { setArama(e.proforma_no || ""); setSekme(satirSekmesi({ durum: e.durum })); }} />
 
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <SekmeCubugu testId="siparis-sekmeler" sayiBicimi="rozet" className="lg:w-auto lg:inline-flex" dugmeBosluk="px-3"

@@ -71,7 +71,7 @@ const NAVY = "#10B981";
 const BORDER = "#1E2530";
 const TEXT_MUTED = "#8B95A5";
 
-// Marka (11.11.2026, kullanici): logonun yaninda yalniz "IHRACAT YONETIM" (sirket adi ve "Ihracat AI" kaldirildi).
+// Marka (11.11.2026, kullanici): logonun yaninda yalniz "IHRACAT YONETIM". 20.11.2026: program adi "UNEX-AI".
 export default function Sidebar() {
   const pathname = usePathname();
   const { signOut, user, yetkiler, isSuperAdmin } = useAuth();
@@ -141,7 +141,7 @@ export default function Sidebar() {
       <Link href={ilkErisilebilirSayfa(yetkiler.sayfa_yetkileri) || "/panel"} onClick={closeMobile} className="mx-2 mt-2 px-3 py-3 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors">
         <img src="/images/logo.png" alt="Unex" className="w-9 h-9 object-contain shrink-0" />
         <div className="min-w-0">
-          <h1 className="font-semibold text-[14px] leading-tight tracking-[0.06em] text-white whitespace-nowrap">İHRACAT YÖNETİM</h1>
+          <h1 className="font-semibold text-[14px] leading-tight tracking-[0.06em] text-white whitespace-nowrap">UNEX-AI</h1>
         </div>
       </Link>
       <div className="mx-4 h-px" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />

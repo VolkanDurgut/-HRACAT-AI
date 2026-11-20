@@ -7,6 +7,7 @@ import { bekleyenNavlunlari, siparisRaporHesapla, siparisRaporHtml, siparisRapor
 import { navlunTablosuOku } from "../_shared/navlun-veri.ts";
 import { oturumPenceresi, oturumSaatten } from "../_shared/rapor-oturum.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // SIPARIS RAPORU MAILI (siparis-rapor) - 11.11.2026
@@ -164,7 +165,7 @@ Deno.serve(async (req: Request) => {
         console.error("siparis-rapor: navlun tablosu okunamadi:", e instanceof Error ? e.message : e);
       }
       const ozet = { ...rapor.ozet, navlunLiman: navlunlar ? navlunlar.length : null };
-      const konu = `${test ? "[TEST] " : ""}${siparisRaporKonusu(rapor, sirketAdi)}`;
+      const konu = etiketliKonu("Rapor", `${test ? "[TEST] " : ""}${siparisRaporKonusu(rapor, sirketAdi)}`, { sirketAdi });
       const html = siparisRaporHtml(rapor, sirketAdi, new Date().toISOString(), navlunlar);
       const alicilar = test ? TEST_ALICISI : ayar.alicilar;
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: ayar.canli ? ayar.alicilar : TEST_ALICISI, canli: ayar.canli, ozet, html }); continue; }
@@ -196,7 +197,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${sirketAdi} Sipariş Raporu <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html,
+          from: UNEX_AI_GONDEREN, to: alicilar, subject: konu, html,
           attachments: [{ filename: `Siparis_Listesi_${tarih}.xlsx`, content: ek }],
         }),
       });

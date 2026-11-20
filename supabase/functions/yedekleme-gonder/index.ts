@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import JSZip from "npm:jszip@3.10.1";
 import { sevkiyatBelgeTuru, yedekMailHtml, yedekMailKonusu } from "./mail.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // GUNLUK VERI YEDEGI (yedekleme-gonder)
@@ -755,9 +756,9 @@ Deno.serve(async (req: Request) => {
 
     // ---- Mail ----
     const mailGovdesi: Record<string, unknown> = {
-      from: "İhracat AI <bildirim@ihracatasistanim.com>",
+      from: UNEX_AI_GONDEREN,
       to: testMaili ? [KISISEL_ALICI] : YEDEK_ALICILARI,
-      subject: `${testMaili ? "[TEST] " : ""}${yedekMailKonusu(mailGirdisi)}`,
+      subject: etiketliKonu(mailGirdisi.uyarilar.length ? "Önemli" : "Rapor", `${testMaili ? "[TEST] " : ""}${yedekMailKonusu(mailGirdisi)}`),
       html,
     };
     if (ekSigiyor) {

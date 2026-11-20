@@ -196,7 +196,7 @@ export function sevkiyatBelgeTuru(yol: string): (typeof SEVKIYAT_BELGE_SIRASI)[n
 const KAPASITE_RENK: Record<KapasiteGirdisi["durum"], string> = { normal: "#047857", uyari: "#B45309", kritik: "#B91C1C", olculemedi: "#64748B" };
 
 export function yedekMailKonusu(g: YedekMailGirdisi): string {
-  return `${g.uyarilar.length ? "[UYARI] " : ""}İhracat AI - Günlük Veri Yedeği (${g.tarih})`;
+  return `${g.uyarilar.length ? "UYARI · " : ""}Günlük Veri Yedeği (${g.tarih})`;
 }
 
 /** Tablolari gruplara ayirir (grup sirasi sabit, grup icinde gelen sira korunur). */
@@ -301,7 +301,7 @@ export function yedekMailHtml(g: YedekMailGirdisi): string {
 <tr><td>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="Logo" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Günlük Veri Yedeği</div></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">UNEX-AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Günlük Veri Yedeği</div></td>
     <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${esc(g.tarih)}</div><div style="font-size:11px;color:#94A3B8">Otomatik yedek · ${esc(g.saat)}</div></td>
   </tr></table>
   ${g.test ? `<div style="margin-top:14px;border:1px dashed #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST GÖNDERİMİ</b> · Bu mail elle istenen bir denemedir; içerik ve yedek dosyası gerçektir. Otomatik yedek her gece 03:00'te gönderilir.${g.gercekAlicilar?.length ? `<div style="margin-top:4px">Gece yedeğinin alıcıları: <b>${g.gercekAlicilar.map(esc).join(", ")}</b></div>` : ""}</div>` : ""}

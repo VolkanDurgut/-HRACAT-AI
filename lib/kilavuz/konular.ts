@@ -73,7 +73,7 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
     hikaye: "Müşteri proformayı onayladı. Şimdi onu bir ihracat dosyasına dönüştürme zamanı.",
     renk: ["#8B5CF6", "#10B981"], ekran: "proforma-yukle", adres: "/yeni-dosya", yetki: "yeni_dosya",
     adimlar: [
-      { baslik: "Dosyayı yapay zekâ açar", metin: "Onaylanan proformayı yükleyin; İhracat AI belgeyi okur ve ihracat dosyasını sizin için hazırlar." },
+      { baslik: "Dosyayı yapay zekâ açar", metin: "Onaylanan proformayı yükleyin; UNEX-AI belgeyi okur ve ihracat dosyasını sizin için hazırlar." },
       { nokta: "asistan", baslik: "AI Asistan", metin: "Alıcı ve adresi, ürün kalemlerini, tutar ve ödemeyi, limanları ve banka bilgilerini okur. Mevcut bir siparişle eşleşiyorsa size sorar." },
       { nokta: "birak", baslik: "PDF'i bırakın", metin: "Proformayı sürükleyip bırakın ya da tıklayıp seçin (PDF, en fazla 20 MB)." },
       { nokta: "oku", baslik: "Oku ve hazırla", metin: "Okunanlar dosya açılmadan önce özet olarak gösterilir; okunamayan alanlar işaretlenir. Onaylayınca IHR numaralı dosya açılır." },
@@ -132,7 +132,7 @@ export const KILAVUZ_KONULARI: KilavuzKonusu[] = [
     hikaye: "Fatura kesildi, Draft BL geldi. Evraklar artık kendini yazıyor.",
     renk: ["#A78BFA", "#283474"], ekran: "dosya-evrak", adres: "/panel", cubuk: "/dosya/IHR-2026-0142?tab=evraklar", yetki: "panel",
     adimlar: [
-      { baslik: "Yükledikçe hazırlanır", metin: "Fatura, konşimento talimatı, Draft BL ve beyannameyi İhracat AI asistanına bırakın; ihracat evrakları kendiliğinden hazırlanır." },
+      { baslik: "Yükledikçe hazırlanır", metin: "Fatura, konşimento talimatı, Draft BL ve beyannameyi UNEX-AI asistanına bırakın; ihracat evrakları kendiliğinden hazırlanır." },
       { nokta: "fatura", baslik: "Muhasebe · Fatura", metin: "Faturayı asistana bırakın: fatura no, tarih ve DİİB okunur, tutar, ağırlık ve konteynerler sistemle karşılaştırılır. Konteynerler eksikse alan kilitlidir ve nedeni yazar." },
       { nokta: "konsimento", baslik: "Konşimento talimatı", metin: "Consignee ve notify talimattan okunur; konteyner, mühür, ağırlık ve limanlar kontrol edilir. Talimat yüklenmeden evraklar tamamlanmaz." },
       { nokta: "draftbl", ekran: "dosya-evrak-2", baslik: "Draft BL", metin: "Acenteden gelen taslak konşimentoyu bırakın; BL no okunur, bilgiler karşılaştırılır. Yüklenince dosya İhracat Evrakları sayfasında müşteri onayına hazırlanır." },

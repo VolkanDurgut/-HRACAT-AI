@@ -32,7 +32,7 @@ function AsistanSatiri({ durum, belge, hazirYazisi }: { durum: "hazir" | "calisi
         <Sparkles size={15} style={{ color: ACCENT }} />
       </span>
       <div className="min-w-0">
-        <p className="text-[12.5px] font-semibold text-white leading-tight">İhracat AI</p>
+        <p className="text-[12.5px] font-semibold text-white leading-tight">UNEX-AI</p>
         <p className="text-[11px] flex items-center gap-1.5 mt-0.5" style={{ color: TEXT_MUTED }}>
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${durum === "calisiyor" ? "animate-pulse" : ""}`} style={{ backgroundColor: renk }} />
           {yazi}

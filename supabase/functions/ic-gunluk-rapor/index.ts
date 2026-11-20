@@ -3,6 +3,7 @@ import {
   IC_RAPOR_OTURUMLARI, IC_RAPOR_SAATI, icGunlukRaporHesapla, icGunlukRaporHtml, icGunlukRaporKonusu, trBugun,
   type IcRaporOturumu, type RaporAlis, type RaporIsEmri, type RaporSevk, type RaporTeslim,
 } from "../_shared/ic-gunluk-rapor.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // GUNLUK IC PIYASA RAPORU MAILI (ic-gunluk-rapor) - 04.11.2026
@@ -227,7 +228,7 @@ Deno.serve(async (req: Request) => {
       const sirketAdi = (sirketler.find((s) => s.id === h.company_id)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const alicilar = testAdresine ? TEST_ALICISI : Array.from(new Set((h.gunluk_rapor_eposta || "").split(",").map((x) => x.trim().toLowerCase()).filter((x) => EPOSTA_RE.test(x)))).slice(0, 5);
       const rapor = await sirketRaporu(h.company_id, tarih);
-      const konu = `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi, oturum)}`;
+      const konu = etiketliKonu("Rapor", `${test ? "[TEST] " : ""}${icGunlukRaporKonusu(rapor, sirketAdi, oturum)}`, { sirketAdi });
       const html = icGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString(), oturum, { gruplu: gruplu || (deneme && govde.test_adresine === true), toplamlar: TOPLAM_CANLI || testAdresine || (deneme && govde.test_adresine === true) });
       if (deneme) { sonuclar.push({ tarih, oturum, konu, alicilar, ozet: rapor.ozet, html }); continue; }
       if (!alicilar.length) { sonuclar.push({ atlandi: "Geçerli alıcı yok." }); continue; }
@@ -258,7 +259,7 @@ Deno.serve(async (req: Request) => {
       const mRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: `${sirketAdi} İç Piyasa <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html }),
+        body: JSON.stringify({ from: UNEX_AI_GONDEREN, to: alicilar, subject: konu, html }),
       });
       if (!mRes.ok) {
         const hata = (await mRes.text()).slice(0, 300);

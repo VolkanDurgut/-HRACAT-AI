@@ -5,6 +5,16 @@ import {
   kapanisOzeti,
 } from "../_shared/mesaj-sablonlari.ts";
 import { kapanisRaporHtml, kapanisRaporKonusu, type KapanisAraci } from "../_shared/ic-kapanis-rapor.ts";
+import { etiketliKonu, type MailEtiketi, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
+
+/** Ic bildirim konu etiketi (20.11.2026, _shared/unex-ai.ts). Musteri e-postalari etiketlenmez. */
+const IC_ETIKET: Record<string, MailEtiketi> = {
+  cikis_onayi_talebi: "Hatırlatma",
+  cikis_hatirlatma: "Hatırlatma",
+  cikis_cevap_yok: "Önemli",
+  cikis_bugun_degil: "Önemli",
+  siparis_kapanis: "Rapor",
+};
 
 // ============================================================================
 // IC PIYASA (ic-piyasa) - 12.10.2026
@@ -33,7 +43,7 @@ import { kapanisRaporHtml, kapanisRaporKonusu, type KapanisAraci } from "../_sha
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GONDEREN = "Unex Gıda İç Piyasa <bildirim@ihracatasistanim.com>";
+const GONDEREN = UNEX_AI_GONDEREN; // yalniz ic bildirimler; musteri e-postasi bilgi.gonderen ("Unex Gıda")
 const KOVA = "ic-piyasa-belgeler";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -204,7 +214,7 @@ function epostaOlustur(b: Bildirim): { konu: string; html: string } {
   const [plaka, siparis, urun, net, saat] = b.degerler.map((d) => String(d ?? "-"));
   const satirlar: [string, string][] = [["Plaka", plaka], ["Sipariş", siparis], ["Ürün", urun], ["Net miktar", net]];
   const cikisDugme = b.dugme_eki ? { metin: "Çıkışı bildir", adres: cikisAdresi(b.dugme_eki) } : null;
-  const otomatik = "Bu e-posta İhracat AI › İç Piyasa tarafından otomatik gönderildi. Müşteriye bu aşamada bir şey gitmez; müşteri mesajı ancak çıkış onaylanınca hazırlanır.";
+  const otomatik = "Bu e-posta UNEX-AI › İç Piyasa tarafından otomatik gönderildi. Müşteriye bu aşamada bir şey gitmez; müşteri mesajı ancak çıkış onaylanınca hazırlanır.";
   switch (b.sablon) {
     case "cikis_onayi_talebi":
       return {
@@ -213,7 +223,7 @@ function epostaOlustur(b: Bildirim): { konu: string; html: string } {
       };
     case "cikis_hatirlatma":
       return {
-        konu: `Hatırlatma: ${plaka} çıktı mı?${saat && saat !== "-" ? ` (planlanan ${saat})` : ""}`,
+        konu: `${plaka} çıktı mı?${saat && saat !== "-" ? ` (planlanan ${saat})` : ""}`,
         html: epostaHtml(saat && saat !== "-" ? `Planlanan saat geldi: ${saat}` : "Çıkış bildirimi bekleniyor",
           saat && saat !== "-" ? "Araç için verdiğiniz çıkış saati geldi. Araç yola çıktıysa onaylayın; çıkmadıysa yeni saat seçin." : "Araç yükleneli bir saat oldu ve çıkış durumu henüz bildirilmedi.",
           saat && saat !== "-" ? [...satirlar, ["Planlanan", saat]] : satirlar, cikisDugme, otomatik),
@@ -259,7 +269,7 @@ async function kuyruguIsle(): Promise<{ zamanlanan: number; gonderilen: number; 
         await resendGonder({ ...e, to: [b.hedef], ...cc });
       } else {
         const { konu, html } = b.sablon === "siparis_kapanis" ? await kapanisEpostasi(b) : epostaOlustur(b);
-        await resendGonder({ from: GONDEREN, to: [b.hedef], ...cc, subject: konu, html });
+        await resendGonder({ from: GONDEREN, to: [b.hedef], ...cc, subject: etiketliKonu(IC_ETIKET[b.sablon] ?? "Hatırlatma", konu), html });
       }
       await rpc("ic_bildirim_eposta_sonuc", { p_id: b.id, p_basarili: true });
       gonderilen++;

@@ -9,7 +9,7 @@ import SayfaGecisi from "@/components/sayfa-gecisi";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "İhracat AI - Export Management System",
+  title: "UNEX-AI - Export Management System",
   description: "Türk İhracat Yönetim Sistemi",
   viewport: "width=device-width, initial-scale=1",
 };

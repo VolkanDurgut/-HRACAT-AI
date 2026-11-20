@@ -339,7 +339,7 @@ export default function GunlukRaporSayfasi() {
             <div className="flex items-center gap-3">
               <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain shrink-0" />
               <div>
-                <h1 className="text-lg font-bold tracking-tight leading-tight" style={{ color: LACIVERT }}>{companyName ? `${companyName} İhracat AI` : "İhracat AI"}</h1>
+                <h1 className="text-lg font-bold tracking-tight leading-tight" style={{ color: LACIVERT }}>UNEX-AI</h1>
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Güncel İhracat Raporu</p>
               </div>
             </div>

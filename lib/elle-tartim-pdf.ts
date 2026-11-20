@@ -32,7 +32,7 @@ export function elleTartimPdf(kayit: ElleTartimKaydi, dosyaNo: string | null, mu
   doc.setFontSize(10);
   doc.text("Bu belge resmî DBA (Doğrulanmış Brüt Ağırlık) belgesi DEĞİLDİR.", 18, 39);
   doc.setFontSize(9);
-  doc.text("DBA belgesi sisteme yüklenemediği için tartım bilgileri İhracat AI'a elle girilmiştir.", 18, 45);
+  doc.text("DBA belgesi sisteme yüklenemediği için tartım bilgileri UNEX-AI'a elle girilmiştir.", 18, 45);
 
   const satirlar: [string, string][] = [
     ["Konteyner no", kayit.konteyner_no],
@@ -59,6 +59,6 @@ export function elleTartimPdf(kayit: ElleTartimKaydi, dosyaNo: string | null, mu
 
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text("İhracat AI · ihracatasistanim.com", 14, doc.internal.pageSize.getHeight() - 10);
+  doc.text("UNEX-AI · ihracatasistanim.com", 14, doc.internal.pageSize.getHeight() - 10);
   return doc.output("blob");
 }

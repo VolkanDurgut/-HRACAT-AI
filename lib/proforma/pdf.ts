@@ -595,7 +595,7 @@ function sayfa3(doc: jsPDF, b: ProformaBelgesi) {
 // ================================================================== disari ===
 export function proformaPdf(b: ProformaBelgesi): jsPDF {
   const doc = yeniBelge();
-  doc.setProperties({ title: `Proforma ${b.proformaNo}`, subject: "Proforma Invoice / Sales Contract", author: SATICI.unvan, creator: "İhracat AI" });
+  doc.setProperties({ title: `Proforma ${b.proformaNo}`, subject: "Proforma Invoice / Sales Contract", author: SATICI.unvan, creator: "İhracat AI" }); // Creator teknik isaret (sistemUretimiMi); UNEX-AI adina cevrilmez (20.11.2026)
   // Once deneme cizimiyle en az sikistirma kademesi bulunur (bos belgeye ciz, olc)
   const sinir = ALTBILGI_ALT - 8 - 10.5 * Math.max(0, b.altBilgi.length - 1) - 10;
   let s1 = 0;

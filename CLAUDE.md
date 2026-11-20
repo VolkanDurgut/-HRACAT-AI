@@ -1,4 +1,4 @@
-# İhracat AI — Proje Notları (Claude için)
+# UNEX-AI (eski adı İhracat AI) — Proje Notları (Claude için)
 
 Bu dosya, bu repo üzerinde çalışan herhangi bir Claude oturumunun (yeni chat dahil)
 hızlıca bağlam kazanması ve tekrar eden hataları yapmaması için tutulur. Kod
@@ -45,6 +45,11 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
 - Kullanıcılar Supabase panelinden elle AÇILMAZ (`handle_new_user` ayrı şirket açar);
   ayrıntı `docs/claude/altyapi.md`.
 - Rapor / bildirim maillerine booking no gibi arama anahtarı olabilecek numara eklenmez.
+- Marka (20.11.2026): program adı **UNEX-AI**. İÇ mailler yalnız `_shared/unex-ai.ts` ile gider:
+  gönderen `UNEX_AI_GONDEREN` ("Unex AI <bildirim@ihracatasistanim.com>"), konu `etiketliKonu("Rapor" |
+  "Hatırlatma" | "Önemli", konu)`. MÜŞTERİYE giden mail ve evrak "Unex Gıda" kalır (ic-piyasa müşteri
+  e-postası, musteri-durum-rapor, proforma / fatura / sertifikalar). Mail adresi ve domain değişmez.
+  Proforma ve konşimento talimatı PDF'indeki Creator "İhracat AI" teknik işarettir (`sistemUretimiMi`), değiştirme.
 - Teslim: her parça bitince HEMEN commit + bundle (02.11.2026: çalışma ortamı sıfırlanınca
   commit'lenmemiş iş kayboldu).
 
@@ -102,7 +107,7 @@ Rapor gönderim saatlerine yakın (ör. ilk canlı rapordan önceki akşam) çek
 
 ## Proje nedir
 
-- **İhracat AI** — Türkçe bir ihracat/export yönetim SaaS'ı (dosya takibi,
+- **UNEX-AI** (20.11.2026'ya kadar "İhracat AI") — Türkçe bir ihracat/export yönetim SaaS'ı (dosya takibi,
   rezervasyon/konteyner, evrak üretimi, draft onay akışı, ETD/ETA, kantar vb.).
 - Canlı domain: `ihracatasistanim.com`.
 - Next.js 13 (app router) + TypeScript + Tailwind + Supabase (Postgres + auth).

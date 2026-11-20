@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Kullanım Kılavuzu · Unex Gıda İhracat AI",
+  title: "Kullanım Kılavuzu · UNEX-AI",
   robots: { index: false, follow: false },
 };
 

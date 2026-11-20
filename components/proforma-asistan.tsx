@@ -49,7 +49,7 @@ function AsistanBasligi({ durum }: { durum: "hazir" | "calisiyor" }) {
         <Sparkles size={19} style={{ color: ACCENT }} />
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-white leading-tight">İhracat AI Asistanı</p>
+        <p className="text-sm font-semibold text-white leading-tight">UNEX-AI Asistanı</p>
         <p className="text-[11px] flex items-center gap-1.5 mt-0.5" style={{ color: TEXT_MUTED }}>
           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${durum === "calisiyor" ? "animate-pulse" : ""}`}
             style={{ backgroundColor: durum === "calisiyor" ? "#F59E0B" : ACCENT }} />

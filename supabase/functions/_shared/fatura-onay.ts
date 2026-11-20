@@ -82,7 +82,7 @@ export function talimatMailiHtml(o: OnayOzeti, kayitId: string, sirketAdi: strin
       { metin: "Fatura Talimatını İndir (PDF)", href: `${RAPOR_URL}${talimatYolu(kayitId)}`, birincil: true },
       { metin: "Dosyayı aç", href: `${RAPOR_URL}/dosya/${d.id}?tab=evraklar` },
     ],
-    altNotHtml: `İndirmek için ${esc(sirketAdi)} İhracat AI hesabınızla giriş yapmanız gerekir. Bu e-posta, dosyanın bütün konteynerleri girildiğinde otomatik gönderilir.`,
+    altNotHtml: `İndirmek için UNEX-AI hesabınızla giriş yapmanız gerekir. Bu e-posta, dosyanın bütün konteynerleri girildiğinde otomatik gönderilir.`,
   });
   return { konu, html };
 }

@@ -6,6 +6,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 import { baglamKur, type AcenteHafizasi, type LimanKurali } from "../_shared/navlun-karsilastirma.ts";
 import { limanAnahtari } from "../_shared/liman-anahtari.ts";
 import { esleriYukle, type AdEsi, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // NAVLUN TABLOSU MAILI (navlun-tablosu) - 11.11.2026
@@ -231,7 +232,7 @@ Deno.serve(async (req: Request) => {
       const veri = await sirketTablosu(companyId, tarih);
       const tablo = veri.tablo;
       const ozet = { liman: tablo.limanlar.length, blok: tablo.bloklar.length, gerceklesen: tablo.gerceklesenVar, booking: veri.satinAlma.satirlar.length, navlunsuz: veri.satinAlma.belirsiz };
-      const konu = `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`;
+      const konu = etiketliKonu("Rapor", `${test ? "[TEST] " : ""}${navlunTablosuKonusu(tablo, sirketAdi, veri.satinAlma)}`, { sirketAdi });
       // Bir onceki gonderilmis rapor: bu andan sonra gelen teklifler "YENI" (yoksa son 48 saat). Eski haftalik kayitlar haric.
       const onceki = await hepsiniCek<{ gonderim_zamani: string | null }>(`navlun_tablosu_gonderimleri?select=gonderim_zamani&company_id=eq.${companyId}&durum=eq.gonderildi&test=eq.${test}&oturum=neq.haftalik&order=gonderim_zamani.desc.nullslast&limit=1`);
       const html = navlunTablosuHtml(tablo, sirketAdi, { oncekiIso: onceki[0]?.gonderim_zamani ?? null, oturumEtiketi: oturumAdi(oturum as "sabah" | "aksam"), satinAlma: veri.satinAlma, tekTeklif: TEK_TEKLIF });
@@ -261,7 +262,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${sirketAdi} Navlun Tablosu <bildirim@ihracatasistanim.com>`, to: alicilar, ...(cc.length ? { cc } : {}), subject: konu, html,
+          from: UNEX_AI_GONDEREN, to: alicilar, ...(cc.length ? { cc } : {}), subject: konu, html,
           attachments: ekListesi,
         }),
       });

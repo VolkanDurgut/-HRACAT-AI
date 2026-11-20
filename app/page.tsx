@@ -78,7 +78,7 @@ export default function GirisSayfasi() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/logo.png" alt="Unex" className="w-11 h-11 object-contain" />
           <div>
-            <p className="text-lg font-semibold leading-tight text-white">İhracat AI</p>
+            <p className="text-lg font-semibold leading-tight text-white">UNEX-AI</p>
             <p className="text-xs" style={{ color: TEXT_MUTED }}>Unex Gıda · İhracat Operasyon Paneli</p>
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function GirisSayfasi() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px]" style={{ color: TEXT_MUTED }}>© {new Date().getFullYear()} Unex Gıda · İhracat AI</p>
+        <p className="mt-6 text-center text-[11px]" style={{ color: TEXT_MUTED }}>© {new Date().getFullYear()} Unex Gıda · UNEX-AI</p>
       </div>
     </main>
   );

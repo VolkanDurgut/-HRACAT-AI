@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { gonderimMaili, haftalikHatirlatmaMaili, sonucMaili, type HaftalikHatirlatma, type SaListe } from "../_shared/satin-alma.ts";
+import { etiketliKonu, type MailEtiketi, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // SATIN ALMA (satin-alma) - 26.10.2026
@@ -42,7 +43,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GONDEREN = "Unex Gıda Satın Alma <bildirim@ihracatasistanim.com>";
+const GONDEREN = UNEX_AI_GONDEREN;
 
 const EPOSTA = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 function alicilar(ad: string, varsayilan: string[]): string[] {
@@ -97,12 +98,12 @@ async function rpc<T>(ad: string, govde: Record<string, unknown>, yetki: "servis
   return (metin ? JSON.parse(metin) : null) as T;
 }
 
-async function resendGonder(to: string[], konu: string, html: string): Promise<void> {
+async function resendGonder(to: string[], konu: string, html: string, etiket: MailEtiketi): Promise<void> {
   if (!RESEND_API_KEY) throw new Error("RESEND_API_KEY tanımlı değil.");
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: GONDEREN, to, subject: konu, html }),
+    body: JSON.stringify({ from: GONDEREN, to, subject: etiketliKonu(etiket, konu), html }),
   });
   if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
@@ -112,7 +113,7 @@ async function mailGonderVeKaydet(tur: "gonderim" | "sonuc", liste: SaListe): Pr
   const to = liste.test === true ? TEST_ALICILARI : tur === "gonderim" ? GONDERIM_ALICILARI : SONUC_ALICILARI;
   try {
     const { konu, html } = tur === "gonderim" ? gonderimMaili(liste) : sonucMaili(liste);
-    await resendGonder(to, konu, html);
+    await resendGonder(to, konu, html, tur === "gonderim" ? "Hatırlatma" : "Rapor");
     await rpc("sa_mail_sonuc", { p_liste_id: liste.id, p_tur: tur, p_basarili: true }).catch((e) => console.error("sa_mail_sonuc:", e));
     return { mail: "gonderildi", alicilar: to };
   } catch (e) {
@@ -200,7 +201,7 @@ Deno.serve(async (req: Request) => {
         try {
           if (!to.length) throw new Error("Alıcı yok.");
           const { konu, html } = haftalikHatirlatmaMaili(h);
-          await resendGonder(to, konu, html);
+          await resendGonder(to, konu, html, "Hatırlatma");
           basarili = true;
           gonderilen++;
         } catch (e) {

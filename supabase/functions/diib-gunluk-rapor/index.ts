@@ -3,6 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { yuklenenHesapla, type BekleyenSira, type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi } from "../_shared/diib-hesap.ts";
 import { diibExcelDosyalari } from "../_shared/diib-excel.ts";
 import { diibGunlukRaporHesapla, diibGunlukRaporHtml, diibGunlukRaporKonusu } from "../_shared/diib-rapor.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // DIIB GUNLUK RAPORU MAILI (diib-gunluk-rapor) - 06.11.2026
@@ -158,7 +159,7 @@ Deno.serve(async (req: Request) => {
     for (const companyId of idler) {
       const sirketAdi = (sirketler.find((s) => s.id === companyId)?.company_name || "").replace(/[<>"]/g, "").trim() || "Unex Gıda";
       const rapor = await sirketRaporu(companyId, tarih);
-      const konu = `${test ? "[TEST] " : ""}${diibGunlukRaporKonusu(rapor, sirketAdi)}`;
+      const konu = etiketliKonu("Rapor", `${test ? "[TEST] " : ""}${diibGunlukRaporKonusu(rapor, sirketAdi)}`, { sirketAdi });
       const html = diibGunlukRaporHtml(rapor, sirketAdi, new Date().toISOString());
       const alicilar = test ? TEST_ALICISI : ALICILAR;
       if (deneme) { sonuclar.push({ tarih, konu, alicilar: CANLI ? ALICILAR : TEST_ALICISI, canli: CANLI, ozet: rapor.ozet, html }); continue; }
@@ -190,7 +191,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: `${sirketAdi} DİİB Takibi <bildirim@ihracatasistanim.com>`, to: alicilar, subject: konu, html,
+          from: UNEX_AI_GONDEREN, to: alicilar, subject: konu, html,
           attachments: [{ filename: `DIIB_Takibi_${tarih}.xlsx`, content: ek }],
         }),
       });

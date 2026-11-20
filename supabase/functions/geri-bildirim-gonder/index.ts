@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, errorResponse, successResponse, requireAuthToken } from "../_shared/gemini-helper.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 /** Canli sitede zaten yayinda olan logo - e-postaya gomulu base64 yerine
  * dogrudan URL olarak kullaniliyor (Edge Function boyutunu sismemesi icin). */
@@ -125,7 +126,7 @@ function buildEmailHtml(params: {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>İhracat AI · ${escapeHtml(etiket)}</title>
+<title>UNEX-AI · ${escapeHtml(etiket)}</title>
 </head>
 <body style="margin:0;padding:32px 16px;background:${TEMA.sayfaZemin};font-family:-apple-system,'Segoe UI',Arial,Helvetica,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:separate;">
@@ -137,7 +138,7 @@ function buildEmailHtml(params: {
               <img src="${UNEX_LOGO_URL}" width="36" height="36" alt="UNEX" style="display:block;border-radius:8px;">
             </td>
             <td style="vertical-align:middle;padding-left:12px;">
-              <div style="font-size:16px;font-weight:700;color:#FFFFFF;line-height:1.2;">İhracat AI</div>
+              <div style="font-size:16px;font-weight:700;color:#FFFFFF;line-height:1.2;">UNEX-AI</div>
               <div style="font-size:11px;color:${TEMA.mutedMetin};letter-spacing:0.03em;">EXPORT MANAGEMENT</div>
             </td>
             <td style="text-align:right;vertical-align:middle;">
@@ -167,7 +168,7 @@ function buildEmailHtml(params: {
     </tr>
   </table>
   <p style="max-width:560px;margin:16px auto 0 auto;text-align:center;font-size:11.5px;color:${TEMA.mutedMetin};">
-    İhracat AI · Export Management — bu bildirim panelinizdeki "Sorun Bildir" formu üzerinden otomatik olarak gönderilmiştir.
+    UNEX-AI · Export Management — bu bildirim panelinizdeki "Sorun Bildir" formu üzerinden otomatik olarak gönderilmiştir.
   </p>
 </body>
 </html>`;
@@ -198,10 +199,10 @@ async function mailGonder(params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "İhracat AI <bildirim@ihracatasistanim.com>",
+      from: UNEX_AI_GONDEREN,
       to: [GERI_BILDIRIM_ALICI],
       reply_to: params.gonderenEmail || undefined,
-      subject: `[${TUR_ETIKETI[params.tur]}] ${params.gonderenAdi} - İhracat AI`,
+      subject: etiketliKonu(params.tur === "oneri" ? "Rapor" : "Önemli", `${TUR_ETIKETI[params.tur]} · ${params.gonderenAdi}`),
       html,
     }),
   });

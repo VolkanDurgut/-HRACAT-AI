@@ -18,6 +18,7 @@ import {
   type CutoffDurumu,
 } from "../_shared/gunluk-rapor.ts";
 import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slot } from "./yetki.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // GUNLUK SEVKIYAT RAPORU MAILI (gunluk-rapor-gonder) - 07.10.2026
@@ -43,7 +44,7 @@ import { SLOTLAR, SUPER_ADMIN_EPOSTALARI, jwtRolu, yetkisizCagriKarari, type Slo
 // Alici: SADECE GUNLUK_RAPOR_ALICILARI (virgulle birden fazla) secret'i.
 // 09.10.2026: yedek adresine (GERI_BILDIRIM_ALICI) dusme KALDIRILDI - secret
 // yoksa mail GONDERILMEZ, hata doner (rapor yanlis adrese gitmesin).
-// Gonderen adi: "{sirket} Ihracat AI" ("Unex Gida Ihracat AI").
+// Gonderen adi: "Unex AI" (20.11.2026; eskiden "{sirket} Ihracat AI").
 //
 // TEKRAR KORUMASI: cron herkese acik anon anahtarla cagirir. Her (gun, slot,
 // sirket) icin rapor_gonderimleri tablosuna kayit atilir (benzersiz); ayni
@@ -288,7 +289,7 @@ function mailHtml(sirketAdi: string, r: GunlukRapor, slot: Slot): string {
 <tr><td>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${UYGULAMA_URL}/images/logo.png" width="48" height="48" alt="${esc(sirketAdi || "Logo")}" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">${esc(sirketAdi ? `${sirketAdi} İhracat AI` : "İhracat AI")}</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">UNEX-AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Güncel İhracat Raporu</div></td>
     <td style="text-align:right"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${tarihTR(r.tarih)}</div><div style="font-size:11px;color:#94A3B8">${SLOT_BASLIK[slot]}</div></td>
   </tr></table>
 
@@ -355,11 +356,7 @@ async function kayitGuncelle(tarih: string, slot: string, companyId: string, ala
   });
 }
 
-/** "Unex Gıda İhracat AI" - mail istemcisinde gorunen gonderen adi (tirnak/acili parantez temizlenir). */
-function gonderenAdi(sirketAdi: string | null): string {
-  const ad = (sirketAdi || "").replace(/[<>"]/g, "").trim();
-  return ad ? `${ad} İhracat AI` : "İhracat AI";
-}
+// Gonderen adi (20.11.2026): "Unex AI" (_shared/unex-ai.ts), konu "[Rapor] ...".
 
 // ---------------------------------------------------------------- yetki
 /**
@@ -424,7 +421,7 @@ Deno.serve(async (req: Request) => {
     const sonuclar: unknown[] = [];
     for (const s of sirketler) {
       const rapor = await sirketRaporu(s.id, tarih);
-      const konu = mailKonusu(rapor, slot);
+      const konu = etiketliKonu("Rapor", mailKonusu(rapor, slot));
       const html = mailHtml(s.company_name || "", rapor, slot);
       if (deneme) {
         sonuclar.push({ sirket: s.company_name, tarih, slot, konu, ozet: rapor.ozet, sevkiyat_satirlari: rapor.sevkiyatlar.map(sevkiyatSatiriMetni), html });
@@ -442,7 +439,7 @@ Deno.serve(async (req: Request) => {
       const mailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: `${gonderenAdi(s.company_name)} <bildirim@ihracatasistanim.com>`, to: ALICILAR, subject: konu, html }),
+        body: JSON.stringify({ from: UNEX_AI_GONDEREN, to: ALICILAR, subject: konu, html }),
       });
       if (!mailRes.ok) {
         const hata = (await mailRes.text()).slice(0, 300);

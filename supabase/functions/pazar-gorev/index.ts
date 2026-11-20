@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // PAZAR GUNLUK GOREV (pazar-gorev) - 10.11.2026 (Dalga 3.3 + 3.4)
@@ -28,7 +29,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GONDEREN = "Unex Gıda İhracat AI <bildirim@ihracatasistanim.com>";
+const GONDEREN = UNEX_AI_GONDEREN;
 const SITE = "https://ihracatasistanim.com";
 const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}` };
 const GOREV_ADET = 6;
@@ -152,7 +153,7 @@ function mailOlustur(gorevler: OzetGorev[], kisi: Kisi, cc: string[], test: bool
 <tr><td>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${SITE}/images/logo.png" width="48" height="48" alt="Unex Gıda" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">Unex Gıda İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">UNEX Satış · Bugünkü müşteriniz</div></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">UNEX-AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">UNEX Satış · Bugünkü müşteriniz</div></td>
     <td style="text-align:right;vertical-align:middle"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${kacis(tarih)}</div></td>
   </tr></table>
   ${testSeridi}
@@ -169,7 +170,7 @@ function mailOlustur(gorevler: OzetGorev[], kisi: Kisi, cc: string[], test: bool
   ${digerleri.length ? `${bolumBaslik(`Bugün sırada ${digerleri.length} müşteri daha`)}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${digerleri.map(satir).join("")}</table>
   <div style="margin-top:6px;font-size:11px;color:#94A3B8">İlk müşteriyi bitirince sayfadaki "Yeni müşteriyle devam et" ile sıradakine geçebilirsiniz.</div>` : ""}
-  <div style="margin-top:18px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Mailler Outlook'tan sizin adresinizden (${kacis(kisi.eposta)}) gider; bbt@ ve execution@ bilgiye eklenir. Bağlantı 3 gün geçerlidir; giriş gerektirmez.<br>İhracat AI tarafından hafta içi her sabah otomatik gönderilir.</div>
+  <div style="margin-top:18px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Mailler Outlook'tan sizin adresinizden (${kacis(kisi.eposta)}) gider; bbt@ ve execution@ bilgiye eklenir. Bağlantı 3 gün geçerlidir; giriş gerektirmez.<br>UNEX-AI tarafından hafta içi her sabah otomatik gönderilir.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
   return { konu, html };
@@ -200,7 +201,7 @@ function duyuruMaili(kisi: Kisi, cc: string[], test: boolean): { konu: string; h
 <tr><td>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
     <td style="width:56px;vertical-align:middle"><img src="${SITE}/images/logo.png" width="48" height="48" alt="Unex Gıda" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">Unex Gıda İhracat AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">UNEX Satış · Yeni çalışma düzeni</div></td>
+    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">UNEX-AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">UNEX Satış · Yeni çalışma düzeni</div></td>
   </tr></table>
   ${testSeridi}
   <p style="margin:18px 0 6px;color:#1E293B;font-size:15px;line-height:1.55">Merhaba${kisi.hitap ? ` ${kacis(kisi.hitap)}` : ""},</p>
@@ -219,7 +220,7 @@ function duyuruMaili(kisi: Kisi, cc: string[], test: boolean): { konu: string; h
     <a href="${kacis(`${SITE}/gorev/rehber`)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:15px;font-weight:bold;padding:12px 30px;border-radius:6px">Rehberi izle (3 dakika)</a>
     <div style="margin-top:8px;font-size:11px;color:#94A3B8">Ekran görüntüleriyle, adım adım; giriş gerektirmez.</div>
   </div>
-  <div style="margin-top:20px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Sorularınız için: execution@unex.com.tr<br>Bu bilgilendirme İhracat AI tarafından gönderildi.</div>
+  <div style="margin-top:20px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Sorularınız için: execution@unex.com.tr<br>Bu bilgilendirme UNEX-AI tarafından gönderildi.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
   return { konu, html };
@@ -230,7 +231,7 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: konu, html }),
+    body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: etiketliKonu("Hatırlatma", konu), html }),
   });
   if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return ((await res.json()) as { id?: string }).id || null;

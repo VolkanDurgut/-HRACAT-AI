@@ -279,7 +279,7 @@ export default function SatinAlmaFisi({ params }: { params: { token: string } })
         </div>
 
         <p className="mt-5 pt-3 print:mt-3 print:pt-2 border-t text-[10.5px] leading-relaxed" style={{ borderColor: B.cizgi, color: B.soluk }}>
-          Bu fiş İhracat AI Satın Alma modülünde elektronik olarak onaylanmıştır; ıslak imza gerektirmez.
+          Bu fiş UNEX-AI Satın Alma modülünde elektronik olarak onaylanmıştır; ıslak imza gerektirmez.
           Fiş no {liste.liste_no}. Teslim durumları fiş bağlantısından güncel olarak izlenir.
         </p>
       </article>

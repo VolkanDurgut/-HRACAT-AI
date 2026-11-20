@@ -460,7 +460,7 @@ export default function YeniDosyaPage() {
       <SayfaBasligi
         ikon={<FileUp size={20} />}
         baslik="Proforma Yükle"
-        aciklama="Proformayı yükleyin; İhracat AI belgeyi okuyup ihracat dosyanızı oluştursun."
+        aciklama="Proformayı yükleyin; UNEX-AI belgeyi okuyup ihracat dosyanızı oluştursun."
         className="mb-6"
       />
 

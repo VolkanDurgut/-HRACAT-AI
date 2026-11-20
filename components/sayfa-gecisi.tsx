@@ -75,7 +75,7 @@ const SAYFA_ADLARI: [string, string][] = [
   ["/belge/konsimento", "Konşimento Talimatı"],
 ];
 export function sayfaAdi(yol: string): string {
-  return SAYFA_ADLARI.find(([p]) => yol === p || yol.startsWith(p.endsWith("/") ? p : `${p}/`) || yol.startsWith(p + "?"))?.[1] ?? "İhracat AI";
+  return SAYFA_ADLARI.find(([p]) => yol === p || yol.startsWith(p.endsWith("/") ? p : `${p}/`) || yol.startsWith(p + "?"))?.[1] ?? "UNEX-AI";
 }
 
 const yolKismi = (href: string) => href.split("#")[0].split("?")[0];
@@ -225,7 +225,7 @@ export default function SayfaGecisi() {
         <img src="/images/logo.png" alt="" className={`sg-logo ${faz === "cikis" ? "sg-logo-gel" : "sg-logo-gec"}`} />
       </div>
       <div className={`sg-yazi ${faz === "giris" ? "sg-yazi-git" : ""}`}>
-        <p className="sg-ust">İhracat AI</p>
+        <p className="sg-ust">UNEX-AI</p>
         <p className="sg-ad" data-testid="sayfa-gecisi-ad" aria-label={ad}>
           {harfler.map((h, i) => (
             <span key={i} className="sg-harf" style={{

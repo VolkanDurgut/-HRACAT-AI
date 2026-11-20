@@ -242,7 +242,7 @@ function cerceve(belge: string, no: string, govde: string, test = false): string
 ${testSeridi}
 <tr><td class="g" style="padding:22px 24px 26px;">${govde}</td></tr>
 </table>
-<p style="margin:12px 0 0;color:#8B91A8;font-size:11px;">Unex Gıda San. ve Tic. Ltd. Şti. · Süleymanpaşa / Tekirdağ · Bu e-posta İhracat AI › Satın Alma tarafından otomatik gönderildi.</p>
+<p style="margin:12px 0 0;color:#8B91A8;font-size:11px;">Unex Gıda San. ve Tic. Ltd. Şti. · Süleymanpaşa / Tekirdağ · Bu e-posta UNEX-AI › Satın Alma tarafından otomatik gönderildi.</p>
 </td></tr></table></body></html>`;
 }
 

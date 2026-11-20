@@ -186,7 +186,7 @@ function akkon(doc: jsPDF, m: TalimatModeli) {
 export function talimatPdf(m: TalimatModeli): Blob | null {
   if (m.sablon === "msc_web") return null;
   const doc = yeniBelge();
-  doc.setProperties({ title: `Konşimento Talimatı ${m.booking || m.dosyaNo}`, creator: "İhracat AI" });
+  doc.setProperties({ title: `Konşimento Talimatı ${m.booking || m.dosyaNo}`, creator: "İhracat AI" }); // disariya giden evrak; isim degisikliginde bilincli olarak korundu (20.11.2026)
   if (m.sablon === "akkon") akkon(doc, m); else standart(doc, m);
   return doc.output("blob");
 }

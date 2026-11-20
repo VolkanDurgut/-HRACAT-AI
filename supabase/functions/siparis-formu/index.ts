@@ -3,6 +3,7 @@ import JSZip from "npm:jszip@3.10.1";
 import { formDosyaAdi, formKonusu, formMailHtml, formModeli, LOGO_CID, type FormHam, type FormModeli } from "../_shared/siparis-formu.ts";
 import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "../_shared/siparis-formu-xlsx.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // SIPARIS BILDIRIM FORMU MAILI (siparis-formu) - 18.11.2026
@@ -148,7 +149,7 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: "Unex Gıda Sipariş Formu <bildirim@ihracatasistanim.com>", to, ...(cc.length ? { cc } : {}), subject: konu, html, ...(ekler.length ? { attachments: ekler } : {}) }),
+    body: JSON.stringify({ from: UNEX_AI_GONDEREN, to, ...(cc.length ? { cc } : {}), subject: etiketliKonu("Önemli", konu), html, ...(ekler.length ? { attachments: ekler } : {}) }),
   });
   if (!res.ok) throw new Error(`Mail gönderilemedi (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
   await res.body?.cancel();

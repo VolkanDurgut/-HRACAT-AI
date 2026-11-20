@@ -282,7 +282,7 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
   not("Kaynak: acentelerin navlun talebi yazışmalarındaki teklifler (Navlun Bildirimi) — hücre: o ay alınan SON 20'DC fiyatı (USD).");
   if (t.gerceklesenVar) not("Yeşil kalın: gerçekleşen navlun (yükleme planı, rezervasyonu yapılmış yükleme, konteyner başı; ETD ayı).");
   not("HEDEF: operasyonun acenteye yazdığı son hedef fiyat (\"hedef rakamımız …\") · FREE TIME / TRANSIT: acentenin teklifinde yazdığı gün (boş = teklifte belirtilmemiş).");
-  not(`Oluşturma: ${tarihTr(t.tarih)} · İhracat AI`);
+  not(`Oluşturma: ${tarihTr(t.tarih)} · UNEX-AI`);
   return { ad, sutunGenislik: genislik, satirlar, birlestir, dondur: "D4" };
 }
 

@@ -4,6 +4,7 @@ import { jsPDF } from "npm:jspdf@4.2.1";
 import { autoTable } from "npm:jspdf-autotable@5.0.8";
 import { ROBOTO_VGM_BASE64 } from "../_shared/roboto-vgm-base64.ts";
 import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "../_shared/vgm-pdf.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // VGM RAPORU MAILI (vgm-rapor) - 10.11.2026
@@ -25,7 +26,7 @@ import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "../_shared/vgm-pdf
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GONDEREN = "Unex Gıda İhracat AI <bildirim@ihracatasistanim.com>";
+const GONDEREN = UNEX_AI_GONDEREN;
 const SITE = "https://ihracatasistanim.com";
 const KOVA = "konsimento-talimatlari";
 const IMZA_SURESI_SN = 30 * 24 * 3600;
@@ -169,7 +170,7 @@ function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: stri
       { metin: "Dosyayı aç", href: `${SITE}/dosya/${h.dosya.id}?tab=konteynerler` },
     ],
     dugmeNotuHtml: "PDF bu e-postanın ekinde de var. İndirme bağlantısı 30 gün geçerlidir; giriş gerektirmez.",
-    altNotHtml: "Tüm konteynerlerin VGM'i girildiğinde İhracat AI tarafından otomatik gönderildi.",
+    altNotHtml: "Tüm konteynerlerin VGM'i girildiğinde UNEX-AI tarafından otomatik gönderildi.",
   });
   return { konu, html };
 }
@@ -185,7 +186,7 @@ async function mailGonder(to: string[], cc: string[], konu: string, html: string
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: konu, html, attachments: [{ filename: ad, content: base64(pdf) }] }),
+    body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: etiketliKonu("Rapor", konu), html, attachments: [{ filename: ad, content: base64(pdf) }] }),
   });
   if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return ((await res.json()) as { id?: string }).id || null;

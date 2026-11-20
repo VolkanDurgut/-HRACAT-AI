@@ -389,7 +389,7 @@ export function formMailHtml(m: FormModeli, sirketAdi: string, test: boolean, lo
       Boş ekipman alımı <b>${esc(trTarih(m.ekipmanTarihi) || "—")}</b>${a.planlananYukleme ? `, planlanan yükleme (ardiyesiz giriş) <b>${esc(a.planlananYukleme)}</b>` : ""}.</p>
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:6px">${sol}</table>
     <table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:10px">${sag}</table>
-    <p style="margin:14px 0 0;color:#6B7280;font-size:12px">Bu mail ${esc(sirketAdi)} İhracat Asistanı tarafından otomatik gönderildi${test ? " (TEST - üretime gitmedi)" : ""}.</p>
+    <p style="margin:14px 0 0;color:#6B7280;font-size:12px">Bu mail UNEX-AI tarafından otomatik gönderildi${test ? " (TEST - üretime gitmedi)" : ""}.</p>
   </div>
 </div></body></html>`;
 }

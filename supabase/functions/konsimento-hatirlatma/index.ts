@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { khMail, KH_VARSAYILAN_ALICI, KH_VARSAYILAN_CC, type KhVeri } from "../_shared/konsimento-hatirlatma.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // KONSIMENTO TALIMATI HATIRLATMASI (konsimento-hatirlatma) - 27.10.2026
@@ -22,7 +23,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const GONDEREN = "Unex Gıda İhracat <bildirim@ihracatasistanim.com>";
+const GONDEREN = UNEX_AI_GONDEREN;
 
 const EPOSTA = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 function adresler(ad: string, varsayilan: string[]): string[] {
@@ -78,7 +79,7 @@ async function gonder(is: Is): Promise<Sonuc> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: konu, html }),
+      body: JSON.stringify({ from: GONDEREN, to, ...(cc.length ? { cc } : {}), subject: etiketliKonu("Hatırlatma", konu), html }),
     });
     if (!res.ok) throw new Error(`Resend HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     await rpc("kh_sonuc", { p_id: is.id, p_basarili: true, p_test: !CANLI, p_alicilar: to.join(", "), p_cc: cc.join(", ") || null })

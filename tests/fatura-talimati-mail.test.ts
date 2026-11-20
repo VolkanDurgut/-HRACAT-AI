@@ -43,5 +43,7 @@ test("mail: HTML kacisi (musteri adinda < > & \")", () => {
   const m = talimatMailiHtml(o, ID, "Unex <Gıda>");
   assert.ok(m.html.includes("A&amp;B &lt;Trading&gt; &quot;Co&quot;"));
   assert.ok(!m.html.includes("<Trading>"));
-  assert.ok(m.html.includes("Unex &lt;Gıda&gt;"));
+  // 20.11.2026: alt notta sirket adi yerine "UNEX-AI"; sirket adi ust etikette (buyuk harf) kacisli
+  assert.ok(m.html.includes("UNEX &lt;GIDA&gt;"));
+  assert.ok(!m.html.includes("<Gıda>") && !m.html.includes("<GIDA>"));
 });

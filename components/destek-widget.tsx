@@ -175,7 +175,7 @@ export default function DestekWidget() {
                 {TESEKKUR_DETAYI[tur]}
               </p>
               <p className="text-[11px] pt-2 mt-1 border-t w-full" style={{ color: TEXT_MUTED, borderColor: CARD_BORDER }}>
-                Volkan Durgut · İhracat AI
+                Volkan Durgut · UNEX-AI
               </p>
               <button
                 onClick={panelKapat}

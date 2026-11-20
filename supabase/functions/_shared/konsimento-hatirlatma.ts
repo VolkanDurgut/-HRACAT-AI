@@ -127,7 +127,7 @@ export function khMail(v: KhVeri, secenek: { test: boolean; gercekAlici: string;
       ? [{ metin: "Dosyayı uygulamada aç", href: adres, birincil: true }]
       : [{ metin: "Talimatı Gör", href: talimatAdres, birincil: true }, { metin: "Dosyayı aç", href: adres }],
     dugmeNotuHtml: msc ? null : "Talimat, açıldığı anda sistemdeki güncel bilgilerle oluşturulur; sayfadan indirilebilir.",
-    altNotHtml: `Bu hatırlatma İhracat AI tarafından ${secenek.tetik === "elle" ? `${kacis(secenek.isteyen || "bir kullanıcı")} isteğiyle` : "son konteyner girildiğinde otomatik olarak"} gönderildi. Konşimento talimatı yüklendiğinde dosyada uyum kontrolü otomatik yapılır.`,
+    altNotHtml: `Bu hatırlatma UNEX-AI tarafından ${secenek.tetik === "elle" ? `${kacis(secenek.isteyen || "bir kullanıcı")} isteğiyle` : "son konteyner girildiğinde otomatik olarak"} gönderildi. Konşimento talimatı yüklendiğinde dosyada uyum kontrolü otomatik yapılır.`,
   });
   return { konu, html };
 }

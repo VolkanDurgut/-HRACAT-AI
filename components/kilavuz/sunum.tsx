@@ -181,7 +181,7 @@ export function KilavuzSunum({ konular, noktalar, baslik, konumAnahtari, cikis =
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/logo.png" alt="Unex" className="w-8 h-8 object-contain shrink-0" />
           <span className="min-w-0 text-left">
-            <span className="block text-[10px] font-semibold tracking-[0.18em] uppercase leading-tight" style={{ color: TEXT_MUTED }}>Unex Gıda · İhracat AI</span>
+            <span className="block text-[10px] font-semibold tracking-[0.18em] uppercase leading-tight" style={{ color: TEXT_MUTED }}>Unex Gıda · UNEX-AI</span>
             <span className="block text-sm font-semibold leading-tight truncate">{baslik}</span>
           </span>
         </button>
@@ -402,7 +402,7 @@ function Kapak({ konular, baslik, ayar, onBasla, onGit, kayitli }: { konular: Ki
   return (
     <div className="min-h-full w-full max-w-5xl mx-auto px-4 md:px-8 py-6 md:py-4 flex flex-col items-center justify-center text-center">
       <div className="klv-yukari"><LogoGezegen konular={konular} boyut={128} /></div>
-      <p className="klv-yukari klv-g1 mt-1 text-[11px] font-semibold tracking-[0.32em] uppercase" style={{ color: "#F4A07C" }}>Unex Gıda · İhracat AI</p>
+      <p className="klv-yukari klv-g1 mt-1 text-[11px] font-semibold tracking-[0.32em] uppercase" style={{ color: "#F4A07C" }}>Unex Gıda · UNEX-AI</p>
       <h1 className="klv-yukari klv-g1 mt-2 text-3xl md:text-5xl font-bold tracking-tight">{baslik}</h1>
       <p className="klv-yukari klv-g2 mt-4 max-w-xl text-sm md:text-base leading-relaxed" style={{ color: "#AEB8C7" }}>
         {ayar.aciklama}

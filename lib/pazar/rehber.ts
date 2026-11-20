@@ -10,7 +10,7 @@ import type { KilavuzKonusu } from "@/lib/kilavuz/konular";
 export const REHBER_KONULARI: KilavuzKonusu[] = [
   {
     id: "sabah-maili", baslik: "Sabah Maili", evren: "Güne Başlarken",
-    hikaye: "Saat 09:00. Gelen kutunuzda İhracat AI'dan kısa bir mail var: bugün kiminle görüşeceğiniz hazır.",
+    hikaye: "Saat 09:00. Gelen kutunuzda UNEX-AI'dan kısa bir mail var: bugün kiminle görüşeceğiniz hazır.",
     renk: ["#10B981", "#283474"], ekran: "pazar-mail", cubuk: "Outlook · Gelen Kutusu",
     adimlar: [
       { baslik: "Her sabah size özel tek mail", metin: "Hafta içi her sabah 09:00'da size özel bir mail gelir. Satış ekibindeki her kişiye farklı müşteriler düşer; aynı firma aynı gün iki kişiye verilmez." },
@@ -73,7 +73,7 @@ export const REHBER_KONULARI: KilavuzKonusu[] = [
   },
   {
     id: "takip", baslik: "Takip Ekranı", evren: "Gözlem Kulesi",
-    hikaye: "Yöneticiler günü İhracat AI'da Pazar sayfasının Takip sekmesinden izler; her adımınız burada görünür.",
+    hikaye: "Yöneticiler günü UNEX-AI'da Pazar sayfasının Takip sekmesinden izler; her adımınız burada görünür.",
     renk: ["#F4A07C", "#283474"], ekran: "pazar-takip", cubuk: "/pazar",
     adimlar: [
       // 16.11.2026: Takip sekmesi yonetici paneli oldu; ekran goruntusu yenilenene kadar isaret noktasi yok.

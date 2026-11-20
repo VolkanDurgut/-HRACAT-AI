@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { talimatMailiHtml, type OnayDosyasi, type OnayKonteyneri, type OnayOzeti, type OnayRezervasyonu } from "../_shared/fatura-onay.ts";
 import { raporAyari } from "../_shared/rapor-alici.ts";
+import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
 // FATURA TALIMATI MAILI (fatura-onay) - 11.11.2026, 14.11.2026 onay adimi kaldirildi
@@ -153,7 +154,7 @@ async function talimatGonder(o: OnayOzeti & { dosya: DosyaSatiri }, kaynak: "oto
   const ad = await sirketAdi(companyId);
   const m = talimatMailiHtml(o, kayit.id, ad);
   try {
-    await mailGonder({ from: `${ad} İhracat <bildirim@ihracatasistanim.com>`, to, ...(cc.length ? { cc } : {}), subject: `${test ? "[TEST] " : ""}${m.konu}`, html: m.html });
+    await mailGonder({ from: UNEX_AI_GONDEREN, to, ...(cc.length ? { cc } : {}), subject: etiketliKonu("Önemli", `${test ? "[TEST] " : ""}${m.konu}`), html: m.html });
   } catch (e) {
     await fetch(`${SUPABASE_URL}/rest/v1/fatura_talimati_onaylari?id=eq.${kayit.id}`, { method: "DELETE", headers: basliklar });
     throw e;

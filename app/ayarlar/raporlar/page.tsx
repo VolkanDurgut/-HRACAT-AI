@@ -185,7 +185,7 @@ export default function RaporAlicilariPage() {
     <AppShell>
       <style>{`@keyframes rapor-gir{from{opacity:0;transform:translateY(-6px) scale(.9)}to{opacity:1;transform:none}}`}</style>
       <SayfaBasligi ikon={<Mail size={20} />} baslik="Rapor Alıcıları"
-        aciklama="Bütün otomatik mailler İhracat Asistanım (bildirim@ihracatasistanim.com) adresinden gider. Bir rapor seçin; adreslere tıklayarak Alıcı ve CC belirleyin." />
+        aciklama="İç mailler “Unex AI” adıyla bildirim@ihracatasistanim.com adresinden gider; konu başında [Rapor], [Hatırlatma] ya da [Önemli] yazar. Bir rapor seçin; adreslere tıklayarak Alıcı ve CC belirleyin." />
       {hata && <p className="mb-3 text-sm text-red-400" role="alert">{hata}</p>}
       <div className="grid gap-3 lg:grid-cols-[minmax(260px,340px)_1fr] lg:h-[calc(100vh-190px)] lg:min-h-[520px]">
         {/* Rapor listesi */}

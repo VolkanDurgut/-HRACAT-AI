@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup, Link2 } from "lucide-react";
+import { yoneticiMi } from "@/lib/asistan/gorunum";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup, Link2, ListTodo } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -171,6 +172,20 @@ export default function Sidebar() {
         {isSuperAdmin ? (
           <>
             <Bolum baslik="Yönetim" />
+            {/* Yonetici Asistani (21.11.2026): yalniz yonetici (execution@); sayfa ve RPC de ayni e-postayi kontrol eder */}
+            {yoneticiMi(user?.email) && (
+              <Link
+                href="/asistan"
+                onClick={closeMobile}
+                aria-current={isActive("/asistan") ? "page" : undefined}
+                data-testid="menu-asistan"
+                className={`flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ${isActive("/asistan") ? "text-white" : "hover:bg-white/[0.06] hover:text-white"}`}
+                style={{ color: isActive("/asistan") ? "#FFFFFF" : TEXT_MUTED, backgroundColor: isActive("/asistan") ? "rgba(16,185,129,0.16)" : undefined }}
+              >
+                <span className="shrink-0" style={isActive("/asistan") ? { color: NAVY } : undefined}><ListTodo size={18} /></span>
+                <span className="flex-1 truncate">Yönetici Asistanı</span>
+              </Link>
+            )}
             <button
               onClick={() => setAyarlarAcik(!ayarlarAcik)}
               aria-expanded={ayarlarAcik}

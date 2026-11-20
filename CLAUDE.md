@@ -50,6 +50,10 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   "Hatırlatma" | "Önemli", konu)`. MÜŞTERİYE giden mail ve evrak "Unex Gıda" kalır (ic-piyasa müşteri
   e-postası, musteri-durum-rapor, proforma / fatura / sertifikalar). Mail adresi ve domain değişmez.
   Proforma ve konşimento talimatı PDF'indeki Creator "İhracat AI" teknik işarettir (`sistemUretimiMi`), değiştirme.
+- Yönetici Asistanı (21.11.2026, `/asistan`): YALNIZ yönetici (execution@; `YONETICI_EPOSTASI` + `yonetici_asistani_mi()`).
+  Görevler kaynaktan hesaplanır (`yonetici_asistan_veri`), tabloda yalnız "Gönderdim" işareti. Hazır mail sistemden
+  GİTMEZ (yönetici kopyalayıp kendisi gönderir). Sabah özeti (edge `asistan-ozet`) yalnız yöneticiye; canlı anahtarı
+  `ASISTAN_OZET_CANLI=evet` kullanıcı onayı olmadan açılmaz. Kurallar: `_shared/yonetici-asistan.ts`.
 - Teslim: her parça bitince HEMEN commit + bundle (02.11.2026: çalışma ortamı sıfırlanınca
   commit'lenmemiş iş kayboldu).
 

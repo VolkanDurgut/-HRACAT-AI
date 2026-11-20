@@ -11,7 +11,7 @@
 import { supabase, type Dosya, type Konteyner, type Rezervasyon } from "@/lib/supabase";
 import { faturaTalimatiPdfOlustur } from "@/lib/fatura-talimati-pdf-builder";
 import { bayrakPng } from "@/lib/bayraklar";
-import { ticaretYapilanUlke } from "@/lib/ulke-bul";
+import { dosyaTicaretUlkesi } from "@/lib/ulke-bul";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
 /** 14.11.2026 atlandi: canliya geciste mail istenmeyen eski hazir dosya (mail GITMEDI). */
@@ -79,7 +79,7 @@ export const talimatPdfAdi = (dosyaNo: string | null | undefined) => `Fatura_Tal
 
 /** Dosya sayfasindaki "Fatura Talimati Indir" ile AYNI PDF (bayrak dahil): onizleme / indirme blob'u. */
 export async function talimatPdfUret(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], bolunme: TalimatParcaGirdisi[]): Promise<{ blob: Blob; ad: string }> {
-  const bayrak = await bayrakPng(ticaretYapilanUlke(dosya.alici_adresi));
+  const bayrak = await bayrakPng(dosyaTicaretUlkesi(dosya.ticaret_ulkesi, dosya.alici_adresi));
   const doc = faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, false, bolunme, bayrak);
   return { blob: doc.output("blob"), ad: talimatPdfAdi(dosya.dosya_no) };
 }

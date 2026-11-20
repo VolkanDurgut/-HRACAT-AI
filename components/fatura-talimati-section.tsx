@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
-import { asciiYap, gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
+import { asciiYap, gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ, ULKE_ADLARI } from "@/lib/ulke-bul";
+import { ticaretUlkesiKaydet } from "@/lib/dosya/ticaret-ulkesi";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -58,6 +59,15 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
   // 19.11.2026: BIRLESIK FATURA (ayni musteri + ayni gemi, tek fatura). Dosya bir gruptaysa talimat GRUBUN tamamindan
   // uretilir (lib/birlesik-fatura); grupta degilse tek dosyalik talimat eskisi gibi.
   const [grupModu, setGrupModu] = useState<{ model: BirlesikFaturaModeli; on: boolean; ids: string[] } | null>(null);
+  // 20.11.2026: elle ticaret yapilan ulke (undefined = kayitli deger; null = adresten bul)
+  const [elleUlke, setElleUlke] = useState<string | null | undefined>(undefined);
+  const [ulkeDuzenle, setUlkeDuzenle] = useState(false);
+  const [ulkeGirdi, setUlkeGirdi] = useState("");
+  const [ulkeKaydediliyor, setUlkeKaydediliyor] = useState(false);
+  useEffect(() => { setElleUlke(undefined); }, [dosya.id, dosya.ticaret_ulkesi]);
+  const ticaretUlkesi = grupModu
+    ? dosyaTicaretUlkesi(elleUlke !== undefined ? elleUlke : grupModu.model.ticaretUlkesiElle, grupModu.model.aliciAdresi)
+    : dosyaTicaretUlkesi(elleUlke !== undefined ? elleUlke : dosya.ticaret_ulkesi ?? null, dosya.alici_adresi);
   const grupModeli = useCallback(async () => {
     if (!companyId || !dosya.id) return null;
     try {
@@ -178,7 +188,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       satir("Varis Limani", dosya.varis_limani),
       // PDF ile ayni kural (lib/ulke-bul.ts); mailto govdesi ASCII.
       satir("Gidecegi Ulke", asciiYap(gidecegiUlke(dosya.varis_limani) ?? ulkeAyikla(dosya.varis_limani) ?? "")),
-      satir("Ticaret Yapilan Ulke", asciiYap(ticaretYapilanUlke(dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ)),
+      satir("Ticaret Yapilan Ulke", asciiYap(dosyaTicaretUlkesi(elleUlke !== undefined ? elleUlke : dosya.ticaret_ulkesi ?? null, dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ)),
       satir("Teslim Sekli", dosya.teslim_sekli),
       satir("Odeme Sekli", dosya.gumruk_odeme_sekli),
       satir("Gemi Adi", rez?.gemi_adi),
@@ -251,6 +261,23 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
     return `${onNotu}Sayin Ilgili,\n\nAsagida belirtilen ihracat dosyasina ait fatura tanzimi icin gerekli bilgiler tarafiniza iletilmistir. Bilgilerinize ve gereginin yapilmasini rica ederiz.\n\n${bolumler}\n\nBilgilerinize arz ederiz.\n\nSaygilarimizla,\nIhracat Departmani`;
   };
 
+  /** Elle ticaret yapilan ulke: dosyaya (birlesikte gruptaki butun dosyalara) yazilir, mail metnindeki satir guncellenir. */
+  const ulkeKaydet = async (deger: string | null) => {
+    setUlkeKaydediliyor(true);
+    const ids = grupModu ? grupModu.ids : [dosya.id];
+    const sorun = await ticaretUlkesiKaydet(companyId, ids, deger);
+    setUlkeKaydediliyor(false);
+    if (sorun) { showToast(`Ülke kaydedilemedi: ${sorun}`, "error"); return; }
+    const kayit = deger && deger.trim() ? deger.replace(/\s+/g, " ").trim().toLocaleUpperCase("tr-TR") : null;
+    setElleUlke(kayit);
+    if (grupModu) setGrupModu({ ...grupModu, model: { ...grupModu.model, ticaretUlkesiElle: kayit } });
+    const yeni = grupModu ? dosyaTicaretUlkesi(kayit, grupModu.model.aliciAdresi) : dosyaTicaretUlkesi(kayit, dosya.alici_adresi);
+    setMetin((m) => m.replace(/^Ticaret Yapilan Ulke: .*$/m, `Ticaret Yapilan Ulke: ${asciiYap(yeni ?? TICARET_ULKESI_BELIRSIZ)}`));
+    setUlkeDuzenle(false);
+    showToast("Ticaret yapılan ülke kaydedildi.", "success");
+    onRefresh();
+  };
+
   const handleFaturaTalimatiAc = async (onaylandi = false) => {
     const g = await grupModeli().catch(() => undefined);
     if (g === undefined) return;
@@ -259,7 +286,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
       setKonu(birlesikKonu(g.model, g.on));
       setMetin(birlesikTalimatMetni(g.model, g.on, {
         gidecegiUlke: asciiYap(gidecegiUlke(g.model.varisLimani) ?? ulkeAyikla(g.model.varisLimani) ?? ""),
-        ticaretUlkesi: asciiYap(ticaretYapilanUlke(g.model.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ),
+        ticaretUlkesi: asciiYap(dosyaTicaretUlkesi(g.model.ticaretUlkesiElle, g.model.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ),
         beyannameSuresi: birlesikBeyannameSuresi(g.model) || undefined,
       }));
       setTo(""); setCc("");
@@ -358,10 +385,25 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
             {/* 05.11.2026: ticaret yapilan ulke + bayrak (PDF ile ayni kaynak: alici adresi) */}
             <p className="flex items-center gap-2 text-xs" style={{ color: TEXT_MUTED }} data-testid="talimat-ticaret-ulkesi">
               Ticaret yapılan ülke:
-              {ticaretYapilanUlke(dosya.alici_adresi)
-                ? <span className="inline-flex items-center gap-1.5 font-semibold text-white"><UlkeBayrak ulke={ticaretYapilanUlke(dosya.alici_adresi)} yukseklik={13} />{ticaretYapilanUlke(dosya.alici_adresi)}</span>
+              {ticaretUlkesi
+                ? <span className="inline-flex items-center gap-1.5 font-semibold text-white"><UlkeBayrak ulke={ticaretUlkesi} yukseklik={13} />{ticaretUlkesi}</span>
                 : <span className="text-amber-300">belirlenemedi (alıcı adresini kontrol edin)</span>}
+              {!ulkeDuzenle && (
+                <button type="button" onClick={() => { setUlkeGirdi(ticaretUlkesi || ""); setUlkeDuzenle(true); }} className="underline hover:text-white" data-testid="ticaret-ulkesi-degistir">Değiştir</button>
+              )}
             </p>
+            {ulkeDuzenle && (
+              <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="ticaret-ulkesi-duzenle">
+                <input list="ticaret-ulkesi-listesi" value={ulkeGirdi} onChange={(e) => setUlkeGirdi(e.target.value)} placeholder="Ülke (ör. SURİNAM)"
+                  className="h-8 px-2 rounded-lg border text-white flex-1 min-w-[160px]" style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+                <datalist id="ticaret-ulkesi-listesi">{ULKE_ADLARI.map((u) => <option key={u} value={u} />)}</datalist>
+                <button type="button" disabled={ulkeKaydediliyor || ulkeGirdi.trim().length < 2} onClick={() => ulkeKaydet(ulkeGirdi)}
+                  className="h-8 px-3 rounded-lg font-semibold text-white disabled:opacity-50" style={{ backgroundColor: ACCENT }}>Kaydet</button>
+                <button type="button" disabled={ulkeKaydediliyor} onClick={() => ulkeKaydet(null)} className="h-8 px-3 rounded-lg border hover:bg-white/[0.04]"
+                  style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} title="Elle girilen ülkeyi sil; alıcı adresinden bulunsun">Adresten bul</button>
+                <button type="button" onClick={() => setUlkeDuzenle(false)} className="h-8 px-2" style={{ color: TEXT_MUTED }}>Vazgeç</button>
+              </div>
+            )}
             {grupModu && (
               <div className="text-xs rounded-lg border px-3 py-2 space-y-1" style={{ borderColor: "rgba(244,160,124,0.45)", backgroundColor: "rgba(244,160,124,0.08)", color: "#FCD9C6" }} data-testid="birlesik-talimat-notu">
                 <p><b className="text-white">Birleşik fatura:</b> {grupModu.model.dosyaSayisi} dosya ({grupModu.model.dosyalar.map((d) => d.dosyaNo).join(", ")}) tek faturada · {grupModu.model.toplam.konteyner} konteyner · {grupModu.model.toplam.mt.toLocaleString("tr-TR", { maximumFractionDigits: 3 })} MTS</p>

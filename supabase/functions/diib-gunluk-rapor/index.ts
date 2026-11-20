@@ -30,7 +30,7 @@ const basliklar = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_R
 const SUPER_ADMIN_EPOSTALARI = ["execution@unex.com.tr", "bbt@unex.com.tr"];
 const EPOSTA_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DOSYA_KOLONLARI = "id,dosya_no,durum,fatura_no,fatura_tarihi,beyanname_no,beyanname_dosya_url,alici_firma,alici_adresi,urun_detaylari,toplam_tutar,para_birimi,diib_no";
+const DOSYA_KOLONLARI = "id,dosya_no,durum,fatura_no,fatura_tarihi,beyanname_no,beyanname_dosya_url,alici_firma,alici_adresi,ticaret_ulkesi,urun_detaylari,toplam_tutar,para_birimi,diib_no";
 
 function adresler(ad: string, varsayilan: string[]): string[] {
   const liste = (Deno.env.get(ad) || "").split(",").map((a) => a.trim().toLowerCase()).filter((a) => EPOSTA_RE.test(a));

@@ -8,7 +8,7 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI } from "@/lib/supabase";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { limanAnahtari } from "@/lib/liman-anahtari";
-import { gidecegiUlke, ticaretYapilanUlke } from "@/lib/ulke-bul";
+import { gidecegiUlke, dosyaTicaretUlkesi } from "@/lib/ulke-bul";
 import { varisLimaniSorunu } from "@/lib/varis-limani-kontrol";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -317,7 +317,7 @@ export default function AnalizPage() {
       const anahtar = analizLimani(d); if (!anahtar) return;
       if (!s[anahtar]) s[anahtar] = { tutar: 0, konteyner: 0, adet: 0, mts: 0, yazimlar: new Set(), teslim: new Set(), ulke: null };
       // Harita: liman listede yoksa ulkenin ana limanina yaklasik konum (05.11.2026)
-      if (!s[anahtar].ulke) s[anahtar].ulke = gidecegiUlke(d.varis_limani) || ticaretYapilanUlke(d.alici_adresi);
+      if (!s[anahtar].ulke) s[anahtar].ulke = gidecegiUlke(d.varis_limani) || dosyaTicaretUlkesi(d.ticaret_ulkesi, d.alici_adresi);
       s[anahtar].tutar += d.toplam_tutar || 0;
       s[anahtar].konteyner += konteynerSayisi(d);
       s[anahtar].adet += 1;

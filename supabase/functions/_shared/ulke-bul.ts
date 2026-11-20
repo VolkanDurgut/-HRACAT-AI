@@ -157,6 +157,14 @@ const ULKELER: string[][] = [
   ["BOLİVYA", "BOLIVIA"],
   ["AMERİKA BİRLEŞİK DEVLETLERİ", "UNITED STATES", "UNITED STATES OF AMERICA", "USA", "U.S.A."],
   ["KANADA", "CANADA"],
+  // 20.11.2026 (IHR-2026-0131: "PARAMARIBO, SURINAME" ulkesi bulunamiyordu)
+  ["SURİNAM", "SURINAME", "SURINAM"],
+  ["GUYANA"],
+  ["TRİNİDAD VE TOBAGO", "TRINIDAD AND TOBAGO", "TRINIDAD & TOBAGO", "TRINIDAD"],
+  ["BARBADOS"],
+  ["BELİZE", "BELIZE"],
+  ["BAHAMALAR", "BAHAMAS"],
+  ["PORTO RİKO", "PUERTO RICO"],
 ];
 
 /** Ulke adi olmadigi halde ulke ima eden liman/sehir adlari (sadece varis limani icin). */
@@ -174,6 +182,9 @@ const LIMAN_ULKE: Record<string, string> = {
   MALABO: "EKVATOR GİNESİ",
   BATA: "EKVATOR GİNESİ",
   "PORT LOUIS": "MAURİTİUS",
+  PARAMARIBO: "SURİNAM",
+  "PORT OF SPAIN": "TRİNİDAD VE TOBAGO",
+  GEORGETOWN: "GUYANA",
 };
 
 type Aday = { ulke: string; desen: string };
@@ -225,6 +236,20 @@ export function gidecegiUlke(varisLimani: string | null | undefined): string | n
     if (s.includes(` ${normalize(liman)} `)) return u;
   }
   return null;
+}
+
+/** Bilinen ulkelerin Turkce adlari (elle secim listesi). */
+export const ULKE_ADLARI: string[] = ULKELER.map((x) => x[0]).sort((a, b) => a.localeCompare(b, "tr"));
+
+/**
+ * 20.11.2026 (kullanici: "ticaret yapilan ulkeyi manuel revize edebilmeliyiz"): dosyada elle girilen ulke
+ * (ihracat_dosyalari.ticaret_ulkesi) varsa o, yoksa alici adresinden bulunan. Elle yazim bilinen bir ulkeye
+ * karsilik geliyorsa Turkce adina cevrilir ("Suriname" -> "SURİNAM"); bilinmiyorsa buyuk harfle aynen kullanilir.
+ */
+export function dosyaTicaretUlkesi(elle: string | null | undefined, aliciAdresi: string | null | undefined): string | null {
+  const e = (elle || "").trim();
+  if (e) return ulkeBul(e) || e.toLocaleUpperCase("tr-TR");
+  return ticaretYapilanUlke(aliciAdresi);
 }
 
 /** Adresten ulke bulunamazsa fatura talimatinda gorunen uyari (tahmin yerine). */

@@ -7,7 +7,7 @@ import autoTable from "jspdf-autotable";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatBirimFiyatKg, formatFobBirimFiyatKg, formatCutoffSaat, formatCutoffTarihUzun, ulkeAyikla } from "@/lib/cutoff-utils";
-import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
+import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { bayrakPng } from "@/lib/bayraklar";
 import { birlesikKonu, type BirlesikFaturaModeli } from "@/lib/birlesik-fatura/model";
 
@@ -115,7 +115,7 @@ function ciz(m: BirlesikFaturaModeli, olcek: number, on: boolean, bayrak: string
     ["Yukleme Limani", m.yuklemeLimani],
     ["Varis Limani", m.varisLimani],
     ["Gidecegi Ulke", gidecegiUlke(m.varisLimani) ?? ulkeAyikla(m.varisLimani)],
-    ["Ticaret Yapilan Ulke", ticaretYapilanUlke(m.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ],
+    ["Ticaret Yapilan Ulke", dosyaTicaretUlkesi(m.ticaretUlkesiElle, m.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ],
     ["Teslim Sekli", m.teslimSekli],
     ["Odeme Sekli", m.odemeSekli],
     ["Gemi Adi", m.gemi],
@@ -232,11 +232,11 @@ export const birlesikPdfAdi = (m: BirlesikFaturaModeli, on = false) =>
   `Fatura_Talimati_Birlesik_${(m.dosyalar[0]?.dosyaNo || "dosya").replace(/[^a-zA-Z0-9_-]/g, "_")}_${m.dosyaSayisi}_dosya${on ? "-ON" : ""}.pdf`;
 
 export async function birlesikTalimatPdfUret(m: BirlesikFaturaModeli, on = false): Promise<{ blob: Blob; ad: string }> {
-  const bayrak = await bayrakPng(ticaretYapilanUlke(m.aliciAdresi));
+  const bayrak = await bayrakPng(dosyaTicaretUlkesi(m.ticaretUlkesiElle, m.aliciAdresi));
   return { blob: birlesikTalimatPdfOlustur(m, on, bayrak).output("blob"), ad: birlesikPdfAdi(m, on) };
 }
 
 export async function indirBirlesikTalimatPdf(m: BirlesikFaturaModeli, on = false): Promise<void> {
-  const bayrak = await bayrakPng(ticaretYapilanUlke(m.aliciAdresi));
+  const bayrak = await bayrakPng(dosyaTicaretUlkesi(m.ticaretUlkesiElle, m.aliciAdresi));
   birlesikTalimatPdfOlustur(m, on, bayrak).save(birlesikPdfAdi(m, on));
 }

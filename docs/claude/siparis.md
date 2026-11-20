@@ -622,3 +622,10 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
   gruptaki BÜTÜN dosyalara yazılır (`grupFaturasiYaz`). Aynı PDF birden çok dosyada durduğu için depodan yalnız hiçbir dosya
   kullanmıyorsa silinir (`faturaAdresiKullaniliyor`).
 - Önce tek dosyaya yüklenmiş fatura: o dosyada "Yeniden kontrol" grup kontrolünü yapar ve faturayı bütün dosyalara yayar.
+
+## 4.24 Ticaret yapılan ülke: elle düzeltme + Surinam (20.11.2026)
+- `ihracat_dosyalari.ticaret_ulkesi` (migration 20261120120000): elle girilen ülke; boşsa alıcı adresinden (`dosyaTicaretUlkesi`).
+  Fatura talimatı penceresinde "Değiştir" (liste + serbest yazım, "Adresten bul" = elle değeri sil); birleşikte gruptaki bütün
+  dosyalara yazılır. Talimat metni, PDF, bayrak, fatura onayı, DİİB ve Kontrol Merkezi bu kuralı kullanır.
+- Ülke listesine Surinam, Guyana, Trinidad ve Tobago, Barbados, Belize, Bahamalar, Porto Riko eklendi (Paramaribo / Port of Spain /
+  Georgetown limanları da).

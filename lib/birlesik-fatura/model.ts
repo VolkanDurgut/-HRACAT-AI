@@ -33,6 +33,8 @@ export type BirlesikFaturaModeli = {
   aliciFirma: string;
   saticiFirma: string;
   aliciAdresi: string | null;
+  /** 20.11.2026: gruptaki dosyalarda elle girilen ticaret yapilan ulke (ilk dolu olan) */
+  ticaretUlkesiElle: string | null;
   varisLimani: string;
   yuklemeLimani: string;
   teslimSekli: string;
@@ -196,6 +198,7 @@ export function birlesikFaturaModeli(uyelerHam: GrupUyesi[], bolunmeliDosyalar: 
     aliciFirma: enKisa(uyeler.map((u) => u.dosya.alici_firma)),
     saticiFirma: birlesik(uyeler.map((u) => u.dosya.satici_firma)),
     aliciAdresi: uyeler.map((u) => metin(u.dosya.alici_adresi)).find(Boolean) || null,
+    ticaretUlkesiElle: uyeler.map((u) => metin(u.dosya.ticaret_ulkesi)).find(Boolean) || null,
     varisLimani,
     yuklemeLimani: birlesik(uyeler.map((u) => ilkRez(u)?.yuklenme_limani || u.dosya.yuklenme_limani)),
     teslimSekli,

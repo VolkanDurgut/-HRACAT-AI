@@ -4,7 +4,7 @@ import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
-import { gidecegiUlke, ticaretYapilanUlke, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
+import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
 import { bayrakPng } from "@/lib/bayraklar";
 import { faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
@@ -170,7 +170,7 @@ function ciz(
     // proformadaki BUYER'in ulkesi (ticaret yapilan) farkli olabilir
     // (0091: alici Ispanya, mal Kuba'ya). Bkz. lib/ulke-bul.ts
     ["Gidecegi Ulke", gidecegiUlke(dosya.varis_limani) ?? ulkeAyikla(dosya.varis_limani)],
-    ["Ticaret Yapilan Ulke", ticaretYapilanUlke(dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ],
+    ["Ticaret Yapilan Ulke", dosyaTicaretUlkesi(dosya.ticaret_ulkesi, dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ],
     ["Teslim Sekli", dosya.teslim_sekli],
     ["Odeme Sekli", dosya.gumruk_odeme_sekli],
     ["Gemi Adi", rez?.gemi_adi],
@@ -426,6 +426,6 @@ export function faturaTalimatiPdfOlustur(dosya: Dosya, rezervasyonlar: Rezervasy
  * cevrilemezse PDF bayraksiz uretilir.
  */
 export async function indirFaturaTalimatiPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], on = false, bolunme: TalimatParcaGirdisi[] = []): Promise<void> {
-  const bayrak = await bayrakPng(ticaretYapilanUlke(dosya.alici_adresi));
+  const bayrak = await bayrakPng(dosyaTicaretUlkesi(dosya.ticaret_ulkesi, dosya.alici_adresi));
   faturaTalimatiPdfOlustur(dosya, rezervasyonlar, konteynerler, on, bolunme, bayrak).save(`Fatura_Talimati_${guvenliDosyaAdi(dosya.dosya_no)}${on ? "-ON" : ""}.pdf`);
 }

@@ -18,7 +18,7 @@
  *     bolunme gerekip gerekmedigi buradan gorulur).
  */
 import { kalemMiktari, sayiOku } from "./sayi-oku.ts";
-import { ticaretYapilanUlke } from "./ulke-bul.ts";
+import { dosyaTicaretUlkesi } from "./ulke-bul.ts";
 
 export const DIIB_ORAN = 0.97 * 0.74; // 0,7178
 
@@ -63,6 +63,7 @@ export type DiibDosyasi = {
   alici_firma: string | null;
   /** Proformadaki alici adresi: "ticaret yapilan ulke" (bayrak) buradan bulunur (05.11.2026). */
   alici_adresi?: string | null;
+  ticaret_ulkesi?: string | null;
   urun_detaylari: unknown;
   toplam_tutar: number | string | null;
   para_birimi: string | null;
@@ -224,7 +225,7 @@ export type DiibSonucu = {
 /** Tablodaki kayitlar + sistemdeki dosyalar -> ekrandaki DIIB satirlari. */
 export function diibSatirlari(belgeler: DiibBelgesi[], kayitlar: DiibKaydi[], dosyalar: DiibDosyasi[], bolunmeler: DiibBolunmesi[]): DiibSonucu {
   const dosyaNo = new Map(dosyalar.map((d) => [d.id, d.dosya_no]));
-  const dosyaUlke = new Map(dosyalar.map((d) => [d.id, ticaretYapilanUlke(d.alici_adresi)]));
+  const dosyaUlke = new Map(dosyalar.map((d) => [d.id, dosyaTicaretUlkesi(d.ticaret_ulkesi, d.alici_adresi)]));
   const satirlar: DiibSatiri[] = kayitlar.map((k) => kayitSatiri(k, k.dosya_id ? dosyaNo.get(k.dosya_id) ?? null : null, k.dosya_id ? dosyaUlke.get(k.dosya_id) ?? null : null));
   const kayitliFatura = new Set(kayitlar.map((k) => faturaNorm(k.fatura_no)).filter(Boolean));
   const kayitliDosyaDiib = new Set(kayitlar.filter((k) => k.dosya_id).map((k) => `${k.dosya_id}|${k.diib_id}`));

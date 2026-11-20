@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { diibAlanMetni, diibOzetleri, diibSatirlari, guncelDiib, siraliBekleyenler, yuklenenHesapla, type BekleyenSira, type DiibBelgesi, type DiibBolunmesi, type DiibDosyasi, type DiibKaydi } from "@/lib/diib/hesap";
 import type { TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
 
-export const DIIB_DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, beyanname_dosya_url, fatura_dosya_url, alici_firma, alici_adresi, urun_detaylari, toplam_tutar, para_birimi, diib_no";
+export const DIIB_DOSYA_KOLONLARI = "id, dosya_no, durum, fatura_no, fatura_tarihi, beyanname_no, beyanname_dosya_url, fatura_dosya_url, alici_firma, alici_adresi, ticaret_ulkesi, urun_detaylari, toplam_tutar, para_birimi, diib_no";
 
 export type DiibVerisi = { belgeler: DiibBelgesi[]; kayitlar: DiibKaydi[]; dosyalar: DiibDosyasi[]; bolunmeler: DiibBolunmesi[] };
 

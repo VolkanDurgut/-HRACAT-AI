@@ -25,7 +25,7 @@ import {
 import { diibExcelOlustur } from "@/lib/diib/excel-yaz";
 import { beyannameNoOku } from "@/lib/beyanname-oku";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
-import { ticaretYapilanUlke } from "@/lib/ulke-bul";
+import { dosyaTicaretUlkesi } from "@/lib/ulke-bul";
 import { DIIB_DOSYA_KOLONLARI, bekleyenSiraGetir, yuklenenEkle, yuklenenKgleri } from "@/lib/diib/veri";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
@@ -478,7 +478,7 @@ function BekleyenYuklemeler({ sonuc, ozetler, bolunmeler }: { sonuc: ReturnType<
               <tr key={dosya.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="bekleyen-satir">
                 <td className="px-3 py-2.5 text-sm tabular-nums" style={{ color: TEXT_MUTED }}>{i + 1}</td>
                 <td className="px-3 py-2.5 text-sm whitespace-nowrap"><Link href={`/dosya/${dosya.id}?tab=evraklar`} className="font-mono text-white hover:underline inline-flex items-center gap-1">{dosya.dosya_no} <ExternalLink size={11} style={{ color: TEXT_MUTED }} /></Link></td>
-                <td className="px-3 py-2.5 text-sm max-w-[260px] hidden md:table-cell" style={{ color: TEXT_MUTED }} title={dosya.alici_firma || ""}><span className="flex items-center gap-1.5 min-w-0"><UlkeBayrak ulke={ticaretYapilanUlke(dosya.alici_adresi)} /><span className="truncate">{dosya.alici_firma}</span></span></td>
+                <td className="px-3 py-2.5 text-sm max-w-[260px] hidden md:table-cell" style={{ color: TEXT_MUTED }} title={dosya.alici_firma || ""}><span className="flex items-center gap-1.5 min-w-0"><UlkeBayrak ulke={dosyaTicaretUlkesi(dosya.ticaret_ulkesi, dosya.alici_adresi)} /><span className="truncate">{dosya.alici_firma}</span></span></td>
                 <td className="px-3 py-2.5 text-xs whitespace-nowrap hidden lg:table-cell" style={{ color: TEXT_MUTED }}>{s ? `${tarihYaz(s.talimatCutoff)} · ${tarihYaz(s.etd)}` : "-"}</td>
                 <td className="px-3 py-2.5 text-sm text-right tabular-nums text-white whitespace-nowrap">
                   {kgYaz(kg)}

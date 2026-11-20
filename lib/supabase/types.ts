@@ -71,6 +71,8 @@ export type Dosya = {
   fatura_kontrol_sonucu: Record<string, unknown> | null;
   consignee: string | null;
   alici_adresi: string | null;
+  /** 20.11.2026: elle girilen ticaret yapilan ulke (bos = alici adresinden bulunur). */
+  ticaret_ulkesi?: string | null;
   detayli_ambalaj: string | null;
   hesap_adi: string | null;
   banka: string | null;

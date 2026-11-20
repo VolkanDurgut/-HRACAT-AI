@@ -611,7 +611,7 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 
 ## 4.22 Rapor saatleri sadeleştirildi (19.11.2026, kullanıcı: "gün içinde çok rapor gidiyor")
 - Günlük ihracat raporu ve iç piyasa raporu: YALNIZ 17:00 (sabah / öğle cron işleri `active=false`, silinmedi).
-- Sipariş raporu: YALNIZ cumartesi 08:00 (`siparis-rapor-sabah` = `0 5 * * 6`, akşam işi kapalı).
-- DİİB raporu: cumartesi 08:00, fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 07:55–09:00; cron
+- Sipariş raporu: YALNIZ cumartesi 09:00 (20.11.2026; `siparis-rapor-sabah` = `0 6 * * 6`, akşam işi kapalı; sabah penceresi 08:55–10:00).
+- DİİB raporu: cumartesi 09:00 (20.11.2026), fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 08:55–10:00; cron
   değişikliği (migration 20261119170000) yeni edge deploy edildikten SONRA uygulanır.
 - Navlun raporu değişmedi (her gün 17:00).

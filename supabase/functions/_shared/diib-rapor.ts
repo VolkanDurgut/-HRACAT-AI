@@ -66,8 +66,8 @@ export function diibGunlukRaporHesapla(v: DiibRaporVerisi, sira: Record<string, 
 const LACIVERT = "#283474";
 const MARKA_TURUNCU = "#F4A07C";
 export const DIIB_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
-/** 19.11.2026: haftalik (cumartesi 08:00 TR); fatura bolumu son 7 gunu kapsar. */
-export const DIIB_RAPOR_SAATI = "her cumartesi 08:00";
+/** 19.11.2026: haftalik (cumartesi 09:00 TR); fatura bolumu son 7 gunu kapsar. */
+export const DIIB_RAPOR_SAATI = "her cumartesi 09:00";
 export const DIIB_RAPOR_GUN = 7;
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const sayi = (x: number, en = 0) => x.toLocaleString("tr-TR", { maximumFractionDigits: en });

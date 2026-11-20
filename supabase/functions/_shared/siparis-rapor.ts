@@ -16,8 +16,8 @@ import { oturumAdi } from "./rapor-oturum.ts";
 import { RAPOR_LACIVERT, esc, raporKabugu } from "./rapor-kabugu.ts";
 
 export const SIPARIS_RAPOR_UYGULAMA_URL = "https://ihracatasistanim.com";
-/** 19.11.2026 (kullanici): siparis raporu yalniz her cumartesi 08:00 (pg_cron 0 5 * * 6; aksam isi kapali). */
-export const SIPARIS_RAPOR_SAATI = "her cumartesi 08:00";
+/** 19.11.2026 (kullanici): siparis raporu yalniz her cumartesi 09:00 (pg_cron 0 6 * * 6; aksam isi kapali). */
+export const SIPARIS_RAPOR_SAATI = "her cumartesi 09:00";
 /** Plan bolumunde gosterilecek ileri gun sayisi (ETD bugun .. bugun+14) */
 const PLAN_GUN = 14;
 

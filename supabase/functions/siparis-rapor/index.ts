@@ -11,7 +11,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // ============================================================================
 // SIPARIS RAPORU MAILI (siparis-rapor) - 11.11.2026
 // ============================================================================
-// pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). 19.11.2026 (kullanici): yalniz CUMARTESI 08:00 (sabah isi 0 5 * * 6, aksam isi kapali). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
+// pg_cron 'siparis-rapor-sabah' 05:00 UTC = 08:00 TR ve 'siparis-rapor-aksam' 14:00 UTC = 17:00 TR, her gun (11.11.2026). 19.11.2026 (kullanici): yalniz CUMARTESI 09:00 (20.11.2026; sabah isi 0 6 * * 6, aksam isi kapali). Hesap + HTML: _shared/siparis-rapor.ts (Siparisler sayfasiyla
 // ayni veri: siparis_listesi_veri + yukleme_plani_veri, service_role, yalniz okuma). Ek: sayfadaki "Excel indir" ile AYNI
 // dosya (_shared/siparis-xlsx.ts). Musteriye GITMEZ.
 // ALICILAR: Ayarlar > Rapor Alicilari (rapor_alicilari, rapor = 'siparis'); satir yoksa secret'lar
@@ -20,7 +20,7 @@ import { raporAyari } from "../_shared/rapor-alici.ts";
 // MAIL (18.11.2026): ust = on odemesi alinmis / rezervasyonu alinmamis siparisler; alt = bu siparislerin limanlari icin en yeni
 //   navlun fiyatlari (navlun tablosu _shared/navlun-veri.ts ile okunur; okunamazsa rapor yine gider, alt bolumde not). Tum satirlar ekteki Excel'de.
 // CAGRI YETKISI (diib-gunluk-rapor ile ayni ilke):
-//  - Anon (pg_cron): yalniz 07:55-09:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
+//  - Anon (pg_cron): yalniz 08:55-10:00 / 16:55-18:00 TR penceresinde; sirket + gun + oturum icin bir kez
 //    (siparis_rapor_gonderimleri kismi benzersiz index). Yanitta veri yok. Anon {"test": true}: YALNIZ test modunda (alici sabit test
 //    adresi), 24 saatte en fazla 3; zamanlanmis raporu engellemez.
 //  - Yetkili kullanici (admin / super admin), yalniz KENDI sirketi: {"deneme": true} -> mail GITMEZ,

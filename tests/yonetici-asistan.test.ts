@@ -41,7 +41,7 @@ test("gorevler: odeme tek gunluk gorev, draft dosya basina; acik olanlar once", 
   assert.equal(g[1].anahtar, "draft:d1:2026-11-20T10:01:00Z");
   assert.equal(g[1].alici, OPERASYON_EPOSTASI);
   assert.equal(g[1].baglanti, "/dosya/d1?tab=evraklar");
-  assert.deepEqual(gorevSayilari(g), { acik: 2, gonderildi: 0, draft: 1, odeme: 1 });
+  assert.deepEqual(gorevSayilari(g), { acik: 2, gonderildi: 0, draft: 1, odeme: 1, evrak: 1 });
 });
 
 test("Gonderdim isareti: gorev 'gonderildi' olur ve sona gider; yeni draft yeni anahtar", () => {
@@ -113,4 +113,36 @@ test("zaman ve kapanan ayrintisi bicimi", async () => {
   assert.equal(kapananAyrintisi({ ayrinti: "telex" }), "Telex");
   assert.equal(kapananAyrintisi({ ayrinti: "imzali" }), "İmzalı proforma");
   assert.equal(kapananAyrintisi({ ayrinti: null }), "");
+});
+
+test("fatura ve beyanname gorevleri: muhasebe / gumruk musaviri, kendi revize metni", () => {
+  const v = asistanVerisiNormalize({
+    ...ham,
+    evrak: [
+      { tur: "fatura", dosya_id: "d5", dosya_no: "IHR-2026-0905", alici_firma: "ORNEK TRADING LTD", belge_no: "ORN2026000001", yukleme: "2026-11-20T13:09:19Z",
+        kontrol_tarihi: null, alanlar: [{ alan: "Aracı banka", sistem: "ORNEK BANK A", belge: "ORNEK BANK B", not: "Aracı banka proformadaki bankadan farklı." }] },
+      { tur: "beyanname", dosya_id: "d6", dosya_no: "IHR-2026-0906", alici_firma: "KURGU FOODS", belge_no: "26ORN0001", yukleme: "2026-11-20T12:00:00Z",
+        kontrol_tarihi: "2026-11-20T12:01:00Z", alanlar: [{ alan: "Net ağırlık (toplam)", sistem: "125.000 kg", belge: "120.000 kg", not: null }] },
+      { tur: "bozuk", dosya_id: "d7", alanlar: [] },
+    ],
+  });
+  assert.equal(v.evrak.length, 2);
+  const g = gorevleriKur(v);
+  const f = g.find((x) => x.tur === "fatura")!;
+  assert.equal(f.anahtar, "fatura:d5:2026-11-20T13:09:19Z");
+  assert.equal(f.sorumlu, "Muhasebe (Harun Bey)");
+  assert.equal(f.konu, "Fatura düzeltme · IHR-2026-0905 · ORNEK TRADING LTD");
+  assert.match(f.metin, /^Harun Bey merhaba,/);
+  assert.match(f.metin, /• Aracı banka — Sistem: ORNEK BANK A \/ Fatura: ORNEK BANK B\n {2}Aracı banka proformadaki bankadan farklı\./);
+  const b = g.find((x) => x.tur === "beyanname")!;
+  assert.equal(b.sorumlu, "Gümrük müşaviri");
+  assert.equal(b.konu, "Gümrük beyannamesi düzeltme · IHR-2026-0906 · KURGU FOODS");
+  assert.match(b.metin, /• Net ağırlık \(toplam\) — Sistem: 125\.000 kg \/ Beyanname: 120\.000 kg/);
+  assert.equal(b.baglanti, "/dosya/d6?tab=evraklar");
+  assert.equal(gorevSayilari(g).evrak, 3);
+  // Gonderdim isareti fatura turunde de calisir
+  const isaretli = gorevleriKur(asistanVerisiNormalize({ ...ham, evrak: [{ tur: "fatura", dosya_id: "d5", yukleme: "2026-11-20T13:09:19Z", alanlar: [{ alan: "X" }] }],
+    isaretler: [{ anahtar: "fatura:d5:2026-11-20T13:09:19Z", tur: "fatura", isleyen: "x", zaman: "2026-11-21T07:00:00Z" }] }));
+  assert.equal(isaretli.find((x) => x.tur === "fatura")?.durum, "gonderildi");
+  assert.equal(isaretli.find((x) => x.tur === "fatura")?.isaret?.tur, "fatura");
 });

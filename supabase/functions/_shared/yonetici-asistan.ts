@@ -11,18 +11,29 @@
  *    yuklenip yine uyusmazsa yeni gorev acilir.
  *  - odeme: gemisi kalkmis ve odemesi girilmemis sevkiyatlar + on odemesi beklenen siparisler, TEK gorev, GUNLUK anahtar
  *    (her gunun basinda yeniden istenebilir).
+ *  - fatura / beyanname (21.11.2026, kullanici: "ayni sekilde fatura, draft BL ve beyanname icin de revize metinleri"):
+ *    acik dosyada uyusmayan fatura / beyanname kontrolu. Beyanname: birlesik fatura grubundaki dosyalar ve okunamayan /
+ *    birbirini iceren alanlar veritabaninda elenir (asistan_kontrol_alanlari; migration 20261121010000).
+ * Kontroller evrak sisteme YUKLENINCE yapilir (mail okunmaz); gorev listesi her acilista bu sonuclardan hesaplanir.
  * Sistemin gonderdigi ozet mailinde booking / B/L no YOK (CLAUDE.md); kopyalanan hazir metinde dosya icin gerekli.
  */
 
 export const YONETICI_EPOSTASI = "execution@unex.com.tr";
 export const OPERASYON_EPOSTASI = "operation@unex.com.tr";
 export const ODEME_SORUMLUSU = "Harun Bey";
+export const FATURA_SORUMLUSU = "Muhasebe (Harun Bey)";
+export const BEYANNAME_SORUMLUSU = "Gümrük müşaviri";
 
 export type DraftAlani = { alan: string; sistem: string | null; belge: string | null; not: string | null };
 export type DraftKaynagi = {
   dosya_id: string; dosya_no: string | null; alici_firma: string | null; varis_limani: string | null; bl_no: string | null;
   yukleme: string | null; kontrol_tarihi: string | null; ozet: string | null; revize_istendi: boolean;
   gemi: string | null; acente: string | null; alanlar: DraftAlani[];
+};
+export type EvrakTuru = "fatura" | "beyanname";
+export type EvrakKaynagi = {
+  tur: EvrakTuru; dosya_id: string; dosya_no: string | null; alici_firma: string | null; varis_limani: string | null;
+  belge_no: string | null; yukleme: string | null; kontrol_tarihi: string | null; ozet: string | null; gemi: string | null; alanlar: DraftAlani[];
 };
 export type OdemeKaynagi = {
   rezervasyon_id: string; dosya_id: string; dosya_no: string | null; alici_firma: string | null; proforma_no: string | null;
@@ -33,13 +44,14 @@ export type OnOdemeKaynagi = {
   anahtar: string; kaynak: string | null; proforma_no: string | null; proforma_tarihi: string | null; firma: string | null;
   miktar_mt: number | null; konteyner: number | null; tutar: number | null; para_birimi: string | null; liman: string | null; gun: number | null;
 };
-export type Kapanan = { tur: "odeme" | "on_odeme" | "draft_bl"; baslik: string | null; ayrinti: string | null; zaman: string | null };
-export type Isaret = { anahtar: string; tur: "draft_bl" | "odeme"; ozet: string | null; isleyen: string; zaman: string };
+export type Kapanan = { tur: "odeme" | "on_odeme" | "draft_bl" | "fatura" | "beyanname"; baslik: string | null; ayrinti: string | null; zaman: string | null };
+export type Isaret = { anahtar: string; tur: GorevTuru; ozet: string | null; isleyen: string; zaman: string };
 export type AsistanVerisi = {
-  tarih: string; draft: DraftKaynagi[]; odeme: OdemeKaynagi[]; on_odeme: OnOdemeKaynagi[]; kapananlar: Kapanan[]; isaretler: Isaret[];
+  tarih: string; draft: DraftKaynagi[]; evrak: EvrakKaynagi[]; odeme: OdemeKaynagi[]; on_odeme: OnOdemeKaynagi[]; kapananlar: Kapanan[]; isaretler: Isaret[];
 };
 
-export type GorevTuru = "draft_bl" | "odeme";
+export type GorevTuru = "draft_bl" | "odeme" | "fatura" | "beyanname";
+export const GOREV_TURLERI: readonly GorevTuru[] = ["draft_bl", "fatura", "beyanname", "odeme"];
 export type Gorev = {
   anahtar: string;
   tur: GorevTuru;
@@ -75,6 +87,12 @@ export function asistanVerisiNormalize(ham: unknown): AsistanVerisi {
       revize_istendi: d.revize_istendi === true, gemi: yazi(d.gemi), acente: yazi(d.acente),
       alanlar: dizi<Record<string, unknown>>(d.alanlar).map((a) => ({ alan: String(a.alan || "-"), sistem: yazi(a.sistem), belge: yazi(a.belge), not: yazi(a.not) })),
     })).filter((d) => d.dosya_id),
+    evrak: dizi<Record<string, unknown>>(h.evrak).map((e) => ({
+      tur: (e.tur === "beyanname" || e.tur === "fatura" ? e.tur : "") as EvrakTuru, dosya_id: String(e.dosya_id || ""), dosya_no: yazi(e.dosya_no),
+      alici_firma: yazi(e.alici_firma), varis_limani: yazi(e.varis_limani), belge_no: yazi(e.belge_no), yukleme: yazi(e.yukleme),
+      kontrol_tarihi: yazi(e.kontrol_tarihi), ozet: yazi(e.ozet), gemi: yazi(e.gemi),
+      alanlar: dizi<Record<string, unknown>>(e.alanlar).map((a) => ({ alan: String(a.alan || "-"), sistem: yazi(a.sistem), belge: yazi(a.belge), not: yazi(a.not) })),
+    })).filter((e) => e.dosya_id && (e.tur === "fatura" || e.tur === "beyanname")),
     odeme: dizi<Record<string, unknown>>(h.odeme).map((o) => ({
       rezervasyon_id: String(o.rezervasyon_id || ""), dosya_id: String(o.dosya_id || ""), dosya_no: yazi(o.dosya_no), alici_firma: yazi(o.alici_firma),
       proforma_no: yazi(o.proforma_no), varis_limani: yazi(o.varis_limani), gemi: yazi(o.gemi), etd: yazi(o.etd), gun: sayi(o.gun),
@@ -86,10 +104,10 @@ export function asistanVerisiNormalize(ham: unknown): AsistanVerisi {
       liman: yazi(s.liman), gun: sayi(s.gun),
     })).filter((s) => s.anahtar),
     kapananlar: dizi<Record<string, unknown>>(h.kapananlar).map((k) => ({
-      tur: (k.tur === "on_odeme" || k.tur === "draft_bl" ? k.tur : "odeme") as Kapanan["tur"], baslik: yazi(k.baslik), ayrinti: yazi(k.ayrinti), zaman: yazi(k.zaman),
+      tur: (["on_odeme", "draft_bl", "fatura", "beyanname"].includes(String(k.tur)) ? k.tur : "odeme") as Kapanan["tur"], baslik: yazi(k.baslik), ayrinti: yazi(k.ayrinti), zaman: yazi(k.zaman),
     })),
     isaretler: dizi<Record<string, unknown>>(h.isaretler).map((i) => ({
-      anahtar: String(i.anahtar || ""), tur: (i.tur === "odeme" ? "odeme" : "draft_bl") as GorevTuru, ozet: yazi(i.ozet), isleyen: String(i.isleyen || ""), zaman: String(i.zaman || ""),
+      anahtar: String(i.anahtar || ""), tur: ((GOREV_TURLERI as readonly string[]).includes(String(i.tur)) ? i.tur : "draft_bl") as GorevTuru, ozet: yazi(i.ozet), isleyen: String(i.isleyen || ""), zaman: String(i.zaman || ""),
     })).filter((i) => i.anahtar),
   };
 }
@@ -127,16 +145,36 @@ export function kapananAyrintisi(k: Pick<Kapanan, "ayrinti">): string {
 
 export const draftAnahtari = (d: Pick<DraftKaynagi, "dosya_id" | "kontrol_tarihi" | "yukleme">) => `draft:${d.dosya_id}:${d.kontrol_tarihi || d.yukleme || "-"}`;
 export const odemeAnahtari = (tarih: string) => `odeme:${tarih}`;
+export const evrakAnahtari = (e: Pick<EvrakKaynagi, "tur" | "dosya_id" | "kontrol_tarihi" | "yukleme">) => `${e.tur}:${e.dosya_id}:${e.kontrol_tarihi || e.yukleme || "-"}`;
+
+const alanSatirlari = (alanlar: DraftAlani[], belgeAdi: string, ozet: string | null) => (alanlar.length
+  ? alanlar.map((a) => {
+    const deger = [a.sistem ? `Sistem: ${a.sistem}` : "", a.belge ? `${belgeAdi}: ${a.belge}` : ""].filter(Boolean).join(" / ");
+    return `• ${a.alan}${deger ? ` — ${deger}` : ""}${a.not ? `\n  ${a.not}` : ""}`;
+  }).join("\n")
+  : `• ${ozet || "Kontrol uyuşmazlık buldu"}`);
+
+export const EVRAK_ADI: Record<EvrakTuru, string> = { fatura: "Fatura", beyanname: "Gümrük beyannamesi" };
+
+/** Fatura -> muhasebe, beyanname -> gumruk musaviri: duzeltilmis belge rica metni. */
+export function evrakMaili(e: EvrakKaynagi): { konu: string; metin: string } {
+  const firma = e.alici_firma || "-";
+  const ad = EVRAK_ADI[e.tur];
+  const konu = `${ad} düzeltme · ${e.dosya_no || "-"} · ${firma}`;
+  const kimlik = [e.dosya_no, firma, e.belge_no ? `${e.tur === "fatura" ? "Fatura" : "Beyanname"} no ${e.belge_no}` : "", e.gemi || "", e.varis_limani || ""].filter(Boolean).join(" · ");
+  const hitap = e.tur === "fatura" ? `${ODEME_SORUMLUSU} merhaba,` : "Merhaba,";
+  const rica = e.tur === "fatura"
+    ? "Faturayı bu bilgilere göre düzeltip yeniden gönderebilir misiniz? Düzeltilmiş fatura sisteme yüklendiğinde kontrol yeniden yapılacak."
+    : "Beyannameyi bu bilgilere göre düzeltebilir misiniz? Düzeltilmiş beyanname sisteme yüklendiğinde kontrol yeniden yapılacak.";
+  const metin = [hitap, "", kimlik, `${ad} sistemdeki bilgilerle karşılaştırıldı; aşağıdaki alanlar tutmuyor:`, "",
+    alanSatirlari(e.alanlar, e.tur === "fatura" ? "Fatura" : "Beyanname", e.ozet), "", rica, "", "Teşekkürler."].join("\n");
+  return { konu, metin };
+}
 
 export function draftMaili(d: DraftKaynagi): { konu: string; metin: string } {
   const firma = d.alici_firma || "-";
   const konu = `Draft B/L düzeltme · ${d.dosya_no || "-"} · ${firma}`;
-  const satirlar = d.alanlar.length
-    ? d.alanlar.map((a) => {
-      const deger = [a.sistem ? `Sistem: ${a.sistem}` : "", a.belge ? `Draft: ${a.belge}` : ""].filter(Boolean).join(" / ");
-      return `• ${a.alan}${deger ? ` — ${deger}` : ""}${a.not ? `\n  ${a.not}` : ""}`;
-    }).join("\n")
-    : `• ${d.ozet || "Kontrol uyuşmazlık buldu"}`;
+  const satirlar = alanSatirlari(d.alanlar, "Draft", d.ozet);
   const kimlik = [d.dosya_no, firma, d.bl_no ? `B/L ${d.bl_no}` : "", d.gemi || "", d.varis_limani || ""].filter(Boolean).join(" · ");
   const metin = [
     "Merhaba,",
@@ -200,15 +238,29 @@ export function gorevleriKur(v: AsistanVerisi): Gorev[] {
       ozetSatiri: `${d.dosya_no || "-"} · ${d.alici_firma || "-"}: ${alanlar} tutmuyor`, adet: d.alanlar.length || 1,
     });
   }
+  for (const e of v.evrak) {
+    const anahtar = evrakAnahtari(e);
+    const m = evrakMaili(e);
+    const isaret = isaretler.get(anahtar) || null;
+    const alanlar = e.alanlar.map((a) => a.alan).join(", ") || e.ozet || "uyuşmazlık";
+    const sorumlu = e.tur === "fatura" ? FATURA_SORUMLUSU : BEYANNAME_SORUMLUSU;
+    liste.push({
+      anahtar, tur: e.tur, baslik: `${EVRAK_ADI[e.tur]} uyuşmazlığı · ${e.dosya_no || "-"}`, alt: `${e.alici_firma || "-"} · ${alanlar}`,
+      kaynak: `${EVRAK_ADI[e.tur]} kontrolü · ${trTarih(e.kontrol_tarihi || e.yukleme)}`, sorumlu, alici: "",
+      konu: m.konu, metin: m.metin, baglanti: `/dosya/${e.dosya_id}?tab=evraklar`, durum: isaret ? "gonderildi" : "acik", isaret,
+      ozetSatiri: `${e.dosya_no || "-"} · ${e.alici_firma || "-"}: ${alanlar} tutmuyor`, adet: e.alanlar.length || 1,
+    });
+  }
   return liste.sort((a, b) => Number(a.durum === "gonderildi") - Number(b.durum === "gonderildi"));
 }
 
-export function gorevSayilari(g: Gorev[]): { acik: number; gonderildi: number; draft: number; odeme: number } {
+export function gorevSayilari(g: Gorev[]): { acik: number; gonderildi: number; draft: number; odeme: number; evrak: number } {
   return {
     acik: g.filter((x) => x.durum === "acik").length,
     gonderildi: g.filter((x) => x.durum === "gonderildi").length,
     draft: g.filter((x) => x.tur === "draft_bl").length,
     odeme: g.filter((x) => x.tur === "odeme").length,
+    evrak: g.filter((x) => x.tur === "draft_bl" || x.tur === "fatura" || x.tur === "beyanname").length,
   };
 }
 
@@ -249,9 +301,9 @@ export function ozetMailiHtml(g: Gorev[], v: AsistanVerisi, site: string, secene
   </tr></table>
   ${testSeridi}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>
-    ${kutu("Açık görev", acik.length, acik.length ? "#B45309" : YESIL)}${kutu("Draft B/L uyuşmazlığı", v.draft.length, v.draft.length ? "#B91C1C" : YESIL)}${kutu("Ödemesi girilmemiş", v.odeme.length, LACIVERT)}${kutu("Ön ödeme bekleyen", v.on_odeme.length, LACIVERT)}
+    ${kutu("Açık görev", acik.length, acik.length ? "#B45309" : YESIL)}${kutu("Evrak uyuşmazlığı", v.draft.length + v.evrak.length, v.draft.length + v.evrak.length ? "#B91C1C" : YESIL)}${kutu("Ödemesi girilmemiş", v.odeme.length, LACIVERT)}${kutu("Ön ödeme bekleyen", v.on_odeme.length, LACIVERT)}
   </tr></table>
-  ${acik.length ? `${bolum(`Bugün isteyin (${acik.length})`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${acik.map((x) => satir(x, x.tur === "draft_bl" ? "#B91C1C" : "#B45309", "")).join("")}</table>`
+  ${acik.length ? `${bolum(`Bugün isteyin (${acik.length})`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${acik.map((x) => satir(x, x.tur === "odeme" ? "#B45309" : "#B91C1C", "")).join("")}</table>`
     : `<p style="margin:18px 0 0;font-size:14px;color:#047857">Bugün istemeniz gereken bir şey yok.</p>`}
   ${bekleyen.length ? `${bolum(`Gönderildi, cevap bekleniyor (${bekleyen.length})`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${bekleyen.map((x) => satir(x, "#94A3B8", `<span style="font-size:11px;color:#94A3B8;margin-right:8px">${kacis(x.isaret ? `${trTarih(x.isaret.zaman)} gönderildi` : "")}</span>`)).join("")}</table>` : ""}
   <div style="margin-top:20px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Hazır mail metinleri panelde: kopyalayıp kendi adresinizden gönderin, sonra “Gönderdim” deyin.<br>Görevler kaynak düzelince kendiliğinden kapanır. Bu özet yalnız size gider · UNEX-AI</div>

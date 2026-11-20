@@ -34,6 +34,10 @@ import {
 import { asistanVerisiOku, gorevIsaretiniGeriAl, gorevIsaretle, ozetMailiCagir } from "@/lib/asistan/veri";
 
 const SEFTALI = "#F4A07C";
+/** Gorev turune gore ust etiket ve kaynak tablo basligi */
+const TUR_ETIKETI: Record<Gorev["tur"], string> = { draft_bl: "Draft B/L", fatura: "Fatura", beyanname: "Gümrük beyannamesi", odeme: "Ödeme takibi" };
+const BELGE_SUTUNU: Record<Gorev["tur"], string> = { draft_bl: "Draft", fatura: "Fatura", beyanname: "Beyanname", odeme: "" };
+const KAPANAN_ETIKETI: Record<string, string> = { draft_bl: "Draft B/L", fatura: "Fatura", beyanname: "Beyanname", on_odeme: "Ön ödeme", odeme: "Ödeme" };
 const KIRMIZI = "#F87171";
 const AMBER = "#FBBF24";
 const saatTR = (zaman: string | null | undefined) => {
@@ -178,7 +182,8 @@ export default function YoneticiAsistaniPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <OzetKarti testId="asistan-kart-acik" ikon={<Inbox size={14} />} etiket="Bugün isteyin" deger={sayi.acik}
             alt={sayi.gonderildi ? `${sayi.gonderildi} görev gönderildi, bekleniyor` : "Gönderildi bekleyen yok"} onClick={() => setFiltre("acik")} />
-          <OzetKarti testId="asistan-kart-draft" ikon={<FileWarning size={14} />} etiket="Draft B/L uyuşmazlığı" deger={veri?.draft.length ?? 0} alt="Açık dosyalar · onaylanmamış draft" />
+          <OzetKarti testId="asistan-kart-draft" ikon={<FileWarning size={14} />} etiket="Evrak uyuşmazlığı" deger={(veri?.draft.length ?? 0) + (veri?.evrak.length ?? 0)}
+            alt={veri ? `Draft B/L ${veri.draft.length} · Fatura ${veri.evrak.filter((e) => e.tur === "fatura").length} · Beyanname ${veri.evrak.filter((e) => e.tur === "beyanname").length}` : "Açık dosyalar"} />
           <OzetKarti testId="asistan-kart-odeme" ikon={<Banknote size={14} />} etiket="Ödemesi girilmemiş sevkiyat" deger={veri?.odeme.length ?? 0} alt="Gemisi kalkmış · telex / seawaybill / vesaik yok" />
           <OzetKarti testId="asistan-kart-onodeme" ikon={<Banknote size={14} />} etiket="Ön ödeme bekleyen sipariş" deger={veri?.on_odeme.length ?? 0} alt="Sipariş Listesi › Onay bekleyen" />
         </div>
@@ -193,17 +198,17 @@ export default function YoneticiAsistaniPage() {
               <div className="px-5 py-10 text-center">
                 <CheckCircle2 size={28} className="mx-auto mb-2" style={{ color: ACCENT }} />
                 <p className="text-sm text-white">{filtre === "acik" ? "Bugün istemeniz gereken bir şey yok." : "Bu bölümde görev yok."}</p>
-                <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>Draft uyuşmazlığı ya da bekleyen ödeme çıkınca burada görünür.</p>
+                <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>Draft B/L, fatura ya da beyanname uyuşmazlığı ve bekleyen ödeme çıkınca burada görünür.</p>
               </div>
             ) : gorunen.map((g) => {
               const s = g.anahtar === secili;
-              const renk = g.durum === "gonderildi" ? TEXT_MUTED : g.tur === "draft_bl" ? KIRMIZI : AMBER;
+              const renk = g.durum === "gonderildi" ? TEXT_MUTED : g.tur === "odeme" ? AMBER : KIRMIZI;
               return (
                 <button key={g.anahtar} type="button" onClick={() => sec(g.anahtar)} data-gorev={g.anahtar} aria-current={s ? "true" : undefined}
                   className="w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors hover:bg-white/[0.03]"
                   style={{ borderColor: CARD_BORDER, backgroundColor: s ? "rgba(16,185,129,0.08)" : undefined, boxShadow: `inset 3px 0 0 ${s ? ACCENT : renk}` }}>
                   <div className="flex items-start gap-2">
-                    <span className="mt-0.5 shrink-0" style={{ color: renk }}>{g.tur === "draft_bl" ? <FileWarning size={15} /> : <Banknote size={15} />}</span>
+                    <span className="mt-0.5 shrink-0" style={{ color: renk }}>{g.tur === "odeme" ? <Banknote size={15} /> : <FileWarning size={15} />}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-semibold text-white truncate">{g.baslik}</span>
                       <span className="block text-xs mt-0.5 line-clamp-2" style={{ color: TEXT_MUTED }}>{g.alt}</span>
@@ -211,7 +216,7 @@ export default function YoneticiAsistaniPage() {
                         <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#C9D1DC" }}>Kime: {g.sorumlu}</span>
                         {g.durum === "gonderildi"
                           ? <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: "rgba(16,185,129,0.14)", color: "#6EE7B7" }}>Gönderildi · {saatTR(g.isaret?.zaman)}</span>
-                          : <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: g.tur === "draft_bl" ? "rgba(248,113,113,0.14)" : "rgba(245,158,11,0.14)", color: g.tur === "draft_bl" ? "#FCA5A5" : "#FCD34D" }}>Bugün isteyin</span>}
+                          : <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: g.tur === "odeme" ? "rgba(245,158,11,0.14)" : "rgba(248,113,113,0.14)", color: g.tur === "odeme" ? "#FCD34D" : "#FCA5A5" }}>Bugün isteyin</span>}
                       </span>
                     </span>
                   </div>
@@ -228,24 +233,26 @@ export default function YoneticiAsistaniPage() {
               <div className="p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold tracking-[0.14em] uppercase" style={{ color: gorev.tur === "draft_bl" ? KIRMIZI : AMBER }}>{gorev.tur === "draft_bl" ? "Draft B/L" : "Ödeme takibi"}</p>
+                    <p className="text-[11px] font-semibold tracking-[0.14em] uppercase" style={{ color: gorev.tur === "odeme" ? AMBER : KIRMIZI }}>{TUR_ETIKETI[gorev.tur]}</p>
                     <h2 className="text-lg font-semibold text-white leading-snug mt-0.5">{gorev.baslik}</h2>
                     <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>Kaynak: {gorev.kaynak} · Kime: {gorev.sorumlu}</p>
                   </div>
                   <Link href={gorev.baglanti} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs hover:bg-white/[0.05]" style={{ borderColor: CARD_BORDER, color: "#E5E7EB" }}>
-                    <ExternalLink size={13} /> {gorev.tur === "draft_bl" ? "Dosyayı aç" : "ETD/ETA ödeme takibi"}
+                    <ExternalLink size={13} /> {gorev.tur === "odeme" ? "ETD/ETA ödeme takibi" : "Dosyayı aç"}
                   </Link>
                 </div>
 
                 {/* Kaynak ayrintisi */}
-                {gorev.tur === "draft_bl" && veri && (() => {
-                  const d = veri.draft.find((x) => gorev.anahtar.startsWith(`draft:${x.dosya_id}:`));
+                {gorev.tur !== "odeme" && veri && (() => {
+                  const d = gorev.tur === "draft_bl"
+                    ? veri.draft.find((x) => gorev.anahtar.startsWith(`draft:${x.dosya_id}:`))
+                    : veri.evrak.find((x) => gorev.anahtar.startsWith(`${x.tur}:${x.dosya_id}:`));
                   if (!d) return null;
                   return (
                     <div className="mt-4 rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }} data-testid="asistan-draft-alanlar">
                       <table className="w-full text-[13px]">
                         <thead><tr style={{ backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }} className="text-[11px] uppercase tracking-wide">
-                          <th className="text-left px-3 py-2 font-medium">Alan</th><th className="text-left px-3 py-2 font-medium">Sistem</th><th className="text-left px-3 py-2 font-medium">Draft</th>
+                          <th className="text-left px-3 py-2 font-medium">Alan</th><th className="text-left px-3 py-2 font-medium">Sistem</th><th className="text-left px-3 py-2 font-medium">{BELGE_SUTUNU[gorev.tur]}</th>
                         </tr></thead>
                         <tbody>{(d.alanlar.length ? d.alanlar : [{ alan: d.ozet || "Uyuşmazlık", sistem: null, belge: null, not: null }]).map((a, i) => (
                           <tr key={i} className="border-t align-top" style={{ borderColor: CARD_BORDER }}>
@@ -363,7 +370,7 @@ export default function YoneticiAsistaniPage() {
                 {veri.kapananlar.map((k, i) => (
                   <li key={i} className="flex items-center gap-3 px-4 py-2 border-t text-[13px]" style={{ borderColor: CARD_BORDER }}>
                     <span className="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: "#6EE7B7" }}>
-                      {k.tur === "draft_bl" ? "Draft B/L" : k.tur === "on_odeme" ? "Ön ödeme" : "Ödeme"}
+                      {KAPANAN_ETIKETI[k.tur] || "Ödeme"}
                     </span>
                     <span className="truncate flex-1 text-white">{k.baslik || "-"}</span>
                     <span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{kapananAyrintisi(k)}</span>

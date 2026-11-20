@@ -52,8 +52,8 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   Proforma ve konşimento talimatı PDF'indeki Creator "İhracat AI" teknik işarettir (`sistemUretimiMi`), değiştirme.
 - Yönetici Asistanı (21.11.2026, `/asistan`): YALNIZ yönetici (execution@; `YONETICI_EPOSTASI` + `yonetici_asistani_mi()`).
   Görevler kaynaktan hesaplanır (`yonetici_asistan_veri`), tabloda yalnız "Gönderdim" işareti. Hazır mail sistemden
-  GİTMEZ (yönetici kopyalayıp kendisi gönderir). Sabah özeti (edge `asistan-ozet`) yalnız yöneticiye; canlı anahtarı
-  `ASISTAN_OZET_CANLI=evet` kullanıcı onayı olmadan açılmaz. Kurallar: `_shared/yonetici-asistan.ts`.
+  GİTMEZ (yönetici kopyalayıp kendisi gönderir). Sabah özet maili 21.11.2026'da KALDIRILDI (kullanıcı: "Mail gelmesine
+  gerek yok, takibi sistemden yapacağım"); geri eklenmez. Kurallar: `_shared/yonetici-asistan.ts`.
 - Sipariş Listesi SİSTEM ESAS (21.11.2026, kullanıcı kararı): Excel satırı yalnız sistemde hiç karşılığı yoksa durum
   belirler. Dosya, Excel'de aynı proforma no'lu satır var diye gizlenmez; dosyaları miktarı karşılayan bağsız aktif Excel
   satırı gösterilmez (silinmez). Karşılıksız aktif Excel satırları: `siparis_eslesmeyenler()` (Sipariş Listesi şeridi).

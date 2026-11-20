@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  asistanVerisiNormalize, draftAnahtari, gorevleriKur, gorevSayilari, odemeAnahtari, ozetKonusu, ozetMailiHtml, trTarih,
+  asistanVerisiNormalize, draftAnahtari, gorevleriKur, gorevSayilari, odemeAnahtari, trTarih,
   OPERASYON_EPOSTASI, type AsistanVerisi,
 } from "../supabase/functions/_shared/yonetici-asistan.ts";
 import { asistanFiltresi, yoneticiMi } from "../lib/asistan/gorunum.ts";
@@ -77,20 +77,6 @@ test("yalniz odeme ya da yalniz draft; hic yoksa gorev yok", () => {
   assert.equal(gorevleriKur(asistanVerisiNormalize({ ...ham, odeme: [], on_odeme: [] })).length, 1);
   assert.equal(gorevleriKur(asistanVerisiNormalize({ ...ham, draft: [] })).length, 1);
   assert.equal(gorevleriKur(asistanVerisiNormalize({ tarih: "2026-11-21" })).length, 0);
-});
-
-test("sabah ozeti: konu, panel baglantilari, B/L no yazilmaz, kacis", () => {
-  const v = asistanVerisiNormalize({ ...ham, draft: [{ ...ham.draft[0], alici_firma: "A&B <Ltd>" }] });
-  const g = gorevleriKur(v);
-  assert.equal(ozetKonusu(g, v.tarih), "Bugün istemeniz gerekenler · 2 görev · 21.11.2026");
-  const html = ozetMailiHtml(g, v, "https://ornek.test");
-  assert.ok(html.includes("https://ornek.test/asistan?gorev=odeme%3A2026-11-21"));
-  assert.ok(html.includes(`https://ornek.test/asistan?gorev=${encodeURIComponent("draft:d1:2026-11-20T10:01:00Z")}`));
-  assert.ok(!html.includes("ORNKBL1234"), "B/L no ozet mailinde olmamali");
-  assert.ok(html.includes("A&amp;B &lt;Ltd&gt;") && !html.includes("<Ltd>"));
-  assert.ok(!ozetMailiHtml(g, v, "https://ornek.test").includes("TEST"));
-  assert.ok(ozetMailiHtml(g, v, "https://ornek.test", { test: true, gercekAlici: "yonetici@ornek.com" }).includes("yonetici@ornek.com"));
-  assert.ok(ozetMailiHtml([], asistanVerisiNormalize({ tarih: "2026-11-21" }), "https://ornek.test").includes("istemeniz gereken bir şey yok"));
 });
 
 test("yonetici kontrolu ve filtre", () => {

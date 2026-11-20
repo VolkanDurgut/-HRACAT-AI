@@ -1,6 +1,6 @@
 /**
- * YONETICI ASISTANI - saf kurallar (21.11.2026, Faz 2). Sayfa (app/asistan) ve sabah ozet maili (edge asistan-ozet)
- * AYNI kurallari kullanir. Veri: yonetici_asistani() / yonetici_asistan_veri() RPC (migration 20261121000000).
+ * YONETICI ASISTANI - saf kurallar (21.11.2026, Faz 2). Sayfa (app/asistan) bu kurallari kullanir
+ * (21.11.2026: sabah ozet maili kaldirildi - kullanici takibi sistemden yapiyor). Veri: yonetici_asistani() / yonetici_asistan_veri() RPC (migration 20261121000000).
  *
  * Kullanici: "Her gun Harun Bey'den ya da Burak Bey'den on odeme bilgisi rica etmek zorunda kaldigim durumlar gibi
  * dusun; sistem sadece benim mailime gonderecek. Draft B/L'de uyusmazlik varsa operasyondaki ilgili kisiye
@@ -15,7 +15,6 @@
  *    acik dosyada uyusmayan fatura / beyanname kontrolu. Beyanname: birlesik fatura grubundaki dosyalar ve okunamayan /
  *    birbirini iceren alanlar veritabaninda elenir (asistan_kontrol_alanlari; migration 20261121010000).
  * Kontroller evrak sisteme YUKLENINCE yapilir (mail okunmaz); gorev listesi her acilista bu sonuclardan hesaplanir.
- * Sistemin gonderdigi ozet mailinde booking / B/L no YOK (CLAUDE.md); kopyalanan hazir metinde dosya icin gerekli.
  */
 
 export const YONETICI_EPOSTASI = "execution@unex.com.tr";
@@ -262,51 +261,4 @@ export function gorevSayilari(g: Gorev[]): { acik: number; gonderildi: number; d
     odeme: g.filter((x) => x.tur === "odeme").length,
     evrak: g.filter((x) => x.tur === "draft_bl" || x.tur === "fatura" || x.tur === "beyanname").length,
   };
-}
-
-// ---------------------------------------------------------------- sabah ozet maili
-const kacis = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const LACIVERT = "#283474";
-const SEFTALI = "#F4A07C";
-const YESIL = "#10B981";
-
-export function ozetKonusu(g: Gorev[], tarih: string): string {
-  const acik = g.filter((x) => x.durum === "acik").length;
-  return `Bugün istemeniz gerekenler · ${acik} görev · ${trTarih(tarih)}`;
-}
-
-/** Yalniz yoneticiye; her satirda panele giden baglanti. Booking / B/L no yazilmaz. */
-export function ozetMailiHtml(g: Gorev[], v: AsistanVerisi, site: string, secenek: { test?: boolean; gercekAlici?: string } = {}): string {
-  const acik = g.filter((x) => x.durum === "acik");
-  const bekleyen = g.filter((x) => x.durum === "gonderildi");
-  const adres = (x: Gorev) => `${site}/asistan?gorev=${encodeURIComponent(x.anahtar)}`;
-  const satir = (x: Gorev, renk: string, sag: string) => `<tr><td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;border-left:3px solid ${renk}">
-    <div style="font-size:13px;font-weight:bold;color:#1E293B">${kacis(x.baslik)}</div>
-    <div style="font-size:12px;color:#475569;margin-top:2px">${kacis(x.alt)}</div>
-    <div style="font-size:11px;color:#94A3B8;margin-top:2px">Kime: ${kacis(x.sorumlu)} · Kaynak: ${kacis(x.kaynak)}</div></td>
-    <td style="padding:10px 12px;border-bottom:1px solid #E2E8F0;text-align:right;white-space:nowrap;vertical-align:middle">${sag}<a href="${kacis(adres(x))}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:12px;font-weight:bold;padding:7px 14px;border-radius:5px">Aç</a></td></tr>`;
-  const bolum = (t: string) => `<div style="margin:22px 0 8px;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:${LACIVERT};border-left:4px solid ${SEFTALI};padding-left:8px">${kacis(t)}</div>`;
-  const kutu = (etiket: string, deger: number, renk: string) => `<td style="width:25%;padding:0 4px"><div style="border:1px solid #E2E8F0;border-radius:6px;padding:10px 12px"><div style="font-size:11px;color:#64748B">${kacis(etiket)}</div><div style="font-size:22px;font-weight:bold;color:${renk}">${deger}</div></div></td>`;
-  const testSeridi = secenek.test
-    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Yalnız test adresine gönderildi. Canlıda alıcı: <b>${kacis(secenek.gercekAlici || YONETICI_EPOSTASI)}</b></div>` : "";
-  return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:20px 0"><tr><td align="center">
-<table role="presentation" width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#fff;border-radius:6px;padding:24px">
-<tr><td>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:4px solid ${LACIVERT};padding-bottom:10px"><tr>
-    <td style="width:56px;vertical-align:middle"><img src="${site}/images/logo.png" width="48" height="48" alt="Unex" style="display:block;width:48px;height:48px;border:0"></td>
-    <td style="vertical-align:middle"><div style="font-size:18px;font-weight:bold;color:${LACIVERT}">UNEX-AI</div><div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#64748B;text-transform:uppercase">Yönetici Asistanı · Bugün istemeniz gerekenler</div></td>
-    <td style="text-align:right;vertical-align:middle"><div style="font-size:14px;font-weight:bold;color:${LACIVERT}">${kacis(trTarih(v.tarih))}</div></td>
-  </tr></table>
-  ${testSeridi}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px"><tr>
-    ${kutu("Açık görev", acik.length, acik.length ? "#B45309" : YESIL)}${kutu("Evrak uyuşmazlığı", v.draft.length + v.evrak.length, v.draft.length + v.evrak.length ? "#B91C1C" : YESIL)}${kutu("Ödemesi girilmemiş", v.odeme.length, LACIVERT)}${kutu("Ön ödeme bekleyen", v.on_odeme.length, LACIVERT)}
-  </tr></table>
-  ${acik.length ? `${bolum(`Bugün isteyin (${acik.length})`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${acik.map((x) => satir(x, x.tur === "odeme" ? "#B45309" : "#B91C1C", "")).join("")}</table>`
-    : `<p style="margin:18px 0 0;font-size:14px;color:#047857">Bugün istemeniz gereken bir şey yok.</p>`}
-  ${bekleyen.length ? `${bolum(`Gönderildi, cevap bekleniyor (${bekleyen.length})`)}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${bekleyen.map((x) => satir(x, "#94A3B8", `<span style="font-size:11px;color:#94A3B8;margin-right:8px">${kacis(x.isaret ? `${trTarih(x.isaret.zaman)} gönderildi` : "")}</span>`)).join("")}</table>` : ""}
-  <div style="margin-top:20px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Hazır mail metinleri panelde: kopyalayıp kendi adresinizden gönderin, sonra “Gönderdim” deyin.<br>Görevler kaynak düzelince kendiliğinden kapanır. Bu özet yalnız size gider · UNEX-AI</div>
-</td></tr></table>
-</td></tr></table></body></html>`;
 }

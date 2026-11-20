@@ -1,6 +1,6 @@
 /**
  * Yonetici Asistani - saf kurallar (21.11.2026). Tek yer: supabase/functions/_shared/yonetici-asistan.ts
- * (sayfa ve sabah ozet maili ayni gorev / mail kurallarini kullanir).
+ * (gorev ve hazir mail kurallari).
  */
 import { YONETICI_EPOSTASI } from "@/supabase/functions/_shared/yonetici-asistan";
 

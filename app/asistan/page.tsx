@@ -8,13 +8,13 @@
  * Duzen: ozet kartlari, filtre (Acik / Gonderildi / Tumu, ?filtre=), solda gorev listesi, sagda secili gorev: kaynak
  * ayrintisi + hazir mail (Kime / Konu / Metin; Kopyala) + "Gonderdim" / "Geri al". Altta son 7 gunde kapananlar.
  * Gorev kaynak duzelince kendiliginden kaybolur (veri her acilista kaynaktan hesaplanir). ?gorev=<anahtar> secili gorev.
- * Hicbir mail sistemden gitmez; "Gonderdim" yalniz kayit.
+ * Hicbir mail sistemden gitmez; "Gonderdim" yalniz kayit. 21.11.2026: sabah ozet maili kaldirildi (kullanici: "Mail gelmesine gerek yok, takibi sistemden yapacagim").
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle, Banknote, Check, CheckCircle2, ClipboardCheck, Copy, ExternalLink, Eye, FileWarning, Inbox, Loader2, RefreshCw, RotateCcw, Send, X,
+  AlertTriangle, Banknote, Check, CheckCircle2, ClipboardCheck, Copy, ExternalLink, FileWarning, Inbox, Loader2, RefreshCw, RotateCcw, Send,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -31,9 +31,8 @@ import {
   asistanFiltresi, gorevleriKur, gorevSayilari, kapananAyrintisi, konsimentoYazisi, trTarih, trTutar, yoneticiMi, zamanIso,
   type AsistanFiltre, type AsistanVerisi, type Gorev,
 } from "@/lib/asistan/gorunum";
-import { asistanVerisiOku, gorevIsaretiniGeriAl, gorevIsaretle, ozetMailiCagir } from "@/lib/asistan/veri";
+import { asistanVerisiOku, gorevIsaretiniGeriAl, gorevIsaretle } from "@/lib/asistan/veri";
 
-const SEFTALI = "#F4A07C";
 /** Gorev turune gore ust etiket ve kaynak tablo basligi */
 const TUR_ETIKETI: Record<Gorev["tur"], string> = { draft_bl: "Draft B/L", fatura: "Fatura", beyanname: "Gümrük beyannamesi", odeme: "Ödeme takibi" };
 const BELGE_SUTUNU: Record<Gorev["tur"], string> = { draft_bl: "Draft", fatura: "Fatura", beyanname: "Beyanname", odeme: "" };
@@ -86,7 +85,6 @@ export default function YoneticiAsistaniPage() {
   const [filtre, setFiltre] = useUrlSekmesi<AsistanFiltre>(asistanFiltresi, "acik", "filtre");
   const [mesgul, setMesgul] = useState<string | null>(null);
   const [metinler, setMetinler] = useState<Record<string, string>>({});
-  const [onizleme, setOnizleme] = useState<{ konu: string; html: string } | null>(null);
   const [kapananAcik, setKapananAcik] = useAcikTercihi("asistan-kapananlar");
 
   useEffect(() => { if (!authLoading && !yetkili) router.replace("/panel"); }, [authLoading, yetkili, router]);
@@ -102,7 +100,7 @@ export default function YoneticiAsistaniPage() {
   const sayi = useMemo(() => gorevSayilari(gorevler), [gorevler]);
   const gorunen = useMemo(() => gorevler.filter((g) => filtre === "tumu" || g.durum === filtre), [gorevler, filtre]);
 
-  // Ilk acilista ?gorev= (sabah ozet mailindeki "Ac"); yoksa / gecersizse gorunen listenin ilki
+  // Ilk acilista ?gorev= (dogrudan gorev baglantisi); yoksa / gecersizse gorunen listenin ilki
   useEffect(() => {
     if (!veri) return;
     const istenen = adresParametresi("gorev");
@@ -133,23 +131,6 @@ export default function YoneticiAsistaniPage() {
     catch (e) { showToast(`Geri alınamadı: ${e instanceof Error ? e.message : String(e)}`, "error"); }
     setMesgul(null);
   };
-  const ozetOnizle = async () => {
-    setMesgul("onizle");
-    try {
-      const r = await ozetMailiCagir({ deneme: true });
-      if (r.html) setOnizleme({ konu: r.konu || "", html: r.html }); else showToast("Önizleme alınamadı.", "error");
-    } catch (e) { showToast(`Önizleme alınamadı: ${e instanceof Error ? e.message : String(e)}`, "error"); }
-    setMesgul(null);
-  };
-  const ozetTest = async () => {
-    setMesgul("test");
-    try {
-      const r = await ozetMailiCagir({ test: true });
-      showToast(r.gonderildi ? `Test maili gönderildi: ${(r.alici || []).join(", ")}` : (r.hata || "Test maili gönderilmedi."), r.gonderildi ? "success" : "error");
-    } catch (e) { showToast(`Test maili gönderilemedi: ${e instanceof Error ? e.message : String(e)}`, "error"); }
-    setMesgul(null);
-  };
-
   if (authLoading || (yetkili && yukleniyor)) return <AppShell><SayfaYukleniyor /></AppShell>;
   if (!yetkili) return <AppShell><div /></AppShell>;
 
@@ -166,10 +147,6 @@ export default function YoneticiAsistaniPage() {
           aciklama="Bugün istemeniz gerekenler. Hazır maili kopyalayıp kendi adresinizden gönderin; kaynak düzelince görev kendiliğinden kapanır."
           sag={
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={ozetOnizle} disabled={!!mesgul} data-testid="asistan-ozet-onizle"
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] hover:bg-white/[0.05] disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#E5E7EB" }}>
-                {mesgul === "onizle" ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Sabah özetini önizle
-              </button>
               <button type="button" onClick={() => { setYukleniyor(false); getir(); }} disabled={!!mesgul} data-testid="asistan-yenile"
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-[13px] hover:bg-white/[0.05] disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: "#E5E7EB" }}>
                 <RefreshCw size={14} /> Yenile
@@ -383,24 +360,6 @@ export default function YoneticiAsistaniPage() {
         )}
       </div>
 
-      {onizleme && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(4,7,11,0.7)" }} role="dialog" aria-modal="true" aria-label="Sabah özeti önizleme">
-          <div className="w-full max-w-3xl h-[85vh] rounded-xl border flex flex-col overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-            <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Unex AI · hafta içi her sabah 08:30 · yalnız size</p>
-                <p className="text-sm text-white truncate">{onizleme.konu}</p>
-              </div>
-              <button type="button" onClick={ozetTest} disabled={!!mesgul} data-testid="asistan-ozet-test"
-                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs hover:bg-white/[0.05] disabled:opacity-50" style={{ borderColor: SEFTALI, color: SEFTALI }}>
-                {mesgul === "test" ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test adresine gönder
-              </button>
-              <button type="button" onClick={() => setOnizleme(null)} aria-label="Kapat" className="p-1.5 rounded-lg hover:bg-white/[0.06]" style={{ color: TEXT_MUTED }}><X size={16} /></button>
-            </div>
-            <iframe title="Sabah özeti" srcDoc={onizleme.html} sandbox="" className="flex-1 w-full bg-white" />
-          </div>
-        </div>
-      )}
     </AppShell>
   );
 }

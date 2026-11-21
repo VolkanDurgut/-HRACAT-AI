@@ -8,6 +8,12 @@
  * Beklenen yapi (2023..2026 yil sayfalari): FIRMA ADI | KONTEYNER ADET | VARIS LIMANI | ACENTE |
  * BOOKING NO | B/L(KONSIMENTO) | ETD | ETA | GEMI ADI | YUKLENDI | KONSIMENTO | YUK EVRAKLARI | ...
  * Sutunlar BASLIK METNINDEN bulunur (sira degisse de calisir).
+ *
+ * 21.11.2026 (kullanici: "Excel'de ETA bilgileri belirtilmesine ragmen listeye yansimadi"): aktarim eskiden YALNIZ
+ * KONSIMENTO sutununu yaziyordu; ETA'lar hep elle girilmisti. Artik ETA da eslestirilir (etaDegisecek): Excel'de dolu
+ * ve sistemdekinden farkli ETA onizlemede listelenir, onaylaninca yazilir. Excel'de bos ETA sistemdekini SILMEZ.
+ * Kural (veritabaniyla ayni, odeme_excel_yukleme_kaydet): ETA, ETD'den once ya da ETD'den 180 gunden sonra olamaz;
+ * boyle satirlar "supheli" listesinde gosterilir ve uygulanmaz (or. yil yanlis yazilmis: 27.01.2026 / ETD 18.12.2026).
  */
 
 import { excelKonsimentoDurumu, numaraAnahtari, odemeAlindiMi, type KonsimentoDurumu } from "@/lib/odeme-takibi";
@@ -193,7 +199,48 @@ export type SistemSevkiyati = {
   alici_firma: string | null;
   dosya_no: string;
   konsimento_durumu: string | null;
+  /** 21.11.2026: ETA karsilastirmasi icin (YYYY-MM-DD) */
+  etd?: string | null;
+  eta?: string | null;
 };
+
+export type EtaDegisikligi = {
+  rezervasyon_id: string;
+  dosya_no: string;
+  firma: string;
+  booking: string;
+  eski: string | null; // YYYY-MM-DD
+  yeni: string;        // YYYY-MM-DD
+  etd: string | null;  // kontrol edilen ETD (sistem, yoksa Excel)
+  kaynak: string;
+  sebep?: string;      // supheli ise
+};
+
+export const ETA_EN_FAZLA_GUN = 180;
+
+/** "gg.aa.yyyy" / "gg/aa/yyyy" / "yyyy-aa-gg" -> YYYY-MM-DD (gecersiz -> null) */
+export function tarihIso(v: string | null | undefined): string | null {
+  const t = (v || "").trim();
+  let g: number, a: number, y: number;
+  let m = t.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (m) { g = +m[1]; a = +m[2]; y = +m[3]; }
+  else if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) { y = +m[1]; a = +m[2]; g = +m[3]; }
+  else return null;
+  const d = new Date(Date.UTC(y, a - 1, g));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== a - 1 || d.getUTCDate() !== g || y < 2000 || y > 2100) return null;
+  return `${y}-${String(a).padStart(2, "0")}-${String(g).padStart(2, "0")}`;
+}
+
+const gunFarki = (a: string, b: string) => Math.round((Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000);
+
+/** ETA uygun mu (veritabani kurali): ETD yoksa her tarih; varsa ETD <= ETA <= ETD + 180 gun. Donus: sebep ya da null. */
+export function etaSorunu(eta: string, etd: string | null): string | null {
+  if (!etd) return null;
+  const f = gunFarki(eta, etd);
+  if (f < 0) return "ETA, ETD'den önce";
+  if (f > ETA_EN_FAZLA_GUN) return `ETA, ETD'den ${ETA_EN_FAZLA_GUN} günden fazla sonra`;
+  return null;
+}
 
 export type EslesmeDegisikligi = {
   rezervasyon_id: string;
@@ -213,6 +260,9 @@ export type EslesmeSonucu = {
   taninmayan: ExcelSatiri[];
   sistemdeYok: ExcelSatiri[];
   eslesen: number;
+  /** 21.11.2026 ETA */
+  etaDegisecek: EtaDegisikligi[];
+  etaSupheli: EtaDegisikligi[];
 };
 
 export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiyati[]): EslesmeSonucu {
@@ -236,9 +286,23 @@ export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiy
 
   const degisecek: EslesmeDegisikligi[] = [];
   const taninmayan: ExcelSatiri[] = [];
+  const etaDegisecek: EtaDegisikligi[] = [];
+  const etaSupheli: EtaDegisikligi[] = [];
   let ayni = 0;
   let excelBos = 0;
   for (const { s, e } of Array.from(son.values())) {
+    // ETA (konsimento kararindan bagimsiz): Excel'de dolu ve farkliysa
+    const yeniEta = tarihIso(e.eta);
+    const eskiEta = s.eta ? s.eta.slice(0, 10) : null;
+    if (yeniEta && yeniEta !== eskiEta) {
+      const etd = (s.etd ? s.etd.slice(0, 10) : null) || tarihIso(e.etd);
+      const sebep = etaSorunu(yeniEta, etd);
+      const d: EtaDegisikligi = {
+        rezervasyon_id: s.rezervasyon_id, dosya_no: s.dosya_no, firma: s.alici_firma || e.firma, booking: s.booking_no || e.booking,
+        eski: eskiEta, yeni: yeniEta, etd, kaynak: `${e.sayfa} / satır ${e.satir}`,
+      };
+      if (sebep) etaSupheli.push({ ...d, sebep }); else etaDegisecek.push(d);
+    }
     if (!e.durum) {
       if (e.durumHam) taninmayan.push(e); else excelBos++;
       continue; // Excel'de bos / taninmayan: sistemdeki deger KORUNUR
@@ -257,5 +321,5 @@ export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiy
       odemeDegisimi: once === sonra ? null : sonra ? "alindi" : "bekliyor",
     });
   }
-  return { degisecek, ayni, excelBos, taninmayan, sistemdeYok, eslesen: son.size };
+  return { degisecek, ayni, excelBos, taninmayan, sistemdeYok, eslesen: son.size, etaDegisecek, etaSupheli };
 }

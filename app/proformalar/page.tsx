@@ -7,7 +7,7 @@ import { useToast } from "@/lib/toast-context";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { MetinListesiEditor } from "@/components/metin-listesi-editor";
-import { FileSignature, Plus, Trash2, Loader2, Download, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil } from "lucide-react";
+import { FileSignature, Plus, Trash2, Loader2, Download, AlertCircle, CheckCircle2, ChevronDown, Search, RotateCcw, ExternalLink, Save, FolderOpen, FilePlus2, Pencil, History } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { NavlunLimanReferansi } from "@/components/navlun/liman-referansi";
 import { yazmaHatasi } from "@/lib/supabase";
@@ -43,6 +43,9 @@ import {
   type ProformaTaslak,
 } from "@/lib/proforma/belge";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { SilinenProformalar } from "@/components/proforma/silinen-proformalar";
+import { proformaGeriYukle, silinenProformalarOku } from "@/lib/proforma/veri";
+import type { SilinenProforma } from "@/lib/proforma/silinen";
 
 /**
  * PROFORMALAR - Yeni Proforma (17.10.2026, sadelestirilmis tek ekran).
@@ -57,6 +60,9 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
  * `proformalar` tablosu (taslak = ekranin tamami). "Kaydet" ve "Kaydet ve PDF Indir"
  * (indirilen her proforma kayitli kalir); "Kayitli Proformalar" listesinden acilip ayni
  * kayda duzenlenir; "Yeni proforma" bos form. Sayfa 2'ye ilave satir (ekSatirlar).
+ * 21.11.2026 (kullanici): "Silinen proformalar musteri bazinda kayit altinda olmali, revize edip tekrar aktif hale
+ * getirebilmeli" -> "Silinen Proformalar" paneli (components/proforma/silinen-proformalar.tsx; kaynak denetim kaydi).
+ * "Geri yükle" ayni numarayla geri acar; "Geri yükle ve düzenle" ayrica editorde acar. ?silinen=1 paneli acik getirir.
  */
 const IMZALI = true;
 
@@ -96,6 +102,11 @@ export default function YeniProformaPage() {
   const [kayitlar, setKayitlar] = useState<ProformaKaydi[]>([]);
   const [kayitHatasi, setKayitHatasi] = useState<string | null>(null);
   const [listeAcik, setListeAcik] = useState(false);
+  // 21.11.2026 Silinen proformalar (denetim kaydindan; panel acilinca okunur)
+  const [silinenAcik, setSilinenAcik] = useState(false);
+  const [silinenler, setSilinenler] = useState<SilinenProforma[] | null>(null);
+  const [silinenHata, setSilinenHata] = useState<string | null>(null);
+  const [geriYukleniyor, setGeriYukleniyor] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
   const [aciliyor, setAciliyor] = useState<string | null>(null);
   const [onay, setOnay] = useState<{ tur: "ac"; kayit: ProformaKaydi } | { tur: "yeni" } | { tur: "sil"; kayit: ProformaKaydi } | null>(null);
@@ -253,14 +264,47 @@ export default function YeniProformaPage() {
   };
   const acIste = (k: ProformaKaydi) => (degisti ? setOnay({ tur: "ac", kayit: k }) : kaydiAc(k));
 
+  const silinenleriGetir = useCallback(async () => {
+    setSilinenHata(null);
+    try { setSilinenler(await silinenProformalarOku()); }
+    catch (e) { setSilinenHata(e instanceof Error ? e.message : "Silinen proformalar okunamadı."); }
+  }, []);
+  // ?silinen=1 (Siparis Listesi'nden): panel acik gelir
+  useEffect(() => {
+    if (authLoading || !yetkili) return;
+    try {
+      if (new URLSearchParams(window.location.search).get("silinen") === "1") { setSilinenAcik(true); setListeAcik(false); }
+    } catch { /* adres okunamazsa panel kapali */ }
+  }, [authLoading, yetkili]);
+  useEffect(() => { if (silinenAcik && silinenler === null) silinenleriGetir(); }, [silinenAcik, silinenler, silinenleriGetir]);
+
+  const geriYukle = async (p: SilinenProforma, duzenle: boolean) => {
+    if (duzenle && degisti) { showToast("Formda kaydedilmemiş değişiklik var; önce kaydedin ya da Yeni proforma ile temizleyin.", "error"); return; }
+    setGeriYukleniyor(p.denetim_id);
+    try {
+      const k = await proformaGeriYukle(p.denetim_id);
+      showToast(`${k.proforma_no} geri yüklendi; Sipariş Listesi'nde "Onay bekleyen" olarak görünür.`, "success");
+      setSilinenler((l) => (l ? l.filter((x) => x.denetim_id !== p.denetim_id) : l));
+      kayitlariGetir();
+      if (duzenle) {
+        setSilinenAcik(false);
+        await kaydiAc({ id: k.id, proforma_no: k.proforma_no } as ProformaKaydi);
+      }
+    } catch (e) {
+      showToast(`Geri yüklenemedi: ${e instanceof Error ? e.message : "bilinmeyen hata"}`, "error");
+      silinenleriGetir();
+    } finally { setGeriYukleniyor(null); }
+  };
+
   const sil = async (k: ProformaKaydi) => {
     setSiliniyor(true);
     const { data, error } = await supabase.from("proformalar").delete().eq("id", k.id).eq("company_id", companyId!).select("id");
     setSiliniyor(false);
     const hata = error ? kayitHataMesaji(error, k.proforma_no) : yazmaHatasi(null, data);
     if (hata) { showToast(`Silinemedi: ${hata}`, "error"); return; }
-    showToast(`${k.proforma_no} silindi.`, "success");
+    showToast(`${k.proforma_no} silindi; Silinen Proformalar'dan geri yüklenebilir.`, "success");
     setOnay(null);
+    setSilinenler(null);
     if (kayitId === k.id) { setKayitId(null); setKayitBilgi(null); setDegisti(true); }
     kayitlariGetir();
   };
@@ -347,7 +391,11 @@ export default function YeniProformaPage() {
         }
         sag={
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setListeAcik((a) => !a)} aria-expanded={listeAcik} data-testid="kayitli-ac"
+            <button onClick={() => { setSilinenAcik((a) => !a); setListeAcik(false); }} aria-expanded={silinenAcik} data-testid="silinen-ac"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: silinenAcik ? ACCENT : CARD_BORDER, color: silinenAcik ? "#E6F4EE" : TEXT_MUTED }}>
+              <History size={14} /> Silinen Proformalar{silinenler?.length ? ` (${silinenler.length})` : ""}
+            </button>
+            <button onClick={() => { setListeAcik((a) => !a); setSilinenAcik(false); }} aria-expanded={listeAcik} data-testid="kayitli-ac"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: listeAcik ? ACCENT : CARD_BORDER, color: listeAcik ? "#E6F4EE" : TEXT_MUTED }}>
               <FolderOpen size={14} /> Kayıtlı Proformalar{kayitlar.length ? ` (${kayitlar.length})` : ""}
             </button>
@@ -365,6 +413,10 @@ export default function YeniProformaPage() {
         </div>
       )}
 
+      {silinenAcik && (
+        <SilinenProformalar liste={silinenler} hata={silinenHata} mesgul={geriYukleniyor}
+          onGeriYukle={geriYukle} onYenile={silinenleriGetir} onKapat={() => setSilinenAcik(false)} />
+      )}
       {listeAcik && (
         <KayitliProformalar kayitlar={kayitlar} hata={kayitHatasi} aktifId={kayitId} aciliyor={aciliyor}
           onAc={acIste} onSil={(k) => setOnay({ tur: "sil", kayit: k })} onYenile={kayitlariGetir} onKapat={() => setListeAcik(false)} />
@@ -636,7 +688,7 @@ export default function YeniProformaPage() {
         onOpenChange={(a) => { if (!a && !siliniyor) setOnay(null); }}
         title={onay?.tur === "sil" ? `${onay.kayit.proforma_no} silinsin mi?` : "Kaydedilmemiş değişiklikler var"}
         description={onay?.tur === "sil"
-          ? `${onay.kayit.alici_unvan} için kayıtlı proforma silinir. Daha önce indirilen PDF'ler etkilenmez; silinen kaydın kopyası denetim kaydında kalır.`
+          ? `${onay.kayit.alici_unvan} için kayıtlı proforma silinir. Daha önce indirilen PDF'ler etkilenmez; silinen proforma "Silinen Proformalar" listesinden geri yüklenebilir.`
           : "Formdaki kaydedilmemiş değişiklikler kaybolacak. Devam etmeden önce kaydetmek isterseniz Vazgeç'e basın."}
         confirmLabel={onay?.tur === "sil" ? "Evet, sil" : "Değişiklikleri bırak"}
         cancelLabel="Vazgeç"

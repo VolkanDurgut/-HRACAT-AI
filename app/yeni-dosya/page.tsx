@@ -80,17 +80,29 @@ export default function YeniDosyaPage() {
   // (otomatik dosya acilmaz). Okuma yapay zekasiz (sistemProformasiOku), dosya acma akisi aynen.
   const [kayitliNot, setKayitliNot] = useState<string | null>(null);
   const kayitliIslendi = useRef(false);
+  // 21.11.2026 (kullanici: "on odeme alindi isaretlenince Ana Panel'e sanki proforma yuklenmis gibi acilmali"):
+  // ?otomatik=1 -> hazirlanan imzali PDF icin okuma KENDILIGINDEN baslar ("Baslat" beklenmez). Yalniz is karari olan
+  // tek sevkiyat / kismi sevkiyat (siparis takibi) secimi kullaniciya kalir; dosya acilinca sonuc ekrani gelir.
+  const [otomatikBaslat, setOtomatikBaslat] = useState(false);
+  const [otomatikGeldi, setOtomatikGeldi] = useState(false);
   useEffect(() => {
     if (authLoading || !companyId || kayitliIslendi.current) return;
     const id = (adresParametresi("proforma") || "").trim();
     if (!id) return;
     kayitliIslendi.current = true;
-    adresiGuncelle({ proforma: null }); // bir kez; yenilemede tekrar hazirlanmaz
+    const otomatik = adresParametresi("otomatik") === "1";
+    adresiGuncelle({ proforma: null, otomatik: null }); // bir kez; yenilemede tekrar hazirlanmaz
     kayitliProformaPdf(id, companyId).then((k) => {
       if (!k) { setError("Kayıtlı proforma bulunamadı ya da okunamadı. Proformayı PDF olarak yükleyebilirsiniz."); return; }
       setPdfFile(k.dosya);
       setError(null);
-      setKayitliNot(`${k.proformaNo} kayıtlı proformadan hazırlandı (imzalı PDF). Kontrol edip "Başlat" ile dosyayı açın.`);
+      if (otomatik) {
+        setOtomatikGeldi(true);
+        setOtomatikBaslat(true);
+        setKayitliNot(`${k.proformaNo} kayıtlı proformadan hazırlandı (imzalı PDF); okuma kendiliğinden başlıyor.`);
+      } else {
+        setKayitliNot(`${k.proformaNo} kayıtlı proformadan hazırlandı (imzalı PDF). Kontrol edip "Başlat" ile dosyayı açın.`);
+      }
     }).catch(() => setError("Kayıtlı proforma hazırlanamadı. Proformayı PDF olarak yükleyebilirsiniz."));
   }, [authLoading, companyId]);
 
@@ -239,6 +251,14 @@ export default function YeniDosyaPage() {
       setLoading(false);
     }
   };
+
+  // ?otomatik=1: PDF hazir olunca okuma bir kez kendiliginden baslar
+  useEffect(() => {
+    if (!otomatikBaslat || !pdfFile || step !== "upload" || loading) return;
+    setOtomatikBaslat(false);
+    handleUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otomatikBaslat, pdfFile, step, loading]);
 
   /**
    * Varis limani dogrulamasi (kural: 03.10.2026 - "Varis limani yukleme limani
@@ -509,6 +529,13 @@ export default function YeniDosyaPage() {
           <ProformaAsistanIlerleme dosyaAdi={pdfFile?.name || "proforma.pdf"} asama={asama} />
         )}
 
+        {step === "ana_siparis_check" && proformData && otomatikGeldi && (
+          <div className="flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm mb-4" role="status" data-testid="otomatik-dosya-notu"
+            style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#A7F3D0" }}>
+            <FileUp size={16} className="shrink-0 mt-0.5" />
+            <span>Ön ödemesi alınan proforma okundu. Son adım: bu sipariş <b>tek sevkiyat</b> mı, yoksa <b>kısmi sevkiyatlarla</b> mı gidecek? Seçiminizle dosya Ana Panel&apos;de açılır.</span>
+          </div>
+        )}
         {step === "ana_siparis_check" && proformData && (
           <ProformaOkumaOzeti veri={proformData} toplamMts={getProformaMts(proformData)} uyari={varisLimaniNotu} />
         )}

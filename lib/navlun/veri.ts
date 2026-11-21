@@ -7,6 +7,7 @@ import type { NavlunSatiri } from "@/lib/navlun/ozet";
 import { baglamKur, type AcenteHafizasi, type GerceklesenKanit, type KarsilastirmaBaglami, type LimanKurali } from "@/lib/navlun/karsilastirma";
 import { limanAnahtari } from "@/lib/liman-anahtari";
 import { esleriYukle, type AdEsi } from "@/supabase/functions/_shared/navlun-tablosu";
+import type { NavlunTeklifi } from "@/lib/siparis/plan-bekleyen";
 
 export type OkunamayanMesaj = {
   id: string;
@@ -120,4 +121,26 @@ export async function yenidenOkumaIste(tarih: string): Promise<void> {
 export async function yenidenOkumaIptal(): Promise<void> {
   const { error } = await supabase.rpc("navlun_yeniden_oku_iptal");
   if (error) throw new Error(error.message);
+}
+
+/**
+ * 21.11.2026 Yukleme Plani "Rezervasyon bekleyen siparisler" paneli: son acente teklifleri (varsayilan 120 gun; RLS
+ * "proformalar" / "analiz" / "navlun"). Liman eslesmesi ve acente basina son teklif: lib/siparis/plan-bekleyen.ts.
+ */
+export async function sonNavlunTeklifleriOku(gun = 120): Promise<NavlunTeklifi[]> {
+  const bas = new Date(Date.now() - gun * 86400000).toISOString();
+  const { data, error } = await supabase
+    .from("navlun_teklifleri")
+    .select("tur,liman,liman_anahtar,acente,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih")
+    .in("tur", ["teklif", "karsi_teklif"])
+    .gte("tarih", bas)
+    .order("tarih", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(error.message);
+  return ((data || []) as Record<string, unknown>[]).map((r) => ({
+    tur: String(r.tur || ""), liman: (r.liman as string) || null, liman_anahtar: (r.liman_anahtar as string) || null, acente: (r.acente as string) || null,
+    tutar: r.tutar === null || r.tutar === undefined ? null : Number(r.tutar), para_birimi: (r.para_birimi as string) || null,
+    ekipman: (r.ekipman as string) || null, free_time_gun: r.free_time_gun === null || r.free_time_gun === undefined ? null : Number(r.free_time_gun),
+    transit_gun: r.transit_gun === null || r.transit_gun === undefined ? null : String(r.transit_gun), tarih: String(r.tarih || ""),
+  }));
 }

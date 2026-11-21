@@ -3,7 +3,8 @@
 import { beklenenAvans } from "@/lib/on-odeme";
 import { guncelDiibNoGetir } from "@/lib/diib/veri";
 import { sevkiyatBankasi } from "@/lib/proforma-banka";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
 import { useGecisliYonlendirme } from "@/components/sayfa-gecisi";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
@@ -213,6 +214,22 @@ export default function IhracatlarPage() {
       setDevamEdiyor(null);
     }
   };
+
+  // 21.11.2026 Yukleme Plani "Rezervasyon bekleyen" > "Sevkiyat aç": /ihracatlar?siparis=<proforma>. Devam eden
+  // siparislerden eslesen icin SEVKIYAT SECIMI penceresi bir kez acilir (revize eki "R" yok sayilir).
+  const siparisParametresiIslendi = useRef(false);
+  useEffect(() => {
+    if (siparisParametresiIslendi.current || siparisLoading || !companyId) return;
+    const no = (adresParametresi("siparis") || "").trim();
+    if (!no) return;
+    siparisParametresiIslendi.current = true;
+    adresiGuncelle({ siparis: null });
+    const anahtar = (x: string | null | undefined) => (x || "").replace(/\s/g, "").toUpperCase().replace(/(\d)R\d?$/, "$1");
+    const s = acikSiparisler.find((x) => anahtar(x.proforma_no) === anahtar(no));
+    if (s) handleSipariseDevamEt(s);
+    else showToast(`${no} için devam eden sipariş bulunamadı.`, "error");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siparisLoading, acikSiparisler, companyId]);
 
   const handleDevamOnayla = async (onay: DevamOnayi) => {
     if (!user || !companyId || !devamPenceresi) return;

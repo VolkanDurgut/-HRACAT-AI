@@ -6,6 +6,8 @@
  * Dosya TARAYICIDA okunur (makro calismaz, dosya yuklenmez/saklanmaz). Onizlemede kullanici
  * satir satir secer; "Uygula" -> odeme_konsimento_toplu() (tek islem). Excel'de bos olan
  * hucre sistemdeki degeri SILMEZ.
+ * 21.11.2026: ETA sutunu da okunur (lib/etd-excel.ts etaDegisecek); secilen ETA'lar ayni islemde yazilir.
+ * ETD ile uyumsuz ETA (yil hatasi vb.) "kontrol edin" listesinde gosterilir, uygulanmaz.
  */
 
 import React from "react";
@@ -24,7 +26,12 @@ export type ExcelYuklemeOzeti = {
   sistemdeYok: number;
   odemesiGelen: { firma: string; booking: string }[];
   yeniBekleyen: { firma: string; booking: string }[];
+  /** 21.11.2026 */
+  etaDegisen?: number;
+  etaSupheli?: number;
 };
+
+const trGun = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "—");
 
 function DurumRozeti({ durum }: { durum: string | null }) {
   if (!durum || !konsimentoDurumuMu(durum)) return <span className="text-[11px]" style={{ color: TEXT_MUTED }}>boş</span>;
@@ -42,7 +49,7 @@ export function EtdExcelAktar({
   sistem: SistemSevkiyati[];
   onKapat: () => void;
   /** Durumlar + yukleme kaydi (yeni hatirlatma turu). Hata metni dondurur (null = basarili) */
-  onUygula: (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string) => Promise<string | null>;
+  onUygula: (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string, etalar: { id: string; eta: string }[]) => Promise<string | null>;
 }) {
   const [okunuyor, setOkunuyor] = React.useState(false);
   const [hata, setHata] = React.useState<string | null>(null);
@@ -51,6 +58,7 @@ export function EtdExcelAktar({
   const [uyarilar, setUyarilar] = React.useState<string[]>([]);
   const [sonYilYok, setSonYilYok] = React.useState<ExcelSatiri[]>([]);
   const [secili, setSecili] = React.useState<Set<string>>(new Set());
+  const [seciliEta, setSeciliEta] = React.useState<Set<string>>(new Set());
   const [uygulaniyor, setUygulaniyor] = React.useState(false);
   const input = React.useRef<HTMLInputElement>(null);
 
@@ -73,6 +81,7 @@ export function EtdExcelAktar({
       setUyarilar(okuma.uyarilar);
       setSonuc(e);
       setSecili(new Set(e.degisecek.map((d) => d.rezervasyon_id)));
+      setSeciliEta(new Set(e.etaDegisecek.map((d) => d.rezervasyon_id)));
     } catch (err) {
       setHata(err instanceof Error ? err.message : "Dosya okunamadı.");
     } finally {
@@ -84,6 +93,7 @@ export function EtdExcelAktar({
     if (!sonuc) return;
     const secilen = sonuc.degisecek.filter((d) => secili.has(d.rezervasyon_id));
     const satirlar = secilen.map((d) => ({ id: d.rezervasyon_id, durum: d.yeni }));
+    const etalar = sonuc.etaDegisecek.filter((d) => seciliEta.has(d.rezervasyon_id)).map((d) => ({ id: d.rezervasyon_id, eta: d.yeni }));
     const kisa = (d: (typeof secilen)[number]) => ({ firma: d.firma.slice(0, 120), booking: d.booking.slice(0, 60) });
     const ozet: ExcelYuklemeOzeti = {
       eslesen: sonuc.eslesen,
@@ -95,14 +105,18 @@ export function EtdExcelAktar({
       odemesiGelen: secilen.filter((d) => d.odemeDegisimi === "alindi").map(kisa),
       // Daha once odemesi "alindi" ya da bos olan sevkiyat bu yuklemede bekleyen oldu
       yeniBekleyen: secilen.filter((d) => !odemeAlindiMi(d.yeni) && (d.eski === null || odemeAlindiMi(d.eski))).map(kisa),
+      etaDegisen: etalar.length,
+      etaSupheli: sonuc.etaSupheli.length,
     };
     setUygulaniyor(true); setHata(null);
-    const h = await onUygula(satirlar, ozet, dosyaAdi || "");
+    const h = await onUygula(satirlar, ozet, dosyaAdi || "", etalar);
     setUygulaniyor(false);
     if (h) setHata(h);
   };
 
   const tumu = sonuc ? sonuc.degisecek.length > 0 && secili.size === sonuc.degisecek.length : false;
+  const tumuEta = sonuc ? sonuc.etaDegisecek.length > 0 && seciliEta.size === sonuc.etaDegisecek.length : false;
+  const toplamSecili = secili.size + seciliEta.size;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/60 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="etd-excel-baslik"
@@ -110,8 +124,8 @@ export function EtdExcelAktar({
       <div className="w-full max-w-3xl my-6 rounded-xl border shadow-xl" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: CARD_BORDER }}>
           <div>
-            <p id="etd-excel-baslik" className="text-sm font-semibold text-white flex items-center gap-2"><FileSpreadsheet size={15} style={{ color: ACCENT }} /> Excel&apos;den konşimento / ödeme durumu</p>
-            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Haftalık ETD-ETA dosyasını seçin. Yalnızca &quot;KONŞİMENTO&quot; sütunu okunur; önizlemeyi onaylamadan hiçbir şey değişmez. Onaylanan her yükleme yeni hatırlatma turunu başlatır.</p>
+            <p id="etd-excel-baslik" className="text-sm font-semibold text-white flex items-center gap-2"><FileSpreadsheet size={15} style={{ color: ACCENT }} /> Excel&apos;den ETA ve konşimento / ödeme durumu</p>
+            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>Haftalık ETD-ETA dosyasını seçin. &quot;ETA&quot; ve &quot;KONŞİMENTO&quot; sütunları okunur; önizlemeyi onaylamadan hiçbir şey değişmez. Excel&apos;de boş hücre sistemdeki değeri silmez. Onaylanan her yükleme yeni hatırlatma turunu başlatır.</p>
           </div>
           <button onClick={onKapat} disabled={uygulaniyor} className="hover:text-white disabled:opacity-50" style={{ color: TEXT_MUTED }} aria-label="Kapat"><X size={16} /></button>
         </div>
@@ -141,7 +155,8 @@ export function EtdExcelAktar({
               <div className="flex flex-wrap gap-2 text-[11.5px]">
                 {[
                   ["Eşleşen sevkiyat", sonuc.eslesen],
-                  ["Değişecek", sonuc.degisecek.length],
+                  ["Konşimento değişecek", sonuc.degisecek.length],
+                  ["ETA değişecek", sonuc.etaDegisecek.length],
                   ["Zaten aynı", sonuc.ayni],
                   ["Excel'de boş (korunur)", sonuc.excelBos],
                 ].map(([ad, n]) => (
@@ -158,8 +173,56 @@ export function EtdExcelAktar({
                 </p>
               )}
 
+              {sonuc.etaDegisecek.length > 0 && (
+                <div className="rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }} data-testid="eta-degisecek">
+                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED, backgroundColor: ROW_HEADER_BG }}>ETA (varış) · {sonuc.etaDegisecek.length}</p>
+                  <div className="overflow-x-auto max-h-[35vh]">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0" style={{ backgroundColor: ROW_HEADER_BG }}>
+                        <tr className="border-b" style={{ borderColor: CARD_BORDER }}>
+                          <th className="px-3 py-2 w-8">
+                            <input type="checkbox" aria-label="Tüm ETA'ları seç" checked={tumuEta}
+                              onChange={() => setSeciliEta(tumuEta ? new Set() : new Set(sonuc.etaDegisecek.map((d) => d.rezervasyon_id)))} className="accent-emerald-500" />
+                          </th>
+                          {["Firma", "Dosya", "Booking", "ETD", "Sistemde", "", "Excel"].map((b, i) => (
+                            <th key={i} className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>{b}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sonuc.etaDegisecek.map((d) => (
+                          <tr key={d.rezervasyon_id} className="border-b last:border-0" style={{ borderColor: CARD_BORDER }} data-eta-satiri={d.booking}>
+                            <td className="px-3 py-1.5">
+                              <input type="checkbox" aria-label={`${d.booking} ETA seç`} checked={seciliEta.has(d.rezervasyon_id)} className="accent-emerald-500"
+                                onChange={() => setSeciliEta((s) => { const n = new Set(s); if (n.has(d.rezervasyon_id)) n.delete(d.rezervasyon_id); else n.add(d.rezervasyon_id); return n; })} />
+                            </td>
+                            <td className="px-2 py-1.5 text-white max-w-[180px] truncate" title={d.firma}>{d.firma}</td>
+                            <td className="px-2 py-1.5 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{d.dosya_no}</td>
+                            <td className="px-2 py-1.5 font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }} title={d.kaynak}>{d.booking}</td>
+                            <td className="px-2 py-1.5 whitespace-nowrap tabular-nums" style={{ color: TEXT_MUTED }}>{trGun(d.etd)}</td>
+                            <td className="px-2 py-1.5 whitespace-nowrap tabular-nums" style={{ color: d.eski ? "#C9D1DC" : TEXT_MUTED }}>{d.eski ? trGun(d.eski) : "boş"}</td>
+                            <td className="px-1 py-1.5" style={{ color: TEXT_MUTED }}><ArrowRight size={12} /></td>
+                            <td className="px-2 py-1.5 whitespace-nowrap tabular-nums text-emerald-300 font-medium">{trGun(d.yeni)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {sonuc.etaSupheli.length > 0 && (
+                <div className="rounded-lg border px-3 py-2.5 text-[11.5px]" style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.06)" }} data-testid="eta-supheli">
+                  <p className="text-amber-300 font-medium mb-1 flex items-center gap-1.5"><AlertTriangle size={12} /> Excel&apos;de kontrol edilmesi gereken ETA ({sonuc.etaSupheli.length}) — uygulanmaz</p>
+                  <ul className="space-y-0.5" style={{ color: "#E2C76B" }}>
+                    {sonuc.etaSupheli.map((d) => (
+                      <li key={d.rezervasyon_id}>{d.firma} · {d.booking}: ETA {trGun(d.yeni)}, ETD {trGun(d.etd)} — {d.sebep}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {sonuc.degisecek.length === 0 ? (
-                <p className="text-sm text-white">Sistem Excel ile güncel; değişecek satır yok. Yüklemeyi kaydederek yeni hatırlatma turunu başlatabilirsiniz.</p>
+                <p className="text-sm text-white">Konşimento durumları Excel ile güncel.{sonuc.etaDegisecek.length ? "" : " Yüklemeyi kaydederek yeni hatırlatma turunu başlatabilirsiniz."}</p>
               ) : (
                 <div className="rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
                   <div className="overflow-x-auto max-h-[45vh]">
@@ -220,7 +283,9 @@ export function EtdExcelAktar({
               <button type="button" onClick={uygula} disabled={uygulaniyor} data-testid="excel-uygula"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ACCENT }}>
                 {uygulaniyor && <Loader2 size={13} className="animate-spin" />}
-                {secili.size > 0 ? `${secili.size} sevkiyatı güncelle ve yüklemeyi kaydet` : "Yüklemeyi kaydet (değişiklik yok)"}
+                {toplamSecili > 0
+                  ? `${[secili.size ? `${secili.size} konşimento` : "", seciliEta.size ? `${seciliEta.size} ETA` : ""].filter(Boolean).join(" + ")} güncelle ve yüklemeyi kaydet`
+                  : "Yüklemeyi kaydet (değişiklik yok)"}
               </button>
             )}
           </div>

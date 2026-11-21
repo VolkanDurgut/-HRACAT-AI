@@ -5,6 +5,9 @@
  * siparis_listesi_aktar (hepsi "proformalar" yetkisi).
  */
 import { dagitimOku, type OnOdemeDagitimi } from "@/lib/on-odeme";
+import { odemeAlindiMi } from "@/lib/odeme-takibi";
+import type { BakiyeBilgisi } from "@/lib/siparis/odeme";
+import type { BekleyenDurum } from "@/lib/siparis/plan-bekleyen";
 import { supabase } from "@/lib/supabase";
 import { planNormalize, siparisNormalize, type PlanSatiri, type SiparisSatiri } from "@/lib/siparis/liste";
 import { aktarimSatiri, type PlanExcelSatiri, type PlanMevcut } from "@/lib/siparis/plan-excel";
@@ -74,7 +77,7 @@ export async function planAktar(dosyaAdi: string, satirlar: PlanExcelSatiri[]): 
 
 /** Siparis listesi Excel aktarimi onizlemesi icin siparis_defteri kayitlari (RLS: "proformalar" veya "analiz"). */
 export async function siparisKayitlariOku(): Promise<SiparisMevcut[]> {
-  const sutunlar = "id,sira,proforma_no,proforma_tarihi,firma,urun,birim_fiyat,miktar_mt,tutar,konteyner,liman,bl_no,marka,paketleme,durum";
+  const sutunlar = "id,sira,proforma_no,proforma_tarihi,firma,urun,birim_fiyat,miktar_mt,tutar,konteyner,liman,bl_no,marka,paketleme,durum,bakiye_odendi,bakiye_tutar";
   const sonuc: SiparisMevcut[] = [];
   for (let bas = 0; ; bas += 1000) {
     const { data, error } = await supabase.from("siparis_defteri").select(sutunlar).order("sira", { nullsFirst: false }).range(bas, bas + 999);
@@ -82,6 +85,7 @@ export async function siparisKayitlariOku(): Promise<SiparisMevcut[]> {
     const say = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
     sonuc.push(...((data || []) as Record<string, unknown>[]).map((r) => ({
       ...(r as unknown as SiparisMevcut), birim_fiyat: say(r.birim_fiyat), miktar_mt: say(r.miktar_mt), tutar: say(r.tutar), konteyner: say(r.konteyner), sira: say(r.sira),
+      bakiye_tutar: say(r.bakiye_tutar),
     })));
     if (!data || data.length < 1000) break;
   }
@@ -101,6 +105,35 @@ export async function siparisSistemBilgisiOku(): Promise<SiparisSistemBilgisi> {
     if (r.anahtar?.startsWith("excel:") && r.dosya_no) dosyalar.set(r.anahtar.slice(6), { dosya_no: r.dosya_no, booking: r.booking_no });
   }
   return { proformalar: ((p.data || []) as { proforma_no: string | null }[]).map((x) => x.proforma_no || "").filter(Boolean), dosyalar };
+}
+
+/**
+ * 21.11.2026 KALAN ODEME girdisi (siparis_bakiye_durumu): Excel "Bakiye" sutunu + sistem dosyalarinin konsimento durumu.
+ * Dosya "odendi" = tum rezervasyonlarinin konsimentosu odeme alindi (Telex / Seawaybill / Vesaik; lib/odeme-takibi.ts).
+ */
+export async function bakiyeDurumuOku(): Promise<BakiyeBilgisi> {
+  const { data, error } = await supabase.rpc("siparis_bakiye_durumu");
+  if (error) throw new Error(error.message);
+  const d = (data || {}) as { defter?: { anahtar: string; odendi: boolean | null; tutar: number | string | null }[]; dosyalar?: { dosya_no: string; konsimento: (string | null)[] | null }[] };
+  const defter = new Map<string, { odendi: boolean | null; tutar: number | null }>();
+  for (const r of d.defter || []) defter.set(r.anahtar, { odendi: r.odendi ?? null, tutar: r.tutar === null || r.tutar === undefined || r.tutar === "" ? null : Number(r.tutar) });
+  const dosyaOdendi = new Map<string, boolean>();
+  for (const r of d.dosyalar || []) {
+    const k = r.konsimento || [];
+    dosyaOdendi.set(r.dosya_no, k.length > 0 && k.every((x) => odemeAlindiMi(x)));
+  }
+  return { defter, dosyaOdendi };
+}
+
+/** 21.11.2026 Yukleme Plani rezervasyon bekleyenler: proforma basina sistem proformasi / rezervasyonsuz acik dosya / siparis takibi. */
+export async function planBekleyenDurumlariOku(proformalar: string[]): Promise<Map<string, BekleyenDurum>> {
+  const liste = Array.from(new Set(proformalar.map((p) => p.trim()).filter(Boolean))).slice(0, 500);
+  const harita = new Map<string, BekleyenDurum>();
+  if (!liste.length) return harita;
+  const { data, error } = await supabase.rpc("plan_bekleyen_aksiyonlari", { p_proformalar: liste });
+  if (error) throw new Error(error.message);
+  for (const r of (data || []) as BekleyenDurum[]) if (r && r.proforma_no) harita.set(r.proforma_no, { ...r, proforma_id: r.proforma_id || null, dosya: r.dosya || null, ana_siparis: r.ana_siparis || null });
+  return harita;
 }
 
 export async function siparisAktar(dosyaAdi: string, satirlar: SiparisAktarimSatiri[]): Promise<{ eklenen: number; guncellenen: number; ayni: number }> {

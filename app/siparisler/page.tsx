@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/empty-state";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { useAuth } from "@/lib/auth-context";
 import {
-  BEKLEYEN_BLOK, BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planGorunumu, planKalemleri, planSirala, saat, siparisBolumleri,
+  BOLUM_BASLIGI, DURUM_ADI, ON_ODEME_DEGISIR, bugunIst, planBloklari, planGorunumu, planKalemleri, saat, siparisBolumleri,
   siparisBolumu, siparisOzeti, trTarih, type PlanBlogu, type PlanSatiri, type SiparisBolumu, type SiparisDurum, type SiparisSatiri,
 } from "@/lib/siparis/liste";
 import {
@@ -21,8 +21,12 @@ import { SekmeCubugu, type SekmeOgesi } from "@/components/erp/sekme-cubugu";
 import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
 import { SecilebilirOzetKarti } from "@/components/erp/ozet-karti";
 import { DAGITIM_DURUM_METNI, KILIT_METNI, type OnOdemeDagitimi } from "@/lib/on-odeme";
-import { eslesmeyenleriOku, onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku, type EslesmeyenSatir } from "@/lib/siparis/veri";
+import { kalanOdemeleri, kalanToplami, type BakiyeBilgisi, type KalanOdeme } from "@/lib/siparis/odeme";
+import { bakiyeDurumuOku, planBekleyenDurumlariOku, eslesmeyenleriOku, onayImzaliKaydet, onOdemeDagilimiOku, onOdemeKaydet, siparisEslesmeKaldir, siparisListesiOku, siparisSatiriSil, siparisSilinebilir, yuklemePlaniOku, type EslesmeyenSatir } from "@/lib/siparis/veri";
 import { EslesmeyenSerit } from "@/components/siparis/eslesmeyen-serit";
+import { RezervasyonBekleyenPaneli } from "@/components/siparis/rezervasyon-bekleyen";
+import type { BekleyenDurum, NavlunTeklifi } from "@/lib/siparis/plan-bekleyen";
+import { sonNavlunTeklifleriOku } from "@/lib/navlun/veri";
 import { SiparisEslestirFormu } from "@/components/siparis-eslestir";
 import { PlanExcelAktar } from "@/components/plan-excel-aktar";
 import { SiparisExcelAktar } from "@/components/siparis-excel-aktar";
@@ -64,8 +68,20 @@ function DurumRozeti({ d }: { d: SiparisDurum }) {
 const paraIsareti = (p: string | null) => (p === "EUR" ? "€" : p === "TRY" ? "₺" : "$");
 
 /** On odeme hucresi: bekleyen satirda "On odeme alindi" butonu; alinmis satirda tutar + tarih (+ geri al). */
-function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
-  s: SiparisSatiri; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: boolean;
+/** 21.11.2026 kalan odeme satiri (lib/siparis/odeme.ts): bakiye alindi / kalan tutar / bilinmiyor */
+function KalanSatiri({ k }: { k: KalanOdeme | undefined }) {
+  if (!k || k.durum === "tamami") return null;
+  if (k.durum === "odendi") return <span className="block text-[11px] text-emerald-300" title={k.not || ""} data-kalan="odendi">Bakiye alındı ✓</span>;
+  if (k.kalan === null) return <span className="block text-[11px] text-amber-300" title={k.not || ""} data-kalan="bilinmiyor">Kalan: ? <span style={{ color: TEXT_MUTED }}>({k.not})</span></span>;
+  return (
+    <span className="block text-[11px] tabular-nums" title={k.onOdemePayi !== null ? `Ön ödeme payı ${sayiGoster(k.onOdemePayi, 2)} ${paraIsareti(k.para)}${k.not ? ` · ${k.not}` : ""}` : k.not || ""} data-kalan="bekliyor">
+      <span style={{ color: TEXT_MUTED }}>Kalan </span><span className="text-amber-200 font-medium">{sayiGoster(k.kalan, 2)} {paraIsareti(k.para)}</span>
+    </span>
+  );
+}
+
+function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul, kalan }: {
+  s: SiparisSatiri; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; mesgul: boolean; kalan?: KalanOdeme;
 }) {
   const [onay, setOnay] = useState(false);
   const degisir = yetkili && ON_ODEME_DEGISIR.includes(s.durum) && !!s.proforma_no;
@@ -77,13 +93,14 @@ function OnOdemeHucresi({ s, yetkili, onAc, onGeriAl, mesgul }: {
       </button>
     ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
   }
-  if (!s.on_odeme) return <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
+  if (!s.on_odeme) return kalan && kalan.durum !== "tamami" ? <div className="text-xs"><KalanSatiri k={kalan} /></div> : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
   return (
     <div className="text-xs" data-onodeme>
       <span className="text-sky-300 font-medium tabular-nums">
         {s.on_odeme_tutar !== null ? `${sayiGoster(s.on_odeme_tutar, 2)} ${paraIsareti(s.on_odeme_para)}` : "Alındı"}
       </span>
       {s.on_odeme_tarihi ? <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{trTarih(s.on_odeme_tarihi)}</span> : null}
+      <KalanSatiri k={kalan} />
       {degisir && s.durum === "on_odeme_alindi" && (
         onay ? (
           <span className="block mt-0.5 text-[11px]">
@@ -116,12 +133,12 @@ const SIPARIS_SUTUNLARI: Array<{ basliklar: string[]; genislik: string; sag?: bo
   { basliklar: ["Liman", "BL NO"], genislik: "10%" },
   { basliklar: ["Durum"], genislik: "8%" },
   { basliklar: ["Dosya / Booking"], genislik: "8%" },
-  { basliklar: ["Ön ödeme"], genislik: "9%" },
+  { basliklar: ["Ön ödeme", "Kalan ödeme"], genislik: "9%" },
 ];
 
-function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, pazarYetkisi }: {
+function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, pazarYetkisi, kalanlar }: {
   satirlar: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
-  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null; pazarYetkisi: boolean;
+  onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null; pazarYetkisi: boolean; kalanlar: Map<string, KalanOdeme>;
 }) {
   const alt = { color: TEXT_MUTED };
   const h = "px-2 py-2 align-top break-words";
@@ -190,7 +207,7 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir
               {s.booking_no ? <span className="block break-all">{s.booking_no}</span> : null}
               {s.etd ? <span className="block">ETD {trTarih(s.etd)}</span> : null}
             </td>
-            <td className={h}><OnOdemeHucresi s={s} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul === s.anahtar} /></td>
+            <td className={h}><OnOdemeHucresi s={s} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} mesgul={mesgul === s.anahtar} kalan={kalanlar.get(s.anahtar)} /></td>
           </tr>
         );
       })}
@@ -199,11 +216,11 @@ function SiparisSatirlari({ satirlar, yetkili, onAc, onGeriAl, onSil, onEslestir
 }
 
 /** Excel'deki gibi bölümlü sipariş listesi; her bölümde en güncel en altta. */
-function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, goster, pazarYetkisi }: {
+function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, onAyir, mesgul, goster, pazarYetkisi, kalanlar }: {
   liste: SiparisSatiri[]; yetkili: boolean; onAc: (s: SiparisSatiri) => void; onGeriAl: (s: SiparisSatiri) => void; onSil: (s: SiparisSatiri) => void;
   onEslestir: (s: SiparisSatiri) => void; onAyir: (s: SiparisSatiri) => void; mesgul: string | null;
   /** 16.11.2026 sekmeler: yalniz bu bolumler (sekmenin satirlari zaten suzulmus gelir) */
-  goster: SiparisBolumu[]; pazarYetkisi: boolean;
+  goster: SiparisBolumu[]; pazarYetkisi: boolean; kalanlar: Map<string, KalanOdeme>;
 }) {
   const bolumler = useMemo(() => siparisBolumleri(liste).filter((b) => goster.includes(b.bolum)), [liste, goster]);
   return (
@@ -212,6 +229,9 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
         if (b.bolum === "iptal" && !b.adet) return null;
         const gorunen = b.satirlar;
         const tutarlar = Object.entries(b.tutar).map(([p, t]) => `${sayiGoster(t, 0)} ${paraIsareti(p)}`).join(" + ") || "—";
+        // 21.11.2026: on odemesi alinan bolumde toplam kalan odeme
+        const kalan = b.bolum === "on_odeme" ? kalanToplami(gorunen, kalanlar) : null;
+        const kalanMetni = kalan ? (Object.entries(kalan.toplam).map(([p, t]) => `${sayiGoster(t, 0)} ${paraIsareti(p)}`).join(" + ") || "—") + (kalan.bilinmeyen ? ` (+${kalan.bilinmeyen} satırda ön ödeme tutarı yok)` : "") : null;
         const vurgu = b.bolum === "on_odeme" ? "#93C5FD" : b.bolum === "bekleyen" ? "#CBD5E1" : b.bolum === "rezervasyon" ? "#6EE7B7" : "#64748B";
         return (
           <section key={b.bolum} id={`bolum-${b.bolum}`} className="rounded-xl border overflow-hidden scroll-mt-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={`bolum-${b.bolum}`}>
@@ -219,6 +239,7 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
               <h3 className="text-[13px] font-semibold text-white leading-snug" data-bolum-baslik>{BOLUM_BASLIGI[b.bolum]}</h3>
               <span className="text-xs ml-auto tabular-nums whitespace-nowrap" style={{ color: TEXT_MUTED }} data-bolum-ozet>
                 {b.adet} sipariş · {sayiGoster(b.mt, 2)} MT · {b.konteyner} kont. · {tutarlar}
+                {kalanMetni ? <span className="text-amber-200" data-bolum-kalan> · kalan ödeme {kalanMetni}</span> : null}
               </span>
             </div>
             {b.adet === 0 ? (
@@ -237,7 +258,7 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
                     </tr>
                   </thead>
                   <tbody>
-                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} onEslestir={onEslestir} onAyir={onAyir} mesgul={mesgul} pazarYetkisi={pazarYetkisi} />
+                    <SiparisSatirlari satirlar={gorunen} yetkili={yetkili} onAc={onAc} onGeriAl={onGeriAl} onSil={onSil} onEslestir={onEslestir} onAyir={onAyir} mesgul={mesgul} pazarYetkisi={pazarYetkisi} kalanlar={kalanlar} />
                   </tbody>
                 </table>
               </div>
@@ -253,7 +274,8 @@ function SiparisBolumleri({ liste, yetkili, onAc, onGeriAl, onSil, onEslestir, o
 /**
  * On odeme / onay penceresi. 17.11.2026 "Onay geldi" (onay bekleyen siparis): onay iki yoldan gelir -
  *  "Ön ödeme geldi" (asagidaki mevcut form, tutar zorunlu) | "İmzalı proforma geldi" (tutarsiz, siparis_onay_imzali).
- * Sistem proformasinda (dosyasi acilmamis) "Kaydedince dosyayi ac" -> Proforma Yukle ?proforma=<id>.
+ * Sistem proformasinda (dosyasi acilmamis) "Kaydedince dosyayi ac" -> Proforma Yukle ?proforma=<id>&otomatik=1
+ * (21.11.2026: okuma kendiliginden baslar; yalniz tek / kismi sevkiyat secimi kullaniciya kalir).
  * Onaylanmis satirda ("Tutar gir") pencere eskisi gibi yalniz on odeme formudur.
  */
 function OnOdemeFormu({ s, onKapat, onKaydet, onImzali, dosyaAcilabilir, onDosyaAc }: {
@@ -405,7 +427,7 @@ function OnOdemeFormu({ s, onKapat, onKaydet, onImzali, dosyaAcilabilir, onDosya
           {yeniOnay && dosyaAcilabilir && (
             <label className="flex items-start gap-2 text-xs text-white cursor-pointer" data-testid="onay-dosya-ac">
               <input type="checkbox" checked={dosyaAc} onChange={(e) => setDosyaAc(e.target.checked)} className="mt-0.5" />
-              <span>Kaydedince dosyayı aç <span style={{ color: TEXT_MUTED }}>— kayıtlı proformanın imzalı PDF&apos;i hazırlanır, Proforma Yükle&apos;de kontrol edip açarsınız.</span></span>
+              <span>Kaydedince dosyayı aç <span style={{ color: TEXT_MUTED }}>— kayıtlı proforma kendiliğinden okunur; tek / kısmi sevkiyat seçimiyle dosya Ana Panel&apos;de açılır.</span></span>
             </label>
           )}
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
@@ -519,6 +541,11 @@ function SiparisIcerik() {
   const [kaynakUyari, setKaynakUyari] = useState<Tutarsizlik[]>([]);
   // 21.11.2026 (Faz 4): sistemde karsiligi olmayan aktif Excel satirlari (okunamazsa serit gorunmez)
   const [eslesmeyen, setEslesmeyen] = useState<EslesmeyenSatir[]>([]);
+  // 21.11.2026 kalan odeme girdisi (okunamazsa yalniz sistem on odemesiyle hesaplanir)
+  const [bakiye, setBakiye] = useState<BakiyeBilgisi | undefined>(undefined);
+  // 21.11.2026 Yukleme Plani ustu "Rezervasyon bekleyen" paneli: navlun teklifleri + proforma basina aksiyon
+  const [navlunTeklifleri, setNavlunTeklifleri] = useState<NavlunTeklifi[] | null>(null);
+  const [bekleyenDurumlari, setBekleyenDurumlari] = useState<Map<string, BekleyenDurum> | null>(null);
   const [siparisler, setSiparisler] = useState<SiparisSatiri[] | null>(null);
   const [plan, setPlan] = useState<PlanSatiri[] | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
@@ -545,6 +572,7 @@ function SiparisIcerik() {
         .then((t) => setKaynakUyari(t.kalemler.filter((k) => k.tur === "kaynak_eski" && k.baglanti === "/siparisler")))
         .catch(() => setKaynakUyari([]));
       eslesmeyenleriOku().then(setEslesmeyen).catch(() => setEslesmeyen([]));
+      bakiyeDurumuOku().then(setBakiye).catch(() => setBakiye(undefined));
     } catch (e) { setHata(e instanceof Error ? e.message : "Veri okunamadı."); }
     finally { setYukleniyor(false); }
   }, []);
@@ -560,24 +588,41 @@ function SiparisIcerik() {
   };
 
   const ozet = useMemo(() => siparisOzeti(siparisler || []), [siparisler]);
+  const kalanlar = useMemo(() => kalanOdemeleri(siparisler || [], bakiye), [siparisler, bakiye]);
   const q = norm(arama.trim());
   const aranan = useMemo(() => siparisAra(siparisler || [], arama), [siparisler, arama]);
   const sayilar = useMemo(() => sekmeSayilari(aranan), [aranan]);
   const gorunenSiparis = useMemo(() => (sekme === "plan" || sekme === "formlar" ? [] : aranan.filter((s) => sekmeyeAit(s, sekme))), [aranan, sekme]);
+  // 21.11.2026: rezervasyon bekleyenler (plan kaynak "siparis") tabloda degil, ustteki panelde
+  const planAranan = useMemo(() => {
+    const l = plan || [];
+    return q ? l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no, p.proforma_no].some((v) => v && norm(v).includes(q))) : l;
+  }, [plan, q]);
+  const bekleyenPlan = useMemo(() => planAranan.filter((p) => p.kaynak === "siparis"), [planAranan]);
   const planBloklariGorunen = useMemo((): PlanBlogu[] => {
-    let l = plan || [];
-    if (q) l = l.filter((p) => [p.musteri, p.booking_no, p.varis_limani, p.gemi, p.acente, p.cinsi, p.dosya_no, p.proforma_no].some((v) => v && norm(v).includes(q)));
+    const l = planAranan.filter((p) => p.kaynak !== "siparis");
     // 21.11.2026: aramada tum yil (eski bir booking / BL eksik satir "Guncel" gorunumde gizli kalmasin)
     if (planTum || q) return planBloklari(l);
     const g = planGorunumu(l, bugun);
     const ozel = (anahtar: string, etiket: string, satirlar: PlanSatiri[]): PlanBlogu[] =>
       satirlar.length ? [{ anahtar, etiket, yil: null, hafta: null, satirlar, konteyner: satirlar.reduce((t, p) => t + (p.konteyner || 0), 0) }] : [];
     return [
-      ...ozel("bekleyen", BEKLEYEN_BLOK, planSirala(g.bekleyen)),
       ...ozel("son", `TAMAMLANAN SON ${g.son.length} SEVKİYAT`, g.son),
       ...planBloklari(g.guncel),
     ];
-  }, [plan, planTum, q, bugun]);
+  }, [planAranan, planTum, q, bugun]);
+  // Panel verisi: plan yuklenince bir kez (okunamazsa panel navlunsuz / aksiyonsuz gorunur)
+  const bekleyenProformalar = useMemo(() => Array.from(new Set((plan || []).filter((p) => p.kaynak === "siparis" && p.proforma_no).map((p) => p.proforma_no as string))).sort().join("|"), [plan]);
+  useEffect(() => {
+    if (!bekleyenProformalar) { setBekleyenDurumlari(new Map()); return; }
+    let iptal = false;
+    planBekleyenDurumlariOku(bekleyenProformalar.split("|")).then((m) => { if (!iptal) setBekleyenDurumlari(m); }).catch(() => { if (!iptal) setBekleyenDurumlari(null); });
+    return () => { iptal = true; };
+  }, [bekleyenProformalar]);
+  useEffect(() => {
+    if (sekme !== "plan" || navlunTeklifleri !== null) return;
+    sonNavlunTeklifleriOku().then(setNavlunTeklifleri).catch(() => setNavlunTeklifleri(null));
+  }, [sekme, navlunTeklifleri]);
 
   const onOdemeKaydetFn = async (s: SiparisSatiri, tutar: number, para: string, tarih: string, ek: { oran: number | null; karsilik: number | null }): Promise<string | null> => {
     if (!s.proforma_no) return "Proforma no yok.";
@@ -619,7 +664,7 @@ function SiparisIcerik() {
     setBekleyen(s.anahtar); setHata(null); setBilgi(null);
     try {
       const no = await siparisSatiriSil(s.anahtar);
-      setBilgi(`${no || s.proforma_no || "Sipariş"} (${s.firma || "-"}) sipariş listesinden silindi.`);
+      setBilgi(`${no || s.proforma_no || "Sipariş"} (${s.firma || "-"}) sipariş listesinden silindi.${s.anahtar.startsWith("proforma:") ? " Proforma Oluştur › Silinen Proformalar'dan geri yüklenebilir." : ""}`);
       await yukle();
     } catch (e) { setHata(e instanceof Error ? e.message : "Sipariş silinemedi."); }
     finally { setBekleyen(null); }
@@ -631,7 +676,7 @@ function SiparisIcerik() {
     setIndiriliyor(true);
     try {
       const [{ xlsxOlustur }, { siparisSayfasi, planSayfasi }] = await Promise.all([import("@/lib/xlsx-yaz"), import("@/lib/siparis/xlsx")]);
-      const blob = await xlsxOlustur([siparisSayfasi(siparisler), planSayfasi(plan, "Yükleme Planı", bugun)]);
+      const blob = await xlsxOlustur([siparisSayfasi(siparisler, "Sipariş Listesi", kalanlar), planSayfasi(plan, "Yükleme Planı", bugun)]);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `Siparis_Listesi_ve_Yukleme_Plani_${bugun.split("-").reverse().join(".")}.xlsx`;
@@ -752,7 +797,7 @@ function SiparisIcerik() {
               <ConfirmDialog open={!!silinecek} onOpenChange={(a) => { if (!a) setSilinecek(null); }}
                 title={`${silinecek?.proforma_no || "Sipariş"} silinsin mi?`}
                 description={silinecek?.anahtar.startsWith("proforma:")
-                  ? `${silinecek?.firma || "-"} · ${silinecek?.proforma_no || "-"}: proforma sistemden silinir (ihracat dosyası açılmamış). Bu işlem geri alınamaz.`
+                  ? `${silinecek?.firma || "-"} · ${silinecek?.proforma_no || "-"}: proforma sistemden silinir (ihracat dosyası açılmamış). Müşteri sonradan dönerse Proforma Oluştur › Silinen Proformalar'dan geri yüklenebilir.`
                   : `${silinecek?.firma || "-"} · ${silinecek?.proforma_no || "-"}: satır sipariş listesinden silinir. Proforma ve ihracat dosyaları etkilenmez. Bu işlem geri alınamaz.`}
                 confirmLabel="Sil" cancelLabel="Vazgeç"
                 onConfirm={() => { const s = silinecek; setSilinecek(null); if (s) siparisSil(s); }} />
@@ -763,12 +808,12 @@ function SiparisIcerik() {
                 <OnOdemeFormu s={onOdemeSatir} onKapat={() => setOnOdemeSatir(null)} onKaydet={(t, p, d, ek) => onOdemeKaydetFn(onOdemeSatir, t, p, d, ek)}
                   onImzali={(d) => onayImzaliFn(onOdemeSatir, d)}
                   dosyaAcilabilir={dosyaAcYetkisi && !!kayitliProformaId(onOdemeSatir)}
-                  onDosyaAc={() => { const id = kayitliProformaId(onOdemeSatir); if (id) window.location.assign(`/yeni-dosya?proforma=${encodeURIComponent(id)}`); }} />
+                  onDosyaAc={() => { const id = kayitliProformaId(onOdemeSatir); if (id) window.location.assign(`/yeni-dosya?proforma=${encodeURIComponent(id)}&otomatik=1`); }} />
               )}
               {gorunenSiparis.length ? (
                 <SiparisBolumleri liste={gorunenSiparis} yetkili={isaretleyebilir} onAc={setOnOdemeSatir} onGeriAl={onOdemeGeriAl} onSil={setSilinecek}
                   onEslestir={setEslestirilecek} onAyir={eslesmeAyir} mesgul={bekleyen}
-                  goster={SEKME_BOLUMLERI[sekme]} pazarYetkisi={pazarYetkisi} />
+                  goster={SEKME_BOLUMLERI[sekme]} pazarYetkisi={pazarYetkisi} kalanlar={kalanlar} />
               ) : (
                 <EmptyState icon={<ClipboardList size={40} />} title={q ? "Bu sekmede aramayla eşleşen sipariş yok" : "Bu sekmede sipariş yok"}
                   description={digerSonuc ? `Diğer sekmelerde ${digerSonuc} sonuç var; sekme sayılarına bakın.` : undefined} />
@@ -796,7 +841,9 @@ function SiparisIcerik() {
               {aktarAcik && (
                 <PlanExcelAktar onKapat={() => setAktarAcik(false)} onAktarildi={(m) => { setAktarAcik(false); setBilgi(m); setPlanTum(true); yukle(); }} />
               )}
-              {planBloklariGorunen.length ? <PlanTablosu bloklar={planBloklariGorunen} bugun={bugun} /> : <EmptyState icon={<Ship size={40} />} title="Planlı yükleme yok" />}
+              <RezervasyonBekleyenPaneli satirlar={bekleyenPlan} siparisler={siparisler} kalanlar={kalanlar} teklifler={navlunTeklifleri}
+                durumlar={bekleyenDurumlari} bugun={bugun} yetkili={isaretleyebilir} />
+              {planBloklariGorunen.length ? <PlanTablosu bloklar={planBloklariGorunen} bugun={bugun} /> : !bekleyenPlan.length ? <EmptyState icon={<Ship size={40} />} title="Planlı yükleme yok" /> : null}
             </>
           )}
         </>

@@ -11,7 +11,9 @@
  * 21.11.2026 (Harun Bey'in elle guncelledigi duzen): "47.HAFTA (15 KASIM - 21 KASIM)" hafta ara basliklari atlanir;
  *   "YÜKLEMESİ PLANLANACAK SİPARİŞLER" -> on_odeme_alindi bolumu, "PEŞİNAT BEKLENEN SİPARİŞLER" -> onay_bekliyor bolumu.
  *   Istege bagli "Ön Ödeme" sutunu (onay kutusu DOGRU/YANLIS): yesil olmayan, BL'siz satirda bolumden ONCE gelir
- *   (DOGRU -> on_odeme_alindi, YANLIS -> onay_bekliyor). "Bakiye" / "Release" sutunlari sistemde yok, okunmaz.
+ *   (DOGRU -> on_odeme_alindi, YANLIS -> onay_bekliyor). "Release" sutunu sistemde yok, okunmaz.
+ * 21.11.2026 (kullanici: "kalan odemeler belirtilmeli"): istege bagli "Bakiye" sutunu okunur: DOGRU -> bakiye alindi;
+ *   YANLIS -> bekliyor; tutar ("$15.750,00") -> bekliyor + kalan tutar. Bos hucre sistemdeki degeri silmez.
  * Sutunlar BASLIK METNINDEN bulunur (sistemin "Excel indir" ciktisi da okunur; ek sutunlari yok sayilir).
  * Eslesme (sistemdeki siparis_defteri satirlari): proforma no (revize "R" eki yok sayilir) + BL; BL'si sonradan
  * eklenen / degisen satir ayni proformanin tek adayina baglanir. Hicbir kayit silinmez.
@@ -36,6 +38,9 @@ export type SiparisExcelSatiri = {
   marka: string | null;
   paketleme: string | null;
   durum: SiparisDurumu;
+  /** 21.11.2026 "Bakiye" sutunu (yoksa / bossa null) */
+  bakiye_odendi: boolean | null;
+  bakiye_tutar: number | null;
 };
 
 export type SiparisExcelSonucu = { satirlar: SiparisExcelSatiri[]; uyarilar: string[]; sayfa: string };
@@ -110,6 +115,8 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
           if (eksik.length) throw new Error(`"${sayfa.ad}" sayfası satır ${no}: başlık bulunamadı: ${eksik.join(", ")}. Başlıklar sipariş listesi ile aynı olmalı.`);
           const oo = anahtarlar.findIndex((x) => x === "ONODEME" || x === "ONODEMESI");
           if (oo >= 0) yeni.on_odeme = oo;
+          const bk = anahtarlar.findIndex((x) => x === "BAKIYE");
+          if (bk >= 0) yeni.bakiye = bk;
           sutun = yeni;
         }
         continue;
@@ -144,6 +151,12 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
       const yesil = yesilMi(renk);
       const onOdemeHam = sutun.on_odeme !== undefined ? metin(h[sutun.on_odeme]).toUpperCase() : "";
       const onOdeme = onOdemeHam === "TRUE" ? true : onOdemeHam === "FALSE" ? false : null;
+      // Bakiye: DOGRU / YANLIS / tutar; baska metin (or. "-") bos sayilir
+      const bakiyeHam = sutun.bakiye !== undefined ? h[sutun.bakiye] : null;
+      const bakiyeMetin = metin(bakiyeHam).toUpperCase();
+      const bakiyeSayi = bakiyeMetin === "TRUE" || bakiyeMetin === "FALSE" ? null : sayiOku(bakiyeHam);
+      const bakiye_odendi = bakiyeMetin === "TRUE" ? true : bakiyeMetin === "FALSE" || (bakiyeSayi !== null && bakiyeSayi > 0) ? false : null;
+      const bakiye_tutar = bakiye_odendi === false && bakiyeSayi !== null && bakiyeSayi > 0 ? Math.round(bakiyeSayi * 100) / 100 : null;
       const durum: SiparisDurumu = yesil ? (bl ? "sevk_edildi" : "bl_eksik")
         : bl ? "rezervasyonlu"
         : onOdeme !== null ? (onOdeme ? "on_odeme_alindi" : "onay_bekliyor")
@@ -157,6 +170,7 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
         urun: deger(h[sutun.urun]), birim_fiyat: fiyat !== null && fiyat >= 0 ? fiyat : null, miktar_mt: miktar !== null && miktar >= 0 ? miktar : null,
         tutar: tutar !== null && tutar >= 0 ? tutar : null, konteyner: kont !== null && kont >= 0 && kont <= 1000 ? Math.round(kont) : null,
         liman: deger(h[sutun.liman]), bl_no: bl, marka: deger(h[sutun.marka]), paketleme: deger(h[sutun.paketleme]), durum,
+        bakiye_odendi, bakiye_tutar,
       });
     }
     if (sutun) {
@@ -177,6 +191,8 @@ export type SiparisMevcut = {
   id: string; sira: number | null; proforma_no: string; proforma_tarihi: string | null; firma: string; urun: string | null;
   birim_fiyat: number | null; miktar_mt: number | null; tutar: number | null; konteyner: number | null; liman: string | null;
   bl_no: string | null; marka: string | null; paketleme: string | null; durum: SiparisDurumu;
+  /** 21.11.2026 Excel "Bakiye" (migration 20261121080000) */
+  bakiye_odendi?: boolean | null; bakiye_tutar?: number | null;
 };
 
 /** Eslesme anahtari: bosluksuz, buyuk harf, sondaki revize eki yok (…051126R, …-1R) */
@@ -186,8 +202,10 @@ const blAnahtar = (s: string | null) => (s || "").replace(/\s/g, "").toUpperCase
 export const SIPARIS_ALAN_ADI: Record<string, string> = {
   proforma_no: "Proforma", firma: "Firma Adı", urun: "Ürün", birim_fiyat: "Fiyat", miktar_mt: "Miktar", tutar: "Tutar",
   konteyner: "Konteyner", liman: "Liman", bl_no: "BL NO", marka: "Marka", paketleme: "Paketleme", durum: "Durum",
+  bakiye_odendi: "Bakiye", bakiye_tutar: "Kalan bakiye",
 };
-const KARSILASTIRILAN = ["proforma_no", "firma", "urun", "birim_fiyat", "miktar_mt", "tutar", "konteyner", "liman", "bl_no", "marka", "paketleme", "durum"] as const;
+const KARSILASTIRILAN = ["proforma_no", "firma", "urun", "birim_fiyat", "miktar_mt", "tutar", "konteyner", "liman", "bl_no", "marka", "paketleme", "durum",
+  "bakiye_odendi", "bakiye_tutar"] as const;
 export const DURUM_ETIKETI: Record<SiparisDurumu, string> = {
   onay_bekliyor: "Onay bekliyor", on_odeme_alindi: "Ön ödeme alındı", rezervasyonlu: "Rezervasyonlu",
   sevk_edildi: "Sevk edildi", bl_eksik: "BL eksik", iptal: "İptal",
@@ -218,6 +236,7 @@ export type SiparisSistemBilgisi = {
 const goster = (alan: string, v: unknown): string => {
   if (v === null || v === undefined || v === "") return "—";
   if (alan === "durum") return DURUM_ETIKETI[v as SiparisDurumu] ?? String(v);
+  if (alan === "bakiye_odendi") return v === true ? "Alındı" : "Bekliyor";
   if (typeof v === "number") return v.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
   return String(v);
 };

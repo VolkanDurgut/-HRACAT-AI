@@ -254,8 +254,9 @@ export default function EtdEtaPage() {
   };
 
   // Excel yuklemesi: durumlar + yukleme kaydi TEK islemde (yeni hatirlatma turu baslar)
-  const handleExcelUygula = async (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string): Promise<string | null> => {
-    const { data, error } = await supabase.rpc("odeme_excel_yukleme_kaydet", { p_dosya_adi: dosyaAdi, p_satirlar: satirlar, p_ozet: ozet });
+  // 21.11.2026: ETA'lar da ayni islemde (p_etalar); ETD ile uyumsuz ETA veritabaninda da reddedilir
+  const handleExcelUygula = async (satirlar: { id: string; durum: string }[], ozet: ExcelYuklemeOzeti, dosyaAdi: string, etalar: { id: string; eta: string }[]): Promise<string | null> => {
+    const { data, error } = await supabase.rpc("odeme_excel_yukleme_kaydet", { p_dosya_adi: dosyaAdi, p_satirlar: satirlar, p_ozet: ozet, p_etalar: etalar });
     if (error) {
       // Fonksiyon henuz yoksa (migration oncesi) yalniz durumlar guncellenir
       if (error.code === "PGRST202" || error.code === "42883") {
@@ -269,11 +270,13 @@ export default function EtdEtaPage() {
       }
       return `Güncellenemedi: ${error.message}`;
     }
-    const kayit = data as ExcelYukleme;
+    const kayit = data as ExcelYukleme & { eta_guncellenen?: number };
     setExcelAcik(false);
     setYuklemeSonucu(kayit);
     setEtaFilter("odeme");
-    showToast(kayit.guncellenen > 0 ? `Excel yüklendi: ${kayit.guncellenen} sevkiyat güncellendi, yeni hatırlatma turu başladı.` : "Excel yüklendi: değişiklik yok, yeni hatırlatma turu başladı.", "success");
+    const etaSay = kayit.eta_guncellenen || 0;
+    const parcalar = [kayit.guncellenen > 0 ? `${kayit.guncellenen} konşimento` : "", etaSay > 0 ? `${etaSay} ETA` : ""].filter(Boolean);
+    showToast(parcalar.length ? `Excel yüklendi: ${parcalar.join(" + ")} güncellendi, yeni hatırlatma turu başladı.` : "Excel yüklendi: değişiklik yok, yeni hatırlatma turu başladı.", "success");
     await fetchData();
     return null;
   };
@@ -749,6 +752,7 @@ export default function EtdEtaPage() {
           sistem={satirlar.map((s) => ({
             rezervasyon_id: s.rezervasyon_id, booking_no: s.booking_no, bl_no: s.bl_no,
             alici_firma: s.alici_firma, dosya_no: s.dosya_no, konsimento_durumu: s.konsimento_durumu,
+            etd: s.etd, eta: s.eta,
           }))}
           onKapat={() => setExcelAcik(false)}
           onUygula={handleExcelUygula}

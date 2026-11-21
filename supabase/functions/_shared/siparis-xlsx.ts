@@ -5,6 +5,7 @@
  */
 import { XS, type XlsxHucre, type XlsxSayfa } from "./xlsx-yaz.ts";
 import { BOLUM_BASLIGI, DURUM_ADI, planBloklari, planKalemleri, saat, siparisBolumleri, type PlanSatiri, type SiparisSatiri } from "./siparis-liste.ts";
+import type { KalanOdeme } from "./siparis-odeme.ts";
 
 const tarih = (iso: string | null): Date | null => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`) : null);
 const yesil = (t: boolean, normal: number, y: number) => (t ? y : normal);
@@ -16,20 +17,29 @@ const SIPARIS_BASLIK = ["Proforma", "Firma Adı", "Ürün", "Fiyat", "Miktar", "
  * Siparis listesi sayfasi: export'un Excel'indeki gibi BOLUMLU (rezervasyonu alinan / sevk edilen ust bolum, sonra
  * "ON ODEMESI ALINMIS…" ve "ON ODEMESI VEYA ONAYI ALINMAMIS" basliklari; her bolumde en guncel en altta). Sevk edilen satir YESIL.
  * Bu dosya "Excel'den iceri aktar" ile geri okunabilir (bolum basliklari ve yesil renk durumu tasir).
+ * 21.11.2026: kalanlar verilirse sona "Ön Ödeme Payı" ve "Kalan Ödeme" sutunlari eklenir (lib/siparis/odeme.ts;
+ * sayfayla ayni hesap). Verilmezse (siparis-rapor maili) sayfa eskisiyle birebir ayni.
  */
-export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi"): XlsxSayfa {
-  const satirlar: (XlsxHucre | null)[][] = [SIPARIS_BASLIK.map((b) => ({ v: b, s: XS.tabloBaslik }))];
+export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi", kalanlar?: Map<string, KalanOdeme>): XlsxSayfa {
+  const baslik = kalanlar ? [...SIPARIS_BASLIK, "Ön Ödeme Payı", "Kalan Ödeme"] : SIPARIS_BASLIK;
+  const son = kalanlar ? "R" : "P";
+  const satirlar: (XlsxHucre | null)[][] = [baslik.map((b) => ({ v: b, s: XS.tabloBaslik }))];
   const birlestir: string[] = [];
   for (const b of siparisBolumleri(liste)) {
     if (!b.adet) continue;
     if (b.bolum !== "rezervasyon") {
       satirlar.push([]);
       satirlar.push([{ v: BOLUM_BASLIGI[b.bolum], s: XS.baslik }]);
-      birlestir.push(`A${satirlar.length}:P${satirlar.length}`);
+      birlestir.push(`A${satirlar.length}:${son}${satirlar.length}`);
     }
     for (const s of b.satirlar) {
       const t = s.durum === "sevk_edildi";
       const m = (v: string | null | undefined) => ({ v: v ?? "", s: yesil(t, XS.metin, XS.metinYesil) });
+      const k = kalanlar?.get(s.anahtar);
+      const kalanHucreleri: (XlsxHucre | null)[] = !kalanlar ? [] : !k ? [m(""), m("")] : [
+        k.onOdemePayi !== null ? { v: k.onOdemePayi, s: yesil(t, XS.ondalik, XS.ondalikYesil) } : m(""),
+        k.durum === "odendi" ? m("Alındı") : k.kalan !== null ? { v: k.kalan, s: yesil(t, XS.ondalik, XS.ondalikYesil) } : m(k.not || "?"),
+      ];
       satirlar.push([
         m(s.proforma_no), m(s.firma), m(s.urun),
         { v: s.birim_fiyat, s: yesil(t, XS.ondalik, XS.ondalikYesil) },
@@ -42,10 +52,12 @@ export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi"):
           + (s.on_odeme_tarihi ? ` ${s.on_odeme_tarihi.slice(8, 10)}.${s.on_odeme_tarihi.slice(5, 7)}` : "") : ""),
         m(s.dosya_no || (s.durum === "on_odeme_alindi" ? "Rezervasyon alınmadı" : "")), m(s.booking_no),
         { v: tarih(s.etd), s: yesil(t, XS.tarih, XS.tarihYesil) },
+        ...kalanHucreleri,
       ]);
     }
   }
-  return { ad, sutunGenislik: [20, 30, 28, 9, 9, 12, 9, 14, 16, 18, 22, 18, 16, 18, 18, 11], satirlar, birlestir };
+  const genislik = [20, 30, 28, 9, 9, 12, 9, 14, 16, 18, 22, 18, 16, 18, 18, 11];
+  return { ad, sutunGenislik: kalanlar ? [...genislik, 14, 16] : genislik, satirlar, birlestir };
 }
 
 /** Operasyonun yukleme plani Excel'iyle BIREBIR ayni 16 baslik ve alt baslik satiri */

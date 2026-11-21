@@ -667,3 +667,35 @@ yükleme planı karşılasın. Sevk edilen kısmını da kaldıralım; İhracatl
 - Kartlar: "Açık sipariş" ve "Rezervasyonlu" → Yükleme Planı. "Liste yükle" / sipariş Excel aktarımı her sekmeden açılır.
 - Excel indir değişmedi (tüm satırlar, sevk edilenler dahil).
 
+
+## 4.27 İş akışı revizeleri (21.11.2026) — migration 20261121080000_is_akisi_revizeleri.sql
+
+Kullanıcı: "Resmen bir iş akışı oluşturmaya başlıyoruz." Beş madde; hiçbir mevcut kayıt silinmez / değişmez.
+
+1. **Silinen proformalar (Proforma Oluştur).** Kaynak: `denetim_kayitlari` (proformalar DELETE; silinen satır taslağıyla).
+   `proforma_silinenler(limit)` numara başına en son silmeyi verir (aynı numarayla yeniden var olan hariç);
+   `proforma_geri_yukle(denetim_id)` satırı AYNEN (id, taslak, tarih, oluşturan) geri yazar → Sipariş Listesi'nde yeniden
+   "Onay bekleyen". Arayüz: `components/proforma/silinen-proformalar.tsx` (müşteri bazında grup; "Geri yükle" /
+   "Geri yükle ve düzenle"), `?silinen=1` paneli açık getirir. Saf: `lib/proforma/silinen.ts`, veri: `lib/proforma/veri.ts`.
+   Sipariş Listesi'nden silinen Excel satırları (siparis_defteri) bu listede yoktur (proforma değil).
+2. **Ön ödeme → dosya.** "Onay geldi" + "Kaydedince dosyayı aç" → `/yeni-dosya?proforma=<id>&otomatik=1`: okuma
+   kendiliğinden başlar; yalnız tek sevkiyat / kısmi sevkiyat (sipariş takibi) seçimi kullanıcıya kalır (iş kararı).
+3. **Kalan ödeme.** `siparis_defteri.bakiye_odendi / bakiye_tutar` (Excel "Bakiye": DOĞRU = alındı, tutar = kalan; boş hücre
+   silmez; `siparis_listesi_aktar` yamalı). `siparis_bakiye_durumu()` = defter bakiyesi + dosyaların konşimento durumları.
+   Hesap TEK YERDE `supabase/functions/_shared/siparis-odeme.ts`: ön ödeme proforma toplamına oranla satırlara dağıtılır;
+   kalan = satır tutarı − pay; bakiye alındı (Excel DOĞRU / konşimento Telex·Seawaybill·Vesaik) → 0; onay bekleyen → tamamı;
+   ön ödeme tutarı yoksa Excel'e yazılan kalan, o da yoksa "bilinmiyor". Sayfa: "Ön ödeme / Kalan ödeme" sütunu + bölüm
+   özetinde kalan toplamı; Excel indir sona "Ön Ödeme Payı" + "Kalan Ödeme" (sipariş raporu mailinin eki değişmedi).
+   İlk Excel aktarımında Bakiye sütunu dolu satırlar bir kez "değişen" görünür (sistemde ilk kez dolar).
+4. **Yükleme Planı: rezervasyon bekleyenler.** Plan `kaynak = siparis` satırları tablo yerine üstteki panelde
+   (`components/siparis/rezervasyon-bekleyen.tsx`): ön ödeme tarihi / bekleme günü / kalan, varış limanının son 120 gün
+   navlun teklifleri (acente başına en son, 20'DC öncelik, ucuzdan; `navlun_teklifleri`), free time, transit ve tek aksiyon
+   (`plan_bekleyen_aksiyonlari`): rezervasyonsuz açık dosya → "Rezervasyon ekle" (dosya › Rezervasyon › yeni) · sipariş
+   takibi → "Sevkiyat aç" (`/ihracatlar?siparis=` sevkiyat seçimi penceresini açar) · sistem proforması → "Dosya aç"
+   (`?otomatik=1`) · hiçbiri → "Proforma yükle". Saf: `lib/siparis/plan-bekleyen.ts`.
+5. **ETD-ETA Excel'i ETA'yı yazar.** Eskiden aktarım YALNIZ KONŞİMENTO sütununu yazıyordu; ETA'lar hep elle girilmişti
+   (yazan bir sürüm hiç olmadı; yükleme planı ETD'yi değiştirince ETA aynı gün kadar kayıyordu). `odeme_excel_yukleme_kaydet`
+   `p_etalar` aldı (3 parametreli eski imza kaldırıldı). Kural (istemci + veritabanı): ETD ≤ ETA ≤ ETD + 180 gün; uyumsuz
+   satır "kontrol edin" listesinde, uygulanmaz (ör. ETA 27.01.2026 / ETD 18.12.2026). Excel'de boş ETA silmez.
+
+Test: `tests/is-akisi-revizeleri.test.ts` (kurgusal veri).

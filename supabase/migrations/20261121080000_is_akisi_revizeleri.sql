@@ -9,7 +9,7 @@
 --     bakiye alindi, tutar = kalan). siparis_listesi_aktar bu iki alani yazar (bos hucre mevcut degeri silmez).
 --     siparis_bakiye_durumu(): Excel bakiyesi + sistem dosyalarinin konsimento durumlari (odeme alindi mi).
 --  4) Yukleme plani: plan_bekleyen_aksiyonlari(proforma no listesi) - rezervasyon bekleyen siparis icin sistem
---     proformasi, rezervasyonsuz acik dosya, devam eden ana siparis.
+--     proformasi, rezervasyonsuz acik dosya, devam eden ana siparis (Excel satiri eslestirilmisse eslesen proforma).
 -- Hicbir mevcut kayit silinmez / degismez (yalniz yeni sutunlar ve fonksiyonlar).
 
 -- ============================================================================ 5) ETA
@@ -256,19 +256,26 @@ begin
     raise exception 'Yetkiniz yok.';
   end if;
   if coalesce(array_length(p_proformalar, 1), 0) > 500 then raise exception 'En fazla 500 proforma.'; end if;
+  -- Excel satiri sistem proformasiyla eslestirilmisse (siparis_eslesmeleri; or. UNEXSIM061126 -> UNEXBSC061126) o proforma
   return coalesce((
     select jsonb_agg(jsonb_build_object(
       'proforma_no', x.no,
-      'proforma_id', (select p.id from proformalar p where p.company_id = v_sirket and siparis_anahtar(p.proforma_no) = siparis_anahtar(x.no)
-                      order by p.updated_at desc limit 1),
+      'proforma_id', (select p.id from proformalar p where p.company_id = v_sirket and siparis_anahtar(p.proforma_no) in (x.k, x.ek)
+                      order by (siparis_anahtar(p.proforma_no) = x.ek) desc nulls last, p.updated_at desc limit 1),
       'dosya', (select jsonb_build_object('id', d.id, 'dosya_no', d.dosya_no) from ihracat_dosyalari d
-                where d.company_id = v_sirket and d.durum = 'Açık' and siparis_anahtar(d.proforma_no) = siparis_anahtar(x.no)
+                where d.company_id = v_sirket and d.durum = 'Açık' and siparis_anahtar(d.proforma_no) in (x.k, x.ek)
                   and not exists (select 1 from rezervasyonlar r where r.dosya_id = d.id and nullif(btrim(r.booking_no), '') is not null)
                 order by d.olusturma_tarihi desc limit 1),
       'ana_siparis', (select jsonb_build_object('id', a.id, 'proforma_no', a.proforma_no) from ana_siparisler a
-                      where a.company_id = v_sirket and not coalesce(a.tamamlandi, false) and siparis_anahtar(a.proforma_no) = siparis_anahtar(x.no)
+                      where a.company_id = v_sirket and not coalesce(a.tamamlandi, false) and siparis_anahtar(a.proforma_no) in (x.k, x.ek)
                       order by a.olusturma_tarihi desc limit 1)))
-    from (select distinct btrim(u) as no from unnest(p_proformalar) u where nullif(btrim(u), '') is not null) x), '[]'::jsonb);
+    from (
+      select y.no, siparis_anahtar(y.no) as k,
+        (select siparis_anahtar(e.proforma_anahtar) from siparis_eslesmeleri e join siparis_defteri s on s.id = e.defter_id
+         where e.company_id = v_sirket and s.company_id = v_sirket and siparis_anahtar(s.proforma_no) = siparis_anahtar(y.no)
+         order by e.created_at desc limit 1) as ek
+      from (select distinct btrim(u) as no from unnest(p_proformalar) u where nullif(btrim(u), '') is not null) y
+    ) x), '[]'::jsonb);
 end; $function$;
 
 revoke all on function public.plan_bekleyen_aksiyonlari(text[]) from public, anon;

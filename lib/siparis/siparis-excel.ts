@@ -8,6 +8,10 @@
  *     Yesil degil ama BL (booking) yazili -> rezervasyonlu.
  *   - "ÖN ÖDEMESİ ALINMIŞ…" basligindan sonra -> on_odeme_alindi; "ÖN ÖDEMESİ (VEYA ONAYI) ALINMAMIŞ" -> onay_bekliyor
  *     (11.11.2026: "VEYA ONAYI" ekli baslik taninmiyordu, 11 siparis yanlislikla on odeme alindi oldu - duzeltildi).
+ * 21.11.2026 (Harun Bey'in elle guncelledigi duzen): "47.HAFTA (15 KASIM - 21 KASIM)" hafta ara basliklari atlanir;
+ *   "YÜKLEMESİ PLANLANACAK SİPARİŞLER" -> on_odeme_alindi bolumu, "PEŞİNAT BEKLENEN SİPARİŞLER" -> onay_bekliyor bolumu.
+ *   Istege bagli "Ön Ödeme" sutunu (onay kutusu DOGRU/YANLIS): yesil olmayan, BL'siz satirda bolumden ONCE gelir
+ *   (DOGRU -> on_odeme_alindi, YANLIS -> onay_bekliyor). "Bakiye" / "Release" sutunlari sistemde yok, okunmaz.
  * Sutunlar BASLIK METNINDEN bulunur (sistemin "Excel indir" ciktisi da okunur; ek sutunlari yok sayilir).
  * Eslesme (sistemdeki siparis_defteri satirlari): proforma no (revize "R" eki yok sayilir) + BL; BL'si sonradan
  * eklenen / degisen satir ayni proformanin tek adayina baglanir. Hicbir kayit silinmez.
@@ -104,6 +108,8 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
           }
           const eksik = BASLIKLAR.filter(([alan]) => yeni[alan] === undefined).map(([, , ad]) => ad);
           if (eksik.length) throw new Error(`"${sayfa.ad}" sayfası satır ${no}: başlık bulunamadı: ${eksik.join(", ")}. Başlıklar sipariş listesi ile aynı olmalı.`);
+          const oo = anahtarlar.findIndex((x) => x === "ONODEME" || x === "ONODEMESI");
+          if (oo >= 0) yeni.on_odeme = oo;
           sutun = yeni;
         }
         continue;
@@ -117,6 +123,12 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
       }
       // Sistemin kendi ciktisindaki "İPTAL EDİLEN SİPARİŞLER" bolumu aktarilmaz (iptal yalniz sistemde degisir)
       if (/^IPTALEDILEN/.test(a)) { blok = "iptal"; continue; }
+      // 21.11.2026 elle guncellenen liste: bolum ve hafta ara basliklari (firma sutunu bos)
+      if (!deger(h[sutun.firma])) {
+        if (/^YUKLEMESIPLANLANACAK/.test(a)) { blok = "alindi"; continue; }
+        if (/^(PESINAT|ONODEME)BEKLENEN/.test(a)) { blok = "alinmamis"; continue; }
+        if (/^\d{1,2}HAFTA/.test(a)) continue;
+      }
       if (blok === "iptal") continue;
       const proforma = deger(h[sutun.proforma_no]);
       const firma = deger(h[sutun.firma]);
@@ -130,8 +142,11 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
       const kont = sayiOku(h[sutun.konteyner]);
       const bl = deger(h[sutun.bl_no]);
       const yesil = yesilMi(renk);
+      const onOdemeHam = sutun.on_odeme !== undefined ? metin(h[sutun.on_odeme]).toUpperCase() : "";
+      const onOdeme = onOdemeHam === "TRUE" ? true : onOdemeHam === "FALSE" ? false : null;
       const durum: SiparisDurumu = yesil ? (bl ? "sevk_edildi" : "bl_eksik")
         : bl ? "rezervasyonlu"
+        : onOdeme !== null ? (onOdeme ? "on_odeme_alindi" : "onay_bekliyor")
         : blok === "alindi" ? "on_odeme_alindi" : "onay_bekliyor";
       for (const [ad, v, ham] of [["Fiyat", fiyat, h[sutun.birim_fiyat]], ["Miktar", miktar, h[sutun.miktar_mt]], ["Konteyner", kont, h[sutun.konteyner]]] as const) {
         if (v === null && deger(ham)) uyarilar.push(`Satır ${no} (${proforma}): ${ad} sayı değil ("${metin(ham)}").`);
@@ -153,7 +168,7 @@ export function siparisSayfasiniCoz(sayfalar: HamSayfa[]): SiparisExcelSonucu {
 }
 
 export async function siparisExceliOku(dosya: File | Blob): Promise<SiparisExcelSonucu> {
-  return siparisSayfasiniCoz(await xlsxHamOku(dosya, { sayfa: () => true, sutun: 30, renk: true }));
+  return siparisSayfasiniCoz(await xlsxHamOku(dosya, { sayfa: () => true, sutun: 30, renk: true, mantiksal: true }));
 }
 
 // --------------------------------------------------------------------------- onizleme
@@ -186,6 +201,18 @@ export type SiparisOnizleme = {
   ayni: number;
   gonderilecek: SiparisAktarimSatiri[];
   dosyadaYok: SiparisMevcut[];
+  /** 21.11.2026 sistem esas: sistemde PROFORMA olarak var (Excel satiri olarak eklenmez, sistem satiri gorunur kalir) */
+  sistemde: SiparisExcelSatiri[];
+  /** 21.11.2026 sistem esas: dosyasi olan satirda Excel'in BL'si dosyanin booking'iyle celisiyor -> BL degistirilmez */
+  blKorunan: Array<{ satir: SiparisExcelSatiri; dosya_no: string; sistem: string; excel: string }>;
+};
+
+/** Onizlemeye sistemden ek bilgi (21.11.2026 "sistem esastır"). */
+export type SiparisSistemBilgisi = {
+  /** Sistemde kayitli proforma numaralari (Proforma Oluştur) */
+  proformalar?: string[];
+  /** siparis_defteri id -> bagli dosyanin numarasi ve booking'i */
+  dosyalar?: Map<string, { dosya_no: string; booking: string | null }>;
 };
 
 const goster = (alan: string, v: unknown): string => {
@@ -203,7 +230,7 @@ const esit = (a: unknown, b: unknown) => {
  * Eslestirme + fark. Kural (siparis_listesi_aktar ile AYNI): Excel'de bos alan sistemdeki degeri silmez;
  * "iptal" durumundaki kayit Excel'le degismez.
  */
-export function siparisOnizleme(excel: SiparisExcelSatiri[], mevcut: SiparisMevcut[]): SiparisOnizleme {
+export function siparisOnizleme(excel: SiparisExcelSatiri[], mevcut: SiparisMevcut[], sistem: SiparisSistemBilgisi = {}): SiparisOnizleme {
   const kullanilan = new Set<string>();
   const eslesme = new Map<SiparisExcelSatiri, SiparisMevcut>();
   const adaylar = (s: SiparisExcelSatiri) => mevcut.filter((m) => !kullanilan.has(m.id) && proformaAnahtar(m.proforma_no) === proformaAnahtar(s.proforma_no));
@@ -217,17 +244,33 @@ export function siparisOnizleme(excel: SiparisExcelSatiri[], mevcut: SiparisMevc
     bagla(s, a[0]);
   }
 
-  const sonuc: SiparisOnizleme = { yeni: [], degisen: [], ayni: 0, gonderilecek: [], dosyadaYok: [] };
+  const sonuc: SiparisOnizleme = { yeni: [], degisen: [], ayni: 0, gonderilecek: [], dosyadaYok: [], sistemde: [], blKorunan: [] };
+  const defterAnahtarlari = new Set(mevcut.map((m) => proformaAnahtar(m.proforma_no)));
+  const sistemProformalari = new Set((sistem.proformalar || []).map(proformaAnahtar));
   for (const s of excel) {
     const { satir: _satir, ...gonder } = s;
     void _satir;
     const m = eslesme.get(s);
-    if (!m) { sonuc.yeni.push(s); sonuc.gonderilecek.push({ ...gonder, id: null }); continue; }
+    if (!m) {
+      // Sistem proformasi (defterde satiri yok): Excel kopyasi eklenmez; sistem satiri zaten listede
+      const pk = proformaAnahtar(s.proforma_no);
+      if (sistemProformalari.has(pk) && !defterAnahtarlari.has(pk)) { sonuc.sistemde.push(s); continue; }
+      sonuc.yeni.push(s); sonuc.gonderilecek.push({ ...gonder, id: null }); continue;
+    }
     const degisiklikler: SiparisDegisiklik[] = [];
+    const dosya = sistem.dosyalar?.get(m.id);
     for (const alan of KARSILASTIRILAN) {
       const yeni = s[alan];
       if (yeni === null || yeni === undefined || yeni === "") continue;
       if (alan === "durum" && m.durum === "iptal") continue;
+      // Yalniz revize eki farkli (…-1 / …-1R): proforma no degismez; on odeme kaydi ve dagitimi mevcut anahtarda
+      if (alan === "proforma_no" && proformaAnahtar(String(yeni)) === proformaAnahtar(m.proforma_no)) { gonder.proforma_no = m.proforma_no; continue; }
+      // Dosyasi olan satirda BL = dosyanin booking'i (sistem esas); Excel farkli diyorsa degistirilmez
+      if (alan === "bl_no" && dosya?.booking && blAnahtar(dosya.booking) !== blAnahtar(String(yeni))) {
+        if (blAnahtar(m.bl_no) !== blAnahtar(String(yeni))) sonuc.blKorunan.push({ satir: s, dosya_no: dosya.dosya_no, sistem: dosya.booking, excel: String(yeni) });
+        gonder.bl_no = null;
+        continue;
+      }
       const eski = m[alan as keyof SiparisMevcut];
       if (!esit(eski, yeni)) degisiklikler.push({ alan: SIPARIS_ALAN_ADI[alan], eski: goster(alan, eski), yeni: goster(alan, yeni) });
     }

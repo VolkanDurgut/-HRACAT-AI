@@ -8,7 +8,7 @@ import { dagitimOku, type OnOdemeDagitimi } from "@/lib/on-odeme";
 import { supabase } from "@/lib/supabase";
 import { planNormalize, siparisNormalize, type PlanSatiri, type SiparisSatiri } from "@/lib/siparis/liste";
 import { aktarimSatiri, type PlanExcelSatiri, type PlanMevcut } from "@/lib/siparis/plan-excel";
-import type { SiparisAktarimSatiri, SiparisMevcut } from "@/lib/siparis/siparis-excel";
+import type { SiparisAktarimSatiri, SiparisMevcut, SiparisSistemBilgisi } from "@/lib/siparis/siparis-excel";
 
 export async function siparisListesiOku(): Promise<SiparisSatiri[]> {
   const { data, error } = await supabase.rpc("siparis_listesi");
@@ -86,6 +86,21 @@ export async function siparisKayitlariOku(): Promise<SiparisMevcut[]> {
     if (!data || data.length < 1000) break;
   }
   return sonuc;
+}
+
+/** 21.11.2026 Excel aktarimi "sistem esas" bilgisi: sistem proformalari + dosyasi olan defter satirlarinin booking'i. */
+export async function siparisSistemBilgisiOku(): Promise<SiparisSistemBilgisi> {
+  const [p, l] = await Promise.all([
+    supabase.from("proformalar").select("proforma_no").limit(5000),
+    supabase.rpc("siparis_listesi"),
+  ]);
+  if (p.error) throw new Error(p.error.message);
+  if (l.error) throw new Error(l.error.message);
+  const dosyalar = new Map<string, { dosya_no: string; booking: string | null }>();
+  for (const r of (l.data || []) as { anahtar: string; dosya_no: string | null; booking_no: string | null }[]) {
+    if (r.anahtar?.startsWith("excel:") && r.dosya_no) dosyalar.set(r.anahtar.slice(6), { dosya_no: r.dosya_no, booking: r.booking_no });
+  }
+  return { proformalar: ((p.data || []) as { proforma_no: string | null }[]).map((x) => x.proforma_no || "").filter(Boolean), dosyalar };
 }
 
 export async function siparisAktar(dosyaAdi: string, satirlar: SiparisAktarimSatiri[]): Promise<{ eklenen: number; guncellenen: number; ayni: number }> {

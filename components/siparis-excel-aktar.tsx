@@ -11,7 +11,7 @@ import React from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, Info, Loader2, X } from "lucide-react";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import { DURUM_ETIKETI, siparisExceliOku, siparisOnizleme, type SiparisOnizleme } from "@/lib/siparis/siparis-excel";
-import { siparisAktar, siparisKayitlariOku } from "@/lib/siparis/veri";
+import { siparisAktar, siparisKayitlariOku, siparisSistemBilgisiOku } from "@/lib/siparis/veri";
 
 const sayi = (n: number | null) => (n === null ? "—" : n.toLocaleString("tr-TR", { maximumFractionDigits: 2 }));
 
@@ -31,10 +31,10 @@ export function SiparisExcelAktar({ onKapat, onAktarildi }: { onKapat: () => voi
     if (!f) return;
     setHata(null); setOnizleme(null); setUyarilar([]); setDosyaAdi(f.name); setOkunuyor(true);
     try {
-      const [excel, mevcut] = await Promise.all([siparisExceliOku(f), siparisKayitlariOku()]);
+      const [excel, mevcut, sistem] = await Promise.all([siparisExceliOku(f), siparisKayitlariOku(), siparisSistemBilgisiOku()]);
       setToplam(excel.satirlar.length);
       setUyarilar(excel.uyarilar);
-      setOnizleme(siparisOnizleme(excel.satirlar, mevcut));
+      setOnizleme(siparisOnizleme(excel.satirlar, mevcut, sistem));
     } catch (e) {
       setHata(e instanceof Error ? e.message : "Dosya okunamadı.");
     } finally {
@@ -103,6 +103,7 @@ export function SiparisExcelAktar({ onKapat, onAktarildi }: { onKapat: () => voi
                   ["Değişecek", onizleme.degisen.length, "degisen"],
                   ["Zaten aynı", onizleme.ayni, "ayni"],
                   ["Sistemde var, dosyada yok (dokunulmaz)", onizleme.dosyadaYok.length, "yok"],
+                  ...(onizleme.sistemde.length ? [["Sistem proformasında (eklenmez)", onizleme.sistemde.length, "sistemde"] as const] : []),
                 ] as const).map(([ad, n, k]) => (
                   <span key={ad} className="px-2.5 py-1 rounded-full border" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} data-sayi={k ?? undefined}>
                     {ad}: <b className="text-white tabular-nums">{n}</b>
@@ -176,6 +177,19 @@ export function SiparisExcelAktar({ onKapat, onAktarildi }: { onKapat: () => voi
                   </button>
                   {yokAcik && <p className="mt-1" style={{ color: TEXT_MUTED }}>{onizleme.dosyadaYok.map((m) => `${m.proforma_no} · ${m.firma}${m.bl_no ? ` · ${m.bl_no}` : ""}`).join(" — ")}</p>}
                 </div>
+              )}
+              {onizleme.blKorunan.length > 0 && (
+                <div className="rounded-lg border px-3 py-2 text-[11.5px]" style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.06)" }} data-testid="siparis-bl-korunan">
+                  <p className="text-amber-300 font-medium flex items-center gap-1.5"><Info size={12} /> Sistem esas: {onizleme.blKorunan.length} satırda Excel&apos;deki BL dosyanın booking&apos;iyle çelişiyor; BL değiştirilmez</p>
+                  <ul className="mt-1 space-y-0.5 list-disc pl-5" style={{ color: "#FCD34D" }}>
+                    {onizleme.blKorunan.map((b) => <li key={b.satir.satir}>{b.satir.proforma_no} · {b.dosya_no}: sistemde {b.sistem}, Excel&apos;de {b.excel}</li>)}
+                  </ul>
+                </div>
+              )}
+              {onizleme.sistemde.length > 0 && (
+                <p className="text-[11.5px]" style={{ color: TEXT_MUTED }} data-testid="siparis-sistemde">
+                  Sistemde proforma olarak kayıtlı {onizleme.sistemde.length} sipariş Excel kopyası olarak eklenmez (sistem satırı listede kalır): {onizleme.sistemde.map((x) => x.proforma_no).join(", ")}
+                </p>
               )}
               <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
                 Elle işaretlenen ön ödeme ve dosya / rezervasyondan gelen canlı durum (rezervasyonlu, sevk edildi, BL eksik) önceliklidir.

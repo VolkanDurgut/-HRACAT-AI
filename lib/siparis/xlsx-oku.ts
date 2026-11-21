@@ -30,7 +30,7 @@ function metinIcerik(el: Element): string {
 /** Excel'in varsayilan tema renkleri (Office): tema dolgusu rengi tahmini icin */
 const TEMA = ["FFFFFF", "000000", "E7E6E6", "44546A", "4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47"];
 
-export async function xlsxHamOku(dosya: File | Blob, secenek: { sayfa: (ad: string) => boolean; sutun?: number; renk?: boolean }): Promise<HamSayfa[]> {
+export async function xlsxHamOku(dosya: File | Blob, secenek: { sayfa: (ad: string) => boolean; sutun?: number; renk?: boolean; mantiksal?: boolean }): Promise<HamSayfa[]> {
   if (dosya.size > ENBUYUK_BOYUT) throw new Error("Dosya 15 MB'tan büyük.");
   const JSZip = (await import("jszip")).default;
   let zip: Awaited<ReturnType<typeof JSZip.loadAsync>>;
@@ -93,7 +93,9 @@ export async function xlsxHamOku(dosya: File | Blob, secenek: { sayfa: (ad: stri
         if (t === "s") d = v !== null ? paylasilan[Number(v)] ?? null : null;
         else if (t === "inlineStr") d = metinIcerik(c);
         else if (t === "str") d = v;
-        else if (t === "e" || t === "b") d = null;
+        // 21.11.2026: onay kutusu / DOGRU-YANLIS hucresi ("Ön Ödeme" sutunu) istenirse "TRUE" / "FALSE"
+        else if (t === "b") d = secenek.mantiksal && v !== null ? (v === "1" ? "TRUE" : "FALSE") : null;
+        else if (t === "e") d = null;
         else d = v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : v;
         if (d !== null && d !== "") dolu = true;
         hucreler[i] = d;

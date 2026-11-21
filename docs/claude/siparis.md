@@ -629,3 +629,22 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
   dosyalara yazılır. Talimat metni, PDF, bayrak, fatura onayı, DİİB ve Kontrol Merkezi bu kuralı kullanır.
 - Ülke listesine Surinam, Guyana, Trinidad ve Tobago, Barbados, Belize, Bahamalar, Porto Riko eklendi (Paramaribo / Port of Spain /
   Georgetown limanları da).
+
+## 4.25 Sipariş listesi Excel: elle güncellenen düzen + "sistem esastır" korumaları (21.11.2026)
+Kullanıcı: "Harun Bey sipariş listesini sistemde değil manuel olarak güncelledi. Bizde sistemi buna göre güncellemeliyiz."
+Dosya `Unex_İhracat_Sipariş_Listesi_21.11.2026.xlsx`: hafta ara başlıkları ("47.HAFTA (15 KASIM - 21 KASIM)"),
+"YÜKLEMESİ PLANLANACAK SİPARİŞLER" / "PEŞİNAT BEKLENEN SİPARİŞLER" bölümleri, onay kutulu "Ön Ödeme" / "Bakiye" / "Release" sütunları.
+- Okuyucu (`lib/siparis/siparis-excel.ts`, `xlsx-oku.ts` `mantiksal`): hafta başlığı atlanır; YÜKLEMESİ PLANLANACAK →
+  ön ödeme alındı bölümü, PEŞİNAT BEKLENEN → onay bekliyor bölümü. "Ön Ödeme" DOĞRU/YANLIŞ yeşil olmayan BL'siz satırda
+  bölümden önce gelir. Bakiye / Release sistemde yok, okunmaz. ESKİ okuyucu bu dosyada YÜKLEMESİ PLANLANACAK satırlarını
+  "onay bekliyor" yapardı.
+- Önizleme korumaları (`siparisOnizleme(excel, mevcut, sistem)`, bilgi `siparisSistemBilgisiOku`):
+  1) Dosyası olan satırda Excel BL'si dosyanın booking'iyle çelişiyorsa BL DEĞİŞMEZ (`blKorunan`; 21.11 dosyasında
+     EMT160926-4R ↔ EMT300926R BL'leri yer değiştirmişti, sistem: 0124 = ISB2105393, 0130 = ISB2105390).
+  2) Yalnız revize eki farkı (…-1 → …-1R) proforma no'yu değiştirmez (DB `siparis_anahtar` "-1R"yi korur; ön ödeme kaydı
+     ve dağıtımı eski anahtarda kalır).
+  3) Defterde satırı olmayan SİSTEM PROFORMASI (Proforma Oluştur) Excel kopyası olarak eklenmez (`sistemde`); eklenirse
+     proforma satırı gizlenir ve "Onay geldi → dosyayı aç" akışı kaybolurdu.
+- 21.11 dosyası kuru çalıştırma (geri alındı): 4 yeni (SOSAR 50 MT ZIMUIST26809823 → 0131'e bağlanır, SOSAR çift sayımı
+  biter; AQI 50 MT B261102149; OMG091126 2×250 booking'li), 39 güncelleme (ön ödeme alındı 14, sevk 12, AQI 375→325,
+  OMG 750→250, SOSAR 100→50), 8 sistem proforması eklenmedi, 2 BL korundu; ARG GROUP (UNEXAGI101126) dosyada yok, dokunulmadı.

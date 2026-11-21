@@ -563,7 +563,7 @@ Kontrol Merkezi / Pazar / Ana Panel düzeni (`app/siparisler/page.tsx`, saf yard
 
 - **Sabit üst:** 6 kart aynı; tıklayınca ilgili sekme açılır ("Olası tekrar" ilk şüpheli satırın sekmesini açar).
 - **Kaynak eski şeridi:** `veri_tutarsizliklari()` içindeki `kaynak_eski` kalemleri (plan / sipariş listesi 3 günden eski — Kontrol Merkezi ile aynı kural). "Plan yükle" / "Liste yükle" mevcut Excel aktarım pencerelerini açar. RPC `analiz` yetkisi ister; okunamazsa şerit görünmez.
-- **Sekmeler (`?sekme=`; varsayılan rezervasyonlu adreste yazılmaz):** `rezervasyonlu` (rezervasyonlu + BL eksik) · `rez_bekleyen` (ön ödeme alındı, rezervasyon yok; turuncu sayı) · `onay` · `sevk` (sevk edilen + iptal) · `plan`. Her durum tam bir sekmede (`sekmeSayilari` toplamı = satır sayısı). Eski "sevk edilenleri göster" düğmesi kalktı.
+- **(21.11.2026 değişti, bkz. 4.26)** **Sekmeler (`?sekme=`; varsayılan rezervasyonlu adreste yazılmaz):** `rezervasyonlu` (rezervasyonlu + BL eksik) · `rez_bekleyen` (ön ödeme alındı, rezervasyon yok; turuncu sayı) · `onay` · `sevk` (sevk edilen + iptal) · `plan`. Her durum tam bir sekmede (`sekmeSayilari` toplamı = satır sayısı). Eski "sevk edilenleri göster" düğmesi kalktı.
 - **Arama:** tek kutu, Türkçe harf duyarsız; sekme sayıları aramaya göre daralır, boş sekmede "diğer sekmelerde N sonuç" yazar.
 - **Bağlantılar:** müşteri adı → `/pazar?musteri=` (Pazar yetkisi varsa); rezervasyonlu satırın dosya no'su → `/panel?dosya=` (sevk edilen / kapalı dosya Ana Panel'de olmayabileceği için yalnız rezervasyonlu).
 - "Dosyaya dönüştür" bu sayfada yok: rezervasyon operasyondan gelir, sipariş kendiliğinden sekme değiştirir.
@@ -648,3 +648,22 @@ Dosya `Unex_İhracat_Sipariş_Listesi_21.11.2026.xlsx`: hafta ara başlıkları 
 - 21.11 dosyası kuru çalıştırma (geri alındı): 4 yeni (SOSAR 50 MT ZIMUIST26809823 → 0131'e bağlanır, SOSAR çift sayımı
   biter; AQI 50 MT B261102149; OMG091126 2×250 booking'li), 39 güncelleme (ön ödeme alındı 14, sevk 12, AQI 375→325,
   OMG 750→250, SOSAR 100→50), 8 sistem proforması eklenmedi, 2 BL korundu; ARG GROUP (UNEXAGI101126) dosyada yok, dokunulmadı.
+
+## 4.26 Sipariş Listesi sayfası Yükleme Planı ile açılır (21.11.2026) — yalnız arayüz, veritabanı değişmedi
+
+Kullanıcı: "Rezervasyonlu sekmesi zaten güncel yükleme planı anlamına geliyor; kaldıralım, sipariş listesi açıldığında
+yükleme planı karşılasın. Sevk edilen kısmını da kaldıralım; İhracatlar sayfasında geriye dönük her şeyi kontrol edebiliyoruz."
+
+- **Sekmeler:** `plan` (varsayılan, adreste yazılmaz) · `rez_bekleyen` · `onay` · `formlar`. `rezervasyonlu` ve `sevk`
+  kaldırıldı; eski adresler (`?sekme=rezervasyonlu`, `?sekme=sevk`) bilinmeyen değer sayılır → Yükleme Planı.
+- `satirSekmesi`: ön ödeme alındı → `rez_bekleyen`, onay bekliyor → `onay`, rezervasyonlu / BL eksik → `plan`,
+  sevk edildi / iptal → `null` (sayfada sekmesi yok; İhracatlar). `sekmeSayilari` yalnız iki liste sekmesini sayar.
+- Kaldırmadan önce canlı kontrol: 17 rezervasyonlu + BL eksik satırın 15'inin booking'i planda (Excel'de rezervasyonlu
+  satırın BL sütunu booking'dir: OMG091126 AKKIST26054134 / 281349160, SIM061126 594600105360). Kalan 2 satır (SAMREX
+  UNEXSGT040526, STE AFRICAN UNEXSAB030626) Excel'de yeşil ama BL'siz eski sevkiyatlar; "Sistemde karşılığı olmayan
+  siparişler" şeridinde listelenir, "BL eksik" kartı şeridi açar.
+- Şeritteki "Listede göster": rezervasyonlu / BL eksik satır Yükleme Planı'nda booking (yoksa BL, yoksa firmanın ilk iki
+  kelimesi; `planAramaMetni`) ile aranır. Planda arama yapılınca tüm yıl taranır (eski haftalar "Güncel" görünümde gizli kalmasın).
+- Kartlar: "Açık sipariş" ve "Rezervasyonlu" → Yükleme Planı. "Liste yükle" / sipariş Excel aktarımı her sekmeden açılır.
+- Excel indir değişmedi (tüm satırlar, sevk edilenler dahil).
+

@@ -3,7 +3,8 @@
  * Siparis Listesi: "Sistemde karsiligi olmayan siparisler" seridi (21.11.2026, Faz 4 - sistem esas).
  * Kullanici: "Eski satirlar proformayla bir kerelik eslestirilir; eslesmeyenler size liste halinde gelir."
  * Bu satirlarin sistemde proformasi / dosyasi yok: durumlari yalniz Excel'den gelir. Satir yoksa serit gorunmez.
- * "Listede goster": arama kutusuna proforma no yazilir ve satirin sekmesi acilir. Hicbir kaydi degistirmez.
+ * "Listede goster": arama kutusuna proforma no yazilir ve satirin sekmesi acilir (21.11.2026: rezervasyonlu / BL eksik
+ * satir Yukleme Plani'nda booking ya da firma adiyla aranir). Hicbir kaydi degistirmez.
  */
 import React from "react";
 import { FileSpreadsheet, Search } from "lucide-react";
@@ -14,12 +15,15 @@ import type { EslesmeyenSatir } from "@/lib/siparis/veri";
 
 const trTarih = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "-");
 
-export function EslesmeyenSerit({ satirlar, onGoster }: { satirlar: EslesmeyenSatir[]; onGoster: (s: EslesmeyenSatir) => void }) {
+/** 21.11.2026: acik / onAcik verilirse sayfa da seridi acabilir ("BL eksik" karti); verilmezse kullanicinin tercihi. */
+export function EslesmeyenSerit({ satirlar, onGoster, acik: disAcik = null, onAcik }: {
+  satirlar: EslesmeyenSatir[]; onGoster: (s: EslesmeyenSatir) => void; acik?: boolean | null; onAcik?: (a: boolean) => void;
+}) {
   const [acik, setAcik] = useAcikTercihi("siparis-eslesmeyen-serit");
   if (!satirlar.length) return null;
-  const gorunur = acik ?? false;
+  const gorunur = disAcik ?? acik ?? false;
   return (
-    <AcilirSerit className="mb-4" testId="eslesmeyen-serit" acik={gorunur} onDegistir={() => setAcik(!gorunur)}
+    <AcilirSerit className="mb-4" testId="eslesmeyen-serit" acik={gorunur} onDegistir={() => { setAcik(!gorunur); onAcik?.(!gorunur); }}
       ikon={<FileSpreadsheet size={14} />} baslik={`Sistemde karşılığı olmayan siparişler · ${satirlar.length}`}
       rozetler={<span className="text-[11px]" style={{ color: "#E2C76B" }}>Durumları yalnız Excel'den gelir</span>}
       {...SERIT_TONU.amber}>

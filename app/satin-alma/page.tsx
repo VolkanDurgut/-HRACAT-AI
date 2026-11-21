@@ -4,7 +4,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle, Check, CheckCircle2, ChevronDown, Clock, Copy, ExternalLink, History, Inbox, Layers, Link2, Loader2, Mail,
-  CheckCheck, FileText, FlaskConical, PackageCheck, Pencil, Plus, RefreshCw, RotateCcw, ShoppingCart, Trash2, Undo2, X, XCircle,
+  CalendarDays, CheckCheck, FileText, FlaskConical, PackageCheck, Pencil, Plus, RefreshCw, RotateCcw, Send, ShoppingCart, Trash2, Undo2, X, XCircle, Zap,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
@@ -22,6 +22,9 @@ import {
   type SaKalem, type SaListe,
 } from "@/supabase/functions/_shared/satin-alma";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { yoneticiMi } from "@/lib/asistan/gorunum";
+import { bekleyenleriAyir, satinAlmaGunuMu, topluSanalListe, varsayilanDahil } from "@/lib/satin-alma/toplu";
+import { topluListeleriOku, type TopluSatiri } from "@/lib/satin-alma/veri";
 
 /**
  * SATIN ALMA (26.10.2026) - departman ihtiyac listelerinin onayi.
@@ -40,6 +43,11 @@ import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
  * o departmanin mailleri SADECE test adresine (test adresi) gider. Departman silinebilir
  * (sa_departman_sil: listeleri + kalemleriyle birlikte, kalici).
  * Tablolar istemciye SADECE okunur; yazmalar RPC / edge function ile.
+ * 21.11.2026 ON ONAY + HAFTALIK TOPLU LISTE: departman formu once "Ön onay" sekmesinde
+ * (Volkan Bey) birikir; cumartesi "Toplu listeyi oluştur" ile secilen formlar TSA-YYYY-NNNN
+ * toplu listesiyle Burak Bey'e TEK mail olarak sunulur (acil form "Acil: hemen onaya sun").
+ * Burak Bey toplu listeye "Onay bekleyen"de TEK kartta karar verir (edge "toplu_karar");
+ * onayli fis / sonuc maili form (departman) bazinda eskisi gibi.
  * 28.10.2026 karar ekrani notlari (urunEslesme: ayni / benzer ad): kalem baska bir
  * departmanin onay bekleyen formunda da varsa, son 30 gunde ayni departmana onaylandiysa
  * ya da ayni formda birden fazla geciyorsa kalemin altinda gosterilir.
@@ -55,10 +63,10 @@ type ListeSatiri = Omit<SaListe, "departman" | "sirket" | "kalemler"> & {
   sonuc_maili_hata: string | null;
   satin_alma_kalemleri: SaKalem[];
 };
-type Liste = SaListe & { departman_id: string; gonderim_maili_hata: string | null; sonuc_maili_hata: string | null };
+type Liste = SaListe & { departman_id: string; gonderim_maili_hata: string | null; sonuc_maili_hata: string | null; on_onay_email?: string | null };
 /** 14.11.2026: degistir = "Degistirerek onayla" (onay_miktar + onay_notu gonderilir) */
 type KararSecimi = { karar: "onaylandi" | "reddedildi"; red_nedeni: string; degistir: boolean; onay_miktar: string; onay_notu: string };
-type Sekme = "bekleyen" | "cek" | "gecmis" | "departmanlar";
+type Sekme = "on_onay" | "bekleyen" | "cek" | "gecmis" | "departmanlar";
 /** Karar ekraninda kalem notlari (28.10.2026). */
 type KalemNotlari = {
   formda: number; // ayni formda ayni urunun diger satir sayisi
@@ -98,7 +106,7 @@ function kalemNotlariHesapla(bekleyenler: Liste[], sonuclananlar: Liste[]): Map<
   return sonuc;
 }
 
-const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad, tedarikci, onay_miktar, onay_notu)";
+const LISTE_KOLONLARI = "id, liste_no, durum, departman_id, toplu_id, on_onay_email, onaya_sunma_zamani, gonderen_ad, gonderim_zamani, karar_veren_email, karar_zamani, karar_notu, gonderim_maili, gonderim_maili_hata, sonuc_maili, sonuc_maili_hata, cek_durumu, cek_tamamlanma, cek_token, test, satin_alma_kalemleri(id, kategori, urun, miktar, birim, aciliyet, aciklama, talep_eden, karar, red_nedeni, olusturma, alindi, alinma_zamani, alan_ad, tedarikci, onay_miktar, onay_notu)";
 
 const kartStil = { backgroundColor: CARD_BG, borderColor: CARD_BORDER } as React.CSSProperties;
 const girdiSinifi = "w-full px-3 py-2 border rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -113,13 +121,15 @@ function TestRozeti() {
 }
 
 function SatinAlmaIcerik() {
-  const { companyId, loading: authLoading, yetkiler } = useAuth();
+  const { companyId, loading: authLoading, yetkiler, user } = useAuth();
   const { showToast } = useToast();
   const params = useSearchParams();
   const hedefListe = params?.get("liste") || null;
+  const hedefToplu = params?.get("toplu") || null;
 
   const [departmanlar, setDepartmanlar] = useState<Departman[]>([]);
   const [listeler, setListeler] = useState<Liste[]>([]);
+  const [toplular, setToplular] = useState<TopluSatiri[]>([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [yenileniyor, setYenileniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
@@ -131,14 +141,16 @@ function SatinAlmaIcerik() {
   const getir = useCallback(async (sessiz = false) => {
     if (!companyId) return;
     if (sessiz) setYenileniyor(true);
-    const [dRes, lRes] = await Promise.all([
+    const [dRes, lRes, tRes] = await Promise.all([
       supabase.from("satin_alma_departmanlari").select("id, ad, token, aktif, test, sira, haftalik_gun, hatirlatma_eposta").eq("company_id", companyId).order("sira").order("ad"),
       supabase.from("satin_alma_listeleri").select(LISTE_KOLONLARI).eq("company_id", companyId)
         .order("gonderim_zamani", { ascending: false, nullsFirst: true }).limit(300),
+      topluListeleriOku(companyId),
     ]);
-    if (dRes.error || lRes.error) {
-      setHata(`Veriler okunamadı: ${(dRes.error || lRes.error)?.message}`);
+    if (dRes.error || lRes.error || tRes.hata) {
+      setHata(`Veriler okunamadı: ${(dRes.error || lRes.error)?.message || tRes.hata}`);
     } else {
+      setToplular(tRes.veri);
       const dep = (dRes.data || []) as Departman[];
       const adlar = new Map(dep.map((d) => [d.id, d.ad]));
       const testler = new Set(dep.filter((d) => d.test).map((d) => d.id));
@@ -160,22 +172,50 @@ function SatinAlmaIcerik() {
   useEffect(() => { if (!authLoading && yetkili) getir(); }, [authLoading, yetkili, getir]);
 
   const bekleyenler = useMemo(() => listeler.filter((l) => l.durum === "bekliyor").sort((a, b) => (a.gonderim_zamani || "").localeCompare(b.gonderim_zamani || "")), [listeler]);
+  const onOnaylar = useMemo(() => listeler.filter((l) => l.durum === "on_onay").sort((a, b) => (a.gonderim_zamani || "").localeCompare(b.gonderim_zamani || "")), [listeler]);
+  const ayrik = useMemo(() => bekleyenleriAyir(bekleyenler), [bekleyenler]);
+  const topluBilgi = useMemo(() => new Map(toplular.map((t) => [t.id, t])), [toplular]);
   const sonuclananlar = useMemo(() => listeler.filter((l) => l.durum === "sonuclandi"), [listeler]);
   const taslaklar = useMemo(() => new Map(listeler.filter((l) => l.durum === "taslak").map((l) => [l.departman_id, l])), [listeler]);
   const kalemNotlari = useMemo(() => kalemNotlariHesapla(bekleyenler, sonuclananlar), [bekleyenler, sonuclananlar]);
 
-  // Mail'deki "Listeyi incele" baglantisi: ?liste=<id> -> ilgili sekme + kaydir
+  // Mail'deki "Listeyi incele" baglantisi: ?liste=<id> / ?toplu=<id> -> ilgili sekme + kaydir.
+  // 21.11.2026: baglanti yoksa yonetici (Volkan Bey) on onayda form varsa "Ön onay" sekmesiyle acar.
   useEffect(() => {
-    if (!hedefListe || hedefIslendi.current || yukleniyor) return;
+    if (hedefIslendi.current || yukleniyor) return;
+    if (hedefToplu) {
+      const varMi = listeler.some((x) => x.toplu_id === hedefToplu);
+      if (!varMi) return;
+      hedefIslendi.current = true;
+      const bekliyor = listeler.some((x) => x.toplu_id === hedefToplu && x.durum === "bekliyor");
+      setSekme(bekliyor ? "bekleyen" : "cek");
+      if (bekliyor) setTimeout(() => document.getElementById(`liste-${hedefToplu}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+      return;
+    }
+    if (!hedefListe) {
+      hedefIslendi.current = true;
+      if (onOnaylar.length > 0 && yoneticiMi(user?.email)) setSekme("on_onay");
+      return;
+    }
     const l = listeler.find((x) => x.id === hedefListe);
     if (!l) return;
     hedefIslendi.current = true;
-    setSekme(l.durum === "sonuclandi" ? "cek" : "bekleyen");
-    setTimeout(() => document.getElementById(`liste-${l.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
-  }, [hedefListe, listeler, yukleniyor]);
+    // Toplu listeyle sunulan form: toplu kartina kaydir
+    const kart = l.durum === "bekliyor" && l.toplu_id ? l.toplu_id : l.id;
+    setSekme(l.durum === "sonuclandi" ? "cek" : l.durum === "on_onay" ? "on_onay" : "bekleyen");
+    setTimeout(() => document.getElementById(`liste-${kart}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  }, [hedefListe, hedefToplu, listeler, onOnaylar.length, user?.email, yukleniyor]);
 
   const fisSayisi = useMemo(() => sonuclananlar.filter((l) => listeOzeti(l).onay > 0).length, [sonuclananlar]);
   const teslimBekleyen = useMemo(() => sonuclananlar.filter((l) => teslimDurumu(l) === "bekliyor").length, [sonuclananlar]);
+
+  const topluMailTekrar = async (topluId: string) => {
+    const r = await satinAlmaCagir<{ mail: string; alicilar: string[] }>({ islem: "toplu_mail_tekrar", toplu_id: topluId }, true);
+    if (!r.ok) showToast(r.hata, "error");
+    else if (r.veri.mail === "gonderildi") showToast(`E-posta gönderildi: ${r.veri.alicilar.join(", ")}`, "success");
+    else showToast("E-posta yine gönderilemedi. Biraz sonra tekrar deneyin.", "error");
+    getir(true);
+  };
 
   const mailTekrar = async (l: Liste, tur: "gonderim" | "sonuc") => {
     const r = await satinAlmaCagir<{ mail: string; alicilar: string[] }>({ islem: "mail_tekrar", liste_id: l.id, tur }, true);
@@ -194,7 +234,7 @@ function SatinAlmaIcerik() {
       <SayfaBasligi
         ikon={<ShoppingCart size={20} />}
         baslik="Satın Alma"
-        aciklama="Departmanların satın alma talepleri. Kalemleri onaylayın ya da reddedin; onaylananlardan oluşan satın alma fişi execution@unex.com.tr adresine gider."
+        aciklama="Departmanların satın alma talepleri önce ön onayda birikir; cumartesi tüm departmanların formları tek toplu listeyle (acilse hemen) Burak Bey'in onayına sunulur. Onaylananlardan oluşan satın alma fişi execution@unex.com.tr adresine gider."
         sag={
           <button onClick={() => getir(true)} disabled={yenileniyor}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm hover:bg-white/5 disabled:opacity-60" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
@@ -207,7 +247,8 @@ function SatinAlmaIcerik() {
 
       <div className="flex flex-wrap gap-1 p-1 rounded-xl border mb-5 w-fit max-w-full" style={kartStil} role="tablist">
         {([
-          ["bekleyen", `Onay bekleyen (${bekleyenler.length})`],
+          ["on_onay", `Ön onay (${onOnaylar.length})`],
+          ["bekleyen", `Onay bekleyen (${ayrik.toplular.length + ayrik.tekler.length})`],
           ["cek", `Onaylı fişler${fisSayisi ? ` (${fisSayisi}${teslimBekleyen ? ` · ${teslimBekleyen} teslim bekliyor` : ""})` : ""}`],
           ["gecmis", "Departman geçmişi"],
           ["departmanlar", "Departmanlar ve bağlantılar"],
@@ -220,13 +261,30 @@ function SatinAlmaIcerik() {
         ))}
       </div>
 
+      {sekme === "on_onay" && <OnOnayPaneli listeler={onOnaylar} onDegisti={(mesaj, tur, sekmeye) => { showToast(mesaj, tur); if (sekmeye) setSekme(sekmeye); getir(true); }} />}
+
       {sekme === "bekleyen" && (
         bekleyenler.length === 0
-          ? <EmptyState icon={<Inbox size={40} />} title="Onay bekleyen liste yok" description="Departmanlar listelerini gönderdiğinde burada görünür ve e-posta gelir." />
-          : <div className="space-y-5">{bekleyenler.map((l) => (
-              <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar} notlar={kalemNotlari} onceki={oncekiListeler(l, listeler)}
-                onKaydedildi={(mesaj, tur) => { showToast(mesaj, tur); getir(true); }} />
-            ))}</div>
+          ? <EmptyState icon={<Inbox size={40} />} title="Onay bekleyen liste yok" description="Ön onaydan sunulan formlar (cumartesi toplu liste ya da acil form) burada görünür ve e-posta gelir." />
+          : <div className="space-y-5">
+              {ayrik.toplular.map((t) => {
+                const bilgi = topluBilgi.get(t.id);
+                const { liste, kalemFormu } = topluSanalListe(t.id, bilgi?.toplu_no || "Toplu liste", t.listeler);
+                const kalemOnceki = new Map<string, Liste[]>();
+                const formOnceki = new Map(t.listeler.map((l) => [l.id, oncekiListeler(l, listeler)]));
+                kalemFormu.forEach((l, kalemId) => kalemOnceki.set(kalemId, formOnceki.get(l.id) || []));
+                return (
+                  <KararKarti key={t.id} liste={{ ...liste, gonderim_maili: bilgi?.onay_maili ?? null, gonderim_maili_hata: bilgi?.onay_maili_hata ?? null, gonderen_ad: bilgi?.olusturan_email || liste.gonderen_ad, gonderim_zamani: bilgi?.olusturma || liste.gonderim_zamani }}
+                    vurgulu={t.id === hedefToplu || t.listeler.some((l) => l.id === hedefListe)} onMailTekrar={mailTekrar} notlar={kalemNotlari} onceki={[]}
+                    toplu={{ listeler: t.listeler, kalemFormu, kalemOnceki, onMailTekrar: () => topluMailTekrar(t.id) }}
+                    onKaydedildi={(mesaj, tur) => { showToast(mesaj, tur); getir(true); }} />
+                );
+              })}
+              {ayrik.tekler.map((l) => (
+                <KararKarti key={l.id} liste={l} vurgulu={l.id === hedefListe} onMailTekrar={mailTekrar} notlar={kalemNotlari} onceki={oncekiListeler(l, listeler)}
+                  onKaydedildi={(mesaj, tur) => { showToast(mesaj, tur); getir(true); }} />
+              ))}
+            </div>
       )}
 
       {sekme === "cek" && <CekListeleri listeler={sonuclananlar} departmanlar={departmanlar} hedef={hedefListe} onMailTekrar={mailTekrar} onDegisti={() => getir(true)} />}
@@ -239,12 +297,182 @@ function SatinAlmaIcerik() {
 }
 
 // ---------------------------------------------------------------------------
+// 21.11.2026 ON ONAY (Volkan Bey): formlar hafta boyunca birikir; cumartesi toplu liste,
+// acilse tek form hemen Burak Bey'e. Kalem karari burada VERILMEZ (Burak Bey verir).
+// ---------------------------------------------------------------------------
+function OnOnayPaneli({ listeler, onDegisti }: {
+  listeler: Liste[];
+  onDegisti: (mesaj: string, tur: "success" | "error", sekmeye?: Sekme) => void;
+}) {
+  // Varsayilan secimden FARKLI isaretlenenler (yeni gelen form varsayilanla secili gelir)
+  const [degisen, setDegisen] = useState<Set<string>>(() => new Set());
+  const [acik, setAcik] = useState<Set<string>>(() => new Set());
+  const [onizleme, setOnizleme] = useState(false);
+  const [onay, setOnay] = useState<{ tur: "toplu" } | { tur: "acil"; liste: Liste } | null>(null);
+  const [calisiyor, setCalisiyor] = useState(false);
+  const varsayilan = useMemo(() => varsayilanDahil(listeler), [listeler]);
+  const dahil = (l: Liste) => (degisen.has(l.id) ? !varsayilan(l) : varsayilan(l));
+  const secilenler = listeler.filter(dahil);
+  const karisik = new Set(secilenler.map((l) => l.test === true)).size > 1;
+  const kalemler = secilenler.flatMap((l) => l.kalemler.map((k) => ({ ...k, departman: l.departman })));
+  const departmanSayisi = new Set(secilenler.map((l) => l.departman)).size;
+  const acilSayisi = kalemler.filter((k) => k.aciliyet === "acil").length;
+  const gruplar = useMemo(() => tedarikciGruplari(kalemler), [kalemler]);
+  const cumartesi = satinAlmaGunuMu();
+  const testSecili = secilenler.some((l) => l.test);
+
+  const degistir = (id: string) => setDegisen((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
+  const ac = (id: string) => setAcik((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
+
+  const gonder = async () => {
+    if (!onay) return;
+    setCalisiyor(true);
+    if (onay.tur === "toplu") {
+      const r = await satinAlmaCagir<{ toplu_no: string; form: number; mail: string; alicilar: string[] }>({ islem: "toplu_sun", liste_ids: secilenler.map((l) => l.id) }, true);
+      setCalisiyor(false);
+      setOnay(null);
+      if (!r.ok) { onDegisti(r.hata, "error"); return; }
+      setDegisen(new Set());
+      onDegisti(r.veri.mail === "gonderildi"
+        ? `${r.veri.toplu_no} toplu listesi (${r.veri.form} form) Burak Bey'in onayına sunuldu; e-posta ${r.veri.alicilar.join(", ")} adresine gitti.`
+        : `${r.veri.toplu_no} onaya sunuldu ancak e-posta gönderilemedi. "Onay bekleyen"den tekrar gönderebilirsiniz.`,
+      r.veri.mail === "gonderildi" ? "success" : "error", "bekleyen");
+      return;
+    }
+    const l = onay.liste;
+    const r = await satinAlmaCagir<{ liste_no: string; mail: string; alicilar: string[] }>({ islem: "onaya_sun", liste_id: l.id }, true);
+    setCalisiyor(false);
+    setOnay(null);
+    if (!r.ok) { onDegisti(r.hata, "error"); return; }
+    onDegisti(r.veri.mail === "gonderildi"
+      ? `${l.liste_no} acil olarak Burak Bey'in onayına sunuldu; e-posta ${r.veri.alicilar.join(", ")} adresine gitti.`
+      : `${l.liste_no} onaya sunuldu ancak e-posta gönderilemedi. "Onay bekleyen"den tekrar gönderebilirsiniz.`,
+    r.veri.mail === "gonderildi" ? "success" : "error");
+  };
+
+  if (listeler.length === 0) {
+    return <EmptyState icon={<Inbox size={40} />} title="Ön onayda form yok" description="Departmanlar talep formunu gönderdiğinde burada birikir ve size e-posta gelir. Cumartesi biriken formları tek toplu liste olarak Burak Bey'in onayına sunarsınız." />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-xl border overflow-hidden" style={{ ...kartStil, ...(cumartesi ? { borderColor: ACCENT } : {}) }} data-testid="toplu-panel">
+        <header className="px-4 sm:px-5 py-3.5 border-b flex flex-wrap items-center gap-x-4 gap-y-2" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+          <CalendarDays size={18} className="shrink-0" style={{ color: cumartesi ? "#34D399" : TEXT_MUTED }} />
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-white">Haftalık toplu alışveriş listesi {cumartesi && <span className="ml-1.5 align-middle text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 tracking-wide">BUGÜN SATIN ALMA GÜNÜ</span>}</p>
+            <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+              Satın alma günü cumartesi. Seçili <b className="text-white">{secilenler.length} form</b> · {departmanSayisi} departman · <b className="text-white">{kalemler.length} kalem</b>{gruplar.some((g) => g.tedarikci) ? ` · ${gruplar.length} tedarikçi` : ""}
+              {acilSayisi > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">{acilSayisi} ACİL</span>}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setOnizleme((x) => !x)} disabled={!secilenler.length} aria-expanded={onizleme}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5 disabled:opacity-40" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+              <ChevronDown size={12} className={`transition-transform ${onizleme ? "" : "-rotate-90"}`} /> Toplu listeyi önizle
+            </button>
+            <button onClick={() => setOnay({ tur: "toplu" })} disabled={!secilenler.length || karisik || calisiyor} data-testid="toplu-sun"
+              title={karisik ? "Test departmanının formları gerçek formlarla aynı listeye eklenemez" : undefined}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110" style={{ backgroundColor: ACCENT }}>
+              {calisiyor && onay?.tur === "toplu" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Toplu listeyi oluştur ve Burak Bey&apos;e sun
+            </button>
+          </div>
+        </header>
+        <p className="px-4 sm:px-5 py-2 text-xs border-b" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          Hafta boyunca gelen formlar burada birikir. Toplu liste, seçili formların hepsini tek listede Burak Bey&apos;in onayına sunar; Burak Bey tüm kalemlere tek ekranda karar verir. Acil bir form için kartındaki <b className="text-white font-semibold">Acil: hemen onaya sun</b> düğmesini kullanın.
+          {karisik && <span className="block mt-1 text-amber-400">Test departmanı formu seçili: test ve gerçek formlar aynı toplu listeye eklenemez.</span>}
+        </p>
+        {onizleme && secilenler.length > 0 && (
+          <div data-testid="toplu-onizleme">
+            {gruplar.map((g) => (
+              <div key={g.tedarikci ?? "-"}>
+                <p className="px-4 sm:px-5 py-2 border-b text-sm font-bold text-white" style={{ borderColor: CARD_BORDER, backgroundColor: "rgba(255,255,255,0.03)" }}>
+                  {g.tedarikci ?? "Tedarikçi belirtilmemiş"} <span className="text-xs font-normal" style={{ color: TEXT_MUTED }}>· {g.kalemler.length} kalem</span>
+                </p>
+                <ul className="divide-y border-b" style={{ borderColor: CARD_BORDER }}>
+                  {g.kalemler.map((k) => (
+                    <li key={k.id} className="px-4 sm:px-5 py-1.5 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_120px_200px] gap-x-3 items-center text-sm" style={{ borderColor: CARD_BORDER }}>
+                      <span className="text-white break-words">{k.urun}{k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}{k.aciklama && <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{k.aciklama}</span>}</span>
+                      <span className="text-right font-semibold text-white whitespace-nowrap tabular-nums">{miktarBirim(k)}</span>
+                      <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }}><span className="text-white">{k.departman}</span> · {k.talep_eden}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {listeler.map((l) => {
+        const o = listeOzeti(l);
+        const secili = dahil(l);
+        const goster = acik.has(l.id);
+        return (
+          <section key={l.id} id={`liste-${l.id}`} className="rounded-xl border overflow-hidden scroll-mt-4" style={kartStil} data-testid="on-onay-form">
+            <header className="px-4 sm:px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <label className="inline-flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer select-none">
+                <input type="checkbox" checked={secili} onChange={() => degistir(l.id)} className="w-4 h-4 accent-emerald-500 shrink-0" aria-label={`${l.departman} formunu toplu listeye ekle`} />
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-white">{l.departman} <span className="font-mono text-xs font-medium whitespace-nowrap" style={{ color: TEXT_MUTED }}>· {l.liste_no}</span>{l.test && <TestRozeti />}</span>
+                  <span className="block text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+                    {l.gonderen_ad} · {saTarih(l.gonderim_zamani)} · {o.toplam} kalem
+                    {o.acil > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">{o.acil} ACİL</span>}
+                    {!secili && <span className="ml-1.5 text-amber-400">· toplu listeye eklenmeyecek</span>}
+                  </span>
+                </span>
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => ac(l.id)} aria-expanded={goster} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                  <ChevronDown size={12} className={`transition-transform ${goster ? "" : "-rotate-90"}`} /> Kalemler
+                </button>
+                <button onClick={() => setOnay({ tur: "acil", liste: l })} disabled={calisiyor} data-testid="acil-sun"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-500/40 text-red-400 hover:bg-red-500/10 disabled:opacity-40">
+                  {calisiyor && onay?.tur === "acil" && onay.liste.id === l.id ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />} Acil: hemen onaya sun
+                </button>
+              </div>
+            </header>
+            {goster && (
+              <ul className="divide-y border-t" style={{ borderColor: CARD_BORDER }}>
+                {tedarikciGruplari(l.kalemler).flatMap((g) => g.kalemler.map((k) => (
+                  <li key={k.id} className="px-4 sm:px-5 py-1.5 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_140px_120px_160px] gap-x-3 items-center text-sm" style={{ borderColor: CARD_BORDER }}>
+                    <span className="text-white break-words">{k.urun}{k.aciliyet === "acil" && <span className="ml-1.5 align-middle text-[9px] font-bold px-1 py-px rounded bg-red-500/15 text-red-400">ACİL</span>}{k.aciklama && <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{k.aciklama}</span>}</span>
+                    <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }}>{k.tedarikci || "-"}</span>
+                    <span className="text-right font-semibold text-white whitespace-nowrap tabular-nums">{miktarBirim(k)}</span>
+                    <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }}>{k.talep_eden}</span>
+                  </li>
+                )))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+
+      <ConfirmDialog
+        open={!!onay}
+        onOpenChange={(a) => { if (!a && !calisiyor) setOnay(null); }}
+        title={onay?.tur === "acil" ? `${onay.liste.liste_no} acil olarak onaya sunulsun mu?` : "Toplu liste Burak Bey'in onayına sunulsun mu?"}
+        description={onay?.tur === "acil"
+          ? `${onay.liste.departman} formu (${onay.liste.kalemler.length} kalem) haftalık listeyi beklemeden Burak Bey'in onayına sunulur ve ${onay.liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "bbt@unex.com.tr adresine"} e-posta gider.`
+          : `${secilenler.length} form (${departmanSayisi} departman, ${kalemler.length} kalem) tek toplu liste olarak Burak Bey'in onayına sunulur ve ${testSecili ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "bbt@unex.com.tr adresine"} tek e-posta gider.${listeler.length > secilenler.length ? ` Seçilmeyen ${listeler.length - secilenler.length} form ön onayda kalır.` : ""}`}
+        confirmLabel="Evet, onaya sun" cancelLabel="Vazgeç"
+        onConfirm={gonder} loading={calisiyor} loadingLabel="Gönderiliyor..."
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Onay bekleyen liste: kalem bazinda karar
 // ---------------------------------------------------------------------------
-function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki }: {
+/** 21.11.2026: haftalik toplu liste karari - tum formlarin kalemleri TEK kartta (liste = sanal liste). */
+type TopluKarar = { listeler: Liste[]; kalemFormu: Map<string, Liste>; kalemOnceki: Map<string, Liste[]>; onMailTekrar: () => Promise<void> };
+
+function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki, toplu }: {
   liste: Liste; vurgulu: boolean; notlar: Map<string, KalemNotlari>; onceki: Liste[];
   onKaydedildi: (mesaj: string, tur: "success" | "error") => void;
   onMailTekrar: (l: Liste, tur: "gonderim" | "sonuc") => Promise<void>;
+  toplu?: TopluKarar;
 }) {
   const [secim, setSecim] = useState<Record<string, KararSecimi>>({});
   const [not, setNot] = useState("");
@@ -265,8 +493,9 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
   const miktariDegisen = degisenOnay.filter((k) => { const m = miktarOku(secim[k.id].onay_miktar); return m !== null && m !== Number(k.miktar); }).length;
 
   // 14.11.2026: gecen haftaya gore rozetler + tedarikci gruplari
-  const rozetler = useMemo(() => new Map(liste.kalemler.map((k) => [k.id, haftaKarsilastir(k, onceki)])), [liste.kalemler, onceki]);
-  const karsilastirmaVar = onceki.length > 0;
+  const rozetler = useMemo(() => new Map(liste.kalemler.map((k) => [k.id, haftaKarsilastir(k, toplu ? toplu.kalemOnceki.get(k.id) || [] : onceki)])), [liste.kalemler, onceki, toplu]);
+  const karsilastirmaVar = toplu ? Array.from(toplu.kalemOnceki.values()).some((x) => x.length > 0) : onceki.length > 0;
+  const formAdi = (k: SaKalem) => toplu?.kalemFormu.get(k.id)?.departman;
   const dikkat = (k: SaKalem) => k.aciliyet === "acil" || notlar.has(k.id) || !!rozetler.get(k.id)?.degisti;
   const degisenSayisi = liste.kalemler.filter(dikkat).length;
   const gruplar = useMemo(() => tedarikciGruplari(liste.kalemler), [liste.kalemler]);
@@ -294,8 +523,8 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
   const kaydet = async () => {
     setHata(null);
     setKaydediliyor(true);
-    const r = await satinAlmaCagir<{ mail: string; alicilar: string[] }>({
-      islem: "karar", liste_id: liste.id, not: not.trim(),
+    const r = await satinAlmaCagir<{ mail: string; alicilar: string[]; form?: number; mail_hatali?: number }>({
+      ...(toplu ? { islem: "toplu_karar", toplu_id: liste.id } : { islem: "karar", liste_id: liste.id }), not: not.trim(),
       kararlar: liste.kalemler.map((k) => {
         const s = secim[k.id];
         const onaylandi = s?.karar === "onaylandi";
@@ -310,6 +539,15 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
     setKaydediliyor(false);
     setOnay(false);
     if (!r.ok) { setHata(r.hata); onKaydedildi(r.hata, "error"); return; }
+    if (toplu) {
+      onKaydedildi(
+        r.veri.mail === "gonderildi"
+          ? `${liste.liste_no} kaydedildi; ${r.veri.form ?? toplu.listeler.length} departmanın sonucu ${r.veri.alicilar.join(", ")} adresine ayrı ayrı gönderildi.`
+          : `${liste.liste_no} kaydedildi ancak ${r.veri.mail_hatali ?? "bazı"} e-posta gönderilemedi. "Onaylı fişler"den tekrar gönderebilirsiniz.`,
+        r.veri.mail === "gonderildi" ? "success" : "error",
+      );
+      return;
+    }
     onKaydedildi(
       r.veri.mail === "gonderildi"
         ? `${liste.liste_no} kaydedildi; ${onaySayisi ? "satın alma fişi" : "sonuç"} ${r.veri.alicilar.join(", ")} adresine gönderildi.`
@@ -336,7 +574,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
             </p>
             <p className="text-[11px] leading-snug break-words" style={{ color: TEXT_MUTED }}>
               {KATEGORILER[k.kategori] ?? k.kategori}{k.aciklama ? ` · ${k.aciklama}` : ""}{!gruplu && k.tedarikci ? ` · Tedarikçi: ${k.tedarikci}` : ""}
-              <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {k.talep_eden}</span>
+              <span className="sm:hidden"> · <b className="text-white">{miktarBirim(k)}</b> · {formAdi(k) ? `${formAdi(k)} · ` : ""}{k.talep_eden}</span>
             </p>
           </div>
           <span className="hidden sm:block text-sm text-right font-semibold text-white whitespace-nowrap tabular-nums">
@@ -344,7 +582,9 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
               ? <><span className="line-through font-normal mr-1.5" style={{ color: TEXT_MUTED }}>{miktarYaz(k.miktar)}</span><span className="text-emerald-400">{miktarBirim({ miktar: yeniMiktar, birim: k.birim })}</span></>
               : miktarBirim(k)}
           </span>
-          <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }} title={k.talep_eden}>{k.talep_eden}</span>
+          <span className="hidden sm:block text-xs truncate" style={{ color: TEXT_MUTED }} title={formAdi(k) ? `${formAdi(k)} · ${k.talep_eden}` : k.talep_eden}>
+            {formAdi(k) && <span className="block text-white font-medium truncate" data-testid="toplu-departman">{formAdi(k)}</span>}{k.talep_eden}
+          </span>
           <div className="flex justify-end" role="group" aria-label={`${k.urun} kararı`}>
             <div className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }}>
               <button onClick={() => sec(k.id, "onaylandi")} aria-pressed={s?.karar === "onaylandi" && !s.degistir}
@@ -407,18 +647,23 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-white">{liste.departman} <span className="font-mono text-sm font-medium whitespace-nowrap" style={{ color: TEXT_MUTED }}>· {liste.liste_no}</span>{liste.test && <TestRozeti />}</p>
           <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
-            {liste.gonderen_ad} · {saTarih(liste.gonderim_zamani)} · {o.toplam} kalem{gruplu ? ` · ${gruplar.length} tedarikçi` : ""}
+            {toplu && "Sunan: "}{liste.gonderen_ad} · {saTarih(liste.gonderim_zamani)}{toplu ? ` · ${toplu.listeler.length} form` : ""} · {o.toplam} kalem{gruplu ? ` · ${gruplar.length} tedarikçi` : ""}
             {o.acil > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400">{o.acil} ACİL</span>}
             {notluKalem > 0 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400" title="Başka departmanda bekleyen, son 30 günde onaylanan ya da formda tekrar eden kalemler">{notluKalem} kalemde not</span>}
           </p>
+          {toplu && (
+            <p className="text-xs mt-0.5 break-words" style={{ color: TEXT_MUTED }} data-testid="toplu-formlar">
+              Formlar: {toplu.listeler.map((l, i) => <React.Fragment key={l.id}>{i > 0 && ", "}<span className="text-white">{l.departman}</span> ({l.liste_no} · {l.kalemler.length} kalem)</React.Fragment>)}
+            </p>
+          )}
           {karsilastirmaVar && (
             <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }} data-testid="karar-karsilastirma">
-              Önceki listeye ({onceki[0].liste_no}) göre <b className="text-white font-semibold">{degisenSayisi}</b> kalem dikkat istiyor (yeni, miktarı artan, geçen sefer reddedilen, acil ya da notlu); {o.toplam - degisenSayisi} kalem aynı.
+              {toplu ? "Departmanların önceki listelerine" : `Önceki listeye (${onceki[0]?.liste_no})`} göre <b className="text-white font-semibold">{degisenSayisi}</b> kalem dikkat istiyor (yeni, miktarı artan, geçen sefer reddedilen, acil ya da notlu); {o.toplam - degisenSayisi} kalem aynı.
             </p>
           )}
         </div>
         {liste.gonderim_maili === "hata" && (
-          <button disabled={mailGonderiliyor} onClick={async () => { setMailGonderiliyor(true); await onMailTekrar(liste, "gonderim"); setMailGonderiliyor(false); }}
+          <button disabled={mailGonderiliyor} onClick={async () => { setMailGonderiliyor(true); await (toplu ? toplu.onMailTekrar() : onMailTekrar(liste, "gonderim")); setMailGonderiliyor(false); }}
             title={liste.gonderim_maili_hata || undefined}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-60">
             {mailGonderiliyor ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Bildirim e-postası gitmedi · tekrar gönder
@@ -459,7 +704,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
 
       {/* Kalem tablosu: tek satir = tek kalem; tedarikci varsa tedarikci gruplari */}
       <div className="hidden sm:grid grid-cols-[28px_minmax(0,1fr)_120px_150px_236px] gap-x-3 px-4 sm:px-5 py-2 border-b text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED, backgroundColor: "rgba(255,255,255,0.015)" }}>
-        <span className="text-right">#</span><span>Ürün / hizmet</span><span className="text-right">Miktar</span><span>Talep eden</span><span className="text-right">Karar</span>
+        <span className="text-right">#</span><span>Ürün / hizmet</span><span className="text-right">Miktar</span><span>{toplu ? "Departman / talep eden" : "Talep eden"}</span><span className="text-right">Karar</span>
       </div>
       {gruplar.map((g) => {
         const anahtar = g.tedarikci ?? "-";
@@ -533,7 +778,7 @@ function KararKarti({ liste, vurgulu, onKaydedildi, onMailTekrar, notlar, onceki
         open={onay}
         onOpenChange={(a) => { if (!a) setOnay(false); }}
         title={`${liste.liste_no} kararı kaydedilsin mi?`}
-        description={`${onaySayisi} kalem onaylanacak${miktariDegisen ? ` (${miktariDegisen} kalemin miktarı değiştirildi)` : ""}, ${redSayisi} kalem reddedilecek.${onaySayisi ? " Onaylananlardan satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} e-postayla gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
+        description={`${onaySayisi} kalem onaylanacak${miktariDegisen ? ` (${miktariDegisen} kalemin miktarı değiştirildi)` : ""}, ${redSayisi} kalem reddedilecek.${toplu ? ` Karar ${toplu.listeler.length} departmanın formuna birlikte kaydedilir; her departmanın sonucu (onaylı fişi)` : onaySayisi ? " Onaylananlardan satın alma fişi oluşur ve" : " Sonuç"} ${liste.test ? `yalnızca ${TEST_ALICISI} adresine (TEST)` : "execution@unex.com.tr adresine"} ${toplu ? "ayrı e-postayla" : "e-postayla"} gider; departman kendi bağlantısında görür. Karar sonradan değiştirilemez.`}
         confirmLabel="Evet, kaydet" cancelLabel="Vazgeç"
         onConfirm={kaydet} loading={kaydediliyor} loadingLabel="Kaydediliyor..."
       />
@@ -928,7 +1173,7 @@ function Departmanlar({ departmanlar, taslaklar, listeler, onDegisti }: { depart
     return {
       liste: ait.length,
       kalem: ait.reduce((t, l) => t + l.kalemler.length, 0),
-      bekleyen: ait.filter((l) => l.durum === "bekliyor").length,
+      bekleyen: ait.filter((l) => l.durum === "bekliyor" || l.durum === "on_onay").length,
       fis: ait.filter((l) => l.durum === "sonuclandi" && listeOzeti(l).onay > 0).length,
       gonderilen: ait.filter((l) => l.durum !== "taslak").length,
     };

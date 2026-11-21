@@ -269,3 +269,35 @@
   (`lib/satin-alma/sablon.ts`; reddedilenler yok, onaylanan miktar). Gidiş-dönüş testli.
 - Testler: tests/satin-alma-excel.test.ts, tests/satin-alma-karsilastir.test.ts. DB testleri
   geri alınan işlemde (kalıcı veri yok). Gerçek mail GÖNDERİLMEDİ.
+
+## Ön onay + haftalık toplu liste (21.11.2026)
+
+- Kullanıcı: "Departmanlar her sipariş verdiğinde sadece bana gelsin. Ben onay verince Burak
+  Beye onaya gönderilsin ... cumartesiden cumartesiye satın alma günü ... cumartesi gününe kadar
+  birikecek. (Acil durumda hemen de onaya gönderebileceğim.) Daha sonra toplu alışveriş listesi
+  oluşacak. Bütün departmanlar için ve onaya sunacağız."
+- Akış: `taslak → on_onay (Volkan Bey) → bekliyor (Burak Bey) → sonuclandi`.
+  Migration `20261121050000_satin_alma_on_onay_toplu.sql`: durum CHECK'e `on_onay`;
+  `satin_alma_toplu` (TSA-YYYY-NNNN, `satin_alma_toplu_sira`, RLS yalnız okuma, denetim
+  tetikleyicisi); listelere `toplu_id`, `on_onay_email`, `onaya_sunma_zamani`.
+  - Departman "gonder" → `sa_token_liste_on_onaya_gonder` (durum on_onay). Eski
+    `sa_token_liste_gonder` (doğrudan bekliyor) edge deploy geçişi için DURUYOR, yeni kod çağırmaz.
+  - Acil → `sa_onaya_sun(liste)`; toplu → `sa_toplu_olustur(liste_ids[])` (hepsi on_onay olmalı;
+    test + gerçek form karışamaz); Burak Bey toplu karar → `sa_toplu_karar_ver(toplu, kararlar, not)`:
+    her form için MEVCUT `sa_karar_ver` (tek işlem). Onaylı fiş / sonuç maili form bazında aynı.
+  - Ürün kataloğu tetikleyicisi artık `taslak → on_onay|bekliyor` geçişinde (ikinci kez saymaz).
+  - `sa_liste_json` + `toplu_id`, `onaya_sunma_zamani`.
+- Edge `satin-alma` yeni işlemler (oturum): `onaya_sun`, `toplu_sun`, `toplu_karar`,
+  `toplu_mail_tekrar`. Alıcılar: `SATIN_ALMA_ON_ONAY_ALICILARI` (vars. execution@: departman
+  formu geldi), `SATIN_ALMA_ONAY_ALICILARI` (vars. bbt@: acil form + toplu liste).
+  Eski `SATIN_ALMA_ALICILARI` KULLANILMIYOR. Mail: `gonderimMaili(l, "on_onay" | "acil" | "onay")`,
+  `topluOnayMaili(t)` (departman tablosu + tedarikçiye göre kalemler, departman sütunlu).
+- UI `/satin-alma`: "Ön onay" sekmesi (yönetici açınca varsayılan): form seçimi (varsayılan tüm
+  gerçek formlar), toplu liste önizlemesi, "Toplu listeyi oluştur ve Burak Bey'e sun", kartta
+  "Acil: hemen onaya sun". "Onay bekleyen"de toplu liste TEK `KararKarti` (sanal liste,
+  `lib/satin-alma/toplu.ts`; talep eden sütununda departman). `?toplu=<id>` bağlantısı.
+  Toplu liste okuma `lib/satin-alma/veri.ts`. Departman sayfası: "Ön onayda · cumartesi toplu listeye girer".
+- Excel okuyucu: "Tedarikçi / Not" hücresinde `TEDARİKÇİ · not` (· • | boşluklu) → tedarikçi +
+  açıklama (`tedarikciNotAyir`; önce not tedarikçi adına yapışıp ayrı grup açıyordu). Birimler +
+  `sise` (Şişe), `kavanoz` (Kavanoz): CHECK, `sa_token_kalem_ekle`, `BIRIMLER`, `BIRIM_ESLER` birlikte.
+- Testler: `tests/satin-alma-on-onay.test.ts`.

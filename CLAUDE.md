@@ -20,7 +20,7 @@ dosyasına yazılır; kök yalnız proje çapındaki kurallar için büyür.
   irsaliye / kantar yurt içi, bildirimler (WhatsApp / e-posta), takip ve çıkış sayfaları,
   alış siparişleri, kapanış raporu.
 - `docs/claude/satin-alma.md` — departman talep formu (/talep), onay, onaylı fiş (/cek),
-  katalog, tedarikçi, toplu ekleme, haftalık liste hatırlatması.
+  katalog, tedarikçi, toplu ekleme, haftalık liste hatırlatması, ön onay + haftalık toplu liste.
 - `docs/claude/pazar.md` — PAZAR (UNEX Satış) CRM: potansiyel / müşteri firmalar, fuar ve rehber listesi
   içe aktarma, sipariş → müşteri dönüşümü, Takip = yönetici paneli (Dalga 3).
 - `docs/claude/analiz-rapor.md` — Kontrol Merkezi (/analiz), Ana Panel özet kartları,

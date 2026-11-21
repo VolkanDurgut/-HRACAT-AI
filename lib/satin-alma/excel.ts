@@ -53,6 +53,8 @@ const BIRIM_ESLER: Record<string, Birim> = {
   takim: "takim",
   kova: "kova",
   bidon: "bidon",
+  sise: "sise",
+  kavanoz: "kavanoz", kvnz: "kavanoz",
   diger: "diger",
 };
 
@@ -123,6 +125,18 @@ export function baslikTedarikcisi(ham: unknown): string | null {
   if (!/[a-zçğıöşü]/i.test(t)) return null;
   if (GENEL_BASLIK.test(k(t))) return null;
   return tedarikciDuzelt(t);
+}
+
+/**
+ * "Tedarikçi / Not" hucresi (21.11.2026): "CEM MARKET · 1 mi 2 mi? Teyit" ->
+ * { tedarikci: "CEM MARKET", not: "1 mi 2 mi? Teyit" }. Ayirici: · • | (bosluklu).
+ * Ayirici yoksa hucrenin tamami tedarikcidir. Not yazildigi gibi korunur (buyuk harfe cevrilmez).
+ */
+export function tedarikciNotAyir(ham: unknown): { tedarikci: string | null; not: string } {
+  const t = String(ham ?? "").replace(/\s+/g, " ").trim();
+  const m = /^(.+?)\s+[·•|]\s+(.+)$/.exec(t);
+  if (!m) return { tedarikci: tedarikciDuzelt(t), not: "" };
+  return { tedarikci: tedarikciDuzelt(m[1]), not: m[2].trim().slice(0, 300) };
 }
 
 const BASLIK_DIGER = /^birim|^urun|^malzeme|^ad$|^adi|^tanim|^kategori|^tedarik/;
@@ -274,7 +288,13 @@ export function alisverisListesiCoz(izgara: unknown[][]): ExcelSonucu {
       const tHam = tedarikciS >= 0 ? hucre(satir, tedarikciS) : "";
       const notEslesme = /^\s*not\s*[:\-]\s*(.*)$/i.exec(tHam);
       if (notEslesme) aciklama = [aciklama, notEslesme[1].trim()].filter(Boolean).join(" · ");
-      else if (tHam) tedarikci = tedarikciDuzelt(tHam);
+      else if (tHam) {
+        // 21.11.2026: "TAKOZLAR · Miktar yok" -> tedarikci TAKOZLAR + not "Miktar yok"
+        // (not tedarikci adina yapisip ayri bir tedarikci grubu olusturuyordu)
+        const ayrik = tedarikciNotAyir(tHam);
+        tedarikci = ayrik.tedarikci;
+        if (ayrik.not) aciklama = [aciklama, ayrik.not].filter(Boolean).join(" · ");
+      }
       if (!tedarikci) tedarikci = bant || b.ad;
       let sorun: string | null = null;
       if (urun.length < 2) sorun = "Ürün adı yok";

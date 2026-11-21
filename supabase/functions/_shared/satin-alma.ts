@@ -9,6 +9,8 @@
 export const SA_SITE = "https://ihracatasistanim.com";
 export const talepAdresi = (token: string) => `${SA_SITE}/talep/${token}`;
 export const yonetimAdresi = (listeId: string) => `${SA_SITE}/satin-alma?liste=${listeId}`;
+/** 21.11.2026: haftalik toplu liste (Burak Bey'in karar ekrani) */
+export const topluAdresi = (topluId: string) => `${SA_SITE}/satin-alma?toplu=${topluId}`;
 /** Onaylanan kalemlerin girissiz "Unex cek listesi" sayfasi (execution@ isaretler). */
 export const cekAdresi = (token: string) => `${SA_SITE}/cek/${token}`;
 
@@ -35,6 +37,9 @@ export const BIRIMLER = {
   takim: "Takım",
   kova: "Kova",
   bidon: "Bidon",
+  // 21.11.2026: Excel listesinde "Limon suyu 2 şişe", "Acı biber turşusu 2 kavanoz"
+  sise: "Şişe",
+  kavanoz: "Kavanoz",
   diger: "Diğer",
 } as const;
 export type Birim = keyof typeof BIRIMLER;
@@ -65,7 +70,8 @@ export type SaKalem = {
 export type SaListe = {
   id: string;
   liste_no: string | null;
-  durum: "taslak" | "bekliyor" | "sonuclandi";
+  /** 21.11.2026: taslak -> on_onay (Volkan Bey) -> bekliyor (Burak Bey) -> sonuclandi */
+  durum: "taslak" | "on_onay" | "bekliyor" | "sonuclandi";
   departman: string;
   departman_id?: string;
   sirket: string | null;
@@ -85,8 +91,34 @@ export type SaListe = {
   cek_tamamlanma?: string | null;
   /** SADECE karar / mail verisinde gelir (departman sayfasina ASLA). */
   cek_token?: string | null;
+  /** 21.11.2026: haftalik toplu listeyle onaya sunulduysa toplu liste; acil sunulduysa null */
+  toplu_id?: string | null;
+  onaya_sunma_zamani?: string | null;
   kalemler: SaKalem[];
 };
+
+/** 21.11.2026 haftalik toplu satin alma listesi (TSA-YYYY-NNNN): ayni anda Burak Bey'e sunulan formlar. */
+export type SaToplu = {
+  id: string;
+  toplu_no: string;
+  test?: boolean;
+  olusturma: string;
+  olusturan_email: string | null;
+  onay_maili?: "gonderildi" | "hata" | null;
+  listeler: SaListe[];
+};
+
+/** Toplu listenin ozeti: departman / form / kalem / acil sayilari */
+export function topluOzeti(t: Pick<SaToplu, "listeler">) {
+  const kalemler = t.listeler.flatMap((l) => l.kalemler || []);
+  return {
+    form: t.listeler.length,
+    departman: new Set(t.listeler.map((l) => l.departman)).size,
+    kalem: kalemler.length,
+    acil: kalemler.filter((k) => k.aciliyet === "acil").length,
+    tedarikci: tedarikciGruplari(kalemler).length,
+  };
+}
 
 /** Ad soyad (27.10.2026): bosluklar teke iner. Veritabanindaki sa_ad_soyad_duzelt ile AYNI. */
 export const adSoyadDuzelt = (s: string | null | undefined) => (s || "").replace(/\s+/g, " ").trim().slice(0, 80);
@@ -288,15 +320,52 @@ function onayliBolum(onaylar: SaKalem[]): string {
     .join("\n");
 }
 
-/** Departman listeyi gonderdi -> execution@ + bbt@ */
-export function gonderimMaili(l: SaListe): { konu: string; html: string } {
+/**
+ * Talep formu maili. 21.11.2026 asama:
+ *  - "on_onay": departman gonderdi -> YALNIZ execution@ (Volkan Bey'in on onayi; cumartesi toplu listeye girer)
+ *  - "acil"   : Volkan Bey formu acil olarak Burak Bey'e sundu -> bbt@
+ *  - "onay"   : eski akis (21.11.2026 oncesi gonderilen ve "Maili tekrar gonder" ile yeniden giden form)
+ */
+export function gonderimMaili(l: SaListe, asama: "on_onay" | "acil" | "onay" = "onay"): { konu: string; html: string } {
   const o = listeOzeti(l);
-  const konu = `${l.haftalik ? "Haftalık satın alma listesi" : "Satın alma talebi"}: ${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
-  const govde = `${giris(`<b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.`)}
+  const ozet = `${l.departman} · ${l.liste_no} (${o.toplam} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
+  const konu = asama === "on_onay"
+    ? `Ön onay: ${ozet}`
+    : asama === "acil"
+      ? `Acil satın alma talebi onayınızda: ${ozet}`
+      : `${l.haftalik ? "Haftalık satın alma listesi" : "Satın alma talebi"}: ${ozet}`;
+  const metin = asama === "on_onay"
+    ? `<b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Form <b>ön onayınızda</b>: cumartesi oluşturacağınız toplu alışveriş listesine eklenir. Acilse uygulamadan hemen Burak Bey'in onayına sunabilirsiniz.`
+    : asama === "acil"
+      ? `<b>${kacis(l.departman)}</b> departmanının talep formu haftalık toplu listeyi beklemeden <b>acil</b> olarak onayınıza sunuldu. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.`
+      : `<b>${kacis(l.departman)}</b> departmanı satın alma talep formunu gönderdi. Kalemleri tek tek onaylayabilir ya da reddedebilirsiniz.`;
+  const govde = `${giris(metin)}
 ${bilgiTablosu([["Departman", l.departman], ["Talep no", l.liste_no || "-"], ["Gönderen", l.gonderen_ad || "-"], ["Gönderim", saTarih(l.gonderim_zamani)], ["Kalem", String(o.toplam)], ["Acil kalem", o.acil ? String(o.acil) : "Yok"]])}
 ${baslik(`Talep kalemleri (${o.toplam})`)}${kalemTablosu(l.kalemler, "talep")}
-${dugme("Talebi incele ve karar ver", yonetimAdresi(l.id))}`;
-  return { konu: testKonu(l, konu), html: cerceve("SATIN ALMA TALEP FORMU", l.liste_no || "", govde, l.test) };
+${dugme(asama === "on_onay" ? "Ön onay ekranını aç" : "Talebi incele ve karar ver", yonetimAdresi(l.id))}`;
+  return { konu: testKonu(l, konu), html: cerceve(asama === "on_onay" ? "TALEP FORMU · ÖN ONAY" : "SATIN ALMA TALEP FORMU", l.liste_no || "", govde, l.test) };
+}
+
+/** Toplu liste kalem tablosu: departman sutunlu (tedarikci grubunun icinde) */
+function topluKalemTablosu(satirlar: { k: SaKalem; departman: string }[]): string {
+  const govde = satirlar.map(({ k, departman }, i) => `<tr><td class="s n">${i + 1}</td>${urunHucresi(k, false)}<td class="s">${kacis(departman)}</td><td class="r"><b>${kacis(miktarBirim(k))}</b></td><td class="n">${oncelik(k)}</td><td>${kacis(k.talep_eden)}</td></tr>`).join("\n");
+  return `<table role="presentation" class="t" width="100%" cellpadding="7" style="border-collapse:collapse;border:1px solid #D5D9E0;table-layout:auto;"><tr><th>#</th><th>Ürün / hizmet</th><th>Departman</th><th class="r">Miktar</th><th>Öncelik</th><th>Talep eden</th></tr>\n${govde}</table>`;
+}
+
+/** 21.11.2026: Volkan Bey haftalik toplu listeyi olusturdu -> bbt@ (TEK mail, tum departmanlar). */
+export function topluOnayMaili(t: SaToplu): { konu: string; html: string } {
+  const o = topluOzeti(t);
+  const konu = `Haftalık toplu satın alma listesi onayınızda: ${t.toplu_no} (${o.departman} departman, ${o.kalem} kalem${o.acil ? `, ${o.acil} acil` : ""})`;
+  const satirlar = t.listeler.flatMap((l) => (l.kalemler || []).map((k) => ({ k, departman: l.departman, tedarikci: k.tedarikci })));
+  const gruplar = tedarikciGruplari(satirlar);
+  const formlar = `<table role="presentation" class="t" width="100%" cellpadding="7" style="border-collapse:collapse;border:1px solid #D5D9E0;"><tr><th>Departman</th><th>Talep no</th><th>Gönderen</th><th>Gönderim</th><th class="r">Kalem</th></tr>
+${t.listeler.map((l) => { const lo = listeOzeti(l); return `<tr><td>${kacis(l.departman)}</td><td class="n">${kacis(l.liste_no || "-")}</td><td>${kacis(l.gonderen_ad || "-")}</td><td class="n s">${kacis(saTarih(l.gonderim_zamani))}</td><td class="r">${lo.toplam}${lo.acil ? ` <span class="acil">· ${lo.acil} ACİL</span>` : ""}</td></tr>`; }).join("\n")}</table>`;
+  const govde = `${giris(`Bu haftanın satın alma talepleri <b>tek listede</b> onayınıza sunuldu. Tüm departmanların kalemlerini tek ekranda onaylayabilir, miktarını değiştirebilir ya da reddedebilirsiniz.`)}
+${bilgiTablosu([["Toplu liste no", t.toplu_no], ["Sunulma", saTarih(t.olusturma)], ["Departman", String(o.departman)], ["Talep formu", String(o.form)], ["Kalem", String(o.kalem)], ["Acil kalem", o.acil ? String(o.acil) : "Yok"]])}
+${baslik(`Talep formları (${o.form})`)}${formlar}
+${baslik(`Kalemler (${o.kalem}) · tedarikçiye göre`)}${gruplar.map((g) => `<p style="margin:14px 0 6px;font-size:12px;font-weight:bold;color:#161B2E;">${kacis(g.tedarikci ?? "Tedarikçi belirtilmemiş")} <span style="color:#5B6275;font-weight:normal;">· ${g.kalemler.length} kalem</span></p>${topluKalemTablosu(g.kalemler)}`).join("\n")}
+${dugme("Toplu listeyi incele ve karar ver", topluAdresi(t.id))}`;
+  return { konu: t.test ? `[TEST] ${konu}` : konu, html: cerceve("TOPLU SATIN ALMA LİSTESİ", t.toplu_no, govde, t.test === true) };
 }
 
 /** Burak Bey karar verdi -> execution@: departman etiketli ONAYLI SATIN ALMA FISI

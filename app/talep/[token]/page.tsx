@@ -22,8 +22,9 @@ import {
  * Departman SATIN ALMA TALEP FORMU (26.10.2026; kurumsal yeniden tasarim 27.10.2026)
  * GIRISSIZ, departmana ozel kalici baglanti. Departmanin ORTAK taslak formu: ayni
  * departmandan birden fazla kisi farkli zamanlarda kalem ekleyebilir. "Formu gonder"
- * -> SA-YYYY-NNNN numarasi, execution@ + bbt@'ye e-posta (TEST departmaninda SADECE
- * test adresine); Burak Bey kalem bazinda onaylar / reddeder, sonuc "Gonderilen
+ * -> SA-YYYY-NNNN numarasi, execution@'ye e-posta (TEST departmaninda SADECE test adresine).
+ * 21.11.2026: form once ON ONAYDA (Volkan Bey) birikir; cumartesi toplu listeyle (acilse hemen)
+ * Burak Bey'e sunulur; Burak Bey kalem bazinda onaylar / reddeder, sonuc "Gonderilen
  * talep formlari"nda gorunur. Veritabanina dogrudan erisim YOK (edge function
  * "satin-alma", lib/satin-alma/api.ts).
  * 28.10.2026: urun adi yazilirken "Daha once siparis verilen urunler" onerilir (secilince
@@ -67,7 +68,7 @@ function urunKontrolu(urun: string, tedarikci: string, bilgi: Bilgi | null): Uru
     if (e === "ayni" && !mukerrer && kalemAnahtari(urun, tedarikci) === kalemAnahtari(k.urun, k.tedarikci)) mukerrer = k;
     else if (e) benzer.push(k);
   }
-  const bekleyen = bilgi.gecmis.filter((l) => l.durum === "bekliyor")
+  const bekleyen = bilgi.gecmis.filter((l) => l.durum === "bekliyor" || l.durum === "on_onay")
     .flatMap((l) => l.kalemler.filter((k) => urunEslesme(urun, k.urun)).map((kalem) => ({ liste_no: l.liste_no, kalem })));
   const sinir = Date.now() - OTUZ_GUN_MS;
   const onaylanan = (bilgi.onaylananlar ?? []).filter((a) => new Date(a.karar_zamani).getTime() >= sinir && urunEslesme(urun, a.urun));
@@ -342,7 +343,7 @@ export default function TalepSayfasi({ params }: { params: { token: string } }) 
               <p className="font-semibold" style={{ color: B.yesil }}>{gonderimSonucu.liste_no} numaralı talep formu gönderildi.</p>
               <p className="mt-0.5" style={{ color: B.metin }}>
                 {gonderimSonucu.mail === "gonderildi"
-                  ? (gonderimSonucu.test ? "Test modu: e-posta yalnızca test adresine gönderildi." : "Form onaya iletildi. Sonucu aşağıdaki “Gönderilen talep formları” tablosundan takip edebilirsiniz.")
+                  ? (gonderimSonucu.test ? "Test modu: e-posta yalnızca test adresine gönderildi." : "Form ön onaya iletildi; cumartesi haftalık toplu listeyle (acilse hemen) satın alma onayına sunulur. Sonucu aşağıdaki “Gönderilen talep formları” tablosundan takip edebilirsiniz.")
                   : "Form kaydedildi ve onay ekranında görünüyor; e-posta şu an gönderilemedi. Ayrıca bir işlem yapmanıza gerek yok."}
               </p>
             </div>
@@ -827,6 +828,8 @@ function KalemKarari({ k }: { k: SaKalem }) {
 
 function FormDurumu({ l }: { l: SaListe }) {
   const o = listeOzeti(l);
+  // 21.11.2026: once on onay (Volkan Bey), sonra satin alma onayi (Burak Bey; cumartesi toplu liste ya da acil)
+  if (l.durum === "on_onay") return <DurumEtiketi renk={B.turuncu}>Ön onayda · cumartesi toplu listeye girer</DurumEtiketi>;
   if (l.durum === "bekliyor") return <DurumEtiketi renk={B.turuncu}>Onay bekliyor</DurumEtiketi>;
   if (!o.onay) return <DurumEtiketi renk={B.kirmizi}>Reddedildi</DurumEtiketi>;
   if (o.alinan >= o.onay) return <DurumEtiketi renk={B.yesil}>Tamamlandı · tümü teslim alındı</DurumEtiketi>;

@@ -280,3 +280,16 @@ Kullanıcı: "Siparişsiz müşteri hala 18 gözüküyor aslında onaylanan sipa
   Müşterilerimiz satırı + firma kartı. Test `tests/pazar-musteri-liste.test.ts`.
 - 21.11 sonucu: siparişsiz 18 → 15 (GMB, OM GENERAL, STE AYRA aktif). Kalan 15'in hiçbir kaynakta (dosya, ana sipariş,
   Sipariş Listesi, sistem proforması, yükleme planı) açık siparişi yok; FARID B.P. aynı firmanın ikinci kartı.
+
+## 3.y Pazar ↔ Sipariş Listesi koordinasyonu + müşteri düzeltmesi (21.11.2026)
+Kullanıcı: "PAZAR - SİPARİŞ LİSTESİ - YÜKLEME LİSTESİ gibi şeylerin koordineli olması gerekiyor." (onaylı)
+Migration `20261121070000_pazar_siparis_koordinasyon.sql`:
+- `pazar_firma_birlestir_ic` (servis; kaynakta temas / görev / gelen varsa REDDEDER — cascade ile giderdi),
+  `pazar_ek_anahtar_ekle_ic`, `pazar_siparis_musteri_isaretle` (tam anahtar → TEK gevşek eşleşen müşteri kartına ek
+  anahtar → yoksa `pazar_musteri_isaretle` yeni kart).
+- Tetikleyici `trg_pazar_siparis_defteri`: Sipariş Listesi satırı rezervasyonlu / sevk edildi / BL eksik → firma müşteri
+  (Excel aktarımı dahil; hata aktarımı durdurmaz). Yükleme planından kart AÇILMAZ (serbest adlar: "GMB- BOCUUM").
+- Veri (canlı 21.11 13:32): FARID B.P. → FARID, EASTBOURNE "…ST JAMES COURT" → EASTBOURNE, Ali Houssein Dail → DEIL
+  birleşti; RICHMOND COM, EASTRBOURNE, ALI (HOUSSEIN) DEIL, (B.) CENTRE VILLE → KOUMANE (UNEXMIK), BLACK STALLION GENERAL TR.
+  ek anahtar; 16 yeni müşteri + BACKALDRIN müşteri. Müşteri 28 → 43 (Aktif 18 · Siparişsiz 25). Yeni kartlarda yetkili /
+  ülke / hacim yok (Excel dönemi; dosya yok) → günlük görev adayı değiller, e-posta eklenince olurlar.

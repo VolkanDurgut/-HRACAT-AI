@@ -159,11 +159,26 @@ export type MusteriAnaSiparisi = {
   tamamlandi: boolean | null;
   olusturma_tarihi: string | null;
 };
+/** 21.11.2026: Siparis Listesi'ndeki acik siparis (siparis_listesi_veri; firma eslesmesi veritabaninda) */
+export type MusteriListeSiparisi = {
+  firma_id: string;
+  proforma_no: string | null;
+  proforma_tarihi: string | null;
+  durum: "onay_bekliyor" | "on_odeme_alindi" | "rezervasyonlu";
+  miktar_mt: number | string | null;
+  konteyner: number | null;
+  dosya_no: string | null;
+  booking_no: string | null;
+  etd: string | null;
+};
 export type MusteriSiparisVerisi = {
   dosyalar: MusteriDosyasi[];
   rezervasyonlar: { dosya_id: string; konteyner_adedi: number | null }[];
   konteynerler: { dosya_id: string; dba_dosya_url: string | null }[];
   ana_siparisler: MusteriAnaSiparisi[];
+  /** 21.11.2026 Siparis Listesi: acik siparisler + firma basina son siparis (proforma) tarihi */
+  siparis_listesi?: MusteriListeSiparisi[];
+  siparis_tarihleri?: { firma_id: string; tarih: string | null }[];
 };
 
 /** Musteri firmalarinin dosya / rezervasyon / acik siparis verisi (salt okunur RPC; kopyalanmaz). */
@@ -171,7 +186,10 @@ export async function pazarMusteriSiparisleri(): Promise<MusteriSiparisVerisi> {
   const { data, error } = await supabase.rpc("pazar_musteri_siparisleri");
   if (error) throw new Error(error.message);
   const v = (data || {}) as Partial<MusteriSiparisVerisi>;
-  return { dosyalar: v.dosyalar || [], rezervasyonlar: v.rezervasyonlar || [], konteynerler: v.konteynerler || [], ana_siparisler: v.ana_siparisler || [] };
+  return {
+    dosyalar: v.dosyalar || [], rezervasyonlar: v.rezervasyonlar || [], konteynerler: v.konteynerler || [], ana_siparisler: v.ana_siparisler || [],
+    siparis_listesi: v.siparis_listesi || [], siparis_tarihleri: v.siparis_tarihleri || [],
+  };
 }
 
 export async function pazarFirmaGuncelle(firmaId: string, ulke: string | null, notlar: string | null): Promise<void> {

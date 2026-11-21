@@ -7,20 +7,32 @@
  * AKTIF = su an siparisi var:
  *   - rezervasyonu girilmis ACIK ihracat dosyasi, ya da
  *   - tamamlanmamis ana siparis (proforma) ve sevk edilmemis miktari var (lib/siparis-takip ile ayni hesap).
+ *   - 21.11.2026: Siparis Listesi'nde acik siparisi var (pesinat bekliyor / on odeme alindi / rezervasyonlu).
+ *     Kullanici: "Siparissiz musteri hala 18 gozukuyor aslinda onaylanan siparisleri var." (GMB, OM GENERAL, STE AYRA)
  * SIPARISSIZ = musteri ama su an siparisi yok -> gunluk "Bugunku musteriniz" icin ilk aday (3.3).
  * Ulke: kartta yoksa son dosyanin varis limanindan / alici adresinden (Kontrol Merkezi ile ayni kural).
  */
 import { siparisIlerlemesiHesapla, fclAdedi } from "@/lib/siparis-takip";
 import { gidecegiUlke, ticaretYapilanUlke } from "@/lib/ulke-bul";
-import type { MusteriSiparisVerisi, PazarFirma } from "@/lib/pazar/veri";
+import type { MusteriListeSiparisi, MusteriSiparisVerisi, PazarFirma } from "@/lib/pazar/veri";
 
 export type AcikDosya = { id: string; dosya_no: string; rezKonteyner: number; yuklenen: number; tarih: string | null };
 export type AcikSiparis = { id: string; proforma_no: string; siparisMts: number; kalanMts: number; kalanFcl: number };
+/** 21.11.2026 Siparis Listesi'ndeki acik siparis (acik dosyasiyla zaten gorunen satir tekrar edilmez) */
+export type ListeSiparisi = { proforma_no: string; durum: MusteriListeSiparisi["durum"]; miktarMt: number | null; konteyner: number | null; tarih: string | null; booking: string | null };
+
+export const LISTE_DURUM_ETIKETI: Record<MusteriListeSiparisi["durum"], string> = {
+  onay_bekliyor: "peşinat bekleniyor",
+  on_odeme_alindi: "ön ödeme alındı · rezervasyon bekliyor",
+  rezervasyonlu: "rezervasyonlu",
+};
 export type MusteriDurumu = {
   aktif: boolean;
   acikDosyalar: AcikDosya[];
   acikSiparisler: AcikSiparis[];
-  /** Son dosyanin (siparisin) tarihi. */
+  /** 21.11.2026: Siparis Listesi'ndeki acik siparisler */
+  listeSiparisleri: ListeSiparisi[];
+  /** Son siparisin tarihi: son dosya ya da Siparis Listesi / sistem proformasi (hangisi yeniyse). */
   sonSiparis: string | null;
   /** Son siparisten bu yana gecen gun (bugun dahil degil). */
   siparissizGun: number | null;
@@ -86,7 +98,27 @@ export function musteriDurumu(firma: PazarFirma, v: MusteriSiparisVerisi, bugun:
     .filter((s) => s.devam)
     .map((s) => ({ id: s.id, proforma_no: s.proforma_no, siparisMts: s.siparisMts, kalanMts: s.kalanMts, kalanFcl: s.kalanFcl }));
 
-  const tarihler = dosyalar.map((d) => d.olusturma_tarihi).filter((t): t is string => !!t).sort();
+  const acikDosyaNolari = new Set(acikDosyalar.map((d) => d.dosya_no));
+  const anaProformalar = new Set(acikSiparisler.map((s) => s.proforma_no));
+  const gorulen = new Set<string>();
+  const listeSiparisleri: ListeSiparisi[] = [];
+  for (const s of v.siparis_listesi || []) {
+    if (s.firma_id !== firma.id) continue;
+    if (s.dosya_no && acikDosyaNolari.has(s.dosya_no)) continue;
+    const no = s.proforma_no || "-";
+    if (anaProformalar.has(no)) continue;
+    const anahtar = `${no}|${s.durum}|${s.booking_no || ""}|${s.miktar_mt ?? ""}`;
+    if (gorulen.has(anahtar)) continue;
+    gorulen.add(anahtar);
+    const mt = s.miktar_mt === null || s.miktar_mt === "" ? null : Number(s.miktar_mt);
+    listeSiparisleri.push({ proforma_no: no, durum: s.durum, miktarMt: mt !== null && Number.isFinite(mt) ? mt : null, konteyner: s.konteyner ?? null, tarih: s.proforma_tarihi, booking: s.booking_no });
+  }
+  const listedenAktif = (v.siparis_listesi || []).some((s) => s.firma_id === firma.id);
+
+  const tarihler = [
+    ...dosyalar.map((d) => d.olusturma_tarihi),
+    ...(v.siparis_tarihleri || []).filter((t) => t.firma_id === firma.id).map((t) => t.tarih),
+  ].filter((t): t is string => !!t).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   const sonSiparis = tarihler.length ? tarihler[tarihler.length - 1] : null;
   const siparissizGun = sonSiparis ? Math.max(0, Math.floor((bugun.getTime() - new Date(sonSiparis).getTime()) / GUN)) : null;
 
@@ -97,9 +129,10 @@ export function musteriDurumu(firma: PazarFirma, v: MusteriSiparisVerisi, bugun:
   }
 
   return {
-    aktif: acikDosyalar.length > 0 || acikSiparisler.length > 0,
+    aktif: acikDosyalar.length > 0 || acikSiparisler.length > 0 || listedenAktif,
     acikDosyalar,
     acikSiparisler,
+    listeSiparisleri,
     sonSiparis,
     siparissizGun,
     toplamDosya: dosyalar.length,

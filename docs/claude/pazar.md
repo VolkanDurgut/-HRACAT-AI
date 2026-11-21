@@ -262,3 +262,21 @@ Kod:
   `UlkeTablosu` (tüm ülkeler, arama + başlıkla sıralama `ulkeTablosu`; "Ülkesi bilinmeyen" hep en altta).
 - DB: migration `20261116240000_pazar_musteri_hacim.sql` — `pazar_musteri_siparisleri()` dosya satırlarına yalnız
   `toplam_tutar`, `para_birimi` (deneme: eski alanlar md5 aynı, 42/42 dosya). Test `tests/pazar-gorunum.test.ts`.
+
+## 3.x Müşterilerimiz: Sipariş Listesi'ndeki açık sipariş = Aktif (21.11.2026)
+Kullanıcı: "Siparişsiz müşteri hala 18 gözüküyor aslında onaylanan siparişleri var. En kötü onay bekleyenler var mı bilmiyorum."
+- Sorun: Aktif yalnız rezervasyonlu AÇIK dosya / tamamlanmamış ana sipariş idi; Sipariş Listesi (`siparis_listesi_veri`) hiç
+  sayılmıyordu → GMB TRADING (UNEXGTI161126 ön ödeme alındı), OM GENERAL (UNEXOMG091126 ön ödeme alındı), STE AYRA
+  (UNEXSAS171126 peşinat bekliyor) "siparişsiz" görünüyor ve günlük görevde aday oluyordu (GMB'ye hatırlatma çıkıyordu).
+- Migration `20261121060000_pazar_siparis_listesi.sql` (salt okunur):
+  - `pazar_anahtar_eslesir(a[], b[])`: aynı anahtar ya da biri diğerinin başı (≥5 harf) — "COOL LINK" ~ "COOL LINK& MARKETING".
+  - `pazar_acik_siparis_anahtarlari(company)` (onay_bekliyor / on_odeme_alindi / rezervasyonlu; `bl_eksik` sevk edilmiş sayılır),
+    `pazar_firma_listede_acik(firma)` — yalnız service.
+  - `pazar_firma_son_siparis`: dosya + Sipariş Listesi / sistem proforması tarihi (yenisi).
+  - `pazar_gorev_olustur`: açık siparişli MÜŞTERİ ne siparişsiz ne hatırlatma adayı; anahtarlar BİR KEZ (veri ~0.8 sn).
+  - `pazar_gorev_bilgi` aktif bilgisi listeyi de görür; `pazar_musteri_siparisleri` + `siparis_listesi` (firma_id'li),
+    `siparis_tarihleri`.
+- UI `lib/pazar/musteri.ts` `listeSiparisleri` (açık dosyasıyla görünen satır tekrar edilmez), `LISTE_DURUM_ETIKETI`;
+  Müşterilerimiz satırı + firma kartı. Test `tests/pazar-musteri-liste.test.ts`.
+- 21.11 sonucu: siparişsiz 18 → 15 (GMB, OM GENERAL, STE AYRA aktif). Kalan 15'in hiçbir kaynakta (dosya, ana sipariş,
+  Sipariş Listesi, sistem proforması, yükleme planı) açık siparişi yok; FARID B.P. aynı firmanın ikinci kartı.

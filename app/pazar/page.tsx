@@ -21,7 +21,7 @@ import {
   pazarAnahtarlari, pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
   type MusteriSiparisVerisi, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarVerisi, type TakipVerisi,
 } from "@/lib/pazar/veri";
-import { musteriDurumu, type MusteriDurumu } from "@/lib/pazar/musteri";
+import { LISTE_DURUM_ETIKETI, musteriDurumu, type MusteriDurumu } from "@/lib/pazar/musteri";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -354,6 +354,11 @@ function PazarIcerik() {
                               <div className="space-y-0.5" style={{ color: "#C9D1DC" }}>
                                 {d.acikDosyalar.map((x) => <p key={x.id}><span className="text-white">{x.dosya_no}</span> · {x.yuklenen}/{x.rezKonteyner} konteyner yüklendi</p>)}
                                 {d.acikSiparisler.map((x) => <p key={x.id}><span className="text-white">{x.proforma_no}</span> · kalan {x.kalanFcl.toLocaleString("tr-TR")} FCL</p>)}
+                                {d.listeSiparisleri.map((x, i) => (
+                                  <p key={`l${i}`} data-liste-siparis={x.durum}>
+                                    <span className="text-white">{x.proforma_no}</span>{x.konteyner ? ` · ${x.konteyner} kont.` : x.miktarMt ? ` · ${x.miktarMt.toLocaleString("tr-TR")} MT` : ""} · <span style={{ color: x.durum === "onay_bekliyor" ? "#FCD34D" : "#6EE7B7" }}>{LISTE_DURUM_ETIKETI[x.durum]}</span>
+                                  </p>
+                                ))}
                               </div>
                             ) : (
                               <p style={{ color: "#FCD34D" }}>

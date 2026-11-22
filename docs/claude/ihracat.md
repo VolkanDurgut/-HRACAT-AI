@@ -1430,3 +1430,27 @@ Kullanıcı: "Mevcut durum kayıtlı kalsın, farklı bir test alanında devam e
     `ana_siparisler` YAZILMAZ, oluşacak kayıt `components/prova-penceresi.tsx` ile gösterilir (`lib/prova.ts`).
   - Diğer sayfalardaki işlemler gerçek kayıttır (şerit bunu söyler).
 - Akış: özellik dalı → PR (main'e) → Netlify önizleme + GitHub "Kod Kontrolu" → kullanıcı onayı → PR birleştirilir → canlı.
+
+## Ana Panel — Tek iş listesi (23.11.2026) — migration 20261123090000_panel_odeme_bekleyenleri.sql (CANLIDA, sürüm 20261122210457)
+
+Kullanıcı: "Bu sayfa çok karışık; tek sayfa şeklinde verebilmeliyiz. Açık sevkiyatlar, rezervasyonu alınmışlar açık sevkiyat
+olarak görülmeli. Ödeme bekleyenler gri, kocaman 'Ödeme bekliyor'; ödeme gelince aktif hale gelecek." + "Bunlar otomatik
+belirlenemiyor mu" → durum tamamen kayıtlardan.
+
+- Kalkanlar: cut-off çubuğu (`components/panel/cutoff-cubugu.tsx`, dosya duruyor, kullanılmıyor), iki iş emri şeridi
+  (`components/panel/is-emirleri.tsx`, aynı), dosya sekmeleri (Tümü / Cut-Off / Rezervasyon Bekleyen / Açık).
+- Tek tablo (`lib/panel/is-listesi.ts` isListesiKur; satırlar `components/panel/is-listesi-satirlari.tsx`, dosya satırı
+  `app/panel/page.tsx`'te eskisi gibi + ilk sütun Durum ve renkli sol kenar):
+  - Cut-off (kırmızı): belgesi verilmemiş talimat / beyanname cut-off'u 0–3 gün (eski "Cut-Off Yaklaşan" kuralı).
+  - Açık sevkiyat (yeşil): rezervasyonlu açık dosya + booking'li, dosyası açılmamış iş emri ("Dosya açılmadı").
+  - Rezervasyon bekliyor (mavi): rezervasyonsuz açık dosya (satırdan "Rezervasyon ekle") + ön ödemesi alınmış, booking'siz sipariş.
+  - Ödeme bekliyor (gri, soluk, kesikli "ÖDEME BEKLİYOR"): `panel_odeme_bekleyenleri()` = Sipariş Listesi "Onay bekleyen"
+    (`siparis_listesi_veri` durum onay_bekliyor). Pasif; yalnız "Sipariş Listesi" bağlantısı. İşaretlenince maviye geçer.
+- Tekrar yok: booking'li iş emri rezervasyonsuz dosyayı işaret ediyorsa dosya satırı gizli; ön ödeme iş emri rezervasyonsuz
+  dosyayı işaret ediyorsa iş emri gizli; ödeme bekleyen proforma başka satırda varsa (R eki dahil) gösterilmez.
+- Sıra: cut-off > açık > rezervasyon bekliyor > ödeme; grup içinde en yakın cut-off / en eski bekleyen üstte.
+- Filtre `?filtre=` tumu | acik (açık + cut-off) | cutoff | rez_bekliyor | odeme; eski `rezervasyon` → rez_bekliyor.
+  Arama: müşteri / proforma / dosya no / booking. `?dosya=` vurgusu aynen (filtre / arama gizliyorsa Tümü'ye döner).
+- Veri: dosyalar dakikada bir; iş emirleri + ödeme bekleyenler 5 dakikada bir PARALEL (biri okunamazsa diğeri gelir).
+- Özet kartları duruyor (Cut-off kartı metni: "listede kırmızı satırlar").
+- Test: tests/panel-is-listesi.test.ts (kurgusal veri).

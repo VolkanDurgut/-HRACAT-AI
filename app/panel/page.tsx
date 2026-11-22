@@ -16,18 +16,18 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, FileCheck2 } from "lucide-react";
-import { CutoffCubugu } from "@/components/panel/cutoff-cubugu";
-import { cutoffUyarilari, dosyaEslesir, EVRAK_KISA, PANEL_FILTRELERI, panelFiltrele, panelFiltresi, type PanelFiltre } from "@/lib/panel-gorunum";
+import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, FileCheck2, Search, CalendarDays } from "lucide-react";
+import { dosyaEslesir, EVRAK_KISA } from "@/lib/panel-gorunum";
 import { kantarDosyaYolu } from "@/lib/kantar-gorunum";
 import { adresiGuncelle } from "@/lib/url-durumu";
 import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { IsEmirleri } from "@/components/panel/is-emirleri";
-import { isEmirleriOku } from "@/lib/panel/veri";
+import { isEmirleriOku, odemeBekleyenleriOku } from "@/lib/panel/veri";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
+import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -145,13 +145,16 @@ function PanelContent() {
   // 16.11.2026: ?filtre= (eski ?filter= baglantilari da) + ?dosya= (satir vurgusu; Kontrol Merkezi / cut-off cubugu)
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilterDurumu] = useState<PanelFiltre>(() => panelFiltresi(searchParams.get("filtre"), searchParams.get("filter")));
-  const [vurgu, setVurgu] = useState<string | null>(() => searchParams.get("dosya"));
+  // 23.11.2026 TEK IS LISTESI: filtre = durum (Tumu / Acik sevkiyat / Cut-off / Rezervasyon bekliyor / Odeme bekliyor)
+  const [activeFilter, setActiveFilterDurumu] = useState<ListeFiltresi>(() => listeFiltresi(searchParams.get("filtre"), searchParams.get("filter")));
+  const [arama, setArama] = useState("");
+  // ?dosya= satir vurgusu (Kontrol Merkezi, Kantar, Siparis Listesi baglantilari). 23.11.2026: cut-off cubugu kalkti
+  const [vurgu] = useState<string | null>(() => searchParams.get("dosya"));
   const [acikDetay, setAcikDetay] = useState<Set<string>>(new Set());
   const vurguKaydirildi = useRef<string | null>(null);
   // Eski ?filter= her guncellemede silinir - ERP ortak kit (lib/url-durumu.ts)
   const adresGuncelle = useCallback((degis: Record<string, string | null>) => adresiGuncelle(degis, ["filter"]), []);
-  const setActiveFilter = useCallback((f: PanelFiltre) => {
+  const setActiveFilter = useCallback((f: ListeFiltresi) => {
     setActiveFilterDurumu(f);
     adresGuncelle({ filtre: f === "tumu" ? null : f });
   }, [adresGuncelle]);
@@ -161,9 +164,14 @@ function PanelContent() {
   // olarak. Mevcut is emrine hemen ulasabilelim, proforma aramayalim." -> dosyasi acilmamis is emirleri (ust serit).
   // Dosya tablosunu beklemez; okunamazsa serit gizli kalir.
   const [isEmirleri, setIsEmirleri] = useState<{ rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] } | null>(null);
+  // 23.11.2026: odeme bekleyen siparisler (gri satirlar; panel_odeme_bekleyenleri) - is emirleriyle paralel okunur
+  const [odemeler, setOdemeler] = useState<OdemeBekleyen[] | null>(null);
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
-    try { setIsEmirleri(await isEmirleriOku()); } catch { /* yetki / ag hatasi: serit gizli */ }
+    // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
+    const [ie, od] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku()]);
+    if (ie.status === "fulfilled") setIsEmirleri(ie.value);
+    if (od.status === "fulfilled") setOdemeler(od.value);
   }, [user?.id, companyId]);
   useEffect(() => {
     isEmirleriniGetir();
@@ -172,7 +180,6 @@ function PanelContent() {
     document.addEventListener("visibilitychange", yenile);
     return () => { window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
   }, [isEmirleriniGetir]);
-  const isEmriSayisi = isEmirleri ? isEmirleri.rezervasyonlu.length + isEmirleri.onOdeme.length : 0;
 
   const fetchDosyalar = useCallback(async () => {
     if (!user?.id || !companyId) return; // companyId kontrolü eklendi
@@ -265,8 +272,13 @@ function PanelContent() {
     setDeleteTarget(null);
   };
 
-  const filteredDosyalar = useMemo(() => panelFiltrele(dosyalar, activeFilter), [dosyalar, activeFilter]);
-  const uyarilar = useMemo(() => cutoffUyarilari(dosyalar), [dosyalar]);
+  // 23.11.2026 TEK IS LISTESI (lib/panel/is-listesi.ts): acik dosyalar + dosyasi acilmamis is emirleri + odeme bekleyenler;
+  // durum ve renk kayitlardan otomatik, siralama cut-off > acik > rezervasyon bekliyor > odeme bekliyor.
+  const ogeler = useMemo(() => isListesiKur(dosyalar, isEmirleri, odemeler), [dosyalar, isEmirleri, odemeler]);
+  const sayilar = useMemo(() => listeSayilari(ogeler), [ogeler]);
+  const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter)), arama), [ogeler, activeFilter, arama]);
+  const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
+  const simdi = Date.now();
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
   const kantarYetkisi = !!yetkiler.sayfa_yetkileri.kantar;
 
@@ -282,16 +294,10 @@ function PanelContent() {
     }
     // Bir kez: kaydirildiktan sonra kullanici baska filtre secerse filtre geri cevrilmez
     if (vurguKaydirildi.current === vurguDosyasi.id) return;
-    if (!filteredDosyalar.some((d) => d.id === vurguDosyasi.id)) { setActiveFilter("tumu"); return; }
+    if (!gorunenler.some((o) => o.tur === "dosya" && o.dosya.id === vurguDosyasi.id)) { setActiveFilter("tumu"); setArama(""); return; }
     vurguKaydirildi.current = vurguDosyasi.id;
     window.setTimeout(() => document.getElementById(`dosya-satir-${vurguDosyasi.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [loading, vurgu, vurguDosyasi, filteredDosyalar, setActiveFilter, gecisliGit, showToast]);
-  const dosyayaGit = useCallback((dosyaId: string) => {
-    vurguKaydirildi.current = null;
-    setVurgu(dosyaId);
-    const d = dosyalar.find((x) => x.id === dosyaId);
-    adresGuncelle({ dosya: d ? (d.proforma_no ? d.proforma_no.split("/")[0].trim() : d.dosya_no) : dosyaId });
-  }, [dosyalar, adresGuncelle]);
+  }, [loading, vurgu, vurguDosyasi, gorunenler, setActiveFilter, gecisliGit, showToast]);
   const detayDegistir = (id: string) => setAcikDetay((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
 
   return (
@@ -299,7 +305,7 @@ function PanelContent() {
       <SayfaBasligi
         ikon={<FolderOpen size={20} />}
         baslik="Ana Panel"
-        aciklama={`${filteredDosyalar.length} açık dosya${isEmriSayisi ? ` · ${isEmriSayisi} dosyası açılmamış iş emri` : ""}`}
+        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor`}
         sag={<BildirimIzniButonu />}
       />
 
@@ -316,24 +322,32 @@ function PanelContent() {
 
       {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
 
-      {/* 16.11.2026: standart uyari cubugu (yoksa gizli) + filtre cubugu (adreste ?filtre=) */}
-      {!loading && <CutoffCubugu uyarilar={uyarilar} onDosya={dosyayaGit} />}
-      {isEmirleri && <IsEmirleri rezervasyonlu={isEmirleri.rezervasyonlu} onOdeme={isEmirleri.onOdeme} yetkili={!!yetkiler.sayfa_yetkileri.proformalar} />}
+      {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
+          (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
       {!loading && (
-        <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
-          ogeler={PANEL_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: panelFiltrele(dosyalar, f.key).length }))} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
+            ogeler={LISTE_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: sayilar[f.key] }))} />
+          <label className="relative mb-4 w-full sm:w-72">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+            <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Müşteri, proforma, booking ara" aria-label="Listede ara" data-testid="panel-arama"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          </label>
+        </div>
       )}
 
       {loading ? (
         <SayfaYukleniyor boyut={24} />
-      ) : filteredDosyalar.length === 0 ? (
-        <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
+      ) : gorunenler.length === 0 ? (
+        <EmptyState icon={<FolderX size={48} />} title="Bu görünümde iş yok" description={arama ? "Aramayı temizleyin ya da başka bir filtre seçin." : "Başka bir filtre seçin ya da yeni dosya açın."} />
       ) : (
         <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
                 <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
@@ -346,7 +360,10 @@ function PanelContent() {
               </tr>
             </thead>
             <tbody>
-              {filteredDosyalar.map((dosya, idx) => {
+              {gorunenler.map((oge, idx) => {
+                if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} />;
+                if (oge.tur === "odeme") return <OdemeListeSatiri key={oge.anahtar} p={oge.odeme} simdi={simdi} listeYetkisi={listeYetkisi} />;
+                const dosya = oge.dosya;
                 const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
                 const latestRez = dosya.rezervasyonlar[0] || null;
                 const hasRez = !!latestRez;
@@ -374,7 +391,8 @@ function PanelContent() {
                     {/* Ana satır (16.11.2026: tek satir; adimlar / mal cinsi / tam evrak rozetleri ▾ detay satirinda) */}
                     <tr id={`dosya-satir-${dosya.id}`} data-vurgu={vurgulu ? "evet" : undefined}
                       className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
-                      style={{ borderColor: CARD_BORDER, ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
+                      style={{ borderColor: CARD_BORDER, ...durumKenari(oge.durum), ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
+                      <DurumHucresi durum={oge.durum} alt={dosya.dosya_no} />
                       <td className="px-3 py-3 align-top">
                         <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }} />
                       </td>
@@ -390,7 +408,10 @@ function PanelContent() {
                       </td>
                       {!hasRez ? (
                         <td className="px-3 py-3 align-top" colSpan={5}>
-                          <span className="text-xs font-medium text-amber-500 animate-pulse whitespace-nowrap">Henüz rezervasyon alınmadı</span>
+                          {/* 23.11.2026: rezervasyonsuz dosya = "Rezervasyon bekliyor" (mavi); dogrudan rezervasyon ekranina */}
+                          <Link href={`/dosya/${dosya.id}?tab=rezervasyon&action=new`} className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap hover:underline" style={{ color: "#93C5FD" }} data-rezervasyon-ekle>
+                            <CalendarDays size={12} /> Henüz rezervasyon alınmadı · Rezervasyon ekle
+                          </Link>
                         </td>
                       ) : (
                         <>
@@ -479,7 +500,7 @@ function PanelContent() {
 
                     {/* Detay satiri (▾): tam evrak rozetleri + adimlar + mal cinsi / gemi */}
                     {detayAcik && <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-detay-satiri>
-                      <td colSpan={9} className="px-4 py-2.5">
+                      <td colSpan={10} className="px-4 py-2.5">
                         <EvrakDurumu dosya={dosya} />
                         <div className="flex items-center gap-1.5 flex-wrap mt-2">
                           {akisAdimlari.map((adim) => {

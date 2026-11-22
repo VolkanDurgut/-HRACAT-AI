@@ -1479,3 +1479,19 @@ girmiş olması. Günlük yükleme hesaplanmalı."
 - Görünüm: `components/panel/gunluk-yukleme-karti.tsx` — bugün yüklenen / hedef + bugün alınacak boş, gereken hız ve geçmiş
   kapasite, önümüzdeki 6 iş günü (güne tıklayınca müşteri bazında). Liste satırında Konteyner sütununda "Bugün: 1 boş al ·
   2 yükle" ya da "Hedef: Per 26.11". Veri `yuklemeGecmisiOku` (lib/panel/veri.ts), iş emirleriyle 5 dakikada bir.
+
+### Günlük yükleme — kural güncellemesi (23.11.2026 gece)
+
+Kullanıcı: "Talimat cut-off'u için tartım gerekmez; rezervasyon kadar konteyner numarası yeterli. Talimat tarihi sabittir.
+Ekipman alım tarihi ve ardiyesiz giriş rezervasyonda belirtilir; ardiyesiz giriş değişebilir." + "50'lik 1,5 saatte, 25'lik
+3–3,5 saatte doluyor." + "Cumartesiyi dahil et" (iş günleri zaten geçmişten: Pzt–Cmt).
+
+- Boş alım: talimat cut-off'una kadar (sabit, en kötü durum); en erken ekipman alım tarihi. Kartta bugün alınacak boşlar
+  talimat saatiyle ("son 15:00").
+- **Bugün en az** (sert): beyanname cut-off'u − 3 sa (yol ~2 + kapı ~1) − dolum (50 kg 1,5 / 25 kg veya bilinmiyor 3,5) 07:00'den
+  önce kalıyorsa son gün bir önceki iş günü (`sertSonGun`). En az = sonraki her iş günü geçmişin en yüksek günü kadar
+  yüklense bile bugün yüklenmesi ZORUNLU kalan adet.
+- **Önerilen**: hedef beyannameden bir önceki iş günü (sert son günü geçemez), dengeli hız (değişmedi).
+- Ardiyesiz giriş (yumuşak): yükleme en erken ardiyesiz girişin bir önceki iş günü; sert son güne sığmıyorsa "ardiye riski".
+- Çuval: `cuvalKgOku` (ambalaj / detaylı ambalaj; karışıkta 25). Gün kutularında ≈ dolum saati.
+- Değişiklik takibi (sonraki iş): rezervasyon değişiklikleri `denetim_kayitlari`'nda (23.09'dan beri); panelde "değişti" gösterimi.

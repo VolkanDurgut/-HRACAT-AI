@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  bookingIsi, dosyaIsi, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sonrakiIsGunu, yuklemePlaniKur, type Kapasite, type YuklemeIsi,
+  bookingIsi, cuvalKgOku, dolumSaati, dosyaIsi, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sertSonGun, sonrakiIsGunu, yuklemePlaniKur,
+  type Kapasite, type YuklemeIsi,
 } from "@/lib/panel/gunluk-yukleme";
 
 const PZT_CMT = [1, 2, 3, 4, 5, 6];
@@ -59,7 +60,7 @@ test("plan: gereken hiz = hedefleri tutturan en dusuk gunluk adet; en yakin hede
   assert.equal(p.bugunAl, 3);
   assert.equal(p.risk, "normal");
   assert.deepEqual(p.takipsiz, ["D"]);
-  assert.deepEqual(p.ozetler.A, { bugunYukle: 2, bugunAl: 1, hedefGun: "2026-11-23", alimSonGun: "2026-11-23", gecikme: false });
+  assert.deepEqual(p.ozetler.A, { bugunYukle: 2, bugunAl: 1, hedefGun: "2026-11-23", alimSonGun: "2026-11-23", gecikme: false, sonGun: "2026-11-23", ardiyeRiski: false, alimSonSaat: null });
   assert.equal(p.ozetler.F.hedefGun, "2026-11-26");
 });
 
@@ -136,4 +137,53 @@ test("gun icinde yukledikce bugunun hedefi SABIT kalir, kalan azalir (yeniden he
   assert.equal(fazla.bugunYuklenen, 8);
   assert.equal(fazla.bugunHedef, 8);
   assert.equal(fazla.gunler.reduce((t, g) => t + g.yukle, 0), 15);
+});
+
+// ---------------------------------------------------------------- 23.11.2026 gece: saat bazli son gun, cuval, ardiye, en az
+test("cuval ve dolum: 50 kg 1,5 sa; 25 kg (ya da karisik / bilinmiyor) 3,5 sa", () => {
+  assert.equal(cuvalKgOku("50 KG"), 50);
+  assert.equal(cuvalKgOku("PP BAG", "2.000 PIECES OF 25 KG PP BAGS"), 25);
+  assert.equal(cuvalKgOku("1*20DC 25KG PP + 1*20DC50KG PP"), 25, "karisikta yavas olan");
+  assert.equal(cuvalKgOku("PP BAG"), null);
+  assert.equal(dolumSaati(50), 1.5);
+  assert.equal(dolumSaati(null), 3.5);
+});
+
+test("sert son gun: beyanname saati - 3 sa yol/kapi - dolum >= 07:00 ise ayni gun, degilse onceki is gunu", () => {
+  assert.equal(sertSonGun("2026-11-24", "2026-11-24T10:00", 25, PZT_CMT), "2026-11-23", "10:00 - 3 - 3,5 = 03:30");
+  assert.equal(sertSonGun("2026-11-24", "2026-11-24T14:00", 25, PZT_CMT), "2026-11-24", "14:00 - 6,5 = 07:30");
+  assert.equal(sertSonGun("2026-11-26", "2026-11-26T12:00", 50, PZT_CMT), "2026-11-26", "12:00 - 4,5 = 07:30");
+  assert.equal(sertSonGun("2026-11-23", "2026-11-23T12:00", 25, PZT_CMT), "2026-11-21", "Pzt 05:30 -> Cmt");
+  assert.equal(sertSonGun("2026-11-24", null, 25, PZT_CMT), "2026-11-23", "saat yoksa temkinli");
+});
+
+// Gercek haftaya benzer (kurgusal adlar): Pzt 23.11
+const GERCEK = [
+  is("BK", { toplam: 2, alinan: 1, cuvalKg: 25, talimatTarihi: "2026-11-23", talimatZaman: "2026-11-23T15:00", beyanTarihi: "2026-11-24", beyanZaman: "2026-11-24T10:00", ekipmanTarihi: "2026-11-21", ardiyesizTarihi: "2026-11-22" }),
+  is("SO", { toplam: 2, alinan: 2, dolu: 1, talimatTamam: true, cuvalKg: 25, beyanTarihi: "2026-11-24", beyanZaman: "2026-11-24T14:00" }),
+  is("CL", { toplam: 2, alinan: 2, dolu: 1, cuvalKg: 25, talimatTarihi: "2026-11-24", talimatZaman: "2026-11-24T16:00", beyanTarihi: "2026-11-25", beyanZaman: "2026-11-25T10:00" }),
+  is("CR", { toplam: 10, takipli: false, cuvalKg: 50, talimatTarihi: "2026-11-26", talimatZaman: "2026-11-26T10:00", beyanTarihi: "2026-11-26", beyanZaman: "2026-11-26T12:00", ekipmanTarihi: "2026-11-23", ardiyesizTarihi: "2026-11-23" }),
+  is("AQ", { toplam: 3, cuvalKg: 25, talimatTarihi: "2026-11-27", talimatZaman: "2026-11-27T10:00", beyanTarihi: "2026-11-27", beyanZaman: "2026-11-27T10:00", ekipmanTarihi: "2026-11-21", ardiyesizTarihi: "2026-11-21" }),
+  is("BS", { toplam: 6, alinan: 3, cuvalKg: 25, talimatTarihi: "2026-11-26", talimatZaman: "2026-11-26T12:00", beyanTarihi: "2026-11-27", beyanZaman: "2026-11-27T14:00", ekipmanTarihi: "2026-11-20", ardiyesizTarihi: "2026-11-25" }),
+];
+
+test("gercek hafta: bugun en az 2 (yalniz BK'nin sert son gunu bugun), onerilen 6; ardiyesiz giristen once yukleme yok", () => {
+  const p = yuklemePlaniKur(GERCEK, KAP, "2026-11-23");
+  assert.equal(p.bugunEnAz, 2);
+  assert.equal(p.bugunHedef, 6);
+  assert.equal(p.gerekenHiz, 6);
+  assert.deepEqual(p.gunler.map((g) => [g.tarih, g.yukle]), [["2026-11-23", 6], ["2026-11-24", 6], ["2026-11-25", 6], ["2026-11-26", 5]]);
+  // BS: ardiyesiz 25.11 -> en erken Sal 24.11 yukleme; Pzt'de BS yok
+  assert.equal(p.gunler[0].isler.some((x) => x.anahtar === "BS" && x.yukle > 0), false);
+  assert.equal(p.ozetler.SO.sonGun, "2026-11-24", "14:00 beyanname: Sal sabah yetisir");
+  assert.equal(p.ozetler.CR.sonGun, "2026-11-26", "50 kg hizli: Per sabah yetisir");
+  assert.equal(p.ozetler.BK.alimSonSaat, "15:00");
+  assert.equal(p.gunler[0].dolumSaat, 4 * 3.5 + 2 * 1.5);
+  assert.deepEqual(p.ardiyeRiskleri, []);
+});
+
+test("ardiye riski: ardiyesiz giris sert son gunden sonraysa isaretlenir, plan yine yapilir", () => {
+  const p = yuklemePlaniKur([is("AR", { toplam: 2, alinan: 2, talimatTamam: true, cuvalKg: 50, beyanTarihi: "2026-11-25", beyanZaman: "2026-11-25T12:00", ardiyesizTarihi: "2026-11-27" })], KAP, "2026-11-23");
+  assert.deepEqual(p.ardiyeRiskleri, ["AR"]);
+  assert.equal(p.gunler.reduce((t, g) => t + g.yukle, 0), 2);
 });

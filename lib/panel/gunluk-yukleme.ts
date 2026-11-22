@@ -16,8 +16,32 @@
  *    gunluk ortalama / %75 / en yuksek -> gereken hiz bunlarla karsilastirilir.
  *  - Plan: en yakin hedef once (EDF), her gun ayni hizla; gereken hiz = tum hedeflerin tutturuldugu EN DUSUK gunluk adet.
  * Cut-off'lar duvar saati olarak saklanir (lib/cutoff-utils.ts): gun = metnin ilk 10 karakteri.
+ *
+ * 23.11.2026 gece (kullanici kurallari): "Talimat cut-off'u icin tartim gerekmez; rezervasyon kadar konteyner numarasi
+ * yeterli (bos alinmis olmali). Talimat tarihi sabittir. Ekipman alim tarihi ve ardiyesiz giris rezervasyonda belirtilir;
+ * ardiyesiz giris degisebilir." + "50'lik 1,5 saatte, 25'lik 3-3,5 saatte doluyor."
+ *  - EN AZ (sert): beyanname cut-off'u - YOL_KAPI_SAAT (fabrika -> Ambarli ~2 sa + kapi ~1 sa) - dolum suresi (cuvala gore)
+ *    gunun YUKLEME_BASLANGIC_SAAT'inden once kaliyorsa son gun bir onceki is gunu. "Bugun en az" = bundan sonra gunde en
+ *    fazla gecmisin en yuksek gunu kadar yuklense bile bugun yuklenmesi ZORUNLU olan adet.
+ *  - ONERILEN: hedef beyanname gunundan bir onceki is gunu (sert son gunu gecemez), dengeli hiz.
+ *  - Ardiyesiz giris: yukleme en erken ardiyesiz girisin bir onceki is gunu (ertesi gun limana girer); sert son gune
+ *    sigmiyorsa ardiye riski isaretlenir (kural yumusak).
  */
 export const PENCERE_IS_GUNU = 5;
+export const YOL_KAPI_SAAT = 3;
+export const YUKLEME_BASLANGIC_SAAT = 7;
+const VARSAYILAN_GUNLUK_TAVAN = 13;
+/** Konteyner dolum suresi (saat): 50 kg cuval ~1,5; 25 kg ~3-3,5; bilinmiyorsa uzun olan (temkinli). */
+export function dolumSaati(cuvalKg: 25 | 50 | null | undefined): number {
+  return cuvalKg === 50 ? 1.5 : 3.5;
+}
+/** Ambalaj metinlerinden cuval tipi: yalniz 50 KG -> 50, 25 KG gecen -> 25 (karisikta yavas olan), yoksa null. */
+export function cuvalKgOku(...metinler: (string | null | undefined)[]): 25 | 50 | null {
+  const m = metinler.filter(Boolean).join(" ");
+  const k25 = /\b25\s*KG/i.test(m);
+  const k50 = /\b50\s*KG/i.test(m);
+  return k25 ? 25 : k50 ? 50 : null;
+}
 export const GECMIS_GUN = 75;
 const VARSAYILAN_IS_GUNLERI = [1, 2, 3, 4, 5, 6]; // Pzt-Cmt (0 = Pazar)
 const HIZ_UST_SINIR = 200;
@@ -38,13 +62,25 @@ export type YuklemeIsi = {
   beyanTamam: boolean;
   /** Dosya acik mi (acilmamis booking'de alinan / dolu takip edilemez) */
   takipli: boolean;
+  /** Duvar saati "YYYY-MM-DDTHH:MM" (saat bazli son tartim / bos alim saati icin) */
+  talimatZaman?: string | null;
+  beyanZaman?: string | null;
+  ardiyesizTarihi?: string | null;
+  cuvalKg?: 25 | 50 | null;
 };
 
 export type Kapasite = { gunSayisi: number; ortalama: number; p75: number; max: number; isGunleri: number[] };
 
 export type GunIsi = { anahtar: string; etiket: string; yukle: number; al: number };
-export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[] };
-export type IsOzeti = { bugunYukle: number; bugunAl: number; hedefGun: string; alimSonGun: string | null; gecikme: boolean };
+export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[]; dolumSaat: number };
+export type IsOzeti = {
+  bugunYukle: number; bugunAl: number; hedefGun: string; alimSonGun: string | null; gecikme: boolean;
+  /** Sert son yukleme gunu (saat bazli) */
+  sonGun?: string;
+  /** Bos alim son saati (talimat cut-off'u, "HH:MM") - alim son gunu bugunse gosterilir */
+  alimSonSaat?: string | null;
+  ardiyeRiski?: boolean;
+};
 export type YuklemePlani = {
   bugun: string;
   isGunuMu: boolean;
@@ -53,6 +89,10 @@ export type YuklemePlani = {
   bugunHedef: number;
   bugunYuklenen: number;
   bugunAl: number;
+  /** Bugun (ya da ilk is gunu) yuklenmesi ZORUNLU kalan adet: yapilmazsa beyanname cut-off'u kacar */
+  bugunEnAz: number;
+  /** Ardiyesiz giristen once limana girmesi kacinilmaz isler */
+  ardiyeRiskleri: string[];
   risk: "normal" | "yuksek" | "asiyor" | "bilinmiyor";
   ozetler: Record<string, IsOzeti>;
   /** Beyanname cut-off'u olmayan (plan disi) isler */
@@ -123,8 +163,27 @@ export function kapasiteHesapla(yuklemeGunleri: string[]): Kapasite {
 // ---------------------------------------------------------------- plan
 type Hazir = {
   is: YuklemeIsi; kalanYukle: number; kalanAl: number; bosHazir: number;
-  hedef: string; alimSon: string | null; erken: string; gecikme: boolean;
+  hedef: string; sonGun: string; alimSon: string | null; erken: string; gecikme: boolean; ardiyeRiski: boolean;
 };
+
+/** "YYYY-MM-DDTHH:MM..." -> gunun dakikasi (duvar saati); saat yoksa null. */
+function gunDakikasi(v: string | null | undefined): number | null {
+  const m = (v || "").match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+export const zamanKismi = (v: string | null | undefined): string | null =>
+  v && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(v) ? `${v.slice(0, 10)}T${v.slice(11, 16)}` : null;
+
+/**
+ * Sert son yukleme gunu: beyanname saati - (yol + kapi) - dolum >= yukleme baslangici ise beyanname gunu (is gunuyse),
+ * degilse bir onceki is gunu. Saat bilinmiyorsa temkinli: bir onceki is gunu.
+ */
+export function sertSonGun(beyanGun: string, beyanZaman: string | null | undefined, cuvalKg: 25 | 50 | null | undefined, isGunleri: number[]): string {
+  const dk = gunKismi(beyanZaman) === beyanGun ? gunDakikasi(beyanZaman) : null;
+  if (dk === null) return oncekiIsGunu(beyanGun, isGunleri);
+  const baslangic = dk - (YOL_KAPI_SAAT + dolumSaati(cuvalKg)) * 60;
+  return isGunuMu(beyanGun, isGunleri) && baslangic >= YUKLEME_BASLANGIC_SAAT * 60 ? beyanGun : oncekiIsGunu(beyanGun, isGunleri);
+}
 
 function hazirla(is: YuklemeIsi, bas: string, isGunleri: number[]): Hazir | null {
   const kalanYukle = is.beyanTamam ? 0 : Math.max(0, is.toplam - is.dolu);
@@ -134,17 +193,28 @@ function hazirla(is: YuklemeIsi, bas: string, isGunleri: number[]): Hazir | null
   const beyan = gunKismi(is.beyanTarihi);
   if (!beyan) return null;
   let gecikme = false;
-  // Hedef: beyanname gunundan bir onceki is gunu; gecmisse cut-off gunu (son care), o da gecmisse bugun
+  let ardiyeRiski = false;
+  // Sert son gun (saat bazli); gecmisse cut-off kacti / kaciyor -> ilk is gunu, isaretli
+  let sonGun = sertSonGun(beyan, is.beyanZaman, is.cuvalKg, isGunleri);
+  if (sonGun < bas) { gecikme = true; sonGun = bas; }
+  // Onerilen hedef: beyanname gunundan bir onceki is gunu; sert son gunu gecemez
   let hedef = oncekiIsGunu(beyan, isGunleri);
-  if (hedef < bas) { gecikme = true; hedef = beyan >= bas ? sonrakiIsGunu(bas, isGunleri) : bas; }
+  if (hedef < bas) hedef = bas;
+  if (hedef > sonGun) hedef = sonGun;
   const talimat = gunKismi(is.talimatTarihi);
   let alimSon = talimat ? enGecIsGunu(talimat, isGunleri) : null;
   if (alimSon && alimSon < bas) { if (kalanAl > 0) gecikme = true; alimSon = bas; }
   const ekipman = gunKismi(is.ekipmanTarihi);
   let erken = ekipman ? sonrakiIsGunu(ekipman, isGunleri) : geriIsGunu(hedef, PENCERE_IS_GUNU, isGunleri);
   if (erken < bas) erken = bas;
-  if (erken > hedef) { hedef = erken; gecikme = true; }
-  return { is, kalanYukle, kalanAl, bosHazir: alimTamam ? kalanYukle : Math.max(0, is.alinan - is.dolu), hedef, alimSon, erken, gecikme };
+  // Ardiyesiz giris (yumusak): yukleme en erken bir onceki is gunu; sert son gune sigmiyorsa ardiye riski
+  const ard = gunKismi(is.ardiyesizTarihi);
+  if (ard && kalanYukle > 0) {
+    const ardErken = oncekiIsGunu(ard, isGunleri);
+    if (ardErken > erken) { if (ardErken <= sonGun) erken = ardErken; else ardiyeRiski = true; }
+  }
+  if (erken > hedef) { hedef = erken; if (hedef > sonGun) gecikme = true; }
+  return { is, kalanYukle, kalanAl, bosHazir: alimTamam ? kalanYukle : Math.max(0, is.alinan - is.dolu), hedef, sonGun, alimSon, erken, gecikme, ardiyeRiski };
 }
 
 type Atama = Map<string, Map<string, number>>; // gun -> anahtar -> yukle
@@ -217,6 +287,7 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
   }
 
   const etiket = new Map(isler.map((i) => [i.anahtar, i.etiket]));
+  const dolum = new Map(isler.map((i) => [i.anahtar, dolumSaati(i.cuvalKg)]));
   const tumGunler = Array.from(new Set([...Array.from(atama.keys()), ...Array.from(alimlar.keys())])).sort();
   const planGunleri: GunPlani[] = tumGunler.map((g) => {
     const y = atama!.get(g) || new Map<string, number>();
@@ -224,7 +295,10 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
     const anahtarlar = Array.from(new Set([...Array.from(y.keys()), ...Array.from(a.keys())]));
     const isler2 = anahtarlar.map((k) => ({ anahtar: k, etiket: etiket.get(k) || k, yukle: y.get(k) || 0, al: a.get(k) || 0 }))
       .filter((x) => x.yukle > 0 || x.al > 0).sort((p, q) => q.yukle - p.yukle || q.al - p.al || p.etiket.localeCompare(q.etiket, "tr"));
-    return { tarih: g, yukle: isler2.reduce((t, x) => t + x.yukle, 0), al: isler2.reduce((t, x) => t + x.al, 0), isler: isler2 };
+    return {
+      tarih: g, yukle: isler2.reduce((t, x) => t + x.yukle, 0), al: isler2.reduce((t, x) => t + x.al, 0), isler: isler2,
+      dolumSaat: Math.round(isler2.reduce((t, x) => t + x.yukle * (dolum.get(x.anahtar) || dolumSaati(null)), 0) * 10) / 10,
+    };
   }).filter((g) => g.yukle > 0 || g.al > 0);
 
   const bugunPlan = isGunuBugun ? planGunleri.find((g) => g.tarih === bugun) : undefined;
@@ -232,13 +306,27 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
   const ozetler: Record<string, IsOzeti> = {};
   for (const h of hazir) {
     const b = bugunPlan?.isler.find((x) => x.anahtar === h.is.anahtar);
-    ozetler[h.is.anahtar] = { bugunYukle: b?.yukle || 0, bugunAl: b?.al || 0, hedefGun: h.hedef, alimSonGun: h.kalanAl > 0 ? h.alimSon : null, gecikme: h.gecikme };
+    const talimatSaat = zamanKismi(h.is.talimatZaman);
+    ozetler[h.is.anahtar] = {
+      bugunYukle: b?.yukle || 0, bugunAl: b?.al || 0, hedefGun: h.hedef, alimSonGun: h.kalanAl > 0 ? h.alimSon : null, gecikme: h.gecikme,
+      sonGun: h.sonGun, ardiyeRiski: h.ardiyeRiski,
+      alimSonSaat: h.kalanAl > 0 && talimatSaat && talimatSaat.slice(0, 10) === h.alimSon ? talimatSaat.slice(11, 16) : null,
+    };
+  }
+  // En az: bugunden sonra her is gunu gecmisin en yuksek gunu kadar yuklense bile bugun yuklenmesi ZORUNLU olan adet
+  const tavan = kapasite.gunSayisi >= 10 && kapasite.max > 0 ? kapasite.max : VARSAYILAN_GUNLUK_TAVAN;
+  let bugunEnAz = 0;
+  for (const d of Array.from(new Set(hazir.map((h) => h.sonGun))).sort()) {
+    const vade = hazir.filter((h) => h.sonGun <= d).reduce((t, h) => t + h.kalanYukle, 0);
+    const sonraki = isGunleriArasi(ekle(bas, 1), d, isGunleri).length;
+    bugunEnAz = Math.max(bugunEnAz, vade - sonraki * tavan);
   }
   const risk: YuklemePlani["risk"] = kapasite.gunSayisi < 10 || hiz === 0 ? (hiz === 0 ? "normal" : "bilinmiyor")
     : hiz <= kapasite.p75 ? "normal" : hiz <= kapasite.max ? "yuksek" : "asiyor";
   return {
     bugun, isGunuMu: isGunuBugun, gunler: planGunleri, gerekenHiz: hiz,
     bugunHedef: (bugunPlan?.yukle || 0) + (isGunuBugun ? bugunYuklenen : 0), bugunYuklenen, bugunAl: bugunPlan?.al || 0,
+    bugunEnAz, ardiyeRiskleri: hazir.filter((h) => h.ardiyeRiski).map((h) => h.is.anahtar),
     risk, ozetler, plansiz,
     takipsiz: isler.filter((i) => !i.takipli && hazir.some((h) => h.is.anahtar === i.anahtar)).map((i) => i.anahtar),
     gecikenler: hazir.filter((h) => h.gecikme).map((h) => h.is.anahtar),
@@ -249,10 +337,12 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
 type PlanDosyasi = {
   id: string; dosya_no: string | null; alici_firma: string | null;
   konsimento_dosya_url?: string | null; draft_bl_dosya_url?: string | null; beyanname_dosya_url?: string | null;
-  rezervasyonlar: { konteyner_adedi?: number | null; talimat_cutoff: string | null; beyanname_cutoff: string | null; ekipman_alim_tarihi?: string | null }[];
+  ambalaj?: string | null; detayli_ambalaj?: string | null;
+  rezervasyonlar: { konteyner_adedi?: number | null; talimat_cutoff: string | null; beyanname_cutoff: string | null; ekipman_alim_tarihi?: string | null; ardiyesiz_giris?: string | null }[];
   konteynerler: { dba_dosya_url?: string | null }[];
 };
 const enErken = (xs: (string | null | undefined)[]) => xs.map(gunKismi).filter((x): x is string => !!x).sort()[0] || null;
+const enErkenZaman = (xs: (string | null | undefined)[]) => xs.map(zamanKismi).filter((x): x is string => !!x).sort()[0] || null;
 
 /** Acik dosya -> yukleme isi (rezervasyonsuz dosya plana girmez: adet / cut-off yok). bugunDolu: bugun tartilanlar. */
 export function dosyaIsi(d: PlanDosyasi, bugunDolu: number): YuklemeIsi | null {
@@ -264,16 +354,22 @@ export function dosyaIsi(d: PlanDosyasi, bugunDolu: number): YuklemeIsi | null {
     talimatTarihi: enErken(d.rezervasyonlar.map((r) => r.talimat_cutoff)), beyanTarihi: enErken(d.rezervasyonlar.map((r) => r.beyanname_cutoff)),
     ekipmanTarihi: enErken(d.rezervasyonlar.map((r) => r.ekipman_alim_tarihi)),
     talimatTamam: !!(d.konsimento_dosya_url || d.draft_bl_dosya_url), beyanTamam: !!d.beyanname_dosya_url, takipli: true,
+    talimatZaman: enErkenZaman(d.rezervasyonlar.map((r) => r.talimat_cutoff)), beyanZaman: enErkenZaman(d.rezervasyonlar.map((r) => r.beyanname_cutoff)),
+    ardiyesizTarihi: enErken(d.rezervasyonlar.map((r) => r.ardiyesiz_giris)), cuvalKg: cuvalKgOku(d.ambalaj, d.detayli_ambalaj),
   };
 }
 
 /** Dosyasi acilmamis booking (Yukleme Plani): alinan / dolu 0 sayilir, takip edilemez. */
-export function bookingIsi(s: { anahtar: string; musteri: string | null; konteyner: number | null; talimat_cutoff: string | null; beyan_cutoff: string | null; bos_ekipman_tarihi: string | null }): YuklemeIsi | null {
+export function bookingIsi(s: {
+  anahtar: string; musteri: string | null; konteyner: number | null; talimat_cutoff: string | null; beyan_cutoff: string | null; bos_ekipman_tarihi: string | null;
+  ardiyesiz_giris?: string | null; ambalaj?: string | null;
+}): YuklemeIsi | null {
   if (!s.konteyner || s.konteyner <= 0) return null;
   return {
     anahtar: `is:${s.anahtar}`, etiket: s.musteri || "—", dosyaNo: null, toplam: s.konteyner, alinan: 0, dolu: 0, bugunDolu: 0,
     talimatTarihi: gunKismi(s.talimat_cutoff), beyanTarihi: gunKismi(s.beyan_cutoff), ekipmanTarihi: gunKismi(s.bos_ekipman_tarihi),
     talimatTamam: false, beyanTamam: false, takipli: false,
+    talimatZaman: zamanKismi(s.talimat_cutoff), beyanZaman: zamanKismi(s.beyan_cutoff), ardiyesizTarihi: gunKismi(s.ardiyesiz_giris), cuvalKg: cuvalKgOku(s.ambalaj),
   };
 }
 

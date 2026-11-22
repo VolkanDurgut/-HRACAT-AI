@@ -28,6 +28,10 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
   const oran = plan.bugunHedef > 0 ? Math.min(100, Math.round((plan.bugunYuklenen / plan.bugunHedef) * 100)) : 0;
   const gunler = plan.gunler.slice(0, 6);
   const secili = gunler.find((g) => g.tarih === acikGun) || null;
+  // Bugun alinacak boslar: talimat cut-off'u bugunse saatiyle (talimat icin rezervasyon kadar konteyner numarasi gerekir)
+  const bugunAlimlar = Object.entries(plan.ozetler).filter(([, o]) => o.bugunAl > 0)
+    .map(([anahtar, o]) => ({ anahtar, al: o.bugunAl, saat: o.alimSonSaat || null }))
+    .sort((a, b) => (a.saat || "99").localeCompare(b.saat || "99"));
 
   return (
     <div className="rounded-xl border mb-4 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: r.kenar }} data-testid="gunluk-yukleme" data-risk={plan.risk}>
@@ -45,9 +49,20 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
               <div className="mt-1.5 h-1.5 w-full rounded-full overflow-hidden" style={{ backgroundColor: ROW_HEADER_BG }}>
                 <div className="h-full rounded-full" style={{ width: `${oran}%`, backgroundColor: r.renk }} />
               </div>
-              <p className="mt-1.5 text-[11px] inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
+              {/* 23.11.2026: en az = yapilmazsa beyanname cut-off'u kacar (saat bazli); hedef = onerilen (dengeli) */}
+              <p className={`mt-1.5 text-[11px] font-semibold ${plan.bugunEnAz > 0 ? "text-red-300" : "text-emerald-300"}`} data-testid="gunluk-en-az">
+                {plan.bugunEnAz > 0 ? `En az ${plan.bugunEnAz} daha zorunlu (yapılmazsa cut-off kaçar)` : "Bugün zorunlu yükleme kalmadı"}
+              </p>
+              <p className="mt-1 text-[11px] inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
                 <Truck size={12} /> Bugün alınması gereken boş: <b className="text-white">{plan.bugunAl}</b>
               </p>
+              {bugunAlimlar.length > 0 && (
+                <ul className="mt-0.5 text-[10.5px] space-y-0.5" style={{ color: TEXT_MUTED }}>
+                  {bugunAlimlar.map((x) => (
+                    <li key={x.anahtar}><span className="text-white">{etiket(x.anahtar)}</span> · {x.al} boş{x.saat ? <b className="text-amber-300"> · son {x.saat}</b> : null}</li>
+                  ))}
+                </ul>
+              )}
             </>
           ) : (
             <p className="mt-1 text-sm" style={{ color: TEXT_MUTED }}>Bugün yükleme günü değil; plan {gunler[0] ? gunEtiketi(gunler[0].tarih) : "—"} başlıyor.</p>
@@ -76,6 +91,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
                   style={{ borderColor: acik ? r.renk : CARD_BORDER, backgroundColor: g.tarih === plan.bugun ? ROW_HEADER_BG : undefined }}>
                   <span className="block text-[10.5px] font-semibold" style={{ color: TEXT_MUTED }}>{g.tarih === plan.bugun ? "Bugün" : gunEtiketi(g.tarih)}</span>
                   <span className="block text-sm text-white tabular-nums"><b>{g.yukle}</b><span className="text-[11px]" style={{ color: TEXT_MUTED }}> · {g.al} boş</span></span>
+                  {g.dolumSaat > 0 && <span className="block text-[10px] tabular-nums" style={{ color: TEXT_MUTED }} title="Dolum: 50 kg ~1,5 sa, 25 kg ~3,5 sa / konteyner">≈ {sayi(g.dolumSaat)} sa dolum</span>}
                 </button>
               );
             })}
@@ -86,7 +102,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
       {secili && (
         <div className="px-4 py-2.5 border-t text-[12px]" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-testid="gunluk-yukleme-detay">
           <p className="text-[11px] font-semibold mb-1 inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
-            {acikGun ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {gunEtiketi(secili.tarih)} · {secili.yukle} yükle · {secili.al} boş al
+            {acikGun ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {gunEtiketi(secili.tarih)} · {secili.yukle} yükle · {secili.al} boş al · ≈ {sayi(secili.dolumSaat)} sa dolum
           </p>
           <ul className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
             {secili.isler.map((x) => (
@@ -99,11 +115,16 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
         </div>
       )}
 
-      {(plan.gecikenler.length > 0 || plan.takipsiz.length > 0 || plan.plansiz.length > 0) && (
+      {(plan.gecikenler.length > 0 || plan.takipsiz.length > 0 || plan.plansiz.length > 0 || plan.ardiyeRiskleri.length > 0) && (
         <div className="px-4 py-2 border-t flex flex-wrap gap-x-5 gap-y-1 text-[11px]" style={{ borderColor: CARD_BORDER }}>
           {plan.gecikenler.length > 0 && (
             <span className="inline-flex items-center gap-1 text-red-300" title={plan.gecikenler.map(etiket).join(", ")}>
               <AlertTriangle size={12} /> {plan.gecikenler.length} sevkiyatın hedef günü geçti / cut-off günü: {plan.gecikenler.map(etiket).slice(0, 3).join(", ")}{plan.gecikenler.length > 3 ? "…" : ""}
+            </span>
+          )}
+          {plan.ardiyeRiskleri.length > 0 && (
+            <span className="text-amber-300" title={plan.ardiyeRiskleri.map(etiket).join(", ")}>
+              {plan.ardiyeRiskleri.length} sevkiyat ardiyesiz giriş tarihinden önce limana girmek zorunda: {plan.ardiyeRiskleri.map(etiket).slice(0, 3).join(", ")}
             </span>
           )}
           {plan.takipsiz.length > 0 && (
@@ -123,9 +144,9 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
 }
 
 /** Liste satirinda kisa gorev: "Bugün: 1 boş al · 2 yükle" / "son gün geçti". */
-export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean }) {
+export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaat = null }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean; alimSonSaat?: string | null }) {
   if (bugunYukle === 0 && bugunAl === 0 && !gecikme) return <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>Hedef: {gunEtiketi(hedefGun)}</p>;
-  const parca = [bugunAl > 0 ? `${bugunAl} boş al` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
+  const parca = [bugunAl > 0 ? `${bugunAl} boş al${alimSonSaat ? ` (son ${alimSonSaat})` : ""}` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
   return (
     <p className={`text-[10.5px] mt-0.5 font-semibold whitespace-nowrap ${gecikme ? "text-red-300" : "text-emerald-300"}`} data-gunluk-gorev>
       {parca ? `Bugün: ${parca}` : "Hedef günü geçti"}

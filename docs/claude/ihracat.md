@@ -1380,3 +1380,24 @@ Fumigation, Fatura Talimatı PDF (ürün adı + ambalaj). Test: `tests/marka-uyu
 - **`?dosya=`:** sayfa açılırken dosya no arama kutusuna yazılır (kartlar ve tablolar süzülür), adresten silinir.
 - **Bağlantılar (yetkiye bağlı):** dosya no → `/panel?dosya=` yalnız Ana Panel yetkisi olana (kantar operatöründe düz yazı; müşteri adı kantara hâlâ gelmez). Ana Panel detay satırındaki "DBA x/y" adımı → `/kantar?dosya=` yalnız Kantar yetkisi olana.
 - Dokunulmayan: DBA yükleme / otomatik DBA, canlı yenileme, sayım kuralı (`lib/kantar-sevkiyat.ts`).
+
+## Ana Panel — İş emirleri (22.11.2026) — migration 20261122090000_panel_is_emirleri.sql
+
+Kullanıcı: "Ön ödemesi alınmış proformalar Ana Panel'de görünmeli; rezervasyonu belliyse rezervasyonlu olarak. Mevcut iş
+emrine hemen ulaşalım, proforma aramayalım."
+
+- `panel_is_emirleri()` (yetki: `panel` ya da `proformalar`; ~1 sn): dosyası HENÜZ AÇILMAMIŞ iş emirleri.
+  - **rezervasyonlu**: Yükleme Planı'nda booking'i olan (ETD son 7 gün ve sonrası, ETD'siz eski satırlar hariç), sistemde
+    rezervasyonu / dosyası olmayan satırlar. Proforma: plan satırı, yoksa Sipariş Listesi'nde BL sütununda bu booking'i
+    taşıyan satır. Sipariş Listesi'nde "sevk edildi" olan booking alınmaz.
+  - **on_odeme**: Yükleme Planı'nın rezervasyon bekleyen (ön ödemesi alınmış) satırları + ön ödeme tarihi (eşleştirilmiş
+    sistem proformasının kaydı da okunur: UNEXSIM061126 → UNEXBSC061126).
+  - **aksiyonlar**: `plan_bekleyen_aksiyonlari_ic(sirket, liste)` (iç; istemciye kapalı). `plan_bekleyen_aksiyonlari` artık
+    yetki kontrolü + bu iç fonksiyon; davranış aynı.
+- Arayüz: `components/panel/is-emirleri.tsx` (dosya tablosunun üstünde iki `AcilirSerit`; açık/kapalı tercihi tarayıcıda).
+  Rezervasyonlu: booking, gemi/sefer, acente, liman, ETD, talimat/beyan cut-off sayaçları (`CutoffSayac`), en yakın cut-off
+  üstte; 2 gün içinde/geçmiş varsa şerit kırmızı. Ön ödemeli: ön ödeme tarihi + kaç gündür beklediği (≥7 gün sarı).
+  Aksiyon (`lib/siparis/plan-bekleyen.ts` `bekleyenAksiyonu`): Rezervasyon ekle / Sevkiyat aç / Dosya aç (?otomatik=1) /
+  Proforma yükle; düğmeler `proformalar` yetkisiyle. Saf: `lib/panel/is-emirleri.ts`; veri: `lib/panel/veri.ts`.
+- Ana Panel dosya tablosunu beklemez; iş emirleri 5 dakikada bir ve sekmeye dönüldüğünde yenilenir; okunamazsa şerit gizli.
+- Test: `tests/panel-is-emirleri.test.ts`.

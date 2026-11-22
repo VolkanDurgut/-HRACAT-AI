@@ -25,6 +25,9 @@ import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { IsEmirleri } from "@/components/panel/is-emirleri";
+import { isEmirleriOku } from "@/lib/panel/veri";
+import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -129,6 +132,8 @@ function EvrakRozetleri({ dosya }: { dosya: DosyaWithRelations }) {
 // (components/panel-ozet-kartlari.tsx). Kontrol Merkezi gibi sayfa gorunurken
 // dakikada bir + sekmeye donulunce kendiliginden yenilenir.
 const YENILEME_MS = 60_000;
+// 22.11.2026 is emirleri (panel_is_emirleri ~1 sn): 5 dakikada bir + sekmeye donuldugunde
+const IS_EMRI_YENILEME_MS = 5 * 60_000;
 
 
 function PanelContent() {
@@ -152,6 +157,22 @@ function PanelContent() {
   }, [adresGuncelle]);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; dosyaNo: string } | null>(null);
   const [yenileme, setYenileme] = useState(0);
+  // 22.11.2026 (kullanici): "On odemesi alinmis proformalar ana panelde gozukmeli; rezervasyonu belliyse rezervasyonlu
+  // olarak. Mevcut is emrine hemen ulasabilelim, proforma aramayalim." -> dosyasi acilmamis is emirleri (ust serit).
+  // Dosya tablosunu beklemez; okunamazsa serit gizli kalir.
+  const [isEmirleri, setIsEmirleri] = useState<{ rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] } | null>(null);
+  const isEmirleriniGetir = useCallback(async () => {
+    if (!user?.id || !companyId) return;
+    try { setIsEmirleri(await isEmirleriOku()); } catch { /* yetki / ag hatasi: serit gizli */ }
+  }, [user?.id, companyId]);
+  useEffect(() => {
+    isEmirleriniGetir();
+    const yenile = () => { if (document.visibilityState === "visible") isEmirleriniGetir(); };
+    const zamanlayici = window.setInterval(yenile, IS_EMRI_YENILEME_MS);
+    document.addEventListener("visibilitychange", yenile);
+    return () => { window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
+  }, [isEmirleriniGetir]);
+  const isEmriSayisi = isEmirleri ? isEmirleri.rezervasyonlu.length + isEmirleri.onOdeme.length : 0;
 
   const fetchDosyalar = useCallback(async () => {
     if (!user?.id || !companyId) return; // companyId kontrolü eklendi
@@ -278,7 +299,7 @@ function PanelContent() {
       <SayfaBasligi
         ikon={<FolderOpen size={20} />}
         baslik="Ana Panel"
-        aciklama={`${filteredDosyalar.length} açık dosya`}
+        aciklama={`${filteredDosyalar.length} açık dosya${isEmriSayisi ? ` · ${isEmriSayisi} dosyası açılmamış iş emri` : ""}`}
         sag={<BildirimIzniButonu />}
       />
 
@@ -297,6 +318,7 @@ function PanelContent() {
 
       {/* 16.11.2026: standart uyari cubugu (yoksa gizli) + filtre cubugu (adreste ?filtre=) */}
       {!loading && <CutoffCubugu uyarilar={uyarilar} onDosya={dosyayaGit} />}
+      {isEmirleri && <IsEmirleri rezervasyonlu={isEmirleri.rezervasyonlu} onOdeme={isEmirleri.onOdeme} yetkili={!!yetkiler.sayfa_yetkileri.proformalar} />}
       {!loading && (
         <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
           ogeler={PANEL_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: panelFiltrele(dosyalar, f.key).length }))} />

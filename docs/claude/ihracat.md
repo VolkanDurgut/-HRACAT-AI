@@ -1507,3 +1507,7 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
   en yoğun gün filoyu (FILO_ARAC = 8) aşarsa kırmızı "Filo yetmiyor".
 - Canlı hafta (23–26.11): 5 / 3 / 5 / 5 araç; alt sınır 18 araç-gün / 4 gün → 5 (en iyisi). Parametreler ileride
   Sevkiyat Parametreleri sayfasına taşınacak (araç takip paneli ölçümleriyle).
+- 23.11.2026 (kullanıcı: "8 saat çalışıyorlar, bazen mesai oluyor"): normal gün `ARAC_GUNLUK_SAAT` = 8 sa → her tur ayrı araç;
+  mesaiyle `MESAI_GUNLUK_SAAT` = 13 sa (50 kg'da araç başı 2 tur). Plan seçimi önce normal mesaide en yoğun günün aracını, sonra
+  mesaili aracı en aza indirir. Kart: "bugün 6 / 8 · 2 araç boşa çıkabilir · mesaiyle 5 araç". 25 kg turu (~8,5 sa) 8 saati
+  az aşıyor; araç takibi ölçümüyle netleşecek.

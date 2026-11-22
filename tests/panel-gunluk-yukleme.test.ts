@@ -193,20 +193,22 @@ test("ardiye riski: ardiyesiz giris sert son gunden sonraysa isaretlenir, plan y
 });
 
 // ---------------------------------------------------------------- 23.11.2026: arac (bosa cikabilecek arac)
-test("tur ve arac: 25 kg tur 8,5 sa (1/gun), 50 kg 6,5 sa (2/gun); turlar araclara yerlestirilir", () => {
+test("tur ve arac: normal gun 8 sa -> tur basina 1 arac; mesaiyle 13 sa -> iki 50'lik tek aracta", () => {
   assert.equal(turSaati(25), 8.5);
   assert.equal(turSaati(50), 6.5);
-  assert.equal(aracIhtiyaci([8.5, 8.5, 6.5, 6.5]), 3, "iki 50'lik tek aracta");
-  assert.equal(aracIhtiyaci([6.5, 6.5, 6.5]), 2);
+  assert.equal(aracIhtiyaci([8.5, 8.5, 6.5, 6.5]), 4, "8 sa: her tur ayri arac");
+  assert.equal(aracIhtiyaci([8.5, 8.5, 6.5, 6.5], 13), 3, "mesai: iki 50'lik tek aracta");
+  assert.equal(aracIhtiyaci([6.5, 6.5, 6.5], 13), 2);
   assert.equal(aracIhtiyaci([]), 0);
 });
 
-test("gercek hafta: en yogun gun 5 arac (alt sinir 18 arac-gun / 4 gun), her gun en az 3 arac bosa cikar", () => {
+test("gercek hafta: normal mesaide gunde en fazla 6 arac (2 bosta); mesaiyle Sal 3, Pzt / Car 5 arac", () => {
   const p = yuklemePlaniKur(GERCEK, KAP, "2026-11-23");
-  assert.deepEqual(p.gunler.map((g) => [g.tarih, g.yukle, g.arac]), [["2026-11-23", 6, 5], ["2026-11-24", 6, 3], ["2026-11-25", 6, 5], ["2026-11-26", 5, 5]]);
+  assert.deepEqual(p.gunler.map((g) => [g.tarih, g.yukle, g.arac, g.aracMesaili]), [["2026-11-23", 6, 6, 5], ["2026-11-24", 6, 6, 3], ["2026-11-25", 6, 6, 5], ["2026-11-26", 5, 5, 5]]);
   assert.equal(p.filo, 8);
-  assert.equal(p.bugunArac, 5);
-  assert.equal(p.bosArac, 3);
-  assert.equal(p.enCokArac, 5);
+  assert.equal(p.bugunArac, 6);
+  assert.equal(p.bosArac, 2);
+  assert.equal(p.bugunAracMesaili, 5);
+  assert.equal(p.enCokArac, 6);
   assert.equal(p.bugunEnAz, 2, "en az degismedi");
 });

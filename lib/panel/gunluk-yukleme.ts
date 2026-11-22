@@ -35,7 +35,9 @@ export const PENCERE_IS_GUNU = 5;
  * Dorse degismez: her tur tek konteyner (bosu depodan alir, fabrikada doldurur, limana birakir).
  */
 export const FILO_ARAC = 8;
-export const ARAC_GUNLUK_SAAT = 13;
+/** Kullanici: "8 saat calisiyorlar, bazen mesai oluyor." Normal gun 8 sa (tur basina 1 arac); mesaiyle en fazla ~13 sa. */
+export const ARAC_GUNLUK_SAAT = 8;
+export const MESAI_GUNLUK_SAAT = 13;
 export const YOL_SAAT = 2;
 export const KAPI_SAAT = 1;
 /** Bir konteynerin tur suresi (saat): 25 kg ~8,5; 50 kg ~6,5. */
@@ -95,7 +97,7 @@ export type YuklemeIsi = {
 export type Kapasite = { gunSayisi: number; ortalama: number; p75: number; max: number; isGunleri: number[] };
 
 export type GunIsi = { anahtar: string; etiket: string; yukle: number; al: number };
-export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[]; dolumSaat: number; arac: number };
+export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[]; dolumSaat: number; arac: number; aracMesaili: number };
 export type IsOzeti = {
   bugunYukle: number; bugunAl: number; hedefGun: string; alimSonGun: string | null; gecikme: boolean;
   /** Sert son yukleme gunu (saat bazli) */
@@ -123,6 +125,8 @@ export type YuklemePlani = {
   bugunArac: number;
   bosArac: number;
   enCokArac: number;
+  /** Mesaiyle (gunde ~13 sa; 50 kg'da arac basi 2 tur) bugun gereken arac */
+  bugunAracMesaili: number;
   risk: "normal" | "yuksek" | "asiyor" | "bilinmiyor";
   ozetler: Record<string, IsOzeti>;
   /** Beyanname cut-off'u olmayan (plan disi) isler */
@@ -295,11 +299,13 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
   const bugunYapilan = isGunuMu(bugun, isGunleri) ? isler.reduce((t, i) => t + Math.max(0, i.bugunDolu), 0) : 0;
   const tur = new Map(isler.map((i) => [i.anahtar, turSaati(i.cuvalKg)]));
   const bugunTurlari = isGunuMu(bugun, isGunleri) ? isler.flatMap((i) => Array(Math.max(0, i.bugunDolu)).fill(turSaati(i.cuvalKg)) as number[]) : [];
-  const gunAraci = (a: Atama, g: string) => {
+  const gunTurlari = (a: Atama, g: string) => {
     const t = Array.from(a.get(g)?.entries() || []).flatMap(([k, n]) => Array(n).fill(tur.get(k) || turSaati(null)) as number[]);
-    return aracIhtiyaci(g === bugun ? [...t, ...bugunTurlari] : t);
+    return g === bugun ? [...t, ...bugunTurlari] : t;
   };
-  const enCok = (a: Atama) => Array.from(a.keys()).reduce((m, g) => Math.max(m, gunAraci(a, g)), 0);
+  const gunAraci = (a: Atama, g: string, saat: number = ARAC_GUNLUK_SAAT) => aracIhtiyaci(gunTurlari(a, g), saat);
+  // Secim olcusu: once normal mesaide en yogun gunun araci, sonra mesaili (ayni arac sayisinda mesai ihtiyaci az olan)
+  const enCok = (a: Atama) => Array.from(a.keys()).reduce((m, g) => Math.max(m, gunAraci(a, g) * 100 + gunAraci(a, g, MESAI_GUNLUK_SAAT)), 0);
   if (toplamYukle > 0) {
     for (hiz = Math.max(1, bugunYapilan); hiz <= HIZ_UST_SINIR; hiz++) { atama = simule(hazir, gunler, hiz, bugun, bugunYapilan); if (atama) break; }
     if (!atama) { hiz = HIZ_UST_SINIR; atama = simule(hazir, gunler, Number.MAX_SAFE_INTEGER, bugun, 0) || new Map(); }
@@ -349,6 +355,7 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
       tarih: g, yukle: isler2.reduce((t, x) => t + x.yukle, 0), al: isler2.reduce((t, x) => t + x.al, 0), isler: isler2,
       dolumSaat: Math.round(isler2.reduce((t, x) => t + x.yukle * (dolum.get(x.anahtar) || dolumSaati(null)), 0) * 10) / 10,
       arac: gunAraci(atama!, g),
+      aracMesaili: gunAraci(atama!, g, MESAI_GUNLUK_SAAT),
     };
   }).filter((g) => g.yukle > 0 || g.al > 0);
 
@@ -385,6 +392,7 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
     bugunArac: isGunuBugun ? (bugunPlan?.arac ?? aracIhtiyaci(bugunTurlari)) : 0,
     bosArac: isGunuBugun ? Math.max(0, FILO_ARAC - (bugunPlan?.arac ?? aracIhtiyaci(bugunTurlari))) : FILO_ARAC,
     enCokArac: planGunleri.reduce((m, g) => Math.max(m, g.arac), 0),
+    bugunAracMesaili: isGunuBugun ? (bugunPlan?.aracMesaili ?? aracIhtiyaci(bugunTurlari, MESAI_GUNLUK_SAAT)) : 0,
     risk, ozetler, plansiz,
     takipsiz: isler.filter((i) => !i.takipli && hazir.some((h) => h.is.anahtar === i.anahtar)).map((i) => i.anahtar),
     gecikenler: hazir.filter((h) => h.gecikme).map((h) => h.is.anahtar),

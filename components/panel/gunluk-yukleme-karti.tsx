@@ -77,6 +77,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
           <p className="text-[11px] mt-1" style={{ color: "#C9D1DC" }} data-testid="gunluk-arac">
             Araç: bugün <b className="text-white">{plan.bugunArac}</b> / {plan.filo}
             {plan.bosArac > 0 ? <> · <b className="text-emerald-300">{plan.bosArac} araç boşa çıkabilir</b></> : null}
+            {plan.bugunAracMesaili < plan.bugunArac ? <span title="Mesaiyle (~13 sa) 50 kg'da araç başı 2 tur"> · mesaiyle {plan.bugunAracMesaili} araç</span> : null}
           </p>
           {plan.enCokArac > plan.filo && (
             <p className="text-[11px] font-semibold text-red-300">Filo yetmiyor: en yoğun gün {plan.enCokArac} araç gerekiyor</p>
@@ -100,7 +101,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
                   <span className="block text-[10.5px] font-semibold" style={{ color: TEXT_MUTED }}>{g.tarih === plan.bugun ? "Bugün" : gunEtiketi(g.tarih)}</span>
                   <span className="block text-sm text-white tabular-nums"><b>{g.yukle}</b><span className="text-[11px]" style={{ color: TEXT_MUTED }}> · {g.al} boş</span></span>
                   {g.dolumSaat > 0 && <span className="block text-[10px] tabular-nums" style={{ color: TEXT_MUTED }} title="Dolum: 50 kg ~1,5 sa, 25 kg ~3,5 sa / konteyner">≈ {sayi(g.dolumSaat)} sa dolum</span>}
-                  {g.arac > 0 && <span className="block text-[10px] tabular-nums" style={{ color: g.arac > plan.filo ? "#FCA5A5" : "#6EE7B7" }} title="Tur: yol ~2 sa + dolum + yol ~2 sa + kapı ~1 sa; araç günde ~13 sa">{g.arac} araç · {Math.max(0, plan.filo - g.arac)} boşta</span>}
+                  {g.arac > 0 && <span className="block text-[10px] tabular-nums" style={{ color: g.arac > plan.filo ? "#FCA5A5" : "#6EE7B7" }} title="Tur: yol ~2 sa + dolum + yol ~2 sa + kapı ~1 sa; normal gün 8 sa (tur başına 1 araç), mesaiyle ~13 sa">{g.arac} araç · {Math.max(0, plan.filo - g.arac)} boşta{g.aracMesaili < g.arac ? ` (mesaiyle ${g.aracMesaili})` : ""}</span>}
                 </button>
               );
             })}

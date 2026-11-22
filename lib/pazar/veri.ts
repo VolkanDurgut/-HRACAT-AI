@@ -4,6 +4,7 @@
  * Migration: supabase/migrations/20261110040000_pazar_crm.sql
  */
 import { supabase } from "@/lib/supabase";
+import { sevkiyatVerisiHazirla, type SevkiyatVerisi } from "@/lib/pazar/siparis-ritmi";
 import type { FuarFirma } from "@/lib/pazar/fuar";
 import type { ListeFirma } from "@/lib/pazar/liste";
 
@@ -241,4 +242,14 @@ export async function pazarTakipOku(): Promise<TakipVerisi> {
     gelenler: (gelen.data || []) as PazarGelen[],
     gorevler: t.gorevler || [],
   };
+}
+
+/**
+ * 23.11.2026 Musteri siparis ritmi: Yukleme Plani + rezervasyon sevkiyat gecmisi, tedarik suresi, karti olmayan plan
+ * musterileri (salt okunur RPC pazar_musteri_sevkiyatlari, migration 20261123100000). Hesap: lib/pazar/siparis-ritmi.ts.
+ */
+export async function pazarMusteriSevkiyatlari(): Promise<SevkiyatVerisi> {
+  const { data, error } = await supabase.rpc("pazar_musteri_sevkiyatlari");
+  if (error) throw new Error(error.message);
+  return sevkiyatVerisiHazirla(data);
 }

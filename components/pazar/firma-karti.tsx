@@ -9,6 +9,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { UlkeBayrak } from "@/components/ulke-bayrak";
 import { pazarFirmaBirlestir, pazarFirmaGuncelle, pazarKisiKaydet, ulkeGosterim, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarTemas } from "@/lib/pazar/veri";
 import { LISTE_DURUM_ETIKETI, type MusteriDurumu } from "@/lib/pazar/musteri";
+import type { MusteriRitmi } from "@/lib/pazar/siparis-ritmi";
+import { RitimBolumu, YoldaSatirlari } from "@/components/pazar/siparis-ritmi";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -41,13 +43,15 @@ const TEMAS_ADI: Record<string, string> = { sorgulama: "Sipariş sorgulama", hat
 type KisiForm = { kisiId: string | null; ad: string; eposta: string; telefon: string; whatsapp: string };
 
 export function FirmaKarti({
-  firma, kisiler, katilimlar, temaslar, durum, tumFirmalar, ulkeler, onKapat, onDegisti,
+  firma, kisiler, katilimlar, temaslar, durum, ritim, tumFirmalar, ulkeler, onKapat, onDegisti,
 }: {
   firma: PazarFirma;
   kisiler: PazarKisi[];
   katilimlar: PazarKatilim[];
   temaslar: PazarTemas[];
   durum: MusteriDurumu | null;
+  /** 23.11.2026 siparis ritmi (lib/pazar/siparis-ritmi.ts) */
+  ritim?: MusteriRitmi;
   tumFirmalar: PazarFirma[];
   ulkeler: string[];
   onKapat: () => void;
@@ -173,6 +177,8 @@ export function FirmaKarti({
                     </span>
                   </div>
                 ))}
+                {/* 23.11.2026: yolda / planda ileri tarihli booking (Yukleme Plani) */}
+                <div className="text-xs space-y-0.5" style={{ color: "#C9D1DC" }}><YoldaSatirlari r={ritim} /></div>
                 {!durum.aktif && (
                   <p className="text-sm" style={{ color: "#FCD34D" }}>
                     Şu an siparişi yok{durum.sonSiparis ? ` · son sipariş ${tarihTR(durum.sonSiparis)} (${durum.siparissizGun} gün önce)` : ""}
@@ -180,6 +186,12 @@ export function FirmaKarti({
                 )}
                 <p className="text-xs" style={{ color: TEXT_MUTED }}>Toplam {durum.toplamDosya} dosya · {durum.toplamKonteyner} konteyner</p>
               </div>
+            </Bolum>
+          )}
+
+          {firma.durum === "musteri" && ritim && (
+            <Bolum baslik="Sipariş ritmi">
+              <RitimBolumu r={ritim} />
             </Bolum>
           )}
 

@@ -23,6 +23,10 @@ import { varisLimaniSorunu, turkiyeLimaniMi, VARIS_LIMANI_SORUN_METNI } from "@/
 import { guncelDiibNoGetir } from "@/lib/diib/veri";
 import { kayitliProformaPdf, sistemProformasiOku } from "@/lib/proforma/okuma-pdf";
 import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
+import { bookingKarari, bookingParametresi, mtsdenFcl, type BookingBilgisi } from "@/lib/siparis-devam";
+import { testOrtami } from "@/lib/ortam";
+import { provaKalemleri } from "@/lib/prova";
+import { ProvaPenceresi, type ProvaOzeti } from "@/components/prova-penceresi";
 
 // 25.10.2026: sayfa "Proforma Yukle" (AI asistan gorunumu); adres ve yetki anahtari (yeni_dosya) degismedi.
 type Step = "upload" | "reading" | "ana_siparis_check" | "success" | "reservation_choice" | "review";
@@ -85,13 +89,21 @@ export default function YeniDosyaPage() {
   // tek sevkiyat / kismi sevkiyat (siparis takibi) secimi kullaniciya kalir; dosya acilinca sonuc ekrani gelir.
   const [otomatikBaslat, setOtomatikBaslat] = useState(false);
   const [otomatikGeldi, setOtomatikGeldi] = useState(false);
+  // 22.11.2026 BOOKING'E GORE SIPARIS TAKIBI: Ana Panel rezervasyonlu is emri "Dosya ac" -> ?booking=&fcl= (konteyner
+  // sayisi). Proforma okununca tek sevkiyat / siparis takibi karari bundan ONERILIR (lib/siparis-devam.ts bookingKarari),
+  // kullanici tek tikla onaylar; Sevkiyat Secimi booking FCL'iyle dolu acilir. Parametre yoksa akis aynen.
+  const [booking, setBooking] = useState<BookingBilgisi | null>(null);
+  // 22.11.2026 TEST ORTAMI (lib/ortam.ts): dosya / ana siparis YAZILMAZ, olusacak kayit prova penceresinde gosterilir.
+  const prova = testOrtami();
+  const [provaOzeti, setProvaOzeti] = useState<ProvaOzeti | null>(null);
   useEffect(() => {
     if (authLoading || !companyId || kayitliIslendi.current) return;
     const id = (adresParametresi("proforma") || "").trim();
     if (!id) return;
     kayitliIslendi.current = true;
     const otomatik = adresParametresi("otomatik") === "1";
-    adresiGuncelle({ proforma: null, otomatik: null }); // bir kez; yenilemede tekrar hazirlanmaz
+    setBooking(bookingParametresi(adresParametresi("booking"), adresParametresi("fcl")));
+    adresiGuncelle({ proforma: null, otomatik: null, booking: null, fcl: null }); // bir kez; yenilemede tekrar hazirlanmaz
     kayitliProformaPdf(id, companyId).then((k) => {
       if (!k) { setError("Kayıtlı proforma bulunamadı ya da okunamadı. Proformayı PDF olarak yükleyebilirsiniz."); return; }
       setPdfFile(k.dosya);
@@ -151,6 +163,8 @@ export default function YeniDosyaPage() {
     setSevkiyatPenceresi(null);
     setGonderilmisMts(0);
     setYeniSiparisMts("");
+    setBooking(null); // booking yalniz panelden gelen ilk proformaya aittir
+    setProvaOzeti(null);
     const girdi = document.getElementById("pdf-input") as HTMLInputElement | null;
     if (girdi) girdi.value = "";
     setStep("upload");
@@ -301,8 +315,35 @@ export default function YeniDosyaPage() {
     return duzeltilmis;
   };
 
+  /**
+   * Test ortami: dosya / ana siparis yazilmadan olusacak kaydin ozeti. tur: "tek" tek seferlik dosya, "yeni" siparis
+   * takibi baslar (ana siparis + ilk sevkiyat), "devam" mevcut siparisin yeni sevkiyati.
+   */
+  const provaGoster = (extracted: any, tur: "tek" | "yeni" | "devam", sevkiyat: DevamOnayi | null) => {
+    const sevk = sevkiyat && sevkiyat.kalemler.length > 0 ? sevkiyat : null;
+    const proformaMts = getProformaMts(extracted);
+    const toplamTaahhut = tur === "yeni" ? parseFloat(yeniSiparisMts) || proformaMts : tur === "devam" ? mevcutAnaSiparis?.toplam_mts || 0 : null;
+    const karar = tur === "tek" ? "Tek seferlik dosya açılır; sipariş takibi başlatılmaz."
+      : tur === "yeni" ? `Sipariş takibi başlar (toplam taahhüt ${toplamTaahhut?.toLocaleString("tr-TR")} MTS); bu dosya ilk sevkiyat olarak açılır.`
+      : `${mevcutAnaSiparis?.proforma_no || ""} siparişine yeni sevkiyat dosyası eklenir.`;
+    setProvaOzeti({
+      baslik: `${extracted.proforma_no || "Proforma"} · ${extracted.alici_firma || ""}`,
+      karar,
+      satirlar: [
+        ...(booking ? [{ etiket: "Booking", deger: `${booking.no} · ${booking.fcl} FCL` }] : []),
+        { etiket: "Proforma miktarı", deger: `${proformaMts.toLocaleString("tr-TR")} MTS · ${mtsdenFcl(proformaMts).toLocaleString("tr-TR")} FCL` },
+        ...(toplamTaahhut !== null ? [{ etiket: "Sipariş toplam taahhüt", deger: `${toplamTaahhut.toLocaleString("tr-TR")} MTS` }] : []),
+        { etiket: "Marka", deger: (sevk ? sevk.marka : "") || extracted.marka || "" },
+        { etiket: "Detaylı ambalaj", deger: (sevk ? sevk.detayliAmbalaj : "") || extracted.detayli_ambalaj || "" },
+      ],
+      kalemler: provaKalemleri(sevk ? sevk.kalemler : extracted.urun_detaylari),
+      paraBirimi: extracted.para_birimi || "USD",
+    });
+  };
+
   const createDosya = async (extracted: any, anaSiparisId: string | null, sevkiyat: DevamOnayi | null = null) => {
     if (!user) return;
+    if (prova) { provaGoster(extracted, anaSiparisId ? "devam" : "tek", sevkiyat); return; }
     setLoading(true);
     try {
       // 18.11.2026: siparis takibinde dosya SECILEN SEVKIYATLA acilir (urun kalemleri, tutar, miktar,
@@ -449,6 +490,7 @@ export default function YeniDosyaPage() {
 
   const handleYeniAnaSiparisOlustur = async (sevkiyat: DevamOnayi | null = null) => {
     if (!proformData || !user) return;
+    if (prova) { provaGoster(proformData, "yeni", sevkiyat); return; }
     const toplamMts = parseFloat(yeniSiparisMts) || getProformaMts(proformData);
     setLoading(true);
     try {
@@ -522,8 +564,11 @@ export default function YeniDosyaPage() {
             olusturuluyor={loading}
             onKapat={() => { if (!loading) setSevkiyatPenceresi(null); }}
             onOnayla={(onay) => (sevkiyatPenceresi.tur === "yeni" ? handleYeniAnaSiparisOlustur(onay) : handleDevamEt(onay))}
+            booking={booking}
+            prova={prova}
           />
         )}
+        {provaOzeti && <ProvaPenceresi ozet={provaOzeti} onKapat={() => setProvaOzeti(null)} />}
 
         {step === "reading" && (
           <ProformaAsistanIlerleme dosyaAdi={pdfFile?.name || "proforma.pdf"} asama={asama} />
@@ -533,12 +578,74 @@ export default function YeniDosyaPage() {
           <div className="flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm mb-4" role="status" data-testid="otomatik-dosya-notu"
             style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#A7F3D0" }}>
             <FileUp size={16} className="shrink-0 mt-0.5" />
-            <span>Ön ödemesi alınan proforma okundu. Son adım: bu sipariş <b>tek sevkiyat</b> mı, yoksa <b>kısmi sevkiyatlarla</b> mı gidecek? Seçiminizle dosya Ana Panel&apos;de açılır.</span>
+            {booking ? (
+              <span>Proforma okundu. Booking&apos;in konteyner sayısına göre <b>öneri</b> aşağıda; onaylayınca dosya açılır.</span>
+            ) : (
+              <span>Ön ödemesi alınan proforma okundu. Son adım: bu sipariş <b>tek sevkiyat</b> mı, yoksa <b>kısmi sevkiyatlarla</b> mı gidecek? Seçiminizle dosya Ana Panel&apos;de açılır.</span>
+            )}
           </div>
         )}
         {step === "ana_siparis_check" && proformData && (
           <ProformaOkumaOzeti veri={proformData} toplamMts={getProformaMts(proformData)} uyari={varisLimaniNotu} />
         )}
+        {step === "ana_siparis_check" && proformData && booking && (() => {
+          // 22.11.2026 booking'e gore oneri: yeni sipariste hedef proformanin tamami, devam eden sipariste acik miktar
+          const acik = mevcutKalemler ? mevcutKalemler.reduce((t, k) => t + k.acikMts, 0) : Math.max(0, (mevcutAnaSiparis?.toplam_mts || 0) - gonderilmisMts);
+          // Yeni sipariste "Toplam Taahhut" alani (varsayilan proforma miktari) - siparis takibi bununla acilir
+          const hedefMts = mevcutAnaSiparis ? acik : parseFloat(yeniSiparisMts) || getProformaMts(proformData);
+          const k = bookingKarari(hedefMts, booking.fcl);
+          const s2 = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 2 });
+          const hedefAdi = mevcutAnaSiparis ? "Siparişte açık" : "Proforma";
+          let metin: React.ReactNode = null;
+          let dugme: { etiket: string; calistir: () => void } | null = null;
+          if (k.tur === "belirsiz") {
+            metin = <>Proforma miktarı okunamadığı için öneri yapılamadı. Aşağıdan seçin.</>;
+          } else if (k.tur === "fazla") {
+            metin = <>Booking ({k.bookingFcl} FCL) {hedefAdi.toLocaleLowerCase("tr-TR")} miktardan ({s2(k.hedefFcl)} FCL) büyük. Otomatik karar verilmedi; proformayı ve Yükleme Planı&apos;nı kontrol edip aşağıdan seçin.</>;
+          } else if (!mevcutAnaSiparis && k.tur === "tek") {
+            metin = <><b>Tek sevkiyat:</b> proformanın tamamı ({s2(k.hedefMts)} MTS) bu booking ile gidiyor. Sipariş takibi açılmaz.</>;
+            dugme = { etiket: "Onayla · Tek Seferlik Dosya", calistir: () => createDosya(proformData, null) };
+          } else if (!mevcutAnaSiparis) {
+            metin = <><b>Kısmi sevkiyat:</b> sipariş takibi başlar (toplam {s2(k.hedefMts)} MTS). Bu dosya {k.bookingFcl} FCL = {s2(k.sevkiyatMts)} MTS; kalan {s2(k.hedefFcl - k.bookingFcl)} FCL siparişte açık kalır.</>;
+            dugme = { etiket: "Onayla · Sipariş Takibini Başlat", calistir: () => sevkiyatSecimiAc("yeni") };
+          } else if (k.tur === "tek") {
+            metin = <><b>Siparişin kalanı:</b> açık {s2(k.hedefMts)} MTS bu booking ile gidiyor.</>;
+            dugme = { etiket: "Onayla · Siparişin Devamı", calistir: () => sevkiyatSecimiAc("devam") };
+          } else {
+            metin = <><b>Siparişe devam:</b> bu dosya {k.bookingFcl} FCL = {s2(k.sevkiyatMts)} MTS; kalan {s2(k.hedefFcl - k.bookingFcl)} FCL siparişte açık kalır.</>;
+            dugme = { etiket: "Onayla · Siparişin Devamı", calistir: () => sevkiyatSecimiAc("devam") };
+          }
+          const uyarili = k.tur === "fazla" || k.tur === "belirsiz";
+          return (
+            <div data-testid="booking-onerisi" className="rounded-xl border shadow-sm p-5 sm:p-6 mb-4 animate-fade-up"
+              style={{ backgroundColor: CARD_BG, borderColor: uyarili ? "rgba(251,191,36,0.45)" : "rgba(16,185,129,0.45)" }}>
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-lg shrink-0 ${uyarili ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400"}`}>
+                  {uyarili ? <AlertCircle size={20} /> : <Package size={20} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-white">Booking&apos;e göre öneri</h3>
+                  <p className="text-xs mt-0.5" style={{ color: TEXT_MUTED }}>
+                    Booking <span className="text-slate-300 font-semibold">{booking.no}</span> · {booking.fcl} FCL
+                    {k.tur !== "belirsiz" && <> · {hedefAdi} {s2(k.hedefFcl)} FCL ({s2(k.hedefMts)} MTS)</>}
+                  </p>
+                  <p className={`text-sm mt-3 ${uyarili ? "text-amber-300" : "text-slate-200"}`}>{metin}</p>
+                  {dugme && (
+                    <button onClick={dugme.calistir} disabled={loading} data-testid="booking-onayla"
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all hover:opacity-90 disabled:opacity-50"
+                      style={{ backgroundColor: ACCENT }}>
+                      {loading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                      {dugme.etiket}
+                    </button>
+                  )}
+                  <p className="text-[11px] mt-3" style={{ color: TEXT_MUTED }}>
+                    {dugme ? "Öneri uymuyorsa aşağıdan elle seçebilirsiniz." : "Aşağıdan elle seçin."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {step === "ana_siparis_check" && proformData && (
           <div className="rounded-xl border shadow-sm p-5 sm:p-8 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>

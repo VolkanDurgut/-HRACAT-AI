@@ -1401,3 +1401,32 @@ emrine hemen ulaşalım, proforma aramayalım."
   Proforma yükle; düğmeler `proformalar` yetkisiyle. Saf: `lib/panel/is-emirleri.ts`; veri: `lib/panel/veri.ts`.
 - Ana Panel dosya tablosunu beklemez; iş emirleri 5 dakikada bir ve sekmeye dönüldüğünde yenilenir; okunamazsa şerit gizli.
 - Test: `tests/panel-is-emirleri.test.ts`.
+
+## Booking'e göre sipariş takibi (22.11.2026) — DB değişikliği yok
+
+Kullanıcı: "Ana panelde dosya aç dediğimde o rezervasyona ait konteyner sayısından sipariş takibini otomatikleştiremez miyiz?"
+
+- Ana Panel rezervasyonlu iş emri: "Dosya aç" / "Sevkiyat aç" adresine `&booking=<no>&fcl=<konteyner>` eklenir
+  (`lib/panel/is-emirleri.ts` bookingliAksiyon). Ön ödeme satırı ve "Rezervasyon ekle" / "Proforma yükle" aynen.
+- Karar `lib/siparis-devam.ts` bookingKarari(hedefMts, bookingFcl). Hedef: yeni siparişte "Toplam Taahhüt"
+  (varsayılan proforma miktarı), devam eden siparişte dosyası açılmamış miktar.
+  - |booking − hedef| ≤ 0,5 FCL → tek (yeni: tek seferlik dosya; devam: siparişin kalanı). Kusurat (10,1 FCL) ayrı sevkiyat sayılmaz.
+  - booking < hedef → sipariş takibi; bu dosya booking FCL'i × 25 MTS.
+  - booking > hedef → otomatik karar YOK, uyarı; seçim kullanıcıda. Miktar okunamazsa da öneri yok.
+- Proforma Yükle (`?booking=&fcl=`): "Booking'e göre öneri" kartı + tek "Onayla" düğmesi; eski seçenekler altta durur.
+- Sevkiyat Seçimi penceresi `booking` alırsa FCL'i açık kalemlere SIRAYLA dağıtarak açılır (bookingSecimleri); seçim
+  toplamı booking'den farklıysa uyarı (engel değil). İhracatlar `?siparis=&booking=&fcl=` aynı.
+- Test: tests/booking-siparis-takibi.test.ts (kurgusal veri).
+
+## Test ortamı (22.11.2026)
+
+Kullanıcı: "Mevcut durum kayıtlı kalsın, farklı bir test alanında devam edelim; test ortamında deneyip duruma göre canlıya alalım."
+
+- Test alanı = Netlify dal / PR önizlemesi. `next.config.js`: CONTEXT `deploy-preview` | `branch-deploy` → `NEXT_PUBLIC_ORTAM=test`;
+  production ve CONTEXT'siz derleme `canli` (`lib/ortam.ts`, yalnız tam "test" test sayılır).
+- Önizleme CANLI veritabanına bağlıdır (ayrı DB yok). Bu yüzden test ortamında:
+  - her sayfada "Test ortamı" şeridi (`components/test-ortami-seridi.tsx`),
+  - Proforma Yükle (tek / yeni sipariş / devam) ve İhracatlar "Sevkiyat aç" PROVA modunda: `ihracat_dosyalari` /
+    `ana_siparisler` YAZILMAZ, oluşacak kayıt `components/prova-penceresi.tsx` ile gösterilir (`lib/prova.ts`).
+  - Diğer sayfalardaki işlemler gerçek kayıttır (şerit bunu söyler).
+- Akış: özellik dalı → PR (main'e) → Netlify önizleme + GitHub "Kod Kontrolu" → kullanıcı onayı → PR birleştirilir → canlı.

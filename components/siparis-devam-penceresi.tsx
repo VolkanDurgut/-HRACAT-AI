@@ -11,7 +11,10 @@ import {
   markaOner,
   detayliAmbalajOner,
   mtsdenFcl,
+  bookingSecimleri,
+  secimFclToplami,
   type DevamSecimi,
+  type BookingBilgisi,
 } from "@/lib/siparis-devam";
 
 export type DevamOnayi = {
@@ -31,6 +34,10 @@ type Props = {
   olusturuluyor: boolean;
   onKapat: () => void;
   onOnayla: (onay: DevamOnayi) => void;
+  /** 22.11.2026: Ana Panel rezervasyonlu is emrinden gelindiyse booking; secim booking FCL'iyle dolu acilir. */
+  booking?: BookingBilgisi | null;
+  /** 22.11.2026: test ortami (lib/ortam.ts) - dugme "Prova" der, cagiran kayit yapmaz. */
+  prova?: boolean;
 };
 
 const sayi = (n: number, ondalik = 2) => n.toLocaleString("tr-TR", { maximumFractionDigits: ondalik });
@@ -43,10 +50,12 @@ const ESIK = 0.01;
  * ister. Hesap: lib/siparis-devam.ts.
  */
 export function SiparisDevamPenceresi({
-  proformaNo, aliciFirma, paraBirimi, kalemler, ornekDetayliAmbalaj, ornekMarka, olusturuluyor, onKapat, onOnayla,
+  proformaNo, aliciFirma, paraBirimi, kalemler, ornekDetayliAmbalaj, ornekMarka, olusturuluyor, onKapat, onOnayla, booking = null, prova = false,
 }: Props) {
-  const [secimler, setSecimler] = useState<DevamSecimi[]>(() => varsayilanSecimler(kalemler));
-  const [fclMetin, setFclMetin] = useState<string[]>(() => varsayilanSecimler(kalemler).map((s) => (s.fcl ? String(s.fcl).replace(".", ",") : "")));
+  // Acilis: booking varsa FCL'i acik kalemlere sirayla dagitilir (bookingSecimleri), yoksa eskisi gibi acik miktarin tamami
+  const ilkSecimler = () => (booking ? bookingSecimleri(kalemler, booking.fcl) : varsayilanSecimler(kalemler));
+  const [secimler, setSecimler] = useState<DevamSecimi[]>(ilkSecimler);
+  const [fclMetin, setFclMetin] = useState<string[]>(() => ilkSecimler().map((s) => (s.fcl ? String(s.fcl).replace(".", ",") : "")));
   const [ambalajElle, setAmbalajElle] = useState<string | null>(null);
   const [markaElle, setMarkaElle] = useState<string | null>(null);
   const [asimOnay, setAsimOnay] = useState(false);
@@ -62,6 +71,8 @@ export function SiparisDevamPenceresi({
   const toplamTutar = secimler.reduce((t, s) => t + secimMts(s) * s.kalem.birimFiyat, 0);
   const asanlar = secimler.filter((s) => secimAsimi(s) > 0);
   const hicDosyalanmamisYok = kalemler.every((k) => k.acikMts <= ESIK);
+  const secimFcl = secimFclToplami(secimler);
+  const bookingFarki = booking ? Math.round((secimFcl - booking.fcl) * 100) / 100 : 0;
 
   // Asim kalkinca onay sifirlanir (sonraki asimda yeniden sorulsun)
   useEffect(() => { if (asanlar.length === 0 && asimOnay) setAsimOnay(false); }, [asanlar.length, asimOnay]);
@@ -126,6 +137,23 @@ export function SiparisDevamPenceresi({
           <p className="text-xs" style={{ color: TEXT_MUTED }}>
             Bu sevkiyatta gönderilecek ürünleri ve FCL miktarını seçin. Seçilmeyen ürünler siparişte açık kalır. 1 FCL = 25 MTS.
           </p>
+          {booking && (
+            <div data-testid="devam-booking" className="rounded-lg border px-3 py-2.5 text-xs"
+              style={Math.abs(bookingFarki) > ESIK
+                ? { borderColor: "rgba(251,191,36,0.45)", backgroundColor: "rgba(251,191,36,0.10)", color: "#FDE68A" }
+                : { borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.08)", color: "#A7F3D0" }}>
+              <p>
+                Booking <b className="text-white">{booking.no}</b> · <b className="text-white">{booking.fcl} FCL</b>. Seçim, Yükleme Planı&apos;ndaki
+                konteyner sayısına göre dolduruldu.
+              </p>
+              {Math.abs(bookingFarki) > ESIK && (
+                <p className="mt-1 inline-flex items-start gap-1.5 text-amber-300">
+                  <AlertTriangle size={12} className="mt-px shrink-0" />
+                  Seçim toplamı {sayi(secimFcl)} FCL; booking {booking.fcl} FCL ({bookingFarki > 0 ? "+" : ""}{sayi(bookingFarki)} FCL). Bilerek değiştirdiyseniz devam edebilirsiniz.
+                </p>
+              )}
+            </div>
+          )}
           {hicDosyalanmamisYok && (
             <p className="text-xs text-amber-400 inline-flex items-start gap-1.5">
               <AlertTriangle size={13} className="mt-px shrink-0" />
@@ -291,7 +319,7 @@ export function SiparisDevamPenceresi({
         {/* Alt cubuk */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t" style={{ borderColor: CARD_BORDER }}>
           <p className="text-[11px]" style={{ color: engel ? "#FBBF24" : TEXT_MUTED }}>
-            {engel || "Dosya oluşturulunca rezervasyon ekranına yönlendirilirsiniz."}
+            {engel || (prova ? "Test ortamı: kayıt yapılmaz, oluşacak dosya gösterilir." : "Dosya oluşturulunca rezervasyon ekranına yönlendirilirsiniz.")}
           </p>
           <div className="flex items-center gap-2">
             <button onClick={onKapat} disabled={olusturuluyor} className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-white/5 disabled:opacity-50" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
@@ -304,7 +332,7 @@ export function SiparisDevamPenceresi({
               style={{ backgroundColor: ACCENT }}
             >
               {olusturuluyor ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
-              {olusturuluyor ? "Oluşturuluyor..." : `Dosyayı Oluştur${toplamMts > ESIK ? ` · ${sayi(mtsdenFcl(toplamMts))} FCL` : ""}`}
+              {olusturuluyor ? "Oluşturuluyor..." : `${prova ? "Prova · Kaydetmeden Göster" : "Dosyayı Oluştur"}${toplamMts > ESIK ? ` · ${sayi(mtsdenFcl(toplamMts))} FCL` : ""}`}
               {!olusturuluyor && <ArrowRight size={14} />}
             </button>
           </div>

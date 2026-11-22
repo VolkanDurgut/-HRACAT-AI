@@ -1470,6 +1470,8 @@ girmiş olması. Günlük yükleme hesaplanmalı."
   - İş günleri ve kapasite son 75 günün DBA TARTIM günlerinden (Bugün Yüklenen ile aynı kural, `efektifTartimBilgisi`):
     en az 3 gün yükleme yapılan hafta günleri (canlı: Pzt–Cmt, Pazar yok); ortalama / %75 / en yüksek (canlı 5,6 / 7 / 13).
   - Plan: en yakın hedef önce (EDF), her gün aynı hız; gereken hız = tüm hedefleri tutturan EN DÜŞÜK günlük adet.
+    Bugün tartılanlar bugünün kotasından düşer: gün içinde yükledikçe kalan azalır, bugünün hedefi SABİT kalır (büyümez);
+    fazla yüklenirse sonraki günlerin yükü azalır.
     Risk: ≤ %75 normal, ≤ en yüksek "ortalamanın üstünde", üstü "en yüksek günü aşıyor"; geçmiş < 10 gün "bilinmiyor".
   - Cut-off'lar duvar saati (gün = metnin ilk 10 karakteri), DBA tartım günü İstanbul.
 - Kaynak: açık dosyalar (rezervasyonlu) + dosyası açılmamış booking'ler (Yükleme Planı; alınan / dolu 0 sayılır, "takip edilemiyor").

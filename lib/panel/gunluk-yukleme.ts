@@ -149,12 +149,16 @@ function hazirla(is: YuklemeIsi, bas: string, isGunleri: number[]): Hazir | null
 
 type Atama = Map<string, Map<string, number>>; // gun -> anahtar -> yukle
 
-function simule(hazir: Hazir[], gunler: string[], hiz: number): Atama | null {
+/**
+ * bugunYapilan: bugun zaten yuklenen (tartilan) adet - bugunun kotasindan duser. Yoksa yukledikce kalan azalir ama
+ * bugunun hedefi buyurdu (6 yukle -> yeniden hesap -> "bugun 5 daha"). Hedef gun icinde SABIT kalir.
+ */
+function simule(hazir: Hazir[], gunler: string[], hiz: number, bugun: string, bugunYapilan: number): Atama | null {
   const kalan = new Map(hazir.map((h) => [h.is.anahtar, h.kalanYukle]));
   const sirali = [...hazir].sort((a, b) => a.hedef.localeCompare(b.hedef) || (a.alimSon || "9").localeCompare(b.alimSon || "9") || a.is.anahtar.localeCompare(b.is.anahtar));
   const atama: Atama = new Map();
   for (const g of gunler) {
-    let c = hiz;
+    let c = g === bugun ? Math.max(0, hiz - bugunYapilan) : hiz;
     const gun = new Map<string, number>();
     for (const h of sirali) {
       if (c <= 0) break;
@@ -188,9 +192,10 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
   let atama: Atama | null = null;
   let hiz = 0;
   const toplamYukle = hazir.reduce((t, h) => t + h.kalanYukle, 0);
+  const bugunYapilan = isGunuMu(bugun, isGunleri) ? isler.reduce((t, i) => t + Math.max(0, i.bugunDolu), 0) : 0;
   if (toplamYukle > 0) {
-    for (hiz = 1; hiz <= HIZ_UST_SINIR; hiz++) { atama = simule(hazir, gunler, hiz); if (atama) break; }
-    if (!atama) { hiz = HIZ_UST_SINIR; atama = simule(hazir, gunler, Number.MAX_SAFE_INTEGER) || new Map(); }
+    for (hiz = Math.max(1, bugunYapilan); hiz <= HIZ_UST_SINIR; hiz++) { atama = simule(hazir, gunler, hiz, bugun, bugunYapilan); if (atama) break; }
+    if (!atama) { hiz = HIZ_UST_SINIR; atama = simule(hazir, gunler, Number.MAX_SAFE_INTEGER, bugun, 0) || new Map(); }
   } else atama = new Map();
 
   // Bos alim: yuklemeden once (oncelik zaten alinmis bos), talimat gunune kadar tamamlanir

@@ -71,7 +71,9 @@ test("bugun yuklenenler hedefe eklenir; beyannamesi verilen / tamamlanan plana g
     is("P", { toplam: 10, takipli: false }),
   ], KAP, "2026-11-23");
   assert.equal(p.bugunYuklenen, 1);
-  assert.equal(p.bugunHedef, 2, "1 yuklendi + 1 plan");
+  // Hiz 1/gun: bugunun payi (1) zaten yuklendi; kalan 1 hedef gunu Sal 24.11'e
+  assert.equal(p.bugunHedef, 1);
+  assert.deepEqual(p.gunler.map((g) => [g.tarih, g.yukle]), [["2026-11-24", 1]]);
   assert.deepEqual(Object.keys(p.ozetler), ["Y"]);
   assert.deepEqual(p.plansiz, ["P"]);
 });
@@ -112,4 +114,26 @@ test("girdiler: dosya ve dosyasi acilmamis booking", () => {
   assert.equal(dosyaIsi({ id: "y", dosya_no: null, alici_firma: null, rezervasyonlar: [], konteynerler: [] }, 0), null);
   const b = bookingIsi({ anahtar: "excel:1", musteri: "DEMO", konteyner: 5, talimat_cutoff: "2026-11-26T10:00:00+00:00", beyan_cutoff: null, bos_ekipman_tarihi: "2026-11-23" })!;
   assert.deepEqual([b.anahtar, b.toplam, b.takipli, b.talimatTarihi, b.beyanTarihi], ["is:excel:1", 5, false, "2026-11-26", null]);
+});
+
+test("gun icinde yukledikce bugunun hedefi SABIT kalir, kalan azalir (yeniden hesapta hedef buyumez)", () => {
+  const sabah = yuklemePlaniKur(HAFTA, KAP, "2026-11-23");
+  assert.equal(sabah.bugunHedef, 6);
+  // Ogleden sonra: A 2, B 1, C 1, D'den 2 yuklendi (D dosyasi acilmis gibi takipli)
+  const ogle = yuklemePlaniKur(HAFTA.map((x) => {
+    if (x.anahtar === "A") return { ...x, alinan: 2, dolu: 2, bugunDolu: 2 };
+    if (x.anahtar === "B") return { ...x, dolu: 2, bugunDolu: 1 };
+    if (x.anahtar === "C") return { ...x, dolu: 2, bugunDolu: 1 };
+    if (x.anahtar === "D") return { ...x, alinan: 2, dolu: 2, bugunDolu: 2, takipli: true };
+    return x;
+  }), KAP, "2026-11-23");
+  assert.equal(ogle.bugunYuklenen, 6);
+  assert.equal(ogle.bugunHedef, 6, "6/6 - hedef buyumedi");
+  assert.equal(ogle.gerekenHiz, 6);
+  assert.deepEqual(ogle.gunler.map((g) => [g.tarih, g.yukle]), [["2026-11-24", 6], ["2026-11-25", 6], ["2026-11-26", 5]]);
+  // Fazla yukleme: bugun 8 -> sonraki gunlerin yuku azalir
+  const fazla = yuklemePlaniKur(HAFTA.map((x) => (x.anahtar === "D" ? { ...x, alinan: 4, dolu: 4, bugunDolu: 4, takipli: true } : x.anahtar === "A" ? { ...x, alinan: 2, dolu: 2, bugunDolu: 2 } : x.anahtar === "B" ? { ...x, dolu: 2, bugunDolu: 1 } : x.anahtar === "C" ? { ...x, dolu: 2, bugunDolu: 1 } : x)), KAP, "2026-11-23");
+  assert.equal(fazla.bugunYuklenen, 8);
+  assert.equal(fazla.bugunHedef, 8);
+  assert.equal(fazla.gunler.reduce((t, g) => t + g.yukle, 0), 15);
 });

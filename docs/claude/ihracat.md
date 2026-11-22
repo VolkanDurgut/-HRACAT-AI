@@ -1454,3 +1454,26 @@ belirlenemiyor mu" → durum tamamen kayıtlardan.
 - Veri: dosyalar dakikada bir; iş emirleri + ödeme bekleyenler 5 dakikada bir PARALEL (biri okunamazsa diğeri gelir).
 - Özet kartları duruyor (Cut-off kartı metni: "listede kırmızı satırlar").
 - Test: tests/panel-is-listesi.test.ts (kurgusal veri).
+
+## Ana Panel — Günlük yükleme hedefi (23.11.2026) — DB değişikliği yok
+
+Kullanıcı: "Günlük yüklenmesi gereken konteyner sayısını hesaplayabilmeli. Talimat cut-off = konşimento talimatının
+gönderilmesi; o tarihe kadar bütün konteynerler alınmış olmalı. Beyanname = bütün konteynerlerin dolu şekilde içeri
+girmiş olması. Günlük yükleme hesaplanmalı."
+
+- Hesap `lib/panel/gunluk-yukleme.ts` (saf; test tests/panel-gunluk-yukleme.test.ts):
+  - Boş alım = rezervasyon adedi − eklenen konteyner; TALİMAT cut-off gününe kadar (talimat / draft BL / beyanname varsa tamam).
+  - Yükleme = rezervasyon adedi − DBA'lı konteyner; hedef = BEYANNAME cut-off gününden bir önceki iş günü (geçmişte son dolu
+    konteyner cut-off'tan ortada ~2 gün önce; cut-off günü son çare → "gecikme"). Beyanname varsa tamam.
+  - Pencere: boş ekipman tarihinden (rezervasyon `ekipman_alim_tarihi`, plan `bos_ekipman_tarihi`) önce plan yok; yoksa hedeften
+    en fazla 5 iş günü önce.
+  - İş günleri ve kapasite son 75 günün DBA TARTIM günlerinden (Bugün Yüklenen ile aynı kural, `efektifTartimBilgisi`):
+    en az 3 gün yükleme yapılan hafta günleri (canlı: Pzt–Cmt, Pazar yok); ortalama / %75 / en yüksek (canlı 5,6 / 7 / 13).
+  - Plan: en yakın hedef önce (EDF), her gün aynı hız; gereken hız = tüm hedefleri tutturan EN DÜŞÜK günlük adet.
+    Risk: ≤ %75 normal, ≤ en yüksek "ortalamanın üstünde", üstü "en yüksek günü aşıyor"; geçmiş < 10 gün "bilinmiyor".
+  - Cut-off'lar duvar saati (gün = metnin ilk 10 karakteri), DBA tartım günü İstanbul.
+- Kaynak: açık dosyalar (rezervasyonlu) + dosyası açılmamış booking'ler (Yükleme Planı; alınan / dolu 0 sayılır, "takip edilemiyor").
+  Beyanname cut-off'u olmayan plan dışı (sayısı kartta).
+- Görünüm: `components/panel/gunluk-yukleme-karti.tsx` — bugün yüklenen / hedef + bugün alınacak boş, gereken hız ve geçmiş
+  kapasite, önümüzdeki 6 iş günü (güne tıklayınca müşteri bazında). Liste satırında Konteyner sütununda "Bugün: 1 boş al ·
+  2 yükle" ya da "Hedef: Per 26.11". Veri `yuklemeGecmisiOku` (lib/panel/veri.ts), iş emirleriyle 5 dakikada bir.

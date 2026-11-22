@@ -16,6 +16,8 @@ import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { DURUM_ETIKETI, gundur, type ListeDurumu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import type { BekleyenAksiyon } from "@/lib/siparis/plan-bekleyen";
+import { GunlukGorev } from "@/components/panel/gunluk-yukleme-karti";
+import type { IsOzeti } from "@/lib/panel/gunluk-yukleme";
 
 export const DURUM_RENGI: Record<ListeDurumu, { renk: string; zemin: string; kenar: string }> = {
   cutoff: { renk: "#FCA5A5", zemin: "rgba(248,113,113,0.14)", kenar: "#F87171" },
@@ -76,7 +78,7 @@ function MusteriHucresi({ musteri, alt }: { musteri: string | null; alt: string 
 const urunOzeti = (konteyner: number | null, ek: (string | null)[]) => [konteyner ? `${konteyner} kont.` : null, ...ek].filter(Boolean).join(" · ");
 
 /** Dosyasi acilmamis is emri: booking'li (acik / cut-off) ya da on odemesi alinmis (rezervasyon bekliyor). */
-export function IsEmriListeSatiri({ s, durum, yetkili, simdi }: { s: IsEmriSatiri; durum: ListeDurumu; yetkili: boolean; simdi: number }) {
+export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { s: IsEmriSatiri; durum: ListeDurumu; yetkili: boolean; simdi: number; gorev?: IsOzeti | null }) {
   const bookingli = s.tur === "rezervasyonlu";
   const bekleme = gundur(s.on_odeme_tarihi, simdi);
   return (
@@ -92,7 +94,10 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi }: { s: IsEmriSatir
             <span className="block text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{[s.gemi, s.sefer].filter(Boolean).join(" / ")}</span>
           </td>
           <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{trTarih(s.etd)}</span></td>
-          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.konteyner ? `${s.konteyner} kont.` : "—"}</span></td>
+          <td className="px-3 py-3 align-top">
+            <span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.konteyner ? `${s.konteyner} kont.` : "—"}</span>
+            {gorev && <GunlukGorev {...gorev} />}
+          </td>
           <td className="px-3 py-3 align-top">{s.talimat_cutoff ? <CutoffSayac deger={s.talimat_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</td>
           <td className="px-3 py-3 align-top">{s.beyan_cutoff ? <CutoffSayac deger={s.beyan_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</td>
         </>

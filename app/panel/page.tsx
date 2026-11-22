@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
-import { formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
+import { formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi, bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
 import { CutoffSayac } from "@/components/cutoff-sayac";
 import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
@@ -24,7 +24,9 @@ import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { isEmirleriOku, odemeBekleyenleriOku } from "@/lib/panel/veri";
+import { isEmirleriOku, odemeBekleyenleriOku, yuklemeGecmisiOku } from "@/lib/panel/veri";
+import { bookingIsi, dosyaIsi, kapasiteHesapla, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
+import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri } from "@/components/panel/is-listesi-satirlari";
@@ -166,12 +168,15 @@ function PanelContent() {
   const [isEmirleri, setIsEmirleri] = useState<{ rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] } | null>(null);
   // 23.11.2026: odeme bekleyen siparisler (gri satirlar; panel_odeme_bekleyenleri) - is emirleriyle paralel okunur
   const [odemeler, setOdemeler] = useState<OdemeBekleyen[] | null>(null);
+  // 23.11.2026 gunluk yukleme hedefi: kapasite / is gunleri gecmis tartim gunlerinden (lib/panel/gunluk-yukleme.ts)
+  const [kapasite, setKapasite] = useState<Kapasite | null>(null);
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
     // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
-    const [ie, od] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku()]);
+    const [ie, od, gc] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku(), yuklemeGecmisiOku(companyId)]);
     if (ie.status === "fulfilled") setIsEmirleri(ie.value);
     if (od.status === "fulfilled") setOdemeler(od.value);
+    if (gc.status === "fulfilled") setKapasite(kapasiteHesapla(gc.value));
   }, [user?.id, companyId]);
   useEffect(() => {
     isEmirleriniGetir();
@@ -279,6 +284,18 @@ function PanelContent() {
   const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter)), arama), [ogeler, activeFilter, arama]);
   const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
   const simdi = Date.now();
+
+  // 23.11.2026 GUNLUK YUKLEME HEDEFI: acik dosyalar + dosyasi acilmamis booking'ler; bugun tartilanlar hedefe sayilir.
+  // Gecmis okunamazsa varsayilan (Pzt-Cmt, kapasite bilinmiyor) ile yine hesaplanir.
+  const bugunGunu = bugunTarihIstanbul();
+  const yuklemeIsleri = useMemo(() => [
+    ...dosyalar.map((d) => dosyaIsi(d, d.konteynerler.filter((k) => !!k.dba_dosya_url && efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi)?.gun === bugunGunu).length)),
+    ...(isEmirleri?.rezervasyonlu || []).map(bookingIsi),
+  ].filter((x): x is YuklemeIsi => x !== null), [dosyalar, isEmirleri, bugunGunu]);
+  const yuklemePlani = useMemo(
+    () => yuklemePlaniKur(yuklemeIsleri, kapasite || { gunSayisi: 0, ortalama: 0, p75: 0, max: 0, isGunleri: [] }, bugunGunu),
+    [yuklemeIsleri, kapasite, bugunGunu]);
+  const isEtiketi = useCallback((a: string) => yuklemeIsleri.find((x) => x.anahtar === a)?.etiket || a, [yuklemeIsleri]);
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
   const kantarYetkisi = !!yetkiler.sayfa_yetkileri.kantar;
 
@@ -322,6 +339,8 @@ function PanelContent() {
 
       {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
 
+      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} />}
+
       {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
           (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
       {!loading && (
@@ -361,9 +380,10 @@ function PanelContent() {
             </thead>
             <tbody>
               {gorunenler.map((oge, idx) => {
-                if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} />;
+                if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} gorev={yuklemePlani.ozetler[oge.anahtar] || null} />;
                 if (oge.tur === "odeme") return <OdemeListeSatiri key={oge.anahtar} p={oge.odeme} simdi={simdi} listeYetkisi={listeYetkisi} />;
                 const dosya = oge.dosya;
+                const gorev = yuklemePlani.ozetler[`dosya:${dosya.id}`] || null;
                 const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
                 const latestRez = dosya.rezervasyonlar[0] || null;
                 const hasRez = !!latestRez;
@@ -427,6 +447,7 @@ function PanelContent() {
                                 {eklenenKont > 0 && (
                                   <p className="text-[10px] whitespace-nowrap" style={{ color: dbaTamamlanan >= eklenenKont ? "#4ADE80" : TEXT_MUTED }}>{dbaTamamlanan}/{eklenenKont} dolu</p>
                                 )}
+                                {gorev && <GunlukGorev {...gorev} />}
                               </div>
                             ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
                           </td>

@@ -73,6 +73,14 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Gereken hız</p>
           <p className="text-white"><span className="text-xl font-bold tabular-nums">{plan.gerekenHiz}</span><span className="text-sm" style={{ color: TEXT_MUTED }}> konteyner / gün</span></p>
           <p className="text-[11px] font-semibold" style={{ color: r.renk }}>{r.metin}</p>
+          {/* 23.11.2026: tarihlere yetisirken en az arac; kalan araclar bosa cikar (dis is / ic piyasa) */}
+          <p className="text-[11px] mt-1" style={{ color: "#C9D1DC" }} data-testid="gunluk-arac">
+            Araç: bugün <b className="text-white">{plan.bugunArac}</b> / {plan.filo}
+            {plan.bosArac > 0 ? <> · <b className="text-emerald-300">{plan.bosArac} araç boşa çıkabilir</b></> : null}
+          </p>
+          {plan.enCokArac > plan.filo && (
+            <p className="text-[11px] font-semibold text-red-300">Filo yetmiyor: en yoğun gün {plan.enCokArac} araç gerekiyor</p>
+          )}
           {kapasite && kapasite.gunSayisi > 0 && (
             <p className="text-[10.5px] mt-0.5" style={{ color: TEXT_MUTED }} title={`Son ${kapasite.gunSayisi} yükleme günü (DBA tartım günleri)`}>
               Geçmiş: ort. {sayi(kapasite.ortalama)} · çoğu gün ≤ {kapasite.p75} · en yüksek {kapasite.max}
@@ -92,6 +100,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
                   <span className="block text-[10.5px] font-semibold" style={{ color: TEXT_MUTED }}>{g.tarih === plan.bugun ? "Bugün" : gunEtiketi(g.tarih)}</span>
                   <span className="block text-sm text-white tabular-nums"><b>{g.yukle}</b><span className="text-[11px]" style={{ color: TEXT_MUTED }}> · {g.al} boş</span></span>
                   {g.dolumSaat > 0 && <span className="block text-[10px] tabular-nums" style={{ color: TEXT_MUTED }} title="Dolum: 50 kg ~1,5 sa, 25 kg ~3,5 sa / konteyner">≈ {sayi(g.dolumSaat)} sa dolum</span>}
+                  {g.arac > 0 && <span className="block text-[10px] tabular-nums" style={{ color: g.arac > plan.filo ? "#FCA5A5" : "#6EE7B7" }} title="Tur: yol ~2 sa + dolum + yol ~2 sa + kapı ~1 sa; araç günde ~13 sa">{g.arac} araç · {Math.max(0, plan.filo - g.arac)} boşta</span>}
                 </button>
               );
             })}
@@ -102,7 +111,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
       {secili && (
         <div className="px-4 py-2.5 border-t text-[12px]" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-testid="gunluk-yukleme-detay">
           <p className="text-[11px] font-semibold mb-1 inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
-            {acikGun ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {gunEtiketi(secili.tarih)} · {secili.yukle} yükle · {secili.al} boş al · ≈ {sayi(secili.dolumSaat)} sa dolum
+            {acikGun ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {gunEtiketi(secili.tarih)} · {secili.yukle} yükle · {secili.al} boş al · ≈ {sayi(secili.dolumSaat)} sa dolum · {secili.arac} araç
           </p>
           <ul className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
             {secili.isler.map((x) => (

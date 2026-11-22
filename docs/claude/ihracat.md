@@ -1495,3 +1495,15 @@ Ekipman alım tarihi ve ardiyesiz giriş rezervasyonda belirtilir; ardiyesiz gir
 - Ardiyesiz giriş (yumuşak): yükleme en erken ardiyesiz girişin bir önceki iş günü; sert son güne sığmıyorsa "ardiye riski".
 - Çuval: `cuvalKgOku` (ambalaj / detaylı ambalaj; karışıkta 25). Gün kutularında ≈ dolum saati.
 - Değişiklik takibi (sonraki iş): rezervasyon değişiklikleri `denetim_kayitlari`'nda (23.09'dan beri); panelde "değişti" gösterimi.
+
+### Günlük yükleme — araç (23.11.2026 gece)
+
+Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. Tarihlere yetişebildiğimiz an kenara boşa araba çıkartmaya çalış."
+- Tur = yol ~2 + dolum (50 kg 1,5 / 25 kg 3,5) + yol ~2 + kapı ~1 sa (`turSaati`: 25 kg 8,5, 50 kg 6,5); araç günde ~13 sa
+  (`ARAC_GUNLUK_SAAT`; 50 kg'da 2 tur, 25 kg'da 1 tur — geçmişte araç başına çoğunlukla 1, bazen 2 tur). Dorse değişmez: tur = 1 konteyner.
+- Günün turları araçlara yerleştirilir (`aracIhtiyaci`, büyükten küçüğe ilk sığan); bugün tartılanların turları bugüne dahil.
+- Plan seçimi: cut-off'ları tutturan en düşük hızdan başlayıp +4 hıza kadar denenir; EN YOĞUN GÜNÜN ARAÇ SAYISI en az olan
+  seçilir (eşitlikte düşük hız). Kartta "Araç: bugün N / 8 · M araç boşa çıkabilir", gün kutusunda "N araç · M boşta";
+  en yoğun gün filoyu (FILO_ARAC = 8) aşarsa kırmızı "Filo yetmiyor".
+- Canlı hafta (23–26.11): 5 / 3 / 5 / 5 araç; alt sınır 18 araç-gün / 4 gün → 5 (en iyisi). Parametreler ileride
+  Sevkiyat Parametreleri sayfasına taşınacak (araç takip paneli ölçümleriyle).

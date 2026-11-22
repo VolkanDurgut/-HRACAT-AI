@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  bookingIsi, cuvalKgOku, dolumSaati, dosyaIsi, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sertSonGun, sonrakiIsGunu, yuklemePlaniKur,
+  aracIhtiyaci, bookingIsi, cuvalKgOku, dolumSaati, dosyaIsi, turSaati, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sertSonGun, sonrakiIsGunu, yuklemePlaniKur,
   type Kapasite, type YuklemeIsi,
 } from "@/lib/panel/gunluk-yukleme";
 
@@ -190,4 +190,23 @@ test("ardiye riski: ardiyesiz giris sert son gunden sonraysa isaretlenir, plan y
   const p = yuklemePlaniKur([is("AR", { toplam: 2, alinan: 2, talimatTamam: true, cuvalKg: 50, beyanTarihi: "2026-11-25", beyanZaman: "2026-11-25T12:00", ardiyesizTarihi: "2026-11-27" })], KAP, "2026-11-23");
   assert.deepEqual(p.ardiyeRiskleri, ["AR"]);
   assert.equal(p.gunler.reduce((t, g) => t + g.yukle, 0), 2);
+});
+
+// ---------------------------------------------------------------- 23.11.2026: arac (bosa cikabilecek arac)
+test("tur ve arac: 25 kg tur 8,5 sa (1/gun), 50 kg 6,5 sa (2/gun); turlar araclara yerlestirilir", () => {
+  assert.equal(turSaati(25), 8.5);
+  assert.equal(turSaati(50), 6.5);
+  assert.equal(aracIhtiyaci([8.5, 8.5, 6.5, 6.5]), 3, "iki 50'lik tek aracta");
+  assert.equal(aracIhtiyaci([6.5, 6.5, 6.5]), 2);
+  assert.equal(aracIhtiyaci([]), 0);
+});
+
+test("gercek hafta: en yogun gun 5 arac (alt sinir 18 arac-gun / 4 gun), her gun en az 3 arac bosa cikar", () => {
+  const p = yuklemePlaniKur(GERCEK, KAP, "2026-11-23");
+  assert.deepEqual(p.gunler.map((g) => [g.tarih, g.yukle, g.arac]), [["2026-11-23", 6, 5], ["2026-11-24", 6, 3], ["2026-11-25", 6, 5], ["2026-11-26", 5, 5]]);
+  assert.equal(p.filo, 8);
+  assert.equal(p.bugunArac, 5);
+  assert.equal(p.bosArac, 3);
+  assert.equal(p.enCokArac, 5);
+  assert.equal(p.bugunEnAz, 2, "en az degismedi");
 });

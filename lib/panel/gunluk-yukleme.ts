@@ -28,6 +28,29 @@
  *    sigmiyorsa ardiye riski isaretlenir (kural yumusak).
  */
 export const PENCERE_IS_GUNU = 5;
+/**
+ * 23.11.2026 ARAC (kullanici: "Konteyner yuklemelerinde disariya araba tasirmaya calis. Tarihlere yetisebildigimiz an
+ * kenara bosa araba cikartmaya calis."): cut-off'lar tutturulurken GUNLUK ARAC SAYISI en aza indirilir, kalan araclar
+ * bosa cikar (dis is / ic piyasa). Tur = fabrikaya yol + dolum + limana yol + kapi; arac gunde ARAC_GUNLUK_SAAT calisir.
+ * Dorse degismez: her tur tek konteyner (bosu depodan alir, fabrikada doldurur, limana birakir).
+ */
+export const FILO_ARAC = 8;
+export const ARAC_GUNLUK_SAAT = 13;
+export const YOL_SAAT = 2;
+export const KAPI_SAAT = 1;
+/** Bir konteynerin tur suresi (saat): 25 kg ~8,5; 50 kg ~6,5. */
+export function turSaati(cuvalKg: 25 | 50 | null | undefined): number {
+  return YOL_SAAT + dolumSaati(cuvalKg) + YOL_SAAT + KAPI_SAAT;
+}
+/** Turlari araclara yerlestirir (buyukten kucuge, ilk sigan arac); gereken arac sayisi. */
+export function aracIhtiyaci(turlar: number[], gunlukSaat: number = ARAC_GUNLUK_SAAT): number {
+  const kalan: number[] = [];
+  for (const t of [...turlar].sort((a, b) => b - a)) {
+    const i = kalan.findIndex((k) => k + 1e-9 >= t);
+    if (i >= 0) kalan[i] -= t; else kalan.push(Math.max(0, gunlukSaat - t));
+  }
+  return kalan.length;
+}
 export const YOL_KAPI_SAAT = 3;
 export const YUKLEME_BASLANGIC_SAAT = 7;
 const VARSAYILAN_GUNLUK_TAVAN = 13;
@@ -72,7 +95,7 @@ export type YuklemeIsi = {
 export type Kapasite = { gunSayisi: number; ortalama: number; p75: number; max: number; isGunleri: number[] };
 
 export type GunIsi = { anahtar: string; etiket: string; yukle: number; al: number };
-export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[]; dolumSaat: number };
+export type GunPlani = { tarih: string; yukle: number; al: number; isler: GunIsi[]; dolumSaat: number; arac: number };
 export type IsOzeti = {
   bugunYukle: number; bugunAl: number; hedefGun: string; alimSonGun: string | null; gecikme: boolean;
   /** Sert son yukleme gunu (saat bazli) */
@@ -95,6 +118,11 @@ export type YuklemePlani = {
   bugunEnAz: number;
   /** Ardiyesiz giristen once limana girmesi kacinilmaz isler */
   ardiyeRiskleri: string[];
+  /** Arac: filo, bugun gereken (bugun yuklenenler dahil), bugun bosa cikabilecek, en yogun gun */
+  filo: number;
+  bugunArac: number;
+  bosArac: number;
+  enCokArac: number;
   risk: "normal" | "yuksek" | "asiyor" | "bilinmiyor";
   ozetler: Record<string, IsOzeti>;
   /** Beyanname cut-off'u olmayan (plan disi) isler */
@@ -265,9 +293,29 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
   let hiz = 0;
   const toplamYukle = hazir.reduce((t, h) => t + h.kalanYukle, 0);
   const bugunYapilan = isGunuMu(bugun, isGunleri) ? isler.reduce((t, i) => t + Math.max(0, i.bugunDolu), 0) : 0;
+  const tur = new Map(isler.map((i) => [i.anahtar, turSaati(i.cuvalKg)]));
+  const bugunTurlari = isGunuMu(bugun, isGunleri) ? isler.flatMap((i) => Array(Math.max(0, i.bugunDolu)).fill(turSaati(i.cuvalKg)) as number[]) : [];
+  const gunAraci = (a: Atama, g: string) => {
+    const t = Array.from(a.get(g)?.entries() || []).flatMap(([k, n]) => Array(n).fill(tur.get(k) || turSaati(null)) as number[]);
+    return aracIhtiyaci(g === bugun ? [...t, ...bugunTurlari] : t);
+  };
+  const enCok = (a: Atama) => Array.from(a.keys()).reduce((m, g) => Math.max(m, gunAraci(a, g)), 0);
   if (toplamYukle > 0) {
     for (hiz = Math.max(1, bugunYapilan); hiz <= HIZ_UST_SINIR; hiz++) { atama = simule(hazir, gunler, hiz, bugun, bugunYapilan); if (atama) break; }
     if (!atama) { hiz = HIZ_UST_SINIR; atama = simule(hazir, gunler, Number.MAX_SAFE_INTEGER, bugun, 0) || new Map(); }
+    else {
+      // Arac: en dusuk hizdan baslayip birkac hiz dene; en yogun gunun ARAC sayisi en az olan plani sec (esitlikte dusuk hiz).
+      // 25 kg (1 tur/gun) ve 50 kg (2 tur/gun) farki yuzunden ayni konteyner sayisi farkli arac ister.
+      let enIyi = { a: atama, h: hiz, arac: enCok(atama) };
+      for (let h = hiz + 1; h <= hiz + 4; h++) {
+        const a = simule(hazir, gunler, h, bugun, bugunYapilan);
+        if (!a) continue;
+        const ar = enCok(a);
+        if (ar < enIyi.arac) enIyi = { a, h, arac: ar };
+      }
+      atama = enIyi.a;
+      hiz = enIyi.h;
+    }
   } else atama = new Map();
 
   // Bos alim: yuklemeden once (oncelik zaten alinmis bos), talimat gunune kadar tamamlanir
@@ -300,6 +348,7 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
     return {
       tarih: g, yukle: isler2.reduce((t, x) => t + x.yukle, 0), al: isler2.reduce((t, x) => t + x.al, 0), isler: isler2,
       dolumSaat: Math.round(isler2.reduce((t, x) => t + x.yukle * (dolum.get(x.anahtar) || dolumSaati(null)), 0) * 10) / 10,
+      arac: gunAraci(atama!, g),
     };
   }).filter((g) => g.yukle > 0 || g.al > 0);
 
@@ -332,6 +381,10 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
     bugun, isGunuMu: isGunuBugun, gunler: planGunleri, gerekenHiz: hiz,
     bugunHedef: (bugunPlan?.yukle || 0) + (isGunuBugun ? bugunYuklenen : 0), bugunYuklenen, bugunAl: bugunPlan?.al || 0,
     bugunEnAz, ardiyeRiskleri: hazir.filter((h) => h.ardiyeRiski).map((h) => h.is.anahtar),
+    filo: FILO_ARAC,
+    bugunArac: isGunuBugun ? (bugunPlan?.arac ?? aracIhtiyaci(bugunTurlari)) : 0,
+    bosArac: isGunuBugun ? Math.max(0, FILO_ARAC - (bugunPlan?.arac ?? aracIhtiyaci(bugunTurlari))) : FILO_ARAC,
+    enCokArac: planGunleri.reduce((m, g) => Math.max(m, g.arac), 0),
     risk, ozetler, plansiz,
     takipsiz: isler.filter((i) => !i.takipli && hazir.some((h) => h.is.anahtar === i.anahtar)).map((i) => i.anahtar),
     gecikenler: hazir.filter((h) => h.gecikme).map((h) => h.is.anahtar),

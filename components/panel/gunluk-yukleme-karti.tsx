@@ -30,8 +30,8 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
   const secili = gunler.find((g) => g.tarih === acikGun) || null;
   // Bugun alinacak boslar: talimat cut-off'u bugunse saatiyle (talimat icin rezervasyon kadar konteyner numarasi gerekir)
   const bugunAlimlar = Object.entries(plan.ozetler).filter(([, o]) => o.bugunAl > 0)
-    .map(([anahtar, o]) => ({ anahtar, al: o.bugunAl, saat: o.alimSonSaat || null }))
-    .sort((a, b) => (a.saat || "99").localeCompare(b.saat || "99"));
+    .map(([anahtar, o]) => ({ anahtar, al: o.bugunAl, saat: o.alimSonSaat || null, bugunSon: !!o.alimSonBugun }))
+    .sort((a, b) => Number(b.bugunSon) - Number(a.bugunSon) || (a.saat || "99").localeCompare(b.saat || "99"));
 
   return (
     <div className="rounded-xl border mb-4 animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: r.kenar }} data-testid="gunluk-yukleme" data-risk={plan.risk}>
@@ -59,7 +59,7 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
               {bugunAlimlar.length > 0 && (
                 <ul className="mt-0.5 text-[10.5px] space-y-0.5" style={{ color: TEXT_MUTED }}>
                   {bugunAlimlar.map((x) => (
-                    <li key={x.anahtar}><span className="text-white">{etiket(x.anahtar)}</span> · {x.al} boş{x.saat ? <b className="text-amber-300"> · son {x.saat}</b> : null}</li>
+                    <li key={x.anahtar}><span className="text-white">{etiket(x.anahtar)}</span> · {x.al} boş{x.saat ? (x.bugunSon ? <b className="text-amber-300"> · son {x.saat}</b> : <span> · son {x.saat}</span>) : null}</li>
                   ))}
                 </ul>
               )}
@@ -144,9 +144,9 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
 }
 
 /** Liste satirinda kisa gorev: "Bugün: 1 boş al · 2 yükle" / "son gün geçti". */
-export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaat = null }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean; alimSonSaat?: string | null }) {
+export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaat = null, alimSonBugun = false }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean; alimSonSaat?: string | null; alimSonBugun?: boolean }) {
   if (bugunYukle === 0 && bugunAl === 0 && !gecikme) return <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>Hedef: {gunEtiketi(hedefGun)}</p>;
-  const parca = [bugunAl > 0 ? `${bugunAl} boş al${alimSonSaat ? ` (son ${alimSonSaat})` : ""}` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
+  const parca = [bugunAl > 0 ? `${bugunAl} boş al${alimSonSaat && alimSonBugun ? ` (son ${alimSonSaat})` : ""}` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
   return (
     <p className={`text-[10.5px] mt-0.5 font-semibold whitespace-nowrap ${gecikme ? "text-red-300" : "text-emerald-300"}`} data-gunluk-gorev>
       {parca ? `Bugün: ${parca}` : "Hedef günü geçti"}

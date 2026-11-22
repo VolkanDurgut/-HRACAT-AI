@@ -60,7 +60,7 @@ test("plan: gereken hiz = hedefleri tutturan en dusuk gunluk adet; en yakin hede
   assert.equal(p.bugunAl, 3);
   assert.equal(p.risk, "normal");
   assert.deepEqual(p.takipsiz, ["D"]);
-  assert.deepEqual(p.ozetler.A, { bugunYukle: 2, bugunAl: 1, hedefGun: "2026-11-23", alimSonGun: "2026-11-23", gecikme: false, sonGun: "2026-11-23", ardiyeRiski: false, alimSonSaat: null });
+  assert.deepEqual(p.ozetler.A, { bugunYukle: 2, bugunAl: 1, hedefGun: "2026-11-23", alimSonGun: "2026-11-23", gecikme: false, sonGun: "2026-11-23", ardiyeRiski: false, alimSonSaat: null, alimSonBugun: true });
   assert.equal(p.ozetler.F.hedefGun, "2026-11-26");
 });
 
@@ -178,6 +178,10 @@ test("gercek hafta: bugun en az 2 (yalniz BK'nin sert son gunu bugun), onerilen 
   assert.equal(p.ozetler.SO.sonGun, "2026-11-24", "14:00 beyanname: Sal sabah yetisir");
   assert.equal(p.ozetler.CR.sonGun, "2026-11-26", "50 kg hizli: Per sabah yetisir");
   assert.equal(p.ozetler.BK.alimSonSaat, "15:00");
+  assert.equal(p.ozetler.BK.alimSonBugun, true);
+  // Duzeltme: CR'nin talimati Per 10:00 - bugun "son 10:00" denmez, gun etiketiyle
+  assert.equal(p.ozetler.CR.alimSonSaat, "Per 26.11 10:00");
+  assert.equal(p.ozetler.CR.alimSonBugun, false);
   assert.equal(p.gunler[0].dolumSaat, 4 * 3.5 + 2 * 1.5);
   assert.deepEqual(p.ardiyeRiskleri, []);
 });

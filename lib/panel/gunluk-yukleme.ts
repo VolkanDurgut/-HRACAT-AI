@@ -79,6 +79,8 @@ export type IsOzeti = {
   sonGun?: string;
   /** Bos alim son saati (talimat cut-off'u, "HH:MM") - alim son gunu bugunse gosterilir */
   alimSonSaat?: string | null;
+  /** Bos alimin son gunu bugun mu (vurgu) */
+  alimSonBugun?: boolean;
   ardiyeRiski?: boolean;
 };
 export type YuklemePlani = {
@@ -310,7 +312,10 @@ export function yuklemePlaniKur(isler: YuklemeIsi[], kapasite: Kapasite, bugun: 
     ozetler[h.is.anahtar] = {
       bugunYukle: b?.yukle || 0, bugunAl: b?.al || 0, hedefGun: h.hedef, alimSonGun: h.kalanAl > 0 ? h.alimSon : null, gecikme: h.gecikme,
       sonGun: h.sonGun, ardiyeRiski: h.ardiyeRiski,
-      alimSonSaat: h.kalanAl > 0 && talimatSaat && talimatSaat.slice(0, 10) === h.alimSon ? talimatSaat.slice(11, 16) : null,
+      // 23.11.2026 duzeltme: saat yalniz son alim gunu BUGUNSE yalin ("15:00"); ileri gunde gun etiketiyle ("Per 26.11 10:00")
+      alimSonSaat: h.kalanAl > 0 && talimatSaat && talimatSaat.slice(0, 10) === h.alimSon
+        ? (h.alimSon === bugun ? talimatSaat.slice(11, 16) : `${gunEtiketi(h.alimSon)} ${talimatSaat.slice(11, 16)}`) : null,
+      alimSonBugun: h.kalanAl > 0 && h.alimSon === bugun,
     };
   }
   // En az: bugunden sonra her is gunu gecmisin en yuksek gunu kadar yuklense bile bugun yuklenmesi ZORUNLU olan adet

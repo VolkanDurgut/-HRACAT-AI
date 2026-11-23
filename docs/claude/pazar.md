@@ -342,3 +342,8 @@ Kullanıcı: "Mevcut pazar için siparişi olmayan müşterilerimizin export ark
   tespiti defter + dosya + proforma ile çapraz doğrulandı (17 müşterinin açık kaydı yok). Bağlanmayan plan adları: GMB- BOCUUM
   (GMB Trading ile aynı mı doğrulanmadı), LEM INTERNATIONAL, AYANSH, SHARIKAT DARRAS, GOLDEN GLORY, JB (Pazar kartı yok).
   rapor_alicilari 'siparissiz' canli=true: ilk gerçek mail pazartesi 23.11 09:00 Harun Bey'e (CC bbt@, execution@).
+- **KAPATILDI (23.11.2026 09:1x)**: kullanıcı: "Bu rapor neden canlıda? ... Böyle bir şeye gerek yok. Bunu Pazar kısmında
+  potansiyel müşterilerimizin takipleri için düşündük. İlave mail gitmesine gerek yok." 23.11 09:00'da bir kez gitti.
+  `20261123120000_siparissiz_raporu_kapat.sql`: cron `siparissiz-musteri-rapor` silindi, rapor_alicilari canli=false.
+  Edge + `pazar_siparissiz_ozet` yerinde (zamanlanmış iş yok, kendiliğinden mail gitmez). Günlük görev ritim önceliği
+  (20261123111000) DEĞİŞMEDİ. Bu raporu kullanıcı açıkça istemeden yeniden canlıya ALMA.

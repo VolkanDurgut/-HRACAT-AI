@@ -45,6 +45,8 @@ export default function RaporAlicilariPage() {
   const [onizleme, setOnizleme] = useState<{ ad: string; konu: string; html: string } | null>(null);
   const [musteriler, setMusteriler] = useState<string[]>([]);
   const [musteri, setMusteri] = useState("");
+  // 23.11.2026: son onizle / test sonucu ekranda kalir (yalniz toast yetmiyordu)
+  const [sonuc, setSonuc] = useState<{ tur: "ok" | "hata"; metin: string; ayrinti?: string } | null>(null);
 
   useEffect(() => { if (!authLoading && !isSuperAdmin) router.replace("/panel"); }, [authLoading, isSuperAdmin, router]);
 
@@ -124,17 +126,30 @@ export default function RaporAlicilariPage() {
       const o = await raporOnizle(tanim.edge, ekParam());
       if (o.musteriler) { setMusteriler(o.musteriler); if (!musteri && o.musteriler[0]) setMusteri(o.musteriler[0]); }
       setOnizleme({ ad: tanim.ad, konu: o.konu, html: o.html });
-    } catch (e) { showToast(`Önizleme açılamadı: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+      setSonuc(null);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      showToast(`Önizleme açılamadı: ${m}`, "error");
+      setSonuc({ tur: "hata", metin: "Önizleme açılamadı", ayrinti: m });
+    }
     setMesgul(null);
   };
   const test = async () => {
     if (!tanim.edge) return;
     setMesgul("test");
-    try { await raporTestMaili(tanim.edge, ekParam()); showToast("Test maili gönderildi (yalnız test adresine).", "success"); }
-    catch (e) { showToast(`Test maili gönderilemedi: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+    try {
+      const r = await raporTestMaili(tanim.edge, ekParam());
+      const kime = r.alici.length ? r.alici.join(", ") : "test adresi";
+      showToast(`Test maili gönderildi: ${kime}`, "success");
+      setSonuc({ tur: "ok", metin: `Test maili gönderildi → ${kime} · ${new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}`, ayrinti: r.konu || undefined });
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      showToast(`Test maili gönderilemedi: ${m}`, "error");
+      setSonuc({ tur: "hata", metin: "Test maili gönderilemedi", ayrinti: m });
+    }
     setMesgul(null);
   };
-  useEffect(() => { setOnizleme(null); }, [secili]);
+  useEffect(() => { setOnizleme(null); setSonuc(null); }, [secili]);
 
   // Taslaktaki ama defterde olmayan adresler de defter listesinde gorunur (tiklanabilir kalsin)
   const tumAdresler = useMemo(() => Array.from(new Set([...defter, ...t.to, ...t.cc])), [defter, t.to, t.cc]);
@@ -312,6 +327,20 @@ export default function RaporAlicilariPage() {
             </>}
             {k?.guncelleme && <span className="ml-auto text-[10px]" style={{ color: TEXT_MUTED }}>Son değişiklik {tarihSaat(k.guncelleme)}{k.guncelleyen ? ` · ${k.guncelleyen}` : ""}</span>}
           </div>
+          {tanim.edge && (
+            <p className="text-[11px] -mt-1" style={{ color: TEXT_MUTED }}>
+              Önizle mail göndermez. Test maili her zaman yalnız test adresine &quot;[TEST]&quot; konuyla gider; canlı alıcılara gitmez.
+            </p>
+          )}
+          {sonuc && (
+            <div role="status" data-testid="rapor-sonuc" className="rounded-lg border px-3 py-2 text-xs"
+              style={sonuc.tur === "ok"
+                ? { borderColor: "rgba(16,185,129,0.4)", backgroundColor: "rgba(16,185,129,0.08)", color: "#A7F3D0" }
+                : { borderColor: "rgba(248,113,113,0.4)", backgroundColor: "rgba(248,113,113,0.08)", color: "#FCA5A5" }}>
+              <p className="font-semibold">{sonuc.metin}</p>
+              {sonuc.ayrinti && <p className="mt-0.5 break-words" style={{ color: sonuc.tur === "ok" ? "#CBD5E1" : "#FECACA" }}>{sonuc.ayrinti}</p>}
+            </div>
+          )}
         </section>
       </div>
 

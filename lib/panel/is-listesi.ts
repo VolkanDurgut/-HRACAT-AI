@@ -15,16 +15,26 @@
  * booking'iyle "Rezervasyon ekle" der); on odeme is emri rezervasyonsuz dosyayi isaret ediyorsa is emri gizlenir.
  * Odeme bekleyen proforma listede baska bir satirda varsa (dosya / is emri) tekrar gosterilmez.
  * Siralama: cutoff > acik > rez_bekliyor > odeme; grup icinde en yakin cut-off / en eski bekleyen ustte.
+ *
+ * 23.11.2026 (kullanici: "Ilk konteyneri alinan yani baslamis olarak gozukur. Sari olarak boyali ve en ustte konteyner
+ * fazlalik siralamasina gore gozukmeli. O kismin alti ise ilk talimat cut-off kimin erkense ona gore siralanmali."):
+ *  - basladi       (sari)    rezervasyonlu dosya; en az 1 konteyner ALINMIS (numarasi girilmis) ve dolu (DBA'li)
+ *                            konteyner rezervasyon adedine ULASMAMIS = yuklemesi suruyor. Hepsi dolunca normal duruma
+ *                            (acik / cutoff) doner; aksi halde evrak bekleyen dolu dosyalarin hepsi sari olurdu.
+ *                            Sira: kalan (yuklenecek) konteyner cok olan ustte, esitse toplam, sonra talimat.
+ *                            Cut-off'u yaklasiyorsa satir sari kalir, "cut-off yakin" notu ve Cut-off filtresinde gorunur.
+ *  - Altinda cutoff + acik TEK sira: ilk (en erken) talimat cut-off'u ustte (talimat yoksa beyanname / ETD).
  */
 import { isCutoffApproaching, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
 import { noParcala } from "@/lib/coklu-no";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 
-export type ListeDurumu = "cutoff" | "acik" | "rez_bekliyor" | "odeme";
-export type ListeFiltresi = "tumu" | "acik" | "cutoff" | "rez_bekliyor" | "odeme";
+export type ListeDurumu = "basladi" | "cutoff" | "acik" | "rez_bekliyor" | "odeme";
+export type ListeFiltresi = "tumu" | "basladi" | "acik" | "cutoff" | "rez_bekliyor" | "odeme";
 
 export const LISTE_FILTRELERI: { key: ListeFiltresi; label: string }[] = [
   { key: "tumu", label: "Tümü" },
+  { key: "basladi", label: "Yükleme başladı" },
   { key: "acik", label: "Açık sevkiyat" },
   { key: "cutoff", label: "Cut-off yaklaşan" },
   { key: "rez_bekliyor", label: "Rezervasyon bekliyor" },
@@ -32,14 +42,14 @@ export const LISTE_FILTRELERI: { key: ListeFiltresi; label: string }[] = [
 ];
 
 export const DURUM_ETIKETI: Record<ListeDurumu, string> = {
-  cutoff: "Cut-off yaklaşıyor", acik: "Açık sevkiyat", rez_bekliyor: "Rezervasyon bekliyor", odeme: "Ödeme bekliyor",
+  basladi: "Yükleme başladı", cutoff: "Cut-off yaklaşıyor", acik: "Açık sevkiyat", rez_bekliyor: "Rezervasyon bekliyor", odeme: "Ödeme bekliyor",
 };
 
 /** ?filtre= (eski degerler dahil: "rezervasyon" = rezervasyonsuz dosya -> rez_bekliyor). Bilinmeyen -> tumu. */
 export function listeFiltresi(filtre: string | null | undefined, eski?: string | null): ListeFiltresi {
   const v = (filtre || eski || "").trim();
   if (v === "rezervasyon") return "rez_bekliyor";
-  return v === "acik" || v === "cutoff" || v === "rez_bekliyor" || v === "odeme" ? v : "tumu";
+  return v === "basladi" || v === "acik" || v === "cutoff" || v === "rez_bekliyor" || v === "odeme" ? v : "tumu";
 }
 
 export type OdemeBekleyen = {
@@ -69,13 +79,32 @@ export function odemeBekleyenleriHazirla(veri: unknown): OdemeBekleyen[] {
 export type ListeDosyasi = {
   id: string; dosya_no: string | null; proforma_no: string | null; alici_firma: string | null; olusturma_tarihi?: string | null;
   konsimento_dosya_url?: string | null; draft_bl_dosya_url?: string | null; beyanname_dosya_url?: string | null;
-  rezervasyonlar: { booking_no?: string | null; talimat_cutoff: string | null; beyanname_cutoff: string | null; gemi_kalkis_tarihi?: string | null }[];
+  rezervasyonlar: { booking_no?: string | null; talimat_cutoff: string | null; beyanname_cutoff: string | null; gemi_kalkis_tarihi?: string | null; konteyner_adedi?: number | null }[];
+  /** Alinan konteynerler (numarasi girilmis); dba_dosya_url = dolu (tartildi). Yoksa yukleme baslamamis sayilir. */
+  konteynerler?: { dba_dosya_url?: string | null }[];
 };
 
+export type YuklemeDurumu = { toplam: number; alinan: number; dolu: number; kalan: number };
+
+/** Rezervasyon adedi / alinan / dolu konteyner ve kalan (yuklenecek) sayi. */
+export function yuklemeDurumu(d: ListeDosyasi): YuklemeDurumu {
+  const toplam = d.rezervasyonlar.reduce((t, r) => t + (Number(r.konteyner_adedi) || 0), 0);
+  const kont = d.konteynerler || [];
+  const dolu = kont.filter((k) => !!k.dba_dosya_url).length;
+  return { toplam, alinan: kont.length, dolu, kalan: Math.max(0, toplam - dolu) };
+}
+
+/** Yuklemesi suruyor: en az 1 konteyner alindi, dolu sayisi rezervasyon adedine ulasmadi. */
+export function yuklemeBasladi(y: YuklemeDurumu): boolean {
+  return y.alinan > 0 && y.toplam > 0 && y.dolu < y.toplam;
+}
+
+/** talimat: ilk talimat cut-off (ms; yoksa SONSUZ); cutoffYakin: durum sari olsa da cut-off 0-3 gun icinde. */
+type OrtakAlan = { anahtar: string; zaman: number; talimat: number; cutoffYakin: boolean };
 export type ListeOgesi<D extends ListeDosyasi> =
-  | { tur: "dosya"; anahtar: string; durum: ListeDurumu; dosya: D; zaman: number }
-  | { tur: "is_emri"; anahtar: string; durum: ListeDurumu; isEmri: IsEmriSatiri; zaman: number }
-  | { tur: "odeme"; anahtar: string; durum: "odeme"; odeme: OdemeBekleyen; zaman: number };
+  | (OrtakAlan & { tur: "dosya"; durum: ListeDurumu; dosya: D; yukleme: YuklemeDurumu })
+  | (OrtakAlan & { tur: "is_emri"; durum: ListeDurumu; isEmri: IsEmriSatiri })
+  | (OrtakAlan & { tur: "odeme"; durum: "odeme"; odeme: OdemeBekleyen });
 
 const SONSUZ = Number.MAX_SAFE_INTEGER;
 /** "2026-11-29" (gun sonu) ya da zaman damgasi -> ms; okunamazsa SONSUZ (en alta). */
@@ -94,9 +123,18 @@ export function proformaAnahtari(no: string | null | undefined): string {
 /** Rezervasyonlu dosyanin durumu (cut-off kurali eski "Cut-Off Yaklasan" sekmesiyle ayni). */
 export function dosyaDurumu(d: ListeDosyasi): ListeDurumu {
   if (d.rezervasyonlar.length === 0) return "rez_bekliyor";
+  if (yuklemeBasladi(yuklemeDurumu(d))) return "basladi";
+  return dosyaCutoffDurumu(d);
+}
+
+/** Yukleme durumundan bagimsiz cut-off rengi (rezervasyonlu dosya). */
+export function dosyaCutoffDurumu(d: ListeDosyasi): "cutoff" | "acik" {
   const tamam = { talimat: talimatCutoffTamamMi(d), beyanname: beyannameCutoffTamamMi(d) };
   return d.rezervasyonlar.some((r) => isCutoffApproaching(r.talimat_cutoff, r.beyanname_cutoff, tamam)) ? "cutoff" : "acik";
 }
+
+/** Ilk (en erken) talimat cut-off'u; belge verilmis olsa da (siralama icin sabit tarih). */
+const ilkTalimat = (d: ListeDosyasi) => enKucuk(d.rezervasyonlar.map((r) => zamanMs(r.talimat_cutoff)));
 
 function dosyaZamani(d: ListeDosyasi, durum: ListeDurumu): number {
   if (durum === "rez_bekliyor") return zamanMs(d.olusturma_tarihi || null);
@@ -125,7 +163,8 @@ export function aksiyonDosyasi(s: IsEmriSatiri): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-const GRUP_SIRASI: Record<ListeDurumu, number> = { cutoff: 0, acik: 1, rez_bekliyor: 2, odeme: 3 };
+/** cutoff ve acik ayni grup: aralarinda ilk talimat cut-off'u belirler. */
+const GRUP_SIRASI: Record<ListeDurumu, number> = { basladi: 0, cutoff: 1, acik: 1, rez_bekliyor: 2, odeme: 3 };
 const musteriOf = <D extends ListeDosyasi>(o: ListeOgesi<D>) =>
   (o.tur === "dosya" ? o.dosya.alici_firma : o.tur === "is_emri" ? o.isEmri.musteri : o.odeme.musteri) || "";
 
@@ -144,13 +183,18 @@ export function isListesiKur<D extends ListeDosyasi>(
   for (const d of dosyalar) {
     if (gizliDosya.has(d.id)) continue;
     const durum = dosyaDurumu(d);
-    ogeler.push({ tur: "dosya", anahtar: `dosya:${d.id}`, durum, dosya: d, zaman: dosyaZamani(d, durum) });
+    const cutoffYakin = durum === "cutoff" || (durum === "basladi" && dosyaCutoffDurumu(d) === "cutoff");
+    ogeler.push({ tur: "dosya", anahtar: `dosya:${d.id}`, durum, dosya: d, yukleme: yuklemeDurumu(d), cutoffYakin,
+      zaman: dosyaZamani(d, durum === "basladi" ? "acik" : durum), talimat: durum === "rez_bekliyor" ? SONSUZ : ilkTalimat(d) });
   }
-  for (const s of rezervasyonlu) ogeler.push({ tur: "is_emri", anahtar: `is:${s.anahtar}`, durum: isEmriDurumu(s), isEmri: s, zaman: isEmriZamani(s) });
+  for (const s of rezervasyonlu) {
+    const durum = isEmriDurumu(s);
+    ogeler.push({ tur: "is_emri", anahtar: `is:${s.anahtar}`, durum, isEmri: s, zaman: isEmriZamani(s), talimat: zamanMs(s.talimat_cutoff), cutoffYakin: durum === "cutoff" });
+  }
   for (const s of onOdeme) {
     const hedef = aksiyonDosyasi(s);
     if (hedef && dosyaIdleri.has(hedef)) continue; // rezervasyonsuz dosya satiri zaten "Rezervasyon bekliyor"
-    ogeler.push({ tur: "is_emri", anahtar: `is:${s.anahtar}`, durum: "rez_bekliyor", isEmri: s, zaman: isEmriZamani(s) });
+    ogeler.push({ tur: "is_emri", anahtar: `is:${s.anahtar}`, durum: "rez_bekliyor", isEmri: s, zaman: isEmriZamani(s), talimat: SONSUZ, cutoffYakin: false });
   }
   const gorulen = new Set<string>();
   for (const o of ogeler) {
@@ -160,20 +204,36 @@ export function isListesiKur<D extends ListeDosyasi>(
   for (const p of odemeler || []) {
     const k = proformaAnahtari(p.proforma_no);
     if (k && gorulen.has(k)) continue;
-    ogeler.push({ tur: "odeme", anahtar: `odeme:${p.anahtar}`, durum: "odeme", odeme: p, zaman: zamanMs(p.proforma_tarihi) });
+    ogeler.push({ tur: "odeme", anahtar: `odeme:${p.anahtar}`, durum: "odeme", odeme: p, zaman: zamanMs(p.proforma_tarihi), talimat: SONSUZ, cutoffYakin: false });
   }
-  return ogeler.sort((a, b) => GRUP_SIRASI[a.durum] - GRUP_SIRASI[b.durum] || a.zaman - b.zaman || musteriOf(a).localeCompare(musteriOf(b), "tr"));
+  const yuk = (o: ListeOgesi<D>) => (o.tur === "dosya" ? o.yukleme : { kalan: 0, toplam: 0 });
+  return ogeler.sort((a, b) => {
+    const g = GRUP_SIRASI[a.durum] - GRUP_SIRASI[b.durum];
+    if (g) return g;
+    if (a.durum === "basladi") {
+      const ya = yuk(a), yb = yuk(b);
+      const f = yb.kalan - ya.kalan || yb.toplam - ya.toplam;
+      if (f) return f;
+    }
+    if (GRUP_SIRASI[a.durum] <= 1) {
+      const t = a.talimat - b.talimat;
+      if (t) return t;
+    }
+    return a.zaman - b.zaman || musteriOf(a).localeCompare(musteriOf(b), "tr");
+  });
 }
 
-export function filtreyeUyar(durum: ListeDurumu, filtre: ListeFiltresi): boolean {
+/** cutoffYakin: sari (yuklemesi suren) satirin cut-off'u da yaklasiyorsa Cut-off filtresinde de gorunur. */
+export function filtreyeUyar(durum: ListeDurumu, filtre: ListeFiltresi, cutoffYakin = false): boolean {
   if (filtre === "tumu") return true;
-  if (filtre === "acik") return durum === "acik" || durum === "cutoff";
+  if (filtre === "acik") return durum === "acik" || durum === "cutoff" || durum === "basladi";
+  if (filtre === "cutoff") return durum === "cutoff" || cutoffYakin;
   return durum === filtre;
 }
 
 export function listeSayilari<D extends ListeDosyasi>(ogeler: ListeOgesi<D>[]): Record<ListeFiltresi, number> {
-  const say: Record<ListeFiltresi, number> = { tumu: ogeler.length, acik: 0, cutoff: 0, rez_bekliyor: 0, odeme: 0 };
-  for (const o of ogeler) for (const f of ["acik", "cutoff", "rez_bekliyor", "odeme"] as const) if (filtreyeUyar(o.durum, f)) say[f] += 1;
+  const say: Record<ListeFiltresi, number> = { tumu: ogeler.length, basladi: 0, acik: 0, cutoff: 0, rez_bekliyor: 0, odeme: 0 };
+  for (const o of ogeler) for (const f of ["basladi", "acik", "cutoff", "rez_bekliyor", "odeme"] as const) if (filtreyeUyar(o.durum, f, o.cutoffYakin)) say[f] += 1;
   return say;
 }
 

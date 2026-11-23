@@ -2,7 +2,7 @@
 /**
  * ANA PANEL TEK IS LISTESI (23.11.2026) - dosya disindaki satirlar ve ortak durum hucresi. Hesap / siralama:
  * lib/panel/is-listesi.ts. Dosya satiri app/panel/page.tsx'te (evrak, detay, sil dugmeleri eskisi gibi).
- *  - Durum renkleri: cut-off (kirmizi), acik sevkiyat (yesil), rezervasyon bekliyor (mavi), odeme bekliyor (gri, soluk).
+ *  - Durum renkleri: yukleme basladi (sari, en ustte), cut-off (kirmizi), acik sevkiyat (yesil), rezervasyon bekliyor (mavi), odeme bekliyor (gri, soluk).
  *  - Is emri satiri: booking'li (dosyasi acilmamis) ya da on odemesi alinmis siparis; tek aksiyon (Dosya ac / Sevkiyat ac /
  *    Rezervasyon ekle / Proforma yukle; lib/siparis/plan-bekleyen.ts).
  *  - Odeme satiri: PASIF (aksiyon yok); on odeme Siparis Listesi'nde isaretlenince kendiliginden maviye gecer.
@@ -20,6 +20,7 @@ import { GunlukGorev } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsOzeti } from "@/lib/panel/gunluk-yukleme";
 
 export const DURUM_RENGI: Record<ListeDurumu, { renk: string; zemin: string; kenar: string }> = {
+  basladi: { renk: "#FCD34D", zemin: "rgba(250,204,21,0.15)", kenar: "#EAB308" },
   cutoff: { renk: "#FCA5A5", zemin: "rgba(248,113,113,0.14)", kenar: "#F87171" },
   acik: { renk: "#6EE7B7", zemin: "rgba(16,185,129,0.13)", kenar: "#10B981" },
   rez_bekliyor: { renk: "#93C5FD", zemin: "rgba(59,130,246,0.13)", kenar: "#3B82F6" },

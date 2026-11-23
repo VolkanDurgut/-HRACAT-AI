@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  isListesiKur, listeSayilari, listeFiltresi, listeAra, filtreyeUyar, dosyaDurumu, odemeBekleyenleriHazirla, proformaAnahtari, gundur,
+  isListesiKur, listeSayilari, listeFiltresi, listeAra, filtreyeUyar, dosyaDurumu, odemeBekleyenleriHazirla, proformaAnahtari, gundur, yuklemeDurumu,
   type ListeDosyasi,
 } from "@/lib/panel/is-listesi";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
@@ -45,7 +45,7 @@ test("isListesiKur: gruplar ve sira (cut-off > acik > rezervasyon > odeme), grup
   assert.deepEqual(liste.map((o) => o.durum), ["cutoff", "cutoff", "acik", "acik", "rez_bekliyor", "rez_bekliyor", "odeme"]);
   assert.deepEqual(liste.map((o) => o.anahtar), ["is:R1", "dosya:kirmizi", "is:R2", "dosya:acik", "is:O1", "dosya:bos", "odeme:excel:1"]);
   const say = listeSayilari(liste);
-  assert.deepEqual(say, { tumu: 7, acik: 4, cutoff: 2, rez_bekliyor: 2, odeme: 1 });
+  assert.deepEqual(say, { tumu: 7, basladi: 0, acik: 4, cutoff: 2, rez_bekliyor: 2, odeme: 1 });
 });
 
 test("tekrar yok: booking'li is emri rezervasyonsuz dosyayi temsil eder; on odeme is emri dosya varsa gizlenir", () => {
@@ -103,4 +103,41 @@ test("gundur: Istanbul takvim gunu", () => {
   assert.equal(gundur("2026-11-11", simdi), 12);
   assert.equal(gundur("2026-11-23", simdi), 0);
   assert.equal(gundur(null, simdi), null);
+});
+
+const kont = (alinan: number, dolu: number) => Array.from({ length: alinan }, (_, i) => ({ dba_dosya_url: i < dolu ? "x" : null }));
+
+test("basladi: en az 1 konteyner alindi ve dolu < rezervasyon -> sari; hepsi dolunca / hic alinmadiysa normal durum", () => {
+  const r = [rez(gun(9), gun(10), { konteyner_adedi: 4 })];
+  assert.equal(dosyaDurumu(dosya("a", { rezervasyonlar: r, konteynerler: kont(1, 0) })), "basladi");
+  assert.equal(dosyaDurumu(dosya("b", { rezervasyonlar: r, konteynerler: kont(4, 3) })), "basladi");
+  assert.equal(dosyaDurumu(dosya("c", { rezervasyonlar: r, konteynerler: kont(4, 4) })), "acik", "hepsi dolu: evrak bekliyor");
+  assert.equal(dosyaDurumu(dosya("d", { rezervasyonlar: r, konteynerler: [] })), "acik", "konteyner alinmamis");
+  assert.equal(dosyaDurumu(dosya("e", { rezervasyonlar: [rez(gun(9), null)], konteynerler: kont(1, 0) })), "acik", "adet bilinmiyor");
+  assert.deepEqual(yuklemeDurumu(dosya("f", { rezervasyonlar: r, konteynerler: kont(3, 1) })), { toplam: 4, alinan: 3, dolu: 1, kalan: 3 });
+});
+
+test("siralama: sarilar en ustte kalan konteyner coktan aza; alti tek sira ilk talimat cut-off'una gore (kirmizi / yesil karisik)", () => {
+  const r = (n: number, t: string) => [rez(t, null, { konteyner_adedi: n })];
+  const liste = isListesiKur(
+    [
+      dosya("s2", { rezervasyonlar: r(2, gun(1)), konteynerler: kont(1, 0) }),          // kalan 2, cut-off yakin
+      dosya("s6", { rezervasyonlar: r(6, gun(4)), konteynerler: kont(3, 0) }),          // kalan 6
+      dosya("s1", { rezervasyonlar: r(2, gun(1)), konteynerler: kont(2, 1) }),          // kalan 1, cut-off yakin
+      dosya("yesilErken", { rezervasyonlar: r(2, gun(-4)), konteynerler: kont(2, 2), konsimento_dosya_url: "x" }),
+      dosya("kirmizi", { rezervasyonlar: r(3, gun(2)) }),
+      dosya("yesilGec", { rezervasyonlar: r(3, gun(8)) }),
+      dosya("bos"),
+    ],
+    { rezervasyonlu: [isEmri("rezervasyonlu", "R5", { talimat_cutoff: gun(5) })], onOdeme: [] },
+    null,
+  );
+  assert.deepEqual(liste.map((o) => o.anahtar), ["dosya:s6", "dosya:s2", "dosya:s1", "dosya:yesilErken", "dosya:kirmizi", "is:R5", "dosya:yesilGec", "dosya:bos"]);
+  assert.deepEqual(liste.map((o) => o.durum), ["basladi", "basladi", "basladi", "acik", "cutoff", "acik", "acik", "rez_bekliyor"]);
+  const say = listeSayilari(liste);
+  assert.equal(say.basladi, 3);
+  assert.equal(say.acik, 7, "acik sevkiyat filtresi sarilari da kapsar");
+  assert.equal(say.cutoff, 3, "kirmizi + cut-off'u yakin iki sari (s2, s1 1 gun)");
+  assert.equal(filtreyeUyar("basladi", "cutoff", false), false);
+  assert.equal(listeFiltresi("basladi"), "basladi");
 });

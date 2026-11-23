@@ -281,7 +281,7 @@ function PanelContent() {
   // durum ve renk kayitlardan otomatik, siralama cut-off > acik > rezervasyon bekliyor > odeme bekliyor.
   const ogeler = useMemo(() => isListesiKur(dosyalar, isEmirleri, odemeler), [dosyalar, isEmirleri, odemeler]);
   const sayilar = useMemo(() => listeSayilari(ogeler), [ogeler]);
-  const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter)), arama), [ogeler, activeFilter, arama]);
+  const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter, o.cutoffYakin)), arama), [ogeler, activeFilter, arama]);
   const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
   const simdi = Date.now();
 
@@ -412,7 +412,11 @@ function PanelContent() {
                     <tr id={`dosya-satir-${dosya.id}`} data-vurgu={vurgulu ? "evet" : undefined}
                       className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
                       style={{ borderColor: CARD_BORDER, ...durumKenari(oge.durum), ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
-                      <DurumHucresi durum={oge.durum} alt={dosya.dosya_no} />
+                      {/* 23.11.2026: yuklemesi suren dosya sari; altinda dolu / rezervasyon ve (varsa) cut-off uyarisi */}
+                      <DurumHucresi durum={oge.durum} alt={oge.durum === "basladi" ? (
+                        <>{dosya.dosya_no}<br />{oge.yukleme.dolu}/{oge.yukleme.toplam} dolu · {oge.yukleme.kalan} kaldı
+                          {oge.cutoffYakin ? <><br /><span style={{ color: "#FCA5A5" }}>Cut-off yakın</span></> : null}</>
+                      ) : dosya.dosya_no} />
                       <td className="px-3 py-3 align-top">
                         <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }} />
                       </td>

@@ -1511,3 +1511,7 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
   mesaiyle `MESAI_GUNLUK_SAAT` = 13 sa (50 kg'da araç başı 2 tur). Plan seçimi önce normal mesaide en yoğun günün aracını, sonra
   mesaili aracı en aza indirir. Kart: "bugün 6 / 8 · 2 araç boşa çıkabilir · mesaiyle 5 araç". 25 kg turu (~8,5 sa) 8 saati
   az aşıyor; araç takibi ölçümüyle netleşecek.
+- 23.11.2026 Ana Panel "Yükleme başladı" (sarı, en üstte): rezervasyonlu dosyada en az 1 konteyner alınmış ve dolu (DBA'lı)
+  sayı rezervasyon adedinin altında. Hepsi dolunca normal duruma döner (evrak bekleyen dolu dosyalar sarı kalmaz). Sarılar
+  kalan konteyner çoktan aza (eşitse toplam, sonra talimat); altında kırmızı + yeşil TEK sıra, ilk talimat cut-off'u erken
+  olan üstte. Sarı satırın cut-off'u yakınsa "Cut-off yakın" notu ve Cut-off filtresinde de görünür (lib/panel/is-listesi.ts).

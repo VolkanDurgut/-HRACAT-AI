@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabase";
 import { yuklemePlaniOku } from "@/lib/siparis/veri";
 import { navlunTablosuHesapla, navlunTablosuSayfasi, type NavlunOlayi, type NavlunTablosu } from "@/supabase/functions/_shared/navlun-tablosu";
+import type { KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 
 const SAYFA = 1000;
 
@@ -14,7 +15,7 @@ export async function navlunTablosuOku(bugun: string): Promise<{ tablo: NavlunTa
   for (let i = 0; i < 20; i++) {
     const { data, error } = await supabase
       .from("navlun_teklifleri")
-      .select("tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih")
+      .select("tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,lokal_dahil")
       .order("tarih", { ascending: true })
       .order("id", { ascending: true })
       .range(i * SAYFA, i * SAYFA + SAYFA - 1);
@@ -29,7 +30,9 @@ export async function navlunTablosuOku(bugun: string): Promise<{ tablo: NavlunTa
   return { tablo: navlunTablosuHesapla(olaylar, plan, bugun), planOkunamadi };
 }
 
-export async function navlunTablosuExcel(bugun: string): Promise<{ blob: Blob; planOkunamadi: boolean }> {
+/** baglam (23.11.2026): sayfanin karsilastirma baglami; verilirse acente hafizasina gore lokali haric teklifler "+lokal" isaretlenir. */
+export async function navlunTablosuExcel(bugun: string, baglam?: KarsilastirmaBaglami | null): Promise<{ blob: Blob; planOkunamadi: boolean }> {
   const [{ xlsxOlustur }, { tablo, planOkunamadi }] = await Promise.all([import("@/lib/xlsx-yaz"), navlunTablosuOku(bugun)]);
+  if (baglam) tablo.baglam = baglam;
   return { blob: await xlsxOlustur([navlunTablosuSayfasi(tablo)]), planOkunamadi };
 }

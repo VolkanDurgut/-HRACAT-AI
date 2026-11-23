@@ -196,10 +196,12 @@ function armatorBul(s: string, yakin?: number): string | null {
 const FT_DESENLERI: RegExp[] = [
   // 19.11.2026 (acente: "14 MERGED free time var Hat / Cma Tt/ 46 gün" -> free time 46 yaziliyordu): "N merged / combined free"
   /(\d{1,2})\s*(?:gün|gun|days?)?\s*(?:merged|combined|kombine)\s*(?:free|ft\b)/gi,
-  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:standa?r[td]\s*)?(?:ft\b|free|frfee)/gi,
+  // 23.11.2026 (Draft: "Tt: 42 days Ft: 14 days" -> free time 42; "TT:25-35 GUN FREE TIME: 9" -> 35): ardindan ":" / sayi
+  // gelen "Ft" / "Free time" SONRAKI alanin etiketidir; onceki sayi free time degil
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:standa?r[td]\s*)?(?:ft\b|free|frfee)(?![ \t]*(?:time[ \t]*)?(?:[:\-–=][ \t]*\d|\d{1,2}[ \t]*(?:days?|gün|gun)\b))/gi,
   /(\d{1,2})\s*(?:calendar\s*)?days?\s*free/gi,
   // 17.11.2026 ("Varis limaninda 13 gun DND free time" okunmuyordu): DND / D&D / combined araya girer
-  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:dnd|d\s*&\s*d|dem\s*\/\s*det|combined|kombine)\s*(?:ft\b|free)/gi,
+  /(\d{1,2})\s*(?:gün|gun|days?)\s*(?:dnd|d\s*&\s*d|dem\s*\/\s*det|combined|kombine)\s*(?:ft\b|free)(?![ \t]*(?:time[ \t]*)?(?:[:\-–=][ \t]*\d|\d{1,2}[ \t]*(?:days?|gün|gun)\b))/gi,
   /(\d{1,2})\s*free\s*var/gi,
   // 19.11.2026 (acente takip cevabi: "Bu teklife 14 gun verebiliriz"): teklife verilen gun free time'dir
   /teklif(?:e|imize)\s*(\d{1,2})\s*(?:gün|gun|days?)\s*(?:free\s*(?:time)?\s*)?(?:verebil|veriyor|tan[ıi]ml)/gi,
@@ -271,7 +273,9 @@ export function freeTimeBul(s: string): number | null {
 // Acik etiketlerde (tt, t/t, transit time / sure, seyir suresi) gun birimi ZORUNLU DEGIL; yalniz "transit" kelimesinde zorunlu.
 const TT_DOLGU = "(?:\\s*(?:[:\\-–=~\\/]|ise|da|de|ise\\s+de|tahmini(?:\\s+olarak)?|tahminen|olarak|ortalama|ort\\.?|yakla[şs][ıi]k|approx\\.?|abt\\.?|about|around|est(?:imated)?\\.?|min(?:imum)?\\.?|max(?:imum)?\\.?|en\\s+az|en\\s+fazla|civar[ıi]))*\\s*";
 const TT_SAYI = "(\\d{1,3}(?:\\s*[-–\\/]\\s*\\d{1,3})?)";
-const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:free|ft\\b|dem|det|serbest)))";
+// 23.11.2026: ardindan ":" / sayi gelen "Ft" / "Free time" sonraki alanin etiketidir ("Tt: 42 days Ft: 14", "TT:25-35 GUN FREE
+// TIME: 9"); transit sayisini reddetmez
+const TT_DEGIL = "(?!\\s*(?:%|usd|\\$|eur|saat|hours?|[.,]\\d|\\d|(?:gün|gun|days?)?\\s*(?:(?:free|ft\\b)(?![ \\t]*(?:time[ \\t]*)?(?:[:\\-–=][ \\t]*\\d|\\d{1,2}[ \\t]*(?:days?|gün|gun)\\b))|dem|det|serbest)))";
 const TT_ACIK = new RegExp(`(?:transit\\s*(?:time|s[üu]re\\w*)|\\bt\\/t\\b|\\btt(?![a-zçğıöşü])|seyir\\s*s[üu]re\\w*|sailing\\s*time)${TT_DOLGU}${TT_SAYI}${TT_DEGIL}`, "gi");
 const TT_BIRIMLI = new RegExp(`\\btransit\\b${TT_DOLGU}${TT_SAYI}\\s*(?:gün|gun|days?)\\b|(\\d{1,3}(?:\\s*[-–]\\s*\\d{1,3})?)\\s*(?:gün|gun|days?)\\s*(?:transit|t\\/t|tt\\b)`, "gi");
 // 19.11.2026: "14 free 28 gun tt" (gun + tt) da transit

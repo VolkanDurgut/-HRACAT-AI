@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
   cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle,
-  gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
+  gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli, type ListeFormu,
 } from "@/lib/siparis-formu";
 import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
 
@@ -135,7 +135,12 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
         lotNo: lotTemizle(lot), firmaAdi: firmaTemizle(firma),
       });
       if (m.gorselYolu && (yuklenen || gorselKaldir)) await gorselSil(m.gorselYolu).catch(() => undefined);
-      onDegisti(`${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`);
+      let mesaj = `${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`;
+      // 23.11.2026 aksam (kullanici): "Gonder butonu ile uretime Unex AI mail olarak gondersin; cuval yuklenmeden ve spekler
+      // girilmeden gonderilemesin." -> otomatik gonderim YOK; form tamamlaninca kullaniciya Uretime gonder hatirlatilir.
+      const gorselVar = !!yuklenen || (!!m.gorselYolu && !gorselKaldir);
+      if (!m.gonderim?.zaman && gorselVar && (ut || m.uretimMetin) && (st || m.sktMetin)) mesaj += ' Form tamamlandı; "Üretime gönder" ile üretime iletebilirsiniz.';
+      onDegisti(mesaj);
     } catch (e) {
       if (yuklenen) await gorselSil(yuklenen.yol).catch(() => undefined);
       setHata(e instanceof Error ? e.message : "Kaydedilemedi.");
@@ -296,7 +301,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
 
 export function SiparisFormlari() {
   const { companyId } = useAuth();
-  const [liste, setListe] = useState<FormModeli[] | null>(null);
+  const [liste, setListe] = useState<ListeFormu[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const [gecmis, setGecmis] = useState(false);
@@ -314,7 +319,10 @@ export function SiparisFormlari() {
   // 19.11.2026 (kullanici: "Cok eski yukleme; yuklemesi tamamlanmis, kaldirmaliyiz"): varsayilan liste Yukleme Planindaki gibi
   // BU HAFTA (Pazar-Cumartesi, plan basliklari "47.HAFTA (15 KASIM - 21 KASIM)") ve sonrasinin bos ekipman tarihleri.
   const haftaBasi = haftaBasiTr(bugun);
-  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi), [liste, gecmis, haftaBasi]);
+  // 23.11.2026 (kullanici: "AL-QASRAWI ... listede gozukmuyor"): bos ekipman tarihi gecen hafta olan ama formu GONDERILMEMIS ve
+  // ilk konteyneri TARTILMAMIS ve gemisi henuz KALKMAMIS yukleme gizlenmez (export hatirlatma listesiyle ayni kural: _shared/siparis-formu-lojistik.ts).
+  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi
+    || (!m.gonderim?.zaman && !m.tartildi && (m.etd ?? m.ekipmanTarihi) >= bugun)), [liste, gecmis, haftaBasi, bugun]);
   // 19.11.2026 (kullanici): gonderilenler listede "Daha once gonderilenler" bolumune duser
   const bekleyenler = gorunen.filter((m) => !m.gonderim?.zaman);
   const gonderilenler = useMemo(() => (liste || []).filter((m) => !!m.gonderim?.zaman)
@@ -327,7 +335,7 @@ export function SiparisFormlari() {
       <div className="rounded-lg border px-3 py-2.5 mb-3 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
         <FileSpreadsheet size={14} style={{ color: ACCENT }} />
         <span className="flex-1 min-w-[240px]">
-          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>; form <b className="text-white">Gönder</b> düğmesiyle üretime gider (otomatik gönderim yok, gönderim günü boş ekipman alımından 1 gün öncedir).
+          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>; çuval görseli, ürün spekleri ve tarihler girilip kaydedildikten sonra <b className="text-white">Üretime gönder</b> düğmesiyle üretime gider (gönderen Unex AI; eksik formda düğme kapalıdır).
           Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT ve lot çuvaldan otomatik okunur.
           Görsel, spek ve tarihler tamamlanmadan form <b className="text-white">gönderilmez</b>. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
         </span>

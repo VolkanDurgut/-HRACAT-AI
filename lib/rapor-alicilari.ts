@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export type RaporTuru =
   | "gunluk_ihracat" | "siparis" | "navlun" | "navlun_haftalik" | "diib" | "vgm" | "konsimento_hatirlatma"
-  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz";
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz" | "siparis_formu_lojistik" | "siparis_formu_spek";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
 export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
@@ -40,6 +40,12 @@ export const RAPORLAR: RaporTanimi[] = [
   // 14.11.2026: onay adimi kaldirildi; 'fatura_onay' listesi = talimat mailinin alicilari (Alici + CC). 'fatura_dagitim' kullanilmiyor.
   { rapor: "fatura_onay", ad: "Fatura Talimatı", grup: "Operasyon", aciklama: "“FATURA VE BEYANNAME TALİMATI HAKKINDA // …” · Harun Bey merhaba + PDF indir düğmesi", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "tam" },
   { rapor: "siparis_formu", ad: "Sipariş Bildirim Formu", grup: "Operasyon", aciklama: "Her yükleme için üretime sipariş formu (Excel + çuval görseli); test için Siparişler > Sipariş Formları", saat: "Gönder butonuyla (elle)", edge: null, testModu: true, etkin: "tam" },
+  // 23.11.2026 (kullanici: "Onayi ve rezervasyonu alinmis yuklemeler Suleyman Bey'e mail gitse; oradan siparis bildirim formu
+  // gonderilmesi gerekenleri secse"): lojistige liste + girissiz secim sayfasi; secilen formlar 'siparis_formu' alicilarina gider
+  // 23.11.2026 ogleden sonra: secim adimi kaldirildi (form export girisi tamamlaninca otomatik gider); cron kapali, satir yedek
+  { rapor: "siparis_formu_lojistik", ad: "Sipariş Formu · Lojistik Seçimi (kullanılmıyor)", grup: "Operasyon", aciklama: "Kaldırıldı: form, export girişleri tamamlanınca Sipariş Formları'nda Üretime gönder ile gider. Zamanlanmış mail kapalı.", saat: "Kapalı", edge: "siparis-formu", testModu: true, etkin: "tam" },
+  // 23.11.2026 (kullanici): export'a her sabah spek / cuval gorseli bekleyen yuklemeler (ekranda da bildirim); form Gonder ile gider
+  { rapor: "siparis_formu_spek", ad: "Sipariş Formu · Export Hatırlatma", grup: "Operasyon", aciklama: "Ürün speki / çuval görseli bekleyen yüklemeler (ekranda da bildirim). Form, girişler tamamlanınca Sipariş Formları'nda Üretime gönder ile gider", saat: "Hafta içi her sabah 08:00", edge: null, testModu: true, etkin: "tam" },
   // 23.11.2026: haftalik siparissiz musteri ozeti (export ekibi; kurulumda CANLI KAPALI, test yalniz test adresine)
   { rapor: "siparissiz", ad: "Siparişsiz Müşteri Raporu", grup: "Satış ve müşteri", aciklama: "Açık siparişi olmayan müşterilerimiz: sipariş ritmi, iletişim durumu, son görev + Excel", saat: "Her pazartesi 09:00", edge: "siparissiz-musteri-rapor", testModu: true, etkin: "tam" },
   { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },

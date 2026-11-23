@@ -14,10 +14,12 @@ export { cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, ha
 const KOVA = "siparis-formlari";
 const AZAMI_PX = 2000;
 
-export async function siparisFormlariOku(): Promise<FormModeli[]> {
+/** 23.11.2026: tartildi = ilk konteyneri tartilmis (yukleme baslamis); siparis_formu_listesi() satira ekler. */
+export type ListeFormu = FormModeli & { tartildi: boolean };
+export async function siparisFormlariOku(): Promise<ListeFormu[]> {
   const { data, error } = await supabase.rpc("siparis_formu_listesi");
   if (error) throw new Error(error.message || "Sipariş formları okunamadı.");
-  return ((data || []) as FormHam[]).map(formModeli);
+  return ((data || []) as (FormHam & { tartildi?: unknown })[]).map((h) => ({ ...formModeli(h), tartildi: h.tartildi === true }));
 }
 
 /** Gorseli JPEG'e cevirir (seffaf alan beyaz), uzun kenar en fazla 2000 px. */
@@ -131,4 +133,22 @@ export async function testFormuGonder(booking: string, canli = false): Promise<s
     throw new Error(mesaj || "Gönderilemedi.");
   }
   return (yanit.alici || []).join(", ");
+}
+
+async function edgeHatasi(error: unknown, yanit: { hata?: string } | null): Promise<string> {
+  let mesaj = yanit?.hata || "";
+  const ctx = (error as { context?: Response } | null)?.context;
+  if (!mesaj && ctx && typeof ctx.json === "function") {
+    try { mesaj = ((await ctx.json()) as { hata?: string }).hata || ""; } catch { /* yanit govdesi okunamadi */ }
+  }
+  return mesaj;
+}
+
+export type ExportBekleyen = { hedef: boolean; satirlar: import("@/supabase/functions/_shared/siparis-formu-spek").SpekSatiri[] };
+/** Uygulama ici uyari: kullanici export girisi alicisiysa spek / cuval gorseli bekleyen yuklemeler. */
+export async function exportBekleyenleriOku(): Promise<ExportBekleyen> {
+  const { data, error } = await supabase.functions.invoke("siparis-formu", { body: { islem: "export_bekleyen" } });
+  const yanit = data as ({ ok?: boolean; hata?: string } & ExportBekleyen) | null;
+  if (error || !yanit?.ok) return { hedef: false, satirlar: [] };
+  return { hedef: !!yanit.hedef, satirlar: Array.isArray(yanit.satirlar) ? yanit.satirlar : [] };
 }

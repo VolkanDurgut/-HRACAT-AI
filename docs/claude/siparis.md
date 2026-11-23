@@ -719,3 +719,21 @@ Test: `tests/is-akisi-revizeleri.test.ts` (kurgusal veri).
   "Tablo" nesnesi değil filtre kullanıldı: tablo nesnesi içinde birleştirilmiş satır olamaz).
 - Yükleme Planı: açılış bu haftanın (yoksa sonraki ilk haftanın) blok başlığında; her blokta başlıklar zaten var.
 - Web "Excel indir" Netlify ile gelir; mail eki için `siparis-rapor` edge'i yeniden yüklenmeli (önizlemede onaydan sonra).
+
+## Sipariş bildirim formu · Lojistik seçimi (23.11.2026)
+- Kullanıcı: "Harun Bey Excel indirip gönderdiği için takip sağlanamadı. Onayı ve rezervasyonu alınmış yüklemeler Süleyman Bey'e
+  mail gitsin; oradan sipariş bildirim formu gönderilmesi gerekenleri seçsin. Şu an yüklenenleri dahil etme." Seçimler: hafta içi
+  her sabah; ilk konteyner tartılınca (DBA) listeden çıkar; ilk etapta yalnız sensei test adresi; canlıda seçilen formlar uretim@ +
+  CC (Rapor Alıcıları › Sipariş Bildirim Formu).
+- Migration `20261123140000_siparis_formu_lojistik.sql` (CANLI): rapor `siparis_formu_lojistik` (lojistik@, canlı KAPALI),
+  `siparis_formu_secimleri` (token, 3 gün; istemciye kapalı), `siparis_formu_tartilanlar()`, cron `siparis-formu-lojistik`
+  (hafta içi 05:27 UTC; edge yalnız CANLI iken gönderir).
+- Liste: `_shared/siparis-formu-lojistik.ts` (test: `tests/siparis-formu-lojistik.test.ts`). Formu gitmemiş / işaretlenmemiş,
+  tartılmamış, gemisi kalkmamış; en yakın boş ekipman önce. Mailde booking no YOK.
+- Edge siparis-formu v10 (CANLI): `lojistik_ozet` (cron / test / Rapor Alıcıları önizle-test: booking'siz deneme|test),
+  `lojistik_bilgi|lojistik_gonder|lojistik_kapat` (token). Lojistik canlı değilken seçilen formlar YALNIZ test adresine, işaret
+  kaydedilmez. "Zaten gönderildi" = alıcısız gonderildi kaydı (Siparişler'de "Kapatıldı"); ozet.secim = seçim id.
+- Sayfa: `/siparis-formu-sec/[token]` (girişsiz; AppShell yok). Rapor köprüsü IZINLI'ye siparis-formu eklendi.
+- 23.11.2026 10:5x ilk test listesi sensei adresine gitti: 7 yükleme (1 hazır). Sistemden gerçekten gönderilmiş form YOK; 19.11'deki
+  6 Eastbourne kaydı "Kapatıldı" (yükleme başlamıştı).
+- CANLIYA ALIŞ: Ayarlar › Rapor Alıcıları › "Sipariş Formu · Lojistik Seçimi" Canlı. Kullanıcı onayı olmadan açılmaz.

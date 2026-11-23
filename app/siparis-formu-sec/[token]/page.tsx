@@ -17,6 +17,12 @@ import { ACCENT, CARD_BG, CARD_BORDER, PAGE_BG, TEXT_MUTED } from "@/lib/theme";
  * - Test modunda (lojistik canli degil) formlar YALNIZ test adresine gider, isaret kaydedilmez; sayfanin ustunde yazar.
  */
 
+/** 23.11.2026 (kullanici: "Urun speklerini lojistik bilemez; export onaylayacak"): spek eksigi export onayi olarak yazilir. */
+const eksikMetni = (e: string[]) => {
+  const spek = e.includes("Ürün spekleri");
+  const diger = e.filter((x) => x !== "Ürün spekleri");
+  return [spek ? "Spek: export onayı bekleniyor" : "", diger.length ? `Eksik: ${diger.join(", ")}` : ""].filter(Boolean).join(" · ");
+};
 const trTarih = (iso: string | null | undefined) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "-");
 const saat = (t: string) => new Date(t).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 const kart = "rounded-xl border";
@@ -155,7 +161,7 @@ export default function SiparisFormuSecimSayfasi() {
               return (
                 <li key={s.anahtar} className="px-3 py-3 flex items-start gap-3" style={{ borderColor: CARD_BORDER }} data-secim-satir={s.hazir ? "hazir" : "eksik"}>
                   <button type="button" onClick={() => s.hazir && degistir(s.anahtar)} disabled={!s.hazir || !!isleniyor} aria-label="Seç"
-                    className="mt-0.5 shrink-0 disabled:opacity-30" title={s.hazir ? "Seç" : `Eksik: ${s.eksikler.join(", ")}`}>
+                    className="mt-0.5 shrink-0 disabled:opacity-30" title={s.hazir ? "Seç" : eksikMetni(s.eksikler)}>
                     {sec ? <CheckSquare size={18} style={{ color: ACCENT }} /> : <Square size={18} style={{ color: TEXT_MUTED }} />}
                   </button>
                   <div className="min-w-0 flex-1">
@@ -172,7 +178,7 @@ export default function SiparisFormuSecimSayfasi() {
                   </div>
                   <span className={`shrink-0 text-[10.5px] font-semibold rounded-full px-2 py-0.5 ${s.hazir ? "text-emerald-300" : "text-amber-300"}`}
                     style={{ backgroundColor: s.hazir ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)" }} title={s.hazir ? "" : "Siparişler › Sipariş Formları'nda tamamlanır"}>
-                    {s.hazir ? "Hazır" : `Eksik: ${s.eksikler.join(", ")}`}
+                    {s.hazir ? "Hazır" : eksikMetni(s.eksikler)}
                   </span>
                 </li>
               );

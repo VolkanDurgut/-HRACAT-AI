@@ -13,7 +13,9 @@ export type RaporTuru =
   // 23.11.2026 haftalik siparissiz musteri raporu (export ekibi)
   | "siparissiz"
   // 23.11.2026 lojistige siparis formu bekleyen yuklemeler listesi (secim sayfasi)
-  | "siparis_formu_lojistik";
+  | "siparis_formu_lojistik"
+  // 23.11.2026 export'a urun speki onayi bekleyen yuklemeler (onay sayfasi)
+  | "siparis_formu_spek";
 /** canli: canli VE en az bir alici. canliIsaret: yalniz anahtar (alicisi raporun kendisinden gelen musteri durum raporu icin). */
 export type RaporAyari = { canli: boolean; canliIsaret: boolean; alicilar: string[]; cc: string[]; kaynak: "ayar" | "secret" };
 

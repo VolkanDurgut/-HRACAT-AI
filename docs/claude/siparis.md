@@ -737,3 +737,17 @@ Test: `tests/is-akisi-revizeleri.test.ts` (kurgusal veri).
 - 23.11.2026 10:5x ilk test listesi sensei adresine gitti: 7 yükleme (1 hazır). Sistemden gerçekten gönderilmiş form YOK; 19.11'deki
   6 Eastbourne kaydı "Kapatıldı" (yükleme başlamıştı).
 - CANLIYA ALIŞ: Ayarlar › Rapor Alıcıları › "Sipariş Formu · Lojistik Seçimi" Canlı. Kullanıcı onayı olmadan açılmaz.
+
+## Sipariş bildirim formu · Export spek onayı (23.11.2026)
+Kullanıcı: "Ürün speklerini lojistik bilemez. O yüzden bunları export onaylayacak."
+- Migration `20261123150000_siparis_formu_spek_onayi.sql` (CANLI): rapor `siparis_formu_spek` (export@, canlı KAPALI),
+  `siparis_formu_spek_onaylari` (token, 3 gün; günde bir canlı liste), cron `siparis-formu-spek` '17 5 * * 1-5' (08:17 TR,
+  lojistik mailinden 10 dk önce).
+- Liste: `_shared/siparis-formu-spek.ts` = lojistik listesindeki yüklemelerden spekleri KAYDEDİLMEMİŞ olanlar; öneri müşterinin
+  kalite ayarından (yoksa varsayılan). Mailde booking no yok.
+- Edge `siparis-formu-spek` v1 (CANLI, verify_jwt): `spek_ozet` (cron; `test:true` YALNIZ test adresine, 24 saatte en fazla 5),
+  `spek_bilgi|spek_onayla` (token). Onay `siparis_formlari.spekler` alanına yazılır (guncelleyen "export (<alıcı>)"); rapor canlı
+  değilken ya da test token'ında KAYDEDİLMEZ.
+- Web: `/siparis-formu-spek/[token]` (girişsiz onay sayfası; satır başına düzenlenebilir spek, tekli / toplu onay).
+  Lojistik seçim sayfası spek eksik yüklemede "Spek: export onayı bekleniyor" gösterir.
+- CANLIYA ALIŞ: Ayarlar › Rapor Alıcıları › "Sipariş Formu · Spek Onayı" Canlı. Kullanıcı onayı olmadan açılmaz.

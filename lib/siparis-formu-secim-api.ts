@@ -3,6 +3,7 @@
  * Girissiz; yetki maildeki 32 haneli token (3 gun). Veritabanina dogrudan erisim YOK.
  */
 import type { LojistikSatiri } from "@/supabase/functions/_shared/siparis-formu-lojistik";
+import type { SpekSatiri } from "@/supabase/functions/_shared/siparis-formu-spek";
 
 export type SecimBilgisi = {
   tarih: string;
@@ -39,3 +40,27 @@ export const formlariGonder = (token: string, bookingler: string[]) =>
   cagir<{ test: boolean; sonuclar: SecimSonucu[]; alici: string[] }>({ islem: "lojistik_gonder", token, bookingler });
 export const gonderildiIsaretle = (token: string, bookingler: string[]) =>
   cagir<{ test: boolean; sonuclar: SecimSonucu[] }>({ islem: "lojistik_kapat", token, bookingler });
+
+// ---- 23.11.2026 export spek onayi (/siparis-formu-spek/[token]) -> edge "siparis-formu-spek" ----
+export type SpekBilgisi = { tarih: string; test: boolean; satirlar: SpekSatiri[] };
+export type SpekSonucu = { booking: string; onaylandi?: boolean; test?: boolean; atlandi?: string };
+
+async function spekCagir<T>(govde: Record<string, unknown>): Promise<Cevap<T>> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anahtar = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  try {
+    const res = await fetch(`${url}/functions/v1/siparis-formu-spek`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anahtar, Authorization: `Bearer ${anahtar}` },
+      body: JSON.stringify(govde),
+    });
+    const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string };
+    if (!res.ok || veri.ok === false) return { ok: false, hata: veri.hata || "Beklenmeyen bir hata oluştu." };
+    return { ok: true, veri: veri as T };
+  } catch {
+    return { ok: false, hata: "Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin." };
+  }
+}
+export const spekBilgisi = (token: string) => spekCagir<SpekBilgisi>({ islem: "spek_bilgi", token });
+export const spekleriOnayla = (token: string, onaylar: { booking: string; spekler: string }[]) =>
+  spekCagir<{ test: boolean; sonuclar: SpekSonucu[] }>({ islem: "spek_onayla", token, onaylar });

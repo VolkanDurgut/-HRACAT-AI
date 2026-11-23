@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export type RaporTuru =
   | "gunluk_ihracat" | "siparis" | "navlun" | "navlun_haftalik" | "diib" | "vgm" | "konsimento_hatirlatma"
-  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz" | "siparis_formu_lojistik";
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz" | "siparis_formu_lojistik" | "siparis_formu_spek";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
 export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
@@ -43,6 +43,8 @@ export const RAPORLAR: RaporTanimi[] = [
   // 23.11.2026 (kullanici: "Onayi ve rezervasyonu alinmis yuklemeler Suleyman Bey'e mail gitse; oradan siparis bildirim formu
   // gonderilmesi gerekenleri secse"): lojistige liste + girissiz secim sayfasi; secilen formlar 'siparis_formu' alicilarina gider
   { rapor: "siparis_formu_lojistik", ad: "Sipariş Formu · Lojistik Seçimi", grup: "Operasyon", aciklama: "Rezervasyonu alınmış, yüklemesi başlamamış ve formu gitmemiş yüklemeler; lojistik seçip üretime gönderir (alıcı + CC: Sipariş Bildirim Formu)", saat: "Hafta içi her sabah 08:27", edge: "siparis-formu", testModu: true, etkin: "tam" },
+  // 23.11.2026 (kullanici: "Urun speklerini lojistik bilemez; export onaylayacak"): export'a spek onay listesi + girissiz onay sayfasi
+  { rapor: "siparis_formu_spek", ad: "Sipariş Formu · Spek Onayı", grup: "Operasyon", aciklama: "Lojistik listesindeki yüklemelerden ürün spekleri onaylanmamış olanlar; export onaylar / düzeltir, lojistik formu gönderebilir", saat: "Hafta içi her sabah 08:17", edge: null, testModu: true, etkin: "tam" },
   // 23.11.2026: haftalik siparissiz musteri ozeti (export ekibi; kurulumda CANLI KAPALI, test yalniz test adresine)
   { rapor: "siparissiz", ad: "Siparişsiz Müşteri Raporu", grup: "Satış ve müşteri", aciklama: "Açık siparişi olmayan müşterilerimiz: sipariş ritmi, iletişim durumu, son görev + Excel", saat: "Her pazartesi 09:00", edge: "siparissiz-musteri-rapor", testModu: true, etkin: "tam" },
   { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },

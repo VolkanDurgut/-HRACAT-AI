@@ -755,3 +755,6 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
   TARTILMAMIŞ ve gemisi KALKMAMIŞ yüklemeyi ekipman tarihi geçmiş olsa da gösterir (AL-QASRAWI: ekipman 21.11, ETD 28.11 gizleniyordu).
   `siparis_formu_listesi()` her satıra `tartildi` ekler (migration `20261123180000_siparis_formu_listesi_tartildi.sql`);
   `lib/siparis-formu.ts` `ListeFormu`. Hatırlatma maili ile ekran aynı kuralı kullanır.
+- 23.11.2026 canlı alıcılar (migration `20261123190000_siparis_formu_alicilar_0800.sql`): hatırlatma `siparis_formu_spek` →
+  export@ + execution@ (CC yok), cron `siparis-formu-spek` hafta içi 08:00 TR ('0 5 * * 1-5'; edge başlığındaki 08:17 notu eski).
+  Üretime giden form `siparis_formu` → alıcı uretim@, execution@, operation@, sales@, lojistik@; CC bbt@.

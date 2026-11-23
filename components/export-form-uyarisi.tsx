@@ -69,7 +69,7 @@ export default function ExportFormUyarisi() {
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-white">Sipariş bildirim formu · ürün speki ve çuval görseli bekleniyor</p>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            {sayi} yükleme{acil ? <span style={{ color: "#F87171" }}> · {acil} acil (boş ekipmana 2 gün ve daha az)</span> : null} · tamamlanıp kaydedilince form üretime otomatik gider
+            {sayi} yükleme{acil ? <span style={{ color: "#F87171" }}> · {acil} acil (boş ekipmana 2 gün ve daha az)</span> : null} · girip kaydettikten sonra Üretime gönder
           </p>
         </div>
         <button type="button" onClick={() => setAcik((x) => !x)} className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:bg-white/5" style={{ color: TEXT_MUTED }} title={acik ? "Daralt" : "Listeyi göster"}>

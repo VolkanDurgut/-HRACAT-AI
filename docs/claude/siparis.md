@@ -738,20 +738,16 @@ Test: `tests/is-akisi-revizeleri.test.ts` (kurgusal veri).
   6 Eastbourne kaydı "Kapatıldı" (yükleme başlamıştı).
 - CANLIYA ALIŞ: Ayarlar › Rapor Alıcıları › "Sipariş Formu · Lojistik Seçimi" Canlı. Kullanıcı onayı olmadan açılmaz.
 
-## Sipariş bildirim formu · Export girişi + otomatik gönderim (23.11.2026)
-Kullanıcı: "Ürün speklerini lojistik bilemez; export onaylayacak." → "Harun Bey spek ve ürün görseli eklediğinde sipariş bildirim
-formu otomatik olarak gitsin. Her gün Harun Bey'e spek ve girilmesi gereken ürün görselleri mail olarak gider; ekranında
-bildirim olarak da görünür." Lojistik seçim adımı KALDIRILDI (cron `siparis-formu-lojistik` kapalı; kod / sayfa yedek).
-- Liste: `_shared/siparis-formu-spek.ts` `spekListesi` = lojistik süzgeci (formu gitmemiş, tartılmamış, gemisi kalkmamış) +
-  giriş eksiği olan (spek / çuval görseli / üretim-SKT). ACİL = boş ekipmana ≤ 2 gün. Mailde booking no yok.
-- Sabah maili: edge `siparis-formu-spek` v2, cron `siparis-formu-spek` 08:17 hafta içi, rapor `siparis_formu_spek` (export@,
-  canlı KAPALI; hitap Pazar ekibinden). Düğme → `/siparisler?sekme=formlar` (giriş gerekir; export@ Siparişler yetkili).
-- Uygulama içi uyarı: `components/export-form-uyarisi.tsx` (app-shell, cut-off uyarısının altında). Edge `siparis-formu`
-  `export_bekleyen`; yalnız `siparis_formu_spek` alıcısı olan kullanıcıda; masaüstü bildirimi günde bir; Siparişler sayfasında gizli.
-- Otomatik gönderim: Sipariş Formları › Kaydet → edge `siparis-formu` v11 `{"islem": "otomatik", booking}`. Form tamam +
-  gönderilmemiş + yükleme başlamamışsa: `siparis_formu_spek` canlı VE `siparis_formu` canlı → üretim alıcı + CC (booking başına
-  bir kez); değilse "[TEST]" yalnız test adresine (booking başına bir). "Üretime gönder" düğmesi yedek olarak kalır.
-- Migration `20261123160000_siparis_formu_export_otomatik.sql` (CANLI): lojistik cron'u kapatır.
-- Girişsiz spek onay sayfası (`/siparis-formu-spek`) kaldırıldı (hiç canlıya çıkmadı); `siparis_formu_spek_onaylari` yalnız
-  günlük mail kaydı (gün tekliği + test oranı).
-- CANLIYA ALIŞ: Ayarlar › Rapor Alıcıları › "Sipariş Formu · Export Girişi ve Otomatik Gönderim" Canlı. Kullanıcı onayı olmadan açılmaz.
+## Sipariş bildirim formu · Export hatırlatma + Gönder butonu (23.11.2026)
+Kullanıcı (son karar): "Gönder butonu ile üretime Unex AI mail olarak göndersin. Çuval yüklenmeden ve spekler girilmeden
+gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve otomatik gönderim KALDIRILDI.
+- Gönderim: yalnız Siparişler › Sipariş Formları › "Üretime gönder" (edge `siparis-formu` v12 `{"gonder": true, booking}`;
+  gönderen Unex AI, etiket [Önemli]; alıcı/CC: Rapor Alıcıları `siparis_formu`). Çuval görseli + spek + üretim + SKT tamam değilse
+  düğme kapalı, edge de reddeder. Kaydet'ten sonra form tamamsa ekranda "Üretime gönder ile iletebilirsiniz" yazar.
+- Hatırlatma: edge `siparis-formu-spek` v3, cron `siparis-formu-spek` 08:17 hafta içi, rapor `siparis_formu_spek` CANLI
+  (migration `20261123170000_siparis_formu_export_hatirlatma_canli.sql`; alıcı export@, hitap Pazar ekibinden). Liste
+  `_shared/siparis-formu-spek.ts` `spekListesi` (formu gitmemiş, tartılmamış, gemisi kalkmamış + giriş eksiği; ACİL = boş ekipmana
+  ≤ 2 gün). Düğme → `/siparisler?sekme=formlar`. Mailde booking no yok. Bu anahtar form gönderimini ETKİLEMEZ.
+- Uygulama içi uyarı: `components/export-form-uyarisi.tsx` (app-shell); edge `siparis-formu` `export_bekleyen`; yalnız
+  `siparis_formu_spek` alıcısı olan kullanıcıda; masaüstü bildirimi günde bir; Siparişler sayfasında gizli.
+- Lojistik cron kapalı (migration `20261123160000`); `siparis_formu_lojistik` kodu / `/siparis-formu-sec` sayfası yedek.

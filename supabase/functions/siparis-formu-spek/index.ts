@@ -7,13 +7,12 @@ import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 // ============================================================================
 // SIPARIS BILDIRIM FORMU - EXPORT GIRISLERI SABAH MAILI (siparis-formu-spek) - 23.11.2026
 // ============================================================================
-// Kullanici: "Harun Bey spek ve urun gorseli eklediginde siparis bildirim formu otomatik olarak gitsin. Her gun Harun Bey'e
-// spek ve girilmesi gereken urun gorselleri mail olarak gider; ekraninda bildirim olarak da gorunur."
+// Kullanici: "Her gun Harun Bey'e spek ve girilmesi gereken urun gorselleri mail olarak gider; ekraninda bildirim olarak da
+// gorunur." + 23.11.2026 aksam: "Gonder butonu ile uretime Unex AI mail olarak gondersin. Hatirlatma her sabah gonderilsin."
 // Liste: _shared/siparis-formu-spek.ts (spek / cuval gorseli / uretim-SKT girisi eksik yuklemeler; ACIL = ekipmana <= 2 gun).
-// Giris: UNEX-AI > Siparisler > Siparis Formlari (giris gerekir). Form tamamlanip kaydedilince edge siparis-formu
-// {"islem": "otomatik"} formu uretime gonderir (bu edge mail gondermez, form gondermez).
-// ALICILAR: Ayarlar > Rapor Alicilari, rapor = 'siparis_formu_spek' (kurulum: export@, CANLI KAPALI). Ayni anahtar otomatik
-// form gonderiminin canli / test secimidir (siparis-formu).
+// Giris: UNEX-AI > Siparisler > Siparis Formlari (giris gerekir); form orada "Uretime gonder" ile gider (edge siparis-formu).
+// Bu edge yalniz hatirlatma maili gonderir, form gondermez.
+// ALICILAR: Ayarlar > Rapor Alicilari, rapor = 'siparis_formu_spek' (export@; 23.11.2026 aksam kullanici istegiyle CANLI).
 //  - {"islem": "spek_ozet"} (pg_cron 'siparis-formu-spek', hafta ici 08:17 TR, anon): CANLI ise alicilara; gunde bir kez;
 //    liste bossa gondermez. {"islem": "spek_ozet", "test": true}: "[TEST]" YALNIZ test adresine (24 saatte en fazla 5).
 // Gonderim kaydi: siparis_formu_spek_onaylari (gun tekligi + test orani; token kullanilmaz).

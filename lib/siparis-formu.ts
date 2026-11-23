@@ -142,18 +142,6 @@ async function edgeHatasi(error: unknown, yanit: { hata?: string } | null): Prom
   return mesaj;
 }
 
-export type OtomatikSonuc = { gonderildi: boolean; test?: boolean; alici?: string[]; neden?: string };
-/**
- * 23.11.2026 (kullanici: "Harun Bey spek ve urun gorseli eklediginde form otomatik gitsin"): Kaydet'ten hemen sonra.
- * Form tamam + gonderilmemis + yukleme baslamamis ise edge gonderir (canli: uretim alicilari + CC; test: yalniz test adresi).
- */
-export async function otomatikGonder(booking: string): Promise<OtomatikSonuc> {
-  const { data, error } = await supabase.functions.invoke("siparis-formu", { body: { islem: "otomatik", booking } });
-  const yanit = data as ({ ok?: boolean; hata?: string } & OtomatikSonuc) | null;
-  if (error || !yanit?.ok) throw new Error((await edgeHatasi(error, yanit)) || "Otomatik gönderim yapılamadı.");
-  return { gonderildi: !!yanit.gonderildi, test: yanit.test, alici: yanit.alici, neden: yanit.neden };
-}
-
 export type ExportBekleyen = { hedef: boolean; satirlar: import("@/supabase/functions/_shared/siparis-formu-spek").SpekSatiri[] };
 /** Uygulama ici uyari: kullanici export girisi alicisiysa spek / cuval gorseli bekleyen yuklemeler. */
 export async function exportBekleyenleriOku(): Promise<ExportBekleyen> {

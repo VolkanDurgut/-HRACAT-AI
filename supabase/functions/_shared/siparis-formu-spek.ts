@@ -3,8 +3,8 @@
  * siparis-formu export_bekleyen) ve web (uygulama ici uyari) AYNI listeyi kullanir.
  *
  * Kullanici: "Urun speklerini lojistik bilemez; bunlari export onaylayacak." + "Harun Bey spek ve urun gorseli eklediginde
- * siparis bildirim formu otomatik olarak gitsin. Her gun Harun Bey'e spek ve girilmesi gereken urun gorselleri mail olarak
- * gider; ekraninda bildirim olarak da gorunur."
+ * siparis bildirim formu ..." -> 23.11.2026 aksam: "Gonder butonu ile uretime Unex AI mail olarak gondersin. Cuval yuklenmeden
+ * ve spekler girilmeden gonderilemesin. Hatirlatma her sabah gonderilsin." (ekranda da bildirim)
  * Liste: rezervasyonu alinmis, formu gitmemis, ilk konteyneri tartilmamis, gemisi kalkmamis ve urun speki / cuval gorseli /
  * uretim-SKT girisi EKSIK yuklemeler (lojistikListesi suzgeci). Bos ekipman alimina 2 gun ve daha az kalanlar ACIL.
  * Not: Bu dosya gercek musteri verisi icermez.
@@ -64,7 +64,7 @@ export function spekMailHtml(satirlar: SpekSatiri[], bugun: string, baglanti: st
     <td style="padding:7px 8px;border-bottom:1px solid #E2E8F0;font-size:11px;color:#334155">${s.oneri ? esc(s.oneri).replace(/\n/g, "<br>") : `<span style="color:#047857">girildi</span>`}</td>
   </tr>`;
   const testSeridi = secenek.test
-    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi${secenek.alici ? `. Canlıda alıcı: <b>${esc(secenek.alici)}</b>` : ""}. Test modunda tamamlanan form üretime değil, yalnızca test adresine gider.</div>`
+    ? `<div style="margin:14px 0 0;border:1px solid #FCD34D;border-left:4px solid #D97706;background:#FFFBEB;border-radius:4px;padding:8px 12px;font-size:12px;color:#92400E"><b>TEST</b> · Bu e-posta yalnızca test adresine gönderildi${secenek.alici ? `. Canlıda alıcı: <b>${esc(secenek.alici)}</b>` : ""}. Canlıda yalnızca bu hatırlatma alıcıya gider.</div>`
     : "";
   return `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background:#F1F5F9;font-family:Arial,Helvetica,sans-serif">
@@ -77,7 +77,7 @@ export function spekMailHtml(satirlar: SpekSatiri[], bugun: string, baglanti: st
   </tr></table>
   ${testSeridi}
   <p style="margin:18px 0 6px;color:#1E293B;font-size:14px;line-height:1.55">Günaydın${secenek.hitap ? ` ${esc(secenek.hitap)}` : ""},</p>
-  <p style="margin:0 0 14px;color:#1E293B;font-size:14px;line-height:1.55">Rezervasyonu alınmış <b>${satirlar.length} yüklemenin</b> sipariş bildirim formunda ürün speki ve/veya çuval görseli bekleniyor. Önerilen spekler müşterinin kalite ayarından gelir; onaylayın ya da düzeltin. Çuval görseli yüklenince üretim tarihi, SKT ve lot görselden okunur. <b>Form tamamlanıp kaydedildiği anda üretime otomatik gider.</b></p>
+  <p style="margin:0 0 14px;color:#1E293B;font-size:14px;line-height:1.55">Rezervasyonu alınmış <b>${satirlar.length} yüklemenin</b> sipariş bildirim formunda ürün speki ve/veya çuval görseli bekleniyor. Önerilen spekler müşterinin kalite ayarından gelir; onaylayın ya da düzeltin. Çuval görseli yüklenince üretim tarihi, SKT ve lot görselden okunur. Kaydettikten sonra form <b>Üretime gönder</b> düğmesiyle üretime iletilir; çuval görseli ve spekler girilmeden gönderilemez.</p>
   <div style="margin:16px 0 4px;text-align:center">
     <a href="${esc(baglanti)}" style="display:inline-block;background:${YESIL};color:#fff;text-decoration:none;font-size:15px;font-weight:bold;padding:12px 30px;border-radius:6px">Sipariş Formları'nı aç</a>
     <div style="margin-top:6px;font-size:11px;color:#94A3B8">UNEX-AI › Siparişler › Sipariş Formları (giriş gerekir)</div>

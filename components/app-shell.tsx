@@ -13,6 +13,7 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { girisSonrasiKaydet } from "@/lib/giris-donus";
 import { PAGE_BG, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { TestOrtamiSeridi } from "@/components/test-ortami-seridi";
 
 const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYetkileri> = {
   "/panel": "panel",
@@ -137,6 +138,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="md:ml-[240px] min-h-screen w-full md:w-[calc(100%-240px)] max-w-full overflow-x-hidden">
         <div className="p-4 md:p-6 pt-16 md:pt-6">
+          {/* 22.11.2026: yalniz Netlify onizlemesinde (lib/ortam.ts); canlida hicbir sey cizmez */}
+          <TestOrtamiSeridi />
           {/* Son 10 saate girmis cut-off'lar - her sayfada (talep: 01.10.2026) */}
           <CutoffUyarilari />
           {children}

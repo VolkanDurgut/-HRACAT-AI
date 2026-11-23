@@ -31,7 +31,9 @@ test("hazirla: rezervasyonlu en yakin talimat cut-off ustte (yoksa ETD); on odem
   assert.deepEqual(h.rezervasyonlu.map((s) => s.booking_no), ["DEMOBK2", "DEMOBK1", "DEMOBK3"]);
   assert.deepEqual(h.onOdeme.map((s) => s.proforma_no), ["DEMOCSK041126", "DEMOGTI161126", "DEMOCMP031126-1"]);
   assert.deepEqual(h.rezervasyonlu.map((s) => s.aksiyon.tur), ["dosya_ac", "sevkiyat", "proforma_yukle"]);
-  assert.equal(h.rezervasyonlu[0].aksiyon.href, "/yeni-dosya?proforma=p-1&otomatik=1");
+  // 22.11.2026: rezervasyonlu "Dosya ac" booking ve konteyner sayisini tasir (lib/siparis-devam.ts bookingKarari)
+  assert.equal(h.rezervasyonlu[0].aksiyon.href, "/yeni-dosya?proforma=p-1&otomatik=1&booking=DEMOBK2&fcl=2");
+  assert.equal(h.rezervasyonlu[1].aksiyon.href, "/ihracatlar?siparis=DEMOCME230926&booking=DEMOBK1&fcl=2");
   assert.equal(h.onOdeme[1].aksiyon.href, "/dosya/f-1?tab=rezervasyon&action=new");
 });
 

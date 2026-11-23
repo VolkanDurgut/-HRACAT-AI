@@ -293,3 +293,52 @@ Migration `20261121070000_pazar_siparis_koordinasyon.sql`:
   birleşti; RICHMOND COM, EASTRBOURNE, ALI (HOUSSEIN) DEIL, (B.) CENTRE VILLE → KOUMANE (UNEXMIK), BLACK STALLION GENERAL TR.
   ek anahtar; 16 yeni müşteri + BACKALDRIN müşteri. Müşteri 28 → 43 (Aktif 18 · Siparişsiz 25). Yeni kartlarda yetkili /
   ülke / hacim yok (Excel dönemi; dosya yok) → günlük görev adayı değiller, e-posta eklenince olurlar.
+
+## 3.z Müşteri sipariş ritmi + yolda = aktif (23.11.2026) — migration 20261123100000 + 20261123101000 (CANLIDA, sürüm 20261122230214 / 20261122230716)
+
+Kullanıcı: "Müşterilerin açık sevkiyatları varsa yani henüz yolda yükleri varsa veya içeride kalan siparişi varsa aktif
+sipariş. Diğerlerinin tarihlerini güncel yükleme planından bulabilirsin. İlk önce kendi müşterilerimizin sipariş tarihlerini
+yani rezervasyon tarihlerinden yola çıkarak ne zaman mal istediklerine dair bir denklem edinmek. Daha sonrasında aktif
+siparişi olmayan müşterileri tespit edelim."
+
+- Veri `pazar_musteri_sevkiyatlari()` (salt okunur, yetki pazar): Yükleme Planı (`sevkiyat_plani`, ETD'li) + plana girmemiş
+  rezervasyonlar (aynı rezervasyon / booking tekrar sayılmaz); ETA ve dosya kapalı bilgisi rezervasyondan. Plan müşteri adı →
+  firma `pazar_anahtar_eslesir` (canlı: 49 addan 39'u tek firmaya, çoklu yok). `tedarik` = proformanın (revize R aynı) İLK
+  sevkiyatı − proforma tarihi, 0–120 gün; müşteri ortancası > 90 ise yok sayılır (genel). Canlı genel ortanca 29 gün.
+  İlk sürümde (20261123100000) her booking sayılıyordu → ESFIRA 225 / COOL LINK 95 gün; 20261123101000 düzeltti.
+  `eslesmeyen` = Pazar'da kartı olmayan plan müşterileri (canlı 10).
+- Hesap `lib/pazar/siparis-ritmi.ts` (test tests/pazar-siparis-ritmi.test.ts): ETD'leri 7 gün içindeki booking'ler tek dalga;
+  ritim = dalga aralıklarının ORTANCASI (≥ 3 dalga); beklenen sevkiyat = son dalga + ritim; beklenen sipariş = beklenen
+  sevkiyat − tedarik. Durum (yalnız siparişsizde gösterilir): fark = bugün − beklenen sipariş, tolerans = max(14, ritim/2):
+  gecikti (> tolerans; > max(60, 2×ritim) "uzun süredir") · zamanı geldi · yaklaşıyor (−14..0) · erken · veri az (< 3 dalga).
+- Aktif: `musteriDurumu` kuralları AYNEN + yolda (ETD geçmiş, ETA / limanın ölçülen transiti / 45 gün içinde varmamış; Kontrol
+  Merkezi sevkiyat haritasıyla aynı `sevkiyatDurumu`) ya da planda ileri tarihli booking. Siparişsiz liste ritim aciliyetine göre.
+- Ekran: Müşterilerimiz'de "Sipariş ritmi" sütunu (~N günde bir · ort. kont. · beklenen sipariş), siparişsizde durum rozeti,
+  aktifte "Yolda N kont. · varış ~" / "Planda N kont. · ETD", üstte ritim özeti ve kartı olmayan plan müşterileri şeridi;
+  firma kartında "Sipariş ritmi" bölümü (son 8 dalga).
+- DOKUNULMADI: `pazar_firma_aktif` (günlük görev / mail adayı) eski kuralla; hizalanması ayrı onayla (mail adayını değiştirir).
+
+### 3.z2 Siparişsiz müşteriler export ekibine (23.11.2026)
+Kullanıcı: "Mevcut pazar için siparişi olmayan müşterilerimizin export arkadaşımıza mail olarak iletilmesi gerekiyor" +
+"Her gün görev olarak belirleniyor, o sisteme öncelik olarak dahil edemiyor muyuz" + haftalık özet Harun Bey'e (export@).
+- **Ritim sunucuda** (`20261123110000_pazar_siparis_ritmi.sql`, CANLI): `pazar_siparis_ritmi(sirket, bugun)` = lib/pazar/siparis-ritmi.ts
+  musteriRitmi'nin SQL karşılığı (43/43 müşteride birebir doğrulandı). `pazar_musteri_sevkiyatlari_sirket` oturumsuz çekirdek;
+  `pazar_musteri_sevkiyatlari()` çıktısı değişmedi (md5 aynı).
+- **Görev önceliği** (`20261123111000_pazar_gorev_ritim_onceligi.sql`, ONAY BEKLİYOR — canlı maili etkiler): grup sırası
+  1 kendi müşterimizin hatırlatması, 2 siparişsiz müşteri (ritim: gecikti > zamanı geldi > yaklaşıyor > erken > veri az, en çok
+  geciken önce), 3 potansiyel hatırlatması, 4 yeni potansiyel; yolda / yüklemede malı olan siparişsiz sayılmaz. Kuru çalıştırma
+  23.11: önceki kuralda 12 görevin tamamı hatırlatmaydı (çoğu potansiyel); yeni kuralda siparişsiz müşteri araya giriyor.
+- **Haftalık rapor** (`20261123112000_siparissiz_musteri_raporu.sql` + edge `siparissiz-musteri-rapor`, CANLI, rapor TEST MODUNDA):
+  `pazar_siparissiz_ozet` (Pazar "Siparişsiz" ile aynı: 43 / 26 aktif / 17), rapor_alicilari 'siparissiz' (export@, CC bbt@ +
+  execution@, canli=false), cron pazartesi 06:00 UTC, gönderim kaydı `siparissiz_rapor_gonderimleri` (hafta başına tek).
+  Gruplar: hemen aranacak / sırası yaklaşan / ikinci sipariş fırsatı / kaydı doğrulanmalı; iletişimsiz müşteri ayrıca işaretli
+  (günlük göreve giremez). Excel ekli (başlık sabit, filtre). Test 23.11 04:21 mesensei'ye gitti. Ayarlar > Rapor Alıcıları'nda
+  Önizle / Test maili (api/rapor-edge izinli listesinde). Canlıya: Rapor Alıcıları'nda "Canlı" açılınca.
+- Edge karşılaştırması: canlıdaki `_shared/rapor-kabugu.ts` yalnız bir yorum satırında ("Özet"/"Ozet") farklı; kod aynı.
+- **Canlıya alış (23.11.2026 04:4x, kullanıcı: "Son olarak sistemi canlıya alalım")**: görev önceliği (20261123111000) ve
+  `20261123113000_siparissiz_canliya_alis.sql` CANLI. Doğruluk kontrolünde ilk test raporunda Ali Salah / Backaldrin / Danah
+  "sevkiyat kaydı yok" görünüyordu: Yükleme Planı'nda farklı yazım ("ALI SALAH", "SHARIKAT BACKALDRIN", "DANAH ENTERPRISES OFF
+  SHORE"; ayrıca "ATLANPASIFIC") karta bağlanmıyordu → ek anahtar eklendi; Ali Salah 5 sevkiyat, ritim 64 gün ("erken"). Siparişsiz
+  tespiti defter + dosya + proforma ile çapraz doğrulandı (17 müşterinin açık kaydı yok). Bağlanmayan plan adları: GMB- BOCUUM
+  (GMB Trading ile aynı mı doğrulanmadı), LEM INTERNATIONAL, AYANSH, SHARIKAT DARRAS, GOLDEN GLORY, JB (Pazar kartı yok).
+  rapor_alicilari 'siparissiz' canli=true: ilk gerçek mail pazartesi 23.11 09:00 Harun Bey'e (CC bbt@, execution@).

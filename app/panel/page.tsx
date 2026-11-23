@@ -7,8 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
-import { formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi } from "@/lib/cutoff-utils";
-import { CutoffSayac } from "@/components/cutoff-sayac";
+import { formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi, bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
 import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
 import { useToast } from "@/lib/toast-context";
@@ -16,18 +15,20 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, FileCheck2 } from "lucide-react";
-import { CutoffCubugu } from "@/components/panel/cutoff-cubugu";
-import { cutoffUyarilari, dosyaEslesir, EVRAK_KISA, PANEL_FILTRELERI, panelFiltrele, panelFiltresi, type PanelFiltre } from "@/lib/panel-gorunum";
+import { Trash2, ExternalLink, FolderX, FileText, FolderOpen, CheckCircle2, CircleDashed, ChevronDown, ChevronRight, FileCheck2, Search, CalendarDays } from "lucide-react";
+import { dosyaEslesir, EVRAK_KISA } from "@/lib/panel-gorunum";
 import { kantarDosyaYolu } from "@/lib/kantar-gorunum";
 import { adresiGuncelle } from "@/lib/url-durumu";
 import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { IsEmirleri } from "@/components/panel/is-emirleri";
-import { isEmirleriOku } from "@/lib/panel/veri";
+import { isEmirleriOku, odemeBekleyenleriOku, yuklemeGecmisiOku } from "@/lib/panel/veri";
+import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
+import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
+import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -128,6 +129,20 @@ function EvrakRozetleri({ dosya }: { dosya: DosyaWithRelations }) {
   );
 }
 
+/** Dar ekranda (Evraklar sutunu gizli) kisa evrak sayaci; tiklayinca dosyanin Evraklar sekmesi. */
+function EvrakSayaci({ dosya, className }: { dosya: DosyaWithRelations; className?: string }) {
+  const evraklar = evrakDurumlari(dosya);
+  const tamam = evraklar.filter((e) => e.tamam).length;
+  const hepsi = tamam === evraklar.length;
+  return (
+    <Link href={`/dosya/${dosya.id}?tab=evraklar`} title={evraklar.map((e) => `${e.ad}: ${e.tamam ? "tamam" : "eksik"}`).join(" · ")}
+      className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums hover:opacity-90 ${className || ""}`}
+      style={hepsi ? { backgroundColor: "rgba(16,185,129,0.15)", color: "#6EE7B7" } : { backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D" }}>
+      Evrak {tamam}/{evraklar.length}
+    </Link>
+  );
+}
+
 // 28.10.2026: eski Kontrol Merkezi kaldirildi; 4 ozet karti buraya tasindi
 // (components/panel-ozet-kartlari.tsx). Kontrol Merkezi gibi sayfa gorunurken
 // dakikada bir + sekmeye donulunce kendiliginden yenilenir.
@@ -145,13 +160,16 @@ function PanelContent() {
   // 16.11.2026: ?filtre= (eski ?filter= baglantilari da) + ?dosya= (satir vurgusu; Kontrol Merkezi / cut-off cubugu)
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilterDurumu] = useState<PanelFiltre>(() => panelFiltresi(searchParams.get("filtre"), searchParams.get("filter")));
-  const [vurgu, setVurgu] = useState<string | null>(() => searchParams.get("dosya"));
+  // 23.11.2026 TEK IS LISTESI: filtre = durum (Tumu / Acik sevkiyat / Cut-off / Rezervasyon bekliyor / Odeme bekliyor)
+  const [activeFilter, setActiveFilterDurumu] = useState<ListeFiltresi>(() => listeFiltresi(searchParams.get("filtre"), searchParams.get("filter")));
+  const [arama, setArama] = useState("");
+  // ?dosya= satir vurgusu (Kontrol Merkezi, Kantar, Siparis Listesi baglantilari). 23.11.2026: cut-off cubugu kalkti
+  const [vurgu] = useState<string | null>(() => searchParams.get("dosya"));
   const [acikDetay, setAcikDetay] = useState<Set<string>>(new Set());
   const vurguKaydirildi = useRef<string | null>(null);
   // Eski ?filter= her guncellemede silinir - ERP ortak kit (lib/url-durumu.ts)
   const adresGuncelle = useCallback((degis: Record<string, string | null>) => adresiGuncelle(degis, ["filter"]), []);
-  const setActiveFilter = useCallback((f: PanelFiltre) => {
+  const setActiveFilter = useCallback((f: ListeFiltresi) => {
     setActiveFilterDurumu(f);
     adresGuncelle({ filtre: f === "tumu" ? null : f });
   }, [adresGuncelle]);
@@ -161,9 +179,18 @@ function PanelContent() {
   // olarak. Mevcut is emrine hemen ulasabilelim, proforma aramayalim." -> dosyasi acilmamis is emirleri (ust serit).
   // Dosya tablosunu beklemez; okunamazsa serit gizli kalir.
   const [isEmirleri, setIsEmirleri] = useState<{ rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] } | null>(null);
+  // 23.11.2026: odeme bekleyen siparisler (gri satirlar; panel_odeme_bekleyenleri) - is emirleriyle paralel okunur
+  const [odemeler, setOdemeler] = useState<OdemeBekleyen[] | null>(null);
+  // 23.11.2026 gunluk yukleme hedefi: kapasite / is gunleri gecmis tartim gunlerinden (lib/panel/gunluk-yukleme.ts)
+  const [kapasite, setKapasite] = useState<Kapasite | null>(null);
+  const [yuklemeGunleri, setYuklemeGunleri] = useState<string[]>([]);
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
-    try { setIsEmirleri(await isEmirleriOku()); } catch { /* yetki / ag hatasi: serit gizli */ }
+    // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
+    const [ie, od, gc] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku(), yuklemeGecmisiOku(companyId)]);
+    if (ie.status === "fulfilled") setIsEmirleri(ie.value);
+    if (od.status === "fulfilled") setOdemeler(od.value);
+    if (gc.status === "fulfilled") { setKapasite(kapasiteHesapla(gc.value)); setYuklemeGunleri(gc.value); }
   }, [user?.id, companyId]);
   useEffect(() => {
     isEmirleriniGetir();
@@ -172,7 +199,6 @@ function PanelContent() {
     document.addEventListener("visibilitychange", yenile);
     return () => { window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
   }, [isEmirleriniGetir]);
-  const isEmriSayisi = isEmirleri ? isEmirleri.rezervasyonlu.length + isEmirleri.onOdeme.length : 0;
 
   const fetchDosyalar = useCallback(async () => {
     if (!user?.id || !companyId) return; // companyId kontrolü eklendi
@@ -265,8 +291,27 @@ function PanelContent() {
     setDeleteTarget(null);
   };
 
-  const filteredDosyalar = useMemo(() => panelFiltrele(dosyalar, activeFilter), [dosyalar, activeFilter]);
-  const uyarilar = useMemo(() => cutoffUyarilari(dosyalar), [dosyalar]);
+  // 23.11.2026 TEK IS LISTESI (lib/panel/is-listesi.ts): acik dosyalar + dosyasi acilmamis is emirleri + odeme bekleyenler;
+  // durum ve renk kayitlardan otomatik, siralama cut-off > acik > rezervasyon bekliyor > odeme bekliyor.
+  const ogeler = useMemo(() => isListesiKur(dosyalar, isEmirleri, odemeler), [dosyalar, isEmirleri, odemeler]);
+  const sayilar = useMemo(() => listeSayilari(ogeler), [ogeler]);
+  const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter, o.cutoffYakin)), arama), [ogeler, activeFilter, arama]);
+  const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
+  const simdi = Date.now();
+
+  // 23.11.2026 GUNLUK YUKLEME HEDEFI: acik dosyalar + dosyasi acilmamis booking'ler; bugun tartilanlar hedefe sayilir.
+  // Gecmis okunamazsa varsayilan (Pzt-Cmt, kapasite bilinmiyor) ile yine hesaplanir.
+  const bugunGunu = bugunTarihIstanbul();
+  const yuklemeIsleri = useMemo(() => [
+    ...dosyalar.map((d) => dosyaIsi(d, d.konteynerler.filter((k) => !!k.dba_dosya_url && efektifTartimBilgisi(k.dba_kontrol_sonucu, k.dba_yukleme_tarihi)?.gun === bugunGunu).length)),
+    ...(isEmirleri?.rezervasyonlu || []).map(bookingIsi),
+  ].filter((x): x is YuklemeIsi => x !== null), [dosyalar, isEmirleri, bugunGunu]);
+  const yuklemePlani = useMemo(
+    () => yuklemePlaniKur(yuklemeIsleri, kapasite || { gunSayisi: 0, ortalama: 0, p75: 0, max: 0, isGunleri: [] }, bugunGunu),
+    [yuklemeIsleri, kapasite, bugunGunu]);
+  // 23.11.2026 Ozet karti: bu hafta yuklenmesi gereken (hedef gunu bu hafta / gecmis) + bu hafta yuklenen
+  const haftalik = useMemo(() => haftalikYukleme(yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri), [yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri]);
+  const isEtiketi = useCallback((a: string) => yuklemeIsleri.find((x) => x.anahtar === a)?.etiket || a, [yuklemeIsleri]);
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
   const kantarYetkisi = !!yetkiler.sayfa_yetkileri.kantar;
 
@@ -282,16 +327,10 @@ function PanelContent() {
     }
     // Bir kez: kaydirildiktan sonra kullanici baska filtre secerse filtre geri cevrilmez
     if (vurguKaydirildi.current === vurguDosyasi.id) return;
-    if (!filteredDosyalar.some((d) => d.id === vurguDosyasi.id)) { setActiveFilter("tumu"); return; }
+    if (!gorunenler.some((o) => o.tur === "dosya" && o.dosya.id === vurguDosyasi.id)) { setActiveFilter("tumu"); setArama(""); return; }
     vurguKaydirildi.current = vurguDosyasi.id;
     window.setTimeout(() => document.getElementById(`dosya-satir-${vurguDosyasi.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [loading, vurgu, vurguDosyasi, filteredDosyalar, setActiveFilter, gecisliGit, showToast]);
-  const dosyayaGit = useCallback((dosyaId: string) => {
-    vurguKaydirildi.current = null;
-    setVurgu(dosyaId);
-    const d = dosyalar.find((x) => x.id === dosyaId);
-    adresGuncelle({ dosya: d ? (d.proforma_no ? d.proforma_no.split("/")[0].trim() : d.dosya_no) : dosyaId });
-  }, [dosyalar, adresGuncelle]);
+  }, [loading, vurgu, vurguDosyasi, gorunenler, setActiveFilter, gecisliGit, showToast]);
   const detayDegistir = (id: string) => setAcikDetay((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
 
   return (
@@ -299,7 +338,7 @@ function PanelContent() {
       <SayfaBasligi
         ikon={<FolderOpen size={20} />}
         baslik="Ana Panel"
-        aciklama={`${filteredDosyalar.length} açık dosya${isEmriSayisi ? ` · ${isEmriSayisi} dosyası açılmamış iş emri` : ""}`}
+        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor`}
         sag={<BildirimIzniButonu />}
       />
 
@@ -314,39 +353,50 @@ function PanelContent() {
         destructive
       />
 
-      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
+      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
 
-      {/* 16.11.2026: standart uyari cubugu (yoksa gizli) + filtre cubugu (adreste ?filtre=) */}
-      {!loading && <CutoffCubugu uyarilar={uyarilar} onDosya={dosyayaGit} />}
-      {isEmirleri && <IsEmirleri rezervasyonlu={isEmirleri.rezervasyonlu} onOdeme={isEmirleri.onOdeme} yetkili={!!yetkiler.sayfa_yetkileri.proformalar} />}
+      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} />}
+
+      {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
+          (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
       {!loading && (
-        <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
-          ogeler={PANEL_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: panelFiltrele(dosyalar, f.key).length }))} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
+            ogeler={LISTE_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: sayilar[f.key] }))} />
+          <label className="relative mb-4 w-full sm:w-72">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+            <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Müşteri, proforma, booking ara" aria-label="Listede ara" data-testid="panel-arama"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          </label>
+        </div>
       )}
 
       {loading ? (
         <SayfaYukleniyor boyut={24} />
-      ) : filteredDosyalar.length === 0 ? (
-        <EmptyState icon={<FolderX size={48} />} title="Dosya bulunamadı" description="Filtre kriterlerinizi değiştirin veya yeni dosya açın" />
+      ) : gorunenler.length === 0 ? (
+        <EmptyState icon={<FolderX size={48} />} title="Bu görünümde iş yok" description={arama ? "Aramayı temizleyin ya da başka bir filtre seçin." : "Başka bir filtre seçin ya da yeni dosya açın."} />
       ) : (
         <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
+          {/* 23.11.2026 her ekrana uyum: 6 sutun; 1400 px alti Evraklar gizli (kisa sayac), 1280 px alti kart (components/panel/is-listesi-satirlari.tsx) */}
+          <table className={LISTE_TABLO}>
+            <thead className={LISTE_BASLIK}>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Kalkış</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Talimat C/O</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Beyanname C/O</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Proforma · müşteri · booking / gemi kalkış">Sipariş</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off: tarih, saat ve kalan süre">Cut-off</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1500px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
+                <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
               </tr>
             </thead>
-            <tbody>
-              {filteredDosyalar.map((dosya, idx) => {
+            <tbody className={LISTE_GOVDE}>
+              {gorunenler.map((oge, idx) => {
+                if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} gorev={yuklemePlani.ozetler[oge.anahtar] || null} />;
+                if (oge.tur === "odeme") return <OdemeListeSatiri key={oge.anahtar} p={oge.odeme} simdi={simdi} listeYetkisi={listeYetkisi} />;
+                const dosya = oge.dosya;
+                const gorev = yuklemePlani.ozetler[`dosya:${dosya.id}`] || null;
                 const staggerClass = `animate-fade-up stagger-${Math.min(idx + 1, 8)}`;
                 const latestRez = dosya.rezervasyonlar[0] || null;
                 const hasRez = !!latestRez;
@@ -373,30 +423,39 @@ function PanelContent() {
                   <React.Fragment key={dosya.id}>
                     {/* Ana satır (16.11.2026: tek satir; adimlar / mal cinsi / tam evrak rozetleri ▾ detay satirinda) */}
                     <tr id={`dosya-satir-${dosya.id}`} data-vurgu={vurgulu ? "evet" : undefined}
-                      className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
-                      style={{ borderColor: CARD_BORDER, ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
-                      <td className="px-3 py-3 align-top">
-                        <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }} />
-                      </td>
-                      <td className="px-3 py-3 align-top max-w-[220px]">
+                      className={`${LISTE_SATIR} ${staggerClass}`}
+                      style={{ borderColor: CARD_BORDER, ...durumKenari(oge.durum), ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
+                      {/* 23.11.2026: yuklemesi suren dosya sari; altinda dolu / rezervasyon ve (varsa) cut-off uyarisi */}
+                      <DurumHucresi durum={oge.durum} alt={oge.durum === "basladi" ? (
+                        <>{dosya.dosya_no}<br />{oge.yukleme.dolu}/{oge.yukleme.toplam} dolu · {oge.yukleme.kalan} kaldı
+                          {oge.cutoffYakin ? <><br /><span style={{ color: "#FCA5A5" }}>Cut-off yakın</span></> : null}</>
+                      ) : dosya.dosya_no} />
+                      <td className={`${HUCRE_TAM} xl:max-w-[240px]`}>
+                        <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="block text-xs font-semibold truncate" style={{ color: ACCENT }} />
                         {pazarYetkisi && dosya.alici_firma ? (
                           <Link href={`/pazar?musteri=${encodeURIComponent(dosya.alici_firma)}`} title="Pazar'da müşteri kartını aç" className="block text-xs font-medium text-white truncate hover:underline decoration-white/40" data-musteri-link>
                             {dosya.alici_firma}
                           </Link>
                         ) : (
-                          <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>
+                          <p className="text-xs font-medium text-white truncate" title={dosya.alici_firma || undefined}>{dosya.alici_firma || "—"}</p>
                         )}
                         <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{dosya.varis_limani || ""}</p>
+                        {hasRez && (
+                          <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: TEXT_MUTED }} title={[latestRez!.booking_no, latestRez!.gemi_adi].filter(Boolean).join(" · ")}>
+                            {latestRez!.booking_no || "—"} · ETD {latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}
+                          </p>
+                        )}
                       </td>
                       {!hasRez ? (
-                        <td className="px-3 py-3 align-top" colSpan={5}>
-                          <span className="text-xs font-medium text-amber-500 animate-pulse whitespace-nowrap">Henüz rezervasyon alınmadı</span>
+                        <td className={HUCRE_GENIS} colSpan={2}>
+                          {/* 23.11.2026: rezervasyonsuz dosya = "Rezervasyon bekliyor" (mavi); dogrudan rezervasyon ekranina */}
+                          <Link href={`/dosya/${dosya.id}?tab=rezervasyon&action=new`} className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline" style={{ color: "#93C5FD" }} data-rezervasyon-ekle>
+                            <CalendarDays size={12} /> Henüz rezervasyon alınmadı · Rezervasyon ekle
+                          </Link>
                         </td>
                       ) : (
                         <>
-                          <td className="px-3 py-3 align-top"><span className="text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.booking_no}</span></td>
-                          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span></td>
-                          <td className="px-3 py-3 align-top">
+                          <td className={HUCRE}>
                             {konteynerAdedi > 0 ? (
                               <div>
                                 <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{eklenenKont}/{konteynerAdedi} <span className="text-[10px]" style={{ color: "#4A5262" }}>alınan</span></p>
@@ -406,34 +465,28 @@ function PanelContent() {
                                 {eklenenKont > 0 && (
                                   <p className="text-[10px] whitespace-nowrap" style={{ color: dbaTamamlanan >= eklenenKont ? "#4ADE80" : TEXT_MUTED }}>{dbaTamamlanan}/{eklenenKont} dolu</p>
                                 )}
+                                {gorev && <GunlukGorev {...gorev} />}
                               </div>
                             ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
+                            <EvrakSayaci dosya={dosya} className={EVRAK_SAYAC_DAR} />
                           </td>
-                          <td className="px-3 py-3 align-top">
-                            {latestRez!.talimat_cutoff ? (
-                              <CutoffSayac
-                                deger={latestRez!.talimat_cutoff}
-                                tamamEtiketi={dosya.konsimento_dosya_url ? "Talimat gönderildi" : talimatCutoffTamamMi(dosya) ? "Draft BL alındı" : null}
+                          <td className={HUCRE}>
+                            <div className="flex flex-col gap-1">
+                              <CutoffSatiri etiket="Talimat" deger={latestRez!.talimat_cutoff}
+                                tamamEtiketi={dosya.konsimento_dosya_url ? "Gönderildi" : talimatCutoffTamamMi(dosya) ? "Draft BL" : null}
                                 tamamHref={dosya.konsimento_dosya_url || dosya.draft_bl_dosya_url}
-                                tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"}
-                              />
-                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                          </td>
-                          <td className="px-3 py-3 align-top">
-                            {latestRez!.beyanname_cutoff ? (
-                              <CutoffSayac
-                                deger={latestRez!.beyanname_cutoff}
-                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Beyanname gönderildi" : null}
+                                tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"} />
+                              <CutoffSatiri etiket="Beyan" deger={latestRez!.beyanname_cutoff}
+                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Gönderildi" : null}
                                 tamamHref={dosya.beyanname_dosya_url}
-                                tamamAciklama="Beyanname gönderildi - belgeyi aç"
-                              />
-                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
+                                tamamAciklama="Beyanname gönderildi - belgeyi aç" />
+                            </div>
                           </td>
                         </>
                       )}
-                      <td className="px-3 py-3 align-top"><EvrakRozetleri dosya={dosya} /></td>
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className={HUCRE_EVRAK}><EvrakRozetleri dosya={dosya} /></td>
+                      <td className={HUCRE_ISLEM}>
+                        <div className="flex items-center justify-end max-xl:justify-start gap-1">
                           <button type="button" onClick={() => detayDegistir(dosya.id)} aria-expanded={detayAcik} title={detayAcik ? "Ayrıntıyı gizle" : "Ayrıntı: adımlar, evraklar, mal cinsi"}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} data-detay-ac>
                             {detayAcik ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -459,10 +512,11 @@ function PanelContent() {
                           </button>
                           <button
                             onClick={() => gecisliGit(`/dosya/${dosya.id}`)}
+                            title="Dosya detayı"
                             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                             style={{ backgroundColor: ACCENT }}
                           >
-                            <ExternalLink size={12} /> Detay
+                            <ExternalLink size={12} /> <span className="hidden 2xl:inline">Detay</span>
                           </button>
                           {yetkiler.sayfa_yetkileri.yeni_dosya && (
                             <button
@@ -478,8 +532,8 @@ function PanelContent() {
                     </tr>
 
                     {/* Detay satiri (▾): tam evrak rozetleri + adimlar + mal cinsi / gemi */}
-                    {detayAcik && <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-detay-satiri>
-                      <td colSpan={9} className="px-4 py-2.5">
+                    {detayAcik && <tr className="border-b max-xl:block" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-detay-satiri>
+                      <td colSpan={LISTE_SUTUN_SAYISI} className="px-4 py-2.5 max-xl:block">
                         <EvrakDurumu dosya={dosya} />
                         <div className="flex items-center gap-1.5 flex-wrap mt-2">
                           {akisAdimlari.map((adim) => {

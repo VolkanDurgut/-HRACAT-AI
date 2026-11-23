@@ -18,10 +18,13 @@ import { OzetKarti } from "@/components/erp/ozet-karti";
 import { hacimMetni, pazarSekmesi, potansiyelFiltrele, VARSAYILAN_SEKME, type PazarSekme } from "@/lib/pazar/gorunum";
 import { useAuth } from "@/lib/auth-context";
 import {
-  pazarAnahtarlari, pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
+  pazarAnahtarlari, pazarMusteriSevkiyatlari, pazarMusteriSiparisleri, pazarTakipOku, pazarVerisiOku, ulkeGosterim,
   type MusteriSiparisVerisi, type PazarFirma, type PazarKatilim, type PazarKisi, type PazarVerisi, type TakipVerisi,
 } from "@/lib/pazar/veri";
 import { LISTE_DURUM_ETIKETI, musteriDurumu, type MusteriDurumu } from "@/lib/pazar/musteri";
+import { musteriRitmi, ritimSiralamasi, transitHaritasi, type MusteriRitmi, type SevkiyatVerisi } from "@/lib/pazar/siparis-ritmi";
+import { EslesmeyenSerit, RitimHucresi, RitimRozeti, YoldaSatirlari } from "@/components/pazar/siparis-ritmi";
+import { bugunTarihIstanbul } from "@/lib/cutoff-utils";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 
 /**
@@ -107,20 +110,24 @@ function PazarIcerik() {
   const [asama, setAsama] = useState<string | null>(null);
   // Adresten ilk sekme (?sekme=ulkeler); degisince adres guncellenir (gecmis kirletilmez) - ERP ortak kit (useUrlSekmesi)
   const [takip, setTakip] = useState<TakipVerisi | null>(null);
+  // 23.11.2026 siparis ritmi (Yukleme Plani sevkiyat gecmisi); okunamazsa sayfa eskisi gibi calisir
+  const [sevkVeri, setSevkVeri] = useState<SevkiyatVerisi | null>(null);
   const [takipHata, setTakipHata] = useState<string | null>(null);
 
   const yukle = useCallback(async () => {
     setYukleniyor(true);
     setHata(null);
     try {
-      const [v, s, t] = await Promise.all([
+      const [v, s, t, sv] = await Promise.all([
         pazarVerisiOku(), pazarMusteriSiparisleri(),
         // Takip okunamazsa sayfanin geri kalani calismaya devam eder
         pazarTakipOku().then((x) => { setTakipHata(null); return x; }).catch((e: unknown) => { setTakipHata(e instanceof Error ? e.message : "Takip okunamadı."); return null; }),
+        pazarMusteriSevkiyatlari().catch(() => null),
       ]);
       setVeri(v);
       setSiparis(s);
       setTakip(t);
+      setSevkVeri(sv);
     } catch (e) {
       setHata(e instanceof Error ? e.message : "Veri okunamadı.");
     } finally {
@@ -144,13 +151,27 @@ function PazarIcerik() {
   }, [veri]);
 
   const firmalar = useMemo(() => veri?.firmalar || [], [veri]);
+  // 23.11.2026 SIPARIS RITMI (lib/pazar/siparis-ritmi.ts): Yukleme Plani'ndan dalga / ortanca aralik / beklenen siparis
+  const ritimler = useMemo(() => {
+    const m = new Map<string, MusteriRitmi>();
+    if (!sevkVeri) return m;
+    const bugun = bugunTarihIstanbul();
+    const transit = transitHaritasi(sevkVeri.sevkiyatlar);
+    for (const f of firmalar) if (f.durum === "musteri") m.set(f.id, musteriRitmi(f.id, sevkVeri, bugun, transit));
+    return m;
+  }, [firmalar, sevkVeri]);
   const durumlar = useMemo(() => {
     const m = new Map<string, MusteriDurumu>();
     if (!siparis) return m;
     const bugun = new Date();
-    for (const f of firmalar) if (f.durum === "musteri") m.set(f.id, musteriDurumu(f, siparis, bugun));
+    for (const f of firmalar) if (f.durum === "musteri") {
+      const d = musteriDurumu(f, siparis, bugun);
+      // Kullanici (23.11.2026): "Henuz yolda yukleri varsa ... aktif siparis" -> yolda ya da planda ileri tarihli booking de aktif
+      const r = ritimler.get(f.id);
+      m.set(f.id, r && (r.yolda.length > 0 || r.yuklemede.length > 0) ? { ...d, aktif: true } : d);
+    }
     return m;
-  }, [firmalar, siparis]);
+  }, [firmalar, siparis, ritimler]);
 
   const musteriler = useMemo(() => firmalar.filter((f) => f.durum === "musteri"), [firmalar]);
   const potansiyeller = useMemo(() => firmalar.filter((f) => f.durum === "potansiyel"), [firmalar]);
@@ -165,12 +186,22 @@ function PazarIcerik() {
       })
       .sort((a, b) => {
         const da = durumlar.get(a.id), db = durumlar.get(b.id);
-        // Siparissiz: en uzun suredir siparissiz once (gunluk mailde ilk aday)
-        if (!da?.aktif && !db?.aktif) return (db?.siparissizGun ?? -1) - (da?.siparissizGun ?? -1) || a.ad.localeCompare(b.ad, "tr");
+        // Siparissiz: 23.11.2026 siparis ritmine gore (gecikti > zamani geldi > yaklasiyor > erken > veri az), sonra en uzun suredir siparissiz
+        if (!da?.aktif && !db?.aktif) return ritimSiralamasi(ritimler.get(a.id), ritimler.get(b.id)) || (db?.siparissizGun ?? -1) - (da?.siparissizGun ?? -1) || a.ad.localeCompare(b.ad, "tr");
         if (!!da?.aktif !== !!db?.aktif) return da?.aktif ? 1 : -1;
         return a.ad.localeCompare(b.ad, "tr");
       });
-  }, [musteriler, durumlar, musteriFiltre]);
+  }, [musteriler, durumlar, musteriFiltre, ritimler]);
+  // Siparissiz musterilerin ritim dagilimi (liste ustu ozet)
+  const ritimOzeti = useMemo(() => {
+    const say = { gecikti: 0, zamani_geldi: 0, yaklasiyor: 0 };
+    for (const f of musteriler) {
+      if (durumlar.get(f.id)?.aktif) continue;
+      const r = ritimler.get(f.id);
+      if (r && (r.durum === "gecikti" || r.durum === "zamani_geldi" || r.durum === "yaklasiyor")) say[r.durum] += 1;
+    }
+    return say;
+  }, [musteriler, durumlar, ritimler]);
 
   const ulkeler = useMemo(() => {
     const m = new Map<string, number>();
@@ -321,6 +352,16 @@ function PazarIcerik() {
                 ))}
               </div>
             </div>
+            {/* 23.11.2026 siparis ritmi ozeti (siparissiz musteriler) + karti olmayan plan musterileri */}
+            {sevkVeri && musteriFiltre !== "aktif" && (ritimOzeti.gecikti + ritimOzeti.zamani_geldi + ritimOzeti.yaklasiyor) > 0 && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-b text-xs" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="ritim-ozeti">
+                <span>Siparişsiz müşterilerde sipariş ritmi:</span>
+                <span style={{ color: "#FCA5A5" }}><b>{ritimOzeti.gecikti}</b> gecikti</span>
+                <span style={{ color: "#FCD34D" }}><b>{ritimOzeti.zamani_geldi}</b> sipariş zamanı geldi</span>
+                <span style={{ color: "#93C5FD" }}><b>{ritimOzeti.yaklasiyor}</b> yaklaşıyor</span>
+              </div>
+            )}
+            {sevkVeri && <EslesmeyenSerit e={sevkVeri.eslesmeyen} />}
             {musteriListesi.length === 0 ? (
               <div className="p-4"><EmptyState icon={<Building2 size={32} />} title="Bu grupta müşteri yok" description="Diğer sekmeye bakın." /></div>
             ) : (
@@ -332,6 +373,7 @@ function PazarIcerik() {
                       <th className="text-left font-medium px-3 py-2 hidden sm:table-cell">Ülke</th>
                       <th className="text-left font-medium px-3 py-2">Sipariş</th>
                       <th className="text-left font-medium px-3 py-2 whitespace-nowrap">Son sipariş</th>
+                      <th className="text-left font-medium px-3 py-2 whitespace-nowrap" title="Yükleme planındaki sevkiyat dalgalarının ortanca aralığı; beklenen sipariş = beklenen sevkiyat − sipariş→sevkiyat süresi">Sipariş ritmi</th>
                       <th className="text-right font-medium px-3 py-2 whitespace-nowrap">Toplam hacim</th>
                       <th className="text-left font-medium px-3 py-2 hidden md:table-cell">Yetkili</th>
                     </tr>
@@ -354,6 +396,7 @@ function PazarIcerik() {
                               <div className="space-y-0.5" style={{ color: "#C9D1DC" }}>
                                 {d.acikDosyalar.map((x) => <p key={x.id}><span className="text-white">{x.dosya_no}</span> · {x.yuklenen}/{x.rezKonteyner} konteyner yüklendi</p>)}
                                 {d.acikSiparisler.map((x) => <p key={x.id}><span className="text-white">{x.proforma_no}</span> · kalan {x.kalanFcl.toLocaleString("tr-TR")} FCL</p>)}
+                                <YoldaSatirlari r={ritimler.get(f.id)} />
                                 {d.listeSiparisleri.map((x, i) => (
                                   <p key={`l${i}`} data-liste-siparis={x.durum}>
                                     <span className="text-white">{x.proforma_no}</span>{x.konteyner ? ` · ${x.konteyner} kont.` : x.miktarMt ? ` · ${x.miktarMt.toLocaleString("tr-TR")} MT` : ""} · <span style={{ color: x.durum === "onay_bekliyor" ? "#FCD34D" : "#6EE7B7" }}>{LISTE_DURUM_ETIKETI[x.durum]}</span>
@@ -361,12 +404,16 @@ function PazarIcerik() {
                                 ))}
                               </div>
                             ) : (
-                              <p style={{ color: "#FCD34D" }}>
-                                {d?.sonSiparis ? <>Açık sipariş yok · <b>{d.siparissizGun} gündür</b></> : "Sipariş kaydı yok"}
-                              </p>
+                              <div className="space-y-1">
+                                <p style={{ color: "#FCD34D" }}>
+                                  {d?.sonSiparis ? <>Açık sipariş yok · <b>{d.siparissizGun} gündür</b></> : "Sipariş kaydı yok"}
+                                </p>
+                                {ritimler.get(f.id) && <RitimRozeti r={ritimler.get(f.id)!} />}
+                              </div>
                             )}
                           </td>
                           <td className="px-3 py-2 text-xs whitespace-nowrap" style={{ color: "#C9D1DC" }} data-son-siparis>{d?.sonSiparis ? tarihTR(d.sonSiparis) : "—"}</td>
+                          <td className="px-3 py-2 text-xs min-w-[190px]" data-ritim-hucre>{sevkVeri ? <RitimHucresi r={ritimler.get(f.id)} /> : <span style={{ color: TEXT_MUTED }}>—</span>}</td>
                           <td className="px-3 py-2 text-xs text-right whitespace-nowrap tabular-nums" data-toplam-hacim title={d ? `${d.toplamDosya} dosya · ${d.toplamKonteyner} konteyner` : undefined}>
                             <span className="text-white font-medium">{d ? hacimMetni(d.hacim) : "—"}</span>
                             {d && d.toplamDosya > 0 && <p className="text-[10.5px]" style={{ color: TEXT_MUTED }}>{d.toplamDosya} dosya · {d.toplamKonteyner} kont.</p>}
@@ -491,6 +538,7 @@ function PazarIcerik() {
               katilimlar={katilimHarita.get(acik.id) || []}
               temaslar={(veri.temaslar || []).filter((t) => t.firma_id === acik.id).sort((a, b) => b.olusturma.localeCompare(a.olusturma))}
               durum={durumlar.get(acik.id) || null}
+              ritim={ritimler.get(acik.id)}
               tumFirmalar={firmalar}
               ulkeler={tumUlkeler}
               onKapat={() => setAcikFirma(null)}

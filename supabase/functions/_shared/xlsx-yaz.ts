@@ -44,6 +44,14 @@ export type XlsxSayfa = {
   birlestir?: string[];
   /** Dondurulan ilk serbest hucre ("D4" -> A:C sutunlari ve 1-3 satirlari sabit) */
   dondur?: string;
+  /**
+   * 23.11.2026 (kullanici: "Excel tablo halinde; ilk kaldigi yer karsilamali; basliklar gorunmeli"):
+   * filtre: Excel filtre dugmeleri ("A1:P200"); baslangic: dosya acildiginda gorunen / secili ilk hucre ("A152");
+   * yazdirBaslik: her basili sayfada tekrarlanan satirlar ("1:1").
+   */
+  filtre?: string;
+  baslangic?: string;
+  yazdirBaslik?: string;
 };
 
 /** XML 1.0'da gecersiz kontrol karakterlerini atar (TAB, LF, CR kalir). */
@@ -95,12 +103,21 @@ export function sayfaXml(s: XlsxSayfa): string {
   const dm = s.dondur ? s.dondur.match(/^([A-Z]+)(\d+)$/) : null;
   const xSplit = dm ? dm[1].split("").reduce((t, h) => t * 26 + h.charCodeAt(0) - 64, 0) - 1 : 0;
   const ySplit = dm ? Number(dm[2]) - 1 : 0;
+  // Acilis yeri: dondurulmus bolmede alt bolmenin ilk gorunen hucresi; donmamis sayfada sayfanin sol ust hucresi
+  const bm = s.baslangic ? s.baslangic.match(/^([A-Z]+)(\d+)$/) : null;
+  const basSatir = bm ? Math.max(Number(bm[2]), ySplit + 1) : 0;
+  const ustSol = dm ? `${dm[1]}${bm ? basSatir : dm[2]}` : null;
+  const aktifBolme = xSplit && ySplit ? "bottomRight" : xSplit ? "topRight" : "bottomLeft";
+  const secim = bm ? `<selection${dm && (xSplit > 0 || ySplit > 0) ? ` pane="${aktifBolme}"` : ""} activeCell="${bm[1]}${basSatir}" sqref="${bm[1]}${basSatir}"/>` : "";
   const pane = dm && (xSplit > 0 || ySplit > 0)
-    ? `<pane${xSplit ? ` xSplit="${xSplit}"` : ""}${ySplit ? ` ySplit="${ySplit}"` : ""} topLeftCell="${s.dondur}" activePane="${xSplit && ySplit ? "bottomRight" : xSplit ? "topRight" : "bottomLeft"}" state="frozen"/>`
+    ? `<pane${xSplit ? ` xSplit="${xSplit}"` : ""}${ySplit ? ` ySplit="${ySplit}"` : ""} topLeftCell="${ustSol}" activePane="${aktifBolme}" state="frozen"/>`
     : "";
+  const gorunum = `${pane}${secim}`;
+  const viewUst = !pane && bm ? ` topLeftCell="${bm[1]}${basSatir}"` : "";
+  const filtre = s.filtre && /^[A-Z]+\d+:[A-Z]+\d+$/.test(s.filtre) ? `<autoFilter ref="${s.filtre}"/>` : "";
   const merge = s.birlestir?.length ? `<mergeCells count="${s.birlestir.length}">${s.birlestir.map((m) => `<mergeCell ref="${m}"/>`).join("")}</mergeCells>` : "";
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0" zoomScale="90" zoomScaleNormal="90"${pane ? `>${pane}</sheetView>` : "/>"}</sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${rows}</sheetData>${merge}<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0" zoomScale="90" zoomScaleNormal="90"${viewUst}${gorunum ? `>${gorunum}</sheetView>` : "/>"}</sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${rows}</sheetData>${filtre}${merge}<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 
 export const STIL_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -144,6 +161,19 @@ export const STIL_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </styleSheet>`;
 
 
+/** Filtre ve yazdirma basligi icin Excel'in gizli tanimli adlari (filtre dugmeleri ve basliklarin her sayfada basilmasi). */
+function tanimliAdlar(sayfalar: XlsxSayfa[], adlar: string[]): string {
+  const mutlak = (ref: string) => ref.split(":").map((x) => x.replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2")).join(":");
+  const tirnak = (ad: string) => `'${ad.replace(/'/g, "''")}'`;
+  const liste: string[] = [];
+  sayfalar.forEach((s, i) => {
+    if (s.filtre && /^[A-Z]+\d+:[A-Z]+\d+$/.test(s.filtre)) liste.push(`<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${kacis(`${tirnak(adlar[i])}!${mutlak(s.filtre)}`)}</definedName>`);
+    const yb = s.yazdirBaslik?.match(/^(\d+):(\d+)$/);
+    if (yb) liste.push(`<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${kacis(`${tirnak(adlar[i])}!$${yb[1]}:$${yb[2]}`)}</definedName>`);
+  });
+  return liste.length ? `<definedNames>${liste.join("")}</definedNames>` : "";
+}
+
 /** .xlsx paketinin dosyalari (yol + icerik). Paketleme (zip) cagirana kalir: web'de jszip, edge'de npm:jszip. */
 export function xlsxParcalari(sayfalar: XlsxSayfa[]): { yol: string; icerik: string }[] {
   const adlar = sayfalar.map((s) => sayfaAdi(s.ad));
@@ -154,7 +184,7 @@ export function xlsxParcalari(sayfalar: XlsxSayfa[]): { yol: string; icerik: str
   file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`);
   file("xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${adlar.map((a, i) => `<sheet name="${kacis(a)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`);
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${adlar.map((a, i) => `<sheet name="${kacis(a)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets>${tanimliAdlar(sayfalar, adlar)}</workbook>`);
   file("xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${adlar.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${adlar.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`);
   file("xl/styles.xml", STIL_XML);

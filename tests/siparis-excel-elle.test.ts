@@ -67,3 +67,29 @@ test("sistem esas: defterde olmayan sistem proforması Excel kopyası olarak ekl
   assert.deepEqual(o.yeni.map((x) => x.proforma_no), ["DEMOYENI201126"]);
   assert.equal(o.gonderilecek.length, 1);
 });
+
+// ---------------------------------------------------------------- 23.11.2026: tablo gorunumu (sabit baslik, filtre, kaldigi yer)
+test("siparis excel: baslik sabit + filtre + basili baslik; acilis ilk sevk edilmemis satirda; plan bu haftanin blogunda", async () => {
+  const { xlsxParcalari } = await import("@/supabase/functions/_shared/xlsx-yaz");
+  const { siparisSayfasi, planSayfasi } = await import("@/supabase/functions/_shared/siparis-xlsx");
+  const { siparisNormalize, planNormalize } = await import("@/supabase/functions/_shared/siparis-liste");
+  const s = (i: number, durum: string) => siparisNormalize({ anahtar: `x${i}`, kaynak: "excel", proforma_no: `DEMO${String(i).padStart(6, "0")}`, firma: `MUSTERI ${i}`, konteyner: 2, durum, on_odeme: durum !== "onay_bekliyor" });
+  const sayfa = siparisSayfasi([s(1, "sevk_edildi"), s(2, "sevk_edildi"), s(3, "rezervasyonlu"), s(4, "on_odeme_alindi")]);
+  assert.equal(sayfa.dondur, "A2");
+  assert.equal(sayfa.baslangic, "A4", "baslik + 2 sevk edilen -> ilk rezervasyonlu satir 4");
+  assert.equal(sayfa.yazdirBaslik, "1:1");
+  assert.match(sayfa.filtre || "", /^A1:P\d+$/);
+  const hepsiSevk = siparisSayfasi([s(1, "sevk_edildi"), s(2, "on_odeme_alindi")]);
+  assert.equal(hepsiSevk.baslangic, "A4", "sevk edilmemis rezervasyon yoksa ilk ara bolum basligi");
+  const p = (i: number, etd: string | null, kaynak = "plan") => planNormalize({ anahtar: `p${i}`, kaynak, musteri: `M${i}`, konteyner: 2, etd, booking_no: kaynak === "plan" ? `B${i}` : null });
+  const plan = planSayfasi([p(1, "2026-11-05"), p(2, "2026-11-25"), p(3, null, "siparis")], "Yükleme Planı", "2026-11-23");
+  assert.equal(plan.satirlar[(Number(plan.baslangic?.slice(1)) || 1) - 1]?.[0]?.v, "48.HAFTA (22 KASIM - 28 KASIM)");
+  const xml = xlsxParcalari([sayfa, plan]);
+  const s1 = xml.find((x) => x.yol === "xl/worksheets/sheet1.xml")!.icerik;
+  assert.match(s1, /<pane ySplit="1" topLeftCell="A4" activePane="bottomLeft" state="frozen"\/><selection pane="bottomLeft" activeCell="A4" sqref="A4"\/>/);
+  assert.match(s1, /<\/sheetData><autoFilter ref="A1:P\d+"\/><mergeCells/);
+  const wb = xml.find((x) => x.yol === "xl/workbook.xml")!.icerik;
+  assert.match(wb, /<definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'Sipariş Listesi'!\$A\$1:\$P\$\d+<\/definedName>/);
+  assert.match(wb, /<definedName name="_xlnm.Print_Titles" localSheetId="0">'Sipariş Listesi'!\$1:\$1<\/definedName>/);
+  assert.match(xml.find((x) => x.yol === "xl/worksheets/sheet2.xml")!.icerik, /topLeftCell="A\d+"><selection activeCell=/);
+});

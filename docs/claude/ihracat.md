@@ -1401,3 +1401,129 @@ emrine hemen ulaşalım, proforma aramayalım."
   Proforma yükle; düğmeler `proformalar` yetkisiyle. Saf: `lib/panel/is-emirleri.ts`; veri: `lib/panel/veri.ts`.
 - Ana Panel dosya tablosunu beklemez; iş emirleri 5 dakikada bir ve sekmeye dönüldüğünde yenilenir; okunamazsa şerit gizli.
 - Test: `tests/panel-is-emirleri.test.ts`.
+
+## Booking'e göre sipariş takibi (22.11.2026) — DB değişikliği yok
+
+Kullanıcı: "Ana panelde dosya aç dediğimde o rezervasyona ait konteyner sayısından sipariş takibini otomatikleştiremez miyiz?"
+
+- Ana Panel rezervasyonlu iş emri: "Dosya aç" / "Sevkiyat aç" adresine `&booking=<no>&fcl=<konteyner>` eklenir
+  (`lib/panel/is-emirleri.ts` bookingliAksiyon). Ön ödeme satırı ve "Rezervasyon ekle" / "Proforma yükle" aynen.
+- Karar `lib/siparis-devam.ts` bookingKarari(hedefMts, bookingFcl). Hedef: yeni siparişte "Toplam Taahhüt"
+  (varsayılan proforma miktarı), devam eden siparişte dosyası açılmamış miktar.
+  - |booking − hedef| ≤ 0,5 FCL → tek (yeni: tek seferlik dosya; devam: siparişin kalanı). Kusurat (10,1 FCL) ayrı sevkiyat sayılmaz.
+  - booking < hedef → sipariş takibi; bu dosya booking FCL'i × 25 MTS.
+  - booking > hedef → otomatik karar YOK, uyarı; seçim kullanıcıda. Miktar okunamazsa da öneri yok.
+- Proforma Yükle (`?booking=&fcl=`): "Booking'e göre öneri" kartı + tek "Onayla" düğmesi; eski seçenekler altta durur.
+- Sevkiyat Seçimi penceresi `booking` alırsa FCL'i açık kalemlere SIRAYLA dağıtarak açılır (bookingSecimleri); seçim
+  toplamı booking'den farklıysa uyarı (engel değil). İhracatlar `?siparis=&booking=&fcl=` aynı.
+- Test: tests/booking-siparis-takibi.test.ts (kurgusal veri).
+
+## Test ortamı (22.11.2026)
+
+Kullanıcı: "Mevcut durum kayıtlı kalsın, farklı bir test alanında devam edelim; test ortamında deneyip duruma göre canlıya alalım."
+
+- Test alanı = Netlify dal / PR önizlemesi. `next.config.js`: CONTEXT `deploy-preview` | `branch-deploy` → `NEXT_PUBLIC_ORTAM=test`;
+  production ve CONTEXT'siz derleme `canli` (`lib/ortam.ts`, yalnız tam "test" test sayılır).
+- Önizleme CANLI veritabanına bağlıdır (ayrı DB yok). Bu yüzden test ortamında:
+  - her sayfada "Test ortamı" şeridi (`components/test-ortami-seridi.tsx`),
+  - Proforma Yükle (tek / yeni sipariş / devam) ve İhracatlar "Sevkiyat aç" PROVA modunda: `ihracat_dosyalari` /
+    `ana_siparisler` YAZILMAZ, oluşacak kayıt `components/prova-penceresi.tsx` ile gösterilir (`lib/prova.ts`).
+  - Diğer sayfalardaki işlemler gerçek kayıttır (şerit bunu söyler).
+- Akış: özellik dalı → PR (main'e) → Netlify önizleme + GitHub "Kod Kontrolu" → kullanıcı onayı → PR birleştirilir → canlı.
+
+## Ana Panel — Tek iş listesi (23.11.2026) — migration 20261123090000_panel_odeme_bekleyenleri.sql (CANLIDA, sürüm 20261122210457)
+
+Kullanıcı: "Bu sayfa çok karışık; tek sayfa şeklinde verebilmeliyiz. Açık sevkiyatlar, rezervasyonu alınmışlar açık sevkiyat
+olarak görülmeli. Ödeme bekleyenler gri, kocaman 'Ödeme bekliyor'; ödeme gelince aktif hale gelecek." + "Bunlar otomatik
+belirlenemiyor mu" → durum tamamen kayıtlardan.
+
+- Kalkanlar: cut-off çubuğu (`components/panel/cutoff-cubugu.tsx`, dosya duruyor, kullanılmıyor), iki iş emri şeridi
+  (`components/panel/is-emirleri.tsx`, aynı), dosya sekmeleri (Tümü / Cut-Off / Rezervasyon Bekleyen / Açık).
+- Tek tablo (`lib/panel/is-listesi.ts` isListesiKur; satırlar `components/panel/is-listesi-satirlari.tsx`, dosya satırı
+  `app/panel/page.tsx`'te eskisi gibi + ilk sütun Durum ve renkli sol kenar):
+  - Cut-off (kırmızı): belgesi verilmemiş talimat / beyanname cut-off'u 0–3 gün (eski "Cut-Off Yaklaşan" kuralı).
+  - Açık sevkiyat (yeşil): rezervasyonlu açık dosya + booking'li, dosyası açılmamış iş emri ("Dosya açılmadı").
+  - Rezervasyon bekliyor (mavi): rezervasyonsuz açık dosya (satırdan "Rezervasyon ekle") + ön ödemesi alınmış, booking'siz sipariş.
+  - Ödeme bekliyor (gri, soluk, kesikli "ÖDEME BEKLİYOR"): `panel_odeme_bekleyenleri()` = Sipariş Listesi "Onay bekleyen"
+    (`siparis_listesi_veri` durum onay_bekliyor). Pasif; yalnız "Sipariş Listesi" bağlantısı. İşaretlenince maviye geçer.
+- Tekrar yok: booking'li iş emri rezervasyonsuz dosyayı işaret ediyorsa dosya satırı gizli; ön ödeme iş emri rezervasyonsuz
+  dosyayı işaret ediyorsa iş emri gizli; ödeme bekleyen proforma başka satırda varsa (R eki dahil) gösterilmez.
+- Sıra: cut-off > açık > rezervasyon bekliyor > ödeme; grup içinde en yakın cut-off / en eski bekleyen üstte.
+- Filtre `?filtre=` tumu | acik (açık + cut-off) | cutoff | rez_bekliyor | odeme; eski `rezervasyon` → rez_bekliyor.
+  Arama: müşteri / proforma / dosya no / booking. `?dosya=` vurgusu aynen (filtre / arama gizliyorsa Tümü'ye döner).
+- Veri: dosyalar dakikada bir; iş emirleri + ödeme bekleyenler 5 dakikada bir PARALEL (biri okunamazsa diğeri gelir).
+- Özet kartları duruyor (Cut-off kartı metni: "listede kırmızı satırlar").
+- Test: tests/panel-is-listesi.test.ts (kurgusal veri).
+
+## Ana Panel — Günlük yükleme hedefi (23.11.2026) — DB değişikliği yok
+
+Kullanıcı: "Günlük yüklenmesi gereken konteyner sayısını hesaplayabilmeli. Talimat cut-off = konşimento talimatının
+gönderilmesi; o tarihe kadar bütün konteynerler alınmış olmalı. Beyanname = bütün konteynerlerin dolu şekilde içeri
+girmiş olması. Günlük yükleme hesaplanmalı."
+
+- Hesap `lib/panel/gunluk-yukleme.ts` (saf; test tests/panel-gunluk-yukleme.test.ts):
+  - Boş alım = rezervasyon adedi − eklenen konteyner; TALİMAT cut-off gününe kadar (talimat / draft BL / beyanname varsa tamam).
+  - Yükleme = rezervasyon adedi − DBA'lı konteyner; hedef = BEYANNAME cut-off gününden bir önceki iş günü (geçmişte son dolu
+    konteyner cut-off'tan ortada ~2 gün önce; cut-off günü son çare → "gecikme"). Beyanname varsa tamam.
+  - Pencere: boş ekipman tarihinden (rezervasyon `ekipman_alim_tarihi`, plan `bos_ekipman_tarihi`) önce plan yok; yoksa hedeften
+    en fazla 5 iş günü önce.
+  - İş günleri ve kapasite son 75 günün DBA TARTIM günlerinden (Bugün Yüklenen ile aynı kural, `efektifTartimBilgisi`):
+    en az 3 gün yükleme yapılan hafta günleri (canlı: Pzt–Cmt, Pazar yok); ortalama / %75 / en yüksek (canlı 5,6 / 7 / 13).
+  - Plan: en yakın hedef önce (EDF), her gün aynı hız; gereken hız = tüm hedefleri tutturan EN DÜŞÜK günlük adet.
+    Bugün tartılanlar bugünün kotasından düşer: gün içinde yükledikçe kalan azalır, bugünün hedefi SABİT kalır (büyümez);
+    fazla yüklenirse sonraki günlerin yükü azalır.
+    Risk: ≤ %75 normal, ≤ en yüksek "ortalamanın üstünde", üstü "en yüksek günü aşıyor"; geçmiş < 10 gün "bilinmiyor".
+  - Cut-off'lar duvar saati (gün = metnin ilk 10 karakteri), DBA tartım günü İstanbul.
+- Kaynak: açık dosyalar (rezervasyonlu) + dosyası açılmamış booking'ler (Yükleme Planı; alınan / dolu 0 sayılır, "takip edilemiyor").
+  Beyanname cut-off'u olmayan plan dışı (sayısı kartta).
+- Görünüm: `components/panel/gunluk-yukleme-karti.tsx` — bugün yüklenen / hedef + bugün alınacak boş, gereken hız ve geçmiş
+  kapasite, önümüzdeki 6 iş günü (güne tıklayınca müşteri bazında). Liste satırında Konteyner sütununda "Bugün: 1 boş al ·
+  2 yükle" ya da "Hedef: Per 26.11". Veri `yuklemeGecmisiOku` (lib/panel/veri.ts), iş emirleriyle 5 dakikada bir.
+
+### Günlük yükleme — kural güncellemesi (23.11.2026 gece)
+
+Kullanıcı: "Talimat cut-off'u için tartım gerekmez; rezervasyon kadar konteyner numarası yeterli. Talimat tarihi sabittir.
+Ekipman alım tarihi ve ardiyesiz giriş rezervasyonda belirtilir; ardiyesiz giriş değişebilir." + "50'lik 1,5 saatte, 25'lik
+3–3,5 saatte doluyor." + "Cumartesiyi dahil et" (iş günleri zaten geçmişten: Pzt–Cmt).
+
+- Boş alım: talimat cut-off'una kadar (sabit, en kötü durum); en erken ekipman alım tarihi. Kartta bugün alınacak boşlar
+  talimat saatiyle ("son 15:00").
+- **Bugün en az** (sert): beyanname cut-off'u − 3 sa (yol ~2 + kapı ~1) − dolum (50 kg 1,5 / 25 kg veya bilinmiyor 3,5) 07:00'den
+  önce kalıyorsa son gün bir önceki iş günü (`sertSonGun`). En az = sonraki her iş günü geçmişin en yüksek günü kadar
+  yüklense bile bugün yüklenmesi ZORUNLU kalan adet.
+- **Önerilen**: hedef beyannameden bir önceki iş günü (sert son günü geçemez), dengeli hız (değişmedi).
+- Ardiyesiz giriş (yumuşak): yükleme en erken ardiyesiz girişin bir önceki iş günü; sert son güne sığmıyorsa "ardiye riski".
+- Çuval: `cuvalKgOku` (ambalaj / detaylı ambalaj; karışıkta 25). Gün kutularında ≈ dolum saati.
+- Değişiklik takibi (sonraki iş): rezervasyon değişiklikleri `denetim_kayitlari`'nda (23.09'dan beri); panelde "değişti" gösterimi.
+
+### Günlük yükleme — araç (23.11.2026 gece)
+
+Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. Tarihlere yetişebildiğimiz an kenara boşa araba çıkartmaya çalış."
+- Tur = yol ~2 + dolum (50 kg 1,5 / 25 kg 3,5) + yol ~2 + kapı ~1 sa (`turSaati`: 25 kg 8,5, 50 kg 6,5); araç günde ~13 sa
+  (`ARAC_GUNLUK_SAAT`; 50 kg'da 2 tur, 25 kg'da 1 tur — geçmişte araç başına çoğunlukla 1, bazen 2 tur). Dorse değişmez: tur = 1 konteyner.
+- Günün turları araçlara yerleştirilir (`aracIhtiyaci`, büyükten küçüğe ilk sığan); bugün tartılanların turları bugüne dahil.
+- Plan seçimi: cut-off'ları tutturan en düşük hızdan başlayıp +4 hıza kadar denenir; EN YOĞUN GÜNÜN ARAÇ SAYISI en az olan
+  seçilir (eşitlikte düşük hız). Kartta "Araç: bugün N / 8 · M araç boşa çıkabilir", gün kutusunda "N araç · M boşta";
+  en yoğun gün filoyu (FILO_ARAC = 8) aşarsa kırmızı "Filo yetmiyor".
+- Canlı hafta (23–26.11): 5 / 3 / 5 / 5 araç; alt sınır 18 araç-gün / 4 gün → 5 (en iyisi). Parametreler ileride
+  Sevkiyat Parametreleri sayfasına taşınacak (araç takip paneli ölçümleriyle).
+- 23.11.2026 (kullanıcı: "8 saat çalışıyorlar, bazen mesai oluyor"): normal gün `ARAC_GUNLUK_SAAT` = 8 sa → her tur ayrı araç;
+  mesaiyle `MESAI_GUNLUK_SAAT` = 13 sa (50 kg'da araç başı 2 tur). Plan seçimi önce normal mesaide en yoğun günün aracını, sonra
+  mesaili aracı en aza indirir. Kart: "bugün 6 / 8 · 2 araç boşa çıkabilir · mesaiyle 5 araç". 25 kg turu (~8,5 sa) 8 saati
+  az aşıyor; araç takibi ölçümüyle netleşecek.
+- 23.11.2026 Ana Panel "Yükleme başladı" (sarı, en üstte): rezervasyonlu dosyada en az 1 konteyner alınmış ve dolu (DBA'lı)
+  sayı rezervasyon adedinin altında. Hepsi dolunca normal duruma döner (evrak bekleyen dolu dosyalar sarı kalmaz). Sarılar
+  kalan konteyner çoktan aza (eşitse toplam, sonra talimat); altında kırmızı + yeşil TEK sıra, ilk talimat cut-off'u erken
+  olan üstte. Sarı satırın cut-off'u yakınsa "Cut-off yakın" notu ve Cut-off filtresinde de görünür (lib/panel/is-listesi.ts).
+- 23.11.2026 Ana Panel her ekrana uyum (kullanıcı: "%100 iken yana kaydırma istemiyorum"): liste 10 sütundan 6'ya indi
+  (Durum | Sipariş: proforma + müşteri + liman + booking · ETD | Konteyner | Cut-off: talimat + beyanname alt alta | Evraklar |
+  İşlemler). 1500 px altı Evraklar sütunu gizli (Konteyner hücresinde "Evrak n/4" sayacı, ▾ detayda tam durum); 1280 px altı
+  (240 px kenar çubuğuyla tablo sığmaz) satırlar kart olur (tablette 4, telefonda 2 sütun). Sınıf sabitleri:
+  components/panel/is-listesi-satirlari.tsx (LISTE_SATIR, HUCRE*). Detay düğmesi yazısı yalnız 2xl'de.
+- 23.11.2026 (kullanıcı: "Böyle de çok amatörce oldu"): Cut-off hücresi tek satırlı iki çizgiye indi
+  ("TALİMAT 26.11 12:00 [3g 08:45]" / "BEYAN …"; tamamsa yeşil "Gönderildi" / "Draft BL"; CutoffSatiri). Satır yüksekliği
+  Sipariş hücresiyle eşit; hücre dolgusu py-2.5; dosyasız iş emrinde Evraklar "—". Evraklar sütunu 1500 px ve üstü.
+- 23.11.2026 Özet kartları doğrulandı (canlı veri): Aktif 14 ✓, Bugün yüklenen (DBA tartım günü) ✓, Cut-off 1 ✓ (BAKEBS talimat
+  15:00, 24 saat kuralı). "Yüklenecek Konteyner" → "Bu Hafta Yüklenecek" (haftalikYukleme: hedef günü bu hafta / geçmiş
+  işlerin kalanı, dosyası açılmamış booking'ler dahil; eski kart yalnız açık dosyaları sayıyordu: 13 → bu hafta 23). Cut-off
+  kartı dosyasız booking'leri de sayar; alt yazı "listede kırmızı satırlar" yerine en yakın uyarı (liste kırmızısı 0-3 gün).

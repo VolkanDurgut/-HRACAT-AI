@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export type RaporTuru =
   | "gunluk_ihracat" | "siparis" | "navlun" | "navlun_haftalik" | "diib" | "vgm" | "konsimento_hatirlatma"
-  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu";
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
 export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
@@ -40,6 +40,8 @@ export const RAPORLAR: RaporTanimi[] = [
   // 14.11.2026: onay adimi kaldirildi; 'fatura_onay' listesi = talimat mailinin alicilari (Alici + CC). 'fatura_dagitim' kullanilmiyor.
   { rapor: "fatura_onay", ad: "Fatura Talimatı", grup: "Operasyon", aciklama: "“FATURA VE BEYANNAME TALİMATI HAKKINDA // …” · Harun Bey merhaba + PDF indir düğmesi", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "tam" },
   { rapor: "siparis_formu", ad: "Sipariş Bildirim Formu", grup: "Operasyon", aciklama: "Her yükleme için üretime sipariş formu (Excel + çuval görseli); test için Siparişler > Sipariş Formları", saat: "Gönder butonuyla (elle)", edge: null, testModu: true, etkin: "tam" },
+  // 23.11.2026: haftalik siparissiz musteri ozeti (export ekibi; kurulumda CANLI KAPALI, test yalniz test adresine)
+  { rapor: "siparissiz", ad: "Siparişsiz Müşteri Raporu", grup: "Satış ve müşteri", aciklama: "Açık siparişi olmayan müşterilerimiz: sipariş ritmi, iletişim durumu, son görev + Excel", saat: "Her pazartesi 09:00", edge: "siparissiz-musteri-rapor", testModu: true, etkin: "tam" },
   { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },
   { rapor: "musteri_durum", ad: "Müşteri Durum Raporu", grup: "Satış ve müşteri", aciklama: "Siparişi olan her müşteriye İngilizce sipariş durumu", saat: "Canlıya alınınca belirlenecek", edge: "musteri-durum-rapor", testModu: true, otomatikAlici: "Müşterinin kendisi", etkin: "tam" },
   { rapor: "satin_alma", ad: "Satın Alma Talebi", grup: "Satış ve müşteri", aciklama: "Satın alma listesi gönderim maili (sonuç maili ayrı)", saat: "Liste gönderilince", edge: null, testModu: false, etkin: "yakinda" },
@@ -86,16 +88,31 @@ export async function adresDefterindenSil(eposta: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-async function edgeCagir(edge: string, govde: Record<string, unknown>) {
+export type RaporSonucu = { html?: string; konu?: string; atlandi?: string; gonderildi?: boolean; musteriler?: string[]; alici?: string[] };
+
+async function edgeCagir(edge: string, govde: Record<string, unknown>): Promise<RaporSonucu> {
   const { data: oturum } = await supabase.auth.getSession();
   const token = oturum.session?.access_token;
   if (!token) throw new Error("Oturum bulunamadı. Lütfen yeniden giriş yapın.");
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${edge}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(govde),
-  });
-  const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string; sonuclar?: { html?: string; konu?: string; atlandi?: string; gonderildi?: boolean; musteriler?: string[] }[] };
+  // 23.11.2026: tarayicidan edge'e dogrudan cagri CORS on kontrolunde (OPTIONS 403) dusuyordu; ayni kokenli sunucu yolu
+  // (app/api/rapor-edge) istegi edge'e sunucudan iletir.
+  let res: Response;
+  try {
+    res = await fetch("/api/rapor-edge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ edge, govde }),
+    });
+  } catch {
+    throw new Error("Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.");
+  }
+  // Netlify sunucu yolu ~10 sn'de keser (rapor ~6-8 sn); edge yine de tamamlanir: test maili buyuk olasilikla gitmistir
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
+    throw new Error(govde.test === true
+      ? "Rapor hazırlanırken bağlantı zaman aşımına uğradı. Test maili büyük olasılıkla yine de gönderildi; birkaç dakika içinde test adresini kontrol edin, gelmediyse tekrar deneyin."
+      : "Rapor hazırlanırken bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.");
+  }
+  const veri = (await res.json().catch(() => ({}))) as { ok?: boolean; hata?: string; sonuclar?: RaporSonucu[] };
   if (!res.ok || !veri.ok) throw new Error(veri.hata || `İstek başarısız (HTTP ${res.status}).`);
   const s = veri.sonuclar?.[0];
   if (!s) throw new Error("Rapor oluşturulamadı (veri yok).");
@@ -109,7 +126,8 @@ export async function raporOnizle(edge: string, ek: Record<string, unknown> = {}
   return { konu: s.konu || "", html: s.html || "", musteriler: s.musteriler };
 }
 
-/** "[TEST]" maili yalniz test adresine. */
-export async function raporTestMaili(edge: string, ek: Record<string, unknown> = {}): Promise<void> {
-  await edgeCagir(edge, { test: true, ...ek });
+/** "[TEST]" maili yalniz test adresine; giden konu ve alici(lar) doner (ekranda gosterilir). */
+export async function raporTestMaili(edge: string, ek: Record<string, unknown> = {}): Promise<{ konu: string; alici: string[] }> {
+  const s = await edgeCagir(edge, { test: true, ...ek });
+  return { konu: s.konu || "", alici: Array.isArray(s.alici) ? s.alici : [] };
 }

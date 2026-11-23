@@ -11,6 +11,7 @@
  * -> Rezervasyon ekle; siparis takibi -> Sevkiyat ac; sistem proformasi -> Dosya ac (?otomatik=1); yoksa Proforma yukle.
  */
 import { bekleyenAksiyonu, type BekleyenAksiyon, type BekleyenDurum } from "@/lib/siparis/plan-bekleyen";
+import { bookingAdresEki } from "@/lib/siparis-devam";
 
 export type IsEmriTuru = "rezervasyonlu" | "on_odeme";
 
@@ -56,6 +57,17 @@ export function isEmriNormalle(r: Record<string, unknown>): IsEmri | null {
   };
 }
 
+/**
+ * 22.11.2026 BOOKING'E GORE SIPARIS TAKIBI: rezervasyonlu is emrinin "Dosya ac" / "Sevkiyat ac" adresine booking no ve
+ * konteyner sayisi eklenir (?booking=&fcl=); Proforma Yukle / Sevkiyat Secimi karari bundan onerir (lib/siparis-devam.ts
+ * bookingKarari). On odeme satirinda booking yok -> adres aynen.
+ */
+export function bookingliAksiyon(s: IsEmri, a: BekleyenAksiyon): BekleyenAksiyon {
+  if (s.tur !== "rezervasyonlu" || (a.tur !== "dosya_ac" && a.tur !== "sevkiyat")) return a;
+  const ek = bookingAdresEki(s.booking_no, s.konteyner);
+  return ek ? { ...a, href: a.href + ek } : a;
+}
+
 /** RPC cevabi -> aksiyonlu satirlar; rezervasyonlu: talimat cut-off (yoksa ETD) en yakin ustte; on odeme: en eski ustte. */
 export function isEmirleriHazirla(veri: { satirlar?: unknown; aksiyonlar?: unknown } | null | undefined): { rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] } {
   const aks = new Map<string, BekleyenDurum>();
@@ -64,7 +76,7 @@ export function isEmirleriHazirla(veri: { satirlar?: unknown; aksiyonlar?: unkno
   }
   const satirlar = ((Array.isArray(veri?.satirlar) ? veri!.satirlar : []) as Record<string, unknown>[])
     .map(isEmriNormalle).filter((x): x is IsEmri => x !== null)
-    .map((s) => ({ ...s, aksiyon: bekleyenAksiyonu(s.proforma_no ? aks.get(s.proforma_no) : undefined, s.proforma_no) }));
+    .map((s) => ({ ...s, aksiyon: bookingliAksiyon(s, bekleyenAksiyonu(s.proforma_no ? aks.get(s.proforma_no) : undefined, s.proforma_no)) }));
   const zaman = (s: IsEmri) => s.talimat_cutoff || (s.etd ? `${s.etd}T23:59:59Z` : "9999");
   return {
     rezervasyonlu: satirlar.filter((s) => s.tur === "rezervasyonlu").sort((a, b) => zaman(a).localeCompare(zaman(b)) || (a.musteri || "").localeCompare(b.musteri || "", "tr")),

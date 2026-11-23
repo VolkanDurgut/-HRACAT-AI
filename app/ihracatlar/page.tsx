@@ -27,6 +27,10 @@ import { siparisIlerlemesiHesapla, SiparisIlerlemesi, SiparisKalemDurumu } from 
 import { siparisTakipVerisiGetir } from "@/lib/siparis-takip-veri";
 import { SiparisTakipListesi } from "@/components/siparis-takip-karti";
 import { SiparisDevamPenceresi, type DevamOnayi } from "@/components/siparis-devam-penceresi";
+import { bookingParametresi, mtsdenFcl, type BookingBilgisi } from "@/lib/siparis-devam";
+import { testOrtami } from "@/lib/ortam";
+import { provaKalemleri } from "@/lib/prova";
+import { ProvaPenceresi, type ProvaOzeti } from "@/components/prova-penceresi";
 import { useSayfaYukleniyor } from "@/components/sayfa-yukleniyor";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
@@ -51,6 +55,12 @@ export default function IhracatlarPage() {
   const [tamamlaniyor, setTamamlaniyor] = useState(false);
   // Sevkiyat secimi penceresi (16.10.2026): guncel kalemler + ilk dosya (sablon)
   const [devamPenceresi, setDevamPenceresi] = useState<{ siparis: AnaSiparisWithProgress; kalemler: SiparisKalemDurumu[]; ornekDosya: Dosya | null } | null>(null);
+  // 22.11.2026: Ana Panel rezervasyonlu is emri "Sevkiyat ac" -> ?siparis=&booking=&fcl=; Sevkiyat Secimi booking FCL'iyle
+  // dolu acilir. Yalniz adresten gelen siparis icin (listeden elle "Siparise Devam Et" booking'siz, eskisi gibi).
+  const [devamBooking, setDevamBooking] = useState<{ siparisId: string; booking: BookingBilgisi } | null>(null);
+  // 22.11.2026 TEST ORTAMI (lib/ortam.ts): sevkiyat dosyasi YAZILMAZ, olusacak kayit prova penceresinde gosterilir.
+  const prova = testOrtami();
+  const [provaOzeti, setProvaOzeti] = useState<ProvaOzeti | null>(null);
   const [devamOlusturuluyor, setDevamOlusturuluyor] = useState(false);
 
   const SAYFA_BOYUTU = 50;
@@ -223,10 +233,11 @@ export default function IhracatlarPage() {
     const no = (adresParametresi("siparis") || "").trim();
     if (!no) return;
     siparisParametresiIslendi.current = true;
-    adresiGuncelle({ siparis: null });
+    const bk = bookingParametresi(adresParametresi("booking"), adresParametresi("fcl"));
+    adresiGuncelle({ siparis: null, booking: null, fcl: null });
     const anahtar = (x: string | null | undefined) => (x || "").replace(/\s/g, "").toUpperCase().replace(/(\d)R\d?$/, "$1");
     const s = acikSiparisler.find((x) => anahtar(x.proforma_no) === anahtar(no));
-    if (s) handleSipariseDevamEt(s);
+    if (s) { setDevamBooking(bk ? { siparisId: s.id, booking: bk } : null); handleSipariseDevamEt(s); }
     else showToast(`${no} için devam eden sipariş bulunamadı.`, "error");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siparisLoading, acikSiparisler, companyId]);
@@ -234,6 +245,24 @@ export default function IhracatlarPage() {
   const handleDevamOnayla = async (onay: DevamOnayi) => {
     if (!user || !companyId || !devamPenceresi) return;
     const { siparis, ornekDosya } = devamPenceresi;
+    if (prova) {
+      const bk = devamBooking && devamBooking.siparisId === siparis.id ? devamBooking.booking : null;
+      const acik = devamPenceresi.kalemler.reduce((t, k) => t + k.acikMts, 0);
+      setProvaOzeti({
+        baslik: `${siparis.proforma_no} · ${siparis.alici_firma || ""}`,
+        karar: `${siparis.proforma_no} siparişine yeni sevkiyat dosyası eklenir; ardından rezervasyon ekranına geçilir.`,
+        satirlar: [
+          ...(bk ? [{ etiket: "Booking", deger: `${bk.no} · ${bk.fcl} FCL` }] : []),
+          { etiket: "Sipariş toplam taahhüt", deger: `${(siparis.toplam_mts || 0).toLocaleString("tr-TR")} MTS` },
+          { etiket: "Dosyası açılmamış (önce)", deger: `${acik.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} MTS · ${mtsdenFcl(acik).toLocaleString("tr-TR")} FCL` },
+          { etiket: "Marka", deger: onay.marka || ornekDosya?.marka || "" },
+          { etiket: "Detaylı ambalaj", deger: onay.detayliAmbalaj || "" },
+        ],
+        kalemler: provaKalemleri(onay.kalemler),
+        paraBirimi: siparis.para_birimi || "USD",
+      });
+      return;
+    }
     setDevamOlusturuluyor(true);
     try {
       const toplamTutar = onay.kalemler.reduce((s, u) => s + parseFloat(u.toplam_tutar_usd), 0);
@@ -416,10 +445,13 @@ export default function IhracatlarPage() {
           ornekDetayliAmbalaj={devamPenceresi.ornekDosya?.detayli_ambalaj || null}
           ornekMarka={devamPenceresi.ornekDosya?.marka || null}
           olusturuluyor={devamOlusturuluyor}
-          onKapat={() => { if (!devamOlusturuluyor) setDevamPenceresi(null); }}
+          onKapat={() => { if (!devamOlusturuluyor) { setDevamPenceresi(null); setDevamBooking(null); } }}
           onOnayla={handleDevamOnayla}
+          booking={devamBooking && devamBooking.siparisId === devamPenceresi.siparis.id ? devamBooking.booking : null}
+          prova={prova}
         />
       )}
+      {provaOzeti && <ProvaPenceresi ozet={provaOzeti} onKapat={() => setProvaOzeti(null)} />}
 
       <SayfaBasligi
         ikon={<Archive size={20} />}

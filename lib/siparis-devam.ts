@@ -260,3 +260,68 @@ export function detayliAmbalajiOlcekle(metin: string | null | undefined, eskiKal
   });
   return gecersiz || kalan !== 0 ? null : sonuc;
 }
+
+// ---------------------------------------------------------------- booking'e gore karar (22.11.2026)
+/**
+ * BOOKING'E GORE SIPARIS TAKIBI (22.11.2026, kullanici: "Ana panelde dosya ac dedigimde o rezervasyona ait konteyner
+ * sayisindan siparis takibini otomatiklestiremez miyiz?"). Ana Panel'in rezervasyonlu is emri, booking numarasini ve
+ * konteyner sayisini adrese ekler (?booking=&fcl=); proforma okununca karar ONERILIR, kullanici tek tikla onaylar.
+ *
+ *  hedef = yeni sipariste proformanin tamami, devam eden sipariste dosyalanmamis (acik) miktar.
+ *  |booking FCL - hedef FCL| <= BOOKING_TOLERANS_FCL -> "tek"   (yeni: tek seferlik dosya; devam: siparisin kalani)
+ *  booking FCL < hedef FCL                            -> "takip" (kismi sevkiyat: bu dosya booking'in FCL'i kadar)
+ *  booking FCL > hedef FCL                            -> "fazla" (otomatik karar YOK; uyari, secim kullanicida)
+ * Tolerans: proformadaki kusurat (252,45 MTS = 10,1 FCL -> 10 konteyner) ayri sevkiyat sayilmaz.
+ */
+export const BOOKING_TOLERANS_FCL = 0.5;
+export const BOOKING_FCL_UST_SINIR = 200;
+
+export type BookingBilgisi = { no: string; fcl: number };
+export type BookingKarari =
+  | { tur: "tek" | "takip" | "fazla"; bookingFcl: number; hedefFcl: number; hedefMts: number; sevkiyatMts: number }
+  | { tur: "belirsiz" };
+
+/** Adres parametreleri -> booking bilgisi; bozuk / eksik / makul disi deger -> null (eski akis aynen). */
+export function bookingParametresi(no: string | null | undefined, fcl: string | null | undefined): BookingBilgisi | null {
+  const n = (no || "").trim();
+  const f = Number(String(fcl ?? "").trim());
+  if (!n || n.length > 40 || !Number.isInteger(f) || f < 1 || f > BOOKING_FCL_UST_SINIR) return null;
+  return { no: n, fcl: f };
+}
+
+/** Panel aksiyon adresine booking eki ("&booking=..&fcl=.."); konteyner bilinmiyorsa bos. */
+export function bookingAdresEki(no: string | null | undefined, konteyner: number | null | undefined): string {
+  const b = bookingParametresi(no, konteyner === null || konteyner === undefined ? null : String(konteyner));
+  return b ? `&booking=${encodeURIComponent(b.no)}&fcl=${b.fcl}` : "";
+}
+
+/** Booking FCL'i ile hedef miktari karsilastirir. sevkiyatMts: bu dosyaya yazilacak miktar ("fazla"da hedefin tamami). */
+export function bookingKarari(hedefMts: number, bookingFcl: number): BookingKarari {
+  if (!(hedefMts > ESIK) || !(bookingFcl > 0)) return { tur: "belirsiz" };
+  const hedefFcl = mtsdenFcl(hedefMts);
+  const fark = bookingFcl - hedefFcl;
+  const yuvarla = (n: number) => Math.round(n * 100) / 100;
+  if (Math.abs(fark) <= BOOKING_TOLERANS_FCL) return { tur: "tek", bookingFcl, hedefFcl, hedefMts, sevkiyatMts: yuvarla(hedefMts) };
+  if (fark < 0) return { tur: "takip", bookingFcl, hedefFcl, hedefMts, sevkiyatMts: yuvarla(bookingFcl * MTS_PER_KONTEYNER) };
+  return { tur: "fazla", bookingFcl, hedefFcl, hedefMts, sevkiyatMts: yuvarla(hedefMts) };
+}
+
+/**
+ * Sevkiyat Secimi penceresinin booking'e gore acilisi: booking FCL'i, dosyalanmamis miktari olan kalemlere SIRAYLA
+ * dagitilir (kalemin acik FCL'ini asmaz; tam karsilanan kalem KESIN miktariyla, secimMts). Artan FCL dagitilmaz -
+ * pencere "booking ile secim farkli" uyarisini gosterir.
+ */
+export function bookingSecimleri(kalemler: SiparisKalemDurumu[], bookingFcl: number): DevamSecimi[] {
+  let kalan = bookingFcl > 0 ? bookingFcl : 0;
+  return kalemler.map((k) => {
+    if (!(k.acikMts > ESIK) || kalan <= 0.005) return { kalem: k, secili: false, fcl: 0 };
+    const al = Math.round(Math.min(kalan, mtsdenFcl(k.acikMts)) * 100) / 100;
+    kalan = Math.round((kalan - al) * 100) / 100;
+    return { kalem: k, secili: al > 0, fcl: al };
+  });
+}
+
+/** Secimin FCL toplami (2 ondalik) - booking ile karsilastirma icin. */
+export function secimFclToplami(secimler: DevamSecimi[]): number {
+  return Math.round(secimler.reduce((t, s) => t + (secimMts(s) > ESIK ? s.fcl : 0), 0) * 100) / 100;
+}

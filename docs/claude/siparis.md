@@ -699,3 +699,23 @@ Kullanıcı: "Resmen bir iş akışı oluşturmaya başlıyoruz." Beş madde; hi
    satır "kontrol edin" listesinde, uygulanmaz (ör. ETA 27.01.2026 / ETD 18.12.2026). Excel'de boş ETA silmez.
 
 Test: `tests/is-akisi-revizeleri.test.ts` (kurgusal veri).
+
+### 23.11.2026 Ayarlar > Rapor Alıcıları: Önizle / Test maili çalışmıyordu
+- Kök neden: sayfa edge'i TARAYICIDAN çağırıyordu; `siparis-rapor`, `navlun-tablosu`, `musteri-durum-rapor` CORS ön kontrolünü
+  (OPTIONS) karşılamıyor → `OPTIONS 403` ("zamanlanmış rapor saati değil"), asıl istek hiç gitmiyordu (log 23.11 00:39 UTC).
+- Çözüm (canlı edge'lere dokunmadan): `app/api/rapor-edge/route.ts` aynı kökenli sunucu yolu; izinli 3 edge, yalnız
+  `{deneme | test | musteri}`, kullanıcının kendi token'ı iletilir (yetki edge'de). `lib/rapor-alicilari.ts edgeCagir` buraya gider.
+- Netlify sunucu yolu ~10 sn: rapor 6-8 sn sürüyor; 502/503/504'te "mail büyük olasılıkla gitti" mesajı. Kalıcı iyileştirme
+  (isteğe bağlı): üç edge'e OPTIONS + CORS başlığı eklenip doğrudan çağrıya dönülebilir.
+- Sayfa: son önizle / test sonucu ekranda kalır (kime gitti, konu ya da hata ayrıntısı); test maili yalnız test adresine gider notu.
+- 21.11 Cumartesi raporu "yanlış": rapor 09:00'da gitti, sipariş Excel'i aynı gün 13:44'te yeniden içe aktarıldı (eski satırlar);
+  kod hatası yok. Güncel veride rezervasyon bekleyen 17 sipariş / 64 konteyner (Ana Panel mavi satırlarıyla aynı).
+
+### 23.11.2026 Sipariş Excel'i tablo görünümü (kullanıcı: "tablo halinde; ilk kaldığı yer karşılamalı; başlıklar görünmeli")
+- `_shared/xlsx-yaz.ts` XlsxSayfa yeni alanlar: `filtre` (autoFilter + gizli _FilterDatabase adı), `baslangic` (açılışta görünen /
+  seçili hücre; dondurulmuşsa alt bölmenin topLeftCell'i), `yazdirBaslik` (Print_Titles). Eski çağrılar etkilenmez.
+- Sipariş Listesi: başlık satırı sabit (A2), filtre düğmeleri, basılı her sayfada başlık; açılış ilk SEVK EDİLMEMİŞ sipariş
+  satırında (yoksa ilk ara bölüm başlığı). Bölüm başlıkları korunur (Excel'den geri okuma bunlara dayanır; bu yüzden Excel
+  "Tablo" nesnesi değil filtre kullanıldı: tablo nesnesi içinde birleştirilmiş satır olamaz).
+- Yükleme Planı: açılış bu haftanın (yoksa sonraki ilk haftanın) blok başlığında; her blokta başlıklar zaten var.
+- Web "Excel indir" Netlify ile gelir; mail eki için `siparis-rapor` edge'i yeniden yüklenmeli (önizlemede onaydan sonra).

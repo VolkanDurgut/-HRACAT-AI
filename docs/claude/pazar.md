@@ -347,3 +347,13 @@ Kullanıcı: "Mevcut pazar için siparişi olmayan müşterilerimizin export ark
   `20261123120000_siparissiz_raporu_kapat.sql`: cron `siparissiz-musteri-rapor` silindi, rapor_alicilari canli=false.
   Edge + `pazar_siparissiz_ozet` yerinde (zamanlanmış iş yok, kendiliğinden mail gitmez). Günlük görev ritim önceliği
   (20261123111000) DEĞİŞMEDİ. Bu raporu kullanıcı açıkça istemeden yeniden canlıya ALMA.
+- **Görev kapsamı (23.11.2026 09:3x, `20261123121000_pazar_gorev_kapsam.sql`)**: kullanıcı: "Bizim mevcut müşteriler Harun Bey'e
+  gitsin. Potansiyel müşterilerimizin takibi yapılsın." Seçim: Müşteri → Harun (export), Potansiyel → Şafak (export2).
+  `pazar_ekip.kapsam` (hepsi | musteri | potansiyel; varsayılan hepsi = eski davranış). musteri: tüm kendi müşterilerimiz
+  (sahibi kim olursa olsun) + kendi başlattığı potansiyel yazışmaların hatırlatması; potansiyel: yalnız potansiyeller, başka aktif
+  üyenin başlattığı potansiyel hatırlatmayı almaz. Kuru çalıştırma 24.11: export 2 siparişsiz müşteri + 4 kendi potansiyel
+  hatırlatması; export2 2 potansiyel hatırlatma + 4 yeni potansiyel. Diğer kurallar aynı.
+- **"43" kontrolü (23.11.2026)**: 43 = Pazar'da durum 'musteri' (42 sipariş + 1 fuar kaynaklı); potansiyel 1.273 (685 fuar + 588
+  "Old contacts"). 43'ünün hepsinin defterde siparişi var; 42'si Yükleme Planı'nda ETD'li (GMB planda "GMB- BOCUUM").
+  Defterde olup kartı olmayan ARG GROUP / GANTOU (onay_bekliyor), SEKOU KOITA (on_odeme_alindi): kural gereği kart
+  rezervasyonlu / sevk_edildi / bl_eksik olunca açılır (trg_pazar_siparis_defteri) — hata değil.

@@ -8,7 +8,6 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { supabase, Dosya, Rezervasyon, Konteyner, DOSYA_LISTE_KOLONLARI, dosyaninStorageUrlleriniTopla, depoDosyalariniTopluSil, yazmaHatasi } from "@/lib/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 import { formatDateTR, talimatCutoffTamamMi, beyannameCutoffTamamMi, bugunTarihIstanbul, efektifTartimBilgisi } from "@/lib/cutoff-utils";
-import { CutoffSayac } from "@/components/cutoff-sayac";
 import { CokluNoKisa } from "@/components/coklu-no-girisi";
 import { BildirimIzniButonu } from "@/components/cutoff-uyarilari";
 import { useToast } from "@/lib/toast-context";
@@ -29,7 +28,7 @@ import { bookingIsi, dosyaIsi, kapasiteHesapla, yuklemePlaniKur, type Kapasite, 
 import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
-import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffEtiketi, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
+import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -384,8 +383,8 @@ function PanelContent() {
                 <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
                 <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Proforma · müşteri · booking / gemi kalkış">Sipariş</th>
                 <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off">Cut-off</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1400px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off: tarih, saat ve kalan süre">Cut-off</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1500px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
                 <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
               </tr>
             </thead>
@@ -469,27 +468,15 @@ function PanelContent() {
                             <EvrakSayaci dosya={dosya} className={EVRAK_SAYAC_DAR} />
                           </td>
                           <td className={HUCRE}>
-                            <div className="flex flex-col gap-1.5">
-                            <div><CutoffEtiketi>Talimat</CutoffEtiketi>
-                            {latestRez!.talimat_cutoff ? (
-                              <CutoffSayac
-                                deger={latestRez!.talimat_cutoff}
-                                tamamEtiketi={dosya.konsimento_dosya_url ? "Talimat gönderildi" : talimatCutoffTamamMi(dosya) ? "Draft BL alındı" : null}
+                            <div className="flex flex-col gap-1">
+                              <CutoffSatiri etiket="Talimat" deger={latestRez!.talimat_cutoff}
+                                tamamEtiketi={dosya.konsimento_dosya_url ? "Gönderildi" : talimatCutoffTamamMi(dosya) ? "Draft BL" : null}
                                 tamamHref={dosya.konsimento_dosya_url || dosya.draft_bl_dosya_url}
-                                tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"}
-                              />
-                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                            </div>
-                            <div><CutoffEtiketi>Beyanname</CutoffEtiketi>
-                            {latestRez!.beyanname_cutoff ? (
-                              <CutoffSayac
-                                deger={latestRez!.beyanname_cutoff}
-                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Beyanname gönderildi" : null}
+                                tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"} />
+                              <CutoffSatiri etiket="Beyan" deger={latestRez!.beyanname_cutoff}
+                                tamamEtiketi={beyannameCutoffTamamMi(dosya) ? "Gönderildi" : null}
                                 tamamHref={dosya.beyanname_dosya_url}
-                                tamamAciklama="Beyanname gönderildi - belgeyi aç"
-                              />
-                            ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                            </div>
+                                tamamAciklama="Beyanname gönderildi - belgeyi aç" />
                             </div>
                           </td>
                         </>

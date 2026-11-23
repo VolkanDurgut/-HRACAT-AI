@@ -1517,6 +1517,9 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
   olan üstte. Sarı satırın cut-off'u yakınsa "Cut-off yakın" notu ve Cut-off filtresinde de görünür (lib/panel/is-listesi.ts).
 - 23.11.2026 Ana Panel her ekrana uyum (kullanıcı: "%100 iken yana kaydırma istemiyorum"): liste 10 sütundan 6'ya indi
   (Durum | Sipariş: proforma + müşteri + liman + booking · ETD | Konteyner | Cut-off: talimat + beyanname alt alta | Evraklar |
-  İşlemler). 1400 px altı Evraklar sütunu gizli (Konteyner hücresinde "Evrak n/4" sayacı, ▾ detayda tam durum); 1280 px altı
+  İşlemler). 1500 px altı Evraklar sütunu gizli (Konteyner hücresinde "Evrak n/4" sayacı, ▾ detayda tam durum); 1280 px altı
   (240 px kenar çubuğuyla tablo sığmaz) satırlar kart olur (tablette 4, telefonda 2 sütun). Sınıf sabitleri:
   components/panel/is-listesi-satirlari.tsx (LISTE_SATIR, HUCRE*). Detay düğmesi yazısı yalnız 2xl'de.
+- 23.11.2026 (kullanıcı: "Böyle de çok amatörce oldu"): Cut-off hücresi tek satırlı iki çizgiye indi
+  ("TALİMAT 26.11 12:00 [3g 08:45]" / "BEYAN …"; tamamsa yeşil "Gönderildi" / "Draft BL"; CutoffSatiri). Satır yüksekliği
+  Sipariş hücresiyle eşit; hücre dolgusu py-2.5; dosyasız iş emrinde Evraklar "—". Evraklar sütunu 1500 px ve üstü.

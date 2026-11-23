@@ -12,6 +12,7 @@ import React from "react";
 import Link from "next/link";
 import { CalendarDays, FilePlus2, Hourglass, Package, Upload, Banknote } from "lucide-react";
 import { CutoffSayac } from "@/components/cutoff-sayac";
+import { formatCutoffSaat, formatCutoffTarih } from "@/lib/cutoff-utils";
 import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { DURUM_ETIKETI, gundur, type ListeDurumu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
@@ -30,7 +31,7 @@ export const DURUM_RENGI: Record<ListeDurumu, { renk: string; zemin: string; ken
 /**
  * 23.11.2026 HER EKRANA UYUM (kullanici: "%100 iken yana kaydirma yapmak istemiyorum"): 10 sutun -> 6
  * (Durum | Siparis: proforma + musteri + booking / ETD | Konteyner | Cut-off: talimat + beyanname | Evraklar | Islemler).
- *  - 1400 px alti: Evraklar sutunu gizli; Konteyner hucresinde kisa "Evrak n/4" sayaci, ▾ detayda tam evrak durumu.
+ *  - 1500 px alti: Evraklar sutunu gizli; Konteyner hucresinde kisa "Evrak n/4" sayaci, ▾ detayda tam evrak durumu.
  *  - xl alti (< 1280 px; 240 px kenar cubuguyla tablo sigmaz): satirlar kart olur (baslik gizli; tablette 4, telefonda
  *    2 sutunlu izgara; Islemler tam satir).
  * Tum satir turleri (dosya / is emri / odeme) ayni sinif sabitlerini kullanir; sutun sayisi her satirda ayni kalir.
@@ -39,21 +40,38 @@ export const LISTE_TABLO = "w-full max-xl:block";
 export const LISTE_GOVDE = "max-xl:block";
 export const LISTE_BASLIK = "max-xl:hidden";
 export const LISTE_SATIR = "border-b hover:bg-white/[0.03] transition-colors max-xl:grid max-xl:grid-cols-2 sm:max-xl:grid-cols-4 max-xl:gap-x-3 max-xl:py-2";
-export const HUCRE = "px-2.5 py-3 align-top max-xl:block max-xl:min-w-0 max-xl:px-3 max-xl:py-1";
+export const HUCRE = "px-2.5 py-2.5 align-top max-xl:block max-xl:min-w-0 max-xl:px-3 max-xl:py-1";
 /** Durum / Siparis: telefonda tam satir, tablette 1 sutun */
 export const HUCRE_TAM = `${HUCRE} max-sm:col-span-2`;
 /** colSpan'li bilgi hucresi (rezervasyon / odeme bekliyor): kartta 2 sutun */
 export const HUCRE_GENIS = `${HUCRE} max-xl:col-span-2`;
 /** Islemler: kartta tam satir, sola yasli */
 export const HUCRE_ISLEM = `${HUCRE} text-right max-xl:col-span-full max-xl:text-left`;
-export const HUCRE_EVRAK = "px-2.5 py-3 align-top hidden min-[1400px]:table-cell";
+export const HUCRE_EVRAK = "px-2.5 py-2.5 align-top hidden min-[1500px]:table-cell";
 /** Evraklar sutunu gizliyken (dar ekran) gorunen kisa evrak sayaci */
-export const EVRAK_SAYAC_DAR = "min-[1400px]:hidden";
+export const EVRAK_SAYAC_DAR = "min-[1500px]:hidden";
 export const LISTE_SUTUN_SAYISI = 6;
 
-/** Cut-off hucresinde kucuk baslik (Talimat / Beyanname). */
-export function CutoffEtiketi({ children }: { children: React.ReactNode }) {
-  return <span className="block text-[9.5px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#5B6475" }}>{children}</span>;
+/**
+ * Cut-off hucresinin TEK satiri: "TALIMAT  26.11 12:00  [3g 08:45]" (tamamsa yesil kisa rozet). Iki satir (talimat +
+ * beyan) satir yuksekligini Siparis hucresiyle esit tutar; tam tarih ve aciklama rozetin title'inda.
+ */
+export function CutoffSatiri({ etiket, deger, tamamEtiketi = null, tamamHref = null, tamamAciklama }: {
+  etiket: string; deger: string | null | undefined; tamamEtiketi?: string | null; tamamHref?: string | null; tamamAciklama?: string;
+}) {
+  const tarih = deger ? formatCutoffTarih(deger) : "-";
+  const saat = deger ? formatCutoffSaat(deger) : "-";
+  return (
+    <div className="flex items-center gap-2 whitespace-nowrap min-h-[22px]">
+      <span className="w-[46px] shrink-0 text-[9.5px] font-semibold uppercase tracking-wide" style={{ color: "#5B6475" }}>{etiket}</span>
+      {deger ? (
+        <>
+          <span className="w-[62px] shrink-0 text-[11px] tabular-nums text-slate-300">{tarih.slice(0, 5)}{saat !== "-" ? ` ${saat}` : ""}</span>
+          <CutoffSayac deger={deger} kompakt tamamEtiketi={tamamEtiketi} tamamHref={tamamHref} tamamAciklama={tamamAciklama} />
+        </>
+      ) : <span className="text-[11px]" style={{ color: "#4A5262" }}>—</span>}
+    </div>
+  );
 }
 
 /** Satirin sol kenar cizgisi (tr style'ina eklenir). */
@@ -122,9 +140,9 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { 
             {gorev && <GunlukGorev {...gorev} />}
           </td>
           <td className={HUCRE}>
-            <div className="flex flex-col gap-1.5">
-              <div><CutoffEtiketi>Talimat</CutoffEtiketi>{s.talimat_cutoff ? <CutoffSayac deger={s.talimat_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</div>
-              <div><CutoffEtiketi>Beyanname</CutoffEtiketi>{s.beyan_cutoff ? <CutoffSayac deger={s.beyan_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</div>
+            <div className="flex flex-col gap-1">
+              <CutoffSatiri etiket="Talimat" deger={s.talimat_cutoff} />
+              <CutoffSatiri etiket="Beyan" deger={s.beyan_cutoff} />
             </div>
           </td>
         </>
@@ -136,7 +154,7 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { 
           <span className="block text-[10.5px] mt-0.5 truncate max-w-[420px]" style={{ color: TEXT_MUTED }}>{urunOzeti(s.konteyner, [s.cinsi, s.cuval_markasi, s.ambalaj]) || "—"}</span>
         </td>
       )}
-      <td className={HUCRE_EVRAK}><span className="text-[10.5px] whitespace-nowrap" style={{ color: "#4A5262" }}>Dosya yok</span></td>
+      <td className={HUCRE_EVRAK}><span className="text-xs" style={{ color: "#4A5262" }} title="Dosya açılmadı; evrak yok">—</span></td>
       <td className={HUCRE_ISLEM}><AksiyonDugmesi a={s.aksiyon} yetkili={yetkili} /></td>
     </tr>
   );

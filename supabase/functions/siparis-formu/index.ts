@@ -5,6 +5,7 @@ import { gorselTuru, siparisFormuXlsx, type FormGorseli } from "../_shared/sipar
 import { raporAyari } from "../_shared/rapor-alici.ts";
 import { etiketliKonu, UNEX_AI_GONDEREN, type MailEtiketi } from "../_shared/unex-ai.ts";
 import { lojistikKonusu, lojistikListesi, lojistikMailHtml, type LojistikSatiri } from "../_shared/siparis-formu-lojistik.ts";
+import { spekListesi } from "../_shared/siparis-formu-spek.ts";
 
 // ============================================================================
 // SIPARIS BILDIRIM FORMU MAILI (siparis-formu) - 18.11.2026
@@ -39,6 +40,15 @@ import { lojistikKonusu, lojistikListesi, lojistikMailHtml, type LojistikSatiri 
 //    "lojistik_kapat", "token", ...}. Lojistik CANLI degilken (ya da test listesinin token'i) secilen formlar "[TEST]" olarak
 //    YALNIZ test adresine gider, "zaten gonderildi" isareti kaydedilmez. Canlida form 'siparis_formu' alicilari + CC'ye
 //    (booking basina BIR kez; ayni tekrar korumasi); isaret = alicisiz "gonderildi" kaydi (Siparisler'de "Kapatildi").
+//  - 23.11.2026 ogleden sonra: lojistik secim adimi KALDIRILDI (pg_cron 'siparis-formu-lojistik' kapatildi; kod / sayfa yedek).
+// EXPORT + OTOMATIK GONDERIM (23.11.2026, kullanici: "Harun Bey spek ve urun gorseli eklediginde siparis bildirim formu
+//   otomatik olarak gitsin; ekraninda bildirim olarak da gorunsun."):
+//  - {"islem": "otomatik", "booking"} (Siparisler yetkisi; Siparis Formlari'nda Kaydet'ten hemen sonra): form TAMAMSA
+//    (gorsel + spek + uretim + SKT), gonderilmemis, ilk konteyneri tartilmamis ve gemisi kalkmamissa gonderir.
+//    Rapor Alicilari 'siparis_formu_spek' VE 'siparis_formu' CANLI ise uretim alicilari + CC (booking basina BIR kez);
+//    degilse "[TEST]" form YALNIZ test adresine (booking basina bir otomatik test).
+//  - {"islem": "export_bekleyen"} (Siparisler yetkisi): uygulama ici uyari; hedef = kullanicinin e-postasi
+//    'siparis_formu_spek' alicilarinda mi + spek / gorsel bekleyen liste (_shared/siparis-formu-spek.ts).
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -399,6 +409,41 @@ Deno.serve(async (req: Request) => {
     }
     if (yetkiliSirket && (govde.deneme === true || (govde.test === true && !govde.booking))) {
       return json({ ok: true, sonuclar: [await lojistikOzet(yetkiliSirket, bugun, govde.deneme === true ? "deneme" : "test")] });
+    }
+
+    // 23.11.2026 export girisi: uygulama ici uyari listesi
+    if (govde.islem === "export_bekleyen") {
+      if (!yetkiliSirket || !kullanici) return json({ ok: false, hata: "Siparişler sayfası yetkisi gerekli." }, 403);
+      const ayar = await raporAyari(SUPABASE_URL, basliklar, yetkiliSirket, "siparis_formu_spek", { canli: false, alicilar: [] });
+      const hedef = ayar.alicilar.includes(kullanici.eposta);
+      if (!hedef) return json({ ok: true, hedef: false, satirlar: [] });
+      const [liste, t] = await Promise.all([formlar(yetkiliSirket, gunKaydir(bugun, -60), gunKaydir(bugun, 120)), tartilanlar(yetkiliSirket)]);
+      return json({ ok: true, hedef: true, tarih: bugun, satirlar: spekListesi(liste, t, bugun) });
+    }
+
+    // 23.11.2026 otomatik gonderim: form tamamlanip kaydedilince (Siparis Formlari > Kaydet)
+    if (govde.islem === "otomatik") {
+      if (!yetkiliSirket || !kullanici) return json({ ok: false, hata: "Siparişler sayfası yetkisi gerekli." }, 403);
+      const anahtar = typeof govde.booking === "string" ? govde.booking.replace(/\s/g, "").toUpperCase() : "";
+      if (!anahtar) return json({ ok: false, hata: "Booking belirtilmedi." }, 400);
+      const [liste, t] = await Promise.all([formlar(yetkiliSirket, gunKaydir(bugun, -60), gunKaydir(bugun, 120)), tartilanlar(yetkiliSirket)]);
+      const m = liste.find((x) => x.anahtar === anahtar);
+      if (!m) return json({ ok: true, gonderildi: false, neden: "Booking yükleme planında bulunamadı." });
+      if (m.gonderim?.zaman) return json({ ok: true, gonderildi: false, neden: "Form üretime daha önce gönderildi." });
+      if (!m.gonderilebilir) return json({ ok: true, gonderildi: false, neden: `Form henüz tamam değil, eksik: ${m.girisEksikleri.join(", ")}.` });
+      if (!lojistikListesi([m], t, bugun).length) return json({ ok: true, gonderildi: false, neden: "Yükleme başlamış ya da gemi kalkmış; otomatik gönderilmedi (gerekirse Üretime gönder)." });
+      const spekAyari = await raporAyari(SUPABASE_URL, basliklar, yetkiliSirket, "siparis_formu_spek", { canli: false, alicilar: [] });
+      const formAyari = await raporAyari(SUPABASE_URL, basliklar, yetkiliSirket, "siparis_formu", { canli: false, alicilar: [] });
+      const sirketAdi = await sirketAdiOku(yetkiliSirket);
+      if (spekAyari.canliIsaret && formAyari.canli) {
+        const sonuc = await gonder(yetkiliSirket, sirketAdi, m, formAyari.alicilar, formAyari.cc, false, false, `otomatik (${kullanici.eposta})`);
+        if (!sonuc.gonderildi) return json({ ok: true, gonderildi: false, neden: sonuc.atlandi === "zaten gönderildi" ? "Form üretime daha önce gönderildi." : String(sonuc.atlandi || "") });
+        return json({ ok: true, gonderildi: true, test: false, alici: [...formAyari.alicilar, ...formAyari.cc] });
+      }
+      if (!TEST_ALICISI.length) return json({ ok: true, gonderildi: false, neden: "Otomatik gönderim test modunda ve test adresi tanımlı değil." });
+      const sonuc = await gonder(yetkiliSirket, sirketAdi, m, TEST_ALICISI, [], true, false, `otomatik (${kullanici.eposta})`);
+      if (!sonuc.gonderildi) return json({ ok: true, gonderildi: false, test: true, neden: sonuc.atlandi === "zaten gönderildi" ? "Bu formun test gönderimi daha önce yapıldı." : String(sonuc.atlandi || "") });
+      return json({ ok: true, gonderildi: true, test: true, alici: TEST_ALICISI });
     }
 
     // Elle (sayfa yetkisi): tek booking; test -> test adresine, gonder -> canli alicilar + CC

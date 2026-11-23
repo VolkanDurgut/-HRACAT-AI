@@ -7,6 +7,7 @@ import { useEffect, useMemo } from "react";
 import Sidebar from "@/components/sidebar";
 import DestekWidget from "@/components/destek-widget";
 import CutoffUyarilari from "@/components/cutoff-uyarilari";
+import ExportFormUyarisi from "@/components/export-form-uyarisi";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { LogOut, ShieldAlert } from "lucide-react";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
@@ -142,6 +143,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <TestOrtamiSeridi />
           {/* Son 10 saate girmis cut-off'lar - her sayfada (talep: 01.10.2026) */}
           <CutoffUyarilari />
+          {/* 23.11.2026: export girisi bekleyen siparis bildirim formlari (yalniz siparis_formu_spek alicisi) */}
+          <ExportFormUyarisi />
           {children}
         </div>
       </main>

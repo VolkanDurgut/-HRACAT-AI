@@ -39,19 +39,24 @@ test("mail: booking numarasi yazilmaz; secim baglantisi ve test seridi var; hazi
   assert.equal(lojistikKonusu(l, "2026-11-23", true), "[TEST] Sipariş bildirim formu bekleyen yüklemeler · 2 yükleme (1 hazır) · 23.11.2026");
 });
 
-test("spek listesi: yalniz spekleri kaydedilmemis lojistik satirlari; oneri ve diger eksikler; bos spek gecersiz", async () => {
-  const { spekListesi, spekGecerli, spekMailHtml } = await yukle("siparis-formu-spek");
+test("export listesi: spek / cuval gorseli / tarih eksik yuklemeler; tamam ve tartilan cikar; acil = ekipmana <= 2 gun", async () => {
+  const { spekListesi, spekMailHtml, spekKonusu } = await yukle("siparis-formu-spek");
   const formlar = [
-    model("SPEKLI", { spekKayitli: true }),
-    model("SPEKSIZ", { spekKayitli: false, spekOnerisi: "Protein min 13%", girisEksikleri: ["Ürün spekleri", "SKT"], gonderilebilir: false }),
-    model("TARTILDI", { spekKayitli: false, spekOnerisi: "x" }),
+    model("TAMAM", { spekKayitli: true }),
+    model("SPEKSIZ", { spekKayitli: false, spekOnerisi: "Protein min 13%", girisEksikleri: ["Ürün spekleri", "SKT"], gonderilebilir: false, ekipmanTarihi: "2026-11-25" }),
+    model("GORSELSIZ", { spekKayitli: true, spekOnerisi: "y", girisEksikleri: ["Çuval görseli"], gonderilebilir: false, ekipmanTarihi: "2026-11-30", etd: "2026-12-05" }),
+    model("TARTILDI", { spekKayitli: false, spekOnerisi: "x", girisEksikleri: ["Ürün spekleri"], gonderilebilir: false }),
   ];
   const l = spekListesi(formlar, ["TARTILDI"], "2026-11-23");
-  assert.deepEqual(l.map((x: { booking: string }) => x.booking), ["SPEKSIZ"]);
+  assert.deepEqual(l.map((x: { booking: string }) => x.booking), ["SPEKSIZ", "GORSELSIZ"]);
   assert.equal(l[0].oneri, "Protein min 13%");
-  assert.deepEqual(l[0].digerEksikler, ["SKT"]);
-  assert.equal(spekGecerli("  "), null);
-  assert.equal(spekGecerli("Protein min 13%\n\nNem: max 14%"), "Protein min 13%\nNem: max 14%");
-  const html = spekMailHtml(l, "2026-11-23", "https://ornek.test/siparis-formu-spek/abc", { test: true });
-  assert.ok(!html.includes("SPEKSIZ") && html.includes("Protein min 13%") && html.includes("TEST"));
+  assert.deepEqual(l[0].eksikler, ["Ürün spekleri", "SKT"]);
+  assert.equal(l[0].acil, true);
+  assert.equal(l[1].oneri, "");
+  assert.equal(l[1].acil, false);
+  const html = spekMailHtml(l, "2026-11-23", "https://ornek.test/siparisler?sekme=formlar", { test: true, hitap: "Ornek Bey" });
+  assert.ok(!html.includes("SPEKSIZ") && !html.includes("GORSELSIZ"));
+  assert.ok(html.includes("Protein min 13%") && html.includes("TEST") && html.includes("ACİL") && html.includes("Ornek Bey"));
+  assert.ok(html.includes("https://ornek.test/siparisler?sekme=formlar") && html.includes("Çuval görseli"));
+  assert.equal(spekKonusu(l, "2026-11-23", true), "[TEST] ACİL · Ürün speki ve çuval görseli bekleyen yüklemeler · 2 yükleme (1 acil) · 23.11.2026");
 });

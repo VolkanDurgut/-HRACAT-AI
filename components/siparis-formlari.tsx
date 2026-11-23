@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/empty-state";
 import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
-  cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle,
+  cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle, otomatikGonder,
   gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
 } from "@/lib/siparis-formu";
 import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
@@ -135,7 +135,18 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
         lotNo: lotTemizle(lot), firmaAdi: firmaTemizle(firma),
       });
       if (m.gorselYolu && (yuklenen || gorselKaldir)) await gorselSil(m.gorselYolu).catch(() => undefined);
-      onDegisti(`${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`);
+      let mesaj = `${a.firma} · ${m.bookingNo}: form kaydedildi.${dosya ? ` Çuvaldaki tam tarih ${m.dosyaNo || "dosyanın"} Ek Bilgiler kartına da yazıldı.` : ""}`;
+      // 23.11.2026 (kullanici): spek + cuval gorseli (ve tarihler) tamamlaninca form uretime OTOMATIK gider
+      if (!m.gonderim?.zaman) {
+        try {
+          const o = await otomatikGonder(m.bookingNo);
+          if (o.gonderildi) mesaj += o.test ? ` Form tamamlandı; otomatik gönderim test modunda olduğu için yalnızca test adresine gitti (${(o.alici || []).join(", ")}).` : ` Form tamamlandı ve üretime otomatik gönderildi (${(o.alici || []).join(", ")}).`;
+          else if (o.neden) mesaj += ` ${o.neden}`;
+        } catch (e) {
+          mesaj += ` Otomatik gönderim yapılamadı: ${e instanceof Error ? e.message : "bilinmeyen hata"}. "Üretime gönder" ile tekrar deneyin.`;
+        }
+      }
+      onDegisti(mesaj);
     } catch (e) {
       if (yuklenen) await gorselSil(yuklenen.yol).catch(() => undefined);
       setHata(e instanceof Error ? e.message : "Kaydedilemedi.");
@@ -327,7 +338,7 @@ export function SiparisFormlari() {
       <div className="rounded-lg border px-3 py-2.5 mb-3 text-xs flex flex-wrap items-center gap-x-3 gap-y-1" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG, color: TEXT_MUTED }}>
         <FileSpreadsheet size={14} style={{ color: ACCENT }} />
         <span className="flex-1 min-w-[240px]">
-          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>; form <b className="text-white">Gönder</b> düğmesiyle üretime gider (otomatik gönderim yok, gönderim günü boş ekipman alımından 1 gün öncedir).
+          Yükleme planındaki her booking için <b className="text-white">Sipariş Bildirim Formu</b>; spek, çuval görseli ve tarihler tamamlanıp <b className="text-white">kaydedildiği anda üretime otomatik gider</b> (yükleme başlamışsa gitmez; gerekirse <b className="text-white">Üretime gönder</b>).
           Burada yalnız <b className="text-white">çuval görseli</b> eklenir ve <b className="text-white">ürün spekleri</b> girilir; üretim / SKT ve lot çuvaldan otomatik okunur.
           Görsel, spek ve tarihler tamamlanmadan form <b className="text-white">gönderilmez</b>. Alıcı ve test modu: Ayarlar &gt; Rapor Alıcıları.
         </span>

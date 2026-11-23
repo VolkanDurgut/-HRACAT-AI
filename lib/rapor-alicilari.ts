@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export type RaporTuru =
   | "gunluk_ihracat" | "siparis" | "navlun" | "navlun_haftalik" | "diib" | "vgm" | "konsimento_hatirlatma"
-  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu";
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
 export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
@@ -40,6 +40,8 @@ export const RAPORLAR: RaporTanimi[] = [
   // 14.11.2026: onay adimi kaldirildi; 'fatura_onay' listesi = talimat mailinin alicilari (Alici + CC). 'fatura_dagitim' kullanilmiyor.
   { rapor: "fatura_onay", ad: "Fatura Talimatı", grup: "Operasyon", aciklama: "“FATURA VE BEYANNAME TALİMATI HAKKINDA // …” · Harun Bey merhaba + PDF indir düğmesi", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "tam" },
   { rapor: "siparis_formu", ad: "Sipariş Bildirim Formu", grup: "Operasyon", aciklama: "Her yükleme için üretime sipariş formu (Excel + çuval görseli); test için Siparişler > Sipariş Formları", saat: "Gönder butonuyla (elle)", edge: null, testModu: true, etkin: "tam" },
+  // 23.11.2026: haftalik siparissiz musteri ozeti (export ekibi; kurulumda CANLI KAPALI, test yalniz test adresine)
+  { rapor: "siparissiz", ad: "Siparişsiz Müşteri Raporu", grup: "Satış ve müşteri", aciklama: "Açık siparişi olmayan müşterilerimiz: sipariş ritmi, iletişim durumu, son görev + Excel", saat: "Her pazartesi 09:00", edge: "siparissiz-musteri-rapor", testModu: true, etkin: "tam" },
   { rapor: "pazar_gorev", ad: "Pazar Görev Maili", grup: "Satış ve müşteri", aciklama: "Ekibe günün müşteri görevleri", saat: "İş günleri sabah", edge: null, testModu: false, otomatikAlici: "Görev atanan ekip üyesi", etkin: "yakinda" },
   { rapor: "musteri_durum", ad: "Müşteri Durum Raporu", grup: "Satış ve müşteri", aciklama: "Siparişi olan her müşteriye İngilizce sipariş durumu", saat: "Canlıya alınınca belirlenecek", edge: "musteri-durum-rapor", testModu: true, otomatikAlici: "Müşterinin kendisi", etkin: "tam" },
   { rapor: "satin_alma", ad: "Satın Alma Talebi", grup: "Satış ve müşteri", aciklama: "Satın alma listesi gönderim maili (sonuç maili ayrı)", saat: "Liste gönderilince", edge: null, testModu: false, etkin: "yakinda" },

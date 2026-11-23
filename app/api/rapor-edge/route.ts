@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const IZINLI = new Set(["siparis-rapor", "navlun-tablosu", "musteri-durum-rapor"]);
+const IZINLI = new Set(["siparis-rapor", "navlun-tablosu", "musteri-durum-rapor", "siparissiz-musteri-rapor"]);
 
 export async function POST(req: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

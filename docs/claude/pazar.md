@@ -317,3 +317,21 @@ siparişi olmayan müşterileri tespit edelim."
   aktifte "Yolda N kont. · varış ~" / "Planda N kont. · ETD", üstte ritim özeti ve kartı olmayan plan müşterileri şeridi;
   firma kartında "Sipariş ritmi" bölümü (son 8 dalga).
 - DOKUNULMADI: `pazar_firma_aktif` (günlük görev / mail adayı) eski kuralla; hizalanması ayrı onayla (mail adayını değiştirir).
+
+### 3.z2 Siparişsiz müşteriler export ekibine (23.11.2026)
+Kullanıcı: "Mevcut pazar için siparişi olmayan müşterilerimizin export arkadaşımıza mail olarak iletilmesi gerekiyor" +
+"Her gün görev olarak belirleniyor, o sisteme öncelik olarak dahil edemiyor muyuz" + haftalık özet Harun Bey'e (export@).
+- **Ritim sunucuda** (`20261123110000_pazar_siparis_ritmi.sql`, CANLI): `pazar_siparis_ritmi(sirket, bugun)` = lib/pazar/siparis-ritmi.ts
+  musteriRitmi'nin SQL karşılığı (43/43 müşteride birebir doğrulandı). `pazar_musteri_sevkiyatlari_sirket` oturumsuz çekirdek;
+  `pazar_musteri_sevkiyatlari()` çıktısı değişmedi (md5 aynı).
+- **Görev önceliği** (`20261123111000_pazar_gorev_ritim_onceligi.sql`, ONAY BEKLİYOR — canlı maili etkiler): grup sırası
+  1 kendi müşterimizin hatırlatması, 2 siparişsiz müşteri (ritim: gecikti > zamanı geldi > yaklaşıyor > erken > veri az, en çok
+  geciken önce), 3 potansiyel hatırlatması, 4 yeni potansiyel; yolda / yüklemede malı olan siparişsiz sayılmaz. Kuru çalıştırma
+  23.11: önceki kuralda 12 görevin tamamı hatırlatmaydı (çoğu potansiyel); yeni kuralda siparişsiz müşteri araya giriyor.
+- **Haftalık rapor** (`20261123112000_siparissiz_musteri_raporu.sql` + edge `siparissiz-musteri-rapor`, CANLI, rapor TEST MODUNDA):
+  `pazar_siparissiz_ozet` (Pazar "Siparişsiz" ile aynı: 43 / 26 aktif / 17), rapor_alicilari 'siparissiz' (export@, CC bbt@ +
+  execution@, canli=false), cron pazartesi 06:00 UTC, gönderim kaydı `siparissiz_rapor_gonderimleri` (hafta başına tek).
+  Gruplar: hemen aranacak / sırası yaklaşan / ikinci sipariş fırsatı / kaydı doğrulanmalı; iletişimsiz müşteri ayrıca işaretli
+  (günlük göreve giremez). Excel ekli (başlık sabit, filtre). Test 23.11 04:21 mesensei'ye gitti. Ayarlar > Rapor Alıcıları'nda
+  Önizle / Test maili (api/rapor-edge izinli listesinde). Canlıya: Rapor Alıcıları'nda "Canlı" açılınca.
+- Edge karşılaştırması: canlıdaki `_shared/rapor-kabugu.ts` yalnız bir yorum satırında ("Özet"/"Ozet") farklı; kod aynı.

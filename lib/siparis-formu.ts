@@ -14,10 +14,12 @@ export { cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, ha
 const KOVA = "siparis-formlari";
 const AZAMI_PX = 2000;
 
-export async function siparisFormlariOku(): Promise<FormModeli[]> {
+/** 23.11.2026: tartildi = ilk konteyneri tartilmis (yukleme baslamis); siparis_formu_listesi() satira ekler. */
+export type ListeFormu = FormModeli & { tartildi: boolean };
+export async function siparisFormlariOku(): Promise<ListeFormu[]> {
   const { data, error } = await supabase.rpc("siparis_formu_listesi");
   if (error) throw new Error(error.message || "Sipariş formları okunamadı.");
-  return ((data || []) as FormHam[]).map(formModeli);
+  return ((data || []) as (FormHam & { tartildi?: unknown })[]).map((h) => ({ ...formModeli(h), tartildi: h.tartildi === true }));
 }
 
 /** Gorseli JPEG'e cevirir (seffaf alan beyaz), uzun kenar en fazla 2000 px. */

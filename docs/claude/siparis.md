@@ -751,3 +751,7 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
 - Uygulama içi uyarı: `components/export-form-uyarisi.tsx` (app-shell); edge `siparis-formu` `export_bekleyen`; yalnız
   `siparis_formu_spek` alıcısı olan kullanıcıda; masaüstü bildirimi günde bir; Siparişler sayfasında gizli.
 - Lojistik cron kapalı (migration `20261123160000`); `siparis_formu_lojistik` kodu / `/siparis-formu-sec` sayfası yedek.
+- 23.11.2026 ekran süzgeci: Sipariş Formları varsayılan listesi (bu hafta + sonrası) artık formu GÖNDERİLMEMİŞ, ilk konteyneri
+  TARTILMAMIŞ ve gemisi KALKMAMIŞ yüklemeyi ekipman tarihi geçmiş olsa da gösterir (AL-QASRAWI: ekipman 21.11, ETD 28.11 gizleniyordu).
+  `siparis_formu_listesi()` her satıra `tartildi` ekler (migration `20261123180000_siparis_formu_listesi_tartildi.sql`);
+  `lib/siparis-formu.ts` `ListeFormu`. Hatırlatma maili ile ekran aynı kuralı kullanır.

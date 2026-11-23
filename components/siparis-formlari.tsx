@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
 import {
   cuvalLotunuAyikla, cuvalTarihleriniAyikla, firmaTemizle, formDurumu, formExcelIndir, formKaydet, gorselAdresi, gorselBlob, gorselSil, gorselYukle,
-  gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli,
+  gunEkle, haftaBasiTr, lotTemizle, siparisFormlariOku, testFormuGonder, trTarih, type CuvalTarihi, type FormDurumu, type FormModeli, type ListeFormu,
 } from "@/lib/siparis-formu";
 import { spekTemizle } from "@/supabase/functions/_shared/siparis-formu";
 
@@ -301,7 +301,7 @@ function FormKarti({ m, bugun, companyId, onDegisti }: { m: FormModeli; bugun: s
 
 export function SiparisFormlari() {
   const { companyId } = useAuth();
-  const [liste, setListe] = useState<FormModeli[] | null>(null);
+  const [liste, setListe] = useState<ListeFormu[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [bilgi, setBilgi] = useState<string | null>(null);
   const [gecmis, setGecmis] = useState(false);
@@ -319,7 +319,10 @@ export function SiparisFormlari() {
   // 19.11.2026 (kullanici: "Cok eski yukleme; yuklemesi tamamlanmis, kaldirmaliyiz"): varsayilan liste Yukleme Planindaki gibi
   // BU HAFTA (Pazar-Cumartesi, plan basliklari "47.HAFTA (15 KASIM - 21 KASIM)") ve sonrasinin bos ekipman tarihleri.
   const haftaBasi = haftaBasiTr(bugun);
-  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi), [liste, gecmis, haftaBasi]);
+  // 23.11.2026 (kullanici: "AL-QASRAWI ... listede gozukmuyor"): bos ekipman tarihi gecen hafta olan ama formu GONDERILMEMIS ve
+  // ilk konteyneri TARTILMAMIS ve gemisi henuz KALKMAMIS yukleme gizlenmez (export hatirlatma listesiyle ayni kural: _shared/siparis-formu-lojistik.ts).
+  const gorunen = useMemo(() => (liste || []).filter((m) => gecmis || !m.ekipmanTarihi || m.ekipmanTarihi >= haftaBasi
+    || (!m.gonderim?.zaman && !m.tartildi && (m.etd ?? m.ekipmanTarihi) >= bugun)), [liste, gecmis, haftaBasi, bugun]);
   // 19.11.2026 (kullanici): gonderilenler listede "Daha once gonderilenler" bolumune duser
   const bekleyenler = gorunen.filter((m) => !m.gonderim?.zaman);
   const gonderilenler = useMemo(() => (liste || []).filter((m) => !!m.gonderim?.zaman)

@@ -10,11 +10,11 @@
  */
 import React from "react";
 import Link from "next/link";
-import { CalendarDays, FilePlus2, Hourglass, Package, Upload, Banknote } from "lucide-react";
+import { CalendarDays, CheckCircle2, FilePlus2, Hourglass, Package, Upload, Banknote } from "lucide-react";
 import { CutoffSayac } from "@/components/cutoff-sayac";
 import { formatCutoffSaat, formatCutoffTarih } from "@/lib/cutoff-utils";
 import { ACCENT, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
-import { DURUM_ETIKETI, gundur, type ListeDurumu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { DURUM_ETIKETI, doluDurumu, gundur, type ListeDurumu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import type { BekleyenAksiyon } from "@/lib/siparis/plan-bekleyen";
 import { GunlukGorev } from "@/components/panel/gunluk-yukleme-karti";
@@ -82,15 +82,72 @@ const AKSIYON_IKONU: Record<BekleyenAksiyon["tur"], React.ReactNode> = {
   rezervasyon: <CalendarDays size={12} />, sevkiyat: <Package size={12} />, dosya_ac: <FilePlus2 size={12} />, proforma_yukle: <Upload size={12} />,
 };
 
-export function DurumHucresi({ durum, alt }: { durum: ListeDurumu; alt?: React.ReactNode }) {
+/** 23.11.2026: butun konteynerler dolu -> durum etiketinin yaninda yesil "DOLU" (cut-off kirmizisi olsa da). */
+const DOLU_RENK = { renk: "#4ADE80", zemin: "rgba(34,197,94,0.16)", kenar: "rgba(34,197,94,0.5)" };
+
+export function DurumHucresi({ durum, alt, hepsiDolu = false }: { durum: ListeDurumu; alt?: React.ReactNode; hepsiDolu?: boolean }) {
   const r = DURUM_RENGI[durum];
   return (
     <td className={`${HUCRE_TAM} whitespace-nowrap`} data-durum={durum}>
-      <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wide" style={{ backgroundColor: r.zemin, color: r.renk }}>
-        {DURUM_ETIKETI[durum]}
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wide" style={{ backgroundColor: r.zemin, color: r.renk }}>
+          {DURUM_ETIKETI[durum]}
+        </span>
+        {hepsiDolu && (
+          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wide border" data-hepsi-dolu
+            title="Rezervasyondaki bütün konteynerler dolu (DBA yüklendi)" style={{ backgroundColor: DOLU_RENK.zemin, color: DOLU_RENK.renk, borderColor: DOLU_RENK.kenar }}>
+            <CheckCircle2 size={11} /> Dolu
+          </span>
+        )}
       </span>
       {alt && <span className="block mt-1 text-[10.5px]" style={{ color: TEXT_MUTED }}>{alt}</span>}
     </td>
+  );
+}
+
+/**
+ * 23.11.2026 aksam: Konteyner hucresinin BUYUK dolu gostergesi (kullanici: "4/6 alinan, bir dolu kismi net ve buyuk
+ * gosterilmeli; hedefi de oraya tasiyabilirsin"). Ust: "1 / 6 DOLU"; cubuk: her konteyner bir bolme (yesil dolu,
+ * sari alindi-bos, gri alinmadi); alt: alinan / alinacak bos; en altta bugunun gorevi (Gunluk yukleme plani).
+ * takipsiz: dosyasi acilmamis booking (alinan / dolu bilinmez).
+ */
+export function DoluGostergesi({ toplam, alinan, dolu, gorev = null, takipsiz = false }: {
+  toplam: number; alinan: number; dolu: number; gorev?: IsOzeti | null; takipsiz?: boolean;
+}) {
+  if (toplam <= 0) return <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>;
+  const durum = doluDurumu({ toplam, alinan, dolu, kalan: Math.max(0, toplam - dolu) });
+  const renk = takipsiz ? TEXT_MUTED : durum === "tam" ? DOLU_RENK.renk : durum === "kismi" ? DURUM_RENGI.basladi.renk : "#C9D1DC";
+  const bolmeli = toplam <= 12;
+  const alinanBos = Math.max(0, Math.min(alinan, toplam) - dolu);
+  const alinacak = Math.max(0, toplam - Math.max(alinan, dolu));
+  return (
+    <div className="min-w-[112px]" data-dolu-gostergesi data-dolu-durum={takipsiz ? "takipsiz" : durum}>
+      <p className="whitespace-nowrap leading-none" style={{ color: renk }}>
+        <span className="text-[20px] font-bold tabular-nums">{takipsiz ? "—" : dolu}</span>
+        <span className="text-[13px] font-semibold tabular-nums"> / {toplam}</span>
+        <span className="ml-1 text-[10.5px] font-bold uppercase tracking-wide">{durum === "tam" && !takipsiz ? "dolu ✓" : "dolu"}</span>
+      </p>
+      {bolmeli ? (
+        <div className="mt-1.5 flex gap-[2px]" aria-hidden="true">
+          {Array.from({ length: toplam }, (_, i) => {
+            const tur = takipsiz ? "yok" : i < dolu ? "dolu" : i < dolu + alinanBos ? "alindi" : "yok";
+            return <span key={i} className="h-2 flex-1 max-w-[16px] rounded-[2px]" style={tur === "dolu" ? { backgroundColor: DOLU_RENK.renk }
+              : tur === "alindi" ? { backgroundColor: "rgba(250,204,21,0.25)", boxShadow: "inset 0 0 0 1px #EAB308" } : { backgroundColor: "#2A3140" }} />;
+          })}
+        </div>
+      ) : (
+        <div className="mt-1.5 h-2 w-full rounded-[2px] overflow-hidden flex" style={{ backgroundColor: "#2A3140" }} aria-hidden="true">
+          {!takipsiz && <span style={{ width: `${(dolu / toplam) * 100}%`, backgroundColor: DOLU_RENK.renk }} />}
+          {!takipsiz && <span style={{ width: `${(alinanBos / toplam) * 100}%`, backgroundColor: "rgba(250,204,21,0.45)" }} />}
+        </div>
+      )}
+      <p className="mt-1 text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>
+        {takipsiz ? "Dosya açılmadı · takip yok"
+          : alinacak > 0 ? <>{alinan} alındı · <span className="text-white">{alinacak} boş alınacak</span></>
+          : durum === "tam" ? "Hepsi alındı ve doldu" : `${alinan} alındı · ${alinanBos} doldurulacak`}
+      </p>
+      {gorev && <GunlukGorev {...gorev} buyuk />}
+    </div>
   );
 }
 
@@ -136,8 +193,7 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { 
       {bookingli ? (
         <>
           <td className={HUCRE}>
-            <span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.konteyner ? `${s.konteyner} kont.` : "—"}</span>
-            {gorev && <GunlukGorev {...gorev} />}
+            <DoluGostergesi toplam={s.konteyner || 0} alinan={0} dolu={0} gorev={gorev} takipsiz />
           </td>
           <td className={HUCRE}>
             <div className="flex flex-col gap-1">

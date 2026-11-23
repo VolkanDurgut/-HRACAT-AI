@@ -479,3 +479,37 @@ export function haftalikYukleme(isler: YuklemeIsi[], plan: Pick<YuklemePlani, "o
   const yuklenen = yuklemeGunleri.filter((g) => { const t = g.slice(0, 10); return t >= bas && t <= bugun; }).length;
   return { bas, son, gereken: hafta.reduce((t, x) => t + x.kalan, 0), isler: hafta, yuklenen, sonrakiKalan, sonrakiIs };
 }
+
+// ---------------------------------------------------------------- sabah plani / gerceklesen (Ana Panel karti)
+/**
+ * 23.11.2026 aksam (kullanici: "Bugun gunluk yukleme hedefine bak, sanirim bir tane az doldurulmus. Operasyonun
+ * yuklemelerinden stratejisini belirle, eksik yanlarini doldur."): gun icinde hedef SABIT kalsin ve neyin eksik / fazla
+ * yapildigi gorunsun diye SABAH PLANI yeniden kurulur: bugun tartilanlar (bugunDolu) dolulardan cikarilir; bugun tartim
+ * yapilan isin beyannamesi sabah verilmemis sayilir (beyannameden sonra yukleme olmaz). Ayni kurallar (yuklemePlaniKur).
+ *  - plan    : sabah planinin bu ise bugun icin verdigi yukleme
+ *  - yapilan : bugun DBA tartimi yapilan konteyner
+ *  - neden   : "takipsiz" (dosyasi acilmamis booking - tartim sisteme dusemez), "plan_disi" (planda yokken yuklendi)
+ */
+export type GunKarsilastirmaSatiri = { anahtar: string; etiket: string; plan: number; yapilan: number; neden: "takipsiz" | "plan_disi" | null };
+export type GunKarsilastirmasi = { sabahHedef: number; yapilan: number; eksik: number; fazla: number; satirlar: GunKarsilastirmaSatiri[] };
+
+export function sabahKarsilastirmasi(isler: YuklemeIsi[], kapasite: Kapasite, bugun: string): GunKarsilastirmasi | null {
+  const isGunleri = kapasite.isGunleri.length ? kapasite.isGunleri : VARSAYILAN_IS_GUNLERI;
+  if (!isGunuMu(bugun, isGunleri)) return null;
+  const sabah = isler.map((i) => {
+    const bd = Math.max(0, i.bugunDolu);
+    return bd > 0 ? { ...i, dolu: Math.max(0, i.dolu - bd), bugunDolu: 0, beyanTamam: false } : { ...i, bugunDolu: 0 };
+  });
+  const plan = yuklemePlaniKur(sabah, kapasite, bugun);
+  const bugunPlan = plan.gunler.find((g) => g.tarih === bugun);
+  const planOf = new Map((bugunPlan?.isler || []).map((x) => [x.anahtar, x.yukle]));
+  const satirlar: GunKarsilastirmaSatiri[] = isler.map((i) => {
+    const p = planOf.get(i.anahtar) || 0;
+    const y = Math.max(0, i.bugunDolu);
+    return { anahtar: i.anahtar, etiket: i.etiket, plan: p, yapilan: y, neden: (y < p && !i.takipli ? "takipsiz" : y > 0 && p === 0 ? "plan_disi" : null) as GunKarsilastirmaSatiri["neden"] };
+  }).filter((s) => s.plan > 0 || s.yapilan > 0)
+    .sort((a, b) => (b.plan - b.yapilan) - (a.plan - a.yapilan) || b.plan - a.plan || a.etiket.localeCompare(b.etiket, "tr"));
+  const sabahHedef = satirlar.reduce((t, s) => t + s.plan, 0);
+  const yapilan = satirlar.reduce((t, s) => t + s.yapilan, 0);
+  return { sabahHedef, yapilan, eksik: Math.max(0, sabahHedef - yapilan), fazla: Math.max(0, yapilan - sabahHedef), satirlar };
+}

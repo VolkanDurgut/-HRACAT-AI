@@ -94,6 +94,18 @@ export function yuklemeDurumu(d: ListeDosyasi): YuklemeDurumu {
   return { toplam, alinan: kont.length, dolu, kalan: Math.max(0, toplam - dolu) };
 }
 
+/**
+ * 23.11.2026 aksam (kullanici: "Iki konteyneri de doldugu icin 'Cut-off yaklasiyor' yaniyor; orada 'dolu' etiketi de olmali.
+ * 4/6 alinan, bir dolu kismi net ve buyuk gosterilmeli."): satirdaki dolu gostergesinin durumu.
+ *  - tam   : rezervasyon adedi kadar dolu (DBA'li) konteyner -> yesil "DOLU" (durum kirmizi cut-off olsa da)
+ *  - kismi : en az 1 dolu ya da alinmis konteyner var
+ *  - yok   : henuz konteyner alinmadi
+ */
+export function doluDurumu(y: YuklemeDurumu): "tam" | "kismi" | "yok" {
+  if (y.toplam > 0 && y.dolu >= y.toplam) return "tam";
+  return y.dolu > 0 || y.alinan > 0 ? "kismi" : "yok";
+}
+
 /** Yuklemesi suruyor: en az 1 konteyner alindi, dolu sayisi rezervasyon adedine ulasmadi. */
 export function yuklemeBasladi(y: YuklemeDurumu): boolean {
   return y.alinan > 0 && y.toplam > 0 && y.dolu < y.toplam;

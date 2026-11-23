@@ -1527,3 +1527,25 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
   15:00, 24 saat kuralı). "Yüklenecek Konteyner" → "Bu Hafta Yüklenecek" (haftalikYukleme: hedef günü bu hafta / geçmiş
   işlerin kalanı, dosyası açılmamış booking'ler dahil; eski kart yalnız açık dosyaları sayıyordu: 13 → bu hafta 23). Cut-off
   kartı dosyasız booking'leri de sayar; alt yazı "listede kırmızı satırlar" yerine en yakın uyarı (liste kırmızısı 0-3 gün).
+
+## Ana Panel — Dolu göstergesi, sabah planı, filo ve buğday (23.11.2026 akşam) — migration 20261123200000_panel_filo_durumu.sql (CANLIDA)
+Kullanıcı: "İki konteyneri de dolduğu için 'Cut-off yaklaşıyor' yanıyor; orada 'dolu' etiketi de olmalı. 4/6 alınan, bir dolu
+kısmı net ve büyük gösterilmeli; hedefi de oraya taşı." + "Bugün bir tane az doldurulmuş; operasyonun stratejisini belirle,
+eksiklerini doldur." + "Kaç araba bizim arabalarımızdan ayrılmış? Buğdaya ne kadar araba ayrıldığının denklemini kur; ölçeklenmeliyiz."
+- **Dolu göstergesi** (components/panel/is-listesi-satirlari.tsx `DoluGostergesi`): Konteyner hücresinde büyük "dolu / rezervasyon",
+  konteyner başına bölmeli çubuk (yeşil dolu, sarı alındı-boş, gri alınmadı), "n alındı · m boş alınacak", altında çerçeveli
+  "Bugün: …" görevi. Hepsi doluysa durum etiketinin yanında yeşil "DOLU" (kırmızı cut-off satırında da). `doluDurumu` (lib/panel/is-listesi.ts).
+  Dosyası açılmamış booking: "Dosya açılmadı · takip yok".
+- **Sabah planı / gerçekleşen** (`sabahKarsilastirmasi`, lib/panel/gunluk-yukleme.ts): bugün tartılanlar dolulardan çıkarılıp
+  (bugün tartım yapılan işin beyannamesi sabah verilmemiş sayılır) aynı kurallarla sabah planı kurulur; kartta iş iş yapılan/plan,
+  eksik / plan dışı ve nedeni ("dosya açılmadı: tartım sisteme düşemez", "plan dışı"). 23.11: plan 6, yapılan 5 (dosyasız
+  booking'e planlanan 2 yapılmadı; ardiyesiz girişi 25.11 olan iş 1 gün erken başladı).
+- Operasyon stratejisi (son 75 gün, 335 konteyner): Pzt–Cmt, günde ort. 5,5 (en yüksek 12), günde 1–2 müşteri (müşteri müşteri
+  bitirilir), yükleme beyanname cut-off'undan ortanca 3,7 gün önce; cut-off gününe 21 konteyner kalmış.
+- **Filo ve buğday** (`panel_filo_durumu` SECURITY DEFINER, salt okunur, fiyat yok; lib/panel/filo-plani.ts; components/panel/filo-bolumu.tsx):
+  filo koda yazılmaz — son 75 günde konteyner taşımış ve konteyner + iç alış + iç sevk toplamı ≥ 3 olan plakalar (23.11: 8).
+  Gün dağılımı: konteyner > buğday (alış) > iç satış > boşta. Son 7 iş günü hiç işi olmayan araç "kullanılmıyor" (arıza / izin?)
+  ayrı gösterilir, kaçan kapasiteye sayılmaz. Denklem: boş araç = aktif filo − konteyner aracı (günlük yükleme planı; pencere
+  sonrası son 14 iş günü ortalaması) − iç satış aracı (nakliyesi bizde açık satışların kalan seferi önce); buğday seferi = boş ×
+  araç başı sefer (filonun alış seferi / araç-gün, 23.11: 1,38) × sefer tonu (25,5 t). Açık alışlar termin sırasıyla doldurulur →
+  tahmini bitiş, termin uyarısı.

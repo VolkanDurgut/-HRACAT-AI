@@ -23,12 +23,14 @@ import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { isEmirleriOku, odemeBekleyenleriOku, yuklemeGecmisiOku } from "@/lib/panel/veri";
-import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
-import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
+import { filoDurumuOku, isEmirleriOku, odemeBekleyenleriOku, yuklemeGecmisiOku } from "@/lib/panel/veri";
+import { filoPlaniKur, type FiloVerisi } from "@/lib/panel/filo-plani";
+import { FiloBolumu } from "@/components/panel/filo-bolumu";
+import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, sabahKarsilastirmasi, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
+import { GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
-import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
-import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
+import { doluDurumu, isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { DoluGostergesi, DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -184,13 +186,16 @@ function PanelContent() {
   // 23.11.2026 gunluk yukleme hedefi: kapasite / is gunleri gecmis tartim gunlerinden (lib/panel/gunluk-yukleme.ts)
   const [kapasite, setKapasite] = useState<Kapasite | null>(null);
   const [yuklemeGunleri, setYuklemeGunleri] = useState<string[]>([]);
+  // 23.11.2026 aksam: filo ve bugday denklemi (panel_filo_durumu; okunamazsa / yetki yoksa bolum gizli)
+  const [filoVerisi, setFiloVerisi] = useState<FiloVerisi | null>(null);
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
     // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
-    const [ie, od, gc] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku(), yuklemeGecmisiOku(companyId)]);
+    const [ie, od, gc, fl] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku(), yuklemeGecmisiOku(companyId), filoDurumuOku()]);
     if (ie.status === "fulfilled") setIsEmirleri(ie.value);
     if (od.status === "fulfilled") setOdemeler(od.value);
     if (gc.status === "fulfilled") { setKapasite(kapasiteHesapla(gc.value)); setYuklemeGunleri(gc.value); }
+    if (fl.status === "fulfilled") setFiloVerisi(fl.value);
   }, [user?.id, companyId]);
   useEffect(() => {
     isEmirleriniGetir();
@@ -309,6 +314,11 @@ function PanelContent() {
   const yuklemePlani = useMemo(
     () => yuklemePlaniKur(yuklemeIsleri, kapasite || { gunSayisi: 0, ortalama: 0, p75: 0, max: 0, isGunleri: [] }, bugunGunu),
     [yuklemeIsleri, kapasite, bugunGunu]);
+  // 23.11.2026 aksam: sabah plani / gerceklesen (hedef gun icinde sabit). Kapasite okunmadan hesaplanmaz (is gunleri gecmisten)
+  const karsilastirma = useMemo(() => (kapasite ? sabahKarsilastirmasi(yuklemeIsleri, kapasite, bugunGunu) : null), [yuklemeIsleri, kapasite, bugunGunu]);
+  // 23.11.2026 aksam: filo plani (konteyner araci gunluk yukleme planindan; is gunleri gecmisten)
+  const filoPlani = useMemo(() => (filoVerisi && filoVerisi.filo.length > 0 ? filoPlaniKur(filoVerisi, yuklemePlani, kapasite?.isGunleri?.length ? kapasite.isGunleri : [1, 2, 3, 4, 5, 6]) : null),
+    [filoVerisi, yuklemePlani, kapasite]);
   // 23.11.2026 Ozet karti: bu hafta yuklenmesi gereken (hedef gunu bu hafta / gecmis) + bu hafta yuklenen
   const haftalik = useMemo(() => haftalikYukleme(yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri), [yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri]);
   const isEtiketi = useCallback((a: string) => yuklemeIsleri.find((x) => x.anahtar === a)?.etiket || a, [yuklemeIsleri]);
@@ -355,7 +365,7 @@ function PanelContent() {
 
       {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
 
-      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} />}
+      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} karsilastirma={karsilastirma} filo={filoPlani ? <FiloBolumu plan={filoPlani} /> : null} />}
 
       {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
           (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
@@ -426,8 +436,9 @@ function PanelContent() {
                       className={`${LISTE_SATIR} ${staggerClass}`}
                       style={{ borderColor: CARD_BORDER, ...durumKenari(oge.durum), ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
                       {/* 23.11.2026: yuklemesi suren dosya sari; altinda dolu / rezervasyon ve (varsa) cut-off uyarisi */}
-                      <DurumHucresi durum={oge.durum} alt={oge.durum === "basladi" ? (
-                        <>{dosya.dosya_no}<br />{oge.yukleme.dolu}/{oge.yukleme.toplam} dolu · {oge.yukleme.kalan} kaldı
+                      {/* 23.11.2026 aksam: dolu sayisi Konteyner hucresinde buyuk (DoluGostergesi); hepsi doluysa durumun yaninda "DOLU" */}
+                      <DurumHucresi durum={oge.durum} hepsiDolu={doluDurumu(oge.yukleme) === "tam"} alt={oge.durum === "basladi" ? (
+                        <>{dosya.dosya_no}<br />{oge.yukleme.kalan} konteyner kaldı
                           {oge.cutoffYakin ? <><br /><span style={{ color: "#FCA5A5" }}>Cut-off yakın</span></> : null}</>
                       ) : dosya.dosya_no} />
                       <td className={`${HUCRE_TAM} xl:max-w-[240px]`}>
@@ -456,18 +467,8 @@ function PanelContent() {
                       ) : (
                         <>
                           <td className={HUCRE}>
-                            {konteynerAdedi > 0 ? (
-                              <div>
-                                <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{eklenenKont}/{konteynerAdedi} <span className="text-[10px]" style={{ color: "#4A5262" }}>alınan</span></p>
-                                {/* Talep (26.09.2026): kac konteynerin DBA belgesi yuklenerek
-                                    "dolu" olarak isaretlendigini de panelden gorebilmek icin
-                                    eklendi - salt goruntuleme, hicbir veri degismiyor. */}
-                                {eklenenKont > 0 && (
-                                  <p className="text-[10px] whitespace-nowrap" style={{ color: dbaTamamlanan >= eklenenKont ? "#4ADE80" : TEXT_MUTED }}>{dbaTamamlanan}/{eklenenKont} dolu</p>
-                                )}
-                                {gorev && <GunlukGorev {...gorev} />}
-                              </div>
-                            ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
+                            {/* 23.11.2026 aksam: buyuk "dolu / rezervasyon" + bolmeli cubuk + bugunun gorevi (salt goruntuleme) */}
+                            <DoluGostergesi toplam={konteynerAdedi} alinan={eklenenKont} dolu={dbaTamamlanan} gorev={gorev} />
                             <EvrakSayaci dosya={dosya} className={EVRAK_SAYAC_DAR} />
                           </td>
                           <td className={HUCRE}>

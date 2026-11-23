@@ -6,6 +6,7 @@ import { isEmirleriHazirla, type IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { odemeBekleyenleriHazirla, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import { GECMIS_GUN } from "@/lib/panel/gunluk-yukleme";
 import { efektifTartimBilgisi } from "@/lib/cutoff-utils";
+import { filoVerisiHazirla, type FiloVerisi } from "@/lib/panel/filo-plani";
 
 /** Dosyasi henuz acilmamis is emirleri (rezervasyonlu + on odemesi alinmis). panel_is_emirleri ~1 sn; seyrek cagrilir. */
 export async function isEmirleriOku(): Promise<{ rezervasyonlu: IsEmriSatiri[]; onOdeme: IsEmriSatiri[] }> {
@@ -38,4 +39,14 @@ export async function yuklemeGecmisiOku(companyId: string): Promise<string[]> {
   return ((data || []) as { dba_yukleme_tarihi: string | null; tartim: string | null }[])
     .map((k) => efektifTartimBilgisi({ tartim_tarih_saat: k.tartim || undefined }, k.dba_yukleme_tarihi)?.gun || null)
     .filter((g): g is string => !!g);
+}
+
+/**
+ * 23.11.2026 aksam: Filo ve bugday denklemi (panel_filo_durumu, migration 20261123200000, ~0,7 sn; salt okunur, fiyat yok).
+ * Yetki yoksa / okunamazsa null: kartin filo bolumu gizli kalir.
+ */
+export async function filoDurumuOku(): Promise<FiloVerisi | null> {
+  const { data, error } = await supabase.rpc("panel_filo_durumu");
+  if (error) throw new Error(error.message);
+  return filoVerisiHazirla(data);
 }

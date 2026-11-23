@@ -10,7 +10,7 @@
 import React, { useState } from "react";
 import { AlertTriangle, CalendarClock, ChevronDown, ChevronRight, Container, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
-import { gunEtiketi, type Kapasite, type YuklemePlani } from "@/lib/panel/gunluk-yukleme";
+import { gunEtiketi, type GunKarsilastirmasi, type Kapasite, type YuklemePlani } from "@/lib/panel/gunluk-yukleme";
 
 const RISK = {
   normal: { renk: "#6EE7B7", kenar: "rgba(16,185,129,0.35)", metin: "Kapasite içinde" },
@@ -21,7 +21,9 @@ const RISK = {
 
 const sayi = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 1 });
 
-export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePlani; kapasite: Kapasite | null; etiket: (anahtar: string) => string }) {
+export function GunlukYuklemeKarti({ plan, kapasite, etiket, karsilastirma = null, filo = null }: {
+  plan: YuklemePlani; kapasite: Kapasite | null; etiket: (anahtar: string) => string; karsilastirma?: GunKarsilastirmasi | null; filo?: React.ReactNode;
+}) {
   const [acikGun, setAcikGun] = useState<string | null>(null);
   if (plan.gunler.length === 0 && plan.bugunYuklenen === 0) return null;
   const r = RISK[plan.risk];
@@ -109,6 +111,34 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
         </div>
       </div>
 
+      {/* 23.11.2026 aksam: SABAH PLANI / GERCEKLESEN - hedef gun icinde sabit; is is plan / yapilan ve farkin nedeni */}
+      {karsilastirma && karsilastirma.satirlar.length > 0 && (
+        <div className="px-4 py-2.5 border-t" style={{ borderColor: CARD_BORDER }} data-testid="gunluk-karsilastirma">
+          <p className="text-[11px] mb-1.5" style={{ color: TEXT_MUTED }}>
+            <b className="text-white">Bugün: sabah planı {karsilastirma.sabahHedef} · yapılan {karsilastirma.yapilan}</b>
+            {karsilastirma.eksik > 0 && <b className="text-red-300"> · {karsilastirma.eksik} eksik</b>}
+            {karsilastirma.fazla > 0 && <b className="text-sky-300"> · {karsilastirma.fazla} plandan fazla</b>}
+            {karsilastirma.eksik === 0 && karsilastirma.fazla === 0 && karsilastirma.sabahHedef > 0 && <b className="text-emerald-300"> · plan tuttu</b>}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {karsilastirma.satirlar.map((s) => {
+              const ton = s.yapilan < s.plan ? { r: "#FCA5A5", k: "rgba(248,113,113,0.45)" } : s.yapilan > s.plan ? { r: "#7DD3FC", k: "rgba(56,189,248,0.45)" } : { r: "#6EE7B7", k: "rgba(16,185,129,0.4)" };
+              const not = s.neden === "takipsiz" ? "dosya açılmadı: tartım sisteme düşemez" : s.neden === "plan_disi" ? "plan dışı: bugün planda yoktu" : s.yapilan < s.plan ? "eksik kaldı" : null;
+              return (
+                <span key={s.anahtar} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px]" style={{ borderColor: ton.k }} data-karsilastirma-is={s.anahtar}
+                  title={`${etiket(s.anahtar)}: sabah planı ${s.plan}, yapılan ${s.yapilan}${not ? ` (${not})` : ""}`}>
+                  <span className="text-white truncate max-w-[180px]">{etiket(s.anahtar)}</span>
+                  <b className="tabular-nums" style={{ color: ton.r }}>{s.yapilan}/{s.plan}</b>
+                  {not && <span style={{ color: ton.r }}>· {not}</span>}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {filo}
+
       {secili && (
         <div className="px-4 py-2.5 border-t text-[12px]" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-testid="gunluk-yukleme-detay">
           <p className="text-[11px] font-semibold mb-1 inline-flex items-center gap-1" style={{ color: TEXT_MUTED }}>
@@ -154,9 +184,15 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket }: { plan: YuklemePl
 }
 
 /** Liste satirinda kisa gorev: "Bugün: 1 boş al · 2 yükle" / "son gün geçti". */
-export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaat = null, alimSonBugun = false }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean; alimSonSaat?: string | null; alimSonBugun?: boolean }) {
-  if (bugunYukle === 0 && bugunAl === 0 && !gecikme) return <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>Hedef: {gunEtiketi(hedefGun)}</p>;
+export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaat = null, alimSonBugun = false, buyuk = false }: { bugunYukle: number; bugunAl: number; hedefGun: string; gecikme: boolean; alimSonSaat?: string | null; alimSonBugun?: boolean; buyuk?: boolean }) {
+  if (bugunYukle === 0 && bugunAl === 0 && !gecikme) return <p className={`${buyuk ? "text-[11px] mt-1" : "text-[10px] mt-0.5"}`} style={{ color: TEXT_MUTED }} data-gunluk-gorev>Hedef: {gunEtiketi(hedefGun)}</p>;
   const parca = [bugunAl > 0 ? `${bugunAl} boş al${alimSonSaat && alimSonBugun ? ` (son ${alimSonSaat})` : ""}` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
+  // 23.11.2026 aksam: dolu gostergesinin altinda buyuk, cerceveli "Bugun" gorevi
+  if (buyuk) return (
+    <p className={`mt-1.5 inline-block px-1.5 py-0.5 rounded-md border text-[11.5px] font-bold leading-snug ${gecikme ? "text-red-300 border-red-400/50 bg-red-500/10" : "text-emerald-300 border-emerald-400/40 bg-emerald-500/10"}`} data-gunluk-gorev>
+      {parca ? `Bugün: ${parca}` : "Hedef günü geçti"}
+    </p>
+  );
   return (
     <p className={`text-[10.5px] mt-0.5 font-semibold leading-snug ${gecikme ? "text-red-300" : "text-emerald-300"}`} data-gunluk-gorev>
       {parca ? `Bugün: ${parca}` : "Hedef günü geçti"}

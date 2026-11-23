@@ -29,7 +29,7 @@ import { bookingIsi, dosyaIsi, kapasiteHesapla, yuklemePlaniKur, type Kapasite, 
 import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
-import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri } from "@/components/panel/is-listesi-satirlari";
+import { DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffEtiketi, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[]; faturaParcalari: FaturaParcasi[] };
@@ -127,6 +127,20 @@ function EvrakRozetleri({ dosya }: { dosya: DosyaWithRelations }) {
         );
       })}
     </div>
+  );
+}
+
+/** Dar ekranda (Evraklar sutunu gizli) kisa evrak sayaci; tiklayinca dosyanin Evraklar sekmesi. */
+function EvrakSayaci({ dosya, className }: { dosya: DosyaWithRelations; className?: string }) {
+  const evraklar = evrakDurumlari(dosya);
+  const tamam = evraklar.filter((e) => e.tamam).length;
+  const hepsi = tamam === evraklar.length;
+  return (
+    <Link href={`/dosya/${dosya.id}?tab=evraklar`} title={evraklar.map((e) => `${e.ad}: ${e.tamam ? "tamam" : "eksik"}`).join(" · ")}
+      className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums hover:opacity-90 ${className || ""}`}
+      style={hepsi ? { backgroundColor: "rgba(16,185,129,0.15)", color: "#6EE7B7" } : { backgroundColor: "rgba(245,158,11,0.15)", color: "#FCD34D" }}>
+      Evrak {tamam}/{evraklar.length}
+    </Link>
   );
 }
 
@@ -363,22 +377,19 @@ function PanelContent() {
       ) : (
         <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
+          {/* 23.11.2026 her ekrana uyum: 6 sutun; 1400 px alti Evraklar gizli (kisa sayac), 1280 px alti kart (components/panel/is-listesi-satirlari.tsx) */}
+          <table className={LISTE_TABLO}>
+            <thead className={LISTE_BASLIK}>
               <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Proforma No</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Müşteri</th>
-                <th lang="en" className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Booking No</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Gemi Kalkış</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Talimat C/O</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Beyanname C/O</th>
-                <th className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
-                <th className="text-right px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Proforma · müşteri · booking / gemi kalkış">Sipariş</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off">Cut-off</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1400px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
+                <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={LISTE_GOVDE}>
               {gorunenler.map((oge, idx) => {
                 if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} gorev={yuklemePlani.ozetler[oge.anahtar] || null} />;
                 if (oge.tur === "odeme") return <OdemeListeSatiri key={oge.anahtar} p={oge.odeme} simdi={simdi} listeYetkisi={listeYetkisi} />;
@@ -410,38 +421,39 @@ function PanelContent() {
                   <React.Fragment key={dosya.id}>
                     {/* Ana satır (16.11.2026: tek satir; adimlar / mal cinsi / tam evrak rozetleri ▾ detay satirinda) */}
                     <tr id={`dosya-satir-${dosya.id}`} data-vurgu={vurgulu ? "evet" : undefined}
-                      className={`border-b hover:bg-white/[0.03] transition-colors ${staggerClass}`}
+                      className={`${LISTE_SATIR} ${staggerClass}`}
                       style={{ borderColor: CARD_BORDER, ...durumKenari(oge.durum), ...(vurgulu ? { backgroundColor: "rgba(16,185,129,0.08)", boxShadow: `inset 3px 0 0 ${ACCENT}` } : {}) }}>
                       {/* 23.11.2026: yuklemesi suren dosya sari; altinda dolu / rezervasyon ve (varsa) cut-off uyarisi */}
                       <DurumHucresi durum={oge.durum} alt={oge.durum === "basladi" ? (
                         <>{dosya.dosya_no}<br />{oge.yukleme.dolu}/{oge.yukleme.toplam} dolu · {oge.yukleme.kalan} kaldı
                           {oge.cutoffYakin ? <><br /><span style={{ color: "#FCA5A5" }}>Cut-off yakın</span></> : null}</>
                       ) : dosya.dosya_no} />
-                      <td className="px-3 py-3 align-top">
-                        <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }} />
-                      </td>
-                      <td className="px-3 py-3 align-top max-w-[220px]">
+                      <td className={`${HUCRE_TAM} xl:max-w-[240px]`}>
+                        <CokluNoKisa deger={dosya.proforma_no || dosya.dosya_no} className="block text-xs font-semibold truncate" style={{ color: ACCENT }} />
                         {pazarYetkisi && dosya.alici_firma ? (
                           <Link href={`/pazar?musteri=${encodeURIComponent(dosya.alici_firma)}`} title="Pazar'da müşteri kartını aç" className="block text-xs font-medium text-white truncate hover:underline decoration-white/40" data-musteri-link>
                             {dosya.alici_firma}
                           </Link>
                         ) : (
-                          <p className="text-xs font-medium text-white truncate">{dosya.alici_firma || "—"}</p>
+                          <p className="text-xs font-medium text-white truncate" title={dosya.alici_firma || undefined}>{dosya.alici_firma || "—"}</p>
                         )}
                         <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{dosya.varis_limani || ""}</p>
+                        {hasRez && (
+                          <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: TEXT_MUTED }} title={[latestRez!.booking_no, latestRez!.gemi_adi].filter(Boolean).join(" · ")}>
+                            {latestRez!.booking_no || "—"} · ETD {latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}
+                          </p>
+                        )}
                       </td>
                       {!hasRez ? (
-                        <td className="px-3 py-3 align-top" colSpan={5}>
+                        <td className={HUCRE_GENIS} colSpan={2}>
                           {/* 23.11.2026: rezervasyonsuz dosya = "Rezervasyon bekliyor" (mavi); dogrudan rezervasyon ekranina */}
-                          <Link href={`/dosya/${dosya.id}?tab=rezervasyon&action=new`} className="inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap hover:underline" style={{ color: "#93C5FD" }} data-rezervasyon-ekle>
+                          <Link href={`/dosya/${dosya.id}?tab=rezervasyon&action=new`} className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline" style={{ color: "#93C5FD" }} data-rezervasyon-ekle>
                             <CalendarDays size={12} /> Henüz rezervasyon alınmadı · Rezervasyon ekle
                           </Link>
                         </td>
                       ) : (
                         <>
-                          <td className="px-3 py-3 align-top"><span className="text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.booking_no}</span></td>
-                          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{latestRez!.gemi_kalkis_tarihi ? formatDateTR(latestRez!.gemi_kalkis_tarihi) : "—"}</span></td>
-                          <td className="px-3 py-3 align-top">
+                          <td className={HUCRE}>
                             {konteynerAdedi > 0 ? (
                               <div>
                                 <p className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{eklenenKont}/{konteynerAdedi} <span className="text-[10px]" style={{ color: "#4A5262" }}>alınan</span></p>
@@ -454,8 +466,11 @@ function PanelContent() {
                                 {gorev && <GunlukGorev {...gorev} />}
                               </div>
                             ) : <span className="text-xs" style={{ color: TEXT_MUTED }}>—</span>}
+                            <EvrakSayaci dosya={dosya} className={EVRAK_SAYAC_DAR} />
                           </td>
-                          <td className="px-3 py-3 align-top">
+                          <td className={HUCRE}>
+                            <div className="flex flex-col gap-1.5">
+                            <div><CutoffEtiketi>Talimat</CutoffEtiketi>
                             {latestRez!.talimat_cutoff ? (
                               <CutoffSayac
                                 deger={latestRez!.talimat_cutoff}
@@ -464,8 +479,8 @@ function PanelContent() {
                                 tamamAciklama={dosya.konsimento_dosya_url ? "Konşimento talimatı gönderildi - talimatı aç" : "Draft BL alındı - belgeyi aç"}
                               />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
-                          </td>
-                          <td className="px-3 py-3 align-top">
+                            </div>
+                            <div><CutoffEtiketi>Beyanname</CutoffEtiketi>
                             {latestRez!.beyanname_cutoff ? (
                               <CutoffSayac
                                 deger={latestRez!.beyanname_cutoff}
@@ -474,12 +489,14 @@ function PanelContent() {
                                 tamamAciklama="Beyanname gönderildi - belgeyi aç"
                               />
                             ) : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}
+                            </div>
+                            </div>
                           </td>
                         </>
                       )}
-                      <td className="px-3 py-3 align-top"><EvrakRozetleri dosya={dosya} /></td>
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className={HUCRE_EVRAK}><EvrakRozetleri dosya={dosya} /></td>
+                      <td className={HUCRE_ISLEM}>
+                        <div className="flex items-center justify-end max-xl:justify-start gap-1">
                           <button type="button" onClick={() => detayDegistir(dosya.id)} aria-expanded={detayAcik} title={detayAcik ? "Ayrıntıyı gizle" : "Ayrıntı: adımlar, evraklar, mal cinsi"}
                             className="inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors hover:text-white" style={{ backgroundColor: CARD_BORDER, color: TEXT_MUTED }} data-detay-ac>
                             {detayAcik ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -505,10 +522,11 @@ function PanelContent() {
                           </button>
                           <button
                             onClick={() => gecisliGit(`/dosya/${dosya.id}`)}
+                            title="Dosya detayı"
                             className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-medium text-white transition-colors hover:opacity-90 whitespace-nowrap"
                             style={{ backgroundColor: ACCENT }}
                           >
-                            <ExternalLink size={12} /> Detay
+                            <ExternalLink size={12} /> <span className="hidden 2xl:inline">Detay</span>
                           </button>
                           {yetkiler.sayfa_yetkileri.yeni_dosya && (
                             <button
@@ -524,8 +542,8 @@ function PanelContent() {
                     </tr>
 
                     {/* Detay satiri (▾): tam evrak rozetleri + adimlar + mal cinsi / gemi */}
-                    {detayAcik && <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-detay-satiri>
-                      <td colSpan={10} className="px-4 py-2.5">
+                    {detayAcik && <tr className="border-b max-xl:block" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }} data-detay-satiri>
+                      <td colSpan={LISTE_SUTUN_SAYISI} className="px-4 py-2.5 max-xl:block">
                         <EvrakDurumu dosya={dosya} />
                         <div className="flex items-center gap-1.5 flex-wrap mt-2">
                           {akisAdimlari.map((adim) => {

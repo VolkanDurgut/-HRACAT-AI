@@ -27,6 +27,35 @@ export const DURUM_RENGI: Record<ListeDurumu, { renk: string; zemin: string; ken
   odeme: { renk: "#9AA3B5", zemin: "rgba(148,163,184,0.10)", kenar: "#4A5262" },
 };
 
+/**
+ * 23.11.2026 HER EKRANA UYUM (kullanici: "%100 iken yana kaydirma yapmak istemiyorum"): 10 sutun -> 6
+ * (Durum | Siparis: proforma + musteri + booking / ETD | Konteyner | Cut-off: talimat + beyanname | Evraklar | Islemler).
+ *  - 1400 px alti: Evraklar sutunu gizli; Konteyner hucresinde kisa "Evrak n/4" sayaci, ▾ detayda tam evrak durumu.
+ *  - xl alti (< 1280 px; 240 px kenar cubuguyla tablo sigmaz): satirlar kart olur (baslik gizli; tablette 4, telefonda
+ *    2 sutunlu izgara; Islemler tam satir).
+ * Tum satir turleri (dosya / is emri / odeme) ayni sinif sabitlerini kullanir; sutun sayisi her satirda ayni kalir.
+ */
+export const LISTE_TABLO = "w-full max-xl:block";
+export const LISTE_GOVDE = "max-xl:block";
+export const LISTE_BASLIK = "max-xl:hidden";
+export const LISTE_SATIR = "border-b hover:bg-white/[0.03] transition-colors max-xl:grid max-xl:grid-cols-2 sm:max-xl:grid-cols-4 max-xl:gap-x-3 max-xl:py-2";
+export const HUCRE = "px-2.5 py-3 align-top max-xl:block max-xl:min-w-0 max-xl:px-3 max-xl:py-1";
+/** Durum / Siparis: telefonda tam satir, tablette 1 sutun */
+export const HUCRE_TAM = `${HUCRE} max-sm:col-span-2`;
+/** colSpan'li bilgi hucresi (rezervasyon / odeme bekliyor): kartta 2 sutun */
+export const HUCRE_GENIS = `${HUCRE} max-xl:col-span-2`;
+/** Islemler: kartta tam satir, sola yasli */
+export const HUCRE_ISLEM = `${HUCRE} text-right max-xl:col-span-full max-xl:text-left`;
+export const HUCRE_EVRAK = "px-2.5 py-3 align-top hidden min-[1400px]:table-cell";
+/** Evraklar sutunu gizliyken (dar ekran) gorunen kisa evrak sayaci */
+export const EVRAK_SAYAC_DAR = "min-[1400px]:hidden";
+export const LISTE_SUTUN_SAYISI = 6;
+
+/** Cut-off hucresinde kucuk baslik (Talimat / Beyanname). */
+export function CutoffEtiketi({ children }: { children: React.ReactNode }) {
+  return <span className="block text-[9.5px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: "#5B6475" }}>{children}</span>;
+}
+
 /** Satirin sol kenar cizgisi (tr style'ina eklenir). */
 export const durumKenari = (d: ListeDurumu): React.CSSProperties => ({ boxShadow: `inset 3px 0 0 ${DURUM_RENGI[d].kenar}` });
 
@@ -38,7 +67,7 @@ const AKSIYON_IKONU: Record<BekleyenAksiyon["tur"], React.ReactNode> = {
 export function DurumHucresi({ durum, alt }: { durum: ListeDurumu; alt?: React.ReactNode }) {
   const r = DURUM_RENGI[durum];
   return (
-    <td className="px-3 py-3 align-top whitespace-nowrap" data-durum={durum}>
+    <td className={`${HUCRE_TAM} whitespace-nowrap`} data-durum={durum}>
       <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-bold uppercase tracking-wide" style={{ backgroundColor: r.zemin, color: r.renk }}>
         {DURUM_ETIKETI[durum]}
       </span>
@@ -59,19 +88,14 @@ function AksiyonDugmesi({ a, yetkili }: { a: BekleyenAksiyon; yetkili: boolean }
   );
 }
 
-function ProformaHucresi({ no }: { no: string | null }) {
+/** Siparis hucresi: proforma (ust) + musteri + liman; booking'liyse booking / gemi / ETD. */
+function SiparisHucresi({ no, musteri, alt, booking }: { no: string | null; musteri: string | null; alt: string | null; booking?: React.ReactNode }) {
   return (
-    <td className="px-3 py-3 align-top">
-      <span className="text-xs font-semibold whitespace-nowrap font-mono" style={{ color: no ? ACCENT : TEXT_MUTED }}>{no || "proforma yok"}</span>
-    </td>
-  );
-}
-
-function MusteriHucresi({ musteri, alt }: { musteri: string | null; alt: string | null }) {
-  return (
-    <td className="px-3 py-3 align-top max-w-[220px]">
+    <td className={`${HUCRE_TAM} xl:max-w-[240px]`}>
+      <span className="block text-xs font-semibold font-mono truncate" style={{ color: no ? ACCENT : TEXT_MUTED }} title={no || undefined}>{no || "proforma yok"}</span>
       <p className="text-xs font-medium text-white truncate" title={musteri || undefined}>{musteri || "—"}</p>
       <p className="text-[10px] truncate" style={{ color: TEXT_MUTED }}>{alt || ""}</p>
+      {booking}
     </td>
   );
 }
@@ -83,35 +107,37 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { 
   const bookingli = s.tur === "rezervasyonlu";
   const bekleme = gundur(s.on_odeme_tarihi, simdi);
   return (
-    <tr className="border-b hover:bg-white/[0.03] transition-colors" style={{ borderColor: CARD_BORDER, ...durumKenari(durum) }}
+    <tr className={LISTE_SATIR} style={{ borderColor: CARD_BORDER, ...durumKenari(durum) }}
       data-testid="liste-is-emri" data-booking={s.booking_no || ""}>
       <DurumHucresi durum={durum} alt={bookingli ? "Dosya açılmadı" : bekleme !== null ? `${bekleme} gündür` : null} />
-      <ProformaHucresi no={s.proforma_no} />
-      <MusteriHucresi musteri={s.musteri} alt={s.varis_limani} />
+      <SiparisHucresi no={s.proforma_no} musteri={s.musteri} alt={s.varis_limani} booking={bookingli ? (
+        <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: TEXT_MUTED }} title={[s.booking_no, s.gemi, s.sefer].filter(Boolean).join(" · ")}>
+          {s.booking_no} · ETD {trTarih(s.etd)}
+        </p>
+      ) : null} />
       {bookingli ? (
         <>
-          <td className="px-3 py-3 align-top">
-            <span className="block text-xs font-mono whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.booking_no}</span>
-            <span className="block text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }}>{[s.gemi, s.sefer].filter(Boolean).join(" / ")}</span>
-          </td>
-          <td className="px-3 py-3 align-top"><span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{trTarih(s.etd)}</span></td>
-          <td className="px-3 py-3 align-top">
+          <td className={HUCRE}>
             <span className="text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }}>{s.konteyner ? `${s.konteyner} kont.` : "—"}</span>
             {gorev && <GunlukGorev {...gorev} />}
           </td>
-          <td className="px-3 py-3 align-top">{s.talimat_cutoff ? <CutoffSayac deger={s.talimat_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</td>
-          <td className="px-3 py-3 align-top">{s.beyan_cutoff ? <CutoffSayac deger={s.beyan_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</td>
+          <td className={HUCRE}>
+            <div className="flex flex-col gap-1.5">
+              <div><CutoffEtiketi>Talimat</CutoffEtiketi>{s.talimat_cutoff ? <CutoffSayac deger={s.talimat_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</div>
+              <div><CutoffEtiketi>Beyanname</CutoffEtiketi>{s.beyan_cutoff ? <CutoffSayac deger={s.beyan_cutoff} /> : <span className="text-xs" style={{ color: "#4A5262" }}>—</span>}</div>
+            </div>
+          </td>
         </>
       ) : (
-        <td className="px-3 py-3 align-top" colSpan={5}>
+        <td className={HUCRE_GENIS} colSpan={2}>
           <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: DURUM_RENGI.rez_bekliyor.renk }}>
             <Hourglass size={12} /> Booking bekleniyor · ön ödeme {trTarih(s.on_odeme_tarihi)}
           </span>
-          <span className="block text-[10.5px] mt-0.5 truncate max-w-[520px]" style={{ color: TEXT_MUTED }}>{urunOzeti(s.konteyner, [s.cinsi, s.cuval_markasi, s.ambalaj]) || "—"}</span>
+          <span className="block text-[10.5px] mt-0.5 truncate max-w-[420px]" style={{ color: TEXT_MUTED }}>{urunOzeti(s.konteyner, [s.cinsi, s.cuval_markasi, s.ambalaj]) || "—"}</span>
         </td>
       )}
-      <td className="px-3 py-3 align-top"><span className="text-[10.5px] whitespace-nowrap" style={{ color: "#4A5262" }}>Dosya yok</span></td>
-      <td className="px-3 py-3 align-top text-right"><AksiyonDugmesi a={s.aksiyon} yetkili={yetkili} /></td>
+      <td className={HUCRE_EVRAK}><span className="text-[10.5px] whitespace-nowrap" style={{ color: "#4A5262" }}>Dosya yok</span></td>
+      <td className={HUCRE_ISLEM}><AksiyonDugmesi a={s.aksiyon} yetkili={yetkili} /></td>
     </tr>
   );
 }
@@ -120,20 +146,20 @@ export function IsEmriListeSatiri({ s, durum, yetkili, simdi, gorev = null }: { 
 export function OdemeListeSatiri({ p, simdi, listeYetkisi }: { p: OdemeBekleyen; simdi: number; listeYetkisi: boolean }) {
   const gun = gundur(p.proforma_tarihi, simdi);
   return (
-    <tr className="border-b" style={{ borderColor: CARD_BORDER, ...durumKenari("odeme"), opacity: 0.62 }} data-testid="liste-odeme">
+    <tr className={LISTE_SATIR} style={{ borderColor: CARD_BORDER, ...durumKenari("odeme"), opacity: 0.62 }} data-testid="liste-odeme">
       <DurumHucresi durum="odeme" alt={gun !== null ? `${gun} gündür` : null} />
-      <ProformaHucresi no={p.proforma_no} />
-      <MusteriHucresi musteri={p.musteri} alt={p.varis_limani} />
-      <td className="px-3 py-3 align-top" colSpan={6}>
+      <SiparisHucresi no={p.proforma_no} musteri={p.musteri} alt={p.varis_limani} />
+      <td className={HUCRE_GENIS} colSpan={2}>
         <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold uppercase tracking-wider"
           style={{ backgroundColor: DURUM_RENGI.odeme.zemin, color: DURUM_RENGI.odeme.renk, border: `1px dashed ${DURUM_RENGI.odeme.kenar}` }}>
           <Banknote size={15} /> Ödeme bekliyor
         </span>
-        <span className="block text-[10.5px] mt-1 truncate max-w-[560px]" style={{ color: TEXT_MUTED }}>
+        <span className="block text-[10.5px] mt-1 truncate max-w-[420px]" style={{ color: TEXT_MUTED }}>
           Proforma {trTarih(p.proforma_tarihi)} · {urunOzeti(p.konteyner, [p.urun, p.marka, p.paketleme]) || "—"}
         </span>
       </td>
-      <td className="px-3 py-3 align-top text-right">
+      <td className={HUCRE_EVRAK} />
+      <td className={HUCRE_ISLEM}>
         {listeYetkisi ? (
           <Link href="/siparisler?sekme=onay" title="Ön ödeme / imzalı proforma Sipariş Listesi'nde işaretlenir" className="text-[11px] hover:underline whitespace-nowrap" style={{ color: TEXT_MUTED }}>
             Sipariş Listesi

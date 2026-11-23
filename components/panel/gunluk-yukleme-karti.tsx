@@ -158,7 +158,7 @@ export function GunlukGorev({ bugunYukle, bugunAl, hedefGun, gecikme, alimSonSaa
   if (bugunYukle === 0 && bugunAl === 0 && !gecikme) return <p className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>Hedef: {gunEtiketi(hedefGun)}</p>;
   const parca = [bugunAl > 0 ? `${bugunAl} boş al${alimSonSaat && alimSonBugun ? ` (son ${alimSonSaat})` : ""}` : null, bugunYukle > 0 ? `${bugunYukle} yükle` : null].filter(Boolean).join(" · ");
   return (
-    <p className={`text-[10.5px] mt-0.5 font-semibold whitespace-nowrap ${gecikme ? "text-red-300" : "text-emerald-300"}`} data-gunluk-gorev>
+    <p className={`text-[10.5px] mt-0.5 font-semibold leading-snug ${gecikme ? "text-red-300" : "text-emerald-300"}`} data-gunluk-gorev>
       {parca ? `Bugün: ${parca}` : "Hedef günü geçti"}
     </p>
   );

@@ -1515,3 +1515,8 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
   sayı rezervasyon adedinin altında. Hepsi dolunca normal duruma döner (evrak bekleyen dolu dosyalar sarı kalmaz). Sarılar
   kalan konteyner çoktan aza (eşitse toplam, sonra talimat); altında kırmızı + yeşil TEK sıra, ilk talimat cut-off'u erken
   olan üstte. Sarı satırın cut-off'u yakınsa "Cut-off yakın" notu ve Cut-off filtresinde de görünür (lib/panel/is-listesi.ts).
+- 23.11.2026 Ana Panel her ekrana uyum (kullanıcı: "%100 iken yana kaydırma istemiyorum"): liste 10 sütundan 6'ya indi
+  (Durum | Sipariş: proforma + müşteri + liman + booking · ETD | Konteyner | Cut-off: talimat + beyanname alt alta | Evraklar |
+  İşlemler). 1400 px altı Evraklar sütunu gizli (Konteyner hücresinde "Evrak n/4" sayacı, ▾ detayda tam durum); 1280 px altı
+  (240 px kenar çubuğuyla tablo sığmaz) satırlar kart olur (tablette 4, telefonda 2 sütun). Sınıf sabitleri:
+  components/panel/is-listesi-satirlari.tsx (LISTE_SATIR, HUCRE*). Detay düğmesi yazısı yalnız 2xl'de.

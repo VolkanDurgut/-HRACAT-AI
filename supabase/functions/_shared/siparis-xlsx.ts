@@ -4,7 +4,7 @@
  * (lib/xlsx-yaz.ts kurali). Yukleme plani operasyonun dosyasiyla ayni duzende: "46.HAFTA (08 KASIM - 14 KASIM)".
  */
 import { XS, type XlsxHucre, type XlsxSayfa } from "./xlsx-yaz.ts";
-import { BOLUM_BASLIGI, DURUM_ADI, planBloklari, planKalemleri, saat, siparisBolumleri, type PlanSatiri, type SiparisSatiri } from "./siparis-liste.ts";
+import { BOLUM_BASLIGI, DURUM_ADI, haftaNo, planBloklari, planKalemleri, saat, siparisBolumleri, type PlanSatiri, type SiparisSatiri } from "./siparis-liste.ts";
 import type { KalanOdeme } from "./siparis-odeme.ts";
 
 const tarih = (iso: string | null): Date | null => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`) : null);
@@ -25,15 +25,19 @@ export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi", 
   const son = kalanlar ? "R" : "P";
   const satirlar: (XlsxHucre | null)[][] = [baslik.map((b) => ({ v: b, s: XS.tabloBaslik }))];
   const birlestir: string[] = [];
+  // 23.11.2026 "ilk kaldigi yer": sevk edilmemis ilk siparis satiri (yoksa ilk ara bolum basligi) acilista gorunur
+  let kaldigiYer = 0;
   for (const b of siparisBolumleri(liste)) {
     if (!b.adet) continue;
     if (b.bolum !== "rezervasyon") {
       satirlar.push([]);
       satirlar.push([{ v: BOLUM_BASLIGI[b.bolum], s: XS.baslik }]);
       birlestir.push(`A${satirlar.length}:${son}${satirlar.length}`);
+      if (!kaldigiYer) kaldigiYer = satirlar.length;
     }
     for (const s of b.satirlar) {
       const t = s.durum === "sevk_edildi";
+      if (!kaldigiYer && !t) kaldigiYer = satirlar.length + 1;
       const m = (v: string | null | undefined) => ({ v: v ?? "", s: yesil(t, XS.metin, XS.metinYesil) });
       const k = kalanlar?.get(s.anahtar);
       const kalanHucreleri: (XlsxHucre | null)[] = !kalanlar ? [] : !k ? [m(""), m("")] : [
@@ -57,7 +61,12 @@ export function siparisSayfasi(liste: SiparisSatiri[], ad = "Sipariş Listesi", 
     }
   }
   const genislik = [20, 30, 28, 9, 9, 12, 9, 14, 16, 18, 22, 18, 16, 18, 18, 11];
-  return { ad, sutunGenislik: kalanlar ? [...genislik, 14, 16] : genislik, satirlar, birlestir };
+  // 23.11.2026: baslik satiri sabit + filtre dugmeleri + basili her sayfada baslik; acilis kaldigi yerden
+  return {
+    ad, sutunGenislik: kalanlar ? [...genislik, 14, 16] : genislik, satirlar, birlestir,
+    dondur: "A2", filtre: `A1:${son}${Math.max(2, satirlar.length)}`, yazdirBaslik: "1:1",
+    baslangic: kaldigiYer > 1 ? `A${kaldigiYer}` : undefined,
+  };
 }
 
 /** Operasyonun yukleme plani Excel'iyle BIREBIR ayni 16 baslik ve alt baslik satiri */
@@ -72,10 +81,15 @@ const ALT_BASLIK: Record<number, string> = { 8: "BOŞ EKİPMAN", 14: "GEMİ KALK
 export function planSayfasi(liste: PlanSatiri[], ad = "Yükleme Planı", bugun?: string): XlsxSayfa {
   const satirlar: (XlsxHucre | null)[][] = [];
   const birlestir: string[] = [];
+  // 23.11.2026 "ilk kaldigi yer": bu haftanin (yoksa sonraki ilk haftanin) blok basligi acilista ustte; blok basliklari gorunur
+  const buHafta = bugun ? haftaNo(bugun) : null;
+  const buKod = buHafta ? buHafta.yil * 100 + buHafta.hafta : null;
+  let kaldigiYer = 0;
   for (const b of planBloklari(liste)) {
     if (satirlar.length) satirlar.push([], []);
     satirlar.push([{ v: b.etiket, s: XS.baslik }]);
     birlestir.push(`A${satirlar.length}:P${satirlar.length}`);
+    if (!kaldigiYer && buKod !== null && b.anahtar !== "bekleyen" && b.yil && b.hafta && b.yil * 100 + b.hafta >= buKod) kaldigiYer = satirlar.length;
     satirlar.push(PLAN_BASLIK.map((x) => ({ v: x, s: XS.tabloBaslik })));
     satirlar.push(PLAN_BASLIK.map((_, i) => (i === 2 ? { v: b.konteyner, s: XS.toplamTamSayi } : { v: ALT_BASLIK[i] ?? "", s: XS.tabloBaslik })));
     for (const p of b.satirlar) {
@@ -100,5 +114,8 @@ export function planSayfasi(liste: PlanSatiri[], ad = "Yükleme Planı", bugun?:
     }
   }
   if (!satirlar.length) satirlar.push([{ v: "Planlı yükleme yok.", s: XS.not }]);
-  return { ad, sutunGenislik: [30, 22, 9, 18, 20, 14, 16, 12, 18, 18, 13, 13, 13, 13, 12, 24], satirlar, birlestir };
+  return {
+    ad, sutunGenislik: [30, 22, 9, 18, 20, 14, 16, 12, 18, 18, 13, 13, 13, 13, 12, 24], satirlar, birlestir,
+    baslangic: kaldigiYer > 1 ? `A${kaldigiYer}` : undefined,
+  };
 }

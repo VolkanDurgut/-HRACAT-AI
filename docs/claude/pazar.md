@@ -335,3 +335,10 @@ Kullanıcı: "Mevcut pazar için siparişi olmayan müşterilerimizin export ark
   (günlük göreve giremez). Excel ekli (başlık sabit, filtre). Test 23.11 04:21 mesensei'ye gitti. Ayarlar > Rapor Alıcıları'nda
   Önizle / Test maili (api/rapor-edge izinli listesinde). Canlıya: Rapor Alıcıları'nda "Canlı" açılınca.
 - Edge karşılaştırması: canlıdaki `_shared/rapor-kabugu.ts` yalnız bir yorum satırında ("Özet"/"Ozet") farklı; kod aynı.
+- **Canlıya alış (23.11.2026 04:4x, kullanıcı: "Son olarak sistemi canlıya alalım")**: görev önceliği (20261123111000) ve
+  `20261123113000_siparissiz_canliya_alis.sql` CANLI. Doğruluk kontrolünde ilk test raporunda Ali Salah / Backaldrin / Danah
+  "sevkiyat kaydı yok" görünüyordu: Yükleme Planı'nda farklı yazım ("ALI SALAH", "SHARIKAT BACKALDRIN", "DANAH ENTERPRISES OFF
+  SHORE"; ayrıca "ATLANPASIFIC") karta bağlanmıyordu → ek anahtar eklendi; Ali Salah 5 sevkiyat, ritim 64 gün ("erken"). Siparişsiz
+  tespiti defter + dosya + proforma ile çapraz doğrulandı (17 müşterinin açık kaydı yok). Bağlanmayan plan adları: GMB- BOCUUM
+  (GMB Trading ile aynı mı doğrulanmadı), LEM INTERNATIONAL, AYANSH, SHARIKAT DARRAS, GOLDEN GLORY, JB (Pazar kartı yok).
+  rapor_alicilari 'siparissiz' canli=true: ilk gerçek mail pazartesi 23.11 09:00 Harun Bey'e (CC bbt@, execution@).

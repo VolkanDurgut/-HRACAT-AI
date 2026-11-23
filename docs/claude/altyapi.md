@@ -456,3 +456,19 @@
   `proformalar OR analiz OR navlun`; mevcut kayıtlara navlun = analiz (erişim değişmedi); operation@ navlun = true.
 - auth-context: anahtarı olmayan eski kayıtta navlun = analiz (geri uyum). Proforma Oluştur açıklamasına
   Sipariş Listesi / Yükleme Planı eklendi (aynı anahtar).
+
+## Navlun denetimi: operasyon tablosu <-> sistem (23.11.2026)
+- Kullanıcı: "Amaç navlun bildirimini en doğru şekilde tutabilmek. Volkan Bey'in raporundan alabileceğin doğru şeyleri al ve
+  doğru okunabilmesi için gerekli kontrolleri sağla." Operasyonun elle tuttuğu tablo (≈110 satır) mail kayıtlarıyla karşılaştırıldı.
+- Okuyucu (`_shared/navlun-oku.ts`): ardından ":" / sayı gelen "Ft" / "Free time" SONRAKİ alanın etiketidir. "Tt: 42 days Ft: 14
+  days" (free time 42 okunuyordu) ve "TT:25-35 GUN FREE TIME: 9" (transit 25 / free time 35) düzeldi. Test:
+  `tests/navlun-okuma-23kasim.test.ts`. Edge navlun-bildirimi v51 (canlı).
+- Excel navlun tablosu: çıkış lokali HARİÇ teklif turuncu "$340 +lokal" (XS.navLokalHaricA/B, numFmt 168) + dipnot. Mailde
+  açık "+ lokaller / lokal hariç" ya da karşılaştırma bağlamında (acente hafızası) hariç. Web indir sayfanın bağlamını verir;
+  mail eki (edge navlun-tablosu) yeniden deploy edilince aynı.
+- Veri (`20261123130000_navlun_operasyon_tablosu_denetimi.sql`): Bata / Mombasa Draft satırları düzeltildi; ZIM Paramaribo
+  lokal hariç; arşive maili gelmemiş 24 teklif tek "elle" kaynak mesajı altında (`<operasyon-navlun-tablosu-20261123@unex-ai>`).
+  Mail kanıtlı kaydın üzerine yazılmadı. Operasyon tablosundaki hatalar (düzeltilmedi, kullanıcıya bildirildi): Evolog 6000
+  Malabo (Bata değil), Horoz Bata/Malabo transit 45, Draft Bata transit 42 / Malabo 44, Akkon Mombasa free time 10.
+- Arşive gelmeyen yazışmalar (Akabe, Jebel Ali, Port Sudan, Cotonou ESNA/Horoz, Luanda ESNA, San Juan Evolog, Bata K+N...):
+  operasyon CC'ye arşiv adresini eklemeli; yoksa her seferinde elle eklenir.

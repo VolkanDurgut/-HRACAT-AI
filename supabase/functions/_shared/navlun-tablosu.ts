@@ -253,6 +253,7 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
   });
 
   const satirlar: (XlsxHucre | null)[][] = [s1, s2, s3];
+  let lokalHaricVar = false;
   for (const l of t.limanlar) {
     const r: (XlsxHucre | null)[] = [null, { v: l.ad, s: XS.metin },
       l.hedef ? (l.hedef.para === "USD" ? { v: l.hedef.tutar, s: XS.navHedef } : { v: `${l.hedef.tutar} ${l.hedef.para}`, s: XS.navBaslik }) : { v: "", s: XS.metin }];
@@ -263,7 +264,10 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
         const h = m?.get(ay);
         if (!h) { r.push({ v: "", s: A ? XS.navOrtaA : XS.navOrtaB }); continue; }
         if (h.para === "USD" && h.ekipman === "20DC") {
-          r.push({ v: h.tutar, s: h.kaynak === "gerceklesen" ? (A ? XS.navGercekA : XS.navGercekB) : (A ? XS.navTutarA : XS.navTutarB) });
+          const haric = h.kaynak === "teklif" && lokalHaric(h, l.anahtar, t.baglam);
+          if (haric) lokalHaricVar = true;
+          r.push({ v: h.tutar, s: h.kaynak === "gerceklesen" ? (A ? XS.navGercekA : XS.navGercekB)
+            : haric ? (A ? XS.navLokalHaricA : XS.navLokalHaricB) : (A ? XS.navTutarA : XS.navTutarB) });
         } else {
           const para = h.para === "USD" ? "$" : h.para === "EUR" ? "€" : h.para;
           r.push({ v: `${h.ekipman === "20DC" ? "" : `${h.ekipman} `}${h.tutar} ${para}`, s: A ? XS.navOrtaA : XS.navOrtaB });
@@ -281,9 +285,21 @@ export function navlunTablosuSayfasi(t: NavlunTablosu, ad = "NAVLUN TABLOSU"): X
   const not = (v: string) => satirlar.push([null, { v, s: XS.not }]);
   not("Kaynak: acentelerin navlun talebi yazışmalarındaki teklifler (Navlun Bildirimi) — hücre: o ay alınan SON 20'DC fiyatı (USD).");
   if (t.gerceklesenVar) not("Yeşil kalın: gerçekleşen navlun (yükleme planı, rezervasyonu yapılmış yükleme, konteyner başı; ETD ayı).");
+  if (lokalHaricVar) not("Turuncu \"+lokal\": acentenin fiyatı çıkış lokali HARİÇ; diğer tekliflerle karşılaştırırken lokal eklenmeli (Navlun Bildirimi sayfasında toplam görünür).");
   not("HEDEF: operasyonun acenteye yazdığı son hedef fiyat (\"hedef rakamımız …\") · FREE TIME / TRANSIT: acentenin teklifinde yazdığı gün (boş = teklifte belirtilmemiş).");
   not(`Oluşturma: ${tarihTr(t.tarih)} · UNEX-AI`);
   return { ad, sutunGenislik: genislik, satirlar, birlestir, dondur: "D4" };
+}
+
+/**
+ * 23.11.2026 (operasyon tablosu karsilastirmasi: Beyrut Evergreen 340 + lokaller = 697; Paramaribo ZIM 2964 + lokal): teklif cikis
+ * lokali HARIC mi. Mailde acikca "+ lokaller / lokal haric" (lokal_dahil = false) ya da karsilastirma baglaminda (acente hafizasi)
+ * lokal haric. Bilinmiyorsa isaretlenmez.
+ */
+export function lokalHaric(h: NavlunHucresi, limanAnahtar: string, baglam: KarsilastirmaBaglami | null | undefined): boolean {
+  if (h.lokal_dahil === false) return true;
+  if (h.lokal_dahil === true || !baglam) return false;
+  return hucreKarsilastir(h, limanAnahtar, baglam).lokalDurum === "haric";
 }
 
 /** Mail ozeti icin: limanda guncel (son 60 gun) en iyi 20'DC teklif */

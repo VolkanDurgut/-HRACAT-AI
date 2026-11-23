@@ -342,7 +342,7 @@ function NavlunIcerik() {
     setTabloIslem("excel"); setHata(null); setTabloBilgi(null);
     try {
       const bugun = bugunIst();
-      const { blob, planOkunamadi } = await navlunTablosuExcel(bugun);
+      const { blob, planOkunamadi } = await navlunTablosuExcel(bugun, veri?.baglam);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `Navlun_Tablosu_${bugun.split("-").reverse().join(".")}.xlsx`;

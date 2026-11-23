@@ -3,7 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Container, FileText, Timer } from "lucide-react";
 import { supabase, type Dosya, type Konteyner, type Rezervasyon } from "@/lib/supabase";
-import { bugunTarihIstanbul, efektifTartimBilgisi, formatDateTR } from "@/lib/cutoff-utils";
+import { bugunTarihIstanbul, cutoffKalanMs, CUTOFF_YAKLASIYOR_MS, efektifTartimBilgisi, formatCutoffSaat, formatDateTR } from "@/lib/cutoff-utils";
+import { gunEtiketi, type HaftalikYukleme } from "@/lib/panel/gunluk-yukleme";
+import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { dosyaAkisiHesapla, rezervasyonlariSirala } from "@/lib/dashboard-akis";
 import { cutoffUyarilari as cutoffUyarilariHesapla } from "@/lib/panel-gorunum";
 import InfoTooltip from "@/components/info-tooltip";
@@ -23,10 +25,21 @@ import { ACCENT, CARD_BG, CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
  * "bugun yuklenen" icin son 2 gunde DBA'si yuklenen konteynerler ayrica okunur.
  * 16.11.2026 gece (kullanici: standart uyari cubugu): Cut-off karti YALNIZ sayac; liste kartlarin altindaki
  * "Cut-off uyarisi" cubugunda (components/panel/cutoff-cubugu.tsx). Hesap tek yerde: lib/panel-gorunum.ts cutoffUyarilari.
+ *
+ * 23.11.2026 (kullanici: "Bu kisimlarin dogruluguna emin olalim ... Yuklenecek konteyner haftalik tespit etmeli"):
+ *  - Yuklenecek Konteyner -> "Bu Hafta Yuklenecek": hedef gunu (beyanname'den onceki is gunu) bu hafta / gecmis olan islerin
+ *    kalan konteyneri; dosyasi acilmamis booking'ler DAHIL (eski kart yalniz acik dosyalari sayiyordu). Hesap:
+ *    lib/panel/gunluk-yukleme.ts haftalikYukleme (Gunluk Yukleme Hedefi ile ayni is listesi / plan).
+ *  - Cut-off Uyarisi: kural ayni (belgesi verilmemis, 24 saat icinde / gecmis); dosyasi acilmamis booking'ler de sayilir.
+ *    Alt yazi "listede kirmizi satirlar" kaldirildi (liste kirmizisi 0-3 gun kurali; karisiyordu): en yakin uyari yazilir.
  */
 type PanelDosyasi = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
-export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar: PanelDosyasi[]; companyId: string | null; yenileme: number }) {
+type KartUyarisi = { anahtar: string; musteri: string; tur: "Talimat" | "Beyanname"; saat: string; dosyaNo: string | null };
+
+export function PanelOzetKartlari({ dosyalar, companyId, yenileme, haftalik, isEmirleri = [] }: {
+  dosyalar: PanelDosyasi[]; companyId: string | null; yenileme: number; haftalik: HaftalikYukleme; isEmirleri?: IsEmriSatiri[];
+}) {
   const [bugunYuklenen, setBugunYuklenen] = useState<number | null>(null);
 
   // Bugun tartilan konteyner: tartim bugunse DBA en erken bugun yuklenmistir (eski Kontrol Merkezi ile ayni)
@@ -61,11 +74,19 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
   }), [dosyalar]);
 
   const bekleyenRez = aciklar.filter((x) => x.dosya.rezervasyonlar.length === 0).length;
-  const yuklenecekDosyalar = aciklar.map((x) => ({ x, kalan: Math.max(0, x.akis.adet - x.akis.dbaYuklenen) })).filter((y) => y.kalan > 0);
-  const yuklenecekToplam = yuklenecekDosyalar.reduce((t, y) => t + y.kalan, 0);
-  const cutoffUyarilari = useMemo(() => cutoffUyarilariHesapla(dosyalar), [dosyalar]);
-  const cutoffDosya = new Set(cutoffUyarilari.map((u) => u.dosyaId)).size;
-  const acilCutoff = cutoffUyarilari.some((u) => u.gun <= 1);
+  const yuklenecekToplam = haftalik.gereken;
+  const cutoffUyarilari = useMemo<KartUyarisi[]>(() => {
+    const simdi = Date.now();
+    const dosyaUyari = cutoffUyarilariHesapla(dosyalar, simdi).map((u) => ({ anahtar: `${u.dosyaId}:${u.tur}`, musteri: u.musteri || u.dosyaNo, tur: u.tur, saat: u.saat || "", dosyaNo: u.dosyaNo }));
+    // Dosyasi acilmamis booking: belge yok, iki cut-off da acik
+    const isUyari = isEmirleri.flatMap((s) => ([["Talimat", s.talimat_cutoff], ["Beyanname", s.beyan_cutoff]] as const)
+      .filter(([, c]) => { const k = cutoffKalanMs(c, simdi); return k !== null && k <= CUTOFF_YAKLASIYOR_MS; })
+      .map(([tur, c]) => ({ anahtar: `${s.anahtar}:${tur}`, musteri: s.musteri || s.booking_no || "—", tur, saat: c || "", dosyaNo: null })));
+    return [...dosyaUyari, ...isUyari].sort((a, b) => (cutoffKalanMs(a.saat, simdi) ?? 0) - (cutoffKalanMs(b.saat, simdi) ?? 0));
+  }, [dosyalar, isEmirleri]);
+  const enYakin = cutoffUyarilari[0] || null;
+  const enYakinKalan = enYakin ? cutoffKalanMs(enYakin.saat) : null;
+  const acilCutoff = enYakinKalan !== null && enYakinKalan <= 10 * 3600_000;
 
   const kart = "rounded-xl border shadow-sm p-4 animate-fade-up";
   return (
@@ -121,28 +142,29 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
         <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>DBA tartım tarihine göre</p>
       </div>
 
-      {/* 3) Yuklenecek Konteyner (gunluk raporla ayni hesap) */}
-      <div className={`${kart} stagger-3`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
+      {/* 3) Bu hafta yuklenecek (haftalikYukleme; acik dosyalar + dosyasi acilmamis booking'ler) */}
+      <div className={`${kart} stagger-3`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-haftalik-yukleme>
         <div className="flex items-center gap-2 mb-2">
           <div className="p-1.5 rounded-lg shrink-0" style={{ backgroundColor: yuklenecekToplam > 0 ? "rgba(245,158,11,0.12)" : CARD_BORDER, color: yuklenecekToplam > 0 ? "#FBBF24" : TEXT_MUTED }}><Container size={16} /></div>
-          <p className="text-xs font-medium flex-1 truncate" style={{ color: TEXT_MUTED }}>Yüklenecek Konteyner</p>
-          {yuklenecekDosyalar.length > 0 && (
-            <InfoTooltip variant="info" position="bottom" align="right" width="w-72">
-              <span className="font-semibold text-slate-200">Yüklenmeyi bekleyen:</span>
+          <p className="text-xs font-medium flex-1 truncate" style={{ color: TEXT_MUTED }}>Bu Hafta Yüklenecek</p>
+          {(haftalik.isler.length > 0 || haftalik.sonrakiKalan > 0) && (
+            <InfoTooltip variant="info" position="bottom" align="right" width="w-80">
+              <span className="font-semibold text-slate-200">{gunEtiketi(haftalik.bas)} – {gunEtiketi(haftalik.son)} yüklenmesi gereken:</span>
               <ul className="mt-1.5 space-y-1">
-                {yuklenecekDosyalar.map(({ x, kalan }) => (
-                  <li key={x.dosya.id} className="text-slate-300 flex justify-between gap-3">
-                    <span className="truncate"><span className="font-medium text-white">{x.dosya.dosya_no}</span> · {x.dosya.alici_firma || "-"}</span>
-                    <span className="shrink-0 text-amber-400 font-semibold">{kalan}</span>
+                {haftalik.isler.map((x) => (
+                  <li key={x.anahtar} className="text-slate-300 flex justify-between gap-3">
+                    <span className="truncate"><span className="font-medium text-white">{x.etiket}</span>{x.dosyaNo ? ` · ${x.dosyaNo}` : " · dosya açılmadı"}</span>
+                    <span className="shrink-0 whitespace-nowrap"><span className={x.gecikme ? "text-red-300" : "text-slate-400"}>{gunEtiketi(x.hedefGun)}</span> <span className="text-amber-400 font-semibold">{x.kalan}</span></span>
                   </li>
                 ))}
               </ul>
+              <p className="mt-2 text-slate-400">Hedef gün: beyanname cut-off&apos;undan önceki iş günü. Sonraki haftalara: {haftalik.sonrakiKalan} konteyner ({haftalik.sonrakiIs} iş).</p>
             </InfoTooltip>
           )}
         </div>
-        <p className="text-2xl font-bold text-white">{yuklenecekToplam}</p>
-        <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>
-          {yuklenecekToplam > 0 ? `açık sevkiyatlarda kalan · ${yuklenecekDosyalar.length} dosya` : "Açık sevkiyatlarda bekleyen yok"}
+        <p className="text-2xl font-bold text-white">{yuklenecekToplam} <span className="text-xs font-medium" style={{ color: TEXT_MUTED }}>konteyner</span></p>
+        <p className="text-[11px] mt-0.5 truncate" style={{ color: TEXT_MUTED }}>
+          {gunEtiketi(haftalik.bas)} – {gunEtiketi(haftalik.son)} · {haftalik.isler.length} iş · bu hafta yüklenen {haftalik.yuklenen}
         </p>
       </div>
 
@@ -155,8 +177,10 @@ export function PanelOzetKartlari({ dosyalar, companyId, yenileme }: { dosyalar:
           <p className="text-xs font-medium flex-1 truncate" style={{ color: TEXT_MUTED }}>Cut-off Uyarısı</p>
         </div>
         <p className={`text-2xl font-bold ${cutoffUyarilari.length > 0 ? "text-red-400" : "text-white"}`}>{cutoffUyarilari.length}</p>
-        {cutoffUyarilari.length > 0 ? (
-          <p className="text-[11px] mt-0.5 text-red-300" data-cutoff-ozet>{cutoffUyarilari.length} uyarı · {cutoffDosya} dosya · listede kırmızı satırlar</p>
+        {enYakin ? (
+          <p className="text-[11px] mt-0.5 text-red-300 truncate" data-cutoff-ozet title={cutoffUyarilari.map((u) => `${u.musteri} · ${u.tur} ${formatDateTR(u.saat.slice(0, 10))} ${formatCutoffSaat(u.saat)}`).join("\n")}>
+            En yakın: {enYakin.musteri} · {enYakin.tur.toLocaleLowerCase("tr")} {formatCutoffSaat(enYakin.saat)}{cutoffUyarilari.length > 1 ? ` · +${cutoffUyarilari.length - 1}` : ""}
+          </p>
         ) : (
           <p className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>24 saat içinde bekleyen cut-off yok</p>
         )}

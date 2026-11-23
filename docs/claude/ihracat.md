@@ -1523,3 +1523,7 @@ Kullanıcı: "Konteyner yüklemelerinde dışarıya araba taşırmaya çalış. 
 - 23.11.2026 (kullanıcı: "Böyle de çok amatörce oldu"): Cut-off hücresi tek satırlı iki çizgiye indi
   ("TALİMAT 26.11 12:00 [3g 08:45]" / "BEYAN …"; tamamsa yeşil "Gönderildi" / "Draft BL"; CutoffSatiri). Satır yüksekliği
   Sipariş hücresiyle eşit; hücre dolgusu py-2.5; dosyasız iş emrinde Evraklar "—". Evraklar sütunu 1500 px ve üstü.
+- 23.11.2026 Özet kartları doğrulandı (canlı veri): Aktif 14 ✓, Bugün yüklenen (DBA tartım günü) ✓, Cut-off 1 ✓ (BAKEBS talimat
+  15:00, 24 saat kuralı). "Yüklenecek Konteyner" → "Bu Hafta Yüklenecek" (haftalikYukleme: hedef günü bu hafta / geçmiş
+  işlerin kalanı, dosyası açılmamış booking'ler dahil; eski kart yalnız açık dosyaları sayıyordu: 13 → bu hafta 23). Cut-off
+  kartı dosyasız booking'leri de sayar; alt yazı "listede kırmızı satırlar" yerine en yakın uyarı (liste kırmızısı 0-3 gün).

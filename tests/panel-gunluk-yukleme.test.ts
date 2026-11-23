@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  aracIhtiyaci, bookingIsi, cuvalKgOku, dolumSaati, dosyaIsi, turSaati, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sertSonGun, sonrakiIsGunu, yuklemePlaniKur,
+  aracIhtiyaci, bookingIsi, cuvalKgOku, dolumSaati, dosyaIsi, turSaati, gunEtiketi, kapasiteHesapla, oncekiIsGunu, sertSonGun, sonrakiIsGunu, yuklemePlaniKur, haftalikYukleme,
   type Kapasite, type YuklemeIsi,
 } from "@/lib/panel/gunluk-yukleme";
 
@@ -211,4 +211,24 @@ test("gercek hafta: normal mesaide gunde en fazla 6 arac (2 bosta); mesaiyle Sal
   assert.equal(p.bugunAracMesaili, 5);
   assert.equal(p.enCokArac, 6);
   assert.equal(p.bugunEnAz, 2, "en az degismedi");
+});
+
+// ---------------------------------------------------------------- 23.11.2026: haftalik ozet karti
+test("haftalik: Pzt-Paz haftasinda hedefi dusen islerin kalan konteyneri (booking dahil); sonraki hafta ayri; bu hafta yuklenen", () => {
+  const isler = [...GERCEK,
+    is("OM", { toplam: 10, takipli: false, cuvalKg: 25, talimatTarihi: "2026-12-11", beyanTarihi: "2026-12-14", beyanZaman: "2026-12-14T10:00" }),
+    is("BIT", { toplam: 3, alinan: 3, dolu: 3, talimatTamam: true, beyanTarihi: "2026-11-24" }),
+    is("VER", { toplam: 2, alinan: 2, dolu: 1, talimatTamam: true, beyanTamam: true, beyanTarihi: "2026-11-24" }),
+  ];
+  const p = yuklemePlaniKur(isler, KAP, "2026-11-23");
+  const h = haftalikYukleme(isler, p, "2026-11-25", ["2026-11-22", "2026-11-23", "2026-11-24", "2026-11-24", "2026-11-26"]);
+  assert.equal(h.bas, "2026-11-23");
+  assert.equal(h.son, "2026-11-29");
+  assert.equal(h.gereken, 2 + 1 + 1 + 10 + 3 + 6, "BK 2, SO 1, CL 1, CR 10, AQ 3, BS 6 = plandaki 23");
+  assert.equal(h.gereken, p.gunler.filter((g) => g.tarih <= h.son).reduce((t, g) => t + g.yukle, 0), "plandaki bu haftanin gunleriyle ayni");
+  assert.deepEqual(h.isler.map((x) => x.anahtar), ["BK", "SO", "CL", "CR", "BS", "AQ"]);
+  assert.equal(h.sonrakiKalan, 10);
+  assert.equal(h.sonrakiIs, 1);
+  assert.equal(h.yuklenen, 3, "Pzt 1 + Sal 2; Pazar (onceki hafta) ve yarin sayilmaz");
+  assert.equal(haftalikYukleme(isler, p, "2026-11-29").bas, "2026-11-23", "Pazar ayni haftanin son gunu");
 });

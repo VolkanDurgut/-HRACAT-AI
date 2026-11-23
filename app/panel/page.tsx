@@ -24,7 +24,7 @@ import { PanelOzetKartlari } from "@/components/panel-ozet-kartlari";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 import { isEmirleriOku, odemeBekleyenleriOku, yuklemeGecmisiOku } from "@/lib/panel/veri";
-import { bookingIsi, dosyaIsi, kapasiteHesapla, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
+import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
 import { GunlukGorev, GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
@@ -183,13 +183,14 @@ function PanelContent() {
   const [odemeler, setOdemeler] = useState<OdemeBekleyen[] | null>(null);
   // 23.11.2026 gunluk yukleme hedefi: kapasite / is gunleri gecmis tartim gunlerinden (lib/panel/gunluk-yukleme.ts)
   const [kapasite, setKapasite] = useState<Kapasite | null>(null);
+  const [yuklemeGunleri, setYuklemeGunleri] = useState<string[]>([]);
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
     // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
     const [ie, od, gc] = await Promise.allSettled([isEmirleriOku(), odemeBekleyenleriOku(), yuklemeGecmisiOku(companyId)]);
     if (ie.status === "fulfilled") setIsEmirleri(ie.value);
     if (od.status === "fulfilled") setOdemeler(od.value);
-    if (gc.status === "fulfilled") setKapasite(kapasiteHesapla(gc.value));
+    if (gc.status === "fulfilled") { setKapasite(kapasiteHesapla(gc.value)); setYuklemeGunleri(gc.value); }
   }, [user?.id, companyId]);
   useEffect(() => {
     isEmirleriniGetir();
@@ -308,6 +309,8 @@ function PanelContent() {
   const yuklemePlani = useMemo(
     () => yuklemePlaniKur(yuklemeIsleri, kapasite || { gunSayisi: 0, ortalama: 0, p75: 0, max: 0, isGunleri: [] }, bugunGunu),
     [yuklemeIsleri, kapasite, bugunGunu]);
+  // 23.11.2026 Ozet karti: bu hafta yuklenmesi gereken (hedef gunu bu hafta / gecmis) + bu hafta yuklenen
+  const haftalik = useMemo(() => haftalikYukleme(yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri), [yuklemeIsleri, yuklemePlani, bugunGunu, yuklemeGunleri]);
   const isEtiketi = useCallback((a: string) => yuklemeIsleri.find((x) => x.anahtar === a)?.etiket || a, [yuklemeIsleri]);
   const pazarYetkisi = !!yetkiler.sayfa_yetkileri.pazar;
   const kantarYetkisi = !!yetkiler.sayfa_yetkileri.kantar;
@@ -350,7 +353,7 @@ function PanelContent() {
         destructive
       />
 
-      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} />}
+      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
 
       {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} />}
 

@@ -444,3 +444,38 @@ const GUN_ADI = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
 export function gunEtiketi(t: string): string {
   return `${GUN_ADI[haftaGunu(t)]} ${t.slice(8, 10)}.${t.slice(5, 7)}`;
 }
+
+// ---------------------------------------------------------------- haftalik (Ana Panel ozet karti)
+/**
+ * 23.11.2026 (kullanici: "Yuklenecek konteyner haftalik tespit etmeli"): bu hafta (Pzt-Paz) YUKLENMESI GEREKEN konteyner =
+ * hedef gunu (beyanname cut-off'undan onceki is gunu) bu haftanin sonuna kadar olan islerin kalan (dolu olmayan) konteyneri;
+ * hedefi gecmis isler de dahil. Acik dosyalar + dosyasi acilmamis booking'ler (planla AYNI is listesi).
+ * yuklenen: bu hafta (Pzt'den bugune) DBA tartimi yapilan konteyner (Gunluk Yukleme gecmisiyle ayni kaynak).
+ */
+export type HaftalikIs = { anahtar: string; etiket: string; dosyaNo: string | null; kalan: number; hedefGun: string; gecikme: boolean };
+export type HaftalikYukleme = {
+  bas: string; son: string; gereken: number; isler: HaftalikIs[]; yuklenen: number;
+  sonrakiKalan: number; sonrakiIs: number;
+};
+
+const gunStr = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+export function haftalikYukleme(isler: YuklemeIsi[], plan: Pick<YuklemePlani, "ozetler">, bugun: string, yuklemeGunleri: string[] = []): HaftalikYukleme {
+  const pztFark = (haftaGunu(bugun) + 6) % 7; // Pzt = 0
+  const bas = gunStr(gunMs(bugun) - pztFark * 86400000);
+  const son = gunStr(gunMs(bas) + 6 * 86400000);
+  const hafta: HaftalikIs[] = [];
+  let sonrakiKalan = 0;
+  let sonrakiIs = 0;
+  for (const i of isler) {
+    const kalan = Math.max(0, i.toplam - i.dolu);
+    const oz = plan.ozetler[i.anahtar];
+    if (kalan <= 0 || i.beyanTamam) continue; // beyanname verilmis: yukleme kapanmis
+    // Plana girmeyen (cut-off'u olmayan / pencere disi) is: sonraki haftalara sayilir
+    if (oz && oz.hedefGun <= son) hafta.push({ anahtar: i.anahtar, etiket: i.etiket, dosyaNo: i.dosyaNo, kalan, hedefGun: oz.hedefGun, gecikme: oz.gecikme });
+    else { sonrakiKalan += kalan; sonrakiIs += 1; }
+  }
+  hafta.sort((a, b) => a.hedefGun.localeCompare(b.hedefGun) || b.kalan - a.kalan || a.etiket.localeCompare(b.etiket, "tr"));
+  const yuklenen = yuklemeGunleri.filter((g) => { const t = g.slice(0, 10); return t >= bas && t <= bugun; }).length;
+  return { bas, son, gereken: hafta.reduce((t, x) => t + x.kalan, 0), isler: hafta, yuklenen, sonrakiKalan, sonrakiIs };
+}

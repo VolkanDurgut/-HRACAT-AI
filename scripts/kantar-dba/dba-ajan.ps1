@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # ============================================================================
-# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.1.0
+# UNEX - DBA OTOMATIK YUKLEME GOREVI (kantar bilgisayari) - surum 1.2.0
 # ============================================================================
 # Windows Gorev Zamanlayici her dakika calistirir (SYSTEM hesabi, pencere yok).
 # Solas'in C:\Truck Scale\DBA klasorune yazdigi "<12 hane>_<yukleten>.pdf"
@@ -19,6 +19,15 @@
 # sisteme girilmemis) gorev her dakika PDF gondermeden "bekleyen" sorusunu sorar;
 # konteyner eklenince belge ayni dakika gonderilir (PDF yedek olarak saatte bir).
 #
+# KANTAR TARTIMLARI (1.2.0, 24.11.2026): kantar programi (BAYKON Truck Scale) tartimlari yerel SQL Server
+# Express'teki TruckSolas veritabanina yaziyor. Gorev SYSTEM hesabiyla (kantar-izin.ps1 ile verilen SALT OKUMA
+# izniyle) dbo.RECORDS (tamamlanan) ve dbo.FIRST (ikinci tartimi bekleyen) tablolarindan yalniz gerekli alanlari
+# okur ve sunucuya "tartim" islemiyle gonderir. SQL'e ASLA yazmaz (yalniz SELECT). Sofor adi / TC / fotograf
+# alanlari okunmaz. Okuma basarisiz olursa DBA akisi etkilenmez (saatte bir gunluge yazilir).
+#   - Ilk calisma: son 14 gunun tartimlari; sonra her dakika yeni kayitlar + son 2 saatte cikan kayitlar
+#     (DBA durumu sonradan dolar); gunde bir kez son 3 gun yeniden (sonradan duzeltilen kayitlar).
+#   - ayar.json "kantar": { "aktif": false } ile kapatilabilir; "sunucu" / "veritabani" degistirilebilir.
+#
 # Gunluk: <kok>\gunluk\YYYY-MM.log (6 aydan eski gunlukler silinir).
 # Bu dosya bilerek SADECE ASCII karakter icerir (Windows PowerShell 5.1 BOM'suz
 # dosyayi ANSI okur; Turkce karakter bozulmasin).
@@ -31,7 +40,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
-$SURUM = '1.1.0'
+$SURUM = '1.2.0'
 $AZAMI_DOSYA_ISTEK = 15          # bir calismada en fazla gonderilecek belge
 $AZAMI_CALISMA_SN = 480          # 8 dk (gorev zaman siniri 10 dk)
 $KARARLILIK_SN = 15              # Solas yazmayi bitirsin diye son degisiklikten sonra beklenen sure
@@ -121,6 +130,66 @@ function Istek-Gonder($istemci, [string]$adres, [hashtable]$basliklar, [byte[]]$
     return @{ Durum = 0; Veri = $null; Hata = $_.Exception.GetBaseException().Message }
   } finally {
     $mesaj.Dispose()
+  }
+}
+
+function Sql-Deger($v) {
+  if ($null -eq $v -or $v -is [System.DBNull]) { return $null }
+  $m = ([string]$v).Trim()
+  if ($m -eq '') { return $null }
+  return $m
+}
+
+function Kantar-Oku([string]$sunucu, [string]$veritabani, [string]$kosul, [int]$sinir) {
+  # SALT OKUNUR: yalniz SELECT. Donus: @{ Kayitlar = ArrayList; Bekleyenler = ArrayList veya $null }
+  $baglanti = New-Object System.Data.SqlClient.SqlConnection ("Server=" + $sunucu + ";Database=" + $veritabani + ";Integrated Security=SSPI;Connect Timeout=5;Application Name=UnexDBA-ajan;ApplicationIntent=ReadOnly")
+  $baglanti.Open()
+  try {
+    $k = $baglanti.CreateCommand()
+    $k.CommandTimeout = 20
+    $k.CommandText = "SELECT TOP (" + $sinir + ") ID, EXTRA_3, PLATE_NO, QUESTION_1, QUESTION_2, QUESTION_3, QUESTION_4, QUESTION_6, QUESTION_7, QUESTION_8, " +
+      "CONVERT(varchar(19), ENTRY_DATE_TIME, 126) AS GIRIS, CONVERT(varchar(19), EXIT_DATE_TIME, 126) AS CIKIS, " +
+      "CONVERT(varchar(40), WEIGHT_1) AS W1, CONVERT(varchar(40), WEIGHT_2) AS W2, " +
+      "CONVERT(varchar(40), TICKET_NO_WEIGHT_1) AS F1, CONVERT(varchar(40), TICKET_NO_WEIGHT_2) AS F2, " +
+      "SOLAS_02, SOLAS_03, CONVERT(varchar(10), SolasStatu) AS SDURUM, CONVERT(varchar(1), [CHANGE]) AS DEGISTI " +
+      "FROM dbo.RECORDS WHERE " + $kosul + " ORDER BY ID"
+    $kayitlar = New-Object System.Collections.ArrayList
+    $o = $k.ExecuteReader()
+    try {
+      while ($o.Read()) {
+        [void]$kayitlar.Add(@{
+          kayit_no = Sql-Deger $o['ID']; ilk_kayit_no = Sql-Deger $o['EXTRA_3']; plaka = Sql-Deger $o['PLATE_NO']
+          firma = Sql-Deger $o['QUESTION_1']; urun = Sql-Deger $o['QUESTION_2']; rezervasyon = Sql-Deger $o['QUESTION_3']
+          irsaliye_no = Sql-Deger $o['QUESTION_4']; konteyner_muhur = Sql-Deger $o['QUESTION_6']; dorse = Sql-Deger $o['QUESTION_7']
+          liman = Sql-Deger $o['QUESTION_8']; giris = Sql-Deger $o['GIRIS']; cikis = Sql-Deger $o['CIKIS']
+          tartim1_kg = Sql-Deger $o['W1']; tartim2_kg = Sql-Deger $o['W2']; fis1 = Sql-Deger $o['F1']; fis2 = Sql-Deger $o['F2']
+          dba_belge_no = Sql-Deger $o['SOLAS_02']; dba_konteyner = Sql-Deger $o['SOLAS_03']; dba_durum = Sql-Deger $o['SDURUM']; degisti = Sql-Deger $o['DEGISTI']
+        })
+      }
+    } finally { $o.Close() }
+
+    $bekleyenler = $null
+    try {
+      $k.CommandText = "SELECT TOP (100) ID, PLATE_NO, QUESTION_1, QUESTION_2, QUESTION_3, QUESTION_4, QUESTION_6, QUESTION_8, " +
+        "CONVERT(varchar(19), ENTRY_DATE_TIME, 126) AS GIRIS, CONVERT(varchar(40), WEIGHT_1) AS W1 FROM dbo.FIRST ORDER BY ID"
+      $liste = New-Object System.Collections.ArrayList
+      $o = $k.ExecuteReader()
+      try {
+        while ($o.Read()) {
+          [void]$liste.Add(@{
+            kayit_no = Sql-Deger $o['ID']; plaka = Sql-Deger $o['PLATE_NO']; firma = Sql-Deger $o['QUESTION_1']; urun = Sql-Deger $o['QUESTION_2']
+            rezervasyon = Sql-Deger $o['QUESTION_3']; irsaliye_no = Sql-Deger $o['QUESTION_4']; konteyner_muhur = Sql-Deger $o['QUESTION_6']
+            liman = Sql-Deger $o['QUESTION_8']; giris = Sql-Deger $o['GIRIS']; tartim1_kg = Sql-Deger $o['W1']
+          })
+        }
+      } finally { $o.Close() }
+      $bekleyenler = $liste
+    } catch {
+      Gunluk ("UYARI | kantar: bekleyenler (FIRST) okunamadi: " + $_.Exception.Message)
+    }
+    return @{ Kayitlar = $kayitlar; Bekleyenler = $bekleyenler }
+  } finally {
+    $baglanti.Close()
   }
 }
 
@@ -262,6 +331,54 @@ try {
     }
     if ($null -ne $yeni) { $dosyalar[$ad] = $yeni }
     Durum-Yaz $durum   # her belgeden sonra kaydet (kesinti olursa ayni belge iki kez islenmesin)
+  }
+
+  # Kantar tartimlari (1.2.0): DBA akisindan bagimsiz; hata olursa yalniz gunluge (saatte bir) yazilir
+  $kantarAyar = @{}
+  if ($ayar.ContainsKey('kantar') -and $ayar['kantar'] -is [hashtable]) { $kantarAyar = $ayar['kantar'] }
+  $kantarAktif = -not ($kantarAyar.ContainsKey('aktif') -and $kantarAyar['aktif'] -eq $false)
+  if ($kantarAktif -and -not $anahtarGecersiz -and ((Get-Date) - $baslangicZamani).TotalSeconds -lt $AZAMI_CALISMA_SN) {
+    $sunucu = $(if ($kantarAyar.ContainsKey('sunucu')) { [string]$kantarAyar['sunucu'] } else { '.\SQLEXPRESS' })
+    $veritabani = $(if ($kantarAyar.ContainsKey('veritabani')) { [string]$kantarAyar['veritabani'] } else { 'TruckSolas' })
+    try {
+      $son = $null
+      if ($durum.ContainsKey('kantarSon') -and $null -ne $durum['kantarSon']) { $son = [long]$durum['kantarSon'] }
+      $bugun = (Get-Date).ToString('yyyy-MM-dd')
+      $tamTarama = -not ($durum.ContainsKey('kantarTamTarama') -and [string]$durum['kantarTamTarama'] -eq $bugun)
+      if ($null -eq $son) {
+        $kosul = 'EXIT_DATE_TIME >= DATEADD(day, -14, GETDATE())'
+      } elseif ($tamTarama) {
+        $kosul = 'ID > ' + $son + ' OR EXIT_DATE_TIME >= DATEADD(day, -3, GETDATE())'
+      } else {
+        $kosul = 'ID > ' + $son + ' OR EXIT_DATE_TIME >= DATEADD(minute, -120, GETDATE())'
+      }
+      $okunan = Kantar-Oku $sunucu $veritabani $kosul 300
+      $json = (@{ kayitlar = $okunan.Kayitlar; bekleyenler = $okunan.Bekleyenler } | ConvertTo-Json -Depth 5 -Compress)
+      $b = $ortak.Clone(); $b['x-islem'] = 'tartim'
+      $y = Istek-Gonder $istemci $adres $b ($utf8.GetBytes($json)) 'application/json'
+      if ($y.Durum -eq 200 -and $null -ne $y.Veri) {
+        $basarili++
+        $enBuyuk = $son
+        foreach ($r in $okunan.Kayitlar) { $n = [long]$r['kayit_no']; if ($null -eq $enBuyuk -or $n -gt $enBuyuk) { $enBuyuk = $n } }
+        if ($null -eq $enBuyuk) { $enBuyuk = 0 }
+        $durum['kantarSon'] = $enBuyuk
+        if ($null -eq $son -or $tamTarama) { $durum['kantarTamTarama'] = $bugun }
+        if ($null -eq $son -or $okunan.Kayitlar.Count -ge 50) { Gunluk ("BILGI | kantar: " + $okunan.Kayitlar.Count + " tartim gonderildi (son kayit " + $enBuyuk + ")") }
+        $durum['kantarHata'] = $null
+      } elseif ($y.Durum -eq 401) {
+        $anahtarGecersiz = $true
+        Gunluk 'HATA | kantar: cihaz anahtari reddedildi (401)'
+      } else {
+        throw ("sunucu HTTP " + $y.Durum + " | " + $(if ($null -ne $y.Veri) { [string]$y.Veri['hata'] } else { [string]$y.Hata }))
+      }
+    } catch {
+      $sonHata = $null
+      if ($durum.ContainsKey('kantarHata')) { $sonHata = Zaman-Coz $durum['kantarHata'] }
+      if ($null -eq $sonHata -or ((Get-Date) - $sonHata).TotalMinutes -ge 60) {
+        Gunluk ("UYARI | kantar okunamadi/gonderilemedi: " + $_.Exception.Message)
+        $durum['kantarHata'] = (Get-Date).ToString('o')
+      }
+    }
   }
 
   # Sinyal: belge gonderilmediyse 5 dakikada bir "buradayim" (bekleyen sorusu da sinyal sayilir)

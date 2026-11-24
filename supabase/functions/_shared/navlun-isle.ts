@@ -1,6 +1,7 @@
 // Navlun Bildirimi: tek mailin kayda donusturulmesi (edge navlun-bildirimi kullanir; test edilebilir olsun diye ayri).
 import { armatorAdi, ekFormuOku, ekYorumArmatoru, fiyatAdaylari, freeTimeBul, navlunMesajOku, acenteAdi, bizdenMi, konudanLiman, transitBul, yeniKisim, type AcenteTablosu, type NavlunOlay } from "./navlun-oku.ts";
 import { limanAnahtari } from "./liman-anahtari.ts";
+import { kalemleriOku } from "./navlun-kalem.ts";
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
 const ANLAMLI = new Set(["teklif", "karsi_teklif", "hedef", "kabul", "hedef_kabul", "hedef_soru", "servis_yok", "yer_yok"]);
@@ -86,6 +87,8 @@ export function mesajIsle(g: NavlunGirdi, acenteler: AcenteTablosu) {
     ek_kaynak: g.ek_kaynak || null,
     // Elle duzeltilmis mailde (olaylari korunur) eksik free time / transit bu bilgiden tamamlanir
     ek_bilgi: ekBilgisi(g),
+    // 24.11.2026: teklif kalemleri (muhur, lokal tablosu, VGM, ENS ...) - konteyner basi toplam icin (_shared/navlun-kalem.ts)
+    kalemler: biz ? [] : kalemleriOku(yeniKisim(g.govde) + (g.ek_metin ? "\n" + g.ek_metin : "")),
   };
 }
 

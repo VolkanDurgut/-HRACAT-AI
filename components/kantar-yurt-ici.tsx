@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { KantarBekleyenSatiri } from "@/components/kantar-canli-seridi";
+import type { KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -31,9 +33,11 @@ const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 
-export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
+export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null }: {
   /** Kantar Paneli ustundeki "Yenile" basilinca artar -> liste yenilenir. */
   yenileTetik?: number;
+  /** 24.11.2026: is emri id -> kantarda tartilip irsaliyesi girilmemis kg / arac (bilgi; resmi rakam degismez) */
+  kantarBekleyen?: Map<string, KantarBekleyenIs> | null;
   /** Acik is emri sayisi (dar ekrandaki bolum dugmesi icin). */
   acikSayiBildir?: (sayi: number) => void;
 } = {}) {
@@ -259,6 +263,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir }: {
                           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
                         </div>
                         <KalanRozet emir={e} kg={kg} arac={e.yuklenen_arac} sade />
+                        {kantarBekleyen?.get(e.id) && <KantarBekleyenSatiri {...kantarBekleyen.get(e.id)!} />}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => pencereAc(e)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-white hover:brightness-110 whitespace-nowrap" style={{ backgroundColor: ACCENT }} title={`${e.is_emri_no} için araç yükle (irsaliye ekle)`}>

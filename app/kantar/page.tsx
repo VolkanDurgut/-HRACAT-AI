@@ -11,6 +11,9 @@ import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { KantarYurtIci } from "@/components/kantar-yurt-ici";
 import { KantarGelenArac } from "@/components/kantar-gelen-arac";
 import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
+import { KantarCanliSeridi } from "@/components/kantar-canli-seridi";
+import { beklemeYazi, kantarSaatYazi, type KantarCanli } from "@/lib/kantar-canli";
+import { kantarCanliOku } from "@/lib/kantar-canli-veri";
 import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
@@ -91,7 +94,10 @@ export default function KantarPage() {
   const [dbaOtoYenile, setDbaOtoYenile] = useState(0);
   const ihracatRef = useRef<HTMLElement>(null);
   const yurtIciRef = useRef<HTMLElement>(null);
-  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); setDbaOtoYenile((n) => n + 1); };
+  // 24.11.2026: canli kantar bilgisi (kantar_canli; salt okunur). Okunamazsa null -> bolumler gizli, sayfa bozulmaz.
+  const [kantarCanli, setKantarCanli] = useState<KantarCanli | null>(null);
+  const kantarCanliGetir = useCallback(async () => { setKantarCanli(await kantarCanliOku()); }, []);
+  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); setDbaOtoYenile((n) => n + 1); kantarCanliGetir(); };
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -202,6 +208,7 @@ export default function KantarPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "konteynerler", filter: `company_id=eq.${companyId}` }, () => {
         fetchKonteynerler();
         setDbaOtoYenile((n) => n + 1);
+        kantarCanliGetir();
       })
       .subscribe((durum) => {
         if (durum === "SUBSCRIBED") {
@@ -215,11 +222,11 @@ export default function KantarPage() {
         }
       });
     return () => { supabase.removeChannel(channel); };
-  }, [fetchKonteynerler, user?.id, companyId]);
+  }, [fetchKonteynerler, kantarCanliGetir, user?.id, companyId]);
 
   useEffect(() => {
     if (!user?.id || !companyId) return;
-    const gorunurseYenile = () => { if (document.visibilityState === "visible") fetchKonteynerler(); };
+    const gorunurseYenile = () => { if (document.visibilityState === "visible") { fetchKonteynerler(); kantarCanliGetir(); } };
     // Canli bildirim kacirilsa bile liste en fazla 1 dk eski kalir.
     const zamanlayici = window.setInterval(gorunurseYenile, 60_000);
     document.addEventListener("visibilitychange", gorunurseYenile);
@@ -229,7 +236,8 @@ export default function KantarPage() {
       document.removeEventListener("visibilitychange", gorunurseYenile);
       window.removeEventListener("online", gorunurseYenile);
     };
-  }, [fetchKonteynerler, user?.id, companyId]);
+  }, [fetchKonteynerler, kantarCanliGetir, user?.id, companyId]);
+  useEffect(() => { if (user?.id && companyId) kantarCanliGetir(); }, [kantarCanliGetir, user?.id, companyId]);
 
   const baglantiSorunu = okumaHatasi || !canliBagli;
   const sonGuncellemeSaat = sonGuncelleme
@@ -418,6 +426,9 @@ export default function KantarPage() {
           ))}
         </div>
 
+        {/* 24.11.2026: Su an kantarda (kantar programindan canli; bilgi amacli) */}
+        <KantarCanliSeridi veri={kantarCanli} />
+
         <div className="flex-1 min-h-0 overflow-y-auto xl:overflow-hidden grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:gap-4 pr-1 xl:pr-0" style={{ scrollbarWidth: "thin" }}>
         {/* ===== SOL: IHRACAT (DBA) - icerik degismedi ===== */}
         <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
@@ -469,7 +480,7 @@ export default function KantarPage() {
         <div className="xl:flex-1 xl:overflow-y-auto xl:min-h-0 pb-4 xl:pb-6 xl:pr-1 space-y-4" style={{ scrollbarWidth: "thin" }}>
           
           {/* Sevkiyat Durumu (28.10.2026): hangi sevkiyattan kac konteyner dolu */}
-          {ihSekme === "aktif" && <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} panelYetkisi={panelYetkisi} />}
+          {ihSekme === "aktif" && <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} panelYetkisi={panelYetkisi} kantar={kantarCanli?.konteynerler ?? null} />}
 
           {/* Bekleyen DBA'lar - tek liste (Aktif dolumlar sekmesi; DBA yukleme burada) */}
           {ihSekme === "aktif" && bekleyenlerFiltreli.length > 0 && (
@@ -500,7 +511,16 @@ export default function KantarPage() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="text-[10px] font-mono" style={{ color: TEXT_MUTED }}>{k.muhur_no || "-"}</div>
-                          <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || "-"}</div>
+                          <div className="text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{k.plaka || kantarCanli?.konteynerler.get(k.id)?.plaka || "-"}</div>
+                          {(() => {
+                            // 24.11.2026: kantar durumu (bilgi): dolduruluyor / tartildi, DBA bekleniyor
+                            const kd = kantarCanli?.konteynerler.get(k.id);
+                            if (!kd) return null;
+                            const dk = kd.giris ? (Date.now() - Date.parse(kd.giris)) / 60000 : null;
+                            return kd.durum === "dolduruluyor"
+                              ? <div className="mt-0.5 text-[10px] font-semibold text-sky-300 whitespace-nowrap" title={`Kantarda 1. tartım: ${kantarSaatYazi(kd.giris)}`} data-kantar-durum="dolduruluyor">Kantarda · {beklemeYazi(dk)}</div>
+                              : <div className="mt-0.5 text-[10px] font-semibold text-emerald-300 whitespace-nowrap" title={`Kantardan çıktı: ${kantarSaatYazi(kd.cikis)}`} data-kantar-durum="tartildi">Tartıldı {kantarSaatYazi(kd.cikis)}</div>;
+                          })()}
                         </td>
                         <td className="px-3 py-2">
                           <div className="text-xs font-medium text-white truncate max-w-[150px]" title={k.marka || "-"}>{k.marka || "-"}</div>
@@ -700,11 +720,11 @@ export default function KantarPage() {
           </div>
           <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 pb-4 xl:pb-6" style={{ scrollbarWidth: "thin" }}>
             <div id="kantar-yi-satis" role="tabpanel" hidden={gorunenSekme !== "satis"}>
-              <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} />
+              <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} kantarBekleyen={kantarCanli?.isEmirleri ?? null} />
             </div>
             {/* Alis bileseni hep bagli kalir (sayiyi bildirir); fonksiyonlar yoksa kendisi hicbir sey cizmez */}
             <div id="kantar-yi-alis" role="tabpanel" hidden={gorunenSekme !== "alis"}>
-              <KantarGelenArac yenileTetik={yurtIciYenile} acikSayiBildir={setAlisAcik} />
+              <KantarGelenArac yenileTetik={yurtIciYenile} acikSayiBildir={setAlisAcik} kantarBekleyen={kantarCanli?.alislar ?? null} />
             </div>
           </div>
         </section>

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { KantarBekleyenSatiri } from "@/components/kantar-canli-seridi";
+import type { KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -26,7 +28,11 @@ type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 const IRSALIYE_NO_RE = /^[A-Z0-9]{3,20}$/;
 const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})(?:\s*\(\d+\))?\.pdf$/i;
 
-export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTetik?: number; acikSayiBildir?: (n: number | null) => void } = {}) {
+export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null }: {
+  yenileTetik?: number; acikSayiBildir?: (n: number | null) => void;
+  /** 24.11.2026: alis id -> kantarda tartilip teslimi girilmemis kg / arac (bilgi; resmi rakam degismez) */
+  kantarBekleyen?: Map<string, KantarBekleyenIs> | null;
+} = {}) {
   const { companyId } = useAuth();
   const { showToast } = useToast();
   const [siparisler, setSiparisler] = useState<KantarAlisSiparisi[]>([]);
@@ -243,6 +249,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir }: { yenileTet
                           <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(il.oran * 100))}%`, backgroundColor: "#F59E0B" }} />
                         </div>
                         <p className="mt-1 text-[10.5px] font-semibold whitespace-nowrap" style={{ color: k.durum === "kalan" ? TEXT_MUTED : k.durum === "fazla" ? "#38BDF8" : "#34D399" }} data-testid="kalan-rozet">{k.metin}</p>
+                        {kantarBekleyen?.get(s.id) && <KantarBekleyenSatiri {...kantarBekleyen.get(s.id)!} />}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => pencereAc(s)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-black hover:brightness-110 whitespace-nowrap" style={{ backgroundColor: "#F59E0B" }} title={`${s.alis_no} için gelen aracı teslim al`}>

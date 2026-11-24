@@ -1579,3 +1579,20 @@ Canlı gösterge ağda Modbus TCP (port 502), büyük ekran ayrı TCP — Faz 4 
   bir ihracat konteynerinde dosya, mühür ve booking tutuyor.
 - Sonraki aşamalar: 1) ihracat (konteyner anında dolu, mühür, booking kontrolü), 2) iç piyasa (sevk/alış eşleştirme, eşleşmeyen
   tartım, kg farkı), 3) ana panel "şu an dolduruluyor" + ölçülen dolum süreleri, 4) canlı gösterge.
+
+### Kantar Paneli — canlı kantar bilgisi (24.11.2026) — migration 20261124120000_kantar_canli.sql (CANLIDA)
+Kullanıcı: "Bütün açık ihracat ve iç piyasa iş emirlerinin takibini otomatik kantar tonajına göre yapabiliriz değil mi? Araç
+tartıldıkça sistem güncellenecek mi?" Kurallar korunur: DBA / irsaliye resmi; kantar yalnız BİLGİ (hiçbir kayıt değişmez, fiyat yok).
+İç piyasada kantarcı dökme buğdayda DORSE plakasını yazar (filo çekicilerinin ortak dökme dorseleri) — eşleştirme plakaya değil
+irsaliye no / firma + ürüne dayanır.
+- `kantar_canli()` (kantar / panel / ic_piyasa yetkisi): iceride (FIRST: ilk tartım yapılmış, ikinci bekleyen; konteyner → dosya,
+  firma+ürün jetonu → açık iş emri / alış), konteynerler (açık dosyada DBA'sı gelmemiş: dolduruluyor / tartıldı), is_emirleri /
+  alislar ("kantarda tartıldı, irsaliyesi girilmedi": irsaliye no sistemde yok VE aynı gün aynı işte ±150 kg kayıt yok),
+  eslesmeyen (son 3 gün, ≥ 5 t, hiçbir kayıt / açık işle eşleşmeyen). `kantar_ad_jetonlari` (Türkçe harf → ASCII, ≥3 harf,
+  genel kelimeler atılır: SAN, TIC, LTD, TMO, AJANS, TARIM …).
+- Arayüz: `KantarCanliSeridi` (sayfa üstü "Şu an kantarda": plaka, dosya/iş emri, bekleme süresi — 6 saatten uzun sarı;
+  kantar verisi 5 dk'dan eskiyse "Kantar verisi gelmiyor"), Sevkiyat kartında "Kantarda N dolduruluyor · M tartıldı, DBA
+  bekleniyor", konteyner satırlarında aynı durum, DBA bekleyen tabloda "Kantarda · süre / Tartıldı saat", iş emri ve alış
+  satırında "+X kg kantarda · irsaliye bekliyor (N araç)". lib/kantar-canli.ts (saf; tests/kantar-canli.test.ts) +
+  lib/kantar-canli-veri.ts (okuma; yetki/fonksiyon yoksa null → bölümler gizli). Sayfa her dakika + canlı bildirimde yeniler.
+- İlk canlı sonuç: bir alış (20.11, ~26 t) kantarda tartılmış ama sistemde teslim kaydı yok → "irsaliye bekliyor" görünüyor.

@@ -6,6 +6,7 @@ import { ChevronDown, ExternalLink, Package } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ROW_HEADER_BG } from "@/lib/theme";
 import { DURUM_ETIKETI, type SevkiyatOzeti, type SevkiyatDurumu } from "@/lib/kantar-sevkiyat";
 import { gorunenSevkiyatlar, panelDosyaYolu } from "@/lib/kantar-gorunum";
+import { kantarSaatYazi, sevkiyatKantarSayilari, type KonteynerKantarDurumu } from "@/lib/kantar-canli";
 
 /**
  * Kantar Paneli · Sevkiyat Durumu (28.10.2026). Her acik sevkiyat icin musteri KODU, dosya no,
@@ -31,7 +32,11 @@ function eslesir(s: SevkiyatOzeti, q: string) {
   return ic(s.dosya_no) || ic(s.musteri_kodu) || ic(s.cuval) || s.konteynerler.some((k) => ic(k.konteyner_no) || ic(k.muhur_no));
 }
 
-export function KantarSevkiyatDurumu({ sevkiyatlar, arama, panelYetkisi = false }: { sevkiyatlar: SevkiyatOzeti[]; arama: string; panelYetkisi?: boolean }) {
+export function KantarSevkiyatDurumu({ sevkiyatlar, arama, panelYetkisi = false, kantar = null }: {
+  sevkiyatlar: SevkiyatOzeti[]; arama: string; panelYetkisi?: boolean;
+  /** 24.11.2026: konteyner id -> kantar durumu (dolduruluyor / tartildi, DBA bekleniyor); bilgi amacli */
+  kantar?: Map<string, KonteynerKantarDurumu> | null;
+}) {
   const [acik, setAcik] = useState<Record<string, boolean>>({});
   const [tamamlananlar, setTamamlananlar] = useState(false);
   // Bolum gizlenebilir (telefonda DBA listesine hizli inmek icin); tercih bu cihazda hatirlanir
@@ -119,6 +124,17 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama, panelYetkisi = false 
                     {s.dolu > 0 && <span style={{ width: `${yuzde(s.dolu)}%`, backgroundColor: RENK.dolu }} />}
                     {s.bos > 0 && <span style={{ width: `${yuzde(s.bos)}%`, backgroundColor: RENK.bos, marginLeft: s.dolu > 0 ? 2 : 0 }} />}
                   </div>
+                  {(() => {
+                    const ks = sevkiyatKantarSayilari(s.konteynerler.map((k) => k.id), kantar);
+                    if (ks.dolduruluyor + ks.tartildi === 0) return null;
+                    return (
+                      <p className="mt-1 text-[10.5px] font-semibold" data-kantar-sayac>
+                        {ks.dolduruluyor > 0 && <span className="text-sky-300">Kantarda {ks.dolduruluyor} dolduruluyor</span>}
+                        {ks.dolduruluyor > 0 && ks.tartildi > 0 && <span style={{ color: TEXT_MUTED }}> · </span>}
+                        {ks.tartildi > 0 && <span className="text-emerald-300">{ks.tartildi} tartıldı, DBA bekleniyor</span>}
+                      </p>
+                    );
+                  })()}
                   <div className="mt-1.5 flex items-center gap-x-3 gap-y-1 flex-wrap text-[10.5px]" style={{ color: TEXT_MUTED }}>
                     <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: RENK.dolu }} />Dolu {s.dolu}</span>
                     <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: RENK.bos }} />Boş ekipman {s.bos}</span>
@@ -160,6 +176,14 @@ export function KantarSevkiyatDurumu({ sevkiyatlar, arama, panelYetkisi = false 
                               {k.dba_dosya_url ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#34D399" }}>
                                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: RENK.dolu }} /> Dolu
+                                </span>
+                              ) : kantar?.get(k.id)?.durum === "dolduruluyor" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-300" title={`Kantarda 1. tartım: ${kantarSaatYazi(kantar.get(k.id)!.giris)}`}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Kantarda · dolduruluyor
+                                </span>
+                              ) : kantar?.get(k.id)?.durum === "tartildi" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-300" title={`Kantardan çıktı: ${kantarSaatYazi(kantar.get(k.id)!.cikis)}`}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Tartıldı · DBA bekleniyor
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#FBBF24" }}>

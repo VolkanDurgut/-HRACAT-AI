@@ -759,21 +759,20 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
   export@ + execution@ (CC yok), cron `siparis-formu-spek` hafta içi 08:00 TR ('0 5 * * 1-5'; edge başlığındaki 08:17 notu eski).
   Üretime giden form `siparis_formu` → alıcı uretim@, execution@, operation@, sales@, lojistik@; CC bbt@.
 
-## 4.28 Navlun: tek hesap yeri + Navlun Merkezi (24.11.2026, Aşama 1-2, kullanıcı onayı)
-- Kullanıcı: "Alt tarafı navlun okuyacağız. Bizim için 1 konteynerin maliyeti demek." ve "Kartlar tek başına çalışmamalı."
-- **Aşama 1 (tek hesap):** edge `navlun-bildirimi` `{"islem":"degerlendir"}` her teklifin konteyner başı toplamını
-  (`_shared/navlun-kalem.ts` + `navlun-karsilastirma.ts`), geçerliliğini (teklif > acente alışkanlığı > 21 gün), durumunu
-  (kesin / kontrol / eksik / suresi_doldu) ve liman başına en iyiyi `navlun_teklif_degerlendirme`'ye; yükleme planındaki
-  gerçekleşen navlunun teklifle karşılaştırmasını `navlun_gerceklesen_kontrol`'e yazar (`_shared/navlun-degerlendirme.ts`).
-  Her kayıt / yeniden işlemeden sonra ve cron `navlun-degerlendir` (7,22,37,52. dakika; rapor anahtarı vault'tan) ile çalışır.
-  Günün TCMB kuru `doviz_kurlari`'na. İş kayıtlarına YAZMAZ. Süresi dolan teklif "en iyi" seçilmez; ETD'ye göre elenmez.
-  Gerçekleşen kontrolü rezervasyon tarihindeki (yoksa ETD) teklifle; FOB hariç; farklı para biriminde o günün kuru.
-- **Aşama 2 (ekran):** `/navlun/merkez` (yetki "navlun"; eski `/navlun` Aşama 3'e kadar yerinde, "Yeni görünüm" bağlantısı).
-  TEK okuma `lib/navlun/merkez-veri.ts`; saf kurallar `lib/navlun/merkez.ts` (test: `tests/navlun-merkez.test.ts`).
-  Sekmeler: Limanlar / Kontrol / Gerçekleşen / Acenteler / İşlem kaydı; yalnız açık sekme çizilir.
-- **Kontrol işlemleri** tek RPC `navlun_kontrol_isle` (migration `20261124210000_navlun_kontrol_isle.sql`), her biri
-  `navlun_kontrol_islemleri`'ne iz (önce / sonra / gerekçe / e-posta): Düzelt ve Kaydet (mail → `navlun_hata_coz`),
-  Yoksay, Kural olarak öğret (acente hafızası lokal dahil / hariç + tutar; lokali belirsiz teklifler ACENTE başına tek kalem),
-  Olduğu Gibi Onayla (yalnız tutmayan gerçekleşen, gerekçe zorunlu). Düzelt / öğret sonrası `navlun_degerlendir_tetikle()`
-  cron komutunu hemen çalıştırır. 48 saati geçen kalem kırmızı ve başta.
+## 4.28 Navlun: tek hesap yeri (24.11.2026, Aşama 1, kullanıcı onayı)
+- Kullanıcı: "Alt tarafı navlun okuyacağız. Bizim için 1 konteynerin maliyeti demek." Amaç: Navlun Bildirimi sayfasının
+  MEVCUT haliyle mimarisini onarmak (kartlar aynı veriden beslensin), yeni ekran değil.
+- Edge `navlun-bildirimi` `{"islem":"degerlendir"}` her teklifin konteyner başı toplamını (`_shared/navlun-kalem.ts` +
+  `navlun-karsilastirma.ts`), geçerliliğini (teklif > acente alışkanlığı > 21 gün), durumunu (kesin / kontrol / eksik /
+  suresi_doldu) ve liman başına en iyiyi `navlun_teklif_degerlendirme`'ye; yükleme planındaki gerçekleşen navlunun teklifle
+  karşılaştırmasını `navlun_gerceklesen_kontrol`'e yazar (`_shared/navlun-degerlendirme.ts`). Her kayıt / yeniden
+  işlemeden sonra ve cron `navlun-degerlendir` (7,22,37,52. dakika; rapor anahtarı vault'tan) ile çalışır. Günün TCMB kuru
+  `doviz_kurlari`'na. İş kayıtlarına YAZMAZ. Süresi dolan teklif "en iyi" seçilmez; ETD'ye göre elenmez. Gerçekleşen
+  kontrolü rezervasyon tarihindeki (yoksa ETD) teklifle; FOB hariç; farklı para biriminde o günün kuru.
+- 24.11.2026 ayrı "Navlun Merkezi" ekranı (/navlun/merkez) denendi ve kullanıcı isteğiyle KALDIRILDI ("Bizim amacımız
+  navlun bildirimi mevcut hali ile mimari yapısını onarmaktı"). Yeni ekran / ayrı sayfa AÇILMAZ; iyileştirme mevcut
+  `/navlun` sayfasının içinde yapılır ve önce kullanıcıya gösterilir.
+- Canlıda kalan, henüz arayüze bağlı olmayan sunucu parçaları (migration `20261124210000_navlun_kontrol_isle.sql`):
+  RPC `navlun_kontrol_isle` (düzelt / yoksay / acente hafızasına lokal öğret / tutmayanı gerekçeyle onayla; iz
+  `navlun_kontrol_islemleri`) ve `navlun_degerlendir_tetikle()`. Mevcut sayfaya bağlanması ayrı onayla.
 - Yapay zekâ okuma (Gemini) yalnız secret `NAVLUN_YZ = acik` iken; varsayılan kapalı.

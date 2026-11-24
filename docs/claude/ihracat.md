@@ -1652,4 +1652,5 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - 24.11.2026 deneme sonrasi: Unex AI [Rapor] -> 9-Diger/Unex-AI-Rapor; [Hatirlatma]/[Onemli] icerigine gore ilgili gruba
   (yoksa 9-Diger/Unex-AI). Reklam/kampanya ve noreply bildirimleri 9-Diger/Bildirim-Reklam; "Tahmini varis" -> ETD-ETA;
   "Duyuru" -> Duyuru-Bulten; genel "Gumruk" kelimesi Beyanname saymaz; cari/ekstre -> Acente-Fatura; kalan evrak -> 4-Evrak/Evrak-Diger.
-  etiketDeneme siniflanmayanlarin 40 ornegini yazar. Forwarder alan adlari repoda degil, betik ozelligi ACENTE_ALANLARI.
+  etiketDeneme siniflanmayanlarin 40 ornegini yazar. KOTA (24.11.2026): yazisma basina Gmail cagrisi yok (getMessagesForThreads +
+  addToThreads); tetikleyici 30 dk. Arsiv hesabinin gunluk Gmail kotasi Pazar + navlun betikleriyle ORTAK. Forwarder alan adlari repoda degil, betik ozelligi ACENTE_ALANLARI.

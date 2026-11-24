@@ -12,12 +12,12 @@
  *                     ornek konularla Yurutme gunlugune yazar. Once bunu calistirip sonuca bakin.
  *   2) etiketGecmis : Etiketsiz TUM yazismalari etiketler. "BITTI" yazana kadar tekrar calistirin
  *                     (her calismada ~4 dakika, birkac yuz yazisma; ayni yazisma iki kez islenmez).
- *   3) etiketKur    : 10 dakikalik tetikleyiciyi kurar (yeni gelen mailler otomatik gruplanir).
+ *   3) etiketKur    : 30 dakikalik tetikleyiciyi kurar (yeni gelen mailler otomatik gruplanir; kota icin seyrek).
  *   Kaldirmak icin etiketKaldir (yalniz tetikleyiciyi siler; etiketler kalir).
  *
  * KURALLAR:
  *   - Yalniz ETIKET eklenir: mail silinmez, arsivlenmez, okundu yapilmaz, gelen kutusundan cikmaz.
- *   - Elle "UNEX/..." etiketi verilmis yazismanin grubu DEGISTIRILMEZ (yalniz ayni gruptaysa alt grup eklenir).
+ *   - Yalniz HIC etiketi olmayan yazismalar islenir; elle etiketlenmis yazismaya dokunulmaz.
  *   - Her yazisma bir ana grup + bir alt grup alir ("UNEX/2-Booking-Acente/Navlun-Talebi"). Hicbir kurala
  *     uymayan "UNEX/9-Diger/Siniflanmayan"a duser (bos kalan mail olmaz).
  *   - Siniflama konu satiri (RE/FW/Ynt onekleri atilir) ve ilk gondericiye bakar; kurallar asagidaki listede,
@@ -141,29 +141,29 @@ function etiketAl_(ad) {
   return etiketOnbellek_[ad];
 }
 
-/** Bir yazisma listesini siniflar; uygula=false ise yalniz sayar. */
+/**
+ * Bir yazisma listesini siniflar; uygula=false ise yalniz sayar.
+ * 24.11.2026 KOTA: Gmail'in gunluk cagri siniri (arsiv hesabindaki Pazar + navlun betikleri de ayni kotayi kullanir)
+ * asildi. Bu surum yazisma basina cagri yapmaz: mesajlar tek cagriyla (getMessagesForThreads) okunur, etiketler
+ * grup basina tek cagriyla (addToThreads) eklenir. Liste zaten "etiketsiz" aramasiyla geldigi icin etiket okunmaz.
+ * 100 yazisma ~ 2 + grup sayisi cagri (eskisi ~400).
+ */
 function etiketIsle_(konular, uygula) {
   var gruplar = {};   // tam etiket adi -> [yazisma]
   var sayac = {};
   var ornek = {};
+  var mesajlar = konular.length ? GmailApp.getMessagesForThreads(konular) : [];
   for (var i = 0; i < konular.length; i++) {
     var t = konular[i];
-    var mesajlar = t.getMessages();
-    var ilk = mesajlar[0];
-    var sonuc = etiketBul(t.getFirstMessageSubject(), ilk ? ilk.getFrom() : '');
-    var mevcut = t.getLabels().map(function (l) { return l.getName(); }).filter(function (n) { return n.indexOf(ETIKET_KOK + '/') === 0; });
+    var ilk = (mesajlar[i] || [])[0];
+    var konu = ilk ? ilk.getSubject() : '';
+    var sonuc = etiketBul(konu, ilk ? ilk.getFrom() : '');
     var anaAd = ETIKET_KOK + '/' + sonuc.ana;
-    var hedefler = [];
-    if (!mevcut.length) {
-      hedefler = [anaAd, anaAd + '/' + sonuc.alt];
-    } else if (mevcut.indexOf(anaAd) >= 0 && mevcut.indexOf(anaAd + '/' + sonuc.alt) < 0) {
-      hedefler = [anaAd + '/' + sonuc.alt];   // elle verilen grup korunur; ayni gruptaysa alt grup eklenir
-    }
     var anahtar = sonuc.ana + '/' + sonuc.alt;
     sayac[anahtar] = (sayac[anahtar] || 0) + 1;
     if (!ornek[anahtar]) ornek[anahtar] = [];
-    if (ornek[anahtar].length < (sonuc.alt === 'Siniflanmayan' ? 40 : 3)) ornek[anahtar].push(t.getFirstMessageSubject().slice(0, 90));
-    hedefler.forEach(function (h) { (gruplar[h] = gruplar[h] || []).push(t); });
+    if (ornek[anahtar].length < (sonuc.alt === 'Siniflanmayan' ? 40 : 3)) ornek[anahtar].push(String(konu).slice(0, 90));
+    [anaAd, anaAd + '/' + sonuc.alt].forEach(function (h) { (gruplar[h] = gruplar[h] || []).push(t); });
   }
   if (uygula) {
     Object.keys(gruplar).forEach(function (ad) {
@@ -177,9 +177,9 @@ function etiketIsle_(konular, uygula) {
 
 /** 1) DENEME: hicbir sey degistirmez; dagilimi ve ornekleri gunluge yazar. */
 function etiketDeneme() {
-  var konular = GmailApp.search('has:nouserlabels -in:trash -in:spam', 0, 300);
+  var konular = GmailApp.search('has:nouserlabels -in:trash -in:spam', 0, 100);
   var s = etiketIsle_(konular, false);
-  console.log('Etiketsiz ' + konular.length + ' yazisma (en yeni 300) - DEGISIKLIK YAPILMADI:');
+  console.log('Etiketsiz ' + konular.length + ' yazisma (en yeni 100) - DEGISIKLIK YAPILMADI:');
   Object.keys(s.sayac).sort().forEach(function (k) {
     console.log(k + ' : ' + s.sayac[k] + '  | ornek: ' + s.ornek[k].join('  ||  '));
   });
@@ -204,7 +204,7 @@ function etiketGecmis() {
   }
 }
 
-/** 3) Tetikleyici: son 3 gunun etiketsiz yazismalari (10 dakikada bir). */
+/** 3) Tetikleyici: son 3 gunun etiketsiz yazismalari (30 dakikada bir; Gmail gunluk kotasi Pazar/navlun ile ortak). */
 function etiketTara() {
   var kilit = LockService.getScriptLock();
   if (!kilit.tryLock(5000)) return;
@@ -218,7 +218,7 @@ function etiketTara() {
 
 function etiketKur() {
   etiketKaldir();
-  ScriptApp.newTrigger('etiketTara').timeBased().everyMinutes(10).create();
+  ScriptApp.newTrigger('etiketTara').timeBased().everyMinutes(30).create();
   etiketTara();
 }
 

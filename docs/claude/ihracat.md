@@ -1654,3 +1654,13 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
   "Duyuru" -> Duyuru-Bulten; genel "Gumruk" kelimesi Beyanname saymaz; cari/ekstre -> Acente-Fatura; kalan evrak -> 4-Evrak/Evrak-Diger.
   etiketDeneme siniflanmayanlarin 40 ornegini yazar. KOTA (24.11.2026): yazisma basina Gmail cagrisi yok (getMessagesForThreads +
   addToThreads); tetikleyici 30 dk. Arsiv hesabinin gunluk Gmail kotasi Pazar + navlun betikleriyle ORTAK. Forwarder alan adlari repoda degil, betik ozelligi ACENTE_ALANLARI.
+
+## Is emri / alis acilmadan once tartilan arac (24.11.2026 aksam) — migration 20261124170000_kantar_canli_once_tartim.sql (CANLIDA)
+- Kullanici: "Aktif is emri yokken kantarda arac tartilirsa is emri acildiginda DBA'daki gibi otomatik eslesmeli."
+- kantar_canli her okumada yeniden hesaplanir: is emri / alis acildigi an onceki tartimlar eslesir (kayit yazilmaz).
+  Pencere: tartim >= min(olusturma, siparis tarihi) - 7 gun (onceden olusturma - 1 gun).
+- Koruma: tartim aninda ayni firma + urunun simdi TAMAMLANMIS baska isi aciktiysa tartim o ise aittir, yenisine sayilmaz.
+- Irsaliye no'su kantarda olmayan tartimin "girilmis" kontrolu ayni firmanin TUM (kapali dahil, son 60 gun) is / alis
+  kayitlariyla (1'e 1, +-2 gun, +-150 kg). Kantar Paneli "sistemde kaydi yok" seridinde aciklama satiri.
+- Test (islem icinde, geri alindi): onceden tartilan arac -> once "eslesmeyen", is emri acilinca is emrine; kapanmis isin
+  donemindeki arac yeni ise sayilmadi.

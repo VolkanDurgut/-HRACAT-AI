@@ -61,6 +61,7 @@ export function KantarCanliSeridi({ veri }: { veri: KantarCanli | null }) {
               <span key={e.kayit_no}>{i > 0 ? " · " : ""}<span className="font-mono">{e.plaka || "—"}</span> {e.firma || "firma yok"} {e.urun ? `(${e.urun})` : ""} {kgYazi(e.net_kg)} · {kantarSaatYazi(e.cikis)}</span>
             ))}
             {veri.eslesmeyen.length > 6 ? ` · +${veri.eslesmeyen.length - 6}` : ""}
+            <span className="block mt-0.5" style={{ color: TEXT_MUTED }}>Açık iş emri / alış yoksa burada bekler; aynı firma ve ürünle iş emri (ya da alış) açılınca kendiliğinden eşleşir ve kalandan düşer (tartımdan sonraki 7 gün içinde açılırsa).</span>
           </span>
         </div>
       )}

@@ -1541,6 +1541,10 @@ Canlı gösterge ağda Modbus TCP (port 502), büyük ekran ayrı TCP — Faz 4 
   + DENY INSERT/UPDATE/DELETE/EXECUTE/ALTER/CREATE (kullanıcıyı kendisi oluşturduysa). Önceki durumu C:\UnexDBA\kantar-izin-onceki.json'a
   yazar; SYSTEM sysadmin ise hiçbir şey değiştirmez; SYSTEM adına test eder (okuma var, yazma kapalı), başarısızsa geri alır.
   `-Kaldir` ile yalnız kendi oluşturduğunu geri alır. Şifre kullanmaz. Truck Scale `sa` ile bağlanıyor; ona dokunulmaz.
+- **DEPLOY UYARISI (24.11.2026 olayı):** `dba-otomatik` HER ZAMAN `--no-verify-jwt` ile deploy edilir
+  (`npx supabase functions deploy dba-otomatik --no-verify-jwt --project-ref …`). Depoda supabase/config.toml yok; CLI
+  bayraksız deploy'da JWT kontrolünü AÇAR ve cihaz anahtarlı bütün istekler 401 alır (24.11 09:32–09:37 DBA + kantar durdu,
+  veri kaybı olmadı: ajan 401'de durumu değiştirmez). Diğer bütün fonksiyonlar verify_jwt AÇIK.
 - **Ajan 1.2.0** (scripts/kantar-dba/dba-ajan.ps1; guncelle.ps1 ile kurulur): her dakika SALT SELECT; ilk çalışma son 14 gün,
   sonra `ID > son` + son 2 saatte çıkanlar, günde bir son 3 gün; FIRST anlık kopya. `x-islem: tartim` ile dba-otomatik'e
   (1.2.0) gönderir → `kantar_tartim_kaydet` (yalnız service_role) → `kantar_tartimlari` (upsert, cihaz+kayıt no) ve

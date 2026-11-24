@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { supabase, Dosya, Rezervasyon, Konteyner, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { CheckCircle2, Mail, FileType2, FileCheck2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X, Archive } from "lucide-react";
+import { CheckCircle2, Mail, FileType2, FileCheck2, Ship, AlertTriangle, ThumbsUp, FileArchive, Loader2, ShieldCheck, MessageSquareWarning, Clock, X, Archive, Send } from "lucide-react";
+import { draftSetiPlani, draftSetiUret } from "@/lib/draft-evrak-seti";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { formatDateTR } from "@/lib/cutoff-utils";
 import { indirTaslakOnayPaketi } from "@/lib/taslak-onay-paketi";
@@ -73,6 +74,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   const { showToast } = useToast();
   const [onaylaniyor, setOnaylaniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
+  const [setGonderiliyor, setSetGonderiliyor] = useState<string | null>(null);
   const [musteriOnayiKaydediliyor, setMusteriOnayiKaydediliyor] = useState(false);
   const [mailIsaretleniyor, setMailIsaretleniyor] = useState(false);
   const [revizeModalAcik, setRevizeModalAcik] = useState(false);
@@ -135,6 +137,42 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       showToast("Paket oluşturulamadı. Lütfen tekrar deneyin.", "error");
     } finally {
       setIndiriliyor(false);
+    }
+  };
+
+  // 24.11.2026: Draft Evrak Seti maili - paketteki belgeler AYNI adlarla, vektor PDF ("cam gibi"), Unex AI maili.
+  // Simdilik YALNIZ TEST adresine gider (edge draft-evrak-mail); dosyada hicbir alan degismez.
+  const handleSetMailGonder = async () => {
+    if (setGonderiliyor) return;
+    if (arsiv) {
+      const eksikBelgeler = evrakSirasi.filter((x) => x.eksikler && ["ci", "pl", "coo", "phyto", "health"].includes(x.key));
+      if (eksikBelgeler.length) {
+        showToast(`Mail hazırlanamadı; eksik bilgi: ${eksikBelgeler.map((x) => `${x.title} (${x.eksikler!.join(", ")})`).join(" · ")}`, "error");
+        return;
+      }
+    }
+    setSetGonderiliyor("Hazırlanıyor…");
+    try {
+      const plan = draftSetiPlani(dosya, rezervasyonlar, konteynerler, draftBlUrl || null, ayarlar);
+      const ekler = await draftSetiUret(plan, (i, n) => setSetGonderiliyor(`Belge ${i}/${n} hazırlanıyor…`));
+      setSetGonderiliyor("Gönderiliyor…");
+      const { data: oturum } = await supabase.auth.getSession();
+      const jeton = oturum?.session?.access_token;
+      if (!jeton) throw new Error("Oturum bulunamadı. Lütfen yeniden giriş yapın.");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/draft-evrak-mail`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ dosya_id: dosya.id, ekler }),
+      });
+      const veri = await res.json().catch(() => ({}));
+      if (!res.ok || !veri.basarili) throw new Error(veri.hata || `Mail gönderilemedi (HTTP ${res.status}).`);
+      const ek = plan.eklenmeyenler.length ? ` · eklenemeyen: ${plan.eklenmeyenler.join("; ")}` : "";
+      showToast(`Draft evrak seti (${veri.ek_sayisi} PDF) ${veri.test ? "TEST adresine " : ""}gönderildi: ${(veri.alicilar || []).join(", ")}${ek}`, plan.eklenmeyenler.length ? "error" : "success");
+    } catch (err) {
+      console.error("Draft evrak seti maili hatasi:", err);
+      showToast(err instanceof Error ? err.message : "Mail gönderilemedi. Lütfen tekrar deneyin.", "error");
+    } finally {
+      setSetGonderiliyor(null);
     }
   };
 
@@ -522,6 +560,18 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}
           >
             {indiriliyor ? <Loader2 size={13} className="animate-spin" /> : <FileArchive size={13} />}
+          </button>
+          <button
+            type="button"
+            onClick={handleSetMailGonder}
+            disabled={!!setGonderiliyor || !draftBlUrl}
+            data-testid="draft-set-mail"
+            title={setGonderiliyor || (draftBlUrl ? "Draft Seti Mail Gönder (PDF ekli · şimdilik test adresine)" : "Draft BL yüklenmemiş")}
+            aria-label="Draft evrak setini mail ile gönder"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg border hover:bg-white/5 disabled:opacity-50 transition-colors shrink-0"
+            style={{ borderColor: CARD_BORDER, color: ACCENT }}
+          >
+            {setGonderiliyor ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
           </button>
 
           {arsiv && <span className="text-[10px]" style={{ color: TEXT_MUTED }}>Salt görüntüleme</span>}

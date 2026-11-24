@@ -1616,3 +1616,17 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
   Asya limanları). Belirsiz adlar bilerek yok (Tripoli, Valencia, San Pedro, Colon). "Gideceği Ülke" satırı da bu sayede dolar.
 - Kullanılan yerler: fatura talimatı PDF + metin (mailto, ASCII), birleşik fatura PDF + metin, fatura talimatı maili (fatura-onay).
 - Edge yeniden deploy: fatura-onay, diib-gunluk-rapor, siparis-formu, siparis-formu-spek (_shared/ulke-bul.ts değişti).
+
+## Draft Evrak Seti maili + vektor PDF motoru (24.11.2026)
+- Ihracat Evraklari kartinda (components/draft-onay-karti.tsx) paket butonunun yaninda **Draft Seti Mail Gönder** (gonder ikonu).
+  Belgeler Taslak Onay Paketi ile AYNI sira ve adlarla: `DRAFT- <sira>- <KOD>- <booking>- <proforma>.pdf`
+  (1 INVOICE, 2 PACKING, 3 BL = yuklenen dosya, 4 COO, 5 PHYTO, 6 HEALTH, 7 QUALITY / 8 FUMIGATION musteri istiyorsa).
+- PDF'ler **vektor**: lib/html-vektor-pdf.ts (HTML gorunmez iframe'de tarayiciya dizdirilir; kelime/cizgi/zemin/gorsel
+  konumlari okunup pdf-lib ile metin olarak yazilir; Liberation Sans/Serif (OFL, public/fonts) alt kume gomulur).
+  Her `.sheet` / `.sheet-ek` bir A4; `.print-hint` basilmaz. html-to-pdf.ts (html2canvas, sevkiyat evraklari) DEGISMEDI.
+- Edge `draft-evrak-mail` (verify_jwt true): kullanici oturumuyla dosyayi RLS ile okur, ekleri dogrular
+  (ad kalibi, %PDF, 8 MB / 20 MB), Unex AI kalibiyla (operasyon-mail.ts) Resend'e yollar. Musteri adi, e-posta, telefon,
+  proforma, booking, gemi, rota, ETD, konteyner, ek listesi.
+- MOD: YALNIZ TEST -> `DRAFT_EVRAK_TEST_ALICISI` (yoksa KONSIMENTO_HATIRLATMA_TEST_ALICISI). Dosyada hicbir alan
+  degismez (draft_mail_gonderildi / 48 saat baslamaz). Canli alici (musteri + CC) kullanici onayiyla eklenecek.
+- Test: tests/draft-evrak-mail.test.ts.

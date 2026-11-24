@@ -28,7 +28,12 @@ test("24.11.2026: fatura talimatinda varis limani ulkesiyle (ulke yazmiyorsa ekl
   // ulke zaten yaziyorsa aynen
   assert.equal(varisLimaniUlkeli("MOMBASA PORT, KENYA"), "MOMBASA PORT, KENYA");
   assert.equal(varisLimaniUlkeli("TEMA PORT GHANA"), "TEMA PORT GHANA");
-  assert.equal(varisLimaniUlkeli("DJIBOUTI PORT"), "DJIBOUTI PORT");
+  assert.equal(varisLimaniUlkeli("BEIRUT PORT LEBANON"), "BEIRUT PORT LEBANON");
+  assert.equal(varisLimaniUlkeli("Djibouti Port, Republic of Djibouti"), "Djibouti Port, Republic of Djibouti");
+  // liman adi ulkeyle ayni: ulke ayrica yazilir (varis limaninin ulkesi; ticaret ulkesi DEGIL)
+  assert.equal(varisLimaniUlkeli("DJIBOUTI PORT"), "DJIBOUTI PORT, CİBUTİ");
+  assert.equal(varisLimaniUlkeli("MARIEL"), "MARIEL, KÜBA");
+  assert.equal(varisLimaniUlkeli("SİNGAPUR"), "SİNGAPUR");
   // bilinmeyen liman: tahmin yok, aynen; bos: null
   assert.equal(varisLimaniUlkeli("KURGU LIMANI"), "KURGU LIMANI");
   assert.equal(varisLimaniUlkeli("  "), null);

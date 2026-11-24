@@ -275,8 +275,13 @@ export function gidecegiUlke(varisLimani: string | null | undefined): string | n
 export function varisLimaniUlkeli(varisLimani: string | null | undefined): string | null {
   const v = (varisLimani || "").trim();
   if (!v) return null;
-  if (ulkeBul(v)) return v;
+  // Ulke, liman adindan SONRA yaziyorsa ("BEIRUT PORT LEBANON", "TEMA PORT, GHANA") aynen birakilir.
+  // Liman adi ulkeyle ayni oldugunda ("DJIBOUTI PORT") ulke ayrica yazilir: "DJIBOUTI PORT, CİBUTİ".
+  const m = v.match(/^(.*?\b(?:PORT|LIMANI|LİMANI|Limanı)\b)(.*)$/i);
+  const kalan = m ? m[2] : v;
+  if (kalan.trim() && ulkeBul(kalan)) return v;
   const u = gidecegiUlke(v);
+  if (u && !m && ulkeBul(v)) return v; // yalniz ulke/sehir-devlet adi ("SİNGAPUR"): tekrar yazilmaz
   return u ? `${v}, ${u}` : v;
 }
 

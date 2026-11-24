@@ -19,7 +19,7 @@ import { dbaAlanlariniOku, dosyaAdindanBelgeNo, type DbaVerisi, type MetinParcas
 //
 // Istek (POST):
 //   x-cihaz-anahtari: unexdba_<64 hex>
-//   x-islem: "belge" | "sinyal" | "bekleyen" | "dogrulama"
+//   x-islem: "belge" | "sinyal" | "bekleyen" | "tartim" | "dogrulama"
 //   belge     : govde = PDF, x-dosya-adi = base64(UTF-8 dosya adi), x-ajan-surumu
 //   sinyal    : govde yok (gorev her calistiginda "buradayim")
 //   bekleyen  : govde JSON {"belgeler":["<12 hane>",...]} (en fazla 50) - "beklemede"
@@ -27,13 +27,18 @@ import { dbaAlanlariniOku, dosyaAdindanBelgeNo, type DbaVerisi, type MetinParcas
 //               yeniden gonderilmesi gerektigini soyler: { hazir: [...] }. PDF'siz,
 //               SALT OKUNUR; gorev (>= 1.1.0) her dakika sorar, konteyner eklenince
 //               belge 1-2 dk icinde yuklenir (20.10.2026).
+//   tartim    : (24.11.2026, ajan >= 1.2.0) kantar programinin (BAYKON Truck Scale, SQL Server TruckSolas) tartim
+//               kayitlari: govde JSON {"kayitlar":[...], "bekleyenler":[...]|null}. kantar_tartim_kaydet (migration
+//               20261124100000) ile kantar_tartimlari / kantar_bekleyenler tablolarina yazilir. DENEME: hicbir is kaydi
+//               (konteyner, sevk, alis) degismez; eslestirme yalniz rapordur (kantar_karsilastirma).
+//               Yanit: { ok, kaydedilen, son_kayit_no }
 //   dogrulama : SALT OKUNUR - kayitli DBA PDF'lerini okuyup sistemdeki degerlerle
 //               karsilastirir (okuyucunun gercek belgelerle sinanmasi); ?bas=0&adet=10
 // Yanit: { ok, karar, mod, mesaj, tekrar_dk } - tekrar_dk: gorevin ayni belgeyi kac
 // dakika sonra yeniden gondermesi gerektigi (null = bir daha gonderme).
 // ============================================================================
 
-const SURUM = "1.1.0";
+const SURUM = "1.2.0";
 /** Bu surumden itibaren gorev "bekleyen" sorgusunu yapar; beklemedeki PDF saatte bir yedek olarak gonderilir. */
 const BEKLEYEN_DESTEKLI_AJAN = [1, 1, 0];
 const BEKLEMEDE_YEDEK_DK = 60;
@@ -310,6 +315,28 @@ async function dogrula(req: Request, cihaz: Cihaz): Promise<Response> {
   return yanit({ ok: true, surum: SURUM, toplam, bas, adet: kayitlar.length, sonuclar });
 }
 
+// ---------------------------------------------------------------- kantar tartimlari (24.11.2026)
+const AZAMI_TARTIM_GOVDE = 1024 * 1024;
+async function tartimKaydet(req: Request, cihaz: Cihaz): Promise<Response> {
+  const metin = await req.text();
+  if (metin.length > AZAMI_TARTIM_GOVDE) return yanit({ ok: false, hata: "Gövde 1 MB sınırını aşıyor." }, 400);
+  let govde: { kayitlar?: unknown; bekleyenler?: unknown };
+  try {
+    govde = JSON.parse(metin);
+  } catch {
+    return yanit({ ok: false, hata: "Gövde JSON değil." }, 400);
+  }
+  const kayitlar = Array.isArray(govde?.kayitlar) ? govde.kayitlar : [];
+  if (kayitlar.length > 300) return yanit({ ok: false, hata: "Bir istekte en fazla 300 kayıt." }, 400);
+  const bekleyenler = Array.isArray(govde?.bekleyenler) ? govde.bekleyenler : null;
+  const sonuc = await rpc<{ kaydedilen: number; son_kayit_no: number | null }>("kantar_tartim_kaydet", {
+    p_cihaz_id: cihaz.id,
+    p_kayitlar: kayitlar,
+    p_bekleyenler: bekleyenler,
+  });
+  return yanit({ ok: true, surum: SURUM, kaydedilen: sonuc?.kaydedilen ?? 0, son_kayit_no: sonuc?.son_kayit_no ?? null });
+}
+
 // ---------------------------------------------------------------- handler
 Deno.serve(async (req: Request) => {
   try {
@@ -333,6 +360,10 @@ Deno.serve(async (req: Request) => {
     if (islem === "bekleyen") {
       await rpc("dba_otomatik_sinyal", { p_cihaz_id: cihaz.id, p_surum: ajanSurumu || "?" });
       return await bekleyenKontrol(req, cihaz);
+    }
+    if (islem === "tartim") {
+      await rpc("dba_otomatik_sinyal", { p_cihaz_id: cihaz.id, p_surum: ajanSurumu || "?" });
+      return await tartimKaydet(req, cihaz);
     }
     if (islem === "dogrulama") return await dogrula(req, cihaz);
     return yanit({ ok: false, hata: "Bilinmeyen işlem." }, 400);

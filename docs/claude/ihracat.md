@@ -1549,3 +1549,33 @@ eksiklerini doldur." + "Kaç araba bizim arabalarımızdan ayrılmış? Buğdaya
   sonrası son 14 iş günü ortalaması) − iç satış aracı (nakliyesi bizde açık satışların kalan seferi önce); buğday seferi = boş ×
   araç başı sefer (filonun alış seferi / araç-gün, 23.11: 1,38) × sefer tonu (25,5 t). Açık alışlar termin sırasıyla doldurulur →
   tahmini bitiş, termin uyarısı.
+
+## Kantar bağlantısı — Aşama 0, deneme (24.11.2026) — migration 20261124100000_kantar_tartimlari.sql (CANLIDA)
+Kantar bilgisayarı = DBA ajanının bilgisayarı. Kantar programı BAYKON "Truck Scale" 8.06 (C:\Truck Scale); tartımlar yerel SQL
+Server Express `.\SQLEXPRESS` → `TruckSolas` veritabanı: `dbo.RECORDS` (tamamlanan; ID, PLATE_NO, QUESTION_1 firma, _2 ürün,
+_3 rezervasyon (booking son hanesi), _4 irsaliye no, _5 şoför (ALINMAZ), _6 "konteyner-mühür", _7 dorse, _8 liman,
+ENTRY/EXIT_DATE_TIME, WEIGHT_1/2, TICKET_NO_*, SOLAS_02 DBA no, SOLAS_03 konteyner, SolasStatu, CHANGE, EXTRA_3 = FIRST kaydı),
+`dbo.FIRST` (ilk tartımı yapılmış, ikinci tartımı bekleyen). Access dosyaları (Log/Truck.mdb) eski, kullanılmıyor.
+Canlı gösterge ağda Modbus TCP (port 502), büyük ekran ayrı TCP — Faz 4 (bağlanılmadı).
+- **Kullanıcı kuralları:** evraklardaki kg'a DOKUNULMAZ (25.000 / 25.050 gibi değerler aynen; kantar kg'ı yalnız kontrol/bilgi).
+  İç piyasada kantar irsaliyenin yerine GEÇMEZ; irsaliye kg ile kantar kg KARŞILAŞTIRILIR.
+- **İzin:** scripts/kantar-dba/kantar-izin.ps1 (tek seferlik, Yönetici): SYSTEM hesabına yalnız TruckSolas `db_datareader`
+  + DENY INSERT/UPDATE/DELETE/EXECUTE/ALTER/CREATE (kullanıcıyı kendisi oluşturduysa). Önceki durumu C:\UnexDBA\kantar-izin-onceki.json'a
+  yazar; SYSTEM sysadmin ise hiçbir şey değiştirmez; SYSTEM adına test eder (okuma var, yazma kapalı), başarısızsa geri alır.
+  `-Kaldir` ile yalnız kendi oluşturduğunu geri alır. Şifre kullanmaz. Truck Scale `sa` ile bağlanıyor; ona dokunulmaz.
+- **DEPLOY UYARISI (24.11.2026 olayı):** `dba-otomatik` HER ZAMAN `--no-verify-jwt` ile deploy edilir
+  (`npx supabase functions deploy dba-otomatik --no-verify-jwt --project-ref …`). Depoda supabase/config.toml yok; CLI
+  bayraksız deploy'da JWT kontrolünü AÇAR ve cihaz anahtarlı bütün istekler 401 alır (24.11 09:32–09:37 DBA + kantar durdu,
+  veri kaybı olmadı: ajan 401'de durumu değiştirmez). Diğer bütün fonksiyonlar verify_jwt AÇIK.
+- **Ajan 1.2.0** (scripts/kantar-dba/dba-ajan.ps1; guncelle.ps1 ile kurulur): her dakika SALT SELECT; ilk çalışma son 14 gün,
+  sonra `ID > son` + son 2 saatte çıkanlar, günde bir son 3 gün; FIRST anlık kopya. `x-islem: tartim` ile dba-otomatik'e
+  (1.2.0) gönderir → `kantar_tartim_kaydet` (yalnız service_role) → `kantar_tartimlari` (upsert, cihaz+kayıt no) ve
+  `kantar_bekleyenler` (yenilenir). Okuma hatası DBA akışını etkilemez (saatte bir günlüğe). ayar.json `"kantar":{"aktif":false}` kapatır.
+- **Karşılaştırma (deneme raporu):** `kantar_karsilastirma(p_bas, p_bit)` (panel / kantar yetkisi, salt okunur): her tartım için
+  tür = ihracat (konteyner no → konteynerler: dosya, mühür kantar/sistem — rakamlar karşılaştırılır, booking kantardaki rezervasyon
+  no ile bitiyor mu) / ic_satis (irsaliye no → ic_sevkler) / ic_alis (irsaliye no → ic_alis_teslimler) / plaka (aynı gün aynı plaka)
+  / eslesmedi; iç piyasada `kg_farki` = irsaliye kg − kantar net; giriş-çıkış dakikası; bekleyenler. Hiçbir iş kaydı değişmez.
+  Doğrulama (23.11 gerçek kayıtlarla, işlem geri alındı): bir iç satış sevkinde kantar neti = irsaliye neti (fark 0);
+  bir ihracat konteynerinde dosya, mühür ve booking tutuyor.
+- Sonraki aşamalar: 1) ihracat (konteyner anında dolu, mühür, booking kontrolü), 2) iç piyasa (sevk/alış eşleştirme, eşleşmeyen
+  tartım, kg farkı), 3) ana panel "şu an dolduruluyor" + ölçülen dolum süreleri, 4) canlı gösterge.

@@ -22,6 +22,9 @@ import {
 } from "@/lib/ic-piyasa/alis";
 import { vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
+import { kantarCanliOku } from "@/lib/kantar-canli-veri";
+import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 
 /**
  * Ic Piyasa - ALIS (30.10.2026). Lojistik Excel'inin ALIS SIPARIS RAPORU'nun
@@ -95,6 +98,8 @@ export default function AlisPage() {
     setTeslimler(t);
     setTedarikciler((tRes.data || []) as IcTedarikci[]);
     setYukleniyor(false);
+    // 24.11.2026: kantarda tartilip irsaliyesi bekleyen gelen araclar (okunamazsa bos; sayfa bozulmaz)
+    kantarCanliOku().then((k) => setKantarBekleyen(k?.alislar ?? null)).catch(() => setKantarBekleyen(null));
   }, [companyId, satisYetkisi]);
 
   useEffect(() => {
@@ -108,6 +113,8 @@ export default function AlisPage() {
     const z = window.setInterval(() => { if (document.visibilityState === "visible") getir(); }, 60_000);
     return () => window.clearInterval(z);
   }, [yetkili, getir]);
+
+  const [kantarBekleyen, setKantarBekleyen] = useState<Map<string, KantarBekleyenIs> | null>(null);
 
   const teslimMap = useMemo(() => {
     const m = new Map<string, IcAlisTeslim[]>();
@@ -135,7 +142,8 @@ export default function AlisPage() {
 
   const bugun = bugunTRIso();
   const acikSiparisler = siparisler.filter((s) => s.durum === "acik");
-  const bekleyenKg = acikSiparisler.reduce((t, s) => t + alisIlerleme(s.miktar_kg, alinan(s.id)).bekleyen, 0);
+  // Kalan: kantarda tartilip irsaliyesi bekleyen araclar da duser (24.11.2026)
+  const bekleyenKg = acikSiparisler.reduce((t, s) => t + alisIlerleme(s.miktar_kg, kantarDahil(alinan(s.id), 0, kantarBekleyen?.get(s.id)).kg).bekleyen, 0);
   const bugunTeslim = teslimler.filter((t) => !t.gecmis && new Date(t.teslim_zamani).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugun);
   const kapatmayaHazir = acikSiparisler.filter((s) => alisKapatmayaHazir(s.miktar_kg, alinan(s.id))).length;
 
@@ -263,7 +271,10 @@ export default function AlisPage() {
                     <tbody>
                       {liste.map((s) => {
                         const a = alinan(s.id);
-                        const il = alisIlerleme(s.miktar_kg, a);
+                        // 24.11.2026: ilerleme / kalan kantar dahil; "Kapatmaya hazir" yalniz irsaliyeyle (kapanan siparise arac girilemez)
+                        const kd = kantarDahil(a, 0, s.durum === "acik" ? kantarBekleyen?.get(s.id) : null);
+                        const ilIrs = alisIlerleme(s.miktar_kg, a);
+                        const il = alisIlerleme(s.miktar_kg, kd.kg);
                         const hazir = s.durum === "acik" && alisKapatmayaHazir(s.miktar_kg, a);
                         const ac = acikDetay === s.id;
                         const terminGecti = s.durum === "acik" && !!s.termin && s.termin < bugun;
@@ -290,12 +301,11 @@ export default function AlisPage() {
                               </td>
                               <td className="px-3 py-3 align-top min-w-[200px]">
                                 <div className="flex justify-between text-xs mb-1 gap-2">
-                                  <span className="text-white font-medium whitespace-nowrap">{tonYazi(a)} / {tonYazi(s.miktar_kg)}</span>
+                                  <span className="text-white font-medium whitespace-nowrap">{tonYazi(kd.kg)} / {tonYazi(s.miktar_kg)}</span>
                                   <span className="whitespace-nowrap" style={{ color: TEXT_MUTED }}>{il.fazla ? `+${tonYazi(il.fazla)} fazla` : `kalan ${tonYazi(il.bekleyen)}`}</span>
                                 </div>
-                                <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                                  <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(il.oran * 100))}%`, backgroundColor: hazir || s.durum === "tamamlandi" ? "#10B981" : "#38BDF8" }} />
-                                </div>
+                                <KantarliCubuk yukseklik="h-2" oranIrsaliye={ilIrs.oran} oranToplam={il.oran} renk={hazir || s.durum === "tamamlandi" ? "#10B981" : "#38BDF8"} />
+                                {kd.kantarKg > 0 && <KantarBekleyenSatiri kg={kd.kantarKg} arac={kd.kantarArac} plakalar={kantarBekleyen?.get(s.id)?.plakalar ?? []} />}
                                 <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: TEXT_MUTED }}>
                                   {aracSayisi(s.id)} araç{ts.some((t) => t.gecmis) ? " + sistem öncesi" : ""}
                                   {ts.some((t) => t.uyarilar?.length) && <AlertTriangle size={11} className="text-amber-400" aria-label="Uyarılı teslim var" />}

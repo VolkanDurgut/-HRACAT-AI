@@ -71,8 +71,20 @@ export function KantarCanliSeridi({ veri }: { veri: KantarCanli | null }) {
 /** Is emri / alis satiri: "+22.120 kg kantarda · irsaliye bekliyor (1 araç)" */
 export function KantarBekleyenSatiri({ kg, arac, plakalar }: { kg: number; arac: number; plakalar: string[] }) {
   return (
-    <p className="mt-1 text-[10.5px] font-semibold text-sky-300" title={`Kantarda tartıldı, irsaliyesi henüz sisteme girilmedi: ${plakalar.join(", ")}. Resmî rakam irsaliye girilince güncellenir.`} data-testid="kantar-bekleyen">
-      +{kgYazi(kg)} kantarda · irsaliye bekliyor ({arac} araç)
+    <p className="mt-1 text-[10.5px] font-semibold text-sky-300" title={`Kantarda tartıldı, irsaliyesi henüz sisteme girilmedi: ${plakalar.join(", ")}. Tonaj kalandan düşüldü; irsaliye girilince bu satır kalkar (çift sayılmaz).`} data-testid="kantar-bekleyen">
+      İçinde +{kgYazi(kg)} kantar tartımı · irsaliye bekliyor ({arac} araç)
     </p>
+  );
+}
+
+/** Iki parcali ilerleme cubugu: irsaliyeli kisim dolu, kantarda tartilip irsaliyesi bekleyen kisim acik ton. */
+export function KantarliCubuk({ oranIrsaliye, oranToplam, renk, yukseklik = "h-1.5" }: { oranIrsaliye: number; oranToplam: number; renk: string; yukseklik?: string }) {
+  const a = Math.max(0, Math.min(100, Math.round(oranIrsaliye * 100)));
+  const b = Math.max(0, Math.min(100 - a, Math.round(oranToplam * 100) - a));
+  return (
+    <div className={`${yukseklik} rounded-full overflow-hidden flex`} style={{ backgroundColor: "#0F131A" }}>
+      <div className="h-full" style={{ width: `${a}%`, backgroundColor: renk }} />
+      {b > 0 && <div className="h-full" style={{ width: `${b}%`, backgroundColor: renk, opacity: 0.45 }} title="Kantarda tartıldı, irsaliye bekliyor" data-testid="kantar-cubuk" />}
+    </div>
   );
 }

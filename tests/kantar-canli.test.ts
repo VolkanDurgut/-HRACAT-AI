@@ -1,7 +1,7 @@
 /** Kantar Paneli canli kantar bilgisi (24.11.2026). Veriler KURGUSALDIR. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { beklemeYazi, kantarCanliHazirla, kantarSaatYazi, sevkiyatKantarSayilari, sinyalDurumu } from "@/lib/kantar-canli";
+import { beklemeYazi, kantarCanliHazirla, kantarSaatYazi, sevkiyatKantarSayilari, sinyalDurumu, kantarDahil } from "@/lib/kantar-canli";
 
 const HAM = {
   son_sinyal: "2026-11-24T07:24:39Z",
@@ -62,4 +62,12 @@ test("kantarSaatYazi: bugun / dun / tarih (Istanbul)", () => {
   assert.equal(kantarSaatYazi("2026-11-23T18:51:00Z", simdi), "dün 21:51");
   assert.equal(kantarSaatYazi("2026-11-20T11:05:00Z", simdi), "20.11 14:05");
   assert.equal(kantarSaatYazi(null, simdi), "—");
+});
+
+test("kantarDahil: irsaliyeli + kantarda tartilip irsaliyesi bekleyen (24.11.2026)", () => {
+  assert.deepEqual(kantarDahil(236700, 15, { id: "x", kg: 24240, arac: 1, son_cikis: null, plakalar: ["00AA000"] }), { kg: 260940, arac: 16, kantarKg: 24240, kantarArac: 1 });
+  assert.deepEqual(kantarDahil(1000, 2, null), { kg: 1000, arac: 2, kantarKg: 0, kantarArac: 0 });
+  assert.deepEqual(kantarDahil(1000, 2, undefined), { kg: 1000, arac: 2, kantarKg: 0, kantarArac: 0 });
+  // bozuk veri sayilmaz
+  assert.deepEqual(kantarDahil(1000, 2, { id: "x", kg: Number.NaN, arac: 3, son_cikis: null, plakalar: [] }), { kg: 1000, arac: 2, kantarKg: 0, kantarArac: 0 });
 });

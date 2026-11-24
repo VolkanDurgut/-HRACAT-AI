@@ -1633,3 +1633,19 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - 4-5-6 (COO / Phyto / Health) alici kutusu (lib/tarim-alici.ts -> iletisimBilgisiniCikar, 24.11.2026): telefon, faks,
   WhatsApp, e-posta ve irtibat kisisi ("CONTACTO:") gosterilmez ("sigmiyor"). Firma, adres, vergi no (TIN/NIF/VAT) kalir.
   Veri degismez; yalniz bu uc belgedeki gosterim. Health'teki eski kisaltma (ilk iletisim/vergi etiketinden keser) aynen.
+
+## Kantar tonaji is emri / alis takibinden duser (24.11.2026 ogleden sonra) — migration 20261124160000_kantar_canli_dusum.sql (CANLIDA)
+- Kullanici: "Kantarda tartilan arac ic piyasa ile ilgili ise tonaj dusulmeli; irsaliye yuklenmeye bir yandan devam etmeli."
+- Ilerleme / kalan = irsaliyeli kayitlar + kantarda tartilip irsaliyesi henuz girilmemis araclar (lib/kantar-canli.ts kantarDahil).
+  Kantar Paneli (Yurt ici / Gelen arac), Ic Piyasa > Is Emirleri ve Alis sayfalari. Cubugun acik tonu = kantar kismi;
+  satir: "Icinde +X kantar tartimi · irsaliye bekliyor". IS KAYDI YAZILMAZ; resmi rakam irsaliyedir.
+- "Kapatmaya hazir" / "Tamamla" yalniz IRSALIYEYLE (kapanan ise kantarci irsaliye ekleyemez). Tutar, devir, raporlar irsaliyeden.
+- kantar_canli: tamamlanan tartim penceresi 7 -> 30 gun; irsaliye no'su kantarda olmayan tartim, ayni iste +-2 gun / +-150 kg
+  irsaliye kaydiyla 1'e 1 eslenir (kantar_bire_bir_es, en yakin ciftten); kantarda irsaliye no'suyla baska tartima bagli kayit
+  bu eslemeye girmez. Kantara iki irsaliye yazilmissa ("...0001-0002") parcalanir (kantar_irsaliye_parcalari).
+
+## Arsiv Gmail etiketleme (24.11.2026) — docs/apps-script/etiket.gs
+- Arsiv Gmail'indeki her yazisma UNEX/<1..9 grup>/<alt grup> etiketi alir (yalniz etiket; silme/arsivleme yok).
+  Kurallar konu + ilk gonderen; ilk eslesen kazanir; uymayan 9-Diger/Siniflanmayan. Elle verilmis UNEX grubu korunur.
+- Calistirma: etiketDeneme (degisiklik yok, dagilim) -> etiketGecmis ("BITTI"ye kadar) -> etiketKur (10 dk tetikleyici).
+- Test: tests/gmail-etiket.test.ts (kurgu konular).

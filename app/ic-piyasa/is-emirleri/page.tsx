@@ -25,6 +25,9 @@ import { fiyatYazi, kdvYazi, vadeYazi } from "@/lib/ic-piyasa/fiyat-formu";
 import { NAKLIYE_ETIKET, SiparisEki, gunAyYil, ozellikleriOku } from "@/lib/ic-piyasa/siparis-formu";
 import { teslimFarki } from "@/lib/ic-piyasa/mesaj-sablonlari";
 import { KalanRozet } from "@/components/ic-kalan-rozet";
+import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
+import { kantarCanliOku } from "@/lib/kantar-canli-veri";
+import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { IcDevirPenceresi } from "@/components/ic-devir-penceresi";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 
@@ -107,6 +110,8 @@ export default function IsEmirleriPage() {
     setSevkler(s);
     setMusteriler((mRes.data || []) as IcMusteri[]);
     setYukleniyor(false);
+    // 24.11.2026: kantarda tartilip irsaliyesi bekleyen araclar (okunamazsa bos; sayfa bozulmaz)
+    kantarCanliOku().then((k) => setKantarBekleyen(k?.isEmirleri ?? null)).catch(() => setKantarBekleyen(null));
     bildirimSayaciniYenile();
   }, [companyId]);
 
@@ -121,6 +126,8 @@ export default function IsEmirleriPage() {
     const z = window.setInterval(() => { if (document.visibilityState === "visible") getir(); }, 60_000);
     return () => window.clearInterval(z);
   }, [yetkili, getir]);
+
+  const [kantarBekleyen, setKantarBekleyen] = useState<Map<string, KantarBekleyenIs> | null>(null);
 
   const sevkMap = useMemo(() => {
     const m = new Map<string, IcSevk[]>();
@@ -335,8 +342,13 @@ export default function IsEmirleriPage() {
                   const devirKg = Number(e.devir_kg || 0);
                   const fazlaKg = e.hedef_tur === "kg" && e.hedef_kg !== null ? Math.round((kg - Number(e.hedef_kg)) * 100) / 100 : 0;
                   const buDevirler = devirler.filter((d) => d.kaynak_id === e.id || d.hedef_id === e.id);
-                  const oran = ilerlemeOrani(e, kg, ss.length);
-                  const tamam = hedefTamam(e, kg, ss.length);
+                  // 24.11.2026: ilerleme / kalan = irsaliyeli + kantarda tartilip irsaliyesi bekleyen (tutar ve devir irsaliyeden)
+                  const kd = kantarDahil(kg, ss.length, e.durum === "acik" ? kantarBekleyen?.get(e.id) : null);
+                  const oranIrs = ilerlemeOrani(e, kg, ss.length);
+                  const oran = ilerlemeOrani(e, kd.kg, kd.arac);
+                  const tamam = hedefTamam(e, kd.kg, kd.arac);
+                  // Kapatma onerisi yalniz irsaliyeyle: kapanan is emrine kantarci irsaliye ekleyemez
+                  const tamamIrs = hedefTamam(e, kg, ss.length);
                   const acik = acikDetay === e.id;
                   const tutar = tutarHesapla(kg, e.birim_fiyat === null ? null : Number(e.birim_fiyat));
                   const uyari = ss.some((s) => s.uyarilar?.length);
@@ -356,7 +368,7 @@ export default function IsEmirleriPage() {
                         <td className="px-3 py-3 align-top">
                           <p className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.is_emri_no}</p>
                           <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DURUM_RENK[e.durum]}`}>{DURUM_ETIKET[e.durum]}</span>
-                          {e.durum === "acik" && tamam && <span className="ml-1 inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 whitespace-nowrap" data-testid="kapatmaya-hazir">Kapatmaya hazır</span>}
+                          {e.durum === "acik" && tamamIrs && <span className="ml-1 inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 whitespace-nowrap" data-testid="kapatmaya-hazir">Kapatmaya hazır</span>}
                         </td>
                         <td className="px-3 py-3 align-top max-w-[240px]">
                           <p className="text-xs font-medium text-white truncate" title={e.ic_musteriler?.unvan}>{e.ic_musteriler?.kisa_ad || e.ic_musteriler?.unvan || "-"}</p>
@@ -372,13 +384,12 @@ export default function IsEmirleriPage() {
                         </td>
                         <td className="px-3 py-3 align-top min-w-[210px]">
                           <div className="flex items-center justify-between gap-3 text-[11px] mb-1">
-                            <span className="text-white whitespace-nowrap">{ilerlemeYazi(e, kg, ss.length)}</span>
+                            <span className="text-white whitespace-nowrap">{ilerlemeYazi(e, kd.kg, kd.arac)}</span>
                             <span className={`whitespace-nowrap ${tamam ? "text-emerald-400" : ""}`} style={tamam ? undefined : { color: TEXT_MUTED }}>{hedefYazi(e)}</span>
                           </div>
-                          <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                            <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
-                          </div>
-                          <KalanRozet emir={e} kg={kg} arac={ss.length} />
+                          <KantarliCubuk oranIrsaliye={oranIrs} oranToplam={oran} renk={tamam ? "#10B981" : "#38BDF8"} />
+                          <KalanRozet emir={e} kg={kd.kg} arac={kd.arac} />
+                          {kd.kantarKg > 0 && <KantarBekleyenSatiri kg={kd.kantarKg} arac={kd.kantarArac} plakalar={kantarBekleyen?.get(e.id)?.plakalar ?? []} />}
                           {devirKg !== 0 && (
                             <p className="mt-0.5 text-[10px] whitespace-nowrap" style={{ color: TEXT_MUTED }} data-testid="devir-not">
                               <ArrowRightLeft size={10} className="inline -mt-0.5" /> Devir {devirKg > 0 ? "+" : "−"}{kgYazi(Math.abs(devirKg))}
@@ -396,7 +407,7 @@ export default function IsEmirleriPage() {
                         </td>
                         <td className="px-3 py-3 align-top">
                           <div className="flex items-center justify-end gap-1.5">
-                            {e.durum === "acik" && tamam && (
+                            {e.durum === "acik" && tamamIrs && (
                               <button onClick={(ev) => { ev.stopPropagation(); setDurumIslem({ emir: e, hedef: "tamamlandi" }); }} title="Siparişi tamamlandı olarak kapat" data-testid="hizli-tamamla"
                                 className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/10 whitespace-nowrap" style={{ borderColor: "#065F46" }}>
                                 <CheckCircle2 size={12} /> Tamamla
@@ -562,7 +573,7 @@ export default function IsEmirleriPage() {
                                 <>
                                   <Eylem onClick={() => { setOnDolum(null); setDuzenlenen(e); setFormAcik(true); }} ikon={<Pencil size={13} />}>Düzenle</Eylem>
                                   <Eylem onClick={() => setGecmisEmir({ id: e.id, is_emri_no: e.is_emri_no, urun: e.urun, musteri: e.ic_musteriler?.unvan || "-" })} ikon={<History size={13} />}>Sistem öncesi araç ekle</Eylem>
-                                  <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamam}>Tamamlandı olarak kapat</Eylem>
+                                  <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "tamamlandi" })} ikon={<CheckCircle2 size={13} />} vurgu={tamamIrs}>Tamamlandı olarak kapat</Eylem>
                                   <Eylem onClick={() => setDurumIslem({ emir: e, hedef: "iptal" })} ikon={<XCircle size={13} />}>İptal et</Eylem>
                                 </>
                               )}

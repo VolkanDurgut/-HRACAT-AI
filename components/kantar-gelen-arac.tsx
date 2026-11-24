@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { KantarBekleyenSatiri } from "@/components/kantar-canli-seridi";
-import type { KantarBekleyenIs } from "@/lib/kantar-canli";
+import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
+import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -234,8 +234,11 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
               </thead>
               <tbody>
                 {siparisler.map((s) => {
-                  const il = alisIlerleme(s.miktar_kg, Number(s.alinan_kg));
-                  const k = kalanMetni("kg", Number(s.miktar_kg), Number(s.alinan_kg), s.alinan_arac);
+                  // 24.11.2026: kantarda tartilip irsaliyesi bekleyen araclar da kalandan duser
+                  const kd = kantarDahil(Number(s.alinan_kg), s.alinan_arac, kantarBekleyen?.get(s.id));
+                  const il = alisIlerleme(s.miktar_kg, kd.kg);
+                  const ilIrs = alisIlerleme(s.miktar_kg, Number(s.alinan_kg));
+                  const k = kalanMetni("kg", Number(s.miktar_kg), kd.kg, kd.arac);
                   return (
                     <tr key={s.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="kantar-alis-siparis">
                       <td className="px-3 py-2">
@@ -244,10 +247,8 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
                         <p className="text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{s.depo ? `Depo ${s.depo}` : ALIS_TESLIM_ETIKET[s.teslim]}{s.termin ? ` · termin ${gunTR(s.termin)}` : ""}</p>
                       </td>
                       <td className="px-3 py-2">
-                        <p className="text-[11px] leading-snug text-white">{tonYazi(s.alinan_kg)} / {tonYazi(s.miktar_kg)} · {s.alinan_arac} araç</p>
-                        <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(il.oran * 100))}%`, backgroundColor: "#F59E0B" }} />
-                        </div>
+                        <p className="text-[11px] leading-snug text-white">{tonYazi(kd.kg)} / {tonYazi(s.miktar_kg)} · {kd.arac} araç</p>
+                        <div className="mt-1"><KantarliCubuk oranIrsaliye={ilIrs.oran} oranToplam={il.oran} renk="#F59E0B" /></div>
                         <p className="mt-1 text-[10.5px] font-semibold whitespace-nowrap" style={{ color: k.durum === "kalan" ? TEXT_MUTED : k.durum === "fazla" ? "#38BDF8" : "#34D399" }} data-testid="kalan-rozet">{k.metin}</p>
                         {kantarBekleyen?.get(s.id) && <KantarBekleyenSatiri {...kantarBekleyen.get(s.id)!} />}
                       </td>

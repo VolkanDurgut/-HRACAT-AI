@@ -108,3 +108,22 @@ export function kantarSaatYazi(iso: string | null, simdi: Date = new Date()): st
   const al = (tur: string) => p.find((x) => x.type === tur)?.value || "";
   return `${al("day")}.${al("month")} ${saat}`;
 }
+
+/**
+ * 24.11.2026 ogleden sonra (kullanici: "Kantarda tartilan arac ic piyasa ile ilgili ise tonaj dusulmeli; irsaliye
+ * yuklenmeye bir yandan devam etmeli"): is emri / alis ilerlemesi = irsaliyeli kayitlar + kantarda tartilip
+ * irsaliyesi henuz girilmemis araclar. Irsaliye girilince arac kantar bekleyeninden duser (cift sayim yok;
+ * eslestirme sunucuda, kantar_canli). Is kaydi YAZILMAZ; resmi rakam irsaliyedir.
+ */
+export function kantarDahil(irsaliyeKg: number, irsaliyeArac: number, b?: KantarBekleyenIs | null): {
+  kg: number; arac: number; kantarKg: number; kantarArac: number;
+} {
+  const kantarKg = b && Number.isFinite(b.kg) && b.kg > 0 ? b.kg : 0;
+  const kantarArac = kantarKg > 0 && b ? Math.max(0, Math.round(b.arac)) : 0;
+  return {
+    kg: Math.round(((Number(irsaliyeKg) || 0) + kantarKg) * 100) / 100,
+    arac: (Number(irsaliyeArac) || 0) + kantarArac,
+    kantarKg,
+    kantarArac,
+  };
+}

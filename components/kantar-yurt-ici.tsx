@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { KantarBekleyenSatiri } from "@/components/kantar-canli-seridi";
-import type { KantarBekleyenIs } from "@/lib/kantar-canli";
+import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
+import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
@@ -247,9 +247,12 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
               </thead>
               <tbody>
                 {emirler.map((e) => {
-                  const kg = Number(e.yuklenen_kg);
-                  const oran = ilerlemeOrani(e, kg, e.yuklenen_arac);
-                  const tamam = hedefTamam(e, kg, e.yuklenen_arac);
+                  // 24.11.2026: kantarda tartilip irsaliyesi bekleyen araclar da kalandan duser
+                  const kd = kantarDahil(Number(e.yuklenen_kg), e.yuklenen_arac, kantarBekleyen?.get(e.id));
+                  const kg = kd.kg;
+                  const oran = ilerlemeOrani(e, kg, kd.arac);
+                  const oranIrs = ilerlemeOrani(e, Number(e.yuklenen_kg), e.yuklenen_arac);
+                  const tamam = hedefTamam(e, kg, kd.arac);
                   return (
                     <tr key={e.id} className="border-t align-top" style={{ borderColor: CARD_BORDER }} data-testid="kantar-is-emri">
                       <td className="px-3 py-2">
@@ -258,11 +261,9 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                         <p className="text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{e.teslim || "-"}</p>
                       </td>
                       <td className="px-3 py-2">
-                        <p className="text-[11px] leading-snug text-white">{ilerlemeYazi(e, kg, e.yuklenen_arac)}</p>
-                        <div className="mt-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "#0F131A" }}>
-                          <div className="h-full rounded-full" style={{ width: `${Math.min(100, Math.round(oran * 100))}%`, backgroundColor: tamam ? "#10B981" : "#38BDF8" }} />
-                        </div>
-                        <KalanRozet emir={e} kg={kg} arac={e.yuklenen_arac} sade />
+                        <p className="text-[11px] leading-snug text-white">{ilerlemeYazi(e, kg, kd.arac)}</p>
+                        <div className="mt-1"><KantarliCubuk oranIrsaliye={oranIrs} oranToplam={oran} renk={tamam ? "#10B981" : "#38BDF8"} /></div>
+                        <KalanRozet emir={e} kg={kg} arac={kd.arac} sade />
                         {kantarBekleyen?.get(e.id) && <KantarBekleyenSatiri {...kantarBekleyen.get(e.id)!} />}
                       </td>
                       <td className="px-3 py-2 text-right">

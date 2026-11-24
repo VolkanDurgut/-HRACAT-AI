@@ -3,7 +3,7 @@
  * tek yazma: hata kuyrugu cozumu (navlun_hata_coz RPC). Migration: 20261110150000_navlun_bildirimi.sql
  */
 import { supabase } from "@/lib/supabase";
-import type { NavlunSatiri } from "@/lib/navlun/ozet";
+import type { NavlunSatiri, SunucuDegerlendirmesi } from "@/lib/navlun/ozet";
 import { baglamKur, type AcenteHafizasi, type GerceklesenKanit, type KarsilastirmaBaglami, type LimanKurali } from "@/lib/navlun/karsilastirma";
 import { limanAnahtari } from "@/lib/liman-anahtari";
 import { esleriYukle, type AdEsi } from "@/supabase/functions/_shared/navlun-tablosu";
@@ -27,6 +27,9 @@ export type NavlunVerisi = {
   baglam: KarsilastirmaBaglami | null;
   /** Baglam okunamadiysa nedeni (sayfada uyari) */
   baglamHatasi: string | null;
+  /** 24.11.2026: "Teklif olabilecek mailler" (ayni okumada; bolum kendi verisini cekmez) */
+  adaylar: TeklifAdayi[];
+  adayHatasi: string | null;
 };
 
 /**
@@ -61,7 +64,7 @@ export async function navlunVerisiOku(gun = 120): Promise<NavlunVerisi> {
   for (let i = 0; i < 10; i++) {
     const { data, error } = await supabase
       .from("navlun_teklifleri")
-      .select("mesaj_id,tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,gecerlilik,lokal_dahil,kaynak,tarih")
+      .select("id,mesaj_id,tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,gecerlilik,lokal_dahil,kaynak,tarih")
       .gte("tarih", bas)
       .order("tarih", { ascending: true })
       .order("id", { ascending: true })
@@ -70,23 +73,41 @@ export async function navlunVerisiOku(gun = 120): Promise<NavlunVerisi> {
     satirlar.push(...((data || []) as NavlunSatiri[]).map((s) => ({ ...s, tutar: s.tutar == null ? null : Number(s.tutar) })));
     if (!data || data.length < SAYFA) break;
   }
-  const { data: ok, error: e2 } = await supabase
-    .from("navlun_mesajlari")
-    .select("id,konu,acente,liman,tarih,kaynak,ozet")
-    .eq("durum", "okunamadi")
-    .order("tarih", { ascending: false })
-    .limit(200);
+  // 24.11.2026: geri kalan okumalar BIRLIKTE (sirayla degil); teklif degerlendirmesi sunucudan (tek hesap yeri)
+  const [okR, sonR, eslerR, degR, adayR] = await Promise.all([
+    supabase.from("navlun_mesajlari").select("id,konu,acente,liman,tarih,kaynak,ozet").eq("durum", "okunamadi").order("tarih", { ascending: false }).limit(200),
+    supabase.from("navlun_mesajlari").select("updated_at").order("updated_at", { ascending: false }).limit(1),
+    supabase.from("ad_esleri").select("tur,kaynak,hedef"),
+    supabase.from("navlun_teklif_degerlendirme")
+      .select("teklif_id,toplam_usd,lokal,ek,lokal_durum,metin,dayanak,celiski,yaklasik,durum,en_iyi,gecerlilik_bitis").limit(10000),
+    supabase.rpc("navlun_teklif_adaylari"),
+  ]);
+  const { data: ok, error: e2 } = okR;
   if (e2) throw new Error(e2.message);
-  const { data: son, error: e3 } = await supabase.from("navlun_mesajlari").select("updated_at").order("updated_at", { ascending: false }).limit(1);
+  const { data: son, error: e3 } = sonR;
   if (e3) throw new Error(e3.message);
+  // Degerlendirme okunamazsa sayfa eski yoldan (tarayicida) hesaplar
+  if (!degR.error) {
+    const sayi = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+    const harita = new Map<string, SunucuDegerlendirmesi>();
+    for (const d of (degR.data || []) as Record<string, unknown>[]) {
+      harita.set(String(d.teklif_id), {
+        toplam_usd: Number(d.toplam_usd), lokal: sayi(d.lokal), ek: Number(d.ek || 0), lokal_durum: d.lokal_durum as SunucuDegerlendirmesi["lokal_durum"],
+        metin: (d.metin as string) || null, dayanak: (d.dayanak as string) || null, celiski: (d.celiski as string) || null, yaklasik: !!d.yaklasik,
+        durum: d.durum as SunucuDegerlendirmesi["durum"], en_iyi: !!d.en_iyi, gecerlilik_bitis: (d.gecerlilik_bitis as string) || null,
+      });
+    }
+    for (const s of satirlar) if (s.id && (s.tur === "teklif" || s.tur === "karsi_teklif")) s.degerlendirme = harita.get(s.id) ?? null;
+  }
   // 16.11.2026 liman / firma es sozlugu (Excel indir tablosu edge raporuyla ayni eslesmeyi kullansin); okunamazsa sabit esler
-  const { data: esler } = await supabase.from("ad_esleri").select("tur,kaynak,hedef");
+  const { data: esler } = eslerR;
   esleriYukle((esler || []) as AdEsi[]);
   // Baglam okunamazsa sayfa yine acilir; lokali belirsiz teklifler en iyi sayilmaz (guvenli taraf) ve uyari gosterilir
   let baglam: KarsilastirmaBaglami | null = null;
   let baglamHatasi: string | null = null;
   try { baglam = await baglamOku(satirlar); } catch (e) { baglamHatasi = e instanceof Error ? e.message : "Karşılaştırma bilgisi okunamadı."; }
-  return { satirlar, okunamayanlar: (ok || []) as OkunamayanMesaj[], sonOkuma: (son && son[0]?.updated_at) || null, baglam, baglamHatasi };
+  return { satirlar, okunamayanlar: (ok || []) as OkunamayanMesaj[], sonOkuma: (son && son[0]?.updated_at) || null, baglam, baglamHatasi,
+    adaylar: adayR.error ? [] : ((adayR.data || []) as TeklifAdayi[]), adayHatasi: adayR.error ? adayR.error.message : null };
 }
 
 export async function navlunHataCoz(id: string, islem: "duzelt" | "yoksay", tutar?: number, ekipman?: string, armator?: string, acente?: string): Promise<void> {
@@ -99,11 +120,6 @@ export async function navlunHataCoz(id: string, islem: "duzelt" | "yoksay", tuta
 /** 16.11.2026: fiyati okunamamis acente cevaplari (metninde tutar gecen ya da tanimadigimiz alan adindan gelen). */
 /** 17.11.2026: denetim - okunmus mailde kayitli olmayan tutar da listeye duser; neden metni RPC'den gelir. */
 export type TeklifAdayi = { id: string; konu: string | null; acente: string | null; alan: string; liman: string | null; tarih: string; metin: string; neden?: string | null };
-export async function teklifAdaylariOku(): Promise<TeklifAdayi[]> {
-  const { data, error } = await supabase.rpc("navlun_teklif_adaylari");
-  if (error) throw new Error(error.message);
-  return (data || []) as TeklifAdayi[];
-}
 
 /** 16.11.2026 "Yeniden oku": Apps Script bir sonraki calismasinda bu tarihten itibaren yazismalari sayfa sayfa yeniden okur. */
 export type YenidenOkuma = { id: string; baslangic: string; durum: "bekliyor" | "isleniyor" | "tamam" | "iptal"; konum: number; gonderilen: number; yeni: number;

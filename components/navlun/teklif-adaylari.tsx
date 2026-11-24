@@ -6,11 +6,12 @@
  * teklif kaydedilir; acentesi bilinmeyen mailde girilen ad ile alan adı acente olarak öğrenilir (sonraki mailler otomatik).
  * 17.11.2026 denetim: okunmuş ama metnindeki bir tutar kayıtlı tekliflerde olmayan mailler de gelir ("neden" satırı);
  * "Teklif olarak kaydet" eksik teklifi ekler, "Teklif değil" yalnız denetimi kapatır (okunmuş teklifler korunur).
+ * 24.11.2026 (mimari onarım): liste sayfanın TEK okumasından gelir (lib/navlun/veri.ts navlunVerisiOku); bölüm kendi verisini çekmez.
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Mail } from "lucide-react";
 import { ACCENT, CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
-import { navlunHataCoz, teklifAdaylariOku, type TeklifAdayi } from "@/lib/navlun/veri";
+import { navlunHataCoz, type TeklifAdayi } from "@/lib/navlun/veri";
 
 const tarihGoster = (iso: string) => new Date(iso).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -62,13 +63,7 @@ function AdaySatiri({ m, onCozuldu }: { m: TeklifAdayi; onCozuldu: () => void })
   );
 }
 
-export function TeklifAdaylari({ yenile, onDegisti }: { yenile: number; onDegisti: () => void }) {
-  const [liste, setListe] = useState<TeklifAdayi[]>([]);
-  const [hata, setHata] = useState<string | null>(null);
-  const getir = useCallback(async () => {
-    try { setListe(await teklifAdaylariOku()); setHata(null); } catch (e) { setHata(e instanceof Error ? e.message : "Okunamadı."); }
-  }, []);
-  useEffect(() => { getir(); }, [getir, yenile]);
+export function TeklifAdaylari({ liste, hata, onDegisti }: { liste: TeklifAdayi[]; hata: string | null; onDegisti: () => void }) {
   if (hata) return <p className="mb-4 text-xs" style={{ color: "#FCA5A5" }}>Teklif olabilecek mailler okunamadı: {hata}</p>;
   if (!liste.length) return null;
   return (
@@ -76,7 +71,7 @@ export function TeklifAdaylari({ yenile, onDegisti }: { yenile: number; onDegist
       <div className="px-4 py-3 flex items-center gap-2 text-sm" style={{ color: "#93C5FD" }}>
         <Mail size={16} /> Teklif olabilecek mailler ({liste.length}) — fiyatı okunamayan ya da kayıtla uyuşmayan mailler; teklifse tutarı girin, değilse işaretleyin.
       </div>
-      {liste.map((m) => <AdaySatiri key={m.id} m={m} onCozuldu={() => { getir(); onDegisti(); }} />)}
+      {liste.map((m) => <AdaySatiri key={m.id} m={m} onCozuldu={onDegisti} />)}
     </div>
   );
 }

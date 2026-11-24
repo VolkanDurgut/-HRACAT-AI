@@ -39,6 +39,8 @@ const tarihGoster = (iso: string) => {
 };
 const norm = (s: string) => s.toLocaleUpperCase("tr-TR").replace(/İ/g, "I");
 const usd = (n: number) => `${n.toLocaleString("tr-TR")} $`;
+const tutarPara = (n: number, para?: string) => (para === "EUR" ? `${n.toLocaleString("tr-TR")} €` : usd(n));
+const tarihGun = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
 
 function Rozet({ metin, renk }: { metin: string; renk: "yesil" | "sari" | "gri" | "mavi" | "kirmizi" }) {
   const r = { yesil: ["rgba(16,185,129,0.14)", "#6EE7B7"], sari: ["rgba(251,191,36,0.14)", "#FCD34D"], gri: ["rgba(148,163,184,0.12)", "#94A3B8"], mavi: ["rgba(96,165,250,0.14)", "#93C5FD"], kirmizi: ["rgba(239,68,68,0.14)", "#FCA5A5"] }[renk];
@@ -112,12 +114,12 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
           <dl className="mt-1.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm" data-baslik-ozet>
             {l.enIyi20 && <>
               <dt style={{ color: "#6EE7B7" }} title="Karşılaştırma: navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç)">En iyi 20&apos;DC</dt>
-              <dd style={{ color: "#6EE7B7" }} data-en-iyi title={l.enIyi20.karsi.dayanak}><b className="tabular-nums">{usd(l.enIyi20.karsi.toplam)}</b> · {l.enIyi20.acente}
+              <dd style={{ color: "#6EE7B7" }} data-en-iyi title={l.enIyi20.karsi.dayanak}><b className="tabular-nums">{l.enIyi20.karsi.yaklasik ? "≈ " : ""}{usd(l.enIyi20.karsi.toplam)}</b> · {l.enIyi20.acente}
                 {l.enIyi20.karsi.metin !== "lokal dahil" && <span style={{ color: TEXT_MUTED }}> ({l.enIyi20.karsi.metin})</span>}</dd>
             </>}
             {l.belirsiz20 && <>
               <dt style={{ color: "#C4B5FD" }}>Lokal belirsiz</dt>
-              <dd style={{ color: "#C4B5FD" }} data-belirsiz title={l.belirsiz20.karsi.dayanak}><b className="tabular-nums">{usd(l.belirsiz20.tutar)}</b> · {l.belirsiz20.acente}
+              <dd style={{ color: "#C4B5FD" }} data-belirsiz title={l.belirsiz20.karsi.dayanak}><b className="tabular-nums">{tutarPara(l.belirsiz20.tutar, l.belirsiz20.para)}</b> · {l.belirsiz20.acente}
                 <span style={{ color: TEXT_MUTED }}> ({l.belirsiz20.karsi.metin}; en iyi sayılmadı)</span></dd>
             </>}
             {l.hedef && <>
@@ -153,15 +155,17 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
                     <td className="px-4 py-2 text-white whitespace-nowrap">{f.acente}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.armator || "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.ekipman}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: enIyi ? "#6EE7B7" : f.karsi.kesin ? "#FFFFFF" : "#C4B5FD" }}
-                      data-toplam title={`${f.karsi.metin} · ${f.karsi.dayanak}`}>{f.karsi.kesin ? usd(f.karsi.toplam) : "?"}</td>
+                    {/* 24.11.2026: suresi dolan teklif gri (en iyi secilmez); EUR teklif kurla USD (≈) */}
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: f.suresiDoldu ? TEXT_MUTED : enIyi ? "#6EE7B7" : f.karsi.kesin ? "#FFFFFF" : "#C4B5FD" }}
+                      data-toplam title={`${f.karsi.metin} · ${f.karsi.dayanak}`}>{f.karsi.kesin ? `${f.karsi.yaklasik ? "≈ " : ""}${usd(f.karsi.toplam)}` : "?"}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-xs whitespace-nowrap" style={{ color: TEXT_MUTED }} data-tutar
-                      title={f.karsi.metin}>{usd(f.tutar)}{f.karsi.kesin && f.karsi.toplam !== f.tutar ? " + lokal" : ""}</td>
+                      title={f.karsi.metin}>{tutarPara(f.tutar, f.para)}{f.karsi.kesin && f.karsi.toplam !== f.tutar && (f.karsi.lokalDurum === "haric" || !f.karsi.yaklasik) ? " + lokal" : ""}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-ft>{f.free_time_gun != null ? `${f.free_time_gun} gün` : "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: "#C9D1DC" }} data-transit>{f.transit_gun ? `${f.transit_gun} gün` : "—"}</td>
                     <td className="px-3 py-2" style={{ color: "#C9D1DC" }}>{f.gecerlilik || "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap" style={{ color: TEXT_MUTED }}>{tarihGoster(f.tarih)}</td>
                     <td className="px-3 py-2 space-x-1 whitespace-nowrap">
+                      {f.suresiDoldu && <span title={f.gecerlilikBitis ? `Geçerlilik ${tarihGun(f.gecerlilikBitis)} tarihinde bitti` : undefined}><Rozet metin="süresi doldu" renk="gri" /></span>}
                       {f.tur !== "teklif" && <Rozet metin={DURUM_ETIKETI[f.tur] || f.tur} renk="mavi" />}
                       <LokalRozeti k={f.karsi} />
                       {f.kaynak === "pdf" && <Rozet metin="PDF'ten" renk="sari" />}
@@ -296,9 +300,8 @@ function NavlunIcerik() {
   const [tabloBilgi, setTabloBilgi] = useState<string | null>(null);
   const [masa, setMasa] = useState<string | null>(null);
 
-  const [adayYenile, setAdayYenile] = useState(0);
   const yukle = useCallback(async () => {
-    setYukleniyor(true); setHata(null); setAdayYenile((n) => n + 1);
+    setYukleniyor(true); setHata(null);
     try { setVeri(await navlunVerisiOku()); } catch (e) { setHata(e instanceof Error ? e.message : "Veri okunamadı."); }
     finally { setYukleniyor(false); }
   }, []);
@@ -409,7 +412,7 @@ function NavlunIcerik() {
           )}
 
           {/* 16.11.2026: fiyati okunamamis acente cevaplari (tanimadigimiz gonderen dahil) */}
-          <TeklifAdaylari yenile={adayYenile} onDegisti={yukle} />
+          <TeklifAdaylari liste={veri.adaylar} hata={veri.adayHatasi} onDegisti={yukle} />
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
           <div className="min-w-0">

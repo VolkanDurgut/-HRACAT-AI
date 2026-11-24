@@ -775,4 +775,11 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
 - Canlıda kalan, henüz arayüze bağlı olmayan sunucu parçaları (migration `20261124210000_navlun_kontrol_isle.sql`):
   RPC `navlun_kontrol_isle` (düzelt / yoksay / acente hafızasına lokal öğret / tutmayanı gerekçeyle onayla; iz
   `navlun_kontrol_islemleri`) ve `navlun_degerlendir_tetikle()`. Mevcut sayfaya bağlanması ayrı onayla.
+- 24.11.2026 MİMARİ ONARIM (mevcut `/navlun` sayfası, görünüm aynı): `navlunVerisiOku` tüm okumaları birlikte yapar ve
+  `navlun_teklif_degerlendirme`'yi teklif satırlarına (`NavlunSatiri.degerlendirme`) bağlar; liman kartı, harita, liman masası
+  ve sohbet konteyner başı maliyeti sunucudan okur (`satirKarsilastirmasi` / `sunucuKarsilastirmasi`, lib/navlun/ozet.ts).
+  Tarayıcı yalnız değerlendirmesi olmayan satırda (hedef kabulü, birkaç dakikalık yeni / elle girilen teklif) hesaplar.
+  Süresi dolan teklif listede gri "süresi doldu" ile kalır, en iyi / lokal belirsiz uyarısı olmaz. EUR teklif "≈ USD".
+  "Teklif olabilecek mailler" aynı okumadan gelir (kendi verisini çekmez). Excel ve 17:00 maili aynı paylaşılan kodu
+  (`_shared/navlun-tablosu.ts`) kullanır. Test: `tests/navlun-ozet-sunucu.test.ts`.
 - Yapay zekâ okuma (Gemini) yalnız secret `NAVLUN_YZ = acik` iken; varsayılan kapalı.

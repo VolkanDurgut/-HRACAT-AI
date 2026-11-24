@@ -9,7 +9,31 @@
 
 import { enIyiSec, karsilastir, type Karsilastirma, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 
+/**
+ * 24.11.2026 TEK HESAP (kullanici onayi: "Navlun bildirimi mevcut hali ile mimari yapisini onarmak"): her teklifin konteyner
+ * basi maliyeti, lokal durumu, gecerliligi ve durumu SUNUCUDA hesaplanir (edge navlun-bildirimi "degerlendir" ->
+ * navlun_teklif_degerlendirme; 17:00 maili ve Excel ile ayni kod). Sayfa bunu okur; tarayici yalniz degerlendirmesi henuz
+ * olmayan satirda (hedef kabulu, birkac dakikalik yeni teklif) eski yoldan hesaplar.
+ */
+export type SunucuDegerlendirmesi = {
+  toplam_usd: number;
+  lokal: number | null;
+  ek: number;
+  lokal_durum: "dahil" | "haric" | "bilinmiyor";
+  metin: string | null;
+  dayanak: string | null;
+  celiski: string | null;
+  yaklasik: boolean;
+  durum: "kesin" | "kontrol" | "eksik" | "suresi_doldu";
+  en_iyi: boolean;
+  gecerlilik_bitis: string | null;
+};
+
 export type NavlunSatiri = {
+  /** navlun_teklifleri.id (24.11.2026: sunucu degerlendirmesiyle eslesme) */
+  id?: string;
+  /** Sunucunun bu teklif icin hesabi (yalniz teklif / karsi_teklif; yoksa null) */
+  degerlendirme?: SunucuDegerlendirmesi | null;
   mesaj_id: string;
   tur: string;
   liman: string | null;
@@ -41,6 +65,12 @@ export type AcenteFiyati = {
   tarih: string;
   /** "teklif" | "karsi_teklif" | "hedef_kabul" */
   tur: string;
+  /** Acentenin yazdigi tutarin para birimi (USD / EUR) */
+  para?: string;
+  /** 24.11.2026: gecerliligi dolmus (teklifte yazan / acente aliskanligi / 21 gun); "en iyi" secilmez */
+  suresiDoldu?: boolean;
+  /** Gecerlilik bitisi (sunucu) */
+  gecerlilikBitis?: string | null;
   /** 13.11.2026: karsilastirma tutari (navlun + lokal + ek), lokal durumu ve dayanagi (lib/navlun/karsilastirma.ts) */
   karsi: Karsilastirma;
 };
@@ -64,6 +94,28 @@ export type LimanOzeti = {
 };
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
+
+/** Sunucu degerlendirmesini sayfanin karsilastirma bicimine cevirir (hesap yok; yalniz bicim). */
+export function sunucuKarsilastirmasi(tutar: number, d: SunucuDegerlendirmesi): Karsilastirma {
+  const metin = d.metin || "";
+  const dayanak = d.dayanak || "";
+  const temel = metin.startsWith("yalnız navlun") ? "navlun" as const : "toplam" as const;
+  const kaynak = temel === "navlun" ? "liman" as const : dayanak.startsWith("Teklif metninde") ? "mail" as const
+    : dayanak.startsWith("Acente hafızası") ? "hafiza" as const : dayanak.startsWith("Rezervasyondan") ? "rezervasyon" as const : "yok" as const;
+  // Gecerlilik ayrica isaretlenir (suresiDoldu); burada lokal / celiski kesinligi
+  const kesin = temel === "navlun" || (!d.celiski && (d.lokal_durum === "dahil" || (d.lokal_durum === "haric" && d.lokal !== null)));
+  return {
+    navlun: tutar, lokal: d.lokal_durum === "dahil" ? 0 : d.lokal, ek: d.ek, toplam: d.toplam_usd, kesin, lokalDurum: d.lokal_durum, temel, kaynak,
+    metin, dayanak, yaklasik: d.yaklasik, celiski: d.celiski,
+  };
+}
+
+/** Satirin karsilastirmasi: sunucu degerlendirmesi varsa o, yoksa (hedef kabulu / yeni teklif) tarayicida. */
+export function satirKarsilastirmasi(s: Pick<NavlunSatiri, "acente" | "tutar" | "ekipman" | "lokal_dahil" | "liman_anahtar" | "degerlendirme">, tutar: number,
+  lokalDahil: boolean | null, baglam: KarsilastirmaBaglami | null): Karsilastirma {
+  if (s.degerlendirme) return sunucuKarsilastirmasi(tutar, s.degerlendirme);
+  return karsilastir({ acente: s.acente, tutar, ekipman: s.ekipman, lokal_dahil: lokalDahil, liman_anahtar: s.liman_anahtar }, baglam);
+}
 export const DURUM_ETIKETI: Record<string, string> = {
   servis_yok: "Servis yok",
   yer_yok: "Yer yok",
@@ -105,8 +157,11 @@ export function limanOzetleri(satirlar: NavlunSatiri[], baglam: KarsilastirmaBag
         const lokalDahil = s.tur === "hedef_kabul" ? true : s.lokal_dahil;
         fiyat.set(`${s.acente}|${ekipman}|${s.armator || ""}`, {
           acente: s.acente, ekipman, tutar, armator: s.armator, free_time_gun: s.free_time_gun, transit_gun: s.transit_gun ?? null, gecerlilik: s.gecerlilik,
-          lokal_dahil: lokalDahil, kaynak: s.kaynak, tarih: s.tarih, tur: s.tur,
-          karsi: karsilastir({ acente: s.acente, tutar, ekipman, lokal_dahil: lokalDahil, liman_anahtar: anahtar }, baglam),
+          lokal_dahil: lokalDahil, kaynak: s.kaynak, tarih: s.tarih, tur: s.tur, para: s.tur === "hedef_kabul" ? "USD" : s.para_birimi || "USD",
+          karsi: s.tur === "hedef_kabul" ? karsilastir({ acente: s.acente, tutar, ekipman, lokal_dahil: lokalDahil, liman_anahtar: anahtar }, baglam)
+            : satirKarsilastirmasi({ ...s, liman_anahtar: anahtar }, tutar, lokalDahil, baglam),
+          suresiDoldu: s.tur !== "hedef_kabul" && s.degerlendirme?.durum === "suresi_doldu",
+          gecerlilikBitis: s.tur !== "hedef_kabul" ? s.degerlendirme?.gecerlilik_bitis ?? null : null,
         });
         sonFiyatTarihi.set(s.acente, s.tarih);
       } else if (s.tur !== "hedef" && s.tur !== "kabul") {
@@ -114,13 +169,15 @@ export function limanOzetleri(satirlar: NavlunSatiri[], baglam: KarsilastirmaBag
       }
     }
     // 13.11.2026: siralama karsilastirma tutarina gore; kesin olanlar once
+    // 24.11.2026: suresi dolan teklif listede kalir ama en sona ve hicbir zaman en iyi / belirsiz uyarisi degil
     const fiyatlar = Array.from(fiyat.values()).sort((a, b) =>
       (a.ekipman === "20DC" ? 0 : 1) - (b.ekipman === "20DC" ? 0 : 1) || a.ekipman.localeCompare(b.ekipman)
+      || (a.suresiDoldu ? 1 : 0) - (b.suresiDoldu ? 1 : 0)
       || (a.karsi.kesin ? 0 : 1) - (b.karsi.kesin ? 0 : 1) || a.karsi.toplam - b.karsi.toplam);
     // Fiyati olan acentenin, fiyattan ONCEKI durumu (ornegin "hedef soruyor") gosterilmez
     const durumlar = Array.from(durum.values()).filter((d) => !sonFiyatTarihi.has(d.acente) || d.tarih > (sonFiyatTarihi.get(d.acente) as string))
       .sort((a, b) => b.tarih.localeCompare(a.tarih));
-    const yirmi = fiyatlar.filter((f) => f.ekipman === "20DC");
+    const yirmi = fiyatlar.filter((f) => f.ekipman === "20DC" && !f.suresiDoldu);
     const secim = enIyiSec(yirmi, (f) => f.karsi);
     sonuc.push({
       anahtar,

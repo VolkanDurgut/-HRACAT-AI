@@ -119,7 +119,7 @@ export function LimanMasasi({ liman, satirlar, onKapat, baglam = null }: { liman
             <p className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: TEXT_MUTED }}>Fiyat merdiveni · son 20&apos;DC teklifleri</p>
             <div className="relative space-y-1">
               {merdiven.slice(0, 5).map((a) => (
-                <button key={a.acente} type="button" onClick={() => setSecili(secili === a.acente ? null : a.acente)} className="w-full flex items-center gap-2 text-[11px] group" title={`${a.acente}: ${a.metin || ""}${a.kesin ? "" : " (lokal belirsiz: en iyi sayılmaz)"}`}>
+                <button key={a.acente} type="button" onClick={() => setSecili(secili === a.acente ? null : a.acente)} className="w-full flex items-center gap-2 text-[11px] group" title={`${a.acente}: ${a.metin || ""}${a.kesin ? "" : " (en iyi sayılmaz)"}`}>
                   <span className="w-24 truncate text-left group-hover:text-white" style={{ color: secili === a.acente ? "#FFFFFF" : "#C9D1DC" }}>{a.acente}</span>
                   <span className="flex-1 h-3.5 rounded relative" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
                     <span className="absolute inset-y-0 left-0 rounded transition-all duration-700" style={{ width: `${((a.toplam as number) / enYuksek) * 100}%`, backgroundColor: a.enIyi ? "rgba(16,185,129,0.55)" : a.kesin ? "rgba(56,189,248,0.35)" : "rgba(251,191,36,0.28)" }} />

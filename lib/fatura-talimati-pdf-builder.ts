@@ -4,7 +4,7 @@ import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi, hesaplaFobFreightCifToplamlari } from "@/lib/cutoff-utils";
-import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
+import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ, varisLimaniUlkeli } from "@/lib/ulke-bul";
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
 import { bayrakPng } from "@/lib/bayraklar";
 import { faturaBolunmesi, parcaAgirliklari, parcaAgirlikMetni, type TalimatParcaGirdisi } from "@/lib/diib/bolunme-talimat";
@@ -165,7 +165,8 @@ function ciz(
     : null;
   bolumTablosu("LOJISTIK BILGILERI", [
     ["Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani],
-    ["Varis Limani", dosya.varis_limani],
+    // 24.11.2026: varis limani ulkesiyle ("ASHDOD PORT, İSRAİL"); ulke metinde yaziyorsa aynen
+    ["Varis Limani", varisLimaniUlkeli(dosya.varis_limani)],
     // 08.10.2026: "Ulke" ikiye ayrildi - varis limaninin ulkesi (gidecegi) ile
     // proformadaki BUYER'in ulkesi (ticaret yapilan) farkli olabilir
     // (0091: alici Ispanya, mal Kuba'ya). Bkz. lib/ulke-bul.ts

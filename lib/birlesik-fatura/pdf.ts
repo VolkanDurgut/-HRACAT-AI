@@ -7,7 +7,7 @@ import autoTable from "jspdf-autotable";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { UNEX_LOGO_BASE64 } from "@/lib/images/unex-logo-base64";
 import { formatCurrency, formatBirimFiyatKg, formatFobBirimFiyatKg, formatCutoffSaat, formatCutoffTarihUzun, ulkeAyikla } from "@/lib/cutoff-utils";
-import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ } from "@/lib/ulke-bul";
+import { gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ, varisLimaniUlkeli } from "@/lib/ulke-bul";
 import { bayrakPng } from "@/lib/bayraklar";
 import { birlesikKonu, type BirlesikFaturaModeli } from "@/lib/birlesik-fatura/model";
 
@@ -113,7 +113,7 @@ function ciz(m: BirlesikFaturaModeli, olcek: number, on: boolean, bayrak: string
   ]);
   bolum("LOJISTIK BILGILERI", [
     ["Yukleme Limani", m.yuklemeLimani],
-    ["Varis Limani", m.varisLimani],
+    ["Varis Limani", varisLimaniUlkeli(m.varisLimani)],
     ["Gidecegi Ulke", gidecegiUlke(m.varisLimani) ?? ulkeAyikla(m.varisLimani)],
     ["Ticaret Yapilan Ulke", dosyaTicaretUlkesi(m.ticaretUlkesiElle, m.aliciAdresi) ?? TICARET_ULKESI_BELIRSIZ],
     ["Teslim Sekli", m.teslimSekli],

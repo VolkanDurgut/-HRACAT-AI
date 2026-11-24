@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { supabase, Rezervasyon, Konteyner, Dosya, yazmaHatasi } from "@/lib/supabase";
 import { formatCurrency, formatDateTR, formatCutoffSaat, formatCutoffTarihUzun, formatBirimFiyatKg, formatFobBirimFiyatKg, fobBirimFiyati, ulkeAyikla, formatDiibBilgisi } from "@/lib/cutoff-utils";
-import { asciiYap, gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ, ULKE_ADLARI } from "@/lib/ulke-bul";
+import { asciiYap, gidecegiUlke, dosyaTicaretUlkesi, TICARET_ULKESI_BELIRSIZ, ULKE_ADLARI, varisLimaniUlkeli } from "@/lib/ulke-bul";
 import { ticaretUlkesiKaydet } from "@/lib/dosya/ticaret-ulkesi";
 import { useToast } from "@/lib/toast-context";
 import { Mail, X, Download } from "lucide-react";
@@ -185,7 +185,7 @@ const FaturaTalimatiSection = forwardRef<FaturaTalimatiSectionHandle, Props>(fun
 
     const lojistikBilgileri = [
       satir("Yukleme Limani", rez?.yuklenme_limani || dosya.yuklenme_limani),
-      satir("Varis Limani", dosya.varis_limani),
+      satir("Varis Limani", dosya.varis_limani ? asciiYap(varisLimaniUlkeli(dosya.varis_limani) ?? "") : null),
       // PDF ile ayni kural (lib/ulke-bul.ts); mailto govdesi ASCII.
       satir("Gidecegi Ulke", asciiYap(gidecegiUlke(dosya.varis_limani) ?? ulkeAyikla(dosya.varis_limani) ?? "")),
       satir("Ticaret Yapilan Ulke", asciiYap(dosyaTicaretUlkesi(elleUlke !== undefined ? elleUlke : dosya.ticaret_ulkesi ?? null, dosya.alici_adresi) ?? TICARET_ULKESI_BELIRSIZ)),

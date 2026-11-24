@@ -13,6 +13,7 @@
  */
 import { RAPOR_URL, esc } from "./rapor-kabugu.ts";
 import { operasyonMailHtml } from "./operasyon-mail.ts";
+import { varisLimaniUlkeli } from "./ulke-bul.ts";
 
 export type OnayDosyasi = {
   id: string;
@@ -65,7 +66,7 @@ export function talimatMailiHtml(o: OnayOzeti, kayitId: string, sirketAdi: strin
   const bilgiler: [string, string][] = [
     ["Müşteri", `<b>${esc(d.alici_firma || "-")}</b>`],
     ["Konteyner", `<b>${esc(konteynerOzeti(o.konteynerler))}</b>`],
-    ["Varış limanı", esc(d.varis_limani || "-")],
+    ["Varış limanı", esc(varisLimaniUlkeli(d.varis_limani) || "-")],
   ];
   if (grup) bilgiler.push(["Birleşik fatura", `<b>${grup.length} dosya tek fatura</b>: ${esc(grup.join(", "))}`]);
   else if (d.dosya_no) bilgiler.push(["Dosya", esc(d.dosya_no)]);

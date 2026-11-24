@@ -1607,3 +1607,12 @@ Kullanıcı: "Bu kısım nedir, doğru çalışıyor mu? Çok karışık görün
 - **Sadeleştirme:** Filo bölümü varsayılan TEK SATIR (bugünkü dağılım + çalışmayan araç + en büyük alışın bitiş tahmini), ayrıntı
   "Ayrıntı" düğmesiyle. Sabah planı satırı "Bugünün planı N · yüklenen M · kalan K"; aynı müşterinin booking'leri tek çip; nedenler kısa
   ("dosya açılmadı", "plan dışı"), açıklama üzerine gelince.
+
+### Fatura talimatı: varış limanı ülkesiyle (24.11.2026) — DB değişikliği yok
+Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda varış ülkesi de belirtilmeli."
+- `varisLimaniUlkeli` (supabase/functions/_shared/ulke-bul.ts; lib/ulke-bul.ts yeniden ihraç eder): metinde ülke zaten yazıyorsa
+  AYNEN ("TEMA PORT, GHANA"), yoksa bilinen limanın ülkesi eklenir ("ASHDOD PORT" → "ASHDOD PORT, İSRAİL"), bulunamazsa aynen.
+- `LIMAN_ULKE` genişletildi (Ashdod, Mombasa, Dar es Salaam / "Dar Salaam", Tema, Batı/Doğu Afrika, Kızıldeniz, Körfez, Akdeniz,
+  Asya limanları). Belirsiz adlar bilerek yok (Tripoli, Valencia, San Pedro, Colon). "Gideceği Ülke" satırı da bu sayede dolar.
+- Kullanılan yerler: fatura talimatı PDF + metin (mailto, ASCII), birleşik fatura PDF + metin, fatura talimatı maili (fatura-onay).
+- Edge yeniden deploy: fatura-onay, diib-gunluk-rapor, siparis-formu, siparis-formu-spek (_shared/ulke-bul.ts değişti).

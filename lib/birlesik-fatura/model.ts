@@ -16,6 +16,7 @@ import { formatCurrency, formatDiibBilgisi, formatBirimFiyatKg, formatFobBirimFi
 import { faturaTalimatiBankasi } from "@/lib/supabase/constants";
 import { kalemMiktari } from "@/lib/sayi-oku";
 import { urunKonteynerDagilimi } from "@/lib/urun-konteyner-dagilimi";
+import { asciiYap, varisLimaniUlkeli } from "@/lib/ulke-bul";
 
 export type GrupUyesi = { dosya: Dosya; rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
@@ -251,7 +252,7 @@ export function birlesikTalimatMetni(m: BirlesikFaturaModeli, on: boolean, ekBil
       satir("Brut Agirlik", m.toplam.brut ? `${sayiTr(m.toplam.brut, 2)} KG` : null),
     ]),
     bolum("LOJISTIK BILGILERI", [
-      satir("Yukleme Limani", m.yuklemeLimani), satir("Varis Limani", m.varisLimani),
+      satir("Yukleme Limani", m.yuklemeLimani), satir("Varis Limani", m.varisLimani ? asciiYap(varisLimaniUlkeli(m.varisLimani) ?? "") : null),
       satir("Gidecegi Ulke", ekBilgi.gidecegiUlke), satir("Ticaret Yapilan Ulke", ekBilgi.ticaretUlkesi),
       satir("Teslim Sekli", m.teslimSekli), satir("Odeme Sekli", m.odemeSekli), satir("Gemi Adi", m.gemi), satir("Acente", m.acente),
       satir("Booking No", m.dosyalar.map((d) => d.bookingNo).filter(Boolean).join(", ")),

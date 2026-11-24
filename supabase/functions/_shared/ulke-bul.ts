@@ -185,6 +185,36 @@ const LIMAN_ULKE: Record<string, string> = {
   PARAMARIBO: "SURİNAM",
   "PORT OF SPAIN": "TRİNİDAD VE TOBAGO",
   GEORGETOWN: "GUYANA",
+  // 24.11.2026 (kullanici: fatura talimatinda "Varis Limani ASHDOD PORT" yaninda ulke de yazmali): ulke adi
+  // yazilmamis varis limanlari icin genis liste. Belirsiz adlar (TRIPOLI: Libya/Lubnan, VALENCIA: Ispanya/Venezuela,
+  // SAN PEDRO, COLON) bilerek YOK - tahmin yerine bos kalir.
+  ASHDOD: "İSRAİL", HAIFA: "İSRAİL", EILAT: "İSRAİL",
+  MOMBASA: "KENYA", LAMU: "KENYA",
+  "DAR ES SALAAM": "TANZANYA", "DAR ES SALAM": "TANZANYA", "DAR SALAAM": "TANZANYA", "DAR SALAM": "TANZANYA", ZANZIBAR: "TANZANYA", TANGA: "TANZANYA",
+  TEMA: "GANA", TAKORADI: "GANA",
+  TOAMASINA: "MADAGASKAR", TAMATAVE: "MADAGASKAR", MAHAJANGA: "MADAGASKAR", MAJUNGA: "MADAGASKAR",
+  MAPUTO: "MOZAMBİK", BEIRA: "MOZAMBİK", NACALA: "MOZAMBİK",
+  DURBAN: "GÜNEY AFRİKA", "CAPE TOWN": "GÜNEY AFRİKA",
+  "PORT SUDAN": "SUDAN", ADEN: "YEMEN", HODEIDAH: "YEMEN", MUKALLA: "YEMEN",
+  JEDDAH: "SUUDİ ARABİSTAN", DAMMAM: "SUUDİ ARABİSTAN",
+  AQABA: "ÜRDÜN", "UMM QASR": "IRAK", BASRA: "IRAK",
+  "JEBEL ALI": "BİRLEŞİK ARAP EMİRLİKLERİ", "BANDAR ABBAS": "İRAN",
+  KARACHI: "PAKİSTAN", "PORT QASIM": "PAKİSTAN", COLOMBO: "SRİ LANKA", CHITTAGONG: "BANGLADEŞ", MALE: "MALDİVLER",
+  LAGOS: "NİJERYA", APAPA: "NİJERYA", "TIN CAN": "NİJERYA", ONNE: "NİJERYA",
+  ABIDJAN: "FİLDİŞİ SAHİLİ", DAKAR: "SENEGAL", FREETOWN: "SİERRA LEONE", MONROVIA: "LİBERYA",
+  NOUAKCHOTT: "MORİTANYA", NOUADHIBOU: "MORİTANYA", BANJUL: "GAMBİYA", BISSAU: "GİNE-BİSSAU", PRAIA: "CABO VERDE",
+  DOUALA: "KAMERUN", KRIBI: "KAMERUN", "POINTE NOIRE": "KONGO", MATADI: "KONGO DEMOKRATİK CUMHURİYETİ",
+  LUANDA: "ANGOLA", LOBITO: "ANGOLA", LIBREVILLE: "GABON", OWENDO: "GABON",
+  MISURATA: "LİBYA", BENGHAZI: "LİBYA", KHOMS: "LİBYA",
+  ALGIERS: "CEZAYİR", ALGER: "CEZAYİR", ORAN: "CEZAYİR", BEJAIA: "CEZAYİR", ANNABA: "CEZAYİR", SKIKDA: "CEZAYİR",
+  TUNIS: "TUNUS", RADES: "TUNUS", SFAX: "TUNUS",
+  ALEXANDRIA: "MISIR", "PORT SAID": "MISIR", DAMIETTA: "MISIR", SOKHNA: "MISIR",
+  CASABLANCA: "FAS", TANGIER: "FAS", TANGER: "FAS", AGADIR: "FAS",
+  BEIRUT: "LÜBNAN", LATAKIA: "SURİYE", TARTUS: "SURİYE", LIMASSOL: "KIBRIS",
+  GENOA: "İTALYA", ODESSA: "UKRAYNA", CONSTANTA: "ROMANYA", BATUMI: "GÜRCİSTAN", POTI: "GÜRCİSTAN",
+  ROTTERDAM: "HOLLANDA", HAMBURG: "ALMANYA", ANTWERP: "BELÇİKA",
+  "PORT KLANG": "MALEZYA", JAKARTA: "ENDONEZYA", SURABAYA: "ENDONEZYA", MANILA: "FİLİPİNLER",
+  "HO CHI MINH": "VİETNAM", HAIPHONG: "VİETNAM", VERACRUZ: "MEKSİKA", "SAN JUAN": "PORTO RİKO",
 };
 
 type Aday = { ulke: string; desen: string };
@@ -236,6 +266,18 @@ export function gidecegiUlke(varisLimani: string | null | undefined): string | n
     if (s.includes(` ${normalize(liman)} `)) return u;
   }
   return null;
+}
+
+/**
+ * 24.11.2026: Fatura talimatinda varis limani ULKESIYLE: metinde ulke zaten yaziyorsa (orn. "TEMA PORT, GHANA") AYNEN;
+ * yoksa bilinen limanin ulkesi eklenir ("ASHDOD PORT" -> "ASHDOD PORT, İSRAİL"); bulunamazsa aynen. Bos ise null.
+ */
+export function varisLimaniUlkeli(varisLimani: string | null | undefined): string | null {
+  const v = (varisLimani || "").trim();
+  if (!v) return null;
+  if (ulkeBul(v)) return v;
+  const u = gidecegiUlke(v);
+  return u ? `${v}, ${u}` : v;
 }
 
 /** Bilinen ulkelerin Turkce adlari (elle secim listesi). */

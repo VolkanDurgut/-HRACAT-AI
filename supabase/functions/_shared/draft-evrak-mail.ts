@@ -11,8 +11,9 @@
 import { operasyonMailHtml, opKacis } from "./operasyon-mail.ts";
 
 /** Taslak Onay Paketi adi: "DRAFT- 1- INVOICE- <booking>- <proforma>.pdf" (lib/evrak-dosya-adi.ts ile ayni) */
-export const DRAFT_EK_ADI = /^DRAFT- ([1-9])- (INVOICE|PACKING|BL|COO|PHYTO|HEALTH|QUALITY|FUMIGATION)- [^\/\\:*?"<>|]{1,80}- [^\/\\:*?"<>|]{1,80}\.pdf$/;
-export const DRAFT_EK_AZAMI_ADET = 8;
+// 24.11.2026: yalniz 1-6 (7 Quality / 8 Fumigation bu maile girmez - kullanici karari)
+export const DRAFT_EK_ADI = /^DRAFT- ([1-6])- (INVOICE|PACKING|BL|COO|PHYTO|HEALTH)- [^\/\\:*?"<>|]{1,80}- [^\/\\:*?"<>|]{1,80}\.pdf$/;
+export const DRAFT_EK_AZAMI_ADET = 6;
 /** Resend siniri 40 MB (base64 dahil); tek belge 8 MB, toplam 20 MB ile genis pay */
 export const DRAFT_EK_AZAMI_BAYT = 8 * 1024 * 1024;
 export const DRAFT_TOPLAM_AZAMI_BAYT = 20 * 1024 * 1024;

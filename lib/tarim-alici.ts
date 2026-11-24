@@ -40,8 +40,49 @@ function ilkNotify(hamVeri: unknown): string | null {
   return null;
 }
 
-/** 4-5-6 numarali evraklarda alici kutusuna yazilacak metin (yoksa null). */
+/**
+ * 24.11.2026 (kullanici: "Mense belgesinde telefon mail bilgileri genel olarak yer almamali. 4-5-6 numarali
+ * evraklar icin. Cunku sigmiyor."): alici metninden telefon / faks / WhatsApp numaralari ve e-posta adresleri
+ * (etiketleriyle) cikarilir; firma adi, adres, vergi no (TIN/NIF/VAT) kalir. Veri DEGISMEZ, yalniz gosterim.
+ */
+const ETIKET_TEL = String.raw`(?:TEL(?:EFONO|EPHONE|EFON)?(?:\s*(?:OFFICE|NO|NR))?|PHONE(?:\s*(?:NUMBER|NO))?|MOBILE|MOB|GSM|CELL?(?:ULAR)?|WHATSAPP|FAX|T|NUMBER)`;
+const TEL_DEGERI = String.raw`[+*(]?\d[\d \t().\/+*-]{5,}\d`;
+const rakamSayisi = (t: string) => (t.match(/\d/g) || []).length;
+
+export function iletisimBilgisiniCikar(metin: string): string {
+  let s = metin.replace(/\r/g, "");
+  // 1) e-posta adresleri
+  s = s.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, " ");
+  // 2) etiketli telefon / faks (deger en az 7 rakam)
+  s = s.replace(new RegExp(String.raw`\b${ETIKET_TEL}[ \t]*[.:]?[ \t]*(${TEL_DEGERI})`, "gi"), (tam, deger: string) => (rakamSayisi(deger) >= 7 ? " " : tam));
+  // 3) etiketsiz uluslararasi numaralar (+ / * / 00 ile baslayan, en az 7 rakam)
+  s = s.replace(new RegExp(String.raw`(^|[ \t,;\/])((?:\+|\*|00)[ \t]?\d[\d \t().\/-]{5,}\d)`, "gm"), (tam, on: string, deger: string) => (rakamSayisi(deger) >= 7 ? on + " " : tam));
+  // 4) degeri kalmayan etiketler ("EMAIL:", "TEL:", "WHATSAPP:")
+  s = s.replace(/\bE[- ]?MAILS?(?:[ \t]*ID)?[ \t]*[:.]?/gi, " ");
+  // irtibat kisisi ("CONTACTO: <ad>") de iletisim bilgisidir
+  s = s.replace(/\bCONTACT(?:O|S)?(?:[ \t]*PERSON)?[ \t]*:[^\n,]*/gi, " ");
+  s = s.replace(new RegExp(String.raw`\b(?:TEL(?:EFONO|EPHONE)?(?:[ \t]*(?:OFFICE|NO))?|PHONE(?:[ \t]*NUMBER)?|MOBILE|GSM|WHATSAPP|FAX)[ \t]*[.:][ \t]*(?=$|[,;\/ \t]*(?:$|[,;\/]))`, "gim"), " ");
+  // 5) satir temizligi: kalan ayiraclar, cift bosluk, bos satir
+  const ilk = metin.replace(/\r/g, "").split("\n");
+  return s
+    .split("\n")
+    .map((satir, i) => (satir === ilk[i] ? satir.trim() : satir
+      .replace(/(?:\s*[,;\/]\s*){2,}/g, ", ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s,;\/:-]+|[\s,;\/:-]+$/g, "")
+      .trim()))
+    .filter((satir) => satir.length > 0)
+    .join("\n");
+}
+
+/** 4-5-6 numarali evraklarda alici kutusuna yazilacak metin (yoksa null). Telefon / e-posta cikarilmis. */
 export function tarimBelgesiAlicisi(dosya: Pick<Dosya, "consignee" | "ham_veri" | "alici_firma" | "alici_adresi">): string | null {
+  const ham = tarimBelgesiAlicisiHam(dosya);
+  if (!ham) return null;
+  return iletisimBilgisiniCikar(ham) || ham;
+}
+
+function tarimBelgesiAlicisiHam(dosya: Pick<Dosya, "consignee" | "ham_veri" | "alici_firma" | "alici_adresi">): string | null {
   const consignee = (dosya.consignee ?? "").trim();
   if (consignee && !consigneeToOrderMu(consignee)) return consignee;
   const notify = ilkNotify(dosya.ham_veri);

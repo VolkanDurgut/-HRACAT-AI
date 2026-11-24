@@ -5,7 +5,7 @@
  * (lib/html-vektor-pdf.ts; "cam gibi"). Paket (lib/taslak-onay-paketi.ts, ZIP) ve sevkiyat evraklari DEGISMEDI.
  * Sira/ad kurali paketle birebir: "DRAFT- <sira>- <KOD>- <booking>- <proforma>.pdf"
  *   1 INVOICE, 2 PACKING (DRAFT filigranli), 3 BL (yuklenen dosyanin kendisi), 4 COO, 5 PHYTO, 6 HEALTH,
- *   7 QUALITY, 8 FUMIGATION (musteri istiyorsa ve bilgisi tamsa; filigranli).
+ *   (7 QUALITY / 8 FUMIGATION bu maile EKLENMEZ - kullanici karari 24.11.2026; ZIP paketinde durur.)
  */
 import type { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { buildCommercialInvoiceHtml } from "@/lib/invoice-builder";
@@ -13,10 +13,7 @@ import { buildPackingListHtml } from "@/lib/packing-list-builder";
 import { buildCertificateOfOriginHtml } from "@/lib/certificate-of-origin-builder";
 import { buildPhytosanitaryCertificateHtml } from "@/lib/phytosanitary-certificate-builder";
 import { buildHealthCertificateHtml } from "@/lib/health-certificate-builder";
-import { buildKaliteSertifikasiHtml } from "@/lib/kalite-sertifikasi-builder";
-import { buildFumigationHtml } from "@/lib/fumigation-builder";
-import { checkKaliteSertifikasiReadiness, checkFumigationReadiness } from "@/lib/document-readiness";
-import { MusteriEvrakAyarlari, BOS_MUSTERI_EVRAK_AYARLARI, dosyaEvrakIstiyorMu } from "@/lib/musteri-evrak-ayarlari";
+import { MusteriEvrakAyarlari, BOS_MUSTERI_EVRAK_AYARLARI } from "@/lib/musteri-evrak-ayarlari";
 import { draftFiligranEkle } from "@/lib/watermark";
 import { draftEkAdi, baytBase64 } from "@/lib/draft-evrak-adi";
 export { draftEkAdi, baytBase64 };
@@ -29,7 +26,7 @@ export type DraftSetiPlani = {
 /** Hangi belgelerin hangi adla eklenecegi (saf; testli). Draft BL adresi yoksa hata firlatir. */
 export function draftSetiPlani(
   dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], draftBlUrl: string | null,
-  ayarlar: MusteriEvrakAyarlari = BOS_MUSTERI_EVRAK_AYARLARI,
+  _ayarlar: MusteriEvrakAyarlari = BOS_MUSTERI_EVRAK_AYARLARI,
 ): DraftSetiPlani {
   if (!draftBlUrl) throw new Error("Draft BL yüklenmemiş.");
   const a = [dosya, rezervasyonlar, konteynerler] as const;
@@ -42,17 +39,9 @@ export function draftSetiPlani(
     { sira: 5, kod: "PHYTO", ad: ad(5, "PHYTO"), html: buildPhytosanitaryCertificateHtml(...a) },
     { sira: 6, kod: "HEALTH", ad: ad(6, "HEALTH"), html: buildHealthCertificateHtml(...a) },
   ];
+  // 24.11.2026 kullanici: "Draft evraklardan sadece 1-2-3-4-5-6 numarali belgeler gonderilmeli. 7 ve 8 gonderilmemeli."
+  // (Quality / Fumigation ZIP paketinde ve Draft/Orijinal butonlarinda eskisi gibi durur; yalniz bu mailde yok.)
   const eklenmeyenler: string[] = [];
-  if (dosyaEvrakIstiyorMu(dosya, "Quality")) {
-    const h = checkKaliteSertifikasiReadiness(...a);
-    if (h.hazir) belgeler.push({ sira: 7, kod: "QUALITY", ad: ad(7, "QUALITY"), html: draftFiligranEkle(buildKaliteSertifikasiHtml(...a, ayarlar.kaliteAyar)) });
-    else eklenmeyenler.push(`Quality Certificate (eksik: ${h.eksikler.join(", ")})`);
-  }
-  if (dosyaEvrakIstiyorMu(dosya, "Fumigation")) {
-    const h = checkFumigationReadiness(...a);
-    if (h.hazir) belgeler.push({ sira: 8, kod: "FUMIGATION", ad: ad(8, "FUMIGATION"), html: draftFiligranEkle(buildFumigationHtml(...a, ayarlar.fumigationAyar)) });
-    else eklenmeyenler.push(`Fumigation Certificate (eksik: ${h.eksikler.join(", ")})`);
-  }
   return { belgeler, eklenmeyenler };
 }
 

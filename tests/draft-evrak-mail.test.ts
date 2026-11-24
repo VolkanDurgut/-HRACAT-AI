@@ -18,7 +18,10 @@ test("ek adlari Taslak Onay Paketi / Draft butonu adlariyla ayni", () => {
   assert.equal(draftEkAdi(1, EVRAK_KISA_KODLARI.ci, dosya, rez), buildEvrakPdfDosyaAdi("taslak", 1, EVRAK_KISA_KODLARI.ci, dosya, rez));
   assert.equal(draftEkAdi(7, EVRAK_KISA_KODLARI.qc, dosya, rez), buildEvrakPdfDosyaAdi("taslak", 7, EVRAK_KISA_KODLARI.qc, dosya, rez));
   assert.equal(draftEkAdi(3, "BL", { proforma_no: null }, []), "DRAFT- 3- BL- BOOKING- PROFORMA.pdf");
-  for (const kod of ["INVOICE", "PACKING", "BL", "COO", "PHYTO", "HEALTH", "QUALITY", "FUMIGATION"]) assert.ok(DRAFT_EK_ADI.test(draftEkAdi(1, kod, dosya, rez)), kod);
+  for (const kod of ["INVOICE", "PACKING", "BL", "COO", "PHYTO", "HEALTH"]) assert.ok(DRAFT_EK_ADI.test(draftEkAdi(1, kod, dosya, rez)), kod);
+  // 7 Quality / 8 Fumigation bu maile girmez
+  assert.equal(DRAFT_EK_ADI.test(draftEkAdi(7, "QUALITY", dosya, rez)), false);
+  assert.equal(DRAFT_EK_ADI.test(draftEkAdi(8, "FUMIGATION", dosya, rez)), false);
 });
 
 test("ek dogrulama: ad, PDF imzasi, tekrar, sira", () => {

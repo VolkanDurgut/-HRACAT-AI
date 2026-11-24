@@ -1620,7 +1620,7 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 ## Draft Evrak Seti maili + vektor PDF motoru (24.11.2026)
 - Ihracat Evraklari kartinda (components/draft-onay-karti.tsx) paket butonunun yaninda **Draft Seti Mail Gönder** (gonder ikonu).
   Belgeler Taslak Onay Paketi ile AYNI sira ve adlarla: `DRAFT- <sira>- <KOD>- <booking>- <proforma>.pdf`
-  (1 INVOICE, 2 PACKING, 3 BL = yuklenen dosya, 4 COO, 5 PHYTO, 6 HEALTH, 7 QUALITY / 8 FUMIGATION musteri istiyorsa).
+  (1 INVOICE, 2 PACKING, 3 BL = yuklenen dosya, 4 COO, 5 PHYTO, 6 HEALTH). 7 Quality / 8 Fumigation bu maile EKLENMEZ (kullanici karari 24.11.2026; ZIP paketinde durur).
 - PDF'ler **vektor**: lib/html-vektor-pdf.ts (HTML gorunmez iframe'de tarayiciya dizdirilir; kelime/cizgi/zemin/gorsel
   konumlari okunup pdf-lib ile metin olarak yazilir; Liberation Sans/Serif (OFL, public/fonts) alt kume gomulur).
   Her `.sheet` / `.sheet-ek` bir A4; `.print-hint` basilmaz. html-to-pdf.ts (html2canvas, sevkiyat evraklari) DEGISMEDI.
@@ -1630,3 +1630,6 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - MOD: YALNIZ TEST -> `DRAFT_EVRAK_TEST_ALICISI` (yoksa KONSIMENTO_HATIRLATMA_TEST_ALICISI). Dosyada hicbir alan
   degismez (draft_mail_gonderildi / 48 saat baslamaz). Canli alici (musteri + CC) kullanici onayiyla eklenecek.
 - Test: tests/draft-evrak-mail.test.ts.
+- 4-5-6 (COO / Phyto / Health) alici kutusu (lib/tarim-alici.ts -> iletisimBilgisiniCikar, 24.11.2026): telefon, faks,
+  WhatsApp, e-posta ve irtibat kisisi ("CONTACTO:") gosterilmez ("sigmiyor"). Firma, adres, vergi no (TIN/NIF/VAT) kalir.
+  Veri degismez; yalniz bu uc belgedeki gosterim. Health'teki eski kisaltma (ilk iletisim/vergi etiketinden keser) aynen.

@@ -41,10 +41,20 @@ test("oncelik: odeme / fatura / booking onayi genel kaliplardan once", () => {
 });
 
 test("gonderene gore ve bos kalmama", () => {
-  assert.equal(bul("[Rapor] Navlun Raporu · 23.11.2026", "Unex AI <bildirim@ihracatasistanim.com>"), "9-Diger/Unex-AI");
-  assert.equal(bul("[TEST] [Önemli] Draft Evrak Seti · KRGPRO01", "x@example.com"), "9-Diger/Unex-AI");
+  assert.equal(bul("[Rapor] Navlun Raporu · 23.11.2026", "Unex AI <bildirim@ihracatasistanim.com>"), "9-Diger/Unex-AI-Rapor");
+  // Unex AI hatirlatma / onemli mailleri icerigine gore gruplanir
+  assert.equal(bul("[TEST] [Önemli] Draft Evrak Seti · KRGPRO01", "x@example.com"), "4-Evrak/Draft-Onay");
+  assert.equal(bul("[Önemli] FATURA VE BEYANNAME TALİMATI HAKKINDA // ORNEK", "bildirim@ihracatasistanim.com"), "8-Gumruk/Fatura-Beyanname-Talimati");
+  assert.equal(bul("[Hatırlatma] Bugünkü müşteriniz · ORNEK", "bildirim@ihracatasistanim.com"), "9-Diger/Unex-AI");
   assert.equal(bul("ORNEK LINE - UNEX GIDA IS GELISTIRME HK", "kurgu@hlag.com"), "2-Booking-Acente/Acente-Yazisma");
-  assert.equal(bul("Hesap güvenlik kodu", "account-security-noreply@example.com"), "9-Diger/Hesap-Test");
+  assert.equal(bul("Hesap güvenlik kodu", "account-security-noreply@example.com"), "9-Diger/Bildirim-Reklam");
+  assert.equal(bul("Save 40% with our Black Friday offer", "kurgu@shop.example"), "9-Diger/Bildirim-Reklam");
+  assert.equal(bul("[TAHMİNİ VARIŞ] ORN-0001 // 2X20'DC ORNEK - ORNEK", "kurgu@example.com"), "6-Gemi-ETA/ETD-ETA");
+  assert.equal(bul("FW: ORNEK Duyuru", "kurgu@unex.com.tr"), "9-Diger/Duyuru-Bulten");
+  assert.equal(bul("UNEX // ORNEK LINE // CARİ BİLGİLERİ HK.", "kurgu@unex.com.tr"), "5-Odeme-Banka/Acente-Fatura");
+  assert.equal(bul("Requested Documents - Batch and Expiry Date Information", "kurgu@example.com"), "4-Evrak/Evrak-Diger");
+  assert.equal(bul("Automatic reply: UNEX // DRAFT APPROVAL OF LOADING DOCUMENTS // KRGPRO01", "kurgu@example.com"), "4-Evrak/Draft-Onay");
+  assert.equal(bul("ORNEK 48.HAFTA LCL GEMİ PROGRAMIMIZ **Duyuru", "kurgu@example.com"), "6-Gemi-ETA/Gemi-Programi-Cutoff");
   assert.equal(bul("2026 bakım sözleşmesi", "kurgu@example.com"), "9-Diger/Siniflanmayan");
   assert.equal(bul("", ""), "9-Diger/Siniflanmayan");
 });

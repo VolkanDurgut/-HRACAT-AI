@@ -53,9 +53,8 @@ function etiketAcenteMi_(gonderen) {
  * Sira onemli: ozel ifadeler (BOOKING CONFIRMATION, PAYMENT) genel olanlardan (VGM, SHIPPING DOCUMENTS) once gelir.
  */
 var ETIKET_KURALLARI = [
-  // Sistemin kendi mailleri (Unex AI raporlari, hatirlatmalari)
-  ['9-Diger', 'Unex-AI', /^\[(TEST\] \[)?(RAPOR|HATIRLATMA|ONEMLI)\]/, null],
-  ['9-Diger', 'Unex-AI', null, /@ihracatasistanim\.com$/i],
+  // Reklam / kampanya (24.11.2026 deneme: "Black Friday offer" teklif sanilmasin)
+  ['9-Diger', 'Bildirim-Reklam', /BLACK FRIDAY|CYBER MONDAY|% ?OFF\b|\bSAVE (UP TO )?[0-9]+ ?%|DISCOUNT|INDIRIM|KAMPANYA|UNSUBSCRIBE/, null],
   // Kesin ifadeler
   ['2-Booking-Acente', 'Booking', /BOOKING CONFIRMATION|BOOKING ONAY|REZERVASYON ONAY/, null],
   ['8-Gumruk', 'Fatura-Beyanname-Talimati', /FATURA VE BEYANNAME TALIMATI/, null],
@@ -63,21 +62,22 @@ var ETIKET_KURALLARI = [
   ['5-Odeme-Banka', 'Acente-Fatura', /\*+ ?INVOICE ?\*+|FATURA (BILDIRIMI|ITIRAZI)|DEBIT NOTE|CREDIT NOTE|NAVLUN FATURA|LOCAL CHARGE/, null],
   ['4-Evrak', 'Draft-Onay', /DRAFT APPROVAL|DRAFT EVRAK/, null],
   ['4-Evrak', 'Sevkiyat-Evraklari', /SHIPPING DOCUMENTS|SEVKIYAT EVRAKLARI|ORIGINAL DOCUMENTS|ORIJINAL EVRAK|\bDHL\b|COURIER|KURYE/, null],
+  ['5-Odeme-Banka', 'Acente-Fatura', /CARI (BILGI|HESAP|EKSTRE)|EKSTRE|MUTABAKAT/, null],
   // Konsimento
   ['3-Konsimento-DraftBL', 'BL-Kopya-Telex', /COPY OF BILL OF LADING|TELEX|SEAWAY|SURRENDER|ORIGINAL B\/?L|EXPRESS RELEASE/, null],
   ['3-Konsimento-DraftBL', 'Draft-BL', /DRAFT B\/?L|DRAFT BILL|^DRAFT\b|KONSIMENTO|SHIPPING INSTRUCTION|BL TALIMAT/, null],
   ['4-Evrak', 'Sertifika-ECTN', /\bECTN\b|CERTIFICATE|SERTIFIKA|FUMIGATION|FUMIGASYON|PHYTO|FITOSANITER|HEALTH CERT|MENSE|\bCOO\b|ANALIZ/, null],
   // Gumruk
   ['8-Gumruk', 'DIIB', /\bDIIB\b|\bD[12]-[0-9]{4,}|IKINCIL ISLEM/, null],
-  ['8-Gumruk', 'Beyanname', /BEYANNAME|GUMRUK|CUSTOMS|DECLARATION/, null],
+  ['8-Gumruk', 'Beyanname', /BEYANNAME|GUMRUK BEYAN|GUMRUK MUSAVIR|CUSTOMS DECLARATION|CUSTOMS CLEARANCE/, null],
   // Yukleme / lojistik
   ['7-Yukleme-Lojistik', 'VGM', /\bVGM\b|VERIFIED GROSS/, null],
   ['7-Yukleme-Lojistik', 'TMO-Irsaliye', /\bTMO\b|IRSALIYE/, null],
   ['7-Yukleme-Lojistik', 'Ekipman-Konteyner', /EKIPMAN|ARDIYESIZ|CEKILMEYEN KONTEYNER|KONTEYNER CEKIM|EQUIPMENT|EMPTY RELEASE/, null],
   ['7-Yukleme-Lojistik', 'Dokme-Gemi', /^M\/?V |DISCHARG|IN BULK|TAHLIYE/, null],
   // Gemi / ETA
-  ['6-Gemi-ETA', 'ETD-ETA', /ETD-ETA|\bETA\b|ARRIVAL NOTICE|VARIS BILDIRIM|ROLL ?OVER|GECIKME|DELAY/, null],
-  ['6-Gemi-ETA', 'Gemi-Programi-Cutoff', /GEMI PROGRAMI|CUT ?OFF|GEMI DEGISIKLIGI|VESSEL SCHEDULE|SAILING|\bW[0-9]{2}\b|SERVISI|DUYURU|BILGILENDIRME/, null],
+  ['6-Gemi-ETA', 'ETD-ETA', /ETD-ETA|\bETA\b|ARRIVAL NOTICE|TAHMINI VARIS|VARIS (BILDIRIM|TARIH)|ROLL ?OVER|GECIKME|DELAY/, null],
+  ['6-Gemi-ETA', 'Gemi-Programi-Cutoff', /GEMI PROGRAM|CUT ?OFF|GEMI DEGISIKLIGI|VESSEL SCHEDULE|SAILING|\bW[0-9]{2}\b|SERVISI|SURCHARGE|BILGILENDIRME/, null],
   // Booking / navlun
   ['2-Booking-Acente', 'Navlun-Talebi', /NAVLUN|FREIGHT RATE|FREIGHT QUOT|RATE REQUEST/, null],
   ['2-Booking-Acente', 'Booking', /BOOKING|REZERVASYON|^[0-9]{4}\/[0-9]{3,5} \/\/|^HRZ[0-9]|\bBKG\b/, null],
@@ -86,9 +86,11 @@ var ETIKET_KURALLARI = [
   ['1-Siparis-Proforma', 'Sozlesme-Proforma', /BUS+INES+ AGREEMENT|PROFORMA|CONTRACT|\bPO[0-9]|PURCHASE ORDER|\bORDER\b|BUSINESS CONFIRMATION/, null],
   ['1-Siparis-Proforma', 'Musteri-Teklif', /SUPPLY|OFFER|QUOTATION|PRICE LIST|FIYAT TEKLIF|INQUIRY|ENQUIRY/, null],
   // Diger
-  ['9-Diger', 'Duyuru-Bulten', /NEWSLETTER|BULTEN|WEBINAR|\bEVENT\b|FUAR|\bEXPO\b|DAVET|INVITATION|\bTIMES\b|KAMPANYA|ANNOUNCEMENT/, null],
-  ['9-Diger', 'Hesap-Test', /\bTEST\b|DENEME|GUVENLIK KODU|SECURITY CODE|VERIFICATION CODE/, null],
-  ['9-Diger', 'Hesap-Test', null, /no-?reply|accountprotection|security/i],
+  ['9-Diger', 'Duyuru-Bulten', /NEWSLETTER|BULTEN|WEBINAR|\bEVENT\b|FUAR|\bEXPO\b|DAVET|INVITATION|\bTIMES\b|ANNOUNCEMENT|DUYURU/, null],
+  ['4-Evrak', 'Evrak-Diger', /DOCUMENT|EVRAK|BELGE/, null],
+  ['9-Diger', 'Test', /\bTEST\b|DENEME/, null],
+  ['9-Diger', 'Bildirim-Reklam', /GUVENLIK KODU|SECURITY CODE|VERIFICATION CODE|HESAB|ACCOUNT|REGISTRATION|PASSWORD|SIFRE/, null],
+  ['9-Diger', 'Bildirim-Reklam', null, /no-?reply|accountprotection|security|newsletter|marketing|info@|news@/i],
   // Konu bir sey soylemiyor ama gonderen gemi hatti / forwarder
   ['2-Booking-Acente', 'Acente-Yazisma', null, { test: function (g) { return etiketAcenteMi_(g); } }],
 ];
@@ -100,27 +102,37 @@ function etiketKonuNormal(konu) {
   s = s.replace(/[çÇğĞıİöÖşŞüÜâîû]/g, function (h) { return tr[h] || h; }).toUpperCase();
   s = s.replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim();
   for (var i = 0; i < 6; i++) {
-    var y = s.replace(/^(RE|FW|FWD|YNT|YANIT|ILT|ILET|TR|AW|WG|RV)\s*:\s*/i, '');
+    var y = s.replace(/^(RE|FW|FWD|YNT|YANIT|ILT|ILET|TR|AW|WG|RV|AUTOMATIC REPLY|OTOMATIK YANIT|OUT OF OFFICE)\s*:\s*/i, '');
     if (y === s) break;
     s = y;
   }
   return s;
 }
 
-/** Konu + gonderen -> { ana, alt }. Saf fonksiyon (testlerde de calisir). */
+/**
+ * Konu + gonderen -> { ana, alt }. Saf fonksiyon (testlerde de calisir).
+ * Unex AI'nin kendi mailleri: [Rapor] -> 9-Diger/Unex-AI-Rapor; [Hatirlatma]/[Onemli] icerigine gore ilgili gruba
+ * (or. "[Onemli] FATURA VE BEYANNAME TALIMATI" -> 8-Gumruk); hicbirine uymazsa 9-Diger/Unex-AI.
+ */
 function etiketBul(konu, gonderen) {
   var k = etiketKonuNormal(konu);
   var g = String(gonderen || '').toLowerCase();
   var m = /<([^>]+)>/.exec(g);
   if (m) g = m[1];
   g = g.trim();
+  var etiket = /^\[(?:TEST|DENEME)\] /.test(k) ? k.replace(/^\[(?:TEST|DENEME)\] /, '') : k;
+  var ai = /^\[(RAPOR|HATIRLATMA|ONEMLI)\] ?/.exec(etiket);
+  var unexAi = !!ai || /@ihracatasistanim\.com$/.test(g);
+  if (ai && ai[1] === 'RAPOR') return { ana: '9-Diger', alt: 'Unex-AI-Rapor' };
+  if (ai) k = etiket.slice(ai[0].length);
   for (var i = 0; i < ETIKET_KURALLARI.length; i++) {
     var r = ETIKET_KURALLARI[i];
+    if (unexAi && !r[2]) continue;   // Unex AI mailinde gonderen kurallari (noreply, acente) gecersiz
     var konuUyar = r[2] ? r[2].test(k) : true;
     var gonUyar = r[3] ? r[3].test(g) : true;
     if ((r[2] || r[3]) && konuUyar && gonUyar) return { ana: r[0], alt: r[1] };
   }
-  return { ana: '9-Diger', alt: 'Siniflanmayan' };
+  return unexAi ? { ana: '9-Diger', alt: 'Unex-AI' } : { ana: '9-Diger', alt: 'Siniflanmayan' };
 }
 
 var etiketOnbellek_ = {};
@@ -150,7 +162,7 @@ function etiketIsle_(konular, uygula) {
     var anahtar = sonuc.ana + '/' + sonuc.alt;
     sayac[anahtar] = (sayac[anahtar] || 0) + 1;
     if (!ornek[anahtar]) ornek[anahtar] = [];
-    if (ornek[anahtar].length < 3) ornek[anahtar].push(t.getFirstMessageSubject().slice(0, 90));
+    if (ornek[anahtar].length < (sonuc.alt === 'Siniflanmayan' ? 40 : 3)) ornek[anahtar].push(t.getFirstMessageSubject().slice(0, 90));
     hedefler.forEach(function (h) { (gruplar[h] = gruplar[h] || []).push(t); });
   }
   if (uygula) {

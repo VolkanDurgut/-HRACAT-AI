@@ -1649,3 +1649,7 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
   Kurallar konu + ilk gonderen; ilk eslesen kazanir; uymayan 9-Diger/Siniflanmayan. Elle verilmis UNEX grubu korunur.
 - Calistirma: etiketDeneme (degisiklik yok, dagilim) -> etiketGecmis ("BITTI"ye kadar) -> etiketKur (10 dk tetikleyici).
 - Test: tests/gmail-etiket.test.ts (kurgu konular).
+- 24.11.2026 deneme sonrasi: Unex AI [Rapor] -> 9-Diger/Unex-AI-Rapor; [Hatirlatma]/[Onemli] icerigine gore ilgili gruba
+  (yoksa 9-Diger/Unex-AI). Reklam/kampanya ve noreply bildirimleri 9-Diger/Bildirim-Reklam; "Tahmini varis" -> ETD-ETA;
+  "Duyuru" -> Duyuru-Bulten; genel "Gumruk" kelimesi Beyanname saymaz; cari/ekstre -> Acente-Fatura; kalan evrak -> 4-Evrak/Evrak-Diger.
+  etiketDeneme siniflanmayanlarin 40 ornegini yazar. Forwarder alan adlari repoda degil, betik ozelligi ACENTE_ALANLARI.

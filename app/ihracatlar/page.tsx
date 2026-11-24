@@ -17,7 +17,8 @@ import { CokluNoKisa, cokluNoSatirlari } from "@/components/coklu-no-girisi";
 import AppShell from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { CopyableField } from "@/components/copyable-field";
-import { Search, ExternalLink, Archive, X, Package, Loader2, Trash2, FileText, Eye } from "lucide-react";
+import { Search, ExternalLink, Archive, X, Package, Loader2, Trash2, FileText, Eye, Copy, Check } from "lucide-react";
+import { aramaTerimi, konteynerNolariMetni } from "@/lib/arsiv-arama";
 import { elleTartimMi } from "@/lib/elle-tartim";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import EvrakOlusturButtons from "@/components/evrak-olustur-buttons";
@@ -41,6 +42,16 @@ export default function IhracatlarPage() {
   const router = useRouter();
   const gecisliGit = useGecisliYonlendirme(); // 06.11.2026: logolu sayfa gecisi
   const { showToast } = useToast();
+  const [konteynerKopyalandi, setKonteynerKopyalandi] = useState(false);
+  const konteynerNolariniKopyala = useCallback(async (metin: string) => {
+    try {
+      await navigator.clipboard.writeText(metin);
+      setKonteynerKopyalandi(true);
+      setTimeout(() => setKonteynerKopyalandi(false), 2000);
+    } catch {
+      showToast("Kopyalanamadı. Tarayıcı panoya erişime izin vermedi.", "error");
+    }
+  }, [showToast]);
   const [dosyalar, setDosyalar] = useState<DosyaWithRelations[]>([]);
   const [acikSiparisler, setAcikSiparisler] = useState<AnaSiparisWithProgress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,14 +147,28 @@ export default function IhracatlarPage() {
   useEffect(() => {
     if (!search.trim() || !companyId) { setAramaSonuclari(null); return; }
     const zamanlayici = setTimeout(async () => {
+      const temiz = aramaTerimi(search);
+      if (!temiz) { setAramaSonuclari([]); return; }
       setAramaYukleniyor(true);
-      const terim = `%${search.trim()}%`;
+      const terim = `%${temiz}%`;
+      // 24.11.2026: booking no rezervasyonlar'da, konteyner/muhur no konteynerler'de durur; once eslesen dosya id'leri
+      // bulunur ve ana aramaya "id.in.(...)" olarak eklenir (yalniz uuid; kullanici metni filtreye girmez).
+      const [{ data: rezEs }, { data: kontEs }] = await Promise.all([
+        supabase.from("rezervasyonlar").select("dosya_id").eq("company_id", companyId).ilike("booking_no", terim).limit(200),
+        supabase.from("konteynerler").select("dosya_id").eq("company_id", companyId)
+          .or(`konteyner_no.ilike.${terim},muhur_no.ilike.${terim}`).limit(200),
+      ]);
+      const iliskiliIdler = Array.from(new Set(
+        [...(rezEs || []), ...(kontEs || [])].map((r: { dosya_id: string | null }) => r.dosya_id)
+          .filter((id): id is string => !!id && /^[0-9a-f-]{36}$/i.test(id)),
+      ));
+      const idFiltresi = iliskiliIdler.length ? `,id.in.(${iliskiliIdler.join(",")})` : "";
       const { data: dosyaData } = await supabase
         .from("ihracat_dosyalari")
         .select(DOSYA_LISTE_KOLONLARI)
         .eq("company_id", companyId)
         .or("durum.eq.Kapalı,durum.eq.Kapali")
-        .or(`dosya_no.ilike.${terim},alici_firma.ilike.${terim},satici_firma.ilike.${terim},proforma_no.ilike.${terim},urun_tanimi.ilike.${terim},varis_limani.ilike.${terim},bl_no.ilike.${terim},marka.ilike.${terim}`)
+        .or(`dosya_no.ilike.${terim},alici_firma.ilike.${terim},satici_firma.ilike.${terim},proforma_no.ilike.${terim},urun_tanimi.ilike.${terim},varis_limani.ilike.${terim},bl_no.ilike.${terim},marka.ilike.${terim}${idFiltresi}`)
         .order("olusturma_tarihi", { ascending: false })
         .limit(100)
         .returns<Dosya[]>();
@@ -482,7 +507,7 @@ export default function IhracatlarPage() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Alıcı, satıcı, proforma, ürün, liman, BL no, marka ile ara..."
+          placeholder="Alıcı, proforma, booking, konteyner, mühür, BL no, ürün, liman, marka ile ara..."
           className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-500"
           style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
         />
@@ -681,9 +706,22 @@ export default function IhracatlarPage() {
               </div>
 
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-3 border-b pb-2" style={{ color: "white", borderColor: CARD_BORDER }}>
-                  Konteynerler ({selectedDosya.konteynerler.length} adet)
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-3 border-b pb-2" style={{ borderColor: CARD_BORDER }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "white" }}>
+                    Konteynerler ({selectedDosya.konteynerler.length} adet)
+                  </h3>
+                  {/* 24.11.2026: tum konteyner numaralarini virgulle yan yana kopyalar */}
+                  {konteynerNolariMetni(selectedDosya.konteynerler) && (
+                    <button type="button" data-testid="konteyner-nolari-kopyala"
+                      onClick={() => konteynerNolariniKopyala(konteynerNolariMetni(selectedDosya.konteynerler))}
+                      title="Konteyner numaralarını virgülle yan yana kopyala"
+                      className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border text-xs font-semibold transition-colors hover:bg-white/[0.06]"
+                      style={{ borderColor: `${ACCENT}55`, color: ACCENT }}>
+                      {konteynerKopyalandi ? <Check size={13} /> : <Copy size={13} />}
+                      {konteynerKopyalandi ? "Kopyalandı" : "Numaraları Kopyala"}
+                    </button>
+                  )}
+                </div>
                 {selectedDosya.konteynerler.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full">

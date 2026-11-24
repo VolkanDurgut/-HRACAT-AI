@@ -115,18 +115,18 @@ export function GunlukYuklemeKarti({ plan, kapasite, etiket, karsilastirma = nul
       {karsilastirma && karsilastirma.satirlar.length > 0 && (
         <div className="px-4 py-2.5 border-t" style={{ borderColor: CARD_BORDER }} data-testid="gunluk-karsilastirma">
           <p className="text-[11px] mb-1.5" style={{ color: TEXT_MUTED }}>
-            <b className="text-white">Bugün: sabah planı {karsilastirma.sabahHedef} · yapılan {karsilastirma.yapilan}</b>
-            {karsilastirma.eksik > 0 && <b className="text-red-300"> · {karsilastirma.eksik} eksik</b>}
+            <b className="text-white">Bugünün planı {karsilastirma.sabahHedef} · yüklenen {karsilastirma.yapilan}</b>
+            {karsilastirma.eksik > 0 && <b className="text-amber-300"> · kalan {karsilastirma.eksik}</b>}
             {karsilastirma.fazla > 0 && <b className="text-sky-300"> · {karsilastirma.fazla} plandan fazla</b>}
             {karsilastirma.eksik === 0 && karsilastirma.fazla === 0 && karsilastirma.sabahHedef > 0 && <b className="text-emerald-300"> · plan tuttu</b>}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {karsilastirma.satirlar.map((s) => {
-              const ton = s.yapilan < s.plan ? { r: "#FCA5A5", k: "rgba(248,113,113,0.45)" } : s.yapilan > s.plan ? { r: "#7DD3FC", k: "rgba(56,189,248,0.45)" } : { r: "#6EE7B7", k: "rgba(16,185,129,0.4)" };
-              const not = s.neden === "takipsiz" ? "dosya açılmadı: tartım sisteme düşemez" : s.neden === "plan_disi" ? "plan dışı: bugün planda yoktu" : s.yapilan < s.plan ? "eksik kaldı" : null;
+              const ton = s.yapilan < s.plan ? { r: "#FCD34D", k: "rgba(245,158,11,0.45)" } : s.yapilan > s.plan ? { r: "#7DD3FC", k: "rgba(56,189,248,0.45)" } : { r: "#6EE7B7", k: "rgba(16,185,129,0.4)" };
+              const not = s.neden === "takipsiz" ? "dosya açılmadı" : s.neden === "plan_disi" ? "plan dışı" : null;
               return (
                 <span key={s.anahtar} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px]" style={{ borderColor: ton.k }} data-karsilastirma-is={s.anahtar}
-                  title={`${etiket(s.anahtar)}: sabah planı ${s.plan}, yapılan ${s.yapilan}${not ? ` (${not})` : ""}`}>
+                  title={`${etiket(s.anahtar)}: bugün planlanan ${s.plan}, yüklenen ${s.yapilan}${s.neden === "takipsiz" ? " — dosyası açılmadığı için kantar tartımı sisteme düşemez" : s.neden === "plan_disi" ? " — bugünün planında yoktu" : ""}`}>
                   <span className="text-white truncate max-w-[180px]">{etiket(s.anahtar)}</span>
                   <b className="tabular-nums" style={{ color: ton.r }}>{s.yapilan}/{s.plan}</b>
                   {not && <span style={{ color: ton.r }}>· {not}</span>}

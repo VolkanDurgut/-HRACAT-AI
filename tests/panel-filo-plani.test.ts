@@ -144,3 +144,30 @@ test("filoPlaniKur: gecmis az ise varsayilan verim", () => {
   assert.equal(p.seferAracGun, VARSAYILAN_SEFER_ARAC_GUN);
   assert.equal(p.seferKg, 25000);
 });
+
+test("24.11 duzeltme: gelecek gunlerde konteyner araci en az gecmis ortalamasi; kantardaki arac bosta sayilmaz", () => {
+  const v = filoVerisiHazirla({ ...HAM, kantarda: ["TEST-07"] })!;
+  // plan yalniz Sal; sonraki gunler planda bos -> ortalama (2) kullanilir, "0 konteyner" sayilmaz
+  const p = filoPlaniKur(v, { gunler: [{ tarih: "2026-11-24", yukle: 6, al: 0, isler: [], dolumSaat: 0, arac: 6, aracMesaili: 6 }] }, PZT_CMT);
+  assert.equal(p.gunler[0].konteynerArac, 6);
+  assert.equal(p.gunler[0].tahmini, false);
+  assert.equal(p.gunler[1].konteynerArac, p.gecmis.ortKonteynerArac);
+  assert.equal(p.gunler[1].tahmini, true);
+  // bugun: TEST-07 bugun bugday yaptigi icin bugday'da kalir; kantarda listesi yalniz bos araci etkiler
+  const v2 = filoVerisiHazirla({ ...HAM, gunler: HAM.gunler.filter((g) => !(g.gun === "2026-11-23" && g.plaka === "TEST-07")), kantarda: ["TEST-07"] })!;
+  const d = gunDagilimi(v2, "2026-11-23", v2.kantarda);
+  assert.deepEqual(d.kantarda, ["TEST-07"]);
+  assert.ok(!d.bosta.includes("TEST-07"));
+});
+
+test("sabah plani: ayni musterinin iki booking'i tek satir", () => {
+  const ikiBooking = [
+    is("K1", { etiket: "KURGU MUSTERI", toplam: 5, takipli: false, beyanTarihi: "2026-11-26", beyanZaman: "2026-11-26T12:00", talimatTarihi: "2026-11-26", ekipmanTarihi: "2026-11-23" }),
+    is("K2", { etiket: "KURGU MUSTERI", toplam: 5, takipli: false, beyanTarihi: "2026-11-26", beyanZaman: "2026-11-26T12:00", talimatTarihi: "2026-11-26", ekipmanTarihi: "2026-11-23" }),
+  ];
+  const k = sabahKarsilastirmasi(ikiBooking, KAP, "2026-11-23")!;
+  assert.equal(k.satirlar.length, 1);
+  assert.equal(k.satirlar[0].etiket, "KURGU MUSTERI");
+  assert.equal(k.satirlar[0].plan, k.sabahHedef);
+  assert.equal(k.satirlar[0].neden, "takipsiz");
+});

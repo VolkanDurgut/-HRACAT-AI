@@ -1596,3 +1596,14 @@ irsaliye no / firma + ürüne dayanır.
   satırında "+X kg kantarda · irsaliye bekliyor (N araç)". lib/kantar-canli.ts (saf; tests/kantar-canli.test.ts) +
   lib/kantar-canli-veri.ts (okuma; yetki/fonksiyon yoksa null → bölümler gizli). Sayfa her dakika + canlı bildirimde yeniler.
 - İlk canlı sonuç: bir alış (20.11, ~26 t) kantarda tartılmış ama sistemde teslim kaydı yok → "irsaliye bekliyor" görünüyor.
+
+### Ana Panel — günlük kart sadeleştirme ve düzeltmeler (24.11.2026) — migration 20261124140000_panel_filo_kantarda.sql (CANLIDA)
+Kullanıcı: "Bu kısım nedir, doğru çalışıyor mu? Çok karışık görünüyor."
+- **Düzeltme 1 (gelecek günler):** konteyner aracı = max(planlanan, son 14 iş günü ortalaması). Önceden plan penceresi uzak bir
+  booking'e (Aralık) kadar uzadığı için aradaki günler "0 konteyner, 7 araç buğday" sayılıyor, buğday bitişi fazla iyimser çıkıyordu.
+- **Düzeltme 2 (bugün):** kantarda ilk tartımı yapılmış (ikinci tartımı bekleyen) filo aracı "Kantarda" sayılır (panel_filo_durumu
+  `kantarda`); "Boşta" yerine gün içinde "İş almadı".
+- **Düzeltme 3 (alış bitişi):** açık alışlar küçük kalandan büyüğe doldurulur (birkaç tonluk alış 1.600 t'luk alışın arkasında beklemez).
+- **Sadeleştirme:** Filo bölümü varsayılan TEK SATIR (bugünkü dağılım + çalışmayan araç + en büyük alışın bitiş tahmini), ayrıntı
+  "Ayrıntı" düğmesiyle. Sabah planı satırı "Bugünün planı N · yüklenen M · kalan K"; aynı müşterinin booking'leri tek çip; nedenler kısa
+  ("dosya açılmadı", "plan dışı"), açıklama üzerine gelince.

@@ -503,11 +503,20 @@ export function sabahKarsilastirmasi(isler: YuklemeIsi[], kapasite: Kapasite, bu
   const plan = yuklemePlaniKur(sabah, kapasite, bugun);
   const bugunPlan = plan.gunler.find((g) => g.tarih === bugun);
   const planOf = new Map((bugunPlan?.isler || []).map((x) => [x.anahtar, x.yukle]));
-  const satirlar: GunKarsilastirmaSatiri[] = isler.map((i) => {
+  const satirlar0: GunKarsilastirmaSatiri[] = isler.map((i) => {
     const p = planOf.get(i.anahtar) || 0;
     const y = Math.max(0, i.bugunDolu);
     return { anahtar: i.anahtar, etiket: i.etiket, plan: p, yapilan: y, neden: (y < p && !i.takipli ? "takipsiz" : y > 0 && p === 0 ? "plan_disi" : null) as GunKarsilastirmaSatiri["neden"] };
-  }).filter((s) => s.plan > 0 || s.yapilan > 0)
+  }).filter((s) => s.plan > 0 || s.yapilan > 0);
+  // 24.11.2026: ayni musteri (etiket) tek satir - ayni musterinin iki booking'i iki ayri cip olarak karisik gorunuyordu
+  const birlesik = new Map<string, GunKarsilastirmaSatiri>();
+  for (const s of satirlar0) {
+    const v = birlesik.get(s.etiket);
+    if (!v) { birlesik.set(s.etiket, { ...s }); continue; }
+    v.plan += s.plan; v.yapilan += s.yapilan;
+    v.neden = v.neden === "takipsiz" || s.neden === "takipsiz" ? "takipsiz" : v.plan === 0 && v.yapilan > 0 ? "plan_disi" : null;
+  }
+  const satirlar = Array.from(birlesik.values())
     .sort((a, b) => (b.plan - b.yapilan) - (a.plan - a.yapilan) || b.plan - a.plan || a.etiket.localeCompare(b.etiket, "tr"));
   const sabahHedef = satirlar.reduce((t, s) => t + s.plan, 0);
   const yapilan = satirlar.reduce((t, s) => t + s.yapilan, 0);

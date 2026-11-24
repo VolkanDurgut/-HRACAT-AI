@@ -4,9 +4,11 @@
  * (veri: panel_filo_durumu). Bugun filonun dagilimi, son 14 is gunu (bosta kalan arac-gun ve tasinabilecek bugday),
  * onumuzdeki gunlerde bugdaya ayrilabilecek arac / sefer / ton ve acik alislarin (TMO / ajans) tahmini bitisi.
  * Hicbir kaydi degistirmez; fiyat gostermez.
+ * 24.11.2026 sadelestirme (kullanici: "Cok karisik gozukuyor"): varsayilan TEK SATIR ozet (bugunku dagilim + bugday bitis
+ * tahmini); denklem, son 14 gun, gun gun plan ve alislar "Ayrinti" ile acilir. Kantarda bekleyen arac "kantarda" sayilir.
  */
-import React from "react";
-import { Truck, Wheat, AlertTriangle } from "lucide-react";
+import React, { useState } from "react";
+import { Truck, Wheat, AlertTriangle, ChevronDown } from "lucide-react";
 import { CARD_BORDER, TEXT_MUTED } from "@/lib/theme";
 import { gunEtiketi } from "@/lib/panel/gunluk-yukleme";
 import type { FiloPlani } from "@/lib/panel/filo-plani";
@@ -25,33 +27,45 @@ function Parca({ etiket, plakalar, renk, testId }: { etiket: string; plakalar: s
 }
 
 export function FiloBolumu({ plan }: { plan: FiloPlani }) {
+  const [acik, setAcik] = useState(false);
   const kullanilmayan = new Set(plan.kullanilmayan.map((k) => k.plaka));
   const bosta = plan.bugun.bosta.filter((p) => !kullanilmayan.has(p));
   const gunler = plan.gunler.slice(0, 6);
+  const enBuyukAlis = [...plan.alislar].sort((a, b) => b.kalanKg - a.kalanKg)[0];
   return (
-    <div className="px-4 py-3 border-t text-[11px]" style={{ borderColor: CARD_BORDER }} data-testid="filo-bolumu">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 text-white">
-          <Truck size={13} style={{ color: "#FCD34D" }} /> Filo ve buğday · {plan.filoSayisi} araç
-        </p>
-        <p className="text-[10.5px]" style={{ color: TEXT_MUTED }} title="Araç başı sefer ve sefer tonu: filonun son 75 gündeki alış teslimlerinden">
-          Boş araç = filo − konteyner − iç satış · buğday/gün = boş araç × {ondalik(plan.seferAracGun)} sefer × {ondalik(plan.seferKg / 1000)} t
-        </p>
-      </div>
-
-      {/* Bugun */}
+    <div className="px-4 py-2.5 border-t text-[11px]" style={{ borderColor: CARD_BORDER }} data-testid="filo-bolumu">
+      {/* Ozet satiri (varsayilan) */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-white font-semibold mr-1">Bugün</span>
+        <span className="inline-flex items-center gap-1.5 font-bold text-white mr-1 whitespace-nowrap">
+          <Truck size={13} style={{ color: "#FCD34D" }} /> Filo bugün ({plan.filoSayisi})
+        </span>
         <Parca etiket="Konteyner" plakalar={plan.bugun.konteyner} renk="#6EE7B7" testId="konteyner" />
+        <Parca etiket="Kantarda" plakalar={plan.bugun.kantarda} renk="#7DD3FC" testId="kantarda" />
         <Parca etiket="Buğday" plakalar={plan.bugun.bugday} renk="#FCD34D" testId="bugday" />
         <Parca etiket="İç satış" plakalar={plan.bugun.satis} renk="#93C5FD" testId="satis" />
-        <Parca etiket="Boşta" plakalar={bosta} renk={bosta.length > 0 ? "#FCA5A5" : "#C9D1DC"} testId="bosta" />
+        <Parca etiket="İş almadı" plakalar={bosta} renk="#C9D1DC" testId="bosta" />
         {plan.kullanilmayan.length > 0 && (
-          <span className="inline-flex items-center gap-1 text-amber-300" data-filo="kullanilmayan">
-            <AlertTriangle size={12} /> {plan.kullanilmayan.map((k) => `${k.plaka} (son iş ${trGun(k.sonIs)})`).join(", ")}: 7 iş günüdür iş yok (arıza / izin?)
+          <span className="inline-flex items-center gap-1 text-amber-300 whitespace-nowrap" data-filo="kullanilmayan"
+            title={plan.kullanilmayan.map((k) => `${k.plaka}: son iş ${trGun(k.sonIs)}`).join(", ") + " — 7 iş günüdür hiç iş yok (arıza / izin?)"}>
+            <AlertTriangle size={12} /> {plan.kullanilmayan.map((k) => k.plaka).join(", ")} 7 iş günüdür çalışmıyor
           </span>
         )}
+        {enBuyukAlis && (
+          <span className={`whitespace-nowrap ${enBuyukAlis.terminiKacirir ? "text-red-300" : ""}`} style={enBuyukAlis.terminiKacirir ? undefined : { color: TEXT_MUTED }} data-filo="ozet-alis">
+            · Buğday: {enBuyukAlis.tedarikci || enBuyukAlis.no} kalan <b>{ton(enBuyukAlis.kalanKg)} t</b>, bu hızla <b>{enBuyukAlis.bitis ? gunEtiketi(enBuyukAlis.bitis) : "60 iş gününde bitmiyor"}</b>
+          </span>
+        )}
+        <button type="button" onClick={() => setAcik((a) => !a)} aria-expanded={acik} data-filo="ayrinti"
+          className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+          {acik ? "Gizle" : "Ayrıntı"} <ChevronDown size={12} className={`transition-transform ${acik ? "rotate-180" : ""}`} />
+        </button>
       </div>
+
+      {acik && (<>
+      <p className="mt-2 text-[10.5px]" style={{ color: TEXT_MUTED }} title="Araç başı sefer ve sefer tonu: filonun son 75 gündeki alış teslimlerinden">
+        Hesap: buğdaya ayrılabilecek araç = filo − konteyner aracı − iç satış aracı · günlük buğday = bu araç × {ondalik(plan.seferAracGun)} sefer × {ondalik(plan.seferKg / 1000)} t.
+        Konteyner aracı: bilinen yükleme planı, en az son 14 iş günü ortalaması ({plan.gecmis.ortKonteynerArac} araç).
+      </p>
 
       {/* Son 14 is gunu */}
       {plan.gecmis.gunSayisi > 0 && (
@@ -59,7 +73,7 @@ export function FiloBolumu({ plan }: { plan: FiloPlani }) {
           Son {plan.gecmis.gunSayisi} iş günü: buğdaya <b className="text-white">{plan.gecmis.bugdayAracGun}</b> araç-gün ayrıldı,
           {" "}<b className={plan.gecmis.bostaAracGun > 0 ? "text-red-300" : "text-white"}>{plan.gecmis.bostaAracGun}</b> araç-gün boşta kaldı
           {plan.gecmis.olasiSefer > 0 && plan.toplamKalanKg > 0 ? <> → aynı günlerde ≈ <b className="text-amber-300">{plan.gecmis.olasiSefer} sefer / {plan.gecmis.olasiTon.toLocaleString("tr-TR")} t</b> buğday daha çekilebilirdi</> : null}.
-          {" "}Konteynere günde ortalama {plan.gecmis.ortKonteynerArac} araç gidiyor.
+
         </p>
       )}
 
@@ -96,6 +110,7 @@ export function FiloBolumu({ plan }: { plan: FiloPlani }) {
       {plan.satisKalanSefer > 0 && (
         <p className="mt-1" style={{ color: TEXT_MUTED }}>İç satışta nakliyesi bizde kalan ≈ <b className="text-white">{plan.satisKalanSefer} sefer</b> önce planlandı (buğdaydan önce).</p>
       )}
+      </>)}
     </div>
   );
 }

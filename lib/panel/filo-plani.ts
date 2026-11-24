@@ -11,8 +11,10 @@
  *   satis seferi  = acik ic satislardan (nakliye bizde) kalan sefer, once bunlar (musteriye soz verilmis)
  *   bugday seferi = (bos arac - satis araci) x arac basi gunluk sefer (gecmis: filonun alis seferi / arac-gun)
  *   bugday tonu   = bugday seferi x sefer basina ortalama ton (gecmis)
- * Acik alislar (TMO / ajans) termin sirasiyla bu tonla doldurulur -> her alisin tahmini bitis gunu ve termin uyarisi.
- * Plan penceresinden sonrasi icin konteyner araci = son 14 is gunundeki ortalama.
+ * Acik alislar (TMO / ajans) kucuk kalandan buyuge bu tonla doldurulur -> her alisin tahmini bitis gunu ve termin uyarisi.
+ * Gelecek gunlerde konteyner araci = max(plandaki arac, son 14 is gunu ortalamasi): plan yalniz bugun bilinen booking'leri
+ * icerir; ilerideki bos gunler "konteyner yok" demek degildir (24.11.2026 duzeltme: 27.11-08.12 arasi 0 konteyner sayiliyordu).
+ * Bugun: kantarda ilk tartimi yapilmis (ikinci tartimi bekleyen) filo araci "kantarda" sayilir, bosta degil (24.11.2026).
  * Gecmis ("ne yapilmis"): son 14 is gununde bosta kalan arac-gun ve o gunlerle tasinabilecek bugday (kullanilmayan arac
  * ayrica gosterilir, kacan kapasiteye sayilmaz: arizali / izinli olabilir).
  */
@@ -24,6 +26,8 @@ export type FiloSatis = { no: string; musteri: string | null; urun: string | nul
 export type FiloVerisi = {
   bugun: string; filo: string[]; gunler: FiloGunKaydi[]; alislar: FiloAlis[]; satislar: FiloSatis[];
   verim: { sefer: number; aracGun: number; ortKg: number };
+  /** 24.11.2026: kantarda su an ikinci tartimi bekleyen plakalar (normallestirilmis) */
+  kantarda: string[];
 };
 
 const sayi = (v: unknown, d = 0) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? d : Number(v));
@@ -51,6 +55,7 @@ export function filoVerisiHazirla(ham: unknown): FiloVerisi | null {
       gidenKg: sayi(s.giden_kg), sefer: sayi(s.sefer),
     })),
     verim: { sefer: sayi(v.sefer), aracGun: sayi(v.arac_gun), ortKg: sayi(v.ort_kg) },
+    kantarda: (Array.isArray(r.kantarda) ? r.kantarda : []).map(metin).filter((x): x is string => !!x),
   };
 }
 
@@ -61,16 +66,18 @@ const GECMIS_IS_GUNU = 14;
 const KULLANILMAYAN_IS_GUNU = 7;
 const UFUK_IS_GUNU = 60;
 
-export type GunDagilimi = { konteyner: string[]; bugday: string[]; satis: string[]; bosta: string[] };
+export type GunDagilimi = { konteyner: string[]; bugday: string[]; satis: string[]; kantarda: string[]; bosta: string[] };
 
-/** Bir gunde filonun dagilimi: konteyner tasiyan > bugday (alis) > ic satis > bosta (her arac tek sinifta). */
-export function gunDagilimi(v: Pick<FiloVerisi, "filo" | "gunler">, gun: string): GunDagilimi {
-  const d: GunDagilimi = { konteyner: [], bugday: [], satis: [], bosta: [] };
+/** Bir gunde filonun dagilimi: konteyner tasiyan > bugday (alis) > ic satis > kantarda (yalniz bugun) > bosta (her arac tek sinifta). */
+export function gunDagilimi(v: Pick<FiloVerisi, "filo" | "gunler">, gun: string, kantarda: string[] = []): GunDagilimi {
+  const d: GunDagilimi = { konteyner: [], bugday: [], satis: [], kantarda: [], bosta: [] };
+  const kantar = new Set(kantarda);
   for (const p of v.filo) {
     const k = v.gunler.find((g) => g.gun === gun && g.plaka === p);
     if (k && k.konteyner > 0) d.konteyner.push(p);
     else if (k && k.alis > 0) d.bugday.push(p);
     else if (k && k.sevk > 0) d.satis.push(p);
+    else if (kantar.has(p)) d.kantarda.push(p);
     else d.bosta.push(p);
   }
   return d;
@@ -107,8 +114,9 @@ export function filoPlaniKur(v: FiloVerisi, plan: Pick<YuklemePlani, "gunler">, 
 
   // Kullanilmayan arac: son KULLANILMAYAN_IS_GUNU is gununde (bugun dahil) hic isi yok
   const yakin = new Set([...oncekiIsGunleri(bugun, KULLANILMAYAN_IS_GUNU - 1, isGunleri), bugun]);
+  const kantardaSet = new Set(v.kantarda || []);
   const sonIs = (p: string) => v.gunler.filter((g) => g.plaka === p && (g.konteyner + g.alis + g.sevk) > 0).map((g) => g.gun).sort().pop() || null;
-  const kullanilmayan = v.filo.filter((p) => !v.gunler.some((g) => g.plaka === p && yakin.has(g.gun) && (g.konteyner + g.alis + g.sevk) > 0))
+  const kullanilmayan = v.filo.filter((p) => !kantardaSet.has(p) && !v.gunler.some((g) => g.plaka === p && yakin.has(g.gun) && (g.konteyner + g.alis + g.sevk) > 0))
     .map((p) => ({ plaka: p, sonIs: sonIs(p) }));
   const kullanilmayanSet = new Set(kullanilmayan.map((k) => k.plaka));
   const aktifFilo = Math.max(0, v.filo.length - kullanilmayan.length);
@@ -132,14 +140,14 @@ export function filoPlaniKur(v: FiloVerisi, plan: Pick<YuklemePlani, "gunler">, 
     return t;
   }, 0);
 
-  // Onumuzdeki is gunleri: plan penceresi (Gunluk yukleme arac) + sonrasi gecmis ortalamasi; bugun dahil degil (gun bitiyor)
+  // Onumuzdeki is gunleri: konteyner araci = max(plan, gecmis ortalamasi); bugun dahil degil (gun suruyor)
   const planArac = new Map(plan.gunler.map((g) => [g.tarih, g.arac]));
-  const planSon = plan.gunler.reduce((m, g) => (g.tarih > m ? g.tarih : m), bugun);
   const gunler: FiloPlanGunu[] = [];
   let satisKalan = satisKalanSefer;
   for (let x = sonrakiIsGunu(ekle(bugun, 1), isGunleri), i = 0; i < UFUK_IS_GUNU; x = sonrakiIsGunu(ekle(x, 1), isGunleri), i++) {
-    const tahmini = x > planSon;
-    const konteynerArac = Math.min(aktifFilo, tahmini ? ortKonteynerArac : planArac.get(x) || 0);
+    const planli = planArac.get(x) || 0;
+    const tahmini = ortKonteynerArac > planli;
+    const konteynerArac = Math.min(aktifFilo, Math.max(planli, ortKonteynerArac));
     const bos = Math.max(0, aktifFilo - konteynerArac);
     const satisSefer = Math.min(satisKalan, Math.floor(bos * seferAracGun));
     satisKalan -= satisSefer;
@@ -152,7 +160,9 @@ export function filoPlaniKur(v: FiloVerisi, plan: Pick<YuklemePlani, "gunler">, 
   // Acik alislar termin sirasiyla bugday tonuyla doldurulur
   const sirali = [...v.alislar].map((a) => ({ ...a, kalanKg: Math.max(0, a.hedefKg - a.gelenKg) }))
     .filter((a) => a.kalanKg > 0)
-    .sort((a, b) => (a.termin || "9999").localeCompare(b.termin || "9999") || a.no.localeCompare(b.no));
+    // 24.11.2026: kucuk kalanlar once (birkac tonluk alis 1.600 t'luk alisin bitmesini beklemiyormus gibi gorunmesin);
+    // buyuk alisin bitisi bu yuzden yalniz birkac ton kayar. Termin uyarisi her alis icin ayri.
+    .sort((a, b) => a.kalanKg - b.kalanKg || (a.termin || "9999").localeCompare(b.termin || "9999") || a.no.localeCompare(b.no));
   const alislar: AlisBitisi[] = [];
   let gi = 0;
   let gunKalanKg = gunler[0] ? gunler[0].bugdayTon * 1000 : 0;
@@ -170,7 +180,7 @@ export function filoPlaniKur(v: FiloVerisi, plan: Pick<YuklemePlani, "gunler">, 
   }
   const toplamKalanKg = alislar.reduce((t, a) => t + a.kalanKg, 0);
   return {
-    filoSayisi: v.filo.length, bugun: gunDagilimi(v, bugun), kullanilmayan, seferAracGun, seferKg,
+    filoSayisi: v.filo.length, bugun: gunDagilimi(v, bugun, v.kantarda || []), kullanilmayan, seferAracGun, seferKg,
     gecmis: { gunSayisi: gecmisGunler.length, bostaAracGun, bugdayAracGun, olasiSefer, olasiTon: Math.round((olasiSefer * seferKg) / 1000), ortKonteynerArac },
     gunler, satisKalanSefer, alislar, toplamKalanKg,
     tumBitis: alislar.length === 0 ? null : alislar.some((a) => a.bitis === null) ? null : alislar.map((a) => a.bitis as string).sort().pop() || null,

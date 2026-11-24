@@ -3,7 +3,8 @@
 import { OzetKarti } from "@/components/erp/ozet-karti";
 import { girisSonrasiTemizle } from "@/lib/giris-donus";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Ship, Target } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Anchor, Brain, CheckCircle2, Download, FileWarning, Mail, RefreshCw, Search, Ship, Sparkles, Target } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -362,6 +363,10 @@ function NavlunIcerik() {
         aciklama="Acentelerin navlun teklifleri · operasyon yazışmalarından otomatik"
         sag={
           <div className="flex items-center gap-2">
+            {/* 24.11.2026 Asama 2: yeni Navlun Merkezi (tek hesap, sekmeli); bu sayfa Asama 3'e kadar yerinde */}
+            <Link href="/navlun/merkez" data-testid="yeni-gorunum" className="h-9 px-3 inline-flex items-center gap-2 rounded-lg border text-sm hover:bg-white/[0.04]" style={{ borderColor: ACCENT, color: "#6EE7B7" }}>
+              <Sparkles size={15} /> Yeni görünüm
+            </Link>
             <button type="button" onClick={tabloExcel} disabled={!!tabloIslem} data-testid="navlun-tablosu-excel" title="Operasyonun navlun tablosuyla aynı düzende Excel"
               className="h-9 px-3 inline-flex items-center gap-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: ACCENT }}>
               <Download size={15} /> {tabloIslem === "excel" ? "Hazırlanıyor…" : "Excel indir"}

@@ -34,6 +34,8 @@ export type NavlunNoktasi = {
   /** "340 + lokal 356 = 696" / "lokal dahil" */
   enIyiMetin: string | null;
   hedef: number | null;
+  /** 25.11.2026: gecerli teklif yoksa suresi dolmus en iyi teklif (yalniz gri bilgi; durum "fiyatsiz" kalir) */
+  dolan: { tutar: number; acente: string; bitis: string | null } | null;
   acenteSayisi: number;
   teklifSayisi: number;
   sonTarih: string;
@@ -53,6 +55,7 @@ export function navlunNoktalari(limanlar: LimanOzeti[], satirlar: NavlunSatiri[]
     return {
       anahtar: l.anahtar, ad: l.ad, konum: navlunLimanKonumu(l.anahtar), enIyi, enIyiAcente: l.enIyi20?.acente ?? null,
       enIyiMetin: l.enIyi20?.karsi.metin ?? null, hedef,
+      dolan: l.dolan20 ? { tutar: l.dolan20.karsi.toplam, acente: l.dolan20.acente, bitis: l.dolan20.gecerlilikBitis ?? null } : null,
       acenteSayisi: acenteler.size, teklifSayisi: olaylar.filter((s) => s.tur === "teklif" || s.tur === "karsi_teklif").length,
       sonTarih: l.sonTarih, durum, yeni: !!oncekiGorulme && l.sonTarih > oncekiGorulme,
     };

@@ -25,6 +25,8 @@ export const DURUM_RENGI: Record<NoktaDurumu, string> = { hedefte: "#10B981", us
 // 13.11.2026: karsilastirma lokal dahil toplamla; lokali kesin teklif yoksa "Lokal belirsiz" (asla yesil degil)
 export const DURUM_ADI: Record<NoktaDurumu, string> = { hedefte: "Hedefte / altında", ustunde: "Hedefin üstünde", fiyatli: "Fiyat var (hedef yok)", belirsiz: "Lokal belirsiz", fiyatsiz: "Fiyat yok" };
 const usd = (n: number) => `${n.toLocaleString("tr-TR")} $`;
+/** 25.11.2026: suresi dolan teklifin bitis gunu "23.11" */
+const gunAy = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}` : "");
 
 export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[]; onSec: (anahtar: string) => void }) {
   const kutuRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
   const etiketler = boyut.w > 0 ? etiketYerlestir([
     { ad: "__cikis", ...cikisP, r: 5, metin: CIKIS.ad },
     // Isigi yananlar once yerlesir (arama sonucu etiketi her zaman gorunsun)
-    ...[...ciz].sort((a, b) => Number(yanar(b.anahtar)) - Number(yanar(a.anahtar))).map((n) => ({ ad: n.anahtar, x: n.x, y: n.y, r: n.r, metin: `${n.ad}${n.enIyi !== null ? ` · ${usd(n.enIyi)}` : ""}` })),
+    ...[...ciz].sort((a, b) => Number(yanar(b.anahtar)) - Number(yanar(a.anahtar))).map((n) => ({ ad: n.anahtar, x: n.x, y: n.y, r: n.r, metin: `${n.ad}${n.enIyi !== null ? ` · ${usd(n.enIyi)}` : n.dolan ? ` · ${usd(n.dolan.tutar)}` : ""}` })),
   ], boyut.w, boyut.h) : [];
   const etiket = new Map(etiketler.map((e) => [e.ad, e]));
   const listede = noktalar.filter((n) => uyanlar.has(n.anahtar));
@@ -122,7 +124,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
                 <button type="button" onClick={() => onSec(n.anahtar)} onMouseEnter={() => setUzerinde(n.anahtar)} onFocus={() => setUzerinde(n.anahtar)} onBlur={() => setUzerinde(null)}
                   className="absolute rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-opacity duration-300"
                   style={{ left: n.x - n.r, top: n.y - n.r, width: n.r * 2, height: n.r * 2, opacity: acik ? 1 : 0.18, backgroundColor: `${renk}40`, border: `1.5px solid ${renk}`, boxShadow: acik ? `0 0 12px ${renk}99` : "none" }}
-                  aria-label={`${n.ad}${n.enIyi !== null ? `: en iyi ${usd(n.enIyi)}` : ": fiyat yok"}, ${n.acenteSayisi} acente`}
+                  aria-label={`${n.ad}${n.enIyi !== null ? `: en iyi ${usd(n.enIyi)}` : n.dolan ? `: süresi dolmuş teklif ${usd(n.dolan.tutar)}` : ": fiyat yok"}, ${n.acenteSayisi} acente`}
                   data-navlun-noktasi={n.anahtar} data-isik={acik ? "acik" : "sonuk"}>
                   {acik && <span className="navlun-nabiz absolute inset-0 rounded-full" style={{ border: `1.5px solid ${renk}` }} aria-hidden />}
                   {acik && n.yeni && <span className="navlun-nabiz navlun-nabiz-gec absolute inset-0 rounded-full" style={{ border: `1.5px solid ${SEFTALI}` }} aria-hidden />}
@@ -132,7 +134,7 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
                   <button type="button" onClick={() => onSec(n.anahtar)} onMouseEnter={() => setUzerinde(n.anahtar)}
                     className="absolute text-[10px] whitespace-nowrap px-1.5 rounded transition-opacity duration-300 hover:text-white"
                     style={{ left: e.x, top: e.y, lineHeight: "18px", color: "#E2E8F0", backgroundColor: "rgba(11,15,20,0.75)", opacity: acik ? 1 : 0.12 }} data-navlun-etiket={n.anahtar} tabIndex={-1}>
-                    <b className="font-semibold">{n.ad}</b>{n.enIyi !== null && <span style={{ color: renk }}> · {usd(n.enIyi)}</span>}
+                    <b className="font-semibold">{n.ad}</b>{n.enIyi !== null ? <span style={{ color: renk }}> · {usd(n.enIyi)}</span> : n.dolan && <span style={{ color: "#94A3B8" }} data-suresi-doldu> · {usd(n.dolan.tutar)}</span>}
                   </button>
                 )}
               </React.Fragment>
@@ -156,7 +158,8 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
           {ipucu && (
             <div className="absolute left-3 top-14 z-10 rounded-lg border px-3 py-2 text-[11px] shadow-xl pointer-events-none min-w-[180px]" style={{ backgroundColor: "#1A1F2B", borderColor: "#2A3141" }} data-navlun-ipucu="">
               <p className="text-xs font-semibold text-white">{ipucu.ad}</p>
-              <p style={{ color: DURUM_RENGI[ipucu.durum] }}>{ipucu.enIyi !== null ? `En iyi 20'DC ${usd(ipucu.enIyi)} · ${ipucu.enIyiAcente}` : ipucu.durum === "belirsiz" ? "Lokal belirsiz: en iyi seçilemedi" : "Fiyat yok"}</p>
+              <p style={{ color: DURUM_RENGI[ipucu.durum] }}>{ipucu.enIyi !== null ? `En iyi 20'DC ${usd(ipucu.enIyi)} · ${ipucu.enIyiAcente}` : ipucu.durum === "belirsiz" ? "Lokal belirsiz: en iyi seçilemedi" : ipucu.dolan ? "Geçerli teklif yok" : "Fiyat yok"}</p>
+              {ipucu.enIyi === null && ipucu.dolan && <p style={{ color: "#94A3B8" }}>Süresi doldu{ipucu.dolan.bitis ? ` (${gunAy(ipucu.dolan.bitis)})` : ""}: {usd(ipucu.dolan.tutar)} · {ipucu.dolan.acente}</p>}
               {ipucu.enIyiMetin && ipucu.enIyiMetin !== "lokal dahil" && <p style={{ color: TEXT_MUTED }}>{ipucu.enIyiMetin}</p>}
               {ipucu.hedef !== null && <p style={{ color: "#FCD34D" }}>Hedefimiz {usd(ipucu.hedef)}</p>}
               <p style={{ color: TEXT_MUTED }}>{ipucu.acenteSayisi} acente · {ipucu.teklifSayisi} teklif · tıklayın: yazışma</p>
@@ -189,9 +192,9 @@ export function NavlunHaritasi({ noktalar, onSec }: { noktalar: NavlunNoktasi[];
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: DURUM_RENGI[n.durum], boxShadow: `0 0 6px ${DURUM_RENGI[n.durum]}` }} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-[13px] font-medium text-white truncate">{n.ad}{n.yeni && <span className="text-[9px] font-bold px-1 rounded" style={{ backgroundColor: "rgba(244,160,124,0.18)", color: SEFTALI }}>YENİ</span>}</span>
-                    <span className="block text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{n.acenteSayisi} acente{n.enIyiAcente ? ` · ${n.enIyiAcente}` : ""}</span>
+                    <span className="block text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{n.acenteSayisi} acente{n.enIyiAcente ? ` · ${n.enIyiAcente}` : n.dolan ? ` · süresi doldu${n.dolan.bitis ? ` ${gunAy(n.dolan.bitis)}` : ""}` : ""}</span>
                   </span>
-                  <span className="text-[12px] font-semibold tabular-nums shrink-0" style={{ color: n.enIyi !== null ? DURUM_RENGI[n.durum] : TEXT_MUTED }}>{n.enIyi !== null ? usd(n.enIyi) : "—"}</span>
+                  <span className="text-[12px] font-semibold tabular-nums shrink-0" style={{ color: n.enIyi !== null ? DURUM_RENGI[n.durum] : TEXT_MUTED }} title={n.enIyi === null && n.dolan ? `${n.dolan.acente} teklifinin süresi doldu; en iyi sayılmaz` : undefined}>{n.enIyi !== null ? usd(n.enIyi) : n.dolan ? usd(n.dolan.tutar) : "—"}</span>
                 </button>
               </li>
             ))}

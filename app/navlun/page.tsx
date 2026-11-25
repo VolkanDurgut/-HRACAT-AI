@@ -110,12 +110,17 @@ function LimanKarti({ l }: { l: LimanOzeti }) {
           <p className="text-white font-semibold flex items-center gap-2"><Anchor size={15} style={{ color: ACCENT }} />{l.ad}</p>
           <span className="text-xs ml-auto" style={{ color: TEXT_MUTED }}>son: {tarihGoster(l.sonTarih)}</span>
         </div>
-        {(l.enIyi20 || l.belirsiz20 || l.hedef || l.kabul) && (
+        {(l.enIyi20 || l.belirsiz20 || l.dolan20 || l.hedef || l.kabul) && (
           <dl className="mt-1.5 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-sm" data-baslik-ozet>
             {l.enIyi20 && <>
               <dt style={{ color: "#6EE7B7" }} title="Karşılaştırma: navlun + çıkış lokali + konteyner başı VGM / mühür (KDV hariç)">En iyi 20&apos;DC</dt>
               <dd style={{ color: "#6EE7B7" }} data-en-iyi title={l.enIyi20.karsi.dayanak}><b className="tabular-nums">{l.enIyi20.karsi.yaklasik ? "≈ " : ""}{usd(l.enIyi20.karsi.toplam)}</b> · {l.enIyi20.acente}
                 {l.enIyi20.karsi.metin !== "lokal dahil" && <span style={{ color: TEXT_MUTED }}> ({l.enIyi20.karsi.metin})</span>}</dd>
+            </>}
+            {!l.enIyi20 && l.dolan20 && <>
+              <dt style={{ color: "#94A3B8" }}>Geçerli teklif yok</dt>
+              <dd style={{ color: "#94A3B8" }} data-suresi-doldu title={l.dolan20.karsi.dayanak}><b className="tabular-nums">{l.dolan20.karsi.yaklasik ? "≈ " : ""}{usd(l.dolan20.karsi.toplam)}</b> · {l.dolan20.acente}
+                <span style={{ color: TEXT_MUTED }}> (süresi doldu{l.dolan20.gecerlilikBitis ? ` ${tarihGun(l.dolan20.gecerlilikBitis)}` : ""}; en iyi sayılmaz)</span></dd>
             </>}
             {l.belirsiz20 && <>
               <dt style={{ color: "#C4B5FD" }}>Lokal belirsiz</dt>

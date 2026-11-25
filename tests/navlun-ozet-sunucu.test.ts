@@ -57,3 +57,23 @@ test("sunucuKarsilastirmasi: lokal kesinligi ve kaynak; degerlendirmesi olmayan 
   assert.equal(l.enIyi20?.acente, "GAMA");
   assert.equal(l.enIyi20?.karsi.toplam, 1500);
 });
+
+test("gecerli teklifi kalmayan liman: suresi dolan en iyi teklif gri bilgi olarak doner, en iyi / haritada fiyat sayilmaz", async () => {
+  const { navlunNoktalari } = await import("@/lib/navlun/harita");
+  const [l] = limanOzetleri([satir("a", "ALFA", 290, "2026-11-02T10:00:00Z", deg(290, { durum: "suresi_doldu", gecerlilik_bitis: "2026-11-23" }))]);
+  assert.equal(l.enIyi20, null);
+  assert.equal(l.belirsiz20, null);
+  assert.equal(l.dolan20?.acente, "ALFA");
+  assert.equal(l.dolan20?.gecerlilikBitis, "2026-11-23");
+  const [n] = navlunNoktalari([l], [], null);
+  assert.equal(n.enIyi, null);
+  assert.equal(n.durum, "fiyatsiz");
+  assert.deepEqual(n.dolan, { tutar: 290, acente: "ALFA", bitis: "2026-11-23" });
+  // Gecerli teklif varsa suresi dolan gosterilmez
+  const [l2] = limanOzetleri([
+    satir("a", "ALFA", 290, "2026-11-02T10:00:00Z", deg(290, { durum: "suresi_doldu", gecerlilik_bitis: "2026-11-23" })),
+    satir("b", "BETA", 400, "2026-11-20T10:00:00Z", deg(400)),
+  ]);
+  assert.equal(l2.enIyi20?.acente, "BETA");
+  assert.equal(l2.dolan20, null);
+});

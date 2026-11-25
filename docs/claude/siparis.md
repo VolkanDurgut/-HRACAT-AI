@@ -782,4 +782,9 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
   Süresi dolan teklif listede gri "süresi doldu" ile kalır, en iyi / lokal belirsiz uyarısı olmaz. EUR teklif "≈ USD".
   "Teklif olabilecek mailler" aynı okumadan gelir (kendi verisini çekmez). Excel ve 17:00 maili aynı paylaşılan kodu
   (`_shared/navlun-tablosu.ts`) kullanır. Test: `tests/navlun-ozet-sunucu.test.ts`.
+- 25.11.2026 (kullanıcı: "neden - olarak gösterilenler var?"): geçerli 20'DC teklifi KALMAYAN limanda liste / harita / liman
+  masası / liman kartı "—" yerine süresi dolan en iyi teklifi GRİ gösterir ("290 $ · süresi doldu 23.11"; `LimanOzeti.dolan20`,
+  `NavlunNoktasi.dolan`). En iyi / hedef / nokta rengi hesabına girmez (nokta "fiyat yok" gri kalır). Geçerlilik kuralı aynı
+  (kullanıcı onayı: tarih yazmıyor ve acente alışkanlığı yoksa 21 gün). Canlı veri sağlaması: 57 limanın 57'sinde en iyi
+  fiyat değişmedi; yalnız BELAWAN gri fiyat aldı.
 - Yapay zekâ okuma (Gemini) yalnız secret `NAVLUN_YZ = acik` iken; varsayılan kapalı.

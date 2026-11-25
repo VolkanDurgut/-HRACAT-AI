@@ -108,8 +108,9 @@ export function LimanMasasi({ liman, satirlar, onKapat, baglam = null }: { liman
         {/* Navlun raporu */}
         <div className="px-4 sm:px-5 py-3 border-b grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" style={{ borderColor: CARD_BORDER }} data-testid="masa-rapor">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <RaporKutusu etiket="En iyi 20'DC (lokal dahil)" deger={liman.enIyi20 ? usd(liman.enIyi20.karsi.toplam) : "—"} renk="#6EE7B7"
-              alt={liman.enIyi20 ? `${liman.enIyi20.acente} · ${liman.enIyi20.karsi.metin}` : liman.belirsiz20 ? <span style={{ color: "#FCD34D" }}>⚠ {liman.belirsiz20.acente}: {liman.belirsiz20.karsi.metin}</span> : "teklif yok"} />
+            <RaporKutusu etiket="En iyi 20'DC (lokal dahil)" deger={liman.enIyi20 ? usd(liman.enIyi20.karsi.toplam) : liman.dolan20 ? usd(liman.dolan20.karsi.toplam) : "—"} renk={liman.enIyi20 || !liman.dolan20 ? "#6EE7B7" : "#94A3B8"}
+              alt={liman.enIyi20 ? `${liman.enIyi20.acente} · ${liman.enIyi20.karsi.metin}` : liman.belirsiz20 ? <span style={{ color: "#FCD34D" }}>⚠ {liman.belirsiz20.acente}: {liman.belirsiz20.karsi.metin}</span>
+                : liman.dolan20 ? `${liman.dolan20.acente} · süresi doldu${liman.dolan20.gecerlilikBitis ? ` ${kisa(liman.dolan20.gecerlilikBitis)}` : ""}` : "teklif yok"} />
             <RaporKutusu etiket="Hedefimiz" deger={liman.hedef ? usd(liman.hedef.tutar) : "—"} renk="#FCD34D"
               alt={fark === null ? (liman.hedef ? kisa(liman.hedef.tarih) : "hedef yazılmadı") : fark <= 0 ? <span style={{ color: "#6EE7B7" }}>en iyi teklif hedefte</span> : <span style={{ color: "#FCD34D" }}>en iyi +{usd(fark)} üstünde</span>} />
             <RaporKutusu etiket="Kabul edilen" deger={liman.kabul ? usd(liman.kabul.tutar) : "—"} alt={liman.kabul ? `${liman.kabul.armator || ""} ${kisa(liman.kabul.tarih)}`.trim() : "henüz yok"} renk="#93C5FD" />

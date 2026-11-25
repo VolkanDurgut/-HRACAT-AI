@@ -91,6 +91,11 @@ export type LimanOzeti = {
   enIyi20: AcenteFiyati | null;
   /** Toplami kesin olmayan (lokal belirsiz) en dusuk 20'DC teklif; en iyi sayilmaz, ayrica uyarilir */
   belirsiz20: AcenteFiyati | null;
+  /**
+   * 25.11.2026 (kullanici: "neden - olarak gosterilenler var?"): gecerli 20'DC teklif HIC yoksa suresi dolmus tekliflerin
+   * en iyisi (kesin olan once). Yalniz GRI bilgi: en iyi / hedef hesabina girmez. Gecerli teklif varsa null.
+   */
+  dolan20: AcenteFiyati | null;
 };
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
@@ -179,6 +184,7 @@ export function limanOzetleri(satirlar: NavlunSatiri[], baglam: KarsilastirmaBag
       .sort((a, b) => b.tarih.localeCompare(a.tarih));
     const yirmi = fiyatlar.filter((f) => f.ekipman === "20DC" && !f.suresiDoldu);
     const secim = enIyiSec(yirmi, (f) => f.karsi);
+    const dolanSecim = yirmi.length ? null : enIyiSec(fiyatlar.filter((f) => f.ekipman === "20DC" && f.suresiDoldu), (f) => f.karsi);
     sonuc.push({
       anahtar,
       ad: (liste[liste.length - 1].liman || anahtar).toLocaleUpperCase("tr-TR"),
@@ -187,6 +193,7 @@ export function limanOzetleri(satirlar: NavlunSatiri[], baglam: KarsilastirmaBag
       enIyi20: secim.enIyi,
       // Belirsiz teklif yalniz en iyiden daha ucuzsa (ya da kesin teklif yoksa) uyari olarak gosterilir
       belirsiz20: secim.belirsiz && (!secim.enIyi || secim.belirsiz.karsi.toplam < secim.enIyi.karsi.toplam) ? secim.belirsiz : null,
+      dolan20: dolanSecim ? dolanSecim.enIyi ?? dolanSecim.belirsiz : null,
     });
   }
   return sonuc.sort((a, b) => b.sonTarih.localeCompare(a.sonTarih));

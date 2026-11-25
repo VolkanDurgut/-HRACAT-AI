@@ -9,7 +9,7 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { GemiAracFormu, GemiFormu, GemiHizliGiris, LimanListesiPenceresi, SatisFormu } from "@/components/ic-gemi-pencereler";
+import { GemiAracFormu, GemiFormu, GemiHizliGiris, GemiLimanExcelYukle, LimanListesiPenceresi, SatisFormu } from "@/components/ic-gemi-pencereler";
 import {
   Ship, Plus, Loader2, AlertCircle, AlertTriangle, Pencil, Trash2, Download, ClipboardPaste, Truck, RefreshCw, CheckCircle2, RotateCcw, Users, PauseCircle, PlayCircle, Unlink, Clock,
 } from "lucide-react";
@@ -245,6 +245,7 @@ export default function GemiTahliyePage() {
                     <button onClick={excelIndir} disabled={indiriliyor} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-excel">
                       {indiriliyor ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Excel Raporu
                     </button>
+                    {acik && <GemiLimanExcelYukle gemi={gemi} kaydedildi={getir} testId="gemi-sayfa-excel" />}
                     {acik && <>
                       <button onClick={() => setListeAcik(true)} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-liste-ac" title="Gemiden satış araçlarının liman listesi"><ClipboardPaste size={14} /> Liman Listesi Yapıştır</button>
                       <button onClick={() => setAracForm(true)} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-arac-ac"><Truck size={14} /> Araç Ekle</button>
@@ -381,7 +382,7 @@ export default function GemiTahliyePage() {
                                 <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ color: a.alici_id ? undefined : TEXT_MUTED }}>
                                   <span className={a.alici_id ? "text-white" : ""}>{yerAdi(a, alicilar)}</span>
                                   {yoldaMi(a) && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-300"><Clock size={10} /> yolda</span>}
-                                  <span className="ml-1.5 text-[10px]" style={{ color: TEXT_MUTED }} title={`${a.girilen_email || ""} · ${tarihSaatYazi(a.olusturma)}`}>{a.kaynak === "ofis" ? "ofis" : "kantar"}</span>
+                                  <span className="ml-1.5 text-[10px]" style={{ color: TEXT_MUTED }} title={`${a.girilen_email || ""} · ${tarihSaatYazi(a.olusturma)}`}>{a.kaynak === "liman" ? "liman Excel" : a.kaynak === "ofis" ? "ofis" : "kantar"}</span>
                                 </td>
                                 <td className="px-2 py-1.5 text-right">
                                   {acik && !a.alici_id && a.teslim_kg !== null && <button onClick={() => setEslesmeKaldir(a)} className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }} title="Teslim kg'ını kaldır (yanlış eşleşme)" aria-label={`${a.plaka} teslim kaldır`}><Unlink size={13} /></button>}

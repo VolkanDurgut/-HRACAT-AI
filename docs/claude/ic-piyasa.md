@@ -835,3 +835,24 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   "Tartıldı · liman fişi gelmedi" listesi (liman kg ⏎), son girilenlerde kaynak (kantar #no / elle).
 - Yerel PG: eşleşme senaryoları (aynı plakanın iki seferi kg'a göre, dorse, irsaliyeli TMO, kg uzak → yolda, fişsiz bağlama,
   elle, kaldır → tekrar eşleşmez, kantarcı yetki sınırları, TMO firma koruması). Canlı rollback denemeleri.
+
+### Gemi Tahliye 3: liman portalı Excel'i, ağırlık + saat eşleştirmesi, sade kantar kartı (25.11.2026 akşam)
+
+- Gemi geldi (liman Excel'inde Gemi/Sefer = ikinci gemi). Kullanıcı: "Bu sayfada yönetim çok zor. Her zaman son tartılmış
+  5 araç gözüksün. Gittiği yer Unex Gıda olarak revize edilsin. Liman tonajlarını Excel ile yükleyeceğiz."
+- Gerçek ilk araçlarda: limandaki plaka (çekici) ≠ kantarımızdaki plaka (dorse); ama aynı aracın BOŞ ağırlığı iki
+  kantarda ~60 kg, DOLU ~120 kg içinde; araç limandan çıkıştan ~20 dk sonra kantara giriyor.
+- `lib/xls-oku.ts`: dış paketsiz BIFF8/OLE2 (.xls) okuyucu (SST+CONTINUE, LABELSST, LABEL, NUMBER, RK, MULRK, FORMULA,
+  BOOLERR; şifreli / xlsx anlaşılır hata). `lib/ic-piyasa/liman-excel.ts`: sütunlar başlık adına göre (Araç Plakası, Boş /
+  Dolu Ağırlık, Ağırlık, Çıkış Tarihi, Fiş Kodu, Gemi/Sefer, Alıcı Firma); Excel seri günü TR (UTC+3) → UTC.
+  Test: tests/liman-excel.test.ts (test içinde KURGU .xls üretilir; gerçek dosya repoda YOK).
+- Migration `20261125210000_ic_gemi_liman_excel.sql` (canlıda): araç + `liman_fis_kodu` (şirket içinde tekil → aynı Excel
+  tekrar yüklenince atlanır), `liman_bos_kg`, `liman_dolu_kg`, `liman_cikis`, `liman_alici`; kaynak + `liman`.
+  `ic_gemi_liman_excel_yukle(p_gemi, p_satirlar, p_kaydet)` (kantar VEYA ic_piyasa): alıcıda UNEX jetonu → UNEX GIDA,
+  değilse gemiden satış firması (jeton kesişimi; yoksa hata), Gemi/Sefer seçili gemiye uymalı, HEPSİ YA DA HİÇBİRİ.
+  Eşleştirme: liman çıkışı bilinen araç → kantar girişi çıkıştan 15 dk önce..8 sa sonra, |net| ≤ 800, |boş| ≤ 500;
+  sıra plaka > firma alanında gemi adı > en küçük (boş + dolu) farkı > en erken. Liman çıkışı olmayan (elle) eski kural.
+  Canlıda kullanıcının Excel'iyle (7 araç) yüklendi: 3'ü dorse plakalı kantar tartımlarına +60 / +20 / +40 kg ile bağlandı.
+- Kantar kartı: Liman Excel'i Yükle (ön izleme: yeni / zaten yüklü / hatalı), "Elle araç" (katlanır hızlı giriş),
+  "Yolda N araç" ve "Liman kaydı yok N" çipleri (açılır), HER ZAMAN "Son tartılan 5 araç" (liman plakası · kantar
+  plakası · gittiği yer, liman / teslim / fark). `UNEX_YER = "UNEX GIDA"` (ekran + Excel raporu).

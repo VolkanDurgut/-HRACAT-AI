@@ -3,12 +3,12 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, Ship, AlertTriangle, Clock, Scale, CheckCircle2 } from "lucide-react";
+import { Loader2, Ship, AlertTriangle, Clock, Scale, CheckCircle2, Plus } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi, tonYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { trSayiOku, plakaBicimle } from "@/lib/ic-piyasa/irsaliye-oku";
 import { KantarFissizTartim, KantarGemi, KantarGemiArac, UNEX_YER, gemiHataMesaji, yuzdeYazi } from "@/lib/ic-piyasa/gemi-tahliye";
-import { GemiHizliGiris } from "@/components/ic-gemi-pencereler";
+import { GemiHizliGiris, GemiLimanExcelYukle } from "@/components/ic-gemi-pencereler";
 
 /**
  * Kantar Paneli > Yurt Ici > Gemi (25.11.2026). Her acik gemi icin HEP ACIK hizli satir (plaka -> Enter -> liman kg -> Enter).
@@ -83,8 +83,17 @@ export function KantarGemiTahliye({ yenileTetik = 0, acikSayiBildir }: { yenileT
 
 function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: KantarGemiArac[]; fissiz: KantarFissizTartim[]; yenile: () => void }) {
   const yuzde = g.bl_kg > 0 ? (Number(g.gelen_kg) * 100) / Number(g.bl_kg) : 0;
-  const yolda = araclar.filter((a) => !a.alici_id && a.teslim_kg === null).sort((a, b) => (a.olusturma < b.olusturma ? -1 : 1));
-  const son = araclar.filter((a) => !(!a.alici_id && a.teslim_kg === null)).slice(0, 10);
+  const [elle, setElle] = useState(false);
+  const [yoldaAcik, setYoldaAcik] = useState(false);
+  const [fissizAcik, setFissizAcik] = useState(false);
+  const yolda = araclar.filter((a) => !a.alici_id && a.teslim_kg === null)
+    .sort((a, b) => ((a.liman_cikis || a.olusturma) < (b.liman_cikis || b.olusturma) ? -1 : 1));
+  // 25.11.2026 kullanici: "her zaman son tartilmis 5 arac gozuksun" (teslimi gelen UNEX + gemiden satis, en yeni ustte)
+  const sonTartilan = araclar.filter((a) => a.teslim_kg !== null || a.alici_id)
+    .sort((a, b) => ((b.teslim_zamani || b.liman_cikis || b.olusturma) > (a.teslim_zamani || a.liman_cikis || a.olusturma) ? 1 : -1))
+    .slice(0, 5);
+  const yoldaKg = yolda.reduce((t, a) => t + Number(a.liman_kg), 0);
+  const cip = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold hover:bg-white/5";
   return (
     <section className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label={g.gemi_adi}>
       <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 border-b" style={{ borderColor: CARD_BORDER }}>
@@ -95,25 +104,79 @@ function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: Kan
         </div>
         <div className="text-right">
           <p className="text-sm font-bold text-white tabular-nums">{tonYazi(g.gelen_kg)} <span className="font-normal text-xs" style={{ color: TEXT_MUTED }}>/ {tonYazi(g.bl_kg)}</span></p>
-          <p className="text-[11px] tabular-nums" style={{ color: TEXT_MUTED }}>{yuzdeYazi(yuzde, 1)} · {g.gelen_arac} araç{g.yolda_arac ? ` · ${g.yolda_arac} yolda` : ""}</p>
+          <p className="text-[11px] tabular-nums" style={{ color: TEXT_MUTED }}>{yuzdeYazi(yuzde, 1)} · {g.gelen_arac} araç · {UNEX_YER} teslim {tonYazi(g.unex_teslim_kg)}</p>
         </div>
       </div>
       <div className="h-1" style={{ backgroundColor: "#1E2530" }}><div className="h-full" style={{ width: `${Math.min(100, yuzde)}%`, backgroundColor: ACCENT }} /></div>
 
       <div className="p-3 flex flex-col gap-3">
-        <GemiHizliGiris gemi={g} alicilar={g.alicilar} kaynak="kantar" kaydedildi={yenile} testId={`kantar-gemi-hizli-${g.id.slice(0, 8)}`} />
+        {/* Islemler: liman Excel'i (asil yol) + elle arac (WhatsApp fisi) + durum cipleri */}
+        <div className="flex flex-wrap items-center gap-2">
+          <GemiLimanExcelYukle gemi={g} kaydedildi={yenile} kucuk testId={`kantar-gemi-excel-${g.id.slice(0, 8)}`} />
+          <button type="button" onClick={() => setElle((x) => !x)} className={cip} style={{ borderColor: CARD_BORDER, color: elle ? "white" : TEXT_MUTED }} aria-expanded={elle}>
+            <Plus size={12} /> Elle araç
+          </button>
+          {yolda.length > 0 && (
+            <button type="button" onClick={() => setYoldaAcik((x) => !x)} className={cip} style={{ borderColor: "rgba(245,158,11,0.45)", color: "#FCD34D" }} aria-expanded={yoldaAcik} data-testid="kantar-gemi-yolda-cip">
+              <Clock size={12} /> Yolda {yolda.length} araç · {tonYazi(yoldaKg)}
+            </button>
+          )}
+          {fissiz.length > 0 && (
+            <button type="button" onClick={() => setFissizAcik((x) => !x)} className={cip} style={{ borderColor: "rgba(56,189,248,0.45)", color: "#7DD3FC" }} aria-expanded={fissizAcik} data-testid="kantar-gemi-fissiz-cip">
+              <Scale size={12} /> Liman kaydı yok {fissiz.length}
+            </button>
+          )}
+        </div>
 
-        {/* Yolda: liman fisi girildi, kantar tartimi bekleniyor */}
-        {yolda.length > 0 && (
+        {elle && <GemiHizliGiris gemi={g} alicilar={g.alicilar} kaynak="kantar" kaydedildi={yenile} testId={`kantar-gemi-hizli-${g.id.slice(0, 8)}`} />}
+
+        {/* SON TARTILAN 5 ARAC */}
+        <div className="rounded-lg border overflow-hidden" style={{ borderColor: CARD_BORDER }} data-testid="kantar-gemi-son5">
+          <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: TEXT_MUTED, backgroundColor: ROW_HEADER_BG }}>
+            <CheckCircle2 size={11} className="text-emerald-400" /> Son tartılan 5 araç
+          </p>
+          {sonTartilan.length === 0 ? (
+            <p className="px-3 py-3 text-xs" style={{ color: TEXT_MUTED }}>Henüz tartılan araç yok. Liman Excel&apos;i yüklenince araçlar kantarda tartıldıkça burada görünür.</p>
+          ) : (
+            <table className="w-full table-fixed text-left border-collapse text-xs">
+              <colgroup><col className="w-14" /><col /><col className="w-20" /><col className="w-20" /><col className="w-16" /></colgroup>
+              <thead>
+                <tr>{["Saat", "Plaka · Gittiği yer", "Liman", "Teslim", "Fark"].map((b, i) => <th key={b} className={`px-3 py-1 font-semibold uppercase tracking-wide text-[9px] ${i >= 2 ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
+              </thead>
+              <tbody>
+                {sonTartilan.map((a) => {
+                  const fark = a.teslim_kg !== null ? Number(a.teslim_kg) - Number(a.liman_kg) : null;
+                  return (
+                    <tr key={a.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
+                      <td className="px-3 py-1.5 tabular-nums" style={{ color: TEXT_MUTED }}>{saat(a.teslim_zamani || a.liman_cikis || a.olusturma)}</td>
+                      <td className="px-3 py-1.5 truncate">
+                        <span className="font-semibold text-white">{a.plaka}</span>
+                        {a.kantar_plaka && plakaBicimle(a.kantar_plaka) !== a.plaka && <span style={{ color: TEXT_MUTED }} title="Kantarımızdaki plaka (dorse)"> · {plakaBicimle(a.kantar_plaka)}</span>}
+                        <span style={{ color: TEXT_MUTED }}> · {a.firma || UNEX_YER}</span>
+                        {a.uyari_var && <AlertTriangle size={11} className="inline ml-1 text-amber-400" />}
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-white">{Number(a.liman_kg).toLocaleString("tr-TR")}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums text-white">{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : "—"}</td>
+                      <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${fark !== null && Math.abs(fark) > 300 ? "text-amber-400" : "text-emerald-300"}`}>{fark === null ? "" : `${fark > 0 ? "+" : ""}${fark.toLocaleString("tr-TR")}`}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Yolda: liman cikisi var, kantar tartimi bekleniyor */}
+        {yoldaAcik && yolda.length > 0 && (
           <div className="rounded-lg border" style={{ borderColor: "rgba(245,158,11,0.35)" }} data-testid="kantar-gemi-yolda">
-            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300 flex items-center gap-1.5"><Clock size={11} /> Yolda · kantar tartımı bekleniyor ({yolda.length})</p>
+            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Yolda · kantar tartımı bekleniyor (otomatik eşleşir; olmazsa teslim kg yazıp Enter)</p>
             <table className="w-full table-fixed text-left border-collapse text-xs">
               <colgroup><col className="w-28" /><col /><col className="w-20" /><col className="w-32" /></colgroup>
               <tbody>
                 {yolda.map((a) => (
                   <tr key={a.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
                     <td className="px-3 py-1 font-semibold text-white whitespace-nowrap">{a.plaka}</td>
-                    <td className="px-3 py-1 truncate" style={{ color: TEXT_MUTED }}>fiş {saat(a.olusturma)}</td>
+                    <td className="px-3 py-1 truncate" style={{ color: TEXT_MUTED }}>{a.liman_cikis ? `limandan çıkış ${saat(a.liman_cikis)}` : `fiş ${saat(a.olusturma)}`}</td>
                     <td className="px-3 py-1 text-right tabular-nums text-white">{Number(a.liman_kg).toLocaleString("tr-TR")}</td>
                     <td className="px-2 py-1 text-right"><TeslimGirdisi arac={a} yenile={yenile} /></td>
                   </tr>
@@ -123,10 +186,10 @@ function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: Kan
           </div>
         )}
 
-        {/* Fisi gelmemis tartimlar */}
-        {fissiz.length > 0 && (
+        {/* Kantarda tartildi, liman kaydi yok (firma alaninda gemi adi) */}
+        {fissizAcik && fissiz.length > 0 && (
           <div className="rounded-lg border" style={{ borderColor: "rgba(56,189,248,0.35)" }} data-testid="kantar-gemi-fissiz">
-            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300 flex items-center gap-1.5"><Scale size={11} /> Tartıldı · liman fişi gelmedi ({fissiz.length})</p>
+            <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300">Tartıldı · liman kaydı yok (Excel yüklenince kendiliğinden eşleşir; acilse liman kg yazıp Enter)</p>
             <table className="w-full table-fixed text-left border-collapse text-xs">
               <colgroup><col className="w-28" /><col /><col className="w-20" /><col className="w-32" /></colgroup>
               <tbody>
@@ -143,7 +206,7 @@ function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: Kan
           </div>
         )}
 
-        {/* Ozet: UNEX + satislar */}
+        {/* Gittigi yer ozeti */}
         <table className="w-full table-fixed text-left border-collapse text-xs rounded-lg overflow-hidden">
           <colgroup><col /><col className="w-14" /><col className="w-24" /><col className="w-28" /></colgroup>
           <thead style={{ backgroundColor: ROW_HEADER_BG }}>
@@ -151,7 +214,7 @@ function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: Kan
           </thead>
           <tbody>
             <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
-              <td className="px-3 py-1.5 text-white font-semibold">UNEX (depo)</td>
+              <td className="px-3 py-1.5 text-white font-semibold">{UNEX_YER}</td>
               <td className="px-3 py-1.5 text-right tabular-nums text-white">{g.unex_arac}</td>
               <td className="px-3 py-1.5 text-right tabular-nums text-white">{kgYazi(g.unex_liman_kg)}</td>
               <td className="px-3 py-1.5 text-right tabular-nums text-white">{kgYazi(g.unex_teslim_kg)}</td>
@@ -169,33 +232,6 @@ function GemiKarti({ g, araclar, fissiz, yenile }: { g: KantarGemi; araclar: Kan
             })}
           </tbody>
         </table>
-
-        {son.length > 0 && (
-          <div>
-            <p className="pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: TEXT_MUTED }}>Son girilenler</p>
-            <table className="w-full table-fixed text-left border-collapse text-xs">
-              <colgroup><col className="w-28" /><col /><col className="w-20" /><col className="w-20" /><col className="w-16" /></colgroup>
-              <tbody>
-                {son.map((a) => {
-                  const fark = a.teslim_kg !== null ? Number(a.teslim_kg) - Number(a.liman_kg) : null;
-                  return (
-                    <tr key={a.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
-                      <td className="px-3 py-1 font-semibold text-white whitespace-nowrap">{a.plaka}{a.uyari_var && <AlertTriangle size={11} className="inline ml-1 text-amber-400" />}</td>
-                      <td className="px-3 py-1 truncate" style={{ color: TEXT_MUTED }} title={tarihSaatYazi(a.olusturma)}>
-                        {a.firma || UNEX_YER} · {saat(a.olusturma)}
-                        {a.teslim_kaynak === "kantar" && <span className="ml-1 text-emerald-400/80">· kantar{a.kantar_kayit_no ? ` #${a.kantar_kayit_no}` : ""}</span>}
-                        {a.teslim_kaynak === "elle" && <span className="ml-1">· elle</span>}
-                      </td>
-                      <td className="px-3 py-1 text-right tabular-nums text-white">{Number(a.liman_kg).toLocaleString("tr-TR")}</td>
-                      <td className="px-3 py-1 text-right tabular-nums text-white">{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : "—"}</td>
-                      <td className={`px-3 py-1 text-right tabular-nums ${fark !== null && Math.abs(fark) > 300 ? "text-amber-400" : ""}`} style={fark === null || Math.abs(fark) <= 300 ? { color: TEXT_MUTED } : undefined}>{fark === null ? "" : fark.toLocaleString("tr-TR")}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </section>
   );

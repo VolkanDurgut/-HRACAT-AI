@@ -70,7 +70,7 @@ export function gemiRaporSayfalari(gemi: GemiTahliye, alicilar: GemiAlici[], ara
   ana.push([null, { v: "GİTTİĞİ YER", s: XS.tabloBaslik }, { v: "LİMAN KG", s: XS.tabloBaslik }, { v: "ARAÇ", s: XS.tabloBaslik }, { v: "SATIŞ TONAJI", s: XS.tabloBaslik }, { v: "KALAN", s: XS.tabloBaslik }]);
   for (const y of r.yerler) {
     ana.push([null,
-      { v: y.ad === UNEX_YER ? "UNEX GIDA" : y.ad, s: XS.metin },
+      { v: y.ad, s: XS.metin },
       { v: y.limanKg, s: XS.tamSayi },
       { v: y.arac, s: XS.tamSayi },
       y.hedefKg === null ? { v: null, s: XS.metin } : { v: y.hedefKg, s: XS.tamSayi },

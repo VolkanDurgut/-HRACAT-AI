@@ -13,7 +13,8 @@
  */
 import { plakaBicimle, plakaGecerli, trSayiOku } from "./irsaliye-oku";
 
-export const UNEX_YER = "UNEX";
+/** 25.11.2026 kullanici: "Gittigi yer kismi Unex Gida olarak revize edilsin" */
+export const UNEX_YER = "UNEX GIDA";
 
 /** beklemede (25.11.2026): gemi henuz gelmedi; kantarda gorunmez, arac girilemez */
 export type GemiDurum = "acik" | "beklemede" | "tamamlandi";
@@ -53,11 +54,13 @@ export type GemiArac = {
   liman_kg: number;
   /** UNEX araci: NULL = yolda (kantar tartimi bekleniyor); satis araci: hep NULL */
   teslim_kg: number | null;
-  kaynak: "kantar" | "ofis";
+  kaynak: "kantar" | "ofis" | "liman";
   kantar_tartim_id?: string | null;
   teslim_kaynak?: "kantar" | "elle" | null;
   teslim_zamani?: string | null;
   esleme_kapali?: boolean;
+  liman_fis_kodu?: string | null;
+  liman_cikis?: string | null;
   uyarilar: string[];
   notlar: string | null;
   girilen_email: string | null;
@@ -87,6 +90,8 @@ export type KantarGemiArac = {
   plaka: string; liman_kg: number; teslim_kg: number | null; kaynak: string; uyari_var: boolean;
   girilen_email: string | null; olusturma: string;
   teslim_kaynak: "kantar" | "elle" | null; kantar_kayit_no: number | null; teslim_zamani: string | null;
+  /** 25.11.2026: kantarimizdaki plaka (dorse olabilir) ve liman cikis saati */
+  kantar_plaka?: string | null; liman_cikis?: string | null;
 };
 
 /** kantar_gemi_fissiz_tartimlar: firma alaninda gemi adi gecen, hicbir araca bagli olmayan BAYKON tartimi */

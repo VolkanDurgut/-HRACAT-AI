@@ -3,12 +3,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, X, Ship, AlertTriangle, ClipboardPaste, Truck, Users, CheckCircle2, CornerDownLeft } from "lucide-react";
+import { Loader2, X, Ship, AlertTriangle, ClipboardPaste, Truck, Users, CheckCircle2, CornerDownLeft, FileSpreadsheet } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi } from "@/lib/ic-piyasa/is-emri";
 import { gunTR, bugunTRIso } from "@/lib/ic-piyasa/alis";
 import { plakaBicimle, plakaGecerli, plakaYazarken, trSayiOku } from "@/lib/ic-piyasa/irsaliye-oku";
 import { GemiAlici, GemiTahliye, ListeSatiri, gemiHataMesaji, limanListesiAyristir } from "@/lib/ic-piyasa/gemi-tahliye";
+import { LimanSatiri, gemiSeferUyar, limanExceliAyristir } from "@/lib/ic-piyasa/liman-excel";
 
 /**
  * Ic Piyasa > Gemi Tahliye pencereleri (25.11.2026): gemi ac / duzenle, gemiden satis (firma + tonaj),
@@ -235,7 +236,7 @@ export function GemiAracFormu({ gemi, alicilar, kaynak, kapat, kaydedildi, varsa
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="text-xs sm:col-span-2" style={{ color: TEXT_MUTED }}>Gittiği yer
           <select value={alici} onChange={(e) => { setAlici(e.target.value); setUyarilar(null); }} className={`${girdi} mt-1`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid="gemi-arac-yer">
-            <option value="">UNEX (depomuza geliyor · liman + teslim)</option>
+            <option value="">UNEX GIDA (depomuza geliyor · liman + teslim)</option>
             {alicilar.map((l) => <option key={l.id} value={l.id}>{l.firma} (gemiden satış · yalnız liman)</option>)}
           </select>
         </label>
@@ -406,7 +407,7 @@ export function GemiHizliGiris({ gemi, alicilar, kaynak, kaydedildi, testId = "g
     setMesgul(false);
     if (error) { setUyarilar(null); setHata(gemiHataMesaji(error)); return; }
     const d = (data || {}) as { kantar_eslesti?: boolean; yolda?: boolean };
-    const yer = alici ? (alicilar.find((l) => l.id === alici)?.firma || "") : "UNEX";
+    const yer = alici ? (alicilar.find((l) => l.id === alici)?.firma || "") : "UNEX GIDA";
     setSon(`${p} · ${kg.toLocaleString("tr-TR")} kg · ${yer}${d.kantar_eslesti ? " · kantar tartımı bulundu" : d.yolda ? " · kantar tartımı bekleniyor" : ""}`);
     setPlaka(""); setLiman(""); setUyarilar(null);
     kaydedildi();
@@ -426,7 +427,7 @@ export function GemiHizliGiris({ gemi, alicilar, kaynak, kaydedildi, testId = "g
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[10px] font-semibold uppercase tracking-wide flex-1 min-w-[150px]" style={{ color: TEXT_MUTED }}>Gittiği yer
           <select value={alici} onChange={(e) => { setAlici(e.target.value); sifirla(); plakaRef.current?.focus(); }} className={`${girdi} mt-1 py-1.5 normal-case tracking-normal font-normal`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={`${testId}-yer`}>
-            <option value="">UNEX (depoya)</option>
+            <option value="">UNEX GIDA (depoya)</option>
             {alicilar.map((l) => <option key={l.id} value={l.id}>{l.firma} (gemiden satış)</option>)}
           </select>
         </label>
@@ -452,5 +453,98 @@ export function GemiHizliGiris({ gemi, alicilar, kaynak, kaydedildi, testId = "g
       {!hata && !uyarilar && son && <p className="mt-2 text-xs text-emerald-300 flex items-center gap-1.5" data-testid={`${testId}-son`}><CheckCircle2 size={12} /> Kaydedildi: {son}</p>}
       {!hata && !uyarilar && !son && <p className="mt-2 text-[11px]" style={{ color: TEXT_MUTED }}>Şoförün liman fişinden: plaka → Enter → kg → Enter. UNEX araçlarında teslim kg kantar tartımından otomatik gelir.</p>}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LIMAN EXCEL'I YUKLE (25.11.2026, kullanici: "Liman tonajlarini excel ile yukleyecegiz"). Liman portali
+// "Gemi Tartim Bilgileri" ExportToExcel (.xls) -> kuru kontrol (eklenecek / zaten var / hatalar) -> yukle.
+// Ayni Excel tekrar yuklenebilir (fis koduna gore atlanir). UNEX araclari kantar tartimina agirlik + saatle baglanir.
+// ---------------------------------------------------------------------------
+type ExcelOzet = { eklenen: number; atlanan: number; toplam_kg: number; hatalar: string[]; uyarilar: string[]; eslesen?: number };
+
+export function GemiLimanExcelYukle({ gemi, kaydedildi, testId = "gemi-liman-excel", kucuk = false }: {
+  gemi: Pick<GemiTahliye, "id" | "gemi_adi">; kaydedildi: () => void; testId?: string; kucuk?: boolean;
+}) {
+  const { showToast } = useToast();
+  const dosyaRef = useRef<HTMLInputElement>(null);
+  const [mesgul, setMesgul] = useState(false);
+  const [hazir, setHazir] = useState<{ ad: string; satirlar: LimanSatiri[]; okunamayan: string[]; ozet: ExcelOzet } | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const gonder = (satirlar: LimanSatiri[], kaydet: boolean) => supabase.rpc("ic_gemi_liman_excel_yukle", {
+    p_gemi: gemi.id, p_kaydet: kaydet,
+    p_satirlar: satirlar.map((s) => ({ fis_kodu: s.fis_kodu, plaka: s.plaka, bos_kg: s.bos_kg, dolu_kg: s.dolu_kg, net_kg: s.net_kg, cikis: s.cikis, gemi_sefer: s.gemi_sefer, alici: s.alici })),
+  });
+  const sec = async (f: File | null | undefined) => {
+    if (!f) return;
+    setHata(null); setHazir(null); setMesgul(true);
+    try {
+      if (f.size > 10 * 1024 * 1024) throw new Error("Dosya 10 MB'tan büyük.");
+      const { xlsOku } = await import("@/lib/xls-oku");
+      const sayfalar = xlsOku(new Uint8Array(await f.arrayBuffer()));
+      const r = limanExceliAyristir(sayfalar[0]?.satirlar || []);
+      if (!r.satirlar.length && r.hatalar.length) throw new Error(r.hatalar[0].hata);
+      if (!r.satirlar.length) throw new Error("Excel'de araç satırı bulunamadı.");
+      const baska = r.gemiler.filter((g) => !gemiSeferUyar(gemi.gemi_adi, g));
+      if (baska.length) throw new Error(`Bu Excel başka gemiye ait (${baska.join(", ")}); ${gemi.gemi_adi} kartından değil, o geminin kartından yükleyin.`);
+      const { data, error } = await gonder(r.satirlar, false);
+      if (error) throw new Error(gemiHataMesaji(error));
+      setHazir({ ad: f.name, satirlar: r.satirlar, okunamayan: r.hatalar.map((h) => `${h.satir}. satır: ${h.hata}`), ozet: data as ExcelOzet });
+    } catch (e) {
+      setHata((e as Error).message || String(e));
+    } finally {
+      setMesgul(false);
+      if (dosyaRef.current) dosyaRef.current.value = "";
+    }
+  };
+  const yukle = async () => {
+    if (!hazir) return;
+    setMesgul(true);
+    const { data, error } = await gonder(hazir.satirlar, true);
+    setMesgul(false);
+    if (error) { setHata(gemiHataMesaji(error)); return; }
+    const o = data as ExcelOzet;
+    showToast(`${gemi.gemi_adi}: ${o.eklenen} araç eklendi${o.atlanan ? `, ${o.atlanan} zaten vardı` : ""}${o.eslesen ? ` · ${o.eslesen} araç kantar tartımıyla eşleşti` : ""}.`, "success");
+    setHazir(null);
+    kaydedildi();
+  };
+
+  return (
+    <>
+      <input ref={dosyaRef} type="file" accept=".xls,application/vnd.ms-excel" className="hidden" onChange={(e) => sec(e.target.files?.[0])} data-testid={`${testId}-dosya`} />
+      <button type="button" onClick={() => dosyaRef.current?.click()} disabled={mesgul}
+        className={`inline-flex items-center gap-1.5 ${kucuk ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"} rounded-lg font-bold text-white hover:brightness-110 disabled:opacity-50`}
+        style={{ backgroundColor: ACCENT }} title="Liman portalı › Gemi Tartım Bilgileri › Excel (.xls)" data-testid={testId}>
+        {mesgul && !hazir ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Liman Excel&apos;i Yükle
+      </button>
+      {hata && !hazir && (
+        <Pencere baslik="Liman Excel'i okunamadı" ikon={<AlertTriangle size={16} className="text-red-400" />} kapat={() => setHata(null)} mesgul={false}>
+          <p className="text-sm text-red-300">{hata}</p>
+          <div className="flex justify-end"><button onClick={() => setHata(null)} className="px-4 py-2 rounded-lg border text-sm font-semibold" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Kapat</button></div>
+        </Pencere>
+      )}
+      {hazir && (
+        <Pencere genis baslik="Liman Excel'i" aciklama={`${gemi.gemi_adi} · ${hazir.ad}`} ikon={<FileSpreadsheet size={16} style={{ color: ACCENT }} />}
+          kapat={() => { setHazir(null); setHata(null); }} mesgul={mesgul} testId={`${testId}-onizleme`}>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-lg border p-3" style={{ borderColor: CARD_BORDER }}><p className="text-2xl font-bold text-emerald-400 tabular-nums">{hazir.ozet.eklenen}</p><p className="text-xs" style={{ color: TEXT_MUTED }}>yeni araç · {kgYazi(hazir.ozet.toplam_kg)}</p></div>
+            <div className="rounded-lg border p-3" style={{ borderColor: CARD_BORDER }}><p className="text-2xl font-bold text-white tabular-nums">{hazir.ozet.atlanan}</p><p className="text-xs" style={{ color: TEXT_MUTED }}>zaten yüklü (atlanır)</p></div>
+            <div className="rounded-lg border p-3" style={{ borderColor: CARD_BORDER }}><p className={`text-2xl font-bold tabular-nums ${hazir.ozet.hatalar.length ? "text-red-400" : "text-white"}`}>{hazir.ozet.hatalar.length + hazir.okunamayan.length}</p><p className="text-xs" style={{ color: TEXT_MUTED }}>hatalı satır</p></div>
+          </div>
+          {(hazir.ozet.hatalar.length > 0 || hazir.okunamayan.length > 0) && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200 space-y-1 max-h-40 overflow-y-auto">
+              {[...hazir.okunamayan, ...hazir.ozet.hatalar].map((h) => <p key={h}>{h}</p>)}
+            </div>
+          )}
+          {hazir.ozet.uyarilar.length > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200 space-y-1">{hazir.ozet.uyarilar.map((u) => <p key={u}>{u}</p>)}</div>
+          )}
+          <p className="text-xs" style={{ color: TEXT_MUTED }}>UNEX GIDA araçları kantarımızda tartılınca teslim kg otomatik eşleşir (liman çıkış saati + dolu/boş ağırlık; plaka farklı olabilir). Aynı Excel tekrar yüklenebilir.</p>
+          <Altbar hata={null} mesgul={mesgul} kapat={() => setHazir(null)} onay={yukle}
+            onayEtiket={hazir.ozet.eklenen ? `${hazir.ozet.eklenen} Aracı Yükle` : "Yeni araç yok"} devreDisi={!hazir.ozet.eklenen || hazir.ozet.hatalar.length > 0} />
+        </Pencere>
+      )}
+    </>
   );
 }

@@ -41,7 +41,7 @@ test("Gemi raporu: gelen / yuzde / UNEX fark ve fire yalniz UNEX araclarindan", 
   // Kalan arac: sablondaki (=gelen/ortalama = gelen arac sayisi) hatasi yok; kalan / ortalama yukari
   assert.equal(r.kalanAracTahmini, Math.ceil(21000 / (179000 / 6)));
   assert.deepEqual(r.yerler.map((y) => [y.ad, y.limanKg, y.arac, y.kalanKg]), [
-    ["UNEX", 87000, 3, null], ["KURGU ALICI A", 61000, 2, -1000], ["KURGU ALICI B", 31000, 1, -1000],
+    ["UNEX GIDA", 87000, 3, null], ["KURGU ALICI A", 61000, 2, -1000], ["KURGU ALICI B", 31000, 1, -1000],
   ]);
   assert.deepEqual(r.gunler.map((g) => [g.tarih, g.arac]), [["2026-11-26", 3], ["2026-11-25", 3]]);
 });
@@ -127,6 +127,6 @@ test("Iki asama: yoldaki UNEX araci fark / fire'ye girmez, ayri sayilir", () => 
   const satir = s[0].satirlar.find((x) => x[1]?.v === "34 KRG 003");
   assert.equal(satir?.[3]?.v, null);
   assert.equal(satir?.[4]?.v, null);
-  assert.equal(satir?.[5]?.v, "UNEX (tartım bekliyor)");
+  assert.equal(satir?.[5]?.v, "UNEX GIDA (tartım bekliyor)");
   assert.ok(s[0].satirlar.some((x) => x[1]?.v === "Yolda (tartım bekleyen)" && x[2]?.v === 30000));
 });

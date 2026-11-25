@@ -10,6 +10,7 @@ import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { useDbaUpload } from "@/lib/hooks/use-dba-upload";
 import { KantarYurtIci } from "@/components/kantar-yurt-ici";
 import { KantarGelenArac } from "@/components/kantar-gelen-arac";
+import { KantarGemiTahliye } from "@/components/kantar-gemi-tahliye";
 import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { KantarCanliSeridi } from "@/components/kantar-canli-seridi";
 import { beklemeYazi, kantarSaatYazi, type KantarCanli } from "@/lib/kantar-canli";
@@ -85,10 +86,12 @@ export default function KantarPage() {
   // Yurt Ici iki SEKME (Satis / Alis), iki sutun xl'den (1280px) itibaren yan yana, kartlar yerine
   // siki tablolar. Alis sekmesi sadece fonksiyonlar varsa (alisAcik !== null) gorunur.
   const [alisAcik, setAlisAcik] = useState<number | null>(null);
-  const [yiSekme, setYiSekme] = useState<"satis" | "alis">("satis");
-  useEffect(() => { try { if (window.localStorage.getItem("kantar-yurt-ici-sekme") === "alis") setYiSekme("alis"); } catch { /* depolama kapali */ } }, []);
-  const sekmeSec = (x: "satis" | "alis") => { setYiSekme(x); try { window.localStorage.setItem("kantar-yurt-ici-sekme", x); } catch { /* depolama kapali */ } };
-  const gorunenSekme = yiSekme === "alis" && alisAcik !== null ? "alis" : "satis";
+  // 25.11.2026: ucuncu sekme "Gemi" (gemi tahliye); yalniz acik gemi varsa (gemiAcik !== null) gorunur.
+  const [gemiAcik, setGemiAcik] = useState<number | null>(null);
+  const [yiSekme, setYiSekme] = useState<"satis" | "alis" | "gemi">("satis");
+  useEffect(() => { try { const k = window.localStorage.getItem("kantar-yurt-ici-sekme"); if (k === "alis" || k === "gemi") setYiSekme(k); } catch { /* depolama kapali */ } }, []);
+  const sekmeSec = (x: "satis" | "alis" | "gemi") => { setYiSekme(x); try { window.localStorage.setItem("kantar-yurt-ici-sekme", x); } catch { /* depolama kapali */ } };
+  const gorunenSekme = yiSekme === "alis" && alisAcik !== null ? "alis" : yiSekme === "gemi" && gemiAcik !== null ? "gemi" : "satis";
   const [yurtIciYenile, setYurtIciYenile] = useState(0);
   // Otomatik DBA (20.10.2026): durum seridi; Yenile'de ve canli degisiklikte tazelenir
   const [dbaOtoYenile, setDbaOtoYenile] = useState(0);
@@ -708,12 +711,12 @@ export default function KantarPage() {
 
         {/* ===== SAG: YURT ICI (irsaliye) - Satis / Alis sekmeleri (30.10.2026) ===== */}
         <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={15} />} baslik="Yurt İçi · İrsaliye" aciklama="Satış: müşteriye giden araç · Alış: depodan gelen araç" />
+          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={15} />} baslik="Yurt İçi · İrsaliye" aciklama="Satış: müşteriye giden araç · Alış: depodan gelen araç · Gemi: tahliye araçları" />
           <div role="tablist" aria-label="Yurt içi bölümleri" className="shrink-0 self-start inline-flex rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-            {([["satis", "Satış · İş Emirleri", yurtIciAcik], ["alis", "Alış · Gelen Araç", alisAcik]] as const).map(([k, etiket, sayi]) => (k === "alis" && alisAcik === null) ? null : (
+            {([["satis", "Satış · İş Emirleri", yurtIciAcik], ["alis", "Alış · Gelen Araç", alisAcik], ["gemi", "Gemi · Tahliye", gemiAcik]] as const).map(([k, etiket, sayi]) => ((k === "alis" && alisAcik === null) || (k === "gemi" && gemiAcik === null)) ? null : (
               <button key={k} role="tab" aria-selected={gorunenSekme === k} aria-controls={`kantar-yi-${k}`} onClick={() => sekmeSec(k)}
                 className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
-                style={gorunenSekme === k ? { backgroundColor: k === "alis" ? "#F59E0B" : ACCENT, color: k === "alis" ? "#111" : "white" } : { color: TEXT_MUTED }}>
+                style={gorunenSekme === k ? { backgroundColor: k === "alis" ? "#F59E0B" : k === "gemi" ? "#38BDF8" : ACCENT, color: k === "satis" ? "white" : "#111" } : { color: TEXT_MUTED }}>
                 {etiket} <span className="font-normal opacity-80">({sayi ?? "–"})</span>
               </button>
             ))}
@@ -725,6 +728,10 @@ export default function KantarPage() {
             {/* Alis bileseni hep bagli kalir (sayiyi bildirir); fonksiyonlar yoksa kendisi hicbir sey cizmez */}
             <div id="kantar-yi-alis" role="tabpanel" hidden={gorunenSekme !== "alis"}>
               <KantarGelenArac yenileTetik={yurtIciYenile} acikSayiBildir={setAlisAcik} kantarBekleyen={kantarCanli?.alislar ?? null} />
+            </div>
+            {/* Gemi bileseni hep bagli kalir; fonksiyon yoksa / acik gemi yoksa sekme gizli */}
+            <div id="kantar-yi-gemi" role="tabpanel" hidden={gorunenSekme !== "gemi"}>
+              <KantarGemiTahliye yenileTetik={yurtIciYenile} acikSayiBildir={setGemiAcik} />
             </div>
           </div>
         </section>

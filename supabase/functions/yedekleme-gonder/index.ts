@@ -147,6 +147,11 @@ const YEDEKLENECEK_TABLOLAR = [
   "diib_dosya_bolunmeleri",
   // Ic piyasa siparisler arasi tonaj devri (04.11.2026)
   "ic_is_emri_devirleri",
+  // Ic piyasa alis bakiye birlestirme kaydi + gemi tahliye (25.11.2026)
+  "ic_alis_birlestirmeleri",
+  "ic_gemi_tahliyeleri",
+  "ic_gemi_alicilari",
+  "ic_gemi_araclari",
   // PAZAR (UNEX Satis) CRM: firmalar, yetkililer, fuar katilimlari, ice aktarma kaydi (10.11.2026)
   "pazar_firmalar",
   "pazar_kisiler",

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, Users, ClipboardList, Bell, PackageOpen, Sheet } from "lucide-react";
+import { FileText, Users, ClipboardList, Bell, PackageOpen, Sheet, Ship } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
@@ -21,6 +21,8 @@ import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 const SEKMELER: { href: string; etiket: string; ikon: typeof FileText; yetki: "ic_piyasa" | "ic_alis" }[] = [
   { href: "/ic-piyasa/is-emirleri", etiket: "İş Emirleri", ikon: ClipboardList, yetki: "ic_piyasa" },
   { href: "/ic-piyasa/alis", etiket: "Alış", ikon: PackageOpen, yetki: "ic_alis" },
+  // 25.11.2026: gemi tahliye (liman / teslim kg, gemiden satis) - ic_piyasa yetkisiyle
+  { href: "/ic-piyasa/gemi", etiket: "Gemi Tahliye", ikon: Ship, yetki: "ic_piyasa" },
   { href: "/ic-piyasa/rapor", etiket: "Sipariş Raporu", ikon: Sheet, yetki: "ic_piyasa" },
   { href: "/ic-piyasa/bildirimler", etiket: "Bildirimler", ikon: Bell, yetki: "ic_piyasa" },
   { href: "/ic-piyasa/musteriler", etiket: "Müşteriler", ikon: Users, yetki: "ic_piyasa" },

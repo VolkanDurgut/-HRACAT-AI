@@ -781,3 +781,33 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
 - Geri al (`ic_alis_birlestirme_geri_al`): yeni alışa araç alınmadıysa kaynaklar aynen geri döner, yeni alış silinir. Listede
   hedefte "Birleştirme · N kaynak" rozeti; hedefte "Sil" yerine "Birleştirmeyi geri al".
 - İlk kullanım 25.11.2026: 4 alışın kalanı 1.668.580 kg → AS-2026-0012 (rollback denemesi: kapanış / açılış / geri al doğru).
+
+## Gemi Tahliye (25.11.2026)
+
+- Kullanıcı: "Bu gemi şu an yanaşta ... araçlar kantarda tartılacak fakat gemiden satış da olabilir. Araçlar tartıldıkça
+  gemi raporu şablonunun otomatik oluşmasını istiyorum; satış ekleme kısmı (firma ismi ve tonajı)." Kararlar
+  (AskUserQuestion): İç Piyasa › **Gemi Tahliye** sekmesi (ayrı İthalat menüsü DEĞİL); UNEX'e gelen aracı KANTARCI girer
+  (liman fişi kg + kendi tartımımız = teslim kg); gemiden satış araçlarının liman listesini OFİS yapıştırır (kantarcı da
+  tek tek girebilir); rapor ekranda canlı + Excel, MAİL YOK; mevcut Alış / İş Emri / günlük raporlara YANSIMAZ.
+- Migration `20261125160000_ic_gemi_tahliye.sql` (SADECE ekleme; KOD PUSH'UNDAN ÖNCE canlıya): `ic_gemi_tahliyeleri`
+  (gemi adı büyük harf, açık gemilerde ad tekil; `bl_kg` = raporun SİPARİŞ MİKTARI; durum acik/tamamlandi),
+  `ic_gemi_alicilari` (firma büyük harf, gemi içinde tekil; tonaj), `ic_gemi_araclari` (alici_id NULL = UNEX: liman +
+  teslim ZORUNLU; dolu = gemiden satış: teslim YOK — CHECK). RLS: gemi/alıcı `ic_piyasa` ile okunur/yazılır; araçlar
+  yalnız okunur, yazma fonksiyonlarla: `ic_gemi_arac_ekle(p_veri, p_kaydet)` (kantar VEYA ic_piyasa; kuru kontrol →
+  uyarılar: liman/teslim farkı > max(300 kg, %1), 35 t üstü, aynı plaka 30 dk içinde, gemi/alıcı tonajı aşımı, geçmiş
+  tarih; tarih bugün..−30 gün), `ic_gemi_liman_listesi_ekle(p_gemi, p_alici, p_satirlar, p_kaydet)` (yalnız ic_piyasa,
+  ≤300 satır, HEPSİ YA DA HİÇBİRİ, mükerrer satır uyarısı), `ic_gemi_arac_sil(p_id)` (yalnız ic_piyasa, açık gemide),
+  `kantar_gemi_tahliyeleri()` / `kantar_gemi_son_araclar(p_gun)`. Araçlı gemi/alıcı silinemez (FK). Denetim
+  tetikleyicileri üç tabloda. Yerel PG16'da (taklit auth/yetki) 2 kez + 15 senaryo test edildi.
+- Hesap TEK yer `lib/ic-piyasa/gemi-tahliye.ts` (`gemiRaporu`), Excel `lib/ic-piyasa/gemi-tahliye-xlsx.ts`: ana sayfa
+  (şablon sütunları + toplam + özet + gittiği yer tablosu), "<GEMİ>- UNEX", her alıcı için "<GEMİ>- <FİRMA>".
+  Şablondaki iki formül BİLEREK düzeltildi: "Kalan Araç Sayısı" (=GELEN/ORTALAMA → gelen araç sayısını veriyordu) →
+  (sipariş − gelen) / ortalama yukarı; "Fire" tüm araçlara göre idi (satış araçlarında teslim olmadığı için satış
+  tonajı fire görünüyordu) → yalnız UNEX araçları. Kullanıcının örnek gemi raporuyla (110 araç) rakamlar birebir
+  doğrulandı (gerçek veri repoda YOK).
+- Ekran `app/ic-piyasa/gemi/page.tsx` + `components/ic-gemi-pencereler.tsx` (gemi, satış, tek araç, liman listesi
+  yapıştır — `limanListesiAyristir`: şablon satırı aynen, TAB/;/çift boşluk, tek boşluklu TR plakası, binlik nokta;
+  kg < 1.000 "ton mu?" hatası). Kantar: `components/kantar-gemi-tahliye.tsx`, Yurt İçi'nde 3. sekme "Gemi · Tahliye"
+  (yalnız açık gemi varsa görünür; localStorage `kantar-yurt-ici-sekme` = gemi).
+- Gece yedeği: üç tablo + (unutulmuş) `ic_alis_birlestirmeleri` `YEDEKLENECEK_TABLOLAR`'a eklendi →
+  `yedekleme-gonder` YENİDEN DEPLOY edilmeli.

@@ -30,7 +30,8 @@ import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, sabahKarsilasti
 import { GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { yuklemeEvraklariTamam } from "@/lib/yukleme-evrak-tamam";
-import { doluDurumu, isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { doluDurumu, isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, listeGruplari, kapaliGruplariOku, durumGrubu, type ListeFiltresi, type ListeGrubu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
+import { ListeGrupCercevesi } from "@/components/panel/liste-grup-cercevesi";
 import { DoluGostergesi, DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
@@ -308,6 +309,15 @@ function PanelContent() {
   const sayilar = useMemo(() => listeSayilari(ogeler), [ogeler]);
   const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter, o.cutoffYakin)), arama), [ogeler, activeFilter, arama]);
   const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
+  // 25.11.2026 grup cerceveleri: siraya dokunmadan 3 gruba bolunur; daraltma tarayicida hatirlanir
+  const gruplar = useMemo(() => listeGruplari(gorunenler), [gorunenler]);
+  const [kapaliGruplar, setKapaliGruplar] = useState<Set<ListeGrubu>>(() => new Set());
+  useEffect(() => { try { setKapaliGruplar(kapaliGruplariOku(window.localStorage.getItem("panel-grup-kapali"))); } catch { /* depolama kapali */ } }, []);
+  const grupDegistir = useCallback((g: ListeGrubu) => setKapaliGruplar((s) => {
+    const y = new Set(s); if (y.has(g)) y.delete(g); else y.add(g);
+    try { window.localStorage.setItem("panel-grup-kapali", JSON.stringify(Array.from(y))); } catch { /* depolama kapali */ }
+    return y;
+  }), []);
   const simdi = Date.now();
 
   // 23.11.2026 GUNLUK YUKLEME HEDEFI: acik dosyalar + dosyasi acilmamis booking'ler; bugun tartilanlar hedefe sayilir.
@@ -348,71 +358,16 @@ function PanelContent() {
     // Bir kez: kaydirildiktan sonra kullanici baska filtre secerse filtre geri cevrilmez
     if (vurguKaydirildi.current === vurguDosyasi.id) return;
     if (!gorunenler.some((o) => o.tur === "dosya" && o.dosya.id === vurguDosyasi.id)) { setActiveFilter("tumu"); setArama(""); return; }
+    // 25.11.2026: hedef satirin grubu daraltilmissa (kaydirilacak satir cizilmez) grup acilir
+    const hedefOge = gorunenler.find((o) => o.tur === "dosya" && o.dosya.id === vurguDosyasi.id);
+    if (hedefOge && kapaliGruplar.has(durumGrubu(hedefOge.durum))) { grupDegistir(durumGrubu(hedefOge.durum)); return; }
     vurguKaydirildi.current = vurguDosyasi.id;
     window.setTimeout(() => document.getElementById(`dosya-satir-${vurguDosyasi.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [loading, vurgu, vurguDosyasi, dosyalar, gorunenler, setActiveFilter, gecisliGit, showToast]);
+  }, [loading, vurgu, vurguDosyasi, dosyalar, gorunenler, setActiveFilter, gecisliGit, showToast, kapaliGruplar, grupDegistir]);
   const detayDegistir = (id: string) => setAcikDetay((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
 
-  return (
-    <AppShell>
-      <SayfaBasligi
-        ikon={<FolderOpen size={20} />}
-        baslik="Ana Panel"
-        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor${aktarilanSayisi > 0 ? ` · ${aktarilanSayisi} tamamlanan iş İhracat Evrakları'nda` : ""}`}
-        sag={<BildirimIzniButonu />}
-      />
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        title="Emin misiniz?"
-        description={`${deleteTarget?.dosyaNo || ""} dosyasını silmek istediğinize emin misiniz?`}
-        confirmLabel="Evet, Sil"
-        cancelLabel="Hayır"
-        onConfirm={handleDelete}
-        destructive
-      />
-
-      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
-
-      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} karsilastirma={karsilastirma} filo={filoPlani ? <FiloBolumu plan={filoPlani} /> : null} />}
-
-      {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
-          (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
-      {!loading && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
-            ogeler={LISTE_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: sayilar[f.key] }))} />
-          <label className="relative mb-4 w-full sm:w-72">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
-            <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Müşteri, proforma, booking ara" aria-label="Listede ara" data-testid="panel-arama"
-              className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
-          </label>
-        </div>
-      )}
-
-      {loading ? (
-        <SayfaYukleniyor boyut={24} />
-      ) : gorunenler.length === 0 ? (
-        <EmptyState icon={<FolderX size={48} />} title="Bu görünümde iş yok" description={arama ? "Aramayı temizleyin ya da başka bir filtre seçin." : "Başka bir filtre seçin ya da yeni dosya açın."} />
-      ) : (
-        <div className="rounded-xl border overflow-hidden animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-          <div className="overflow-x-auto">
-          {/* 23.11.2026 her ekrana uyum: 6 sutun; 1400 px alti Evraklar gizli (kisa sayac), 1280 px alti kart (components/panel/is-listesi-satirlari.tsx) */}
-          <table className={LISTE_TABLO}>
-            <thead className={LISTE_BASLIK}>
-              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Proforma · müşteri · booking / gemi kalkış">Sipariş</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off: tarih, saat ve kalan süre">Cut-off</th>
-                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1500px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
-                <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
-              </tr>
-            </thead>
-            <tbody className={LISTE_GOVDE}>
-              {gorunenler.map((oge, idx) => {
+  // 25.11.2026: satir cizimi gruplar icin fonksiyona alindi (icerik 23.11.2026 ile ayni)
+  const satirCiz = (oge: (typeof gorunenler)[number], idx: number): React.ReactNode => {
                 if (oge.tur === "is_emri") return <IsEmriListeSatiri key={oge.anahtar} s={oge.isEmri} durum={oge.durum} yetkili={listeYetkisi} simdi={simdi} gorev={yuklemePlani.ozetler[oge.anahtar] || null} />;
                 if (oge.tur === "odeme") return <OdemeListeSatiri key={oge.anahtar} p={oge.odeme} simdi={simdi} listeYetkisi={listeYetkisi} />;
                 const dosya = oge.dosya;
@@ -571,10 +526,78 @@ function PanelContent() {
                     </tr>}
                   </React.Fragment>
                 );
-              })}
-            </tbody>
-          </table>
-          </div>
+  };
+
+  return (
+    <AppShell>
+      <SayfaBasligi
+        ikon={<FolderOpen size={20} />}
+        baslik="Ana Panel"
+        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor${aktarilanSayisi > 0 ? ` · ${aktarilanSayisi} tamamlanan iş İhracat Evrakları'nda` : ""}`}
+        sag={<BildirimIzniButonu />}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Emin misiniz?"
+        description={`${deleteTarget?.dosyaNo || ""} dosyasını silmek istediğinize emin misiniz?`}
+        confirmLabel="Evet, Sil"
+        cancelLabel="Hayır"
+        onConfirm={handleDelete}
+        destructive
+      />
+
+      {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
+
+      {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} karsilastirma={karsilastirma} filo={filoPlani ? <FiloBolumu plan={filoPlani} /> : null} />}
+
+      {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
+          (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}
+      {!loading && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SekmeCubugu testId="panel-filtreler" veriOzelligi="filtre" sayiBicimi="duz" secili={activeFilter} onSec={setActiveFilter}
+            ogeler={LISTE_FILTRELERI.map((f) => ({ deger: f.key, etiket: f.label, sayi: sayilar[f.key] }))} />
+          <label className="relative mb-4 w-full sm:w-72">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+            <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Müşteri, proforma, booking ara" aria-label="Listede ara" data-testid="panel-arama"
+              className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+          </label>
+        </div>
+      )}
+
+      {loading ? (
+        <SayfaYukleniyor boyut={24} />
+      ) : gorunenler.length === 0 ? (
+        <EmptyState icon={<FolderX size={48} />} title="Bu görünümde iş yok" description={arama ? "Aramayı temizleyin ya da başka bir filtre seçin." : "Başka bir filtre seçin ya da yeni dosya açın."} />
+      ) : (
+        <div className="flex flex-col gap-4" data-testid="panel-gruplar">
+          {/* 25.11.2026 GRUP CERCEVELERI: 3 grup (Acik Sevkiyatlar / Rezervasyon Bekleyenler / Odeme Bekleyenler) ayri kutu,
+              renkli kenar + baslik; daraltilabilir (localStorage panel-grup-kapali). Satirlar ve sira aynen (lib/panel/is-listesi.ts). */}
+          {gruplar.map((b) => (
+            <ListeGrupCercevesi key={b.grup} grup={b.grup} sayi={b.ogeler.length} konteyner={b.konteyner} dagilim={b.dagilim}
+              kapali={kapaliGruplar.has(b.grup)} degistir={() => grupDegistir(b.grup)}>
+              <div className="overflow-x-auto">
+                {/* 23.11.2026 her ekrana uyum: 6 sutun; 1500 px alti Evraklar gizli (kisa sayac), 1280 px alti kart (components/panel/is-listesi-satirlari.tsx) */}
+                <table className={LISTE_TABLO}>
+            <thead className={LISTE_BASLIK}>
+              <tr className="border-b" style={{ borderColor: CARD_BORDER, backgroundColor: ROW_HEADER_BG }}>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Durum</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Proforma · müşteri · booking / gemi kalkış">Sipariş</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>Konteyner</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }} title="Talimat ve beyanname cut-off: tarih, saat ve kalan süre">Cut-off</th>
+                <th className="text-left px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap hidden min-[1500px]:table-cell" style={{ color: TEXT_MUTED }} title="KT Konşimento Talimatı · FT Fatura · BL Draft BL · BY Beyanname">Evraklar</th>
+                <th className="text-right px-2.5 py-2.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: TEXT_MUTED }}>İşlemler</th>
+              </tr>
+            </thead>
+                  <tbody className={LISTE_GOVDE}>
+                    {b.ogeler.map(satirCiz)}
+                  </tbody>
+                </table>
+              </div>
+            </ListeGrupCercevesi>
+          ))}
         </div>
       )}
     </AppShell>

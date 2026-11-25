@@ -272,3 +272,52 @@ export function gundur(iso: string | null | undefined, simdi: number = Date.now(
   const fark = (Date.parse(`${gun(simdi)}T00:00:00Z`) - Date.parse(`${bas}T00:00:00Z`)) / 86400000;
   return Number.isFinite(fark) ? Math.max(0, Math.round(fark)) : null;
 }
+
+// ---------------------------------------------------------------------------
+// 25.11.2026 GRUP CERCEVELERI (kullanici: "46 satir acik; 'Rezervasyonu bekleyenler' basladigi yere baslik atmak ve
+// cercevelemek lazim; uc ayri grup var ama iyi ifade edemiyoruz"). Karar: 3 grup, ayri kutular + renkli kenar,
+// daraltilabilir (secim tarayicida hatirlanir). Satirlarin icerigi ve siralama DEGISMEZ; yalniz ardisik gruplara bolunur.
+// ---------------------------------------------------------------------------
+export type ListeGrubu = "sevkiyat" | "rezervasyon" | "odeme";
+
+export const LISTE_GRUPLARI: Record<ListeGrubu, { baslik: string; aciklama: string; renk: string; kenar: string; zemin: string }> = {
+  sevkiyat: { baslik: "Açık Sevkiyatlar", aciklama: "Rezervasyonu alınmış · yükleme başladı, cut-off yaklaşan ve açık", renk: "#6EE7B7", kenar: "#10B981", zemin: "rgba(16,185,129,0.08)" },
+  rezervasyon: { baslik: "Rezervasyon Bekleyenler", aciklama: "Ön ödemesi alınmış, booking'i henüz yok", renk: "#93C5FD", kenar: "#3B82F6", zemin: "rgba(59,130,246,0.08)" },
+  odeme: { baslik: "Ödeme Bekleyenler", aciklama: "Ön ödeme / imzalı proforma bekleniyor; işaretlenince Rezervasyon Bekleyenler'e geçer", renk: "#9AA3B5", kenar: "#4A5262", zemin: "rgba(148,163,184,0.06)" },
+};
+
+export function durumGrubu(d: ListeDurumu): ListeGrubu {
+  return d === "rez_bekliyor" ? "rezervasyon" : d === "odeme" ? "odeme" : "sevkiyat";
+}
+
+/** Satirin konteyner adedi (dosya: rezervasyon toplami; is emri / odeme: kayittaki adet). */
+export function ogeKonteyner<D extends ListeDosyasi>(o: ListeOgesi<D>): number {
+  if (o.tur === "dosya") return o.yukleme.toplam;
+  if (o.tur === "is_emri") return Number(o.isEmri.konteyner) || 0;
+  return Number(o.odeme.konteyner) || 0;
+}
+
+export type ListeGrupBolumu<D extends ListeDosyasi> = {
+  grup: ListeGrubu; ogeler: ListeOgesi<D>[]; konteyner: number;
+  /** Yalniz sevkiyat: durum dagilimi (sari / kirmizi / yesil) */
+  dagilim: Partial<Record<ListeDurumu, number>>;
+};
+
+/** Sirali listeyi 3 gruba boler (sira korunur; bos grup donmez). */
+export function listeGruplari<D extends ListeDosyasi>(ogeler: ListeOgesi<D>[]): ListeGrupBolumu<D>[] {
+  const sira: ListeGrubu[] = ["sevkiyat", "rezervasyon", "odeme"];
+  return sira.map((grup) => {
+    const g = ogeler.filter((o) => durumGrubu(o.durum) === grup);
+    const dagilim: Partial<Record<ListeDurumu, number>> = {};
+    for (const o of g) dagilim[o.durum] = (dagilim[o.durum] || 0) + 1;
+    return { grup, ogeler: g, konteyner: g.reduce((t, o) => t + ogeKonteyner(o), 0), dagilim };
+  }).filter((b) => b.ogeler.length > 0);
+}
+
+/** localStorage "panel-grup-kapali" degeri -> kapali gruplar (bozuk / bilinmeyen deger yok sayilir). */
+export function kapaliGruplariOku(ham: string | null | undefined): Set<ListeGrubu> {
+  try {
+    const d = JSON.parse(ham || "[]");
+    return new Set((Array.isArray(d) ? d : []).filter((x): x is ListeGrubu => x === "sevkiyat" || x === "rezervasyon" || x === "odeme"));
+  } catch { return new Set(); }
+}

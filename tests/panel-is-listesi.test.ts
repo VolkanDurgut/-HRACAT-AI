@@ -141,3 +141,27 @@ test("siralama: sarilar en ustte kalan konteyner coktan aza; alti tek sira ilk t
   assert.equal(filtreyeUyar("basladi", "cutoff", false), false);
   assert.equal(listeFiltresi("basladi"), "basladi");
 });
+
+test("25.11.2026 grup cerceveleri: sira korunur, 3 grup, konteyner ve dagilim; bos grup yok", async () => {
+  const { listeGruplari, durumGrubu, kapaliGruplariOku } = await import("@/lib/panel/is-listesi");
+  const liste = isListesiKur(
+    [dosya("acik", { rezervasyonlar: [rez(gun(9), null, { konteyner_adedi: 3 })] }), dosya("kirmizi", { rezervasyonlar: [rez(gun(2), null, { konteyner_adedi: 2 })] }), dosya("bos")],
+    { rezervasyonlu: [isEmri("rezervasyonlu", "R1", { talimat_cutoff: gun(6) })], onOdeme: [isEmri("on_odeme", "O1")] },
+    odemeBekleyenleriHazirla([{ anahtar: "p1", proforma_no: "DEMOODEME1", musteri: "ODEYEN", konteyner: 4 }]),
+  );
+  const g = listeGruplari(liste);
+  assert.deepEqual(g.map((b) => b.grup), ["sevkiyat", "rezervasyon", "odeme"]);
+  // birlestirilince orijinal sira aynen
+  assert.deepEqual(g.flatMap((b) => b.ogeler.map((o) => o.anahtar)), liste.map((o) => o.anahtar));
+  assert.equal(g[0].ogeler.length, 3);
+  assert.equal(g[0].dagilim.cutoff, 1);
+  assert.equal(g[0].dagilim.acik, 2);
+  assert.equal(g[1].ogeler.length, 2);
+  assert.equal(g[2].konteyner, 4);
+  assert.equal(durumGrubu("basladi"), "sevkiyat");
+  // yalniz odeme filtresi -> tek grup
+  assert.deepEqual(listeGruplari(liste.filter((o) => o.durum === "odeme")).map((b) => b.grup), ["odeme"]);
+  assert.deepEqual(Array.from(kapaliGruplariOku('["odeme","x"]')), ["odeme"]);
+  assert.equal(kapaliGruplariOku("bozuk{").size, 0);
+  assert.equal(kapaliGruplariOku(null).size, 0);
+});

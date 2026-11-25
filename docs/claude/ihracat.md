@@ -1684,3 +1684,14 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
   kayitlariyla (1'e 1, +-2 gun, +-150 kg). Kantar Paneli "sistemde kaydi yok" seridinde aciklama satiri.
 - Test (islem icinde, geri alindi): onceden tartilan arac -> once "eslesmeyen", is emri acilinca is emrine; kapanmis isin
   donemindeki arac yeni ise sayilmadi.
+
+## Ana Panel — grup çerçeveleri (25.11.2026) — DB değişikliği yok
+- Kullanıcı: "46 satır açık; 'Rezervasyonu bekleyenler' başladığı yere başlık atmak ve çerçevelemek lazım; üç ayrı grup var
+  ama iyi ifade edemiyoruz." Kararlar (AskUserQuestion): 3 grup, ayrı kutular + renkli kenar, daraltılabilir ve hatırlanır.
+- `lib/panel/is-listesi.ts`: `LISTE_GRUPLARI`, `durumGrubu` (basladi/cutoff/acik → sevkiyat, rez_bekliyor → rezervasyon,
+  odeme → odeme), `listeGruplari` (sıra AYNEN, boş grup yok; konteyner toplamı, sevkiyatta sarı/kırmızı/yeşil dağılımı),
+  `kapaliGruplariOku` (localStorage `panel-grup-kapali`). `components/panel/liste-grup-cercevesi.tsx`: grubun renginde
+  4 px sol kenar + ince çerçeve, başlık şeridi (ad, iş, konteyner, dağılım, kısa açıklama), tıklayınca daralır.
+- `app/panel/page.tsx`: satır çizimi aynen `satirCiz` fonksiyonuna alındı; her grup kendi tablosu (sütun başlıkları her
+  kutuda). Filtre / arama aynen (filtrelenen grup tek kutu). ?dosya= vurgusu daraltılmış gruptaysa grup açılır.
+- Test: tests/panel-is-listesi.test.ts (grup bölme, sıra korunur, dağılım, bozuk depolama değeri).

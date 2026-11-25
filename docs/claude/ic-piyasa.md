@@ -889,3 +889,8 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
 - Geçiş: mevcut liman satırları havuza kopyalandı; eşleşmiş UNEX satırları `otomatik` (yeniden hesaplandı); kantara hiç
   gelmemiş UNEX liman satırları araç listesinden kalktı (havuzda + denetim kaydında). Yerel PG'de ilk gecenin KURGU
   kopyasıyla: eski model hatalı eşleşmeyi üretti, yeni model doğru fişe taşıdı.
+- Sefer desteği (`20261125233000_ic_gemi_sefer_destegi.sql`, kullanıcı: "Plakaya ait kaç sefer varsa karşılaştırılır
+  eşleştirilir, manuel veri girişine gerek kalmaz"): aynı liman plakası + kantar plakası ikilisinin DİĞER seferlerde de
+  sıkı kurala uyan her çifti 100 puan avantaj (en fazla 300). İki aracın ilk seferi belirsiz kalsa bile ikinci sefer
+  gelince ikili netleşir ve ilk sefer de kendiliğinden bağlanır. "Daha önce eşleşmiş ikili" avantajı artık yalnız
+  operatör onaylı eşleşmeden gelir (otomatik eşleşme kendini beslemez). Geçici tablolar `_gm_aday2` / `_gm_es2`.

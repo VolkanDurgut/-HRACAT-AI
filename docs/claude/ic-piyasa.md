@@ -768,3 +768,16 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   `{"test_adresine": true}` artık `x-test-anahtar` başlığı ister (Vault `rapor_test_anahtari`, migration
   `20261113210000`). Başlıksız anon yalnız zamanlanmış rapor. SQL'den test:
   `headers := jsonb_build_object(..., 'x-test-anahtar', (select decrypted_secret from vault.decrypted_secrets where name='rapor_test_anahtari' limit 1))`.
+
+## Alış · Bakiye Birleştir (25.11.2026)
+- Kullanıcı: "İç piyasa kısmı için alış birleştirilmesi gerekiyor" (tedarikçiye verilen dilekçe: birden çok alış sözleşmesinin
+  kalan bakiyesi tek depodan çekilecek). Önceki elle aktarımlar (AS-2026-0008, AS-2026-0011) yalnız notla yapılmıştı.
+- Alış sayfası › "Bakiye Birleştir" (components/ic-alis-birlestir.tsx): açık ve kalanı (miktar − teslim alınan) olan alışlar
+  seçilir; tedarikçi / ürün / kod / depo / termin / açıklama girilir. Aynı ürün şartı; kantarda irsaliyesi bekleyen araç varsa
+  birleştirilmez (önce irsaliye).
+- RPC `ic_alis_bakiye_birlestir` (migration 20261125140000, security definer, ic_alis yetkisi): yeni AÇIK alış (miktar = kalanlar
+  toplamı, notta kaynak dökümü); teslim alınmış kaynak "tamamlandı" (miktar = teslim alınan), hiç teslim almamış kaynak "iptal"
+  (notta "tamamı … aktarıldı"). Kayıt `ic_alis_birlestirmeleri` (kaynakların önceki miktar / durum / notu; denetim tetikleyicisi).
+- Geri al (`ic_alis_birlestirme_geri_al`): yeni alışa araç alınmadıysa kaynaklar aynen geri döner, yeni alış silinir. Listede
+  hedefte "Birleştirme · N kaynak" rozeti; hedefte "Sil" yerine "Birleştirmeyi geri al".
+- İlk kullanım 25.11.2026: 4 alışın kalanı 1.668.580 kg → AS-2026-0012 (rollback denemesi: kapanış / açılış / geri al doğru).

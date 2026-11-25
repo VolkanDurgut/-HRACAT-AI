@@ -10,9 +10,10 @@ import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcAlisSiparisForm } from "@/components/ic-alis-siparis-form";
 import { IcAlisGecmisTeslimPenceresi, GecmisAlis } from "@/components/ic-alis-gecmis-teslim-penceresi";
+import { IcAlisBirlestirPenceresi } from "@/components/ic-alis-birlestir";
 import {
   PackageOpen, Plus, Loader2, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle, RotateCcw, Trash2,
-  FileText, AlertTriangle, Truck, RefreshCw, Search, History, Building2, Save, X, Link2,
+  FileText, AlertTriangle, Truck, RefreshCw, Search, History, Building2, Save, X, Link2, Merge,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { IC_BELGE_BUCKET, kgYazi, tonYazi, tarihSaatYazi, telefonNormallestir, telefonYazi } from "@/lib/ic-piyasa/is-emri";
@@ -69,6 +70,10 @@ export default function AlisPage() {
   const [durumIslem, setDurumIslem] = useState<{ s: SiparisSatiri; hedef: AlisDurum | "sil" } | null>(null);
   const [silinecekTeslim, setSilinecekTeslim] = useState<IcAlisTeslim | null>(null);
   const [isleniyor, setIsleniyor] = useState(false);
+  // 25.11.2026 Bakiye birlestir: pencere + aktif (geri alinmamis) birlestirme kayitlari (hedef alis -> kayit)
+  const [birlestirAcik, setBirlestirAcik] = useState(false);
+  const [birlestirmeler, setBirlestirmeler] = useState<Map<string, { id: string; kaynak: string[] }>>(new Map());
+  const [geriAlinacak, setGeriAlinacak] = useState<{ id: string; hedefNo: string; kaynak: string[] } | null>(null);
 
   const getir = useCallback(async () => {
     if (!companyId) return;
@@ -94,6 +99,13 @@ export default function AlisPage() {
     } else {
       setSevkIsEmri({});
     }
+    // Birlestirme kayitlari okunamazsa sayfa yine acilir (rozet / geri al gorunmez)
+    const b = await supabase.from("ic_alis_birlestirmeleri").select("id, hedef_id, kaynaklar").eq("company_id", companyId).is("geri_alindi", null);
+    const bm = new Map<string, { id: string; kaynak: string[] }>();
+    ((b.data || []) as { id: string; hedef_id: string | null; kaynaklar: { alis_no: string }[] }[]).forEach((x) => {
+      if (x.hedef_id) bm.set(x.hedef_id, { id: x.id, kaynak: (x.kaynaklar || []).map((k) => k.alis_no) });
+    });
+    setBirlestirmeler(bm);
     setSiparisler(s);
     setTeslimler(t);
     setTedarikciler((tRes.data || []) as IcTedarikci[]);
@@ -197,9 +209,15 @@ export default function AlisPage() {
           baslik="İç Piyasa Alış"
           aciklama="Alış siparişleri ve teslim alınan araçlar. Araçlar Kantar Paneli › Gelen Araç'tan girilir."
           sag={gorunum === "siparisler" ? (
-            <button onClick={() => { setDuzenlenen(null); setFormAcik(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
-              <Plus size={15} /> Yeni Alış Siparişi
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setBirlestirAcik(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold text-white hover:bg-white/5" style={{ borderColor: CARD_BORDER }} data-testid="alis-birlestir-ac"
+                title="Açık alışların kalanını tek yeni alış siparişine aktar">
+                <Merge size={15} /> Bakiye Birleştir
+              </button>
+              <button onClick={() => { setDuzenlenen(null); setFormAcik(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }}>
+                <Plus size={15} /> Yeni Alış Siparişi
+              </button>
+            </div>
           ) : null}
         />
         <IcPiyasaSekmeler />
@@ -286,6 +304,7 @@ export default function AlisPage() {
                                 <p className="text-sm font-bold text-white">{s.alis_no}</p>
                                 <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${DURUM_RENK[s.durum]}`}>{ALIS_DURUM_ETIKET[s.durum]}</span>
                                 {hazir && <span className="ml-1 inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400">Kapatmaya hazır</span>}
+                                {birlestirmeler.has(s.id) && <span className="ml-1 inline-flex items-center gap-1 mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-sky-500/15 text-sky-300" title={`Birleştirilen: ${birlestirmeler.get(s.id)!.kaynak.join(", ")}`}><Merge size={10} /> Birleştirme · {birlestirmeler.get(s.id)!.kaynak.length} kaynak</span>}
                               </td>
                               <td className="px-3 py-3 align-top max-w-[210px]">
                                 <p className="text-sm text-white truncate" title={tedarikciAdi(s)}>{tedarikciAdi(s)}</p>
@@ -342,7 +361,11 @@ export default function AlisPage() {
                                       </>
                                     )}
                                     {s.durum !== "acik" && <IslemButon onClick={() => setDurumIslem({ s, hedef: "acik" })} ikon={<RotateCcw size={13} />}>Yeniden aç</IslemButon>}
-                                    {ts.length === 0 && <IslemButon onClick={() => setDurumIslem({ s, hedef: "sil" })} ikon={<Trash2 size={13} />} tehlike>Sil</IslemButon>}
+                                    {/* Birlestirme hedefi: Sil yerine "geri al" (kaynaklar da eski haline doner) */}
+                                    {ts.length === 0 && birlestirmeler.has(s.id) && (
+                                      <IslemButon onClick={() => setGeriAlinacak({ id: birlestirmeler.get(s.id)!.id, hedefNo: s.alis_no, kaynak: birlestirmeler.get(s.id)!.kaynak })} ikon={<RotateCcw size={13} />} tehlike>Birleştirmeyi geri al</IslemButon>
+                                    )}
+                                    {ts.length === 0 && !birlestirmeler.has(s.id) && <IslemButon onClick={() => setDurumIslem({ s, hedef: "sil" })} ikon={<Trash2 size={13} />} tehlike>Sil</IslemButon>}
                                   </div>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs mb-4">
                                     <Bilgi e="Tedarikçi" d={tedarikciAdi(s)} />
@@ -410,6 +433,35 @@ export default function AlisPage() {
         <IcAlisSiparisForm tedarikciler={tedarikciler} duzenlenen={duzenlenen} kapat={() => { setFormAcik(false); setDuzenlenen(null); }} kaydedildi={() => getir()} />
       )}
       {gecmisAlis && <IcAlisGecmisTeslimPenceresi alis={gecmisAlis} kapat={() => setGecmisAlis(null)} kaydedildi={getir} />}
+      {birlestirAcik && (
+        <IcAlisBirlestirPenceresi
+          adaylar={siparisler.filter((s) => s.durum === "acik" && Number(s.miktar_kg) - alinan(s.id) > 0)
+            .map((s) => ({ alis: s, alinan: alinan(s.id), kantardaArac: kantarBekleyen?.get(s.id)?.arac || 0 }))}
+          tedarikciler={tedarikciler}
+          kapat={() => setBirlestirAcik(false)}
+          tamamlandi={() => { setBirlestirAcik(false); setFiltre("acik"); getir(); }}
+        />
+      )}
+      <ConfirmDialog
+        open={!!geriAlinacak}
+        onOpenChange={(o) => { if (!o && !isleniyor) setGeriAlinacak(null); }}
+        title="Birleştirme geri alınsın mı?"
+        description={geriAlinacak ? `${geriAlinacak.hedefNo} silinir; ${geriAlinacak.kaynak.join(", ")} önceki miktar ve durumlarına (açık) döner.` : ""}
+        confirmLabel="Evet, geri al"
+        loading={isleniyor}
+        loadingLabel="Geri alınıyor…"
+        onConfirm={async () => {
+          if (!geriAlinacak) return;
+          setIsleniyor(true);
+          const { error } = await supabase.rpc("ic_alis_birlestirme_geri_al", { p_id: geriAlinacak.id });
+          setIsleniyor(false);
+          if (error) { showToast(alisHataMesaji(error), "error"); return; }
+          showToast(`${geriAlinacak.hedefNo} birleştirmesi geri alındı.`, "success");
+          setGeriAlinacak(null);
+          setAcikDetay(null);
+          getir();
+        }}
+      />
 
       <ConfirmDialog
         open={!!durumIslem}

@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GemiAlici, GemiArac, GemiTahliye, gemiRaporu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
+import { GemiAlici, GemiArac, GemiTahliye, aracFarki, bekleyenDurumu, gemiRaporu, limanBekliyorMu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiRaporSayfalari, gemiRaporDosyaAdi } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
 
 const gemi: GemiTahliye = {
@@ -129,4 +129,39 @@ test("Iki asama: yoldaki UNEX araci fark / fire'ye girmez, ayri sayilir", () => 
   assert.equal(satir?.[4]?.v, null);
   assert.equal(satir?.[5]?.v, "UNEX GIDA (tartım bekliyor)");
   assert.ok(s[0].satirlar.some((x) => x[1]?.v === "Yolda (tartım bekleyen)" && x[2]?.v === 30000));
+});
+
+test("Fabrika esasli: liman fisi bekleyen otomatik arac gelene kantar kg ile girer, fark / fireye girmez", () => {
+  const bekleyen: GemiArac = { ...arac("2026-11-26", "34 KRG 004", 0, 26500, null), liman_kg: null, kaynak: "otomatik" };
+  const ek = [...araclar, bekleyen];
+  const r = gemiRaporu(gemi, alicilar, ek);
+  assert.equal(r.gelenKg, 179000 + 26500);
+  assert.equal(r.gelenArac, 7);
+  assert.equal(r.limanBekleyenArac, 1);
+  assert.equal(r.limanBekleyenKg, 26500);
+  assert.equal(r.unexLimanKg, 87000);
+  assert.equal(r.unexTeslimKg, 86900 + 26500);
+  assert.equal(r.unexEslesmisTeslimKg, 86900);
+  assert.equal(r.unexFarkKg, -100);
+  assert.equal(Math.round((r.firePct ?? 0) * 1000) / 1000, 0.115);
+  assert.equal(r.yoldaArac, 0);
+  assert.equal(aracFarki(bekleyen), null);
+  assert.equal(limanBekliyorMu(bekleyen), true);
+  const s = gemiRaporSayfalari(gemi, alicilar, ek);
+  const satir = s[0].satirlar.find((x) => x[1]?.v === "34 KRG 004");
+  assert.equal(satir?.[2]?.v, null);
+  assert.equal(satir?.[3]?.v, 26500);
+  assert.equal(satir?.[4]?.v, null);
+  assert.equal(satir?.[5]?.v, "UNEX GIDA (liman fişi bekleniyor)");
+  // Ana sayfa TOPLAM satirinin LIMAN sutunu yalniz liman agirliklari (179.000)
+  const toplam = s[0].satirlar.find((x) => x[0]?.v === "TOPLAM");
+  assert.equal(toplam?.[2]?.v, 179000);
+  assert.ok(s[0].satirlar.some((x) => x[1]?.v === "Liman fişi bekleyen" && x[2]?.v === 26500));
+});
+
+test("bekleyenDurumu: aday yok -> excel, aday var -> onay, kaldirildi -> kapali", () => {
+  const f = { fis_id: "f", fis_kodu: "K1", plaka: "34 KRG 9", net_kg: 1, cikis: "", net_fark: 40, dolu_fark: 90, dakika: 20, puan: 0 };
+  assert.equal(bekleyenDurumu({ adaylar: [], kapali: false }), "excel");
+  assert.equal(bekleyenDurumu({ adaylar: [f], kapali: false }), "onay");
+  assert.equal(bekleyenDurumu({ adaylar: [f], kapali: true }), "kapali");
 });

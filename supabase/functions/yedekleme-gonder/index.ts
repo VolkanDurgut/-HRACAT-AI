@@ -152,6 +152,9 @@ const YEDEKLENECEK_TABLOLAR = [
   "ic_gemi_tahliyeleri",
   "ic_gemi_alicilari",
   "ic_gemi_araclari",
+  // Gemi tahliye: liman fis havuzu + gemiye ait olmadigi isaretlenen tartimlar (25.11.2026 gece)
+  "ic_gemi_liman_fisleri",
+  "ic_gemi_haric_tartimlar",
   // PAZAR (UNEX Satis) CRM: firmalar, yetkililer, fuar katilimlari, ice aktarma kaydi (10.11.2026)
   "pazar_firmalar",
   "pazar_kisiler",

@@ -80,6 +80,8 @@ export const TABLO_BILGISI: Record<string, TabloBilgisi> = {
   ic_gemi_tahliyeleri: { ad: "Gemi tahliyeleri", grup: "İç piyasa" },
   ic_gemi_alicilari: { ad: "Gemiden satışlar", grup: "İç piyasa" },
   ic_gemi_araclari: { ad: "Gemi tahliye araçları", grup: "İç piyasa" },
+  ic_gemi_liman_fisleri: { ad: "Gemi liman fişleri (havuz)", grup: "İç piyasa" },
+  ic_gemi_haric_tartimlar: { ad: "Gemiye ait olmayan tartımlar", grup: "İç piyasa" },
   ic_piyasa_ayarlari: { ad: "İç piyasa ayarları", grup: "İç piyasa" },
   kantar_cihazlari: { ad: "Kantar cihazları", grup: "Kantar ve DBA otomasyonu" },
   dba_otomatik_kayitlari: { ad: "Otomatik DBA kayıtları", grup: "Kantar ve DBA otomasyonu" },

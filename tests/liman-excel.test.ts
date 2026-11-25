@@ -96,7 +96,9 @@ test("limanExceliAyristir: basliga gore sutun, TR saati -> UTC, cikisa gore sira
 test("limanExceliAyristir: hatali satirlar ve baslik yok", () => {
   const r = limanExceliAyristir([BASLIK, SATIR("??", 1, 2, 46351.9, "X1"), ["K", "34KRG03", 14000, 14500, 500, 46351.9, 46351.9, 46351.9, "X2", "G", "A"], ["K", "34KRG04", 14000, 40000, 26000, "", "", "bozuk", "X3", "G", "A"]]);
   assert.equal(r.satirlar.length, 0);
-  assert.equal(r.hatalar.length, 3);
+  // 25.11.2026 gece: cikisi okunamayan satir hata degil, "limanda tartiliyor" (bekleyen)
+  assert.equal(r.hatalar.length, 2);
+  assert.equal(r.bekleyen, 1);
   assert.match(limanExceliAyristir([["a", "b"], [1, 2]]).hatalar[0].hata, /Başlık/);
 });
 
@@ -107,4 +109,16 @@ test("limanTarihi ve gemiSeferUyar", () => {
   assert.equal(gemiSeferUyar("MV KURGU GEMI", "KURGU GEMI 2026-1/2026-1"), true);
   assert.equal(gemiSeferUyar("M/V KURGU GEMI", "BASKA 2026-1"), false);
   assert.equal(gemiSeferUyar("MV KURGU GEMI", null), true);
+});
+
+test("limanExceliAyristir: genel ekran - tartimi bitmemis satir atlanir, nakliyeci okunur", () => {
+  const b = [...BASLIK, "Nakliyeci"];
+  const r = limanExceliAyristir([b,
+    ["K", "34KRG05", 14000, 40000, 26000, 46351.9, 46351.9, 46351.9, "X5", "KURGU GEMI 2026-1", "Unex", "KURGU NAKLIYE"],
+    ["K", "34KRG06", 14000, "", "", 46351.9, 46351.9, "", "X6", "KURGU GEMI 2026-1", "Unex", "KURGU NAKLIYE"],
+    ["K", "34KRG07", 14000, 0, 0, 46351.9, 46351.9, "", "X7", "BASKA GEMI 7", "Unex", "KURGU NAKLIYE"]]);
+  assert.equal(r.hatalar.length, 0);
+  assert.equal(r.bekleyen, 2);
+  assert.equal(r.satirlar.length, 1);
+  assert.equal(r.satirlar[0].nakliyeci, "KURGU NAKLIYE");
 });

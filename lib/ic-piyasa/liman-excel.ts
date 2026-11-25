@@ -4,6 +4,8 @@
  * Arac Plakasi, Bos Agirlik, Dolu Agirlik, Agirlik (net), Cikis Tarihi (yoksa Operasyon Tarihi), Fis Kodu (tekil anahtar),
  * Gemi/Sefer, Alici Firma. Tarih Excel seri sayisi (TR saati, UTC+3) ya da "25.11.2026 21:38" metni olabilir.
  * Ayni Excel tekrar yuklenirse fis koduna gore atlanir (sunucu: ic_gemi_liman_excel_yukle).
+ * 25.11.2026 gece: genel liman portali ekrani - limanda tartimi bitmemis satir (net / cikis yok) HATA DEGIL, atlanir
+ * ("bekleyen"); baska gemi satirlari sunucuda atlanir. Nakliyeci sutunu da okunur (bilgi).
  */
 import type { XlsHucre } from "@/lib/xls-oku";
 import { plakaBicimle, plakaGecerli } from "./irsaliye-oku";
@@ -11,7 +13,7 @@ import { plakaBicimle, plakaGecerli } from "./irsaliye-oku";
 export type LimanSatiri = {
   satir: number; fis_kodu: string; plaka: string; bos_kg: number | null; dolu_kg: number | null; net_kg: number;
   /** ISO (UTC) */
-  cikis: string; gemi_sefer: string | null; alici: string | null;
+  cikis: string; gemi_sefer: string | null; alici: string | null; nakliyeci?: string | null;
 };
 export type LimanHatasi = { satir: number; hata: string };
 
@@ -27,6 +29,7 @@ const BASLIKLAR: Record<string, string[]> = {
   fis: ["FISKODU", "FISNO"],
   gemi: ["GEMISEFER", "GEMI"],
   alici: ["ALICIFIRMA", "ALICI"],
+  nakliyeci: ["NAKLIYECI", "NAKLIYECIFIRMA"],
 };
 
 /** Excel seri gunu (TR yerel, UTC+3 sabit) ya da "GG.AA.YYYY SS:DD" -> ISO UTC */
@@ -54,16 +57,17 @@ const sayi = (v: XlsHucre): number | null => {
   return null;
 };
 
-export function limanExceliAyristir(satirlar: XlsHucre[][]): { satirlar: LimanSatiri[]; hatalar: LimanHatasi[]; gemiler: string[] } {
+export function limanExceliAyristir(satirlar: XlsHucre[][]): { satirlar: LimanSatiri[]; hatalar: LimanHatasi[]; gemiler: string[]; bekleyen: number } {
   const bi = satirlar.findIndex((r) => r && r.some((h) => BASLIKLAR.plaka.includes(duz(h))) && r.some((h) => BASLIKLAR.net.includes(duz(h))));
-  if (bi < 0) return { satirlar: [], hatalar: [{ satir: 0, hata: "Başlık satırı bulunamadı (Araç Plakası / Ağırlık sütunları yok). Liman portalındaki Gemi Tartım Bilgileri Excel'ini yükleyin." }], gemiler: [] };
+  if (bi < 0) return { satirlar: [], hatalar: [{ satir: 0, hata: "Başlık satırı bulunamadı (Araç Plakası / Ağırlık sütunları yok). Liman portalındaki Gemi Tartım Bilgileri Excel'ini yükleyin." }], gemiler: [], bekleyen: 0 };
   const baslik = satirlar[bi].map(duz);
   const sutun = (k: keyof typeof BASLIKLAR) => baslik.findIndex((h) => BASLIKLAR[k].includes(h));
-  const s = { plaka: sutun("plaka"), bos: sutun("bos"), dolu: sutun("dolu"), net: sutun("net"), cikis: sutun("cikis"), op: sutun("operasyon"), fis: sutun("fis"), gemi: sutun("gemi"), alici: sutun("alici") };
+  const s = { plaka: sutun("plaka"), bos: sutun("bos"), dolu: sutun("dolu"), net: sutun("net"), cikis: sutun("cikis"), op: sutun("operasyon"), fis: sutun("fis"), gemi: sutun("gemi"), alici: sutun("alici"), nakliyeci: sutun("nakliyeci") };
   const sonuc: LimanSatiri[] = [];
   const hatalar: LimanHatasi[] = [];
   const gemiler = new Set<string>();
   const goruldu = new Set<string>();
+  let bekleyen = 0;
   for (let i = bi + 1; i < satirlar.length; i++) {
     const r = satirlar[i] || [];
     const al = (c: number) => (c >= 0 ? r[c] ?? null : null);
@@ -74,9 +78,10 @@ export function limanExceliAyristir(satirlar: XlsHucre[][]): { satirlar: LimanSa
     const cikis = limanTarihi(al(s.cikis)) || limanTarihi(al(s.op));
     const fis = String(al(s.fis) ?? "").trim() || null;
     if (!plaka && net === null) continue;
+    // Limanda tartimi bitmemis (net bos / 0 ya da cikis yok): hata degil, sonraki yuklemede gelir
+    if (!net || !cikis) { bekleyen++; continue; }
     if (!plakaGecerli(plaka)) { hatalar.push({ satir: no, hata: `Plaka okunamadı (${al(s.plaka) ?? "boş"}).` }); continue; }
-    if (net === null || net < 1000 || net > 60000) { hatalar.push({ satir: no, hata: `${plaka}: net ağırlık 1.000 - 60.000 kg arasında değil (${al(s.net) ?? "boş"}).` }); continue; }
-    if (!cikis) { hatalar.push({ satir: no, hata: `${plaka}: çıkış tarihi okunamadı.` }); continue; }
+    if (net < 1000 || net > 60000) { hatalar.push({ satir: no, hata: `${plaka}: net ağırlık 1.000 - 60.000 kg arasında değil (${al(s.net) ?? "boş"}).` }); continue; }
     // Fis kodu yoksa plaka + cikis zamani tekil anahtar
     const anahtar = fis || `${plaka.replace(/\s/g, "")}-${cikis.slice(0, 16)}`;
     if (goruldu.has(anahtar)) continue;
@@ -87,10 +92,11 @@ export function limanExceliAyristir(satirlar: XlsHucre[][]): { satirlar: LimanSa
       satir: no, fis_kodu: anahtar, plaka, net_kg: net, cikis,
       bos_kg: sayi(al(s.bos)), dolu_kg: sayi(al(s.dolu)),
       gemi_sefer: gemi, alici: String(al(s.alici) ?? "").trim() || null,
+      nakliyeci: String(al(s.nakliyeci) ?? "").trim() || null,
     });
   }
   sonuc.sort((a, b) => (a.cikis < b.cikis ? -1 : 1));
-  return { satirlar: sonuc, hatalar, gemiler: Array.from(gemiler) };
+  return { satirlar: sonuc, hatalar, gemiler: Array.from(gemiler), bekleyen };
 }
 
 /** "KURGU GEMI 2026-1/2026-1" icinde secili geminin adi geciyor mu (MV / M/V on eki atilir). */

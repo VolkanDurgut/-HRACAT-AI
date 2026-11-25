@@ -856,3 +856,36 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
 - Kantar kartı: Liman Excel'i Yükle (ön izleme: yeni / zaten yüklü / hatalı), "Elle araç" (katlanır hızlı giriş),
   "Yolda N araç" ve "Liman kaydı yok N" çipleri (açılır), HER ZAMAN "Son tartılan 5 araç" (liman plakası · kantar
   plakası · gittiği yer, liman / teslim / fark). `UNEX_YER = "UNEX GIDA"` (ekran + Excel raporu).
+
+### Gemi Tahliye 4: FABRİKA ESASLI eşleştirme (25.11.2026 gece)
+
+- Kullanıcı: "Gemiden farklı nakliye de yüklüyor; biz sadece bizim fabrikaya geleni tutmalıyız. Liman Excel'ini en son
+  yükleyeceğiz; fabrika tartım saati ve tonajından eşleştirme yapılacak." Liman portali Excel'inde dorse plakası YOK; Alıcı /
+  Nakliyeci tüm araçlarda aynı → hangi aracın bize geldiğini YALNIZ bizim kantar söyler. İlk gece görülen hata: Excel
+  parça parça yüklenince eski eşleştirme o anki en yakın adayı KİLİTLEDİ (aynı çekicinin 2. seferi, sonradan gelen doğru
+  fiş yerine +240 kg farklı başka fişe bağlandı).
+- Migration `20261125230000_ic_gemi_fabrika_esasli.sql`: `ic_gemi_liman_fisleri` (HAVUZ: liman portalı satırlarının hepsi; fiş
+  kodu şirket içinde tekil; `arac_id` = eşleşen UNEX aracı ya da satış aracı; rapora girmez), `ic_gemi_haric_tartimlar`
+  (otomatik araç silinince tartım "gemiye ait değil" — bir daha oluşmaz). `ic_gemi_araclari`: kaynak + `otomatik`,
+  `liman_kg` yalnız otomatik satırda NULL olabilir (CHECK `ic_gemi_arac_liman_var`), `esleme_onayli`.
+- `ic_gemi_kantar_esle_calistir` (pg_cron 2 dk + ekranlar + yükleme), açık gemi başına: (a) elle/WhatsApp UNEX aracı eski
+  plaka kuralı (tartım otomatik satıra dönmüşse o satır silinip elle kayıt bağlanır), (b) FİRMA alanında gemi adı geçen,
+  hiçbir kayda bağlı olmayan tartım → otomatik UNEX aracı (teslim = kantar neti), (c) onaysız otomatik eşleşmeler HER
+  ÇALIŞMADA BAŞTAN: SIKI kural (limandan çıkış → kantara giriş 10–90 dk, net farkı −100/+200, dolu farkı 0/+250),
+  puan `|net−40| + |dolu−90|/2 + 45 dk üstü/2`, aynı çekici–kantar plaka ikilisi daha önce eşleşmişse −100, plaka birebir
+  aynı −200. Bir araç için serbest ikinci fiş YA DA fiş için serbest ikinci araç 40 puan içindeyse BAĞLANMAZ (temkinli;
+  operatör seçer). Yalnız değişen satırlar yazılır (ikinci çalışma 0 değişiklik).
+- Operatör: `ic_gemi_liman_esle(p_arac, p_fis, p_liman_kg)` — fişi seç / liman kg'ını elle gir (onaylı; otomatik dokunmaz)
+  / ikisi NULL = kaldır (`esleme_kapali`; onaylıyı kaldırmak ic_piyasa ister). `kantar_gemi_liman_adaylari(p_gemi)`:
+  liman fişi bekleyen otomatik araçlar + en iyi 3 serbest aday (gevşek kural, 16 saate kadar). Ekran:
+  `components/gemi-liman-bekleyen.tsx` (Kantar kartı "Liman fişi bekleyen" çipi + İç Piyasa sayfası üst kutu).
+- `ic_gemi_liman_excel_yukle`: tüm satırlar havuza; başka gemi / limanda tartımı bitmemiş (net/çıkış yok) satır HATA
+  DEĞİL atlanır; alıcı gemiden satış firmasıysa satış aracı da yazılır; başka alıcı yalnız havuzda. `ic_gemi_teslim_gir`
+  otomatik satırda hata (teslim kantarın kendisi). `kantar_gemi_tahliyeleri`: `gelen_kg` = liman (yoksa kantar),
+  + `liman_bekleyen_arac/kg`. `kantar_canli` "eşleşmeyen": gemiye bağlı / açık gemi adını taşıyan tartım sayılmaz.
+- Rapor (`gemiRaporu`): gelen = liman ?? teslim; fark / fire yalnız liman + teslimi olan UNEX araçları
+  (`unexTeslimliLimanKg` / `unexEslesmisTeslimKg`); `limanBekleyenArac/Kg`. Excel: fişi bekleyen satırda LİMAN / FARK
+  boş, yer "UNEX GIDA (liman fişi bekleniyor)".
+- Geçiş: mevcut liman satırları havuza kopyalandı; eşleşmiş UNEX satırları `otomatik` (yeniden hesaplandı); kantara hiç
+  gelmemiş UNEX liman satırları araç listesinden kalktı (havuzda + denetim kaydında). Yerel PG'de ilk gecenin KURGU
+  kopyasıyla: eski model hatalı eşleşmeyi üretti, yeni model doğru fişe taşıdı.

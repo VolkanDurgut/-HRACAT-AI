@@ -25,7 +25,11 @@ const saat = (iso: string | null) => (iso ? tarihSaatYazi(iso).slice(-5) : "");
 const ton = (kg: number) => (Number(kg) / 1000).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const SON_SAYISI = 10;
 
-export function KantarGemiTahliye({ yenileTetik = 0, acikSayiBildir }: { yenileTetik?: number; acikSayiBildir?: (n: number | null) => void }) {
+export function KantarGemiTahliye({ yenileTetik = 0, acikSayiBildir, dar = false }: {
+  yenileTetik?: number; acikSayiBildir?: (n: number | null) => void;
+  /** 26.11.2026: Kantar Paneli uc sutun duzeni (genis ekranda 1/3 genislik): siki tablo, "Gittigi yer" plaka altinda */
+  dar?: boolean;
+}) {
   const [gemiler, setGemiler] = useState<KantarGemi[]>([]);
   const [sonlar, setSonlar] = useState<KantarGemiArac[]>([]);
   const [tetik, setTetik] = useState(0);
@@ -95,14 +99,14 @@ export function KantarGemiTahliye({ yenileTetik = 0, acikSayiBildir }: { yenileT
               );
             })}
           </div>
-          <GemiGorunumu key={secili.id} g={secili} araclar={sonlar.filter((x) => x.gemi_id === secili.id)} tetik={tetik} yenile={getir} />
+          <GemiGorunumu key={secili.id} g={secili} araclar={sonlar.filter((x) => x.gemi_id === secili.id)} tetik={tetik} yenile={getir} dar={dar} />
         </>
       )}
     </div>
   );
 }
 
-function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: KantarGemiArac[]; tetik: number; yenile: () => void }) {
+function GemiGorunumu({ g, araclar, tetik, yenile, dar }: { g: KantarGemi; araclar: KantarGemiArac[]; tetik: number; yenile: () => void; dar: boolean }) {
   const yuzde = g.bl_kg > 0 ? (Number(g.gelen_kg) * 100) / Number(g.bl_kg) : 0;
   const [elle, setElle] = useState(false);
   const [yoldaAcik, setYoldaAcik] = useState(false);
@@ -117,18 +121,20 @@ function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: K
     .sort((a, b) => ((b.teslim_zamani || b.liman_cikis || b.olusturma) > (a.teslim_zamani || a.liman_cikis || a.olusturma) ? 1 : -1));
   const gorunen = tumu ? tartilanlar : tartilanlar.slice(0, SON_SAYISI);
   const rozet = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold whitespace-nowrap hover:brightness-125";
-  const th = "px-4 py-2 font-semibold uppercase tracking-wide text-[10px] whitespace-nowrap";
+  const px = dar ? "px-2.5" : "px-4";
+  const th = `${px} py-2 font-semibold uppercase tracking-wide text-[10px] whitespace-nowrap`;
+  const td = `${px} ${dar ? "py-1.5" : "py-2"}`;
 
   return (
     <section className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label={g.gemi_adi}>
       {/* Tek satir ozet + aksiyon seridi */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }} data-testid="kantar-gemi-ozet">
+      <div className={`flex flex-wrap items-center ${dar ? "gap-x-3 gap-y-2 px-3" : "gap-x-5 gap-y-2 px-4"} py-3 border-b`} style={{ borderColor: CARD_BORDER }} data-testid="kantar-gemi-ozet">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white leading-tight flex items-center gap-2"><Ship size={15} style={{ color: ACCENT }} /> {g.gemi_adi}</p>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{[g.urun, g.tahliye_limani].filter(Boolean).join(" · ")} · bugün {g.bugun_arac} araç</p>
         </div>
-        <div className="flex items-center gap-3 min-w-[260px]">
-          <div className="w-36 sm:w-48 h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#1E2530" }} aria-label={`Tahliye ${yuzdeYazi(yuzde, 1)}`}>
+        <div className={`flex items-center gap-3 ${dar ? "w-full" : "min-w-[260px]"}`}>
+          <div className={`${dar ? "flex-1 min-w-[80px]" : "w-36 sm:w-48"} h-2 rounded-full overflow-hidden`} style={{ backgroundColor: "#1E2530" }} aria-label={`Tahliye ${yuzdeYazi(yuzde, 1)}`}>
             <div className="h-full rounded-full" style={{ width: `${Math.min(100, yuzde)}%`, backgroundColor: ACCENT }} />
           </div>
           <p className="text-xs tabular-nums whitespace-nowrap" style={{ color: TEXT_MUTED }}>
@@ -145,10 +151,10 @@ function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: K
             <Scale size={12} /> Liman fişi bekleyen {bekleyenSayi} · {ton(g.liman_bekleyen_kg || 0)} ton
           </button>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          <GemiLimanExcelYukle gemi={g} kaydedildi={yenile} testId={`kantar-gemi-excel-${g.id.slice(0, 8)}`} />
+        <div className={`${dar ? "w-full" : "ml-auto"} flex items-center gap-2`}>
+          <GemiLimanExcelYukle gemi={g} kaydedildi={yenile} kucuk={dar} testId={`kantar-gemi-excel-${g.id.slice(0, 8)}`} />
           <button type="button" onClick={() => setElle((x) => !x)} aria-expanded={elle}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-white/5"
+            className={`inline-flex items-center gap-1.5 rounded-lg border font-semibold hover:bg-white/5 ${dar ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"}`}
             style={{ borderColor: CARD_BORDER, color: elle ? "white" : TEXT_MUTED }} data-testid="kantar-gemi-elle">
             <Plus size={14} /> Elle Araç
           </button>
@@ -188,9 +194,9 @@ function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: K
         {tartilanlar.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm" style={{ color: TEXT_MUTED }}>Henüz tartılan araç yok. Kantarda firma alanına gemi adı yazılan araçlar tartıldıkça burada görünür.</p>
         ) : (
-          <table className="w-full text-left border-collapse text-sm">
+          <table className={`w-full text-left border-collapse ${dar ? "text-xs" : "text-sm"}`}>
             <thead style={{ backgroundColor: ROW_HEADER_BG }}>
-              <tr>{["Saat", "Plaka", "Gittiği Yer", "Liman (kg)", "Teslim (kg)", "Fark"].map((b, i) => <th key={b} className={`${th} ${i >= 3 ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
+              <tr>{(dar ? ["Saat", "Plaka · Yer", "Liman", "Teslim", "Fark"] : ["Saat", "Plaka", "Gittiği Yer", "Liman (kg)", "Teslim (kg)", "Fark"]).map((b, i, d) => <th key={b} className={`${th} ${i >= d.length - 3 ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
             </thead>
             <tbody>
               {gorunen.map((a) => {
@@ -198,16 +204,17 @@ function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: K
                 const kplaka = a.kantar_plaka ? plakaBicimle(a.kantar_plaka) : "";
                 return (
                   <tr key={a.id} className="border-t hover:bg-white/[0.02]" style={{ borderColor: CARD_BORDER }}>
-                    <td className="px-4 py-2 tabular-nums" style={{ color: TEXT_MUTED }}>{saat(a.teslim_zamani || a.liman_cikis || a.olusturma)}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      <span className="font-semibold text-white">{a.plaka}</span>
-                      {kplaka && kplaka !== a.plaka && <span className="text-xs" style={{ color: TEXT_MUTED }} title="Kantarımızdaki plaka (dorse)"> · {kplaka}</span>}
+                    <td className={`${td} tabular-nums`} style={{ color: TEXT_MUTED }}>{saat(a.teslim_zamani || a.liman_cikis || a.olusturma)}</td>
+                    <td className={`${td} ${dar ? "" : "whitespace-nowrap"}`}>
+                      <span className="font-semibold text-white whitespace-nowrap">{a.plaka}</span>
+                      {kplaka && kplaka !== a.plaka && <span className={`whitespace-nowrap ${dar ? "text-[10.5px]" : "text-xs"}`} style={{ color: TEXT_MUTED }} title="Kantarımızdaki plaka (dorse)"> · {kplaka}</span>}
                       {a.uyari_var && <AlertTriangle size={12} className="inline ml-1 text-amber-400" />}
+                      {dar && <span className="block text-[10.5px] truncate" style={{ color: a.firma ? "white" : TEXT_MUTED }}>{a.firma || UNEX_YER}</span>}
                     </td>
-                    <td className="px-4 py-2 text-xs whitespace-nowrap" style={{ color: a.firma ? "white" : TEXT_MUTED }}>{a.firma || UNEX_YER}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-white">{a.liman_kg !== null ? Number(a.liman_kg).toLocaleString("tr-TR") : <span className="text-[11px] text-sky-300" title="Liman Excel'i yüklenince eşleşir">fiş bekleniyor</span>}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-white">{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : "—"}</td>
-                    <td className="px-4 py-2 text-right">
+                    {!dar && <td className={`${td} text-xs whitespace-nowrap`} style={{ color: a.firma ? "white" : TEXT_MUTED }}>{a.firma || UNEX_YER}</td>}
+                    <td className={`${td} text-right tabular-nums text-white`}>{a.liman_kg !== null ? Number(a.liman_kg).toLocaleString("tr-TR") : <span className="text-[11px] text-sky-300" title="Liman Excel'i yüklenince eşleşir">fiş bekleniyor</span>}</td>
+                    <td className={`${td} text-right tabular-nums text-white`}>{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : "—"}</td>
+                    <td className={`${td} text-right`}>
                       {fark !== null && (
                         <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold tabular-nums ${Math.abs(fark) > 300 ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>
                           {fark > 0 ? "+" : ""}{fark.toLocaleString("tr-TR")}
@@ -230,23 +237,23 @@ function GemiGorunumu({ g, araclar, tetik, yenile }: { g: KantarGemi; araclar: K
       {/* Tek satir gittigi yer ozeti */}
       <table className="w-full text-left border-collapse text-xs border-t" style={{ borderColor: CARD_BORDER }} data-testid="kantar-gemi-yer-ozeti">
         <thead style={{ backgroundColor: ROW_HEADER_BG }}>
-          <tr>{["Gittiği Yer", "Toplam Araç", "Liman Toplam", "Teslim / Kalan"].map((b, i) => <th key={b} className={`${th} ${i ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
+          <tr>{(dar ? ["Yer", "Araç", "Liman", "Teslim / Kalan"] : ["Gittiği Yer", "Toplam Araç", "Liman Toplam", "Teslim / Kalan"]).map((b, i) => <th key={b} className={`${th} ${i ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
         </thead>
         <tbody>
           <tr className="border-t" style={{ borderColor: CARD_BORDER }}>
-            <td className="px-4 py-2 text-white font-semibold">{UNEX_YER}</td>
-            <td className="px-4 py-2 text-right tabular-nums text-white">{g.unex_arac}</td>
-            <td className="px-4 py-2 text-right tabular-nums text-white">{kgYazi(g.unex_liman_kg)}</td>
-            <td className="px-4 py-2 text-right tabular-nums text-white">teslim {kgYazi(g.unex_teslim_kg)}</td>
+            <td className={`${px} py-2 text-white font-semibold`}>{UNEX_YER}</td>
+            <td className={`${px} py-2 text-right tabular-nums text-white`}>{g.unex_arac}</td>
+            <td className={`${px} py-2 text-right tabular-nums text-white`}>{kgYazi(g.unex_liman_kg)}</td>
+            <td className={`${px} py-2 text-right tabular-nums text-white`}>teslim {kgYazi(g.unex_teslim_kg)}</td>
           </tr>
           {g.alicilar.map((l) => {
             const kalan = Number(l.miktar_kg) - Number(l.gelen_kg);
             return (
               <tr key={l.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
-                <td className="px-4 py-2 text-white truncate" title={l.firma}>{l.firma}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-white">{l.arac}</td>
-                <td className="px-4 py-2 text-right tabular-nums text-white">{kgYazi(l.gelen_kg)}</td>
-                <td className={`px-4 py-2 text-right tabular-nums ${kalan < 0 ? "text-sky-400" : "text-amber-300"}`}>{kalan < 0 ? `Fazla ${kgYazi(-kalan)}` : `Kalan ${kgYazi(kalan)}`}</td>
+                <td className={`${px} py-2 text-white truncate`} title={l.firma}>{l.firma}</td>
+                <td className={`${px} py-2 text-right tabular-nums text-white`}>{l.arac}</td>
+                <td className={`${px} py-2 text-right tabular-nums text-white`}>{kgYazi(l.gelen_kg)}</td>
+                <td className={`${px} py-2 text-right tabular-nums ${kalan < 0 ? "text-sky-400" : "text-amber-300"}`}>{kalan < 0 ? `Fazla ${kgYazi(-kalan)}` : `Kalan ${kgYazi(kalan)}`}</td>
               </tr>
             );
           })}

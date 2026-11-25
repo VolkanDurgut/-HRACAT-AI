@@ -87,6 +87,15 @@ export default function KantarPage() {
   const [sayilar, setSayilar] = useState<KantarSekmeSayilari | null>(null);
   const sayilarGetir = useCallback(async () => { setSayilar(await kantarSekmeSayilariOku()); }, []);
   const [cekmece, setCekmece] = useState(false);
+  // >= 1280 px: uc sutun (yalniz istemcide bilinir; ilk cizimde dar varsayilir)
+  const [genis, setGenis] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const uygula = () => setGenis(mq.matches);
+    uygula();
+    mq.addEventListener("change", uygula);
+    return () => mq.removeEventListener("change", uygula);
+  }, []);
   // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
   // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
   // baslatmasi) aradaki degisiklikler kacirilmasin diye yeniden baglaninca,
@@ -380,6 +389,20 @@ export default function KantarPage() {
     { deger: "ihracat" as const, etiket: <>İhracat · DBA <span className="font-normal opacity-70">({bekleyenler.length})</span></>, ikon: <Ship size={14} /> },
   ];
   const seciliAna: KantarAnaSekme = anaSekme ?? (gemiSayisi > 0 ? "gemi" : "yurtici");
+  // Genis ekranda uc bolum ayni anda (gemi yoksa iki); dar ekranda yalniz secili sekme
+  const goster = (k: KantarAnaSekme) => (genis ? k !== "gemi" || gemiSayisi > 0 : seciliAna === k);
+  const kolon = (k: KantarAnaSekme, icerik: React.ReactNode) => {
+    if (!genis) return icerik;
+    const o = anaSekmeler.find((x) => x.deger === k);
+    return (
+      <section key={k} className="min-h-0 min-w-0 flex flex-col rounded-2xl border" style={{ borderColor: CARD_BORDER, backgroundColor: "rgba(11,15,20,0.55)" }} aria-labelledby={`kolon-${k}`} data-kolon={k}>
+        <h2 id={`kolon-${k}`} className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b text-sm font-bold text-white" style={{ borderColor: CARD_BORDER }}>
+          <span style={{ color: ACCENT }}>{o?.ikon}</span> {o?.etiket}
+        </h2>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3" style={{ scrollbarWidth: "thin" }}>{icerik}</div>
+      </section>
+    );
+  };
   const alisVar = sayilar?.alis !== null && sayilar?.alis !== undefined;
   const gorunenYi: KantarYiSekme = yiSekme === "alis" && alisVar ? "alis" : "satis";
 
@@ -441,24 +464,27 @@ export default function KantarPage() {
         {/* Canli kantar seridi (tek satir) + eslesmeyen tartimlar cekmecesi */}
         <KantarCanliSeridi veri={kantarCanli} eslesmeyenAc={() => setCekmece(true)} />
 
-        {/* Uc ana sekme (tam genislik) */}
-        <div className="shrink-0 -mb-3">
-          <SekmeCubugu varyant="alt-cizgi" ariaLabel="Kantar bölümleri" testId="kantar-ana-sekmeler" secili={seciliAna} onSec={anaSekmeSec} ogeler={anaSekmeler} />
-        </div>
+        {/* Uc ana bolum. 26.11.2026 (kullanici, onizlemeden sonra): "Ekrani 3'e bol ve 3 baslik altinda hepsini goster" ->
+            genis ekranda (>= 1280 px) uc SUTUN yan yana, her sutun kendi icinde kayar; dar ekranda sekmeler. */}
+        {!genis && (
+          <div className="shrink-0 -mb-3">
+            <SekmeCubugu varyant="alt-cizgi" ariaLabel="Kantar bölümleri" testId="kantar-ana-sekmeler" secili={seciliAna} onSec={anaSekmeSec} ogeler={anaSekmeler} />
+          </div>
+        )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-6" style={{ scrollbarWidth: "thin" }}>
+        <div className={genis ? `flex-1 min-h-0 grid gap-3 ${gemiSayisi > 0 ? "grid-cols-3" : "grid-cols-2"}` : "flex-1 min-h-0 overflow-y-auto pr-1 pb-6"} style={genis ? undefined : { scrollbarWidth: "thin" }} data-testid="kantar-bolumler">
           {anaSekme === null && (
             <div className="flex items-center justify-center py-10" style={{ color: TEXT_MUTED }}><Loader2 size={20} className="animate-spin" style={{ color: ACCENT }} /></div>
           )}
           {/* ===== GEMI TAHLIYE ===== */}
-          {anaSekme !== null && seciliAna === "gemi" && (
+          {anaSekme !== null && goster("gemi") && kolon("gemi", (
             <div id="panel-gemi" role="tabpanel" aria-labelledby="sekme-gemi">
-              <KantarGemiTahliye yenileTetik={yurtIciYenile} />
+              <KantarGemiTahliye yenileTetik={yurtIciYenile} dar={genis} />
             </div>
-          )}
+          ))}
 
           {/* ===== YURT ICI IRSALIYE ===== */}
-          {anaSekme !== null && seciliAna === "yurtici" && (
+          {anaSekme !== null && goster("yurtici") && kolon("yurtici", (
             <div id="panel-yurtici" role="tabpanel" aria-labelledby="sekme-yurtici" className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <div role="tablist" aria-label="Yurt içi" className="inline-flex rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
@@ -481,10 +507,10 @@ export default function KantarPage() {
                 ? <KantarYurtIci yenileTetik={yurtIciYenile} kantarBekleyen={kantarCanli?.isEmirleri ?? null} arama={yiArama} />
                 : <KantarGelenArac yenileTetik={yurtIciYenile} kantarBekleyen={kantarCanli?.alislar ?? null} arama={yiArama} />}
             </div>
-          )}
+          ))}
 
           {/* ===== IHRACAT · DBA ===== */}
-          {anaSekme !== null && seciliAna === "ihracat" && (
+          {anaSekme !== null && goster("ihracat") && kolon("ihracat", (
             <div id="panel-ihracat" role="tabpanel" aria-labelledby="sekme-ihracat" className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[260px]">
@@ -752,7 +778,7 @@ export default function KantarPage() {
 
               </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 

@@ -1711,3 +1711,6 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
   Aktif / Tamamlanan; aktif dolum ve DBA bekleyen yoksa TEK boş durum mesajı.
 - Çekmecede "Gemiye bağla": migration `20261126000000_ic_gemi_tartim_bagla.sql` (`ic_gemi_tartim_bagla(p_gemi, p_kayit_no)`;
   yalnız ekleme, CANLIDA). İş emrine elle bağlama yok (firma + ürünle kendiliğinden eşleşir) — kullanıcı kararı bekleniyor.
+- Önizleme sonrası (kullanıcı: "Ekranı 3'e böl ve bütün 3 başlık altında hepsini göster"): ≥ 1280 px'te üç bölüm
+  YAN YANA üç sütun (başlık + sayı, her sütun kendi içinde kayar; gemi yoksa iki sütun). Dar ekranda sekmeler. Gemi
+  sütunu `dar` kipte: sıkı tablo, "Gittiği yer" plaka altında, Excel düğmesi küçük.

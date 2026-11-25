@@ -610,8 +610,10 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 - Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.
 
 ## 4.22 Rapor saatleri sadeleştirildi (19.11.2026, kullanıcı: "gün içinde çok rapor gidiyor")
-- Günlük ihracat raporu: YALNIZ 17:00; iç piyasa raporu: YALNIZ 18:00 (25.11.2026 kullanıcı; `ic-gunluk-rapor-aksam` 15:00 UTC,
-  `IC_RAPOR_SAATI.aksam = [18, 0]`; önce edge, sonra cron). Sabah / öğle cron işleri `active=false`, silinmedi.
+- Günlük ihracat raporu ve iç piyasa raporu: YALNIZ 18:00 (25.11.2026 kullanıcı; `gunluk-rapor-aksam` ve `ic-gunluk-rapor-aksam`
+  15:00 UTC; `SLOT_TR_SAATI.aksam = 18`, `IC_RAPOR_SAATI.aksam = [18, 0]`; önce edge, sonra cron). Alıcılar: ihracat raporu ve
+  VGM CC Supabase secret'larında (`GUNLUK_RAPOR_ALICILARI`, `VGM_RAPOR_CC`; Ayarlar'daki satırlar yalnız gösterim, eşitlendi),
+  iç piyasa `ic_piyasa_ayarlari.gunluk_rapor_eposta`. 25.11.2026: export2 çıktı; sales ve manager eklendi (iç piyasaya manager). Sabah / öğle cron işleri `active=false`, silinmedi.
 - Sipariş raporu: YALNIZ cumartesi 09:00 (20.11.2026; `siparis-rapor-sabah` = `0 6 * * 6`, akşam işi kapalı; sabah penceresi 08:55–10:00).
 - DİİB raporu: cumartesi 09:00 (20.11.2026), fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 08:55–10:00; cron
   değişikliği (migration 20261119170000) yeni edge deploy edildikten SONRA uygulanır.

@@ -29,6 +29,8 @@ import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 //   "gunluk-rapor-aksam" 14:00 UTC = 17:00 TR -> BUGUNUN raporu
 //   19.11.2026 (kullanici: "gun icinde cok rapor gidiyor"): sabah ve ogle isleri KAPALI (cron.alter_job active=false);
 //   yalniz aksam 17:00 gider. Geri acmak icin migration 20261119160000 notuna bakin.
+//   25.11.2026 (kullanici: "Ihracat raporunu da 18.00 olarak dikkate alalim"): aksam 18:00 TR (cron 15:00 UTC; yetki.ts
+//   SLOT_TR_SAATI.aksam = 18; once edge, sonra cron). Alicilar: GUNLUK_RAPOR_ALICILARI secret'i (export2 cikti; sales, manager eklendi).
 // Icerik /rapor/gunluk sayfasiyla AYNI hesaptan gelir (_shared/gunluk-rapor.ts):
 // ozet kutulari + gun icinde yuklenen konteynerler + sevkiyat tablosu
 // ("MUSTERI | 4x | MARKA | Yukleme Tamamlandi ✔") + tamamlananlarin plaka/tonaji
@@ -78,7 +80,7 @@ const SAYFA_BOYUTU = 1000;
 const SLOT_BASLIK: Record<Slot, string> = {
   sabah: "Sabah raporu · 09:00 (dünün özeti)",
   ogle: "Öğle raporu · 12:00",
-  aksam: "Akşam raporu · 17:00",
+  aksam: "Akşam raporu · 18:00",
 };
 const SLOT_KONU: Record<Slot, string> = { sabah: "(Dün)", ogle: "Öğle", aksam: "Akşam" };
 

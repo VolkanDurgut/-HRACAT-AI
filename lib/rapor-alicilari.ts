@@ -31,7 +31,7 @@ export type RaporTanimi = {
 };
 
 export const RAPORLAR: RaporTanimi[] = [
-  { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 17:00", edge: null, testModu: false, etkin: "yakinda" },
+  { rapor: "gunluk_ihracat", ad: "Günlük İhracat Raporu", grup: "Günlük raporlar", aciklama: "Kontrol Merkezi özeti: dosyalar, sevkiyatlar, tahsilat", saat: "Her gün 18:00", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "siparis", ad: "Sipariş Raporu", grup: "Günlük raporlar", aciklama: "Rezervasyon bekleyen (ön ödemeli) siparişler + limanlarının en yeni navlun fiyatları + Excel", saat: "Her cumartesi 09:00", edge: "siparis-rapor", testModu: true, etkin: "alici" },
   { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Satın alınan navlunlar + rezervasyon bekleyen müşteriler + 2 Excel (satın alma listesi, bütün navlunlar)", saat: "Her gün 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
   { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her cumartesi 09:00 (son 7 gün)", edge: null, testModu: false, etkin: "yakinda" },

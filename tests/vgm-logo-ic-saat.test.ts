@@ -40,3 +40,14 @@ test("ic piyasa raporu aksam oturumu 18:00 (sabah / ogle saatleri degismedi)", (
   assert.deepEqual(IC_RAPOR_SAATI.sabah, [9, 0]);
   assert.deepEqual(IC_RAPOR_SAATI.ogle, [12, 0]);
 });
+
+test("ihracat raporu aksam slotu 18:00: pencere 17:55-19:00, 17:00 artik zamanlanmis degil", async () => {
+  const { SLOT_TR_SAATI, aktifSlot } = await import("@/supabase/functions/gunluk-rapor-gonder/yetki");
+  assert.equal(SLOT_TR_SAATI.aksam, 18);
+  const tr = (s: string) => Date.parse(`2026-11-25T${s}:00+03:00`);
+  assert.equal(aktifSlot(tr("18:00")), "aksam");
+  assert.equal(aktifSlot(tr("17:55")), "aksam");
+  assert.equal(aktifSlot(tr("18:59")), "aksam");
+  assert.equal(aktifSlot(tr("17:00")), null);
+  assert.equal(aktifSlot(tr("19:00")), null);
+});

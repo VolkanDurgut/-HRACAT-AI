@@ -15,12 +15,14 @@ import { KantarDbaOtomasyon } from "@/components/kantar-dba-otomasyon";
 import { KantarCanliSeridi } from "@/components/kantar-canli-seridi";
 import { beklemeYazi, kantarSaatYazi, type KantarCanli } from "@/lib/kantar-canli";
 import { kantarCanliOku } from "@/lib/kantar-canli-veri";
-import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck } from "lucide-react";
+import { Weight, Upload, CheckCircle2, AlertTriangle, Loader2, FileText, RefreshCw, Search, LogOut, ShieldAlert, LayoutGrid, Ship, Truck, Anchor } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, PAGE_BG, ROW_HEADER_BG } from "@/lib/theme";
 import { ArkaPlanGorseli } from "@/components/arka-plan-gorseli";
 import { KantarSevkiyatDurumu } from "@/components/kantar-sevkiyat-durumu";
 import { musteriKodu, sevkiyatOzetleri, type KantarDosya } from "@/lib/kantar-sevkiyat";
-import { eksikDolumlar, kantarSekmesi, panelDosyaYolu, VARSAYILAN_KANTAR_SEKMESI, type KantarSekme } from "@/lib/kantar-gorunum";
+import { baslangicAnaSekmesi, eksikDolumlar, kantarAnaSekmesi, kantarSekmesi, kantarYiSekmesi, panelDosyaYolu, VARSAYILAN_KANTAR_SEKMESI, type KantarAnaSekme, type KantarSekme, type KantarYiSekme } from "@/lib/kantar-gorunum";
+import { kantarSekmeSayilariOku, type KantarSekmeSayilari } from "@/lib/kantar-canli-veri";
+import { KantarEslesmeyenCekmece } from "@/components/kantar-eslesmeyen-cekmece";
 import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
 import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
 import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
@@ -62,13 +64,29 @@ export default function KantarPage() {
   const [dosyalar, setDosyalar] = useState<KantarDosya[]>([]);
   const [rezerveAdet, setRezerveAdet] = useState<Record<string, number>>({});
   const [secilenGun, setSecilenGun] = useState<string | null>(null);
-  // 16.11.2026: Ihracat sutunu iki sekme (?sekme=aktif|tamamlanan) + ?dosya= (Ana Panel DBA adimindan gelis: o dosya suzulur)
-  // ERP ortak kit: adresle esli sekme + adres yardimcilari
-  const [ihSekme, setIhSekme] = useUrlSekmesi<KantarSekme>(kantarSekmesi, VARSAYILAN_KANTAR_SEKMESI);
+  // 26.11.2026 YENIDEN TASARIM (kullanici gorev tanimi): yan yana iki sutun yerine tam genislikte UC ANA SEKME
+  // (?sekme=gemi|yurtici|ihracat). Ihracat ici iki sekme ?ih=aktif|tamamlanan (eski ?sekme=aktif|tamamlanan da okunur),
+  // Yurt ici alt filtre ?yi=satis|alis, gemi ?gemi=<slug>. ?dosya= (Ana Panel DBA adimindan): Ihracat + o dosya aranir.
+  const [ihSekme, setIhSekme] = useUrlSekmesi<KantarSekme>(kantarSekmesi, VARSAYILAN_KANTAR_SEKMESI, "ih");
+  const [yiSekme, setYiSekme] = useUrlSekmesi<KantarYiSekme>(kantarYiSekmesi, "satis", "yi");
+  const [yiArama, setYiArama] = useState("");
+  const [anaSekme, setAnaSekmeDurumu] = useState<KantarAnaSekme | null>(null);
+  const baslangic = useRef<{ adres: KantarAnaSekme | null; dosyaVar: boolean } | null>(null);
   useEffect(() => {
+    const ham = adresParametresi("sekme");
     const d = (adresParametresi("dosya") || "").trim();
+    baslangic.current = { adres: kantarAnaSekmesi(ham), dosyaVar: !!d };
+    // Eski adres: ?sekme=tamamlanan -> ihracat + ih=tamamlanan
+    const eski = kantarSekmesi(ham);
+    if (eski) { setIhSekme(eski); adresiGuncelle({ sekme: "ihracat" }); }
     if (d) { setArama(d); adresiGuncelle({ dosya: null }); } // bir kez: arama kutusuna yazilir, kullanici silebilir
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const anaSekmeSec = (x: KantarAnaSekme) => { setAnaSekmeDurumu(x); adresiGuncelle({ sekme: x }); };
+  // Ana sekme sayilari (yalniz secili sekme cizilir; sayilar hafif sorgularla) + acik gemiler (cekmece "gemiye bagla")
+  const [sayilar, setSayilar] = useState<KantarSekmeSayilari | null>(null);
+  const sayilarGetir = useCallback(async () => { setSayilar(await kantarSekmeSayilariOku()); }, []);
+  const [cekmece, setCekmece] = useState(false);
   // Canli baglanti durumu (05.10.2026): panel terminalde saatlerce acik kalir.
   // Realtime baglantisi koparsa (ag kesintisi, uyku, Supabase yeniden
   // baslatmasi) aradaki degisiklikler kacirilmasin diye yeniden baglaninca,
@@ -77,30 +95,13 @@ export default function KantarPage() {
   const [okumaHatasi, setOkumaHatasi] = useState(false);
   const [sonGuncelleme, setSonGuncelleme] = useState<Date | null>(null);
   const istekSira = useRef(0);
-  // Tek ekran (12.10.2026, kullanici istegi): Ihracat (DBA) ve Yurt Ici
-  // (irsaliye) YAN YANA. 30.10.2026'dan beri xl (>=1280px) itibariyla iki sutun
-  // (eskiden 2xl), her sutun kendi icinde kayar; dar ekranda alt alta, tek
-  // kaydirma + ustte bolume atlama dugmeleri. Ozet kartlari -> baslik sayaclari.
-  const [yurtIciAcik, setYurtIciAcik] = useState<number | null>(null);
-  // 30.10.2026 (kullanici: "Kantar paneli cok karisik, tek ekranda yonetilebilir; her sey cok buyuk"):
-  // Yurt Ici iki SEKME (Satis / Alis), iki sutun xl'den (1280px) itibaren yan yana, kartlar yerine
-  // siki tablolar. Alis sekmesi sadece fonksiyonlar varsa (alisAcik !== null) gorunur.
-  const [alisAcik, setAlisAcik] = useState<number | null>(null);
-  // 25.11.2026: ucuncu sekme "Gemi" (gemi tahliye); yalniz acik gemi varsa (gemiAcik !== null) gorunur.
-  const [gemiAcik, setGemiAcik] = useState<number | null>(null);
-  const [yiSekme, setYiSekme] = useState<"satis" | "alis" | "gemi">("satis");
-  useEffect(() => { try { const k = window.localStorage.getItem("kantar-yurt-ici-sekme"); if (k === "alis" || k === "gemi") setYiSekme(k); } catch { /* depolama kapali */ } }, []);
-  const sekmeSec = (x: "satis" | "alis" | "gemi") => { setYiSekme(x); try { window.localStorage.setItem("kantar-yurt-ici-sekme", x); } catch { /* depolama kapali */ } };
-  const gorunenSekme = yiSekme === "alis" && alisAcik !== null ? "alis" : yiSekme === "gemi" && gemiAcik !== null ? "gemi" : "satis";
   const [yurtIciYenile, setYurtIciYenile] = useState(0);
   // Otomatik DBA (20.10.2026): durum seridi; Yenile'de ve canli degisiklikte tazelenir
   const [dbaOtoYenile, setDbaOtoYenile] = useState(0);
-  const ihracatRef = useRef<HTMLElement>(null);
-  const yurtIciRef = useRef<HTMLElement>(null);
   // 24.11.2026: canli kantar bilgisi (kantar_canli; salt okunur). Okunamazsa null -> bolumler gizli, sayfa bozulmaz.
   const [kantarCanli, setKantarCanli] = useState<KantarCanli | null>(null);
   const kantarCanliGetir = useCallback(async () => { setKantarCanli(await kantarCanliOku()); }, []);
-  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); setDbaOtoYenile((n) => n + 1); kantarCanliGetir(); };
+  const tumunuYenile = () => { fetchKonteynerler(); setYurtIciYenile((n) => n + 1); setDbaOtoYenile((n) => n + 1); kantarCanliGetir(); sayilarGetir(); };
 
   const { yukleniyor, hatalar, yukleDba, inputRefs } = useDbaUpload();
 
@@ -229,7 +230,7 @@ export default function KantarPage() {
 
   useEffect(() => {
     if (!user?.id || !companyId) return;
-    const gorunurseYenile = () => { if (document.visibilityState === "visible") { fetchKonteynerler(); kantarCanliGetir(); } };
+    const gorunurseYenile = () => { if (document.visibilityState === "visible") { fetchKonteynerler(); kantarCanliGetir(); sayilarGetir(); } };
     // Canli bildirim kacirilsa bile liste en fazla 1 dk eski kalir.
     const zamanlayici = window.setInterval(gorunurseYenile, 60_000);
     document.addEventListener("visibilitychange", gorunurseYenile);
@@ -239,8 +240,19 @@ export default function KantarPage() {
       document.removeEventListener("visibilitychange", gorunurseYenile);
       window.removeEventListener("online", gorunurseYenile);
     };
-  }, [fetchKonteynerler, kantarCanliGetir, user?.id, companyId]);
-  useEffect(() => { if (user?.id && companyId) kantarCanliGetir(); }, [kantarCanliGetir, user?.id, companyId]);
+  }, [fetchKonteynerler, kantarCanliGetir, sayilarGetir, user?.id, companyId]);
+  useEffect(() => { if (user?.id && companyId) { kantarCanliGetir(); sayilarGetir(); } }, [kantarCanliGetir, sayilarGetir, user?.id, companyId]);
+  // Ilk sayilar gelince baslangic sekmesi (acik gemi varsa Gemi Tahliye varsayilan); gemi kapanirsa yurt iciye dus
+  useEffect(() => {
+    if (!sayilar) return;
+    const gemiVar = (sayilar.gemi ?? 0) > 0;
+    if (anaSekme === null) {
+      const b = baslangic.current || { adres: null, dosyaVar: false };
+      setAnaSekmeDurumu(baslangicAnaSekmesi({ adres: b.adres, dosyaVar: b.dosyaVar, gemiVar }));
+    } else if (anaSekme === "gemi" && !gemiVar) {
+      setAnaSekmeDurumu("yurtici");
+    }
+  }, [sayilar, anaSekme]);
 
   const baglantiSorunu = okumaHatasi || !canliBagli;
   const sonGuncellemeSaat = sonGuncelleme
@@ -360,21 +372,33 @@ export default function KantarPage() {
     );
   }
 
+  const gemiSayisi = sayilar?.gemi ?? 0;
+  const yiToplam = (sayilar?.satis ?? 0) + (sayilar?.alis ?? 0);
+  const anaSekmeler = [
+    ...(gemiSayisi > 0 ? [{ deger: "gemi" as const, etiket: <>Gemi Tahliye <span className="font-normal opacity-70">({gemiSayisi})</span></>, ikon: <Anchor size={14} /> }] : []),
+    { deger: "yurtici" as const, etiket: <>Yurt İçi İrsaliye <span className="font-normal opacity-70">({sayilar && sayilar.satis !== null ? yiToplam : "–"})</span></>, ikon: <Truck size={14} /> },
+    { deger: "ihracat" as const, etiket: <>İhracat · DBA <span className="font-normal opacity-70">({bekleyenler.length})</span></>, ikon: <Ship size={14} /> },
+  ];
+  const seciliAna: KantarAnaSekme = anaSekme ?? (gemiSayisi > 0 ? "gemi" : "yurtici");
+  const alisVar = sayilar?.alis !== null && sayilar?.alis !== undefined;
+  const gorunenYi: KantarYiSekme = yiSekme === "alis" && alisVar ? "alis" : "satis";
+
   return (
     // isolate: arka plan gorseli (-z) zeminin ustunde, icerigin altinda (22.10.2026)
+    // 26.11.2026 yeniden tasarim: ust cubuk + canli kantar seridi + uc ana sekme sabit; yalniz secili sekmenin icerigi cizilir ve kayar.
     <div className="relative isolate h-[100dvh] w-full flex flex-col p-3 md:p-4 overflow-hidden" style={{ backgroundColor: PAGE_BG }}>
       <ArkaPlanGorseli tur="uygulama" />
       <div className="max-w-6xl xl:max-w-[1840px] mx-auto w-full flex flex-col h-full min-h-0 gap-3">
 
-        {/* Üst Başlık Sabit */}
-        <div className="shrink-0 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm" style={{ backgroundColor: ACCENT }}>
+        {/* Ust cubuk */}
+        <div className="shrink-0 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shadow-sm shrink-0" style={{ backgroundColor: ACCENT }}>
               <Weight size={18} className="text-white" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg font-bold text-white leading-tight">Kantar Paneli</h1>
-              <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>İhracat DBA ve yurt içi irsaliye yükleme</p>
+              <p className="text-xs font-medium truncate" style={{ color: TEXT_MUTED }}>Canlı tartım · gemi tahliye · irsaliye · DBA</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -383,7 +407,7 @@ export default function KantarPage() {
               title={baglantiSorunu
                 ? `Sunucuyla bağlantı kurulamadı; liste ${sonGuncellemeSaat} itibarıyla. Bağlantı gelince otomatik yenilenir.`
                 : `Değişiklikler anında yansıyor. Son güncelleme: ${sonGuncellemeSaat}`}
-              aria-live="polite">
+              aria-live="polite" data-testid="kantar-canli-rozet">
               <span className={`w-2 h-2 rounded-full ${baglantiSorunu ? "bg-amber-500" : "bg-emerald-500"}`} />
               {baglantiSorunu ? <span>Bağlantı yok · {sonGuncellemeSaat}</span> : <span>Canlı</span>}
             </span>
@@ -392,14 +416,14 @@ export default function KantarPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
                 style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
                 title="Uygulamanın diğer sayfalarına dön">
-                <LayoutGrid size={14} /> Ana Menü
+                <LayoutGrid size={14} /> <span className="hidden sm:inline">Ana Menü</span>
               </button>
             )}
             <button onClick={tumunuYenile}
               className="relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
               style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
               title={baglantiSorunu ? `Bağlantı yok — liste ${sonGuncellemeSaat} itibarıyla` : "Canlı — değişiklikler anında yansıyor"}>
-              <RefreshCw size={14} /> Yenile
+              <RefreshCw size={14} /> <span className="hidden sm:inline">Yenile</span>
               {/* Dar ekranda baglanti durumu: butonun kosesinde nokta (baslik tasmasin). */}
               <span aria-hidden="true"
                 className={`sm:hidden absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ${baglantiSorunu ? "bg-amber-500" : "bg-emerald-500"}`}
@@ -409,81 +433,100 @@ export default function KantarPage() {
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-colors shadow-sm hover:bg-white/5"
               style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG, color: TEXT_MUTED }}
               title="Oturumu kapat">
-              <LogOut size={14} /> Çıkış
+              <LogOut size={14} /> <span className="hidden sm:inline">Çıkış</span>
             </button>
           </div>
         </div>
 
-        {/* Dar ekranda bolume atlama (genis ekranda iki sutun zaten yan yana) */}
-        <div className="shrink-0 grid grid-cols-2 gap-2 xl:hidden">
-          {([["İhracat · DBA", `${bekleyenler.length} DBA bekleyen`, Ship, ihracatRef], ["Yurt İçi · İrsaliye", `${yurtIciAcik ?? "–"} satış${alisAcik !== null ? ` · ${alisAcik} alış` : ""}`, Truck, yurtIciRef]] as const).map(([etiket, alt, Ikon, ref]) => (
-            <button key={etiket} onClick={() => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              className="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left hover:bg-white/5"
-              style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
-              <Ikon size={16} style={{ color: ACCENT }} className="shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-xs font-semibold text-white truncate">{etiket}</span>
-                <span className="block text-[11px]" style={{ color: TEXT_MUTED }}>{alt}</span>
-              </span>
-            </button>
-          ))}
+        {/* Canli kantar seridi (tek satir) + eslesmeyen tartimlar cekmecesi */}
+        <KantarCanliSeridi veri={kantarCanli} eslesmeyenAc={() => setCekmece(true)} />
+
+        {/* Uc ana sekme (tam genislik) */}
+        <div className="shrink-0 -mb-3">
+          <SekmeCubugu varyant="alt-cizgi" ariaLabel="Kantar bölümleri" testId="kantar-ana-sekmeler" secili={seciliAna} onSec={anaSekmeSec} ogeler={anaSekmeler} />
         </div>
 
-        {/* 24.11.2026: Su an kantarda (kantar programindan canli; bilgi amacli) */}
-        <KantarCanliSeridi veri={kantarCanli} />
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-6" style={{ scrollbarWidth: "thin" }}>
+          {anaSekme === null && (
+            <div className="flex items-center justify-center py-10" style={{ color: TEXT_MUTED }}><Loader2 size={20} className="animate-spin" style={{ color: ACCENT }} /></div>
+          )}
+          {/* ===== GEMI TAHLIYE ===== */}
+          {anaSekme !== null && seciliAna === "gemi" && (
+            <div id="panel-gemi" role="tabpanel" aria-labelledby="sekme-gemi">
+              <KantarGemiTahliye yenileTetik={yurtIciYenile} />
+            </div>
+          )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto xl:overflow-hidden grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 xl:gap-4 pr-1 xl:pr-0" style={{ scrollbarWidth: "thin" }}>
-        {/* ===== SOL: IHRACAT (DBA) - icerik degismedi ===== */}
-        <section ref={ihracatRef} aria-labelledby="kantar-ihracat" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-        <BolumBasligi id="kantar-ihracat" ikon={<Ship size={15} />} baslik="İhracat · DBA" aciklama="Konteyner tartımı · DBA belgesi"
-          sag={<>
-            <Sayac etiket="Aktif dosya" deger={eksikler.length} renk="text-white" />
-            <Sayac etiket="DBA bekleyen" deger={bekleyenler.length} renk="text-amber-400" />
-            <Sayac etiket="Tamamlanan" deger={tamamlananlar.length} renk="text-emerald-400" />
-          </>} />
-        {/* Arama */}
-        <div className="shrink-0 relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
-          <input
-            type="text"
-            value={arama}
-            onChange={(e) => setArama(e.target.value)}
-            placeholder="Konteyner, mühür, plaka, dosya no, çuval veya müşteri kodu ile ara..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-            style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }}
-          />
-        </div>
+          {/* ===== YURT ICI IRSALIYE ===== */}
+          {anaSekme !== null && seciliAna === "yurtici" && (
+            <div id="panel-yurtici" role="tabpanel" aria-labelledby="sekme-yurtici" className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div role="tablist" aria-label="Yurt içi" className="inline-flex rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
+                  {([["satis", "Satış · İş Emirleri", sayilar?.satis ?? null, ACCENT, "white"], ["alis", "Alış · Gelen Araç", sayilar?.alis ?? null, "#F59E0B", "#111"]] as const).map(([k, etiket, sayi, renk, yazi]) => (k === "alis" && !alisVar) ? null : (
+                    <button key={k} role="tab" aria-selected={gorunenYi === k} onClick={() => setYiSekme(k)} data-yi={k}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
+                      style={gorunenYi === k ? { backgroundColor: renk, color: yazi } : { color: TEXT_MUTED }}>
+                      {etiket} <span className="font-normal opacity-80">({sayi ?? "–"})</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="relative ml-auto w-full sm:w-80">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+                  <input type="search" value={yiArama} onChange={(e) => setYiArama(e.target.value)} placeholder="Plaka, iş emri, müşteri, irsaliye ara…"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} data-testid="kantar-yi-arama" />
+                </div>
+              </div>
+              {gorunenYi === "satis"
+                ? <KantarYurtIci yenileTetik={yurtIciYenile} kantarBekleyen={kantarCanli?.isEmirleri ?? null} arama={yiArama} />
+                : <KantarGelenArac yenileTetik={yurtIciYenile} kantarBekleyen={kantarCanli?.alislar ?? null} arama={yiArama} />}
+            </div>
+          )}
 
-        {/* Otomatik DBA durumu + elle kontrol gereken belgeler (cihaz tanimli degilse gorunmez) */}
-        <KantarDbaOtomasyon yenileTetik={dbaOtoYenile} />
+          {/* ===== IHRACAT · DBA ===== */}
+          {anaSekme !== null && seciliAna === "ihracat" && (
+            <div id="panel-ihracat" role="tabpanel" aria-labelledby="sekme-ihracat" className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[260px]">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: TEXT_MUTED }} />
+                  <input type="text" value={arama} onChange={(e) => setArama(e.target.value)}
+                    placeholder="Konteyner, mühür, plaka, dosya no, çuval veya müşteri kodu ile ara..."
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    style={{ borderColor: CARD_BORDER, backgroundColor: CARD_BG }} />
+                </div>
+                <Sayac etiket="Aktif dosya" deger={eksikler.length} renk="text-white" />
+                <Sayac etiket="DBA bekleyen" deger={bekleyenler.length} renk="text-amber-400" />
+                <Sayac etiket="Tamamlanan" deger={tamamlananlar.length} renk="text-emerald-400" />
+              </div>
 
-        {/* Eksik dolum seridi (16.11.2026): dolumu bitmemis dosyalar; tiklayinca o dosya suzulur. Hepsi tamamsa gizli. */}
-        {eksikler.length > 0 && (
-          <div className="shrink-0 flex items-center gap-2 overflow-x-auto rounded-lg border px-2.5 py-1.5 text-[11px]" role="status" data-testid="eksik-dolum"
-            style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.07)", color: "#FCD34D", scrollbarWidth: "thin" }}>
-            <AlertTriangle size={13} className="shrink-0" />
-            <span className="shrink-0 font-semibold">Dolum sürüyor</span>
-            {eksikler.map((e) => (
-              <button key={e.dosya_id} type="button" onClick={() => { setArama(e.dosya_no); setIhSekme("aktif"); }}
-                className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-white/5 whitespace-nowrap" style={{ borderColor: "rgba(245,158,11,0.35)" }}
-                title={`${e.dosya_no}: ${e.dolu}/${e.toplam} dolu, ${e.bekleyen} bekliyor — konteynerlerini göster`}>
-                <span className="font-mono font-semibold text-white">{e.dosya_no}</span> · {e.dolu}/{e.toplam} dolu
-              </button>
-            ))}
-          </div>
-        )}
+              {/* Otomatik DBA durumu + elle kontrol gereken belgeler (cihaz tanimli degilse gorunmez) */}
+              <KantarDbaOtomasyon yenileTetik={dbaOtoYenile} />
 
-        {/* Ihracat sekmeleri (?sekme=) */}
-        <SekmeCubugu varyant="kompakt" ariaLabel="İhracat bölümleri" testId="kantar-ihracat-sekmeler" secili={ihSekme} onSec={setIhSekme} ogeler={[
-          { deger: "aktif", etiket: "Aktif dolumlar", sayi: bekleyenler.length, ipucu: `${bekleyenler.length} DBA bekleyen` },
-          { deger: "tamamlanan", etiket: "DBA tamamlanan", sayi: tamamlananlar.length, ipucu: `${tamamlananlar.length} konteyner` },
-        ]} />
+              {/* Eksik dolum seridi (16.11.2026): dolumu bitmemis dosyalar; tiklayinca o dosya suzulur. Hepsi tamamsa gizli. */}
+              {eksikler.length > 0 && (
+                <div className="shrink-0 flex items-center gap-2 overflow-x-auto rounded-lg border px-2.5 py-1.5 text-[11px]" role="status" data-testid="eksik-dolum"
+                  style={{ borderColor: "rgba(245,158,11,0.35)", backgroundColor: "rgba(245,158,11,0.07)", color: "#FCD34D", scrollbarWidth: "thin" }}>
+                  <AlertTriangle size={13} className="shrink-0" />
+                  <span className="shrink-0 font-semibold">Dolum sürüyor</span>
+                  {eksikler.map((e) => (
+                    <button key={e.dosya_id} type="button" onClick={() => { setArama(e.dosya_no); setIhSekme("aktif"); }}
+                      className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border hover:bg-white/5 whitespace-nowrap" style={{ borderColor: "rgba(245,158,11,0.35)" }}
+                      title={`${e.dosya_no}: ${e.dolu}/${e.toplam} dolu, ${e.bekleyen} bekliyor — konteynerlerini göster`}>
+                      <span className="font-mono font-semibold text-white">{e.dosya_no}</span> · {e.dolu}/{e.toplam} dolu
+                    </button>
+                  ))}
+                </div>
+              )}
 
-        {/* İçerik Alanı (genis ekranda sadece bu bölüm scroll olur) */}
-        <div className="xl:flex-1 xl:overflow-y-auto xl:min-h-0 pb-4 xl:pb-6 xl:pr-1 space-y-4" style={{ scrollbarWidth: "thin" }}>
-          
+              {/* Ihracat sekmeleri (?ih=) */}
+              <SekmeCubugu varyant="kompakt" ariaLabel="İhracat bölümleri" testId="kantar-ihracat-sekmeler" secili={ihSekme} onSec={setIhSekme} ogeler={[
+                { deger: "aktif", etiket: "Aktif dolumlar", sayi: bekleyenler.length, ipucu: `${bekleyenler.length} DBA bekleyen` },
+                { deger: "tamamlanan", etiket: "DBA tamamlanan", sayi: tamamlananlar.length, ipucu: `${tamamlananlar.length} konteyner` },
+              ]} />
+
+              <div className="space-y-4">
           {/* Sevkiyat Durumu (28.10.2026): hangi sevkiyattan kac konteyner dolu */}
-          {ihSekme === "aktif" && <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} panelYetkisi={panelYetkisi} kantar={kantarCanli?.konteynerler ?? null} />}
+          {ihSekme === "aktif" && (eksikler.length > 0 || !!arama.trim()) && <KantarSevkiyatDurumu sevkiyatlar={sevkiyatlar} arama={arama} panelYetkisi={panelYetkisi} kantar={kantarCanli?.konteynerler ?? null} />}
 
           {/* Bekleyen DBA'lar - tek liste (Aktif dolumlar sekmesi; DBA yukleme burada) */}
           {ihSekme === "aktif" && bekleyenlerFiltreli.length > 0 && (
@@ -688,8 +731,8 @@ export default function KantarPage() {
           )}
 
           {ihSekme === "aktif" && konteynerler.length > 0 && bekleyenlerFiltreli.length === 0 && !arama.trim() && (
-            <div className="rounded-xl border p-4 text-center text-xs" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="dba-bekleyen-yok">
-              DBA bekleyen konteyner yok.{tamamlananlar.length > 0 && <> <button type="button" onClick={() => setIhSekme("tamamlanan")} className="underline" style={{ color: ACCENT }}>Tamamlanan {tamamlananlar.length} konteyner</button></>}
+            <div className="rounded-xl border p-8 text-center text-sm" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="dba-bekleyen-yok">
+              {eksikler.length ? "DBA bekleyen konteyner yok." : "Dolumu süren sevkiyat ve DBA bekleyen konteyner yok."}{tamamlananlar.length > 0 && <> <button type="button" onClick={() => setIhSekme("tamamlanan")} className="underline" style={{ color: ACCENT }}>Tamamlanan {tamamlananlar.length} konteyner</button></>}
             </div>
           )}
 
@@ -699,58 +742,22 @@ export default function KantarPage() {
             </div>
           )}
 
-          {konteynerler.length > 0 && bekleyenlerFiltreli.length === 0 && tamamlananlarFiltreli.length === 0 && (
+          {konteynerler.length > 0 && !!arama.trim() && bekleyenlerFiltreli.length === 0 && tamamlananlarFiltreli.length === 0 && (
             <div className="rounded-xl border shadow-sm p-12 text-center animate-fade-up" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
               <Search size={40} className="mx-auto mb-3" style={{ color: CARD_BORDER }} />
               <p className="text-sm font-medium" style={{ color: TEXT_MUTED }}>&quot;{arama}&quot; ile eşleşen konteyner bulunamadı.</p>
             </div>
           )}
           
-        </div>
-        </section>
 
-        {/* ===== SAG: YURT ICI (irsaliye) - Satis / Alis sekmeleri (30.10.2026) ===== */}
-        <section ref={yurtIciRef} aria-labelledby="kantar-yurt-ici" className="flex flex-col gap-3 xl:min-h-0 xl:rounded-2xl xl:border xl:p-3 scroll-mt-2" style={{ borderColor: CARD_BORDER }}>
-          <BolumBasligi id="kantar-yurt-ici" ikon={<Truck size={15} />} baslik="Yurt İçi · İrsaliye" aciklama="Satış: müşteriye giden araç · Alış: depodan gelen araç · Gemi: tahliye araçları" />
-          <div role="tablist" aria-label="Yurt içi bölümleri" className="shrink-0 self-start inline-flex rounded-lg border p-0.5" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
-            {([["satis", "Satış · İş Emirleri", yurtIciAcik], ["alis", "Alış · Gelen Araç", alisAcik], ["gemi", "Gemi · Tahliye", gemiAcik]] as const).map(([k, etiket, sayi]) => ((k === "alis" && alisAcik === null) || (k === "gemi" && gemiAcik === null)) ? null : (
-              <button key={k} role="tab" aria-selected={gorunenSekme === k} aria-controls={`kantar-yi-${k}`} onClick={() => sekmeSec(k)}
-                className="px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors"
-                style={gorunenSekme === k ? { backgroundColor: k === "alis" ? "#F59E0B" : k === "gemi" ? "#38BDF8" : ACCENT, color: k === "satis" ? "white" : "#111" } : { color: TEXT_MUTED }}>
-                {etiket} <span className="font-normal opacity-80">({sayi ?? "–"})</span>
-              </button>
-            ))}
-          </div>
-          <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto xl:pr-1 pb-4 xl:pb-6" style={{ scrollbarWidth: "thin" }}>
-            <div id="kantar-yi-satis" role="tabpanel" hidden={gorunenSekme !== "satis"}>
-              <KantarYurtIci yenileTetik={yurtIciYenile} acikSayiBildir={setYurtIciAcik} kantarBekleyen={kantarCanli?.isEmirleri ?? null} />
+              </div>
             </div>
-            {/* Alis bileseni hep bagli kalir (sayiyi bildirir); fonksiyonlar yoksa kendisi hicbir sey cizmez */}
-            <div id="kantar-yi-alis" role="tabpanel" hidden={gorunenSekme !== "alis"}>
-              <KantarGelenArac yenileTetik={yurtIciYenile} acikSayiBildir={setAlisAcik} kantarBekleyen={kantarCanli?.alislar ?? null} />
-            </div>
-            {/* Gemi bileseni hep bagli kalir; fonksiyon yoksa / acik gemi yoksa sekme gizli */}
-            <div id="kantar-yi-gemi" role="tabpanel" hidden={gorunenSekme !== "gemi"}>
-              <KantarGemiTahliye yenileTetik={yurtIciYenile} acikSayiBildir={setGemiAcik} />
-            </div>
-          </div>
-        </section>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
 
-/** Kantar Paneli bolum basligi (Ihracat / Yurt Ici). Dar ekranda kaydirirken ustte sabit kalir. Sagda kucuk sayaclar. */
-function BolumBasligi({ id, ikon, baslik, aciklama, sag }: { id: string; ikon: React.ReactNode; baslik: string; aciklama: string; sag?: React.ReactNode }) {
-  return (
-    <div className="shrink-0 sticky top-0 z-20 xl:static flex items-center gap-2.5 py-2 xl:py-0 -mt-1 xl:mt-0 bg-[rgba(11,15,20,0.92)] xl:bg-transparent">
-      <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(16,185,129,0.12)", color: ACCENT }}>{ikon}</span>
-      <div className="min-w-0 mr-auto">
-        <h2 id={id} className="text-sm font-bold text-white leading-tight">{baslik}</h2>
-        <p className="text-[11px] truncate" style={{ color: TEXT_MUTED }}>{aciklama}</p>
-      </div>
-      {sag && <div className="flex items-center gap-1.5 shrink-0">{sag}</div>}
+      <KantarEslesmeyenCekmece acik={cekmece} kapat={() => setCekmece(false)} liste={kantarCanli?.eslesmeyen ?? []}
+        gemiler={sayilar?.gemiler ?? []} baglandi={() => { kantarCanliGetir(); sayilarGetir(); setYurtIciYenile((n) => n + 1); }} />
     </div>
   );
 }

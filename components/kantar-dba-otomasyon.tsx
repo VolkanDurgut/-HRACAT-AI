@@ -123,10 +123,13 @@ export function KantarDbaOtomasyon({ yenileTetik = 0 }: { yenileTetik?: number }
               : { sinif: "bg-white/5", nokta: "bg-slate-500", metin: `Sinyal yok · son ${gecenSure(c.son_sinyal, simdi)}` };
           return (
             <div key={c.id} className="flex items-center gap-1.5 flex-wrap">
-              <span className={`inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap ${c.canli ? "bg-emerald-500/10 text-emerald-400" : "bg-sky-500/10 text-sky-400"}`}
-                title={c.canli ? "Eşleşen belgeler konteynere otomatik yüklenir." : "Deneme modu: belgeler okunur ve eşleştirilir ama konteynere yazılmaz. DBA'ları her zamanki gibi elle yükleyin."}>
-                {c.canli ? "Canlı" : "Deneme modu"}
-              </span>
+              {/* 26.11.2026: "Canli" rozeti yalniz sayfa basliginda; burada yalniz deneme modu uyarisi */}
+              {!c.canli && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold whitespace-nowrap bg-sky-500/10 text-sky-400"
+                  title="Deneme modu: belgeler okunur ve eşleştirilir ama konteynere yazılmaz. DBA'ları her zamanki gibi elle yükleyin.">
+                  Deneme modu
+                </span>
+              )}
               <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium whitespace-nowrap ${sinyal.sinif}`}
                 style={sinyal.nokta === "bg-slate-500" ? { color: TEXT_MUTED } : undefined}
                 title={`${c.ad}${c.son_surum ? ` · görev sürümü ${c.son_surum}` : ""}. Kantar bilgisayarı kapalıysa sinyal gelmez; açılınca aradaki belgeler otomatik işlenir.`}>

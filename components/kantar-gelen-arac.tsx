@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { aramaUyar } from "@/lib/kantar-gorunum";
 import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
 import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
@@ -28,10 +29,12 @@ type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 const IRSALIYE_NO_RE = /^[A-Z0-9]{3,20}$/;
 const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})(?:\s*\(\d+\))?\.pdf$/i;
 
-export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null }: {
+export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null, arama = "" }: {
   yenileTetik?: number; acikSayiBildir?: (n: number | null) => void;
   /** 24.11.2026: alis id -> kantarda tartilip teslimi girilmemis kg / arac (bilgi; resmi rakam degismez) */
   kantarBekleyen?: Map<string, KantarBekleyenIs> | null;
+  /** 26.11.2026: Kantar Paneli Yurt Ici sekmesi arama kutusu */
+  arama?: string;
 } = {}) {
   const { companyId } = useAuth();
   const { showToast } = useToast();
@@ -213,6 +216,8 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
   const bugun = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
   const bugunkuler = sonlar.filter((s) => new Date(s.olusturma).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugun);
   const th = "px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap";
+  const siparislerG = siparisler.filter((x) => aramaUyar(x as unknown as Record<string, unknown>, arama));
+  const sonlarG = sonlar.filter((x) => aramaUyar(x as unknown as Record<string, unknown>, arama));
 
   // 30.10.2026: kartlar yerine SIKI TABLO (Kantar Paneli sadelestirme); Satis ile ayni duzen.
   return (
@@ -220,11 +225,11 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
       {okumaHatasi && <p className="text-xs text-amber-300">Sunucuya ulaşılamadı; liste güncel olmayabilir.</p>}
       <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b" style={{ borderColor: CARD_BORDER }}>
-          <h3 className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Açık alış siparişleri <span className="font-normal" style={{ color: TEXT_MUTED }}>({siparisler.length})</span></h3>
+          <h3 className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Açık alış siparişleri <span className="font-normal" style={{ color: TEXT_MUTED }}>({siparislerG.length})</span></h3>
           <span className="text-[11px]" style={{ color: TEXT_MUTED }}>Bugün teslim alınan: <span className="font-semibold text-amber-400">{bugunkuler.length} araç</span> · {kgYazi(bugunkuler.reduce((t, s) => t + Number(s.net_kg), 0))}</span>
         </div>
-        {siparisler.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs" style={{ color: TEXT_MUTED }}>Açık alış siparişi yok.</p>
+        {siparislerG.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs" style={{ color: TEXT_MUTED }}>{siparisler.length ? "Aramayla eşleşen alış yok." : "Açık alış siparişi yok."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
@@ -233,7 +238,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
                 <tr>{["Alış · Tedarikçi · Ürün", "Alınan / Sipariş", ""].map((b, i) => <th key={i} className={`${th} ${i === 2 ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
               </thead>
               <tbody>
-                {siparisler.map((s) => {
+                {siparislerG.map((s) => {
                   // 24.11.2026: kantarda tartilip irsaliyesi bekleyen araclar da kalandan duser
                   const kd = kantarDahil(Number(s.alinan_kg), s.alinan_arac, kantarBekleyen?.get(s.id));
                   const il = alisIlerleme(s.miktar_kg, kd.kg);
@@ -266,10 +271,10 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
         )}
       </div>
 
-      {sonlar.length > 0 && (
+      {sonlarG.length > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <h3 className="px-3 py-2 border-b text-xs font-bold text-white flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Son 3 günde teslim alınan araçlar <span className="font-normal" style={{ color: TEXT_MUTED }}>({sonlar.length})</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Son 3 günde teslim alınan araçlar <span className="font-normal" style={{ color: TEXT_MUTED }}>({sonlarG.length})</span>
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
@@ -278,7 +283,7 @@ export function KantarGelenArac({ yenileTetik = 0, acikSayiBildir, kantarBekleye
                 <tr>{["Plaka · Zaman", "Tedarikçi · Alış", "Net", "İrsaliye"].map((b) => <th key={b} className={`${th} ${b === "Net" ? "text-right" : ""}`} style={{ color: TEXT_MUTED }}>{b}</th>)}</tr>
               </thead>
               <tbody>
-                {sonlar.map((s) => (
+                {sonlarG.map((s) => (
                   <tr key={s.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
                     <td className="px-3 py-1.5 whitespace-nowrap"><span className="block text-[11px] font-bold text-white">{s.plaka}</span><span className="block text-[10px]" style={{ color: TEXT_MUTED }}>{tarihSaatYazi(s.olusturma).slice(0, 16)}</span></td>
                     <td className="px-3 py-1.5 text-[11px] text-white"><span className="block truncate" title={s.tedarikci}>{s.tedarikci}</span><span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{s.alis_no}{s.dogrudan_is_emri_no ? ` → ${s.dogrudan_is_emri_no}` : ""} · {s.urun}</span></td>

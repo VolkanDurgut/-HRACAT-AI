@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eksikDolumlar, gorunenSevkiyatlar, kantarDosyaYolu, kantarSekmesi, panelDosyaYolu } from "@/lib/kantar-gorunum";
+import { aramaUyar, baslangicAnaSekmesi, eksikDolumlar, gemiSlug, gorunenSevkiyatlar, kantarAnaSekmesi, kantarDosyaYolu, kantarSekmesi, kantarYiSekmesi, panelDosyaYolu } from "@/lib/kantar-gorunum";
 import type { SevkiyatDurumu } from "@/lib/kantar-sevkiyat";
 
 const s = (dosya_no: string, dolu: number, toplam: number, durum: SevkiyatDurumu) => ({ dosya_id: dosya_no, dosya_no, dolu, toplam, durum });
@@ -31,4 +31,27 @@ test("baglantilar dosya no ile; bos dosya no -> null", () => {
   assert.equal(panelDosyaYolu("IHR-2026-0001"), "/panel?dosya=IHR-2026-0001");
   assert.equal(kantarDosyaYolu("IHR-2026-0001"), "/kantar?dosya=IHR-2026-0001");
   assert.equal(panelDosyaYolu(" "), null);
+});
+
+test("26.11.2026 ana sekmeler: adres okuma, eski adres, baslangic secimi", () => {
+  assert.equal(kantarAnaSekmesi("gemi"), "gemi");
+  assert.equal(kantarAnaSekmesi("YURTICI"), "yurtici");
+  assert.equal(kantarAnaSekmesi("tamamlanan"), "ihracat");
+  assert.equal(kantarAnaSekmesi("x"), null);
+  assert.equal(kantarYiSekmesi("alis"), "alis");
+  assert.equal(kantarYiSekmesi("gemi"), null);
+  assert.equal(baslangicAnaSekmesi({ adres: null, dosyaVar: false, gemiVar: true }), "gemi");
+  assert.equal(baslangicAnaSekmesi({ adres: null, dosyaVar: false, gemiVar: false }), "yurtici");
+  assert.equal(baslangicAnaSekmesi({ adres: "gemi", dosyaVar: false, gemiVar: false }), "yurtici");
+  assert.equal(baslangicAnaSekmesi({ adres: "yurtici", dosyaVar: false, gemiVar: true }), "yurtici");
+  assert.equal(baslangicAnaSekmesi({ adres: "gemi", dosyaVar: true, gemiVar: true }), "ihracat");
+});
+
+test("gemiSlug ve aramaUyar", () => {
+  assert.equal(gemiSlug("MV KURGU YILDIZ"), "kurgu-yildiz");
+  assert.equal(gemiSlug("M/V Kurgu Şile"), "kurgu-sile");
+  assert.equal(aramaUyar({ plaka: "34 KRG 001", net: 26500 }, "34krg"), true);
+  assert.equal(aramaUyar({ musteri: "KURGU İÇ TİCARET" }, "ic tic"), true);
+  assert.equal(aramaUyar({ plaka: "34 KRG 001" }, "06"), false);
+  assert.equal(aramaUyar({ plaka: "x" }, "  "), true);
 });

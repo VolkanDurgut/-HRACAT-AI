@@ -1695,3 +1695,19 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - `app/panel/page.tsx`: satır çizimi aynen `satirCiz` fonksiyonuna alındı; her grup kendi tablosu (sütun başlıkları her
   kutuda). Filtre / arama aynen (filtrelenen grup tek kutu). ?dosya= vurgusu daraltılmış gruptaysa grup açılır.
 - Test: tests/panel-is-listesi.test.ts (grup bölme, sıra korunur, dağılım, bozuk depolama değeri).
+
+## Kantar Paneli yeniden tasarım (26.11.2026) — dal `kantar-tasarim`, önizleme onayından sonra canlıya
+- Kullanıcı görev tanımı: 50/50 bölünmüş ekran kalktı; üst çubuk (tek "● Canlı" rozeti, Ana Menü, Yenile, Çıkış) +
+  tek satır canlı kantar şeridi (kantardaki araçlar; sağda yalnız "⚠ Eşleşmeyen N Tartım" düğmesi → sağdan çekmece
+  `components/kantar-eslesmeyen-cekmece.tsx`) + tam genişlikte ÜÇ ANA SEKME: Gemi Tahliye · Yurt İçi İrsaliye · İhracat · DBA.
+  Yalnız seçili sekme çizilir; sekme sayıları `kantarSekmeSayilariOku` (lib/kantar-canli-veri.ts) ile.
+- Adres: `?sekme=gemi|yurtici|ihracat`, `?gemi=<slug>` (MV önekisiz, `gemiSlug`), `?yi=satis|alis`, `?ih=aktif|tamamlanan`.
+  Eski `?sekme=aktif|tamamlanan` → İhracat + ih; `?dosya=` (Ana Panel) → İhracat + arama. Başlangıç: açık gemi varsa Gemi.
+  Saf yardımcılar `lib/kantar-gorunum.ts` (`kantarAnaSekmesi`, `kantarYiSekmesi`, `baslangicAnaSekmesi`, `gemiSlug`, `aramaUyar`).
+- Gemi: hap seçici → tek satır özet (ilerleme, %, ton, araç, amber Yolda, mavi Liman fişi bekleyen) + Liman Excel'i Yükle /
+  + Elle Araç → "Son tartılan araçlar" (10; "tümünü göster") Saat | Plaka | Gittiği Yer | Liman | Teslim | Fark rozeti
+  (|fark| ≤ 300 yeşil, üstü kırmızı) → tek satır gittiği yer özeti. Yurt İçi: Satış / Alış alt filtresi + arama
+  (`arama` prop: KantarYurtIci / KantarGelenArac). İhracat: arama + sayaçlar + Otomatik DBA (yalnız "Deneme modu" rozeti) +
+  Aktif / Tamamlanan; aktif dolum ve DBA bekleyen yoksa TEK boş durum mesajı.
+- Çekmecede "Gemiye bağla": migration `20261126000000_ic_gemi_tartim_bagla.sql` (`ic_gemi_tartim_bagla(p_gemi, p_kayit_no)`;
+  yalnız ekleme, CANLIDA). İş emrine elle bağlama yok (firma + ürünle kendiliğinden eşleşir) — kullanıcı kararı bekleniyor.

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { aramaUyar } from "@/lib/kantar-gorunum";
 import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-seridi";
 import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
@@ -33,11 +34,13 @@ const ETTN_DOSYA_RE = /^([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F
 
 type Adim = "dosya" | "okunuyor" | "kontrol" | "kaydediliyor";
 
-export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null }: {
+export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen = null, arama = "" }: {
   /** Kantar Paneli ustundeki "Yenile" basilinca artar -> liste yenilenir. */
   yenileTetik?: number;
   /** 24.11.2026: is emri id -> kantarda tartilip irsaliyesi girilmemis kg / arac (bilgi; resmi rakam degismez) */
   kantarBekleyen?: Map<string, KantarBekleyenIs> | null;
+  /** 26.11.2026: Kantar Paneli Yurt Ici sekmesi arama kutusu (is emri no, musteri, urun, plaka, irsaliye...) */
+  arama?: string;
   /** Acik is emri sayisi (dar ekrandaki bolum dugmesi icin). */
   acikSayiBildir?: (sayi: number) => void;
 } = {}) {
@@ -216,6 +219,8 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
   const bugun = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" });
   const bugunkuler = sonSevkler.filter((s) => new Date(s.olusturma).toLocaleDateString("en-CA", { timeZone: "Europe/Istanbul" }) === bugun);
   const th = "px-3 py-2 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap";
+  const emirlerG = emirler.filter((x) => aramaUyar(x as unknown as Record<string, unknown>, arama));
+  const sonSevklerG = sonSevkler.filter((x) => aramaUyar(x as unknown as Record<string, unknown>, arama));
 
   // 30.10.2026 (kullanici: "Kantar paneli cok karisik, her sey cok buyuk; tek ekranda yonetilebilir
   // olmali"): kartlar yerine SIKI TABLO, ozet kutulari tek satir, her satirda KALAN tonaj
@@ -231,11 +236,11 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
 
       <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b" style={{ borderColor: CARD_BORDER }}>
-          <h3 className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Açık satış iş emirleri <span className="font-normal" style={{ color: TEXT_MUTED }}>({emirler.length})</span></h3>
+          <h3 className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /> Açık satış iş emirleri <span className="font-normal" style={{ color: TEXT_MUTED }}>({emirlerG.length})</span></h3>
           <span className="text-[11px]" style={{ color: TEXT_MUTED }}>Bugün yüklenen: <span className="font-semibold text-emerald-400">{bugunkuler.length} araç</span> · {kgYazi(bugunkuler.reduce((t, s) => t + Number(s.net_kg), 0))}</span>
         </div>
-        {emirler.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs" style={{ color: TEXT_MUTED }}><Truck size={20} className="mx-auto mb-1.5" style={{ color: CARD_BORDER }} />Açık yurt içi iş emri yok.</p>
+        {emirlerG.length === 0 ? (
+          <p className="px-3 py-6 text-center text-xs" style={{ color: TEXT_MUTED }}><Truck size={20} className="mx-auto mb-1.5" style={{ color: CARD_BORDER }} />{emirler.length ? "Aramayla eşleşen iş emri yok." : "Açık yurt içi iş emri yok."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
@@ -246,7 +251,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                 </tr>
               </thead>
               <tbody>
-                {emirler.map((e) => {
+                {emirlerG.map((e) => {
                   // 24.11.2026: kantarda tartilip irsaliyesi bekleyen araclar da kalandan duser
                   const kd = kantarDahil(Number(e.yuklenen_kg), e.yuklenen_arac, kantarBekleyen?.get(e.id));
                   const kg = kd.kg;
@@ -280,10 +285,10 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
         )}
       </div>
 
-      {sonSevkler.length > 0 && (
+      {sonSevklerG.length > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
           <h3 className="px-3 py-2 border-b text-xs font-bold text-white flex items-center gap-2" style={{ borderColor: CARD_BORDER }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Son 3 günde yüklenen araçlar <span className="font-normal" style={{ color: TEXT_MUTED }}>({sonSevkler.length})</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Son 3 günde yüklenen araçlar <span className="font-normal" style={{ color: TEXT_MUTED }}>({sonSevklerG.length})</span>
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[420px]">
@@ -296,7 +301,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                 </tr>
               </thead>
               <tbody>
-                {sonSevkler.map((s) => (
+                {sonSevklerG.map((s) => (
                   <tr key={s.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
                     <td className="px-3 py-1.5 whitespace-nowrap"><span className="block text-[11px] font-bold text-white">{s.plaka}</span><span className="block text-[10px]" style={{ color: TEXT_MUTED }} title={s.dorse_plaka ? `Dorse: ${s.dorse_plaka}` : undefined}>{tarihSaatYazi(s.olusturma).slice(0, 16)}</span></td>
                     <td className="px-3 py-1.5 text-[11px] text-white"><span className="block truncate" title={s.musteri_maskeli}>{s.musteri_maskeli}</span><span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{s.is_emri_no} · {s.urun}</span></td>

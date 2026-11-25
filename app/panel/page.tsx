@@ -29,6 +29,7 @@ import { FiloBolumu } from "@/components/panel/filo-bolumu";
 import { bookingIsi, dosyaIsi, haftalikYukleme, kapasiteHesapla, sabahKarsilastirmasi, yuklemePlaniKur, type Kapasite, type YuklemeIsi } from "@/lib/panel/gunluk-yukleme";
 import { GunlukYuklemeKarti } from "@/components/panel/gunluk-yukleme-karti";
 import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
+import { yuklemeEvraklariTamam } from "@/lib/yukleme-evrak-tamam";
 import { doluDurumu, isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, type ListeFiltresi, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import { DoluGostergesi, DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
@@ -298,7 +299,12 @@ function PanelContent() {
 
   // 23.11.2026 TEK IS LISTESI (lib/panel/is-listesi.ts): acik dosyalar + dosyasi acilmamis is emirleri + odeme bekleyenler;
   // durum ve renk kayitlardan otomatik, siralama cut-off > acik > rezervasyon bekliyor > odeme bekliyor.
-  const ogeler = useMemo(() => isListesiKur(dosyalar, isEmirleri, odemeler), [dosyalar, isEmirleri, odemeler]);
+  // 25.11.2026 (kullanici): yuklemesi tamamlanan is (KT · FT · BL · BY 4/4) Ihracat Evraklari'na aktarilir -> is listesinde GORUNMEZ.
+  // Liste once TAM kurulur (is emri / odeme eslestirmesi bozulmasin), 4/4 dosya satirlari sonra cikarilir. Yukleme plani,
+  // ozet kartlari ve gunluk yukleme hesaplari butun acik dosyalarla devam eder.
+  const tumOgeler = useMemo(() => isListesiKur(dosyalar, isEmirleri, odemeler), [dosyalar, isEmirleri, odemeler]);
+  const ogeler = useMemo(() => tumOgeler.filter((o) => !(o.tur === "dosya" && yuklemeEvraklariTamam(o.dosya, o.dosya.faturaParcalari))), [tumOgeler]);
+  const aktarilanSayisi = tumOgeler.length - ogeler.length;
   const sayilar = useMemo(() => listeSayilari(ogeler), [ogeler]);
   const gorunenler = useMemo(() => listeAra(ogeler.filter((o) => filtreyeUyar(o.durum, activeFilter, o.cutoffYakin)), arama), [ogeler, activeFilter, arama]);
   const listeYetkisi = !!yetkiler.sayfa_yetkileri.proformalar;
@@ -327,11 +333,15 @@ function PanelContent() {
 
   // ?dosya= / cut-off cubugu: satir bulunur, filtre gizliyorsa "Tumu"ye donulur, satira kaydirilir ve vurgulanir.
   // Acik dosyalarda yoksa (kapali dosya) ve deger dosya kimligiyse eskisi gibi dosya sayfasina gidilir.
-  const vurguDosyasi = useMemo(() => (vurgu ? dosyalar.find((d) => dosyaEslesir(d, vurgu)) || null : null), [dosyalar, vurgu]);
+  // 4/4 dosya listede yok: vurgu bulunamaz -> eskisi gibi dosya sayfasina gidilir
+  const vurguDosyasi = useMemo(() => (vurgu ? dosyalar.find((d) => dosyaEslesir(d, vurgu) && !yuklemeEvraklariTamam(d, d.faturaParcalari)) || null : null), [dosyalar, vurgu]);
   useEffect(() => {
     if (loading || !vurgu) return;
     if (!vurguDosyasi) {
       if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vurgu)) { gecisliGit(`/dosya/${vurgu}`); return; }
+      // Evraklari tamamlanip Ihracat Evraklari'na aktarilan acik dosya: dosya sayfasi
+      const aktarilan = dosyalar.find((d) => dosyaEslesir(d, vurgu));
+      if (aktarilan) { gecisliGit(`/dosya/${aktarilan.id}`); return; }
       if (vurguKaydirildi.current !== vurgu) { vurguKaydirildi.current = vurgu; showToast(`${vurgu} açık dosyalar arasında bulunamadı.`, "error"); }
       return;
     }
@@ -340,7 +350,7 @@ function PanelContent() {
     if (!gorunenler.some((o) => o.tur === "dosya" && o.dosya.id === vurguDosyasi.id)) { setActiveFilter("tumu"); setArama(""); return; }
     vurguKaydirildi.current = vurguDosyasi.id;
     window.setTimeout(() => document.getElementById(`dosya-satir-${vurguDosyasi.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
-  }, [loading, vurgu, vurguDosyasi, gorunenler, setActiveFilter, gecisliGit, showToast]);
+  }, [loading, vurgu, vurguDosyasi, dosyalar, gorunenler, setActiveFilter, gecisliGit, showToast]);
   const detayDegistir = (id: string) => setAcikDetay((s) => { const y = new Set(s); if (y.has(id)) y.delete(id); else y.add(id); return y; });
 
   return (
@@ -348,7 +358,7 @@ function PanelContent() {
       <SayfaBasligi
         ikon={<FolderOpen size={20} />}
         baslik="Ana Panel"
-        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor`}
+        aciklama={`${sayilar.acik} açık sevkiyat · ${sayilar.rez_bekliyor} rezervasyon bekliyor · ${sayilar.odeme} ödeme bekliyor${aktarilanSayisi > 0 ? ` · ${aktarilanSayisi} tamamlanan iş İhracat Evrakları'nda` : ""}`}
         sag={<BildirimIzniButonu />}
       />
 

@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase";
 
 export type RaporTuru =
   | "gunluk_ihracat" | "siparis" | "navlun" | "navlun_haftalik" | "diib" | "vgm" | "konsimento_hatirlatma"
-  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz" | "siparis_formu_lojistik" | "siparis_formu_spek";
+  | "fatura_onay" | "fatura_dagitim" | "pazar_gorev" | "musteri_durum" | "satin_alma" | "siparis_formu" | "siparissiz" | "siparis_formu_lojistik" | "siparis_formu_spek" | "draft_evrak";
 export type RaporAlicisi = { rapor: RaporTuru; alicilar: string[]; cc: string[]; canli: boolean; kayitli: boolean; guncelleyen: string | null; guncelleme: string | null };
 
 export type RaporGrubu = "Günlük raporlar" | "Operasyon" | "Satış ve müşteri";
@@ -36,6 +36,8 @@ export const RAPORLAR: RaporTanimi[] = [
   { rapor: "navlun", ad: "Navlun Raporu", grup: "Günlük raporlar", aciklama: "Satın alınan navlunlar + rezervasyon bekleyen müşteriler + 2 Excel (satın alma listesi, bütün navlunlar)", saat: "Her gün 17:00", edge: "navlun-tablosu", testModu: true, etkin: "tam" },
   { rapor: "diib", ad: "DİİB Raporu", grup: "Günlük raporlar", aciklama: "DİİB kapatma ve süre takibi", saat: "Her cumartesi 09:00 (son 7 gün)", edge: null, testModu: false, etkin: "yakinda" },
   { rapor: "vgm", ad: "Yükleme Tamamlandı · VGM Raporu", grup: "Operasyon", aciklama: "Tüm konteynerleri yüklenen dosyanın VGM PDF'i (logolu)", saat: "Yükleme tamamlanınca", edge: null, testModu: false, etkin: "yakinda" },
+  // 25.11.2026 (kullanici: "Alici mail sadece execution@ olacak"): Ihracat Evraklari > "Draft Seti Mail Gönder" (PDF ekli, ic ekibe)
+  { rapor: "draft_evrak", ad: "Draft Evrak Seti", grup: "Operasyon", aciklama: "İhracat Evrakları'ndan gönderilen draft evrak seti (1-6 numaralı belgeler PDF ekli); müşteriye değil, ekibe", saat: "Gönder butonuyla (elle)", edge: null, testModu: true, etkin: "tam" },
   { rapor: "konsimento_hatirlatma", ad: "Konşimento Hatırlatma", grup: "Operasyon", aciklama: "Fatura talimatından sonra konşimento talimatı bekleyen dosyalar", saat: "Talimat gönderilince", edge: null, testModu: false, etkin: "yakinda" },
   // 14.11.2026: onay adimi kaldirildi; 'fatura_onay' listesi = talimat mailinin alicilari (Alici + CC). 'fatura_dagitim' kullanilmiyor.
   { rapor: "fatura_onay", ad: "Fatura Talimatı", grup: "Operasyon", aciklama: "“FATURA VE BEYANNAME TALİMATI HAKKINDA // …” · Harun Bey merhaba + PDF indir düğmesi", saat: "Konteynerler tamamlanınca (10 dk içinde)", edge: null, testModu: true, etkin: "tam" },

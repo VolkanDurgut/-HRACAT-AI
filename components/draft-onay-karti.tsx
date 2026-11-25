@@ -141,7 +141,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
   };
 
   // 24.11.2026: Draft Evrak Seti maili - paketteki belgeler AYNI adlarla, vektor PDF ("cam gibi"), Unex AI maili.
-  // Simdilik YALNIZ TEST adresine gider (edge draft-evrak-mail); dosyada hicbir alan degismez.
+  // 25.11.2026: alici Ayarlar > Rapor Alicilari > Draft Evrak Seti (canli kapaliysa test adresi; edge draft-evrak-mail); dosyada hicbir alan degismez.
   const handleSetMailGonder = async () => {
     if (setGonderiliyor) return;
     if (arsiv) {
@@ -241,14 +241,16 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
       })
       .eq("id", dosya.id)
       .eq("company_id", companyId)
-      .select("id");
+      .select("id, durum");
     setMusteriOnayiKaydediliyor(false);
     const hata = yazmaHatasi(error, data);
     if (hata) {
       showToast(`Müşteri onayı kaydedilemedi: ${hata}`, "error");
       return;
     }
-    showToast("Müşteri onayı kaydedildi.", "success");
+    // 25.11.2026: onay + yukleme evraklari 4/4 ise veritabani dosyayi otomatik kapatir (Ihracatlar > Kapanan Ihracatlar)
+    const kapandi = (data as { durum?: string }[] | null)?.[0]?.durum === "Kapalı";
+    showToast(kapandi ? "Müşteri onayı kaydedildi. Yükleme evrakları tamam olduğu için dosya kapatıldı (İhracatlar › Kapanan)." : "Müşteri onayı kaydedildi.", "success");
     onRefresh();
   };
 
@@ -566,7 +568,7 @@ export default function DraftOnayKarti({ dosya, rezervasyonlar, konteynerler, co
             onClick={handleSetMailGonder}
             disabled={!!setGonderiliyor || !draftBlUrl}
             data-testid="draft-set-mail"
-            title={setGonderiliyor || (draftBlUrl ? "Draft Seti Mail Gönder (PDF ekli · şimdilik test adresine)" : "Draft BL yüklenmemiş")}
+            title={setGonderiliyor || (draftBlUrl ? "Draft Seti Mail Gönder (PDF ekli · alıcılar: Ayarlar › Rapor Alıcıları › Draft Evrak Seti)" : "Draft BL yüklenmemiş")}
             aria-label="Draft evrak setini mail ile gönder"
             className="inline-flex items-center justify-center w-7 h-7 rounded-lg border hover:bg-white/5 disabled:opacity-50 transition-colors shrink-0"
             style={{ borderColor: CARD_BORDER, color: ACCENT }}

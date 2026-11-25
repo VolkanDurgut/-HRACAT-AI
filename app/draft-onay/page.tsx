@@ -20,6 +20,7 @@ import { TEXT_MUTED, CARD_BG, CARD_BORDER, ROW_HEADER_BG, ACCENT } from "@/lib/t
 import { draftSuresiDoldu, draftYanitSonuMs } from "@/lib/draft-onay-sure";
 import { CUTOFF_UYARI_ESIGI_MS } from "@/lib/cutoff-utils";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+import { yuklemeEvraklariTamam } from "@/lib/yukleme-evrak-tamam";
 
 type DosyaWithRelations = Dosya & { rezervasyonlar: Rezervasyon[]; konteynerler: Konteyner[] };
 
@@ -133,10 +134,16 @@ export default function DraftOnayPage() {
     }
 
     const dosyaIds = dosyaData.map((d) => d.id);
-    const [rezRes, kontRes] = await Promise.all([
+    const [rezRes, kontRes, parcaRes] = await Promise.all([
       supabase.from("rezervasyonlar").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId).order("olusturma_tarihi", { ascending: true }).order("id", { ascending: true }),
       supabase.from("konteynerler").select("*").in("dosya_id", dosyaIds).eq("company_id", companyId),
+      // 25.11.2026: DIIB'e bolunmus yuklemede fatura parcalari (Ana Panel 4/4 kuraliyla ayni)
+      supabase.from("diib_dosya_bolunmeleri").select("dosya_id, fatura_dosya_url").in("dosya_id", dosyaIds).eq("company_id", companyId),
     ]);
+    const parcaMap: Record<string, { fatura_dosya_url: string | null }[]> = {};
+    ((parcaRes.data || []) as { dosya_id: string; fatura_dosya_url: string | null }[]).forEach((p) => {
+      (parcaMap[p.dosya_id] ||= []).push({ fatura_dosya_url: p.fatura_dosya_url });
+    });
 
     const rezMap: Record<string, Rezervasyon[]> = {};
     (rezRes.data || []).forEach((r: Rezervasyon) => {
@@ -155,8 +162,10 @@ export default function DraftOnayPage() {
       konteynerler: kontMap[d.id] || [],
     }));
 
+    // 25.11.2026 (kullanici): Ana Panel'de yuklemesi tamamlanan is (KT · FT · BL · BY 4/4) de buraya aktarilir
+    // (belge verisi eksikse kart eksikleri gosterir); tam evrak seti hazir olanlar eskisi gibi.
     const hazirOlanlar = zenginlesmis.filter(
-      (d) => isDosyaAcik(d) && tamEvrakSetiHazirMi(d, d.rezervasyonlar, d.konteynerler)
+      (d) => isDosyaAcik(d) && (tamEvrakSetiHazirMi(d, d.rezervasyonlar, d.konteynerler) || yuklemeEvraklariTamam(d, parcaMap[d.id] || []))
     );
     hazirOlanlar.sort((a, b) => siraDegeri(a) - siraDegeri(b));
     // Kapananlar: en yeni ustte (sorgu zaten olusturma tarihine gore azalan)

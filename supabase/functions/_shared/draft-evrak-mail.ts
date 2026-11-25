@@ -7,6 +7,9 @@
 // test adresine. Dosya isimleri Taslak Onay Paketi'ndeki gibi."
 // Kalip: operasyon-mail.ts (konsimento talimati ile ayni). Ekler tarayicida vektor PDF olarak uretilir
 // (lib/html-vektor-pdf.ts); edge yalniz dogrular ve Resend ile gonderir.
+// 25.11.2026 (kullanici: Gmail'de mailin devami "..." olarak gizleniyordu): Gmail ayni konulu mailleri tek yazismada toplar ve
+//   onceki maille AYNI olan bolumleri kirpar. Her gonderimde bilgi tablosu ve alt notlara gorunmez benzersiz isaret +
+//   gorunur gonderim zamani eklenir (secenek.benzersiz). Telefon satiri yalniz numara kayitliysa gorunur.
 // ============================================================================
 import { operasyonMailHtml, opKacis } from "./operasyon-mail.ts";
 
@@ -77,22 +80,31 @@ const tarihYazi = (iso: string | null) => {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : null;
 };
 
+/** Gmail kirpmasini onleyen gorunmez isaret (metin olarak benzersiz, gorunumde yok). */
+export function gizliIsaret(isaret: string | null | undefined): string {
+  const t = String(isaret || "").replace(/[^A-Za-z0-9:.\- ]/g, "").slice(0, 60);
+  return t ? `<span style="display:none !important;font-size:0;line-height:0;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${t}</span>` : "";
+}
+
 export function draftMail(
   v: DraftMailVeri,
   ekAdlari: string[],
-  secenek: { site: string; test: boolean; gonderen?: string | null },
+  secenek: { site: string; test: boolean; gonderen?: string | null; benzersiz?: string | null; zaman?: string | null },
 ): { konu: string; html: string } {
   const k = opKacis;
+  const iz = gizliIsaret(secenek.benzersiz);
   const konu = `${secenek.test ? "[TEST] " : ""}Draft Evrak Seti · ${v.proforma_no || v.dosya_no || "-"}${v.booking_no ? ` · ${v.booking_no}` : ""}${v.alici_firma ? ` · ${v.alici_firma}` : ""}`;
   const telHref = (v.alici_tel || "").replace(/[^\d+]/g, "");
   const gemi = [v.gemi_adi, v.sefer_no].filter(Boolean).join(" / ");
   const bilgiler: [string, string][] = [
-    ["Müşteri", v.alici_firma ? `<b>${k(v.alici_firma)}</b>` : "-"],
+    ["Müşteri", `${v.alici_firma ? `<b>${k(v.alici_firma)}</b>` : "-"}${iz}`],
     ["E-posta", v.alici_email ? `<a href="mailto:${k(v.alici_email)}" style="color:#283474;">${k(v.alici_email)}</a>` : "<span style=\"color:#B45309;\">Dosyada kayıtlı değil</span>"],
-    ["Telefon", v.alici_tel ? (telHref ? `<a href="tel:${k(telHref)}" style="color:#283474;text-decoration:none;">${k(v.alici_tel)}</a>` : k(v.alici_tel)) : "-"],
-    ["Proforma No", k(v.proforma_no || "-")],
-    ["Booking No", k(v.booking_no || "-")],
   ];
+  // 25.11.2026 (kullanici): telefon kayitliysa gorunur; yoksa satir hic yok
+  if (v.alici_tel && v.alici_tel.trim()) {
+    bilgiler.push(["Telefon", telHref ? `<a href="tel:${k(telHref)}" style="color:#283474;text-decoration:none;">${k(v.alici_tel)}</a>` : k(v.alici_tel)]);
+  }
+  bilgiler.push(["Proforma No", k(v.proforma_no || "-")], ["Booking No", k(v.booking_no || "-")]);
   if (gemi) bilgiler.push(["Gemi / Sefer", k(gemi)]);
   const rota = [v.yuklenme_limani, v.varis_limani].filter(Boolean).join(" → ");
   if (rota) bilgiler.push(["Rota", k(rota)]);
@@ -111,8 +123,8 @@ export function draftMail(
       { metin: "İhracat Evraklarını Aç", href: `${secenek.site}/draft-onay`, birincil: true },
       { metin: "Dosyayı aç", href: `${secenek.site}/dosya/${v.dosya_id}?tab=evraklar` },
     ],
-    dugmeNotuHtml: "Müşteriye gönderdikten sonra İhracat Evrakları'nda “Gönderildi İşaretle” ile 48 saatlik yanıt süresini başlatın.",
-    altNotHtml: `Bu e-posta UNEX-AI tarafından${secenek.gonderen ? ` ${k(secenek.gonderen)} isteğiyle` : ""} gönderildi. Belgeler sistemdeki güncel bilgilerle oluşturuldu; Draft BL yüklenen dosyanın kendisidir.`,
+    dugmeNotuHtml: `Müşteriye gönderdikten sonra İhracat Evrakları'nda “Gönderildi İşaretle” ile 48 saatlik yanıt süresini başlatın.${iz}`,
+    altNotHtml: `Bu e-posta UNEX-AI tarafından${secenek.gonderen ? ` ${k(secenek.gonderen)} isteğiyle` : ""} gönderildi${secenek.zaman ? ` (${k(secenek.zaman)})` : ""}. Belgeler sistemdeki güncel bilgilerle oluşturuldu; Draft BL yüklenen dosyanın kendisidir.${iz}`,
   });
   return { konu, html };
 }

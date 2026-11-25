@@ -1634,6 +1634,22 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - MOD: YALNIZ TEST -> `DRAFT_EVRAK_TEST_ALICISI` (yoksa KONSIMENTO_HATIRLATMA_TEST_ALICISI). Dosyada hicbir alan
   degismez (draft_mail_gonderildi / 48 saat baslamaz). Canli alici (musteri + CC) kullanici onayiyla eklenecek.
 - Test: tests/draft-evrak-mail.test.ts.
+- 25.11.2026 CANLI: alıcı + CC Ayarlar › Rapor Alıcıları › "Draft Evrak Seti" (`rapor_alicilari.rapor = 'draft_evrak'`;
+  kullanıcı: yalnız execution@). Satır canlı değilse eski test yolu. Gmail kırpması ("•••"): Gmail aynı konulu mailleri
+  yazışmada toplar, tekrarlanan bölümleri gizler → her gönderimde görünmez benzersiz işaret + görünür gönderim zamanı
+  (`gizliIsaret`). Telefon satırı yalnız numara kayıtlıysa. Test: tests/yukleme-evrak-tamam-draft.test.ts.
+
+## Yükleme evrakları 4/4 → İhracat Evrakları → otomatik kapanış (25.11.2026)
+- Kullanıcı: "Ana paneldeki yüklemesi tamamlanmış işler (KT, FT, BL, BY) otomatik İhracat Evrakları'na aktarılmalı; orada
+  müşteri onayladı işaretlenenler otomatik kapatılsın."
+- Kural tek yerde: `lib/yukleme-evrak-tamam.ts` (Ana Panel evrakDurumlari ile aynı) = SQL `dosya_yukleme_evraklari_tamam`.
+- Ana Panel: liste önce TAM kurulur (iş emri / ödeme eşleştirmesi bozulmasın), 4/4 dosya satırları sonra çıkarılır; başlıkta
+  "N tamamlanan iş İhracat Evrakları'nda". Yükleme planı / özet kartları bütün açık dosyalarla.
+- İhracat Evrakları: açık ve (tam evrak seti hazır VEYA 4/4).
+- Otomatik kapanış (migration 20261125120000): `trg_onayli_tamam_kapat` (BEFORE UPDATE ihracat_dosyalari) ve
+  `trg_diib_parca_onayli_kapat` (parça faturası en son yüklenirse). Koşul: açık + müşteri onayı + 4/4; yalnız onay ya da evrak
+  alanı değişen, durumu değişmeyen güncellemede → elle yeniden açılan dosya yeniden kapanmaz. Denetim tetikleyicisi kaydeder.
+  Kartta "dosya kapatıldı (İhracatlar › Kapanan)" bildirimi. Rollback testi: 4/4+onay → Kapalı; yeniden aç → Açık; 4/4 değil → Açık.
 - 4-5-6 (COO / Phyto / Health) alici kutusu (lib/tarim-alici.ts -> iletisimBilgisiniCikar, 24.11.2026): telefon, faks,
   WhatsApp, e-posta ve irtibat kisisi ("CONTACTO:") gosterilmez ("sigmiyor"). Firma, adres, vergi no (TIN/NIF/VAT) kalir.
   Veri degismez; yalniz bu uc belgedeki gosterim. Health'teki eski kisaltma (ilk iletisim/vergi etiketinden keser) aynen.

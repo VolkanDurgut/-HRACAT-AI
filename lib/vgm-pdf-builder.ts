@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import { Dosya, Rezervasyon, Konteyner } from "@/lib/supabase";
 import { ROBOTO_TR_BASE64 } from "@/lib/fonts/roboto-tr-base64";
 import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "@/supabase/functions/_shared/vgm-pdf";
+import { UNEX_LOGO_VGM_BASE64, UNEX_LOGO_VGM_BOY, UNEX_LOGO_VGM_EN } from "@/supabase/functions/_shared/unex-logo-vgm-base64";
 
 /** Dosya + rezervasyon + konteynerlerden VGM PDF verisi (uygulama ve mail ayni icerik). */
 export function vgmPdfVerisi(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[], olusturma: string): VgmPdfVerisi {
@@ -26,6 +27,7 @@ export function vgmPdfVerisi(dosya: Dosya, rezervasyonlar: Rezervasyon[], kontey
 export function indirVgmPdf(dosya: Dosya, rezervasyonlar: Rezervasyon[], konteynerler: Konteyner[]): void {
   // Yatay (landscape) - 5 kolonlu SOLAS VGM formatinin rahat sigmasi icin
   const doc = new jsPDF({ orientation: "landscape" });
-  vgmPdfCiz(doc, autoTable, ROBOTO_TR_BASE64, vgmPdfVerisi(dosya, rezervasyonlar, konteynerler, new Date().toLocaleString("tr-TR")));
+  vgmPdfCiz(doc, autoTable, ROBOTO_TR_BASE64, vgmPdfVerisi(dosya, rezervasyonlar, konteynerler, new Date().toLocaleString("tr-TR")),
+    { base64: UNEX_LOGO_VGM_BASE64, en: UNEX_LOGO_VGM_EN, boy: UNEX_LOGO_VGM_BOY });
   doc.save(vgmPdfDosyaAdi(dosya.dosya_no));
 }

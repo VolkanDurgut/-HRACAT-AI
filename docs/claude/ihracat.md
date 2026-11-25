@@ -1225,6 +1225,10 @@ gönderimini sağlayalım." Canlı alıcılar (kullanıcı 10.11.2026): **To: op
   `vgm-rapor` cron'u yedek/yeniden deneme. Canlıya geçiş 10.11.2026: IHR-2026-0110 `onceden`, cron kuruldu.
 - PDF çizimi tek yerde: `supabase/functions/_shared/vgm-pdf.ts` (uygulamadaki "VGM İndir" — `lib/vgm-pdf-builder.ts` — ve mail
   aynı çizim). Edge fontu: `_shared/roboto-vgm-base64.ts` (Roboto alt kümesi, Latin-1 + Türkçe; ~25 KB, edge ile birlikte dağıtılır).
+- 25.11.2026 (kullanıcı: "VGM raporu aynı zamanda bir yükleme tamamlandı raporu"): konu "Yükleme Tamamlandı · VGM Raporu · …",
+  bant "Yükleme tamamlandı · VGM raporu hazır", bilgi satırı "Yükleme: Tamamlandı · girilen / rezervasyon konteyner". PDF'in sağ
+  üstünde Unex logosu (`_shared/unex-logo-vgm-base64.ts`, logo-mail.png 144×119; uygulama ve mail aynı). Ayarlar'daki ad
+  "Yükleme Tamamlandı · VGM Raporu". Test: `tests/vgm-logo-ic-saat.test.ts`.
 - Secret'lar: `VGM_RAPOR_CANLI`, `VGM_RAPOR_ALICI` (varsayılan operation@), `VGM_RAPOR_CC` (varsayılan bbt@, execution@, export@, export2@). Secret geçersizse varsayılan kullanılır.
 
 ## Konşimento talimatı hatırlatması + VGM raporu — canlı denetim (10.11.2026)

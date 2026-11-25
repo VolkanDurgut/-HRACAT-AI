@@ -14,7 +14,7 @@
 import { limanAnahtari } from "./liman-anahtari.ts";
 import { XS, sutunHarfi, type XlsxHucre, type XlsxSayfa } from "./xlsx-yaz.ts";
 import { esc, raporKabugu, sikiTablo } from "./rapor-kabugu.ts";
-import { enIyiSec, karsilastir, type Karsilastirma, type KarsilastirmaBaglami } from "./navlun-karsilastirma.ts";
+import { enIyiSec, karsilastir, sunucuKarsilastirmasi, type Karsilastirma, type KarsilastirmaBaglami, type SunucuDegerlendirmesi } from "./navlun-karsilastirma.ts";
 
 export type NavlunOlayi = {
   tur: string;
@@ -32,6 +32,9 @@ export type NavlunOlayi = {
   konu?: string | null;
   /** 13.11.2026: teklif metninde lokal dahil (true) / haric (false) yaziyor mu */
   lokal_dahil?: boolean | null;
+  /** 25.11.2026: navlun_teklifleri.id ve sunucunun bu teklif icin degerlendirmesi (sayfayla AYNI sayi; yoksa eski yol) */
+  id?: string | null;
+  deg?: SunucuDegerlendirmesi | null;
 };
 
 /** Yukleme planindan gerceklesen navlun (PlanSatiri'nin ilgili alanlari) */
@@ -47,6 +50,8 @@ export type NavlunHucresi = {
   tutar: number; para: string; ekipman: string; tarih: string; kaynak: "teklif" | "gerceklesen";
   /** 13.11.2026: karsilastirma icin (teklif hucrelerinde) */
   acente?: string | null; lokal_dahil?: boolean | null;
+  /** 25.11.2026: sunucu degerlendirmesi (mail kalemleri, B/L, kur, gecerlilik); varsa karsilastirma bundan okunur */
+  deg?: SunucuDegerlendirmesi | null;
 };
 
 export type NavlunBlogu = {
@@ -194,7 +199,7 @@ export function navlunTablosuHesapla(olaylar: NavlunOlayi[], gerceklesen: Gercek
     if (!tutar || tutar <= 0) continue;
     const b = blok(blokAdi(o.acente, armatorTamamla(o, k)));
     const th: NavlunHucresi = { tutar, para, ekipman: (o.ekipman || "20DC").toUpperCase(), tarih: o.tarih, kaynak: "teklif",
-      acente: o.acente, lokal_dahil: o.tur === "hedef_kabul" ? true : o.lokal_dahil ?? null };
+      acente: o.acente, lokal_dahil: o.tur === "hedef_kabul" ? true : o.lokal_dahil ?? null, deg: o.tur === "hedef_kabul" ? null : o.deg ?? null };
     yaz(b, k, th);
     b.teklifler.set(k, [...(b.teklifler.get(k) || []), th]);
     if (o.free_time_gun != null) b.freeTime.set(k, o.free_time_gun);
@@ -302,9 +307,28 @@ export function lokalHaric(h: NavlunHucresi, limanAnahtar: string, baglam: Karsi
   return hucreKarsilastir(h, limanAnahtar, baglam).lokalDurum === "haric";
 }
 
+/** 25.11.2026: suresi dolan teklif (sunucu: teklifte yazan / acente aliskanligi / 21 gun) raporda "en iyi" adayi olmaz. */
+export const gecerliMi = (h: Pick<NavlunHucresi, "deg">) => h.deg?.durum !== "suresi_doldu";
+
+/** navlun_teklif_degerlendirme satirlarini olaylara (id ile) baglar. SAF; okuma cagiranda (edge). */
+export function degerlendirmeleriBagla(olaylar: NavlunOlayi[], satirlar: Record<string, unknown>[]): void {
+  const sayi = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+  const harita = new Map<string, SunucuDegerlendirmesi>();
+  for (const d of satirlar) {
+    harita.set(String(d.teklif_id), {
+      toplam_usd: Number(d.toplam_usd), lokal: sayi(d.lokal), ek: Number(d.ek || 0), lokal_durum: d.lokal_durum as SunucuDegerlendirmesi["lokal_durum"],
+      metin: (d.metin as string) || null, dayanak: (d.dayanak as string) || null, celiski: (d.celiski as string) || null, yaklasik: !!d.yaklasik,
+      durum: d.durum as SunucuDegerlendirmesi["durum"], en_iyi: !!d.en_iyi, gecerlilik_bitis: (d.gecerlilik_bitis as string) || null,
+    });
+  }
+  for (const o of olaylar) if (o.id && (o.tur === "teklif" || o.tur === "karsi_teklif")) o.deg = harita.get(String(o.id)) ?? null;
+}
+
 /** Mail ozeti icin: limanda guncel (son 60 gun) en iyi 20'DC teklif */
 /** Teklif hucresinin karsilastirma tutari (lib/navlun ile ayni hesap). */
 export function hucreKarsilastir(h: NavlunHucresi, limanAnahtar: string, baglam: KarsilastirmaBaglami | null | undefined): Karsilastirma {
+  // 25.11.2026: sunucu degerlendirmesi varsa o (Navlun sayfasiyla ayni sayi: mail kalemleri, B/L, kur); yoksa eski yol
+  if (h.deg) return sunucuKarsilastirmasi(h.tutar, h.deg);
   return karsilastir({ acente: h.acente ?? null, tutar: h.tutar, ekipman: h.ekipman, lokal_dahil: h.lokal_dahil ?? null, liman_anahtar: limanAnahtar }, baglam ?? null);
 }
 
@@ -327,7 +351,7 @@ export function guncelEnIyiler(t: NavlunTablosu, gun = 60): GuncelEnIyi[] {
       if (!m) continue;
       const son = m.filter((h) => h.kaynak === "teklif" && h.ekipman === "20DC" && h.para === "USD" && h.tarih.slice(0, 10) >= sinir)
         .sort((a, c) => c.tarih.localeCompare(a.tarih))[0];
-      if (!son) continue;
+      if (!son || !gecerliMi(son)) continue;
       sayi++;
       if (!sonGelen || son.tarih > sonGelen.tarih) sonGelen = { blok: b.ad, tutar: son.tutar, tarih: son.tarih };
       adaylar.push({ b, h: son, k: hucreKarsilastir(son, l.anahtar, t.baglam) });
@@ -373,7 +397,8 @@ export function limanSonTeklifleri(t: NavlunTablosu, anahtar: string, gun = 60, 
     if (!y) { tekil.push({ ...x }); continue; }
     if (x.b.ad.length > y.b.ad.length) y.b = x.b;
   }
-  const guncel = tekil.filter((x) => x.h.tarih.slice(0, 10) >= sinir);
+  // 25.11.2026: suresi dolan teklif guncel sayilmaz (gecerli yoksa en son teklif "eski" olarak kalir)
+  const guncel = tekil.filter((x) => x.h.tarih.slice(0, 10) >= sinir && gecerliMi(x.h));
   const havuz = (guncel.length ? guncel : tekil.slice(0, 1))
     .map((x) => ({ ...x, k: hucreKarsilastir(x.h, anahtar, t.baglam) }));
   const { enIyi } = enIyiSec(havuz, (x) => x.k);
@@ -685,7 +710,8 @@ export function limanSatirlari(t: NavlunTablosu, gun = 60): LimanSatiri[] {
       const h = m.filter((x) => x.kaynak === "teklif" && x.ekipman === "20DC" && x.para === "USD").sort((x, y) => y.tarih.localeCompare(x.tarih))[0];
       if (h) sonlar.push({ b, h });
     }
-    const guncel = sonlar.filter((x) => x.h.tarih.slice(0, 10) >= sinir);
+    // 25.11.2026: suresi dolan teklif guncel sayilmaz (gecerli yoksa hepsi "eski" / gri)
+    const guncel = sonlar.filter((x) => x.h.tarih.slice(0, 10) >= sinir && gecerliMi(x.h));
     const havuz = (guncel.length ? guncel : sonlar).map((x) => ({ ...x, k: hucreKarsilastir(x.h, l.anahtar, t.baglam) }));
     // 13.11.2026: en iyi = lokali kesin teklifler arasinda en dusuk karsilastirma tutari (Beyrut: 340 + lokal 356 = 696)
     const secim = enIyiSec(havuz, (x) => x.k);
@@ -741,7 +767,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
       sirketAdi, baslik: "Navlun Raporu", tarih: tarihTr(t.tarih), oturum: secenek.oturumEtiketi || null,
       ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: satinAlmaHtml(sa, { tekTeklif: secenek.tekTeklif === true }),
       dugme: { metin: "Navlun Evreni", yol: "/navlun" },
-      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi; karşılaştırma lokal dahil (navlun + çıkış lokali + VGM / mühür, KDV hariç; acente hafızası), lokali belirsiz teklif en iyi sayılmaz.<br>Ekte iki Excel: ${satinAlmaBasligi(t.tarih)} ve ${navlunTablosuDosyaAdi(t.tarih)} (bütün navlunlar; Navlun Bildirimi › Excel indir ile aynı). Her gün 17:00 · müşteriye gitmez.`,
+      dipnot: `Satın alınan = yükleme planında booking'i alınmış, ETD'si bugün / ileride yükleme; navlun dosya / yükleme planından, yoksa acenteye yazdığımız son anlaşma mailinden (tahmin yok). Güncel en iyi = son 60 günün en düşük 20'DC teklifi; karşılaştırma lokal dahil (navlun + çıkış lokali + mühür + zorunlu B/L bedeli, KDV hariç; Navlun Bildirimi ile aynı hesap), lokali belirsiz ya da süresi dolmuş teklif en iyi sayılmaz.<br>Ekte iki Excel: ${satinAlmaBasligi(t.tarih)} ve ${navlunTablosuDosyaAdi(t.tarih)} (bütün navlunlar; Navlun Bildirimi › Excel indir ile aynı). Her gün 17:00 · müşteriye gitmez.`,
     });
   }
   return raporKabugu({
@@ -749,7 +775,7 @@ export function navlunTablosuHtml(t: NavlunTablosu, sirketAdi = "Unex Gıda", se
     // 12.11.2026 kullanici: "Navlun raporundan otomatik ozet kismini kaldiralim." -> yalniz guncel fiyat tablosu
     ozetAlt: "", maddeler: [], ozetYok: true, ekBolum: tablo,
     dugme: { metin: "Navlun Bildirimi'ni aç", yol: "/navlun" },
-    dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde lokal dahil karşılaştırma tutarı en düşük olanı (navlun + çıkış lokali + VGM / mühür, KDV hariç; acente hafızası); lokali belirsiz teklif en iyi sayılmaz (mor). Gri = 60 günden eski. Yeşil hedef = teklif hedefte/altında. Anlaşılan = acenteye yazdığımız son anlaşma fiyatı.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
+    dipnot: `En iyi = son 60 günde her acentenin son 20'DC teklifi içinde lokal dahil karşılaştırma tutarı en düşük olanı (navlun + çıkış lokali + mühür + zorunlu B/L bedeli, KDV hariç; Navlun Bildirimi ile aynı hesap); lokali belirsiz (mor) ya da süresi dolmuş teklif en iyi sayılmaz. Gri = 60 günden eski. Yeşil hedef = teklif hedefte/altında. Anlaşılan = acenteye yazdığımız son anlaşma fiyatı.<br>Ekteki Excel operasyonun navlun tablosu düzeninde. Her gün 08:00 ve 17:00 · müşteriye gitmez.`,
   });
 }
 

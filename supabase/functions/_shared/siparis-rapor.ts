@@ -182,7 +182,7 @@ export function bekleyenNavlunTablosu(liste: BekleyenNavlunu[] | null): string {
     }
     const satirlar = l.teklifler.map((x) => {
       const renk = x.enIyi ? "#047857" : "#1E293B";
-      const eski = l.eski ? ` <span style="color:#94A3B8;font-size:10.5px">(60 günden eski)</span>` : "";
+      const eski = l.eski ? ` <span style="color:#94A3B8;font-size:10.5px">(güncel teklif yok)</span>` : "";
       return `<tr style="${x.enIyi ? "background:#ECFDF5" : ""}">${[
         td(`${esc(kes(x.blok, 26))}${x.enIyi ? ` <span style="font-size:10px;font-weight:bold;color:#047857;border:1px solid #6EE7B7;border-radius:3px;padding:0 4px">EN İYİ</span>` : ""}`),
         td(`<b style="color:${renk}">${usd(x.navlun)}</b>`, true),
@@ -219,6 +219,6 @@ export function siparisRaporHtml(r: SiparisRapor, sirketAdi = "Unex Gıda", olus
     <div style="margin-top:16px">${bolumBasligi(altBaslik)}</div>
     ${bekleyenNavlunTablosu(navlunlar)}`,
     dugme: { metin: "Siparişleri aç", yol: "/siparisler" },
-    dipnot: `Navlun = her acente / hattın son 60 gündeki en yeni 20'DC USD teklifi (yoksa en son teklif, "60 günden eski"). Lokal dahil = navlun + çıkış lokali + mühür vb., KDV hariç (acente hafızası; VGM eklenmez). EN İYİ = lokali kesin teklifler arasında en düşük.<br>Tüm siparişler ve yükleme planı ekteki Excel'de (sayfadaki "Excel indir" ile aynı). ${SIPARIS_RAPOR_SAATI.charAt(0).toUpperCase()}${SIPARIS_RAPOR_SAATI.slice(1)}'de · müşteriye gitmez.`,
+    dipnot: `Navlun = her acente / hattın son 60 gündeki, süresi dolmamış en yeni 20'DC USD teklifi (yoksa en son teklif, "güncel teklif yok"). Lokal dahil = navlun + çıkış lokali + mühür + zorunlu B/L bedeli vb., KDV hariç (Navlun Bildirimi ile aynı hesap; VGM eklenmez). EN İYİ = lokali kesin teklifler arasında en düşük.<br>Tüm siparişler ve yükleme planı ekteki Excel'de (sayfadaki "Excel indir" ile aynı). ${SIPARIS_RAPOR_SAATI.charAt(0).toUpperCase()}${SIPARIS_RAPOR_SAATI.slice(1)}'de · müşteriye gitmez.`,
   });
 }

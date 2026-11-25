@@ -179,7 +179,8 @@ export type IcRaporOturumu = "sabah" | "ogle" | "aksam";
 export const IC_RAPOR_OTURUMLARI: IcRaporOturumu[] = ["sabah", "ogle", "aksam"];
 /** Turkiye saati (saat, dakika). Ihracat raporu 09:00 / 12:00 / 17:00 -> ic piyasa 15 dk sonra. */
 // 19.11.2026 (kullanici): "Ic piyasa raporu gunde 3 defa: sabah 09.00, ogle 12.00, aksam 17.00" (eskiden 09:15 / 12:15 / 17:15).
-export const IC_RAPOR_SAATI: Record<IcRaporOturumu, [number, number]> = { sabah: [9, 0], ogle: [12, 0], aksam: [17, 0] };
+// 25.11.2026 (kullanici): "Ic piyasa rapor saati 18.00 olarak revize edilsin." -> aksam 18:00 (pg_cron 15:00 UTC; sabah / ogle kapali).
+export const IC_RAPOR_SAATI: Record<IcRaporOturumu, [number, number]> = { sabah: [9, 0], ogle: [12, 0], aksam: [18, 0] };
 const OTURUM_AD: Record<IcRaporOturumu, string> = { sabah: "Sabah", ogle: "Öğle", aksam: "Akşam" };
 export const icRaporSaatYazi = (o: IcRaporOturumu) => `${String(IC_RAPOR_SAATI[o][0]).padStart(2, "0")}:${String(IC_RAPOR_SAATI[o][1]).padStart(2, "0")}`;
 /** Sabah raporu DUNU anlatir ("Dün"); ogle / aksam bugunu. */
@@ -338,7 +339,7 @@ function icRaporSadeHtml(r: IcGunlukRapor, sirketAdi: string, olusturmaIso: stri
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Araç / ${G}: ${G.toLowerCase()} yüklenen (satış) ve teslim alınan (alış) araçlar. Hedef: sipariş miktarı · Yüklenen / Alınan: siparişe bugüne kadar giden toplam (araçlar + siparişler arası devir) · Kalan = Hedef − Yüklenen / Alınan.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${G.toLowerCase()}kü bütün irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir).<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Araç / ${G}: ${G.toLowerCase()} yüklenen (satış) ve teslim alınan (alış) araçlar. Hedef: sipariş miktarı · Yüklenen / Alınan: siparişe bugüne kadar giden toplam (araçlar + siparişler arası devir) · Kalan = Hedef − Yüklenen / Alınan.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${G.toLowerCase()}kü bütün irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir).<br>Her gün ${icRaporSaatYazi("aksam")}'de gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }
@@ -500,7 +501,7 @@ export function icGunlukRaporHtml(r: IcGunlukRapor, sirketAdi = "Unex Gıda", ol
   <div style="margin-top:24px;text-align:center">
     <a href="${IC_RAPOR_UYGULAMA_URL}/ic-piyasa/is-emirleri" style="display:inline-block;background:#10B981;color:#fff;text-decoration:none;font-size:13px;font-weight:bold;padding:10px 18px;border-radius:6px">İç piyasayı uygulamada aç</a>
   </div>
-  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenenler / Gelenler: her sipariş tek satır · Araç: o siparişe ${g} giden araç sayısı · Toplam Net: araçların net toplamı · Saat: ilk–son araç.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${g}kü irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir). Yüklenen miktar: araçların net toplamı + siparişler arası devir.<br>Her gün ${icRaporSaatYazi("sabah")} (dünün raporu), ${icRaporSaatYazi("ogle")} ve ${icRaporSaatYazi("aksam")}'te gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
+  <div style="margin-top:16px;font-size:11px;color:#94A3B8;text-align:center;line-height:1.5">Yüklenenler / Gelenler: her sipariş tek satır · Araç: o siparişe ${g} giden araç sayısı · Toplam Net: araçların net toplamı · Saat: ilk–son araç.<br>İrsaliyeleri İncele: o müşterinin / tedarikçinin ${g}kü irsaliyeleri tek ekranda açılır (uygulamaya giriş gerekir). Yüklenen miktar: araçların net toplamı + siparişler arası devir.<br>Her gün ${icRaporSaatYazi("aksam")}'de gönderilir · müşteriye gitmez · alıcılar: İç Piyasa › Bildirimler › Ayarlar.</div>
 </td></tr></table>
 </td></tr></table></body></html>`;
 }

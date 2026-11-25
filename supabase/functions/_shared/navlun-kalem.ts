@@ -10,6 +10,7 @@
  *   - Her kalemin SABIT KODU vardir (MUHUR, LOKAL, YUKLEME, ...): "Muhur" / "Seal Fee" ayni kalemdir; cift sayim yok,
  *     mail ile acente hafizasi ayni temelde karsilastirilir.
  *   - Birim: konteyner / bl / islem. Yalniz KONTEYNER BASI kalemler toplama girer; BL ve islem basi kalemler gosterilir.
+ *     25.11.2026 istisna (kullanici onayi): ZORUNLU B/L (konsimento) bedeli konteyner basi toplama tam eklenir (KalemOzeti.bl).
  *   - KDV toplama EKLENMEZ (ihracat hizmet KDV'si indirilir, maliyet degildir). VGM EKLENMEZ (tartim kendi kantarimizda).
  *   - Kosullu kalemler ("ilave muhur kullanilmasi halinde", iptal, duzeltme, IMO, reefer, collect / alicidan) EKLENMEZ.
  *   - Lokal tablosu bolumleri: "FABRIKA DOLUM" bolumu esastir (yuklemeler fabrika dolum); "LIMAN DOLUM" bolumu toplama
@@ -140,6 +141,9 @@ export function kalemleriOku(metin: string): NavlunKalem[] {
   let bekleyenAd: string | null = null;
   let bekleyenSira = 0;
   let bolumSatir = 0;
+  // 25.11.2026 (Singapur, COSCO formu): tablo DISINDA ad bir satirda, tutar alt satirda ("B/L Bedeli" / "USD 25").
+  // Yalniz hemen onceki kisa satir ad sayilir; kod kurali tutmayan ad (aciklama cumlesi) kalem uretmez.
+  let tekEtiket: string | null = null;
 
   const ekle = (k: NavlunKalem) => {
     const a = `${k.kod}|${k.tutar}|${k.para}|${k.ekipman ?? ""}|${k.blok ?? ""}|${k.birim}`;
@@ -160,15 +164,18 @@ export function kalemleriOku(metin: string): NavlunKalem[] {
     if (blok && (BOLUM_SONU.test(satir) || satir.length > UZUN_SATIR || ++bolumSatir > 40)) { blok = null; kolonlar = []; bekleyenAd = null; }
     // Kolon basligi: "20'" / "40'" / "20'DC"
     const kolon = satir.match(/^(20|40)\s*'?\s*(?:dc|dv|hc|hq)?\s*$/i);
-    if (kolon) { if (blok && kolonlar.length < 2) kolonlar.push(kolon[1] as "20" | "40"); continue; }
+    if (kolon) { tekEtiket = null; if (blok && kolonlar.length < 2) kolonlar.push(kolon[1] as "20" | "40"); continue; }
     if (!tutarlar.length) {
       // Bolum icinde tutarsiz kisa satir: sonraki tutar satirlarinin adi ("Ihracat Yukleme Giderleri")
       if (blok && satir.length <= 120 && /[a-zçğıöşü]{3}/i.test(satir) && !/^\*/.test(satir)) { bekleyenAd = satir; bekleyenSira = 0; }
+      tekEtiket = !blok && satir.length <= 60 && /[a-zçğıöşü]{3}/i.test(satir) && !/^\*/.test(satir) ? satir : null;
       continue;
     }
+    const etiket = tekEtiket;
+    tekEtiket = null;
     const ilk = tutarlar[0].index ?? 0;
     const onEk = satir.slice(0, ilk);
-    const adHam = /[a-zçğıöşü]{2}/i.test(onEk) ? onEk : (bekleyenAd ?? "");
+    const adHam = /[a-zçğıöşü]{2}/i.test(onEk) ? onEk : (bekleyenAd ?? (!blok && etiket ? etiket : ""));
     const ad = adHam ? `${adHam} ${satir.slice(ilk)}` : satir;
     const yalnizTutar = !/[a-zçğıöşü]{2}/i.test(onEk);
     if (NAVLUN_SATIRI.test(adHam || satir)) continue;
@@ -216,7 +223,17 @@ export type KalemOzeti = {
   yaklasik: boolean;
   /** Secilen bolum */
   bolum: KalemBlok;
+  /**
+   * 25.11.2026 (kullanici + operasyon: Singapur COSCO 95 + "B/L Bedeli USD 25" > OOCL 100 all in): zorunlu B/L (konsimento)
+   * bedeli konteyner basi toplama TAM eklenir (USD). Kosullu B/L ucretleri (telex, duzeltme, sertifika) eklenmez. Yoksa 0.
+   */
+  bl: number;
+  blKalem: NavlunKalem | null;
 };
+
+/** Zorunlu konsimento bedeli adi (telex / release / sertifika / LOI degil) */
+const BL_BEDELI = /kon[şs]imento|\bb\s*\/?\s*-?\s*l\b|bill\s*of\s*lading|d[öo]k[üu]man|documentation|\bdoc\b/i;
+const BL_DEGIL = /sertifika|\bloi\b|telex|release|\bswb\b|seaway|smdc/i;
 
 const yuvarla = (x: number) => Math.round(x * 100) / 100;
 
@@ -236,7 +253,10 @@ export function kalemOzeti(kalemler: NavlunKalem[] | null | undefined, ekipman: 
     if (!v || usdKarsiligi(k.tutar, k.para, kur) > usdKarsiligi(v.tutar, v.para, kur)) tekler.set(k.kod, k);
   }
   const ekKalemler = Array.from(tekler.values());
-  const secilen = new Set([...lokalKalemler, ...ekKalemler]);
+  // Zorunlu B/L bedeli: tek kalem (ayni bedel iki kez yazildiysa en buyugu); liman dolum bolumundeki sayilmaz
+  const blKalem = liste.filter((k) => k.kod === "BL" && k.birim === "bl" && !k.kosullu && k.blok !== "liman" && BL_BEDELI.test(k.ad) && !BL_DEGIL.test(k.ad))
+    .sort((a, b) => usdKarsiligi(b.tutar, b.para, kur) - usdKarsiligi(a.tutar, a.para, kur))[0] ?? null;
+  const secilen = new Set([...lokalKalemler, ...ekKalemler, ...(blKalem ? [blKalem] : [])]);
   const digerleri = liste.filter((k) => !secilen.has(k) && !(k.blok !== null && k.blok !== bolum && sayilir(k)));
   const topla = (xs: NavlunKalem[]) => yuvarla(xs.reduce((s, k) => s + usdKarsiligi(k.tutar, k.para, kur), 0));
   return {
@@ -247,6 +267,8 @@ export function kalemOzeti(kalemler: NavlunKalem[] | null | undefined, ekipman: 
     digerleri,
     yaklasik: [...lokalKalemler, ...ekKalemler].some((k) => k.para !== "USD"),
     bolum,
+    bl: blKalem ? yuvarla(usdKarsiligi(blKalem.tutar, blKalem.para, kur)) : 0,
+    blKalem,
   };
 }
 

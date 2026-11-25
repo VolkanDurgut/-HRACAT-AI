@@ -31,6 +31,7 @@
  *    toplam mailden, ama "kesin" DEGIL (kontrol): en iyi secilmez.
  *  - ek (muhur vb.): maildeki tablo disi konteyner basi kalemler; mailde hic yoksa (ve muhur lokal tablosunda da yoksa) hafiza.
  *  - para_birimi EUR teklif / USD disi kalem: kurla USD'ye cevrilip siralanir, metinde "≈" ile isaretlenir.
+ *  - 25.11.2026: mailde ZORUNLU B/L (konsimento) bedeli varsa konteyner basi toplama TAM eklenir ("95 + B/L 25 = 120").
  * Bu alanlar verilmezse hesap 13.11.2026'daki ile BIREBIR aynidir.
  */
 import { kalemOzeti, usdKarsiligi, VARSAYILAN_KUR, type KalemOzeti, type Kur, type NavlunKalem } from "./navlun-kalem.ts";
@@ -258,16 +259,21 @@ function kalemliKarsilastir(
   const ek = mailEkVar ? kalem!.ek : (!muhurTabloda && h && h.ek_kont > 0 ? h.ek_kont : 0);
   const ekKaynagi = mailEkVar ? "mail" : ek ? "hafıza" : null;
   const yaklasik = eurMu || !!(kalem && kalem.yaklasik && (durum === "haric" || mailEkVar));
-  const y = yaklasik ? "≈ " : "";
+  const y = yaklasik || (kalem?.blKalem && kalem.blKalem.para !== "USD") ? "≈ " : "";
   const nav = eurMu ? `${sayiYaz(navlun)} EUR (${y}${sayiYaz(navlunUsd)} USD)` : sayiYaz(navlun);
   const ekAdi = mailEkVar ? kalem!.ekKalemler.map((k) => k.ad).join(", ").slice(0, 40) : "mühür vb.";
   const ekMetin = ek ? ` + ${sayiYaz(ek)} (${ekAdi})` : "";
-  const ekDayanak = ekKaynagi === "mail" ? " Ek kalemler: mail." : ekKaynagi === "hafıza" ? " Ek kalemler: acente hafızası." : "";
-  const ortak = { navlun, ek, kalem, ...(yaklasik ? { yaklasik: true } : {}) };
+  const ekDayanak0 = ekKaynagi === "mail" ? " Ek kalemler: mail." : ekKaynagi === "hafıza" ? " Ek kalemler: acente hafızası." : "";
+  // 25.11.2026: zorunlu B/L (konsimento) bedeli konteyner basi toplama tam eklenir (kullanici onayi; navlun-kalem.ts KalemOzeti.bl)
+  const bl = kalem?.bl ?? 0;
+  const blMetin = bl ? ` + B/L ${sayiYaz(bl)}` : "";
+  const ekDayanak = ekDayanak0 + (bl ? " B/L bedeli: mail (konteyner başına tam eklendi)." : "");
+  const blYaklasik = !!(kalem?.blKalem && kalem.blKalem.para !== "USD");
+  const ortak = { navlun, ek, kalem, ...(yaklasik || blYaklasik ? { yaklasik: true } : {}) };
   if (durum === "dahil") {
-    const toplam = yuvarla(navlunUsd + ek);
+    const toplam = yuvarla(navlunUsd + ek + bl);
     return { ...ortak, lokal: 0, toplam, kesin: true, lokalDurum: "dahil", temel: "toplam", kaynak, dayanak: dayanak + ekDayanak, celiski: null,
-      metin: ek || eurMu ? `${nav}${ekMetin} = ${y}${sayiYaz(toplam)}` : "lokal dahil" };
+      metin: ek || eurMu || bl ? `${nav}${ekMetin}${blMetin} = ${y}${sayiYaz(toplam)}` : "lokal dahil" };
   }
   if (durum === "haric") {
     const kirk = (t.ekipman || "20DC").startsWith("40");
@@ -278,15 +284,15 @@ function kalemliKarsilastir(
       ? `Maildeki lokal ${sayiYaz(mailLokal)} ≠ acente hafızası ${sayiYaz(hafizaLokal)}` : null;
     const lokalKaynagi = mailLokal !== null ? " Lokal tutarı: maildeki lokal tablosu." : lokal !== null ? " Lokal tutarı: acente hafızası." : "";
     if (lokal !== null) {
-      const toplam = yuvarla(navlunUsd + lokal + ek);
+      const toplam = yuvarla(navlunUsd + lokal + ek + bl);
       return { ...ortak, lokal, toplam, kesin: !celiski, lokalDurum: "haric", temel: "toplam", kaynak, celiski,
         dayanak: dayanak + lokalKaynagi + ekDayanak + (celiski ? ` KONTROL: ${celiski}.` : ""),
-        metin: `${nav} + lokal ${sayiYaz(lokal)}${ekMetin} = ${y}${sayiYaz(toplam)}${celiski ? " (kontrol)" : ""}` };
+        metin: `${nav} + lokal ${sayiYaz(lokal)}${ekMetin}${blMetin} = ${y}${sayiYaz(toplam)}${celiski ? " (kontrol)" : ""}` };
     }
-    return { ...ortak, lokal: null, toplam: yuvarla(navlunUsd + ek), kesin: false, lokalDurum: "haric", temel: "toplam", kaynak, dayanak: dayanak + ekDayanak, celiski: null,
-      metin: `${nav} + lokal (tutarı bilinmiyor)` };
+    return { ...ortak, lokal: null, toplam: yuvarla(navlunUsd + ek + bl), kesin: false, lokalDurum: "haric", temel: "toplam", kaynak, dayanak: dayanak + ekDayanak, celiski: null,
+      metin: `${nav} + lokal (tutarı bilinmiyor)${blMetin}` };
   }
-  return { ...ortak, lokal: null, toplam: yuvarla(navlunUsd + ek), kesin: false, lokalDurum: "bilinmiyor", temel: "toplam", kaynak, dayanak: dayanak + ekDayanak, celiski: null,
+  return { ...ortak, lokal: null, toplam: yuvarla(navlunUsd + ek + bl), kesin: false, lokalDurum: "bilinmiyor", temel: "toplam", kaynak, dayanak: dayanak + ekDayanak, celiski: null,
     metin: "lokal belirsiz" };
 }
 
@@ -303,4 +309,37 @@ export function enIyiSec<T>(liste: T[], k: (x: T) => Karsilastirma): { enIyi: T 
     else if (!belirsiz || c.toplam < k(belirsiz).toplam) belirsiz = x;
   }
   return { enIyi, belirsiz };
+}
+
+/**
+ * SUNUCU DEGERLENDIRMESI (navlun_teklif_degerlendirme satiri; edge navlun-bildirimi "degerlendir" yazar). 25.11.2026: sayfadan
+ * (lib/navlun/ozet.ts) buraya tasindi; sayfa, 17:00 navlun maili ve siparis raporu AYNI donusumu kullanir (tek hesap yeri).
+ */
+export type SunucuDegerlendirmesi = {
+  toplam_usd: number;
+  lokal: number | null;
+  ek: number;
+  lokal_durum: "dahil" | "haric" | "bilinmiyor";
+  metin: string | null;
+  dayanak: string | null;
+  celiski: string | null;
+  yaklasik: boolean;
+  durum: "kesin" | "kontrol" | "eksik" | "suresi_doldu";
+  en_iyi: boolean;
+  gecerlilik_bitis: string | null;
+};
+
+/** Sunucu degerlendirmesini karsilastirma bicimine cevirir (hesap yok; yalniz bicim). Gecerlilik ayrica (durum). */
+export function sunucuKarsilastirmasi(tutar: number, d: SunucuDegerlendirmesi): Karsilastirma {
+  const metin = d.metin || "";
+  const dayanak = d.dayanak || "";
+  const temel = metin.startsWith("yalnız navlun") ? "navlun" as const : "toplam" as const;
+  const kaynak = temel === "navlun" ? "liman" as const : dayanak.startsWith("Teklif metninde") ? "mail" as const
+    : dayanak.startsWith("Acente hafızası") ? "hafiza" as const : dayanak.startsWith("Rezervasyondan") ? "rezervasyon" as const : "yok" as const;
+  // Gecerlilik ayrica isaretlenir (suresi_doldu); burada lokal / celiski kesinligi
+  const kesin = temel === "navlun" || (!d.celiski && (d.lokal_durum === "dahil" || (d.lokal_durum === "haric" && d.lokal !== null)));
+  return {
+    navlun: tutar, lokal: d.lokal_durum === "dahil" ? 0 : d.lokal, ek: d.ek, toplam: d.toplam_usd, kesin, lokalDurum: d.lokal_durum, temel, kaynak,
+    metin, dayanak, yaklasik: d.yaklasik, celiski: d.celiski,
+  };
 }

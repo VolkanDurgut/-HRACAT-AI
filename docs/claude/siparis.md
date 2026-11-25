@@ -610,7 +610,8 @@ Bulunan sınıf hataları ve düzeltmeler (testler `tests/navlun-denetim-19kasim
 - Açık konu: bizden giden "kabul" maillerinde acente boş (alıcı adresi betikten gelmiyor); "Anlaşılan" sütununda görünür.
 
 ## 4.22 Rapor saatleri sadeleştirildi (19.11.2026, kullanıcı: "gün içinde çok rapor gidiyor")
-- Günlük ihracat raporu ve iç piyasa raporu: YALNIZ 17:00 (sabah / öğle cron işleri `active=false`, silinmedi).
+- Günlük ihracat raporu: YALNIZ 17:00; iç piyasa raporu: YALNIZ 18:00 (25.11.2026 kullanıcı; `ic-gunluk-rapor-aksam` 15:00 UTC,
+  `IC_RAPOR_SAATI.aksam = [18, 0]`; önce edge, sonra cron). Sabah / öğle cron işleri `active=false`, silinmedi.
 - Sipariş raporu: YALNIZ cumartesi 09:00 (20.11.2026; `siparis-rapor-sabah` = `0 6 * * 6`, akşam işi kapalı; sabah penceresi 08:55–10:00).
 - DİİB raporu: cumartesi 09:00 (20.11.2026), fatura bölümü son 7 gün (`DIIB_RAPOR_GUN`). Edge penceresi 08:55–10:00; cron
   değişikliği (migration 20261119170000) yeni edge deploy edildikten SONRA uygulanır.
@@ -787,4 +788,17 @@ gönderilemesin. Hatırlatma her sabah gönderilsin." Lojistik seçim adımı ve
   `NavlunNoktasi.dolan`). En iyi / hedef / nokta rengi hesabına girmez (nokta "fiyat yok" gri kalır). Geçerlilik kuralı aynı
   (kullanıcı onayı: tarih yazmıyor ve acente alışkanlığı yoksa 21 gün). Canlı veri sağlaması: 57 limanın 57'sinde en iyi
   fiyat değişmedi; yalnız BELAWAN gri fiyat aldı.
+- 25.11.2026 OPERASYON KONTROLÜ (raporun "Rezervasyon Bekleyen Müşteriler" tablosu iki limanda hatalıydı):
+  - Telefonla indirim (elle tablodan gelen, lokal bilgisi olmayan teklif): kullanıcı onayıyla YALNIZ o teklif düzeltildi
+    (`navlun_teklifleri` lokal_dahil = true, armator; önceki değer `navlun_kontrol_islemleri`'nde 'duzelt' kaydı). Acente hafızası
+    DEĞİŞMEDİ (o acentenin diğer limanlardaki teklifleri "lokal belirsiz" kalır). Elle satırlar yeniden okumada silinmez (`kaynak <> 'elle'`).
+  - ZORUNLU B/L (konşimento) bedeli konteyner başı toplama TAM eklenir (kullanıcı onayı; `KalemOzeti.bl`, metin "95 + B/L 25 = 120").
+    Koşullu B/L ücretleri (telex / release / düzeltme / sertifika / LOI / SMDC) eklenmez. Kalem okuyucu tablo dışı "ad bir satırda,
+    tutar alt satırda" formunu da okur (yalnız hemen önceki kısa satır; kod kuralı tutmayan ad kalem üretmez).
+    Canlı sağlama (203 teklif): yalnız 2 teklif değişti (Singapur COSCO 95 → 120; Paramaribo ZIM + B/L 1.750 TL).
+  - 17:00 navlun maili ve sipariş raporu artık teklif tutarını SUNUCU DEĞERLENDİRMESİNDEN okur
+    (`degerlendirmeleriBagla`, `hucreKarsilastir` → `sunucuKarsilastirmasi`; dönüşüm `_shared/navlun-karsilastirma.ts`'te, sayfa da
+    aynısını kullanır) ve süresi dolan teklifi en iyi saymaz (`gecerliMi`). Önceden mail süresi dolmuş teklifi en iyi
+    gösteriyordu (ör. 31.10'da biten teklif). Sağlama: 55 limanın 55'inde sayfa = mail. Değerlendirme okunamazsa eski yol.
+    Test: `tests/navlun-bl-rapor.test.ts`.
 - Yapay zekâ okuma (Gemini) yalnız secret `NAVLUN_YZ = acik` iken; varsayılan kapalı.

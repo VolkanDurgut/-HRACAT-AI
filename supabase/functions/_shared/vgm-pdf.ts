@@ -29,12 +29,21 @@ export function vgmPdfDosyaAdi(dosyaNo: string | null | undefined): string {
   return `VGM_Raporu_${(dosyaNo || "dosya").replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf`;
 }
 
-/** Yatay A4 VGM raporunu verilen jsPDF belgesine cizer. */
-export function vgmPdfCiz(doc: JsPdfBelgesi, autoTable: AutoTable, fontBase64: string, v: VgmPdfVerisi): void {
+/** Logo (PNG base64 + piksel olcusu); 25.11.2026 (kullanici: "VGM raporu icin Unex logosu eklemeliyiz"). */
+export type VgmPdfLogo = { base64: string; en: number; boy: number };
+
+/** Yatay A4 VGM raporunu verilen jsPDF belgesine cizer. logo verilirse sag ust koseye (22 mm genislik) yerlestirilir. */
+export function vgmPdfCiz(doc: JsPdfBelgesi, autoTable: AutoTable, fontBase64: string, v: VgmPdfVerisi, logo?: VgmPdfLogo | null): void {
   doc.addFileToVFS("Roboto-Regular.ttf", fontBase64);
   doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
   doc.addFont("Roboto-Regular.ttf", "Roboto", "bold");
   doc.setFont("Roboto");
+
+  if (logo && logo.base64 && logo.en > 0 && logo.boy > 0) {
+    const genislik = 22;
+    const yukseklik = (genislik * logo.boy) / logo.en;
+    doc.addImage(logo.base64, "PNG", doc.internal.pageSize.getWidth() - 14 - genislik, 8, genislik, yukseklik);
+  }
 
   doc.setFontSize(16);
   doc.text("VGM Raporu", 14, 18);

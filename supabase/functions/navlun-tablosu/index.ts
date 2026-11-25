@@ -5,7 +5,7 @@ import { oturumAdi, oturumPenceresi, oturumSaatten } from "../_shared/rapor-otur
 import { raporAyari } from "../_shared/rapor-alici.ts";
 import { baglamKur, type AcenteHafizasi, type LimanKurali } from "../_shared/navlun-karsilastirma.ts";
 import { limanAnahtari } from "../_shared/liman-anahtari.ts";
-import { esleriYukle, type AdEsi, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
+import { degerlendirmeleriBagla, esleriYukle, type AdEsi, navlunSatinAlma, navlunTablosuDosyaAdi, navlunTablosuHesapla, navlunTablosuHtml, navlunTablosuKonusu, navlunTablosuSayfasi, satinAlmaBasligi, satinAlmaSayfasi, type NavlunOlayi, type PlanNavlunSatiri } from "../_shared/navlun-tablosu.ts";
 import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
 
 // ============================================================================
@@ -125,12 +125,15 @@ async function rpcHepsi(ad: string, companyId: string): Promise<Record<string, u
 /** Navlun Bildirimi sayfasindaki "Excel indir" ile ayni veri (lib/navlun/tablo.ts). */
 async function sirketTablosu(companyId: string, tarih: string) {
   const [olaylarHam, planHam] = await Promise.all([
-    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,mesaj_id,lokal_dahil&company_id=eq.${companyId}&order=tarih,id`),
+    hepsiniCek<Record<string, unknown>>(`navlun_teklifleri?select=id,tur,liman,liman_anahtar,acente,armator,tutar,para_birimi,ekipman,free_time_gun,transit_gun,tarih,mesaj_id,lokal_dahil&company_id=eq.${companyId}&order=tarih,id`),
     rpcHepsi("yukleme_plani_veri", companyId),
   ]);
   // 12.11.2026 booking eslestirmesi: olaylara kaynak mailin konusu eklenir (yazisma + konteyner adedi + konudaki booking no)
   const konular = new Map((await hepsiniCek<{ mesaj_id: string; konu: string | null }>(`navlun_mesajlari?select=mesaj_id,konu&company_id=eq.${companyId}&order=id`)).map((m) => [m.mesaj_id, m.konu]));
   const olaylar = olaylarHam.map((o) => ({ ...o, tutar: o.tutar == null ? null : Number(o.tutar), konu: konular.get(String(o.mesaj_id)) ?? null })) as unknown as NavlunOlayi[];
+  // 25.11.2026: teklif degerlendirmesi sunucudan (Navlun sayfasiyla AYNI sayi: mail kalemleri, B/L, kur, gecerlilik). Okunamazsa eski yol.
+  try { degerlendirmeleriBagla(olaylar, await hepsiniCek<Record<string, unknown>>(`navlun_teklif_degerlendirme?select=teklif_id,toplam_usd,lokal,ek,lokal_durum,metin,dayanak,celiski,yaklasik,durum,en_iyi,gecerlilik_bitis&company_id=eq.${companyId}&order=teklif_id`)); }
+  catch (e) { console.error("navlun-tablosu: teklif degerlendirmesi okunamadi:", e instanceof Error ? e.message : e); }
   const metin = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
   const plan: PlanNavlunSatiri[] = planHam.map((p) => ({
     varis_limani: metin(p.varis_limani), acente: metin(p.acente), navlun: p.navlun == null || p.navlun === "" ? null : Number(p.navlun) || null,

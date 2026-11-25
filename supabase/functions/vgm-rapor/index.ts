@@ -5,6 +5,7 @@ import { autoTable } from "npm:jspdf-autotable@5.0.8";
 import { ROBOTO_VGM_BASE64 } from "../_shared/roboto-vgm-base64.ts";
 import { vgmPdfCiz, vgmPdfDosyaAdi, type VgmPdfVerisi } from "../_shared/vgm-pdf.ts";
 import { etiketliKonu, UNEX_AI_GONDEREN } from "../_shared/unex-ai.ts";
+import { UNEX_LOGO_VGM_BASE64, UNEX_LOGO_VGM_BOY, UNEX_LOGO_VGM_EN } from "../_shared/unex-logo-vgm-base64.ts";
 
 // ============================================================================
 // VGM RAPORU MAILI (vgm-rapor) - 10.11.2026
@@ -120,7 +121,7 @@ function pdfOlustur(h: Hazir): Uint8Array {
     olusturma: trZaman(),
   };
   const doc = new jsPDF({ orientation: "landscape" });
-  vgmPdfCiz(doc, autoTable, ROBOTO_VGM_BASE64, veri);
+  vgmPdfCiz(doc, autoTable, ROBOTO_VGM_BASE64, veri, { base64: UNEX_LOGO_VGM_BASE64, en: UNEX_LOGO_VGM_EN, boy: UNEX_LOGO_VGM_BOY });
   return new Uint8Array(doc.output("arraybuffer"));
 }
 
@@ -143,23 +144,26 @@ const kacis = opKacis;
 
 // 17.11.2026: ortak operasyon mail kalibi (operasyon-mail.ts; konsimento talimati ve fatura talimati ile ayni tarz).
 // Icerik ayni: hitap + metin, dosya / alici / konteyner / toplam VGM / gemi / acente / rezervasyon, VGM Indir + dosya.
+// 25.11.2026 (kullanici: "VGM raporu ayni zamanda bir yukleme tamamlandi raporu"): konu ve baslik "Yukleme Tamamlandi";
+// bilgi tablosunda "Yukleme: Tamamlandi · girilen / rezervasyon konteyner". PDF'e Unex logosu (sag ust).
 function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: string; html: string } {
   const gemiler = Array.from(new Set(h.rez.map((r) => (r.gemi_adi || "").trim()).filter(Boolean))).join(", ");
   const acente = Array.from(new Set(h.rez.map((r) => (r.acente_ismi || "").trim()).filter(Boolean))).join(", ");
   const toplamVgm = h.kont.reduce((s, k) => s + (sayi(k.vgm_kg) || 0), 0);
   // Rezervasyon (booking) no: konu + bilgi tablosu (kullanici 10.11.2026)
   const rezNo = Array.from(new Set(h.rez.map((r) => (r.booking_no || "").trim()).filter(Boolean))).join(", ");
-  const konu = `${test ? "[TEST] " : ""}VGM Raporu · ${h.dosya.dosya_no || "-"} · ${h.dosya.alici_firma || "-"}${rezNo ? ` · Rezervasyon ${rezNo}` : ""}`;
+  const konu = `${test ? "[TEST] " : ""}Yükleme Tamamlandı · VGM Raporu · ${h.dosya.dosya_no || "-"} · ${h.dosya.alici_firma || "-"}${rezNo ? ` · Rezervasyon ${rezNo}` : ""}`;
+  const rezAdet = h.rez.reduce((s, r) => s + (r.konteyner_adedi || 0), 0);
   const html = operasyonMailHtml({
     site: SITE,
-    baslik: "VGM raporu hazır",
+    baslik: "Yükleme tamamlandı · VGM raporu hazır",
     testMetni: test ? `TEST · Bu e-posta yalnızca test adresine gönderildi. Canlıda alıcı: ${ALICI.join(", ")} · CC: ${CC.join(", ")}` : null,
     hitap: "Kolay gelsin Volkan Bey,",
-    girisHtml: "VGM Raporu ektedir. Lütfen ilgili acenteye gönderimini sağlayalım.",
+    girisHtml: `<b>${kacis(h.dosya.dosya_no || "-")}</b> dosyasının tüm konteynerlerinin yüklemesi tamamlandı.<br>VGM Raporu ektedir. Lütfen ilgili acenteye gönderimini sağlayalım.`,
     bilgiler: [
       ["Dosya", `<b>${kacis(h.dosya.dosya_no || "-")}</b>`],
       ["Alıcı", `<b>${kacis(h.dosya.alici_firma || "-")}</b>`],
-      ["Konteyner", `<b>${h.kont.length}</b> · VGM'i girildi`],
+      ["Yükleme", `<b>Tamamlandı</b> · ${h.kont.length} / ${rezAdet || h.kont.length} konteyner · VGM'i girildi`],
       ["Toplam VGM", `<b>${kacis(toplamVgm.toLocaleString("tr-TR"))} kg</b>`],
       ["Gemi", kacis(gemiler || "-")],
       ["Acente", kacis(acente || "-")],
@@ -170,7 +174,7 @@ function mailOlustur(h: Hazir, indirAdresi: string, test: boolean): { konu: stri
       { metin: "Dosyayı aç", href: `${SITE}/dosya/${h.dosya.id}?tab=konteynerler` },
     ],
     dugmeNotuHtml: "PDF bu e-postanın ekinde de var. İndirme bağlantısı 30 gün geçerlidir; giriş gerektirmez.",
-    altNotHtml: "Tüm konteynerlerin VGM'i girildiğinde UNEX-AI tarafından otomatik gönderildi.",
+    altNotHtml: "Dosyanın tüm konteynerleri yüklenip VGM'leri girildiğinde UNEX-AI tarafından otomatik gönderildi.",
   });
   return { konu, html };
 }

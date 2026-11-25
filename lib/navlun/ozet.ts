@@ -7,7 +7,7 @@
  * "Hedefiniz uygundur" (hedef_kabul) -> o andaki son hedefimiz o acentenin fiyati sayilir.
  */
 
-import { enIyiSec, karsilastir, type Karsilastirma, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
+import { enIyiSec, karsilastir, sunucuKarsilastirmasi, type Karsilastirma, type KarsilastirmaBaglami } from "@/lib/navlun/karsilastirma";
 
 /**
  * 24.11.2026 TEK HESAP (kullanici onayi: "Navlun bildirimi mevcut hali ile mimari yapisini onarmak"): her teklifin konteyner
@@ -15,19 +15,8 @@ import { enIyiSec, karsilastir, type Karsilastirma, type KarsilastirmaBaglami } 
  * navlun_teklif_degerlendirme; 17:00 maili ve Excel ile ayni kod). Sayfa bunu okur; tarayici yalniz degerlendirmesi henuz
  * olmayan satirda (hedef kabulu, birkac dakikalik yeni teklif) eski yoldan hesaplar.
  */
-export type SunucuDegerlendirmesi = {
-  toplam_usd: number;
-  lokal: number | null;
-  ek: number;
-  lokal_durum: "dahil" | "haric" | "bilinmiyor";
-  metin: string | null;
-  dayanak: string | null;
-  celiski: string | null;
-  yaklasik: boolean;
-  durum: "kesin" | "kontrol" | "eksik" | "suresi_doldu";
-  en_iyi: boolean;
-  gecerlilik_bitis: string | null;
-};
+export type { SunucuDegerlendirmesi } from "@/lib/navlun/karsilastirma";
+import type { SunucuDegerlendirmesi } from "@/lib/navlun/karsilastirma";
 
 export type NavlunSatiri = {
   /** navlun_teklifleri.id (24.11.2026: sunucu degerlendirmesiyle eslesme) */
@@ -100,20 +89,8 @@ export type LimanOzeti = {
 
 const FIYATLI = new Set(["teklif", "karsi_teklif"]);
 
-/** Sunucu degerlendirmesini sayfanin karsilastirma bicimine cevirir (hesap yok; yalniz bicim). */
-export function sunucuKarsilastirmasi(tutar: number, d: SunucuDegerlendirmesi): Karsilastirma {
-  const metin = d.metin || "";
-  const dayanak = d.dayanak || "";
-  const temel = metin.startsWith("yalnız navlun") ? "navlun" as const : "toplam" as const;
-  const kaynak = temel === "navlun" ? "liman" as const : dayanak.startsWith("Teklif metninde") ? "mail" as const
-    : dayanak.startsWith("Acente hafızası") ? "hafiza" as const : dayanak.startsWith("Rezervasyondan") ? "rezervasyon" as const : "yok" as const;
-  // Gecerlilik ayrica isaretlenir (suresiDoldu); burada lokal / celiski kesinligi
-  const kesin = temel === "navlun" || (!d.celiski && (d.lokal_durum === "dahil" || (d.lokal_durum === "haric" && d.lokal !== null)));
-  return {
-    navlun: tutar, lokal: d.lokal_durum === "dahil" ? 0 : d.lokal, ek: d.ek, toplam: d.toplam_usd, kesin, lokalDurum: d.lokal_durum, temel, kaynak,
-    metin, dayanak, yaklasik: d.yaklasik, celiski: d.celiski,
-  };
-}
+/** Sunucu degerlendirmesi -> karsilastirma (25.11.2026: ortak modulde; 17:00 maili ve siparis raporu da ayni donusumu kullanir). */
+export { sunucuKarsilastirmasi };
 
 /** Satirin karsilastirmasi: sunucu degerlendirmesi varsa o, yoksa (hedef kabulu / yeni teklif) tarayicida. */
 export function satirKarsilastirmasi(s: Pick<NavlunSatiri, "acente" | "tutar" | "ekipman" | "lokal_dahil" | "liman_anahtar" | "degerlendirme">, tutar: number,

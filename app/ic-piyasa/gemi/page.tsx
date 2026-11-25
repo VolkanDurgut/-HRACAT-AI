@@ -9,15 +9,16 @@ import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler } from "@/components/ic-piyasa-sekmeler";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
-import { GemiAracFormu, GemiFormu, LimanListesiPenceresi, SatisFormu } from "@/components/ic-gemi-pencereler";
+import { GemiAracFormu, GemiFormu, GemiHizliGiris, LimanListesiPenceresi, SatisFormu } from "@/components/ic-gemi-pencereler";
 import {
-  Ship, Plus, Loader2, AlertCircle, AlertTriangle, Pencil, Trash2, Download, ClipboardPaste, Truck, RefreshCw, CheckCircle2, RotateCcw, Users,
+  Ship, Plus, Loader2, AlertCircle, AlertTriangle, Pencil, Trash2, Download, ClipboardPaste, Truck, RefreshCw, CheckCircle2, RotateCcw, Users, PauseCircle, PlayCircle, Unlink, Clock,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi, tonYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { bugunTRIso, gunTR } from "@/lib/ic-piyasa/alis";
+import { trSayiOku } from "@/lib/ic-piyasa/irsaliye-oku";
 import {
-  GemiAlici, GemiArac, GemiTahliye, UNEX_YER, araclariSirala, gemiHataMesaji, gemiRaporu, yerAdi, yuzdeYazi,
+  GemiAlici, GemiArac, GemiDurum, GemiTahliye, UNEX_YER, araclariSirala, gemiHataMesaji, gemiRaporu, yerAdi, yoldaMi, yuzdeYazi,
 } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiRaporDosyaAdi, gemiRaporXlsx } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
 
@@ -30,6 +31,12 @@ import { gemiRaporDosyaAdi, gemiRaporXlsx } from "@/lib/ic-piyasa/gemi-tahliye-x
  */
 
 type Yer = "tumu" | "unex" | string;
+
+const DURUM: Record<GemiDurum, { etiket: string; sinif: string }> = {
+  acik: { etiket: "Tahliyede", sinif: "bg-sky-500/15 text-sky-400" },
+  beklemede: { etiket: "Beklemede", sinif: "bg-amber-500/15 text-amber-400" },
+  tamamlandi: { etiket: "Tamamlandı", sinif: "bg-emerald-500/15 text-emerald-400" },
+};
 
 export default function GemiTahliyePage() {
   const { companyId, yetkiler, loading: authLoading } = useAuth();
@@ -51,12 +58,15 @@ export default function GemiTahliyePage() {
   const [listeAcik, setListeAcik] = useState(false);
   const [silinecekArac, setSilinecekArac] = useState<GemiArac | null>(null);
   const [silinecekSatis, setSilinecekSatis] = useState<GemiAlici | null>(null);
-  const [gemiIslem, setGemiIslem] = useState<"kapat" | "ac" | "sil" | null>(null);
+  const [gemiIslem, setGemiIslem] = useState<"kapat" | "ac" | "sil" | "beklet" | null>(null);
+  const [eslesmeKaldir, setEslesmeKaldir] = useState<GemiArac | null>(null);
   const [isleniyor, setIsleniyor] = useState(false);
   const [indiriliyor, setIndiriliyor] = useState(false);
 
   const getir = useCallback(async () => {
     if (!companyId) return;
+    // Kantar tartimlarini yoldaki araclarla esle (sessiz; hata verse de liste okunur)
+    await supabase.rpc("ic_gemi_kantar_esle");
     const g = await supabase.from("ic_gemi_tahliyeleri").select("*").eq("company_id", companyId).order("durum").order("olusturma", { ascending: false }).limit(100);
     if (g.error) {
       setOkumaHatasi(/does not exist|PGRST20/.test(g.error.message) ? "Gemi Tahliye tabloları henüz kurulmamış." : g.error.message);
@@ -97,7 +107,8 @@ export default function GemiTahliyePage() {
   const gorunenToplam = useMemo(() => ({
     liman: gorunen.reduce((t, a) => t + Number(a.liman_kg), 0),
     teslim: gorunen.reduce((t, a) => t + Number(a.teslim_kg || 0), 0),
-    unexLiman: gorunen.filter((a) => !a.alici_id).reduce((t, a) => t + Number(a.liman_kg), 0),
+    // fark yalniz teslimi gelen UNEX araclarindan (yoldakiler haric)
+    unexLiman: gorunen.filter((a) => !a.alici_id && !yoldaMi(a)).reduce((t, a) => t + Number(a.liman_kg), 0),
   }), [gorunen]);
 
   const gemiSec = (id: string) => { setSeciliId(id); setYer("tumu"); setGunFiltre(""); };
@@ -127,6 +138,16 @@ export default function GemiTahliyePage() {
     setSilinecekArac(null);
     getir();
   };
+  const eslesmeKaldirUygula = async () => {
+    if (!eslesmeKaldir) return;
+    setIsleniyor(true);
+    const { error } = await supabase.rpc("ic_gemi_teslim_gir", { p_id: eslesmeKaldir.id, p_teslim: null });
+    setIsleniyor(false);
+    if (error) { showToast(gemiHataMesaji(error), "error"); return; }
+    showToast(`${eslesmeKaldir.plaka}: teslim kg kaldırıldı; araç yeniden "yolda". Doğru kg'ı elle girebilirsiniz.`, "success");
+    setEslesmeKaldir(null);
+    getir();
+  };
   const satisSil = async () => {
     if (!silinecekSatis || !companyId) return;
     setIsleniyor(true);
@@ -143,11 +164,11 @@ export default function GemiTahliyePage() {
     setIsleniyor(true);
     const s = gemiIslem === "sil"
       ? await supabase.from("ic_gemi_tahliyeleri").delete().eq("id", gemi.id).eq("company_id", companyId).select("id")
-      : await supabase.from("ic_gemi_tahliyeleri").update({ durum: gemiIslem === "kapat" ? "tamamlandi" : "acik" }).eq("id", gemi.id).eq("company_id", companyId).select("id");
+      : await supabase.from("ic_gemi_tahliyeleri").update({ durum: gemiIslem === "kapat" ? "tamamlandi" : gemiIslem === "beklet" ? "beklemede" : "acik" }).eq("id", gemi.id).eq("company_id", companyId).select("id");
     setIsleniyor(false);
     const h = s.error ? gemiHataMesaji(s.error) : yazmaHatasi(null, s.data);
     if (h) { showToast(h, "error"); return; }
-    showToast(gemiIslem === "sil" ? `${gemi.gemi_adi} silindi.` : gemiIslem === "kapat" ? `${gemi.gemi_adi} tahliyesi tamamlandı.` : `${gemi.gemi_adi} tahliyesi yeniden açıldı.`, "success");
+    showToast(gemiIslem === "sil" ? `${gemi.gemi_adi} silindi.` : gemiIslem === "kapat" ? `${gemi.gemi_adi} tahliyesi tamamlandı.` : gemiIslem === "beklet" ? `${gemi.gemi_adi} beklemeye alındı (kantarda görünmez).` : `${gemi.gemi_adi} tahliyeye açıldı.`, "success");
     if (gemiIslem === "sil") setSeciliId(null);
     setGemiIslem(null);
     getir();
@@ -201,7 +222,7 @@ export default function GemiTahliyePage() {
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${g.id === seciliId ? "text-white" : "hover:bg-white/5"}`}
                   style={g.id === seciliId ? { backgroundColor: "rgba(16,185,129,0.15)", borderColor: ACCENT } : { borderColor: CARD_BORDER, color: TEXT_MUTED }}>
                   <Ship size={13} /> {g.gemi_adi}
-                  <span className={`ml-1 px-1.5 rounded text-[10px] ${g.durum === "acik" ? "bg-sky-500/15 text-sky-400" : "bg-emerald-500/15 text-emerald-400"}`}>{g.durum === "acik" ? "Tahliyede" : "Tamamlandı"}</span>
+                  <span className={`ml-1 px-1.5 rounded text-[10px] ${DURUM[g.durum].sinif}`}>{DURUM[g.durum].etiket}</span>
                 </button>
               ))}
             </div>
@@ -212,12 +233,13 @@ export default function GemiTahliyePage() {
                 <div className="rounded-xl border p-4 mb-4 flex flex-wrap items-start gap-4" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }}>
                   <div className="min-w-0 mr-auto">
                     <h2 className="text-white font-bold text-base flex items-center gap-2">{gemi.gemi_adi}
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${acik ? "bg-sky-500/15 text-sky-400" : "bg-emerald-500/15 text-emerald-400"}`}>{acik ? "Tahliyede" : `Tamamlandı · ${tarihSaatYazi(gemi.kapanis_zamani)}`}</span>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${DURUM[gemi.durum].sinif}`}>{gemi.durum === "tamamlandi" ? `Tamamlandı · ${tarihSaatYazi(gemi.kapanis_zamani)}` : DURUM[gemi.durum].etiket}</span>
                     </h2>
                     <p className="text-xs mt-1" style={{ color: TEXT_MUTED }}>
                       {[gemi.urun, gemi.kalite, gemi.satici, gemi.tahliye_limani, gemi.baslangic ? `Başlangıç ${gunTR(gemi.baslangic)}` : null].filter(Boolean).join(" · ")}
                     </p>
                     {gemi.notlar && <p className="text-xs mt-1 text-white/80">{gemi.notlar}</p>}
+                    {gemi.durum === "beklemede" && <p className="text-xs mt-1 text-amber-300">Beklemede: Kantar Paneli'nde görünmez, araç girilemez. Gemi gelince &quot;Tahliyeye Aç&quot;.</p>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button onClick={excelIndir} disabled={indiriliyor} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-excel">
@@ -228,9 +250,10 @@ export default function GemiTahliyePage() {
                       <button onClick={() => setAracForm(true)} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-arac-ac"><Truck size={14} /> Araç Ekle</button>
                     </>}
                     <button onClick={() => setGemiForm({ mevcut: gemi })} className={dugme} style={{ borderColor: CARD_BORDER }} title="Gemi bilgilerini düzenle" aria-label="Düzenle"><Pencil size={14} /></button>
-                    {acik
-                      ? <button onClick={() => setGemiIslem("kapat")} className={dugme} style={{ borderColor: CARD_BORDER }}><CheckCircle2 size={14} /> Tahliyeyi Tamamla</button>
-                      : <button onClick={() => setGemiIslem("ac")} className={dugme} style={{ borderColor: CARD_BORDER }}><RotateCcw size={14} /> Yeniden Aç</button>}
+                    {acik && <button onClick={() => setGemiIslem("beklet")} className={dugme} style={{ borderColor: CARD_BORDER }} title="Kantarda gizle, araç girişini durdur" data-testid="gemi-beklet"><PauseCircle size={14} /> Beklemeye Al</button>}
+                    {acik && <button onClick={() => setGemiIslem("kapat")} className={dugme} style={{ borderColor: CARD_BORDER }}><CheckCircle2 size={14} /> Tahliyeyi Tamamla</button>}
+                    {gemi.durum === "beklemede" && <button onClick={() => setGemiIslem("ac")} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-tahliyeye-ac"><PlayCircle size={14} /> Tahliyeye Aç</button>}
+                    {gemi.durum === "tamamlandi" && <button onClick={() => setGemiIslem("ac")} className={dugme} style={{ borderColor: CARD_BORDER }}><RotateCcw size={14} /> Yeniden Aç</button>}
                     {!araclar.length && <button onClick={() => setGemiIslem("sil")} className={`${dugme} text-red-300`} style={{ borderColor: CARD_BORDER }} title="Aracı olmayan gemi silinebilir" aria-label="Sil"><Trash2 size={14} /></button>}
                   </div>
                 </div>
@@ -240,13 +263,18 @@ export default function GemiTahliyePage() {
                   {kutu("Sipariş (B/L)", tonYazi(rapor.siparisKg), `${rapor.gelenArac} araç geldi`)}
                   {kutu("Gelen (liman)", tonYazi(rapor.gelenKg), yuzdeYazi(rapor.yuzde), "text-emerald-400", "gemi-gelen")}
                   {kutu(rapor.kalanKg >= 0 ? "Kalan" : "Fazla", tonYazi(Math.abs(rapor.kalanKg)), rapor.kalanAracTahmini !== null && rapor.kalanKg > 0 ? `≈ ${rapor.kalanAracTahmini} araç (ort. ${kgYazi(Math.round(rapor.aracOrtalamasi))})` : undefined, rapor.kalanKg >= 0 ? "text-white" : "text-sky-400")}
-                  {kutu("UNEX · liman → teslim", `${tonYazi(rapor.unexLimanKg)} → ${tonYazi(rapor.unexTeslimKg)}`, `${rapor.yerler[0].arac} araç · fark ${kgYazi(rapor.unexFarkKg)}`)}
+                  {kutu("UNEX · liman → teslim", `${tonYazi(rapor.unexTeslimliLimanKg)} → ${tonYazi(rapor.unexTeslimKg)}`, `${rapor.yerler[0].arac} araç · fark ${kgYazi(rapor.unexFarkKg)}${rapor.yoldaArac ? ` · ${rapor.yoldaArac} yolda (${tonYazi(rapor.yoldaKg)})` : ""}`, "text-white", "gemi-unex")}
                   {kutu("Fire (UNEX)", yuzdeYazi(rapor.firePct, 3), "(liman − teslim) / liman", rapor.firePct !== null && rapor.firePct > 0.5 ? "text-amber-400" : "text-white")}
                 </div>
                 <div className="h-2 rounded-full overflow-hidden mb-5" style={{ backgroundColor: "#1E2530" }} aria-label={`Tahliye ${yuzdeYazi(rapor.yuzde)}`}>
                   <div className="h-full" style={{ width: `${Math.min(100, rapor.yuzde)}%`, backgroundColor: ACCENT }} />
                 </div>
 
+                {acik && (
+                  <div className="mb-4">
+                    <GemiHizliGiris gemi={gemi} alicilar={alicilar} kaynak="ofis" kaydedildi={getir} testId="gemi-sayfa-hizli" />
+                  </div>
+                )}
                 <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4">
                   {/* Gidilen yerler / satislar */}
                   <section className="rounded-xl border overflow-hidden self-start" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-labelledby="gemi-yerler">
@@ -341,13 +369,22 @@ export default function GemiTahliyePage() {
                                   {a.uyarilar?.length > 0 && <span title={a.uyarilar.join("\n")} className="ml-1 inline-flex align-middle text-amber-400"><AlertTriangle size={12} /></span>}
                                 </td>
                                 <td className="px-3 py-1.5 text-right tabular-nums text-white">{Number(a.liman_kg).toLocaleString("tr-TR")}</td>
-                                <td className="px-3 py-1.5 text-right tabular-nums text-white">{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : <span style={{ color: TEXT_MUTED }}>—</span>}</td>
+                                <td className="px-3 py-1.5 text-right tabular-nums text-white whitespace-nowrap">
+                                  {yoldaMi(a)
+                                    ? (acik ? <ElleTeslim arac={a} yenile={getir} /> : <span className="text-amber-300 text-xs">yolda</span>)
+                                    : a.teslim_kg !== null ? <>
+                                        {Number(a.teslim_kg).toLocaleString("tr-TR")}
+                                        {a.teslim_kaynak && <span className="ml-1 text-[10px]" style={{ color: TEXT_MUTED }} title={a.teslim_zamani ? tarihSaatYazi(a.teslim_zamani) : ""}>{a.teslim_kaynak === "kantar" ? "kantar" : "elle"}</span>}
+                                      </> : <span style={{ color: TEXT_MUTED }}>—</span>}
+                                </td>
                                 <td className={`px-3 py-1.5 text-right tabular-nums ${fark === null ? "" : Math.abs(fark) > 300 ? "text-amber-400" : fark < 0 ? "text-white/80" : "text-white"}`}>{fark === null ? "" : fark.toLocaleString("tr-TR")}</td>
                                 <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ color: a.alici_id ? undefined : TEXT_MUTED }}>
                                   <span className={a.alici_id ? "text-white" : ""}>{yerAdi(a, alicilar)}</span>
+                                  {yoldaMi(a) && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-300"><Clock size={10} /> yolda</span>}
                                   <span className="ml-1.5 text-[10px]" style={{ color: TEXT_MUTED }} title={`${a.girilen_email || ""} · ${tarihSaatYazi(a.olusturma)}`}>{a.kaynak === "ofis" ? "ofis" : "kantar"}</span>
                                 </td>
                                 <td className="px-2 py-1.5 text-right">
+                                  {acik && !a.alici_id && a.teslim_kg !== null && <button onClick={() => setEslesmeKaldir(a)} className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }} title="Teslim kg'ını kaldır (yanlış eşleşme)" aria-label={`${a.plaka} teslim kaldır`}><Unlink size={13} /></button>}
                                   {acik && <button onClick={() => setSilinecekArac(a)} className="p-1 rounded hover:bg-white/5 text-red-300/80" aria-label={`${a.plaka} sil`}><Trash2 size={13} /></button>}
                                 </td>
                               </tr>
@@ -393,15 +430,44 @@ export default function GemiTahliyePage() {
       <ConfirmDialog open={!!silinecekArac} onOpenChange={(o) => { if (!o) setSilinecekArac(null); }}
         title="Araç kaydı silinsin mi?" description={silinecekArac ? `${gunTR(silinecekArac.tarih)} · ${silinecekArac.plaka} · liman ${kgYazi(silinecekArac.liman_kg)}. Silinen kaydın kopyası denetim kaydında kalır.` : ""}
         confirmLabel="Sil" destructive loading={isleniyor} onConfirm={aracSil} />
+      <ConfirmDialog open={!!eslesmeKaldir} onOpenChange={(o) => { if (!o) setEslesmeKaldir(null); }}
+        title="Teslim kg kaldırılsın mı?" description={eslesmeKaldir ? `${eslesmeKaldir.plaka} · teslim ${kgYazi(eslesmeKaldir.teslim_kg)}${eslesmeKaldir.teslim_kaynak === "kantar" ? " (kantar tartımı)" : ""}. Araç yeniden yolda görünür; bu araç kantarla bir daha otomatik eşleşmez, doğru kg elle girilir.` : ""}
+        confirmLabel="Kaldır" loading={isleniyor} onConfirm={eslesmeKaldirUygula} />
       <ConfirmDialog open={!!silinecekSatis} onOpenChange={(o) => { if (!o) setSilinecekSatis(null); }}
         title="Satış silinsin mi?" description={silinecekSatis ? `${silinecekSatis.firma} · ${tonYazi(silinecekSatis.miktar_kg)}. Aracı olmayan satış silinebilir.` : ""}
         confirmLabel="Sil" destructive loading={isleniyor} onConfirm={satisSil} />
       <ConfirmDialog open={!!gemiIslem} onOpenChange={(o) => { if (!o) setGemiIslem(null); }}
-        title={gemiIslem === "sil" ? "Gemi silinsin mi?" : gemiIslem === "kapat" ? "Tahliye tamamlansın mı?" : "Tahliye yeniden açılsın mı?"}
+        title={gemiIslem === "sil" ? "Gemi silinsin mi?" : gemiIslem === "kapat" ? "Tahliye tamamlansın mı?" : gemiIslem === "beklet" ? "Gemi beklemeye alınsın mı?" : "Tahliyeye açılsın mı?"}
         description={gemi ? (gemiIslem === "kapat"
           ? `${gemi.gemi_adi}: ${tonYazi(rapor?.gelenKg ?? 0)} / ${tonYazi(gemi.bl_kg)} (${yuzdeYazi(rapor?.yuzde ?? 0)}). Tamamlanınca araç girilemez; rapor ve Excel kalır.`
-          : gemiIslem === "sil" ? `${gemi.gemi_adi} ve satış kayıtları silinir (araç kaydı yok).` : `${gemi.gemi_adi} için yeniden araç girilebilir.`) : ""}
-        confirmLabel={gemiIslem === "sil" ? "Sil" : gemiIslem === "kapat" ? "Tamamla" : "Aç"} destructive={gemiIslem === "sil"} loading={isleniyor} onConfirm={gemiIslemUygula} />
+          : gemiIslem === "sil" ? `${gemi.gemi_adi} ve satış kayıtları silinir (araç kaydı yok).`
+          : gemiIslem === "beklet" ? `${gemi.gemi_adi} Kantar Paneli'nden kalkar, araç girilemez. Girilmiş kayıtlar durur.`
+          : `${gemi.gemi_adi} Kantar Paneli'nde görünür, araç girilebilir.`) : ""}
+        confirmLabel={gemiIslem === "sil" ? "Sil" : gemiIslem === "kapat" ? "Tamamla" : gemiIslem === "beklet" ? "Beklemeye Al" : "Aç"} destructive={gemiIslem === "sil"} loading={isleniyor} onConfirm={gemiIslemUygula} />
     </AppShell>
+  );
+}
+
+/** Yoldaki UNEX aracina teslim kg (kantar eslesmediyse): yaz + Enter */
+function ElleTeslim({ arac, yenile }: { arac: GemiArac; yenile: () => void }) {
+  const { showToast } = useToast();
+  const [deger, setDeger] = useState("");
+  const [mesgul, setMesgul] = useState(false);
+  const gonder = async () => {
+    const kg = trSayiOku(deger);
+    if (!kg || kg < 1000 || kg > 60000) { showToast("Teslim kg 1.000 - 60.000 arasında olmalı.", "error"); return; }
+    setMesgul(true);
+    const { error } = await supabase.rpc("ic_gemi_teslim_gir", { p_id: arac.id, p_teslim: kg });
+    setMesgul(false);
+    if (error) { showToast(gemiHataMesaji(error), "error"); return; }
+    setDeger("");
+    yenile();
+  };
+  return (
+    <span className="inline-flex items-center gap-1 justify-end">
+      {mesgul ? <Loader2 size={11} className="animate-spin" style={{ color: TEXT_MUTED }} /> : <span className="text-[10px] text-amber-300">yolda</span>}
+      <input value={deger} onChange={(e) => setDeger(e.target.value.replace(/[^0-9.,]/g, ""))} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); gonder(); } }}
+        placeholder="elle" inputMode="numeric" className="w-20 px-1.5 py-0.5 rounded border text-xs text-white text-right tabular-nums bg-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500/40" style={{ borderColor: CARD_BORDER }} aria-label={`${arac.plaka} teslim kg`} />
+    </span>
   );
 }

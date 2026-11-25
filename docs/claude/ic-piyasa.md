@@ -811,3 +811,27 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   (yalnız açık gemi varsa görünür; localStorage `kantar-yurt-ici-sekme` = gemi).
 - Gece yedeği: üç tablo + (unutulmuş) `ic_alis_birlestirmeleri` `YEDEKLENECEK_TABLOLAR`'a eklendi →
   `yedekleme-gonder` YENİDEN DEPLOY edilmeli.
+
+### Gemi Tahliye 2: beklemede, hızlı giriş, kantardan otomatik teslim (25.11.2026)
+
+- Kullanıcı: "İkinci gemi şimdilik pasif olsun, araç eklenemesin. Araç ekle paneli hep açık dursun; plaka + Enter → tonaj.
+  Şoförler WhatsApp'tan liman fişi paylaşacak, önden girilecek; araç fabrikaya gelince bizim tartımımız otomatik gelecek."
+- Migration `20261125180000_ic_gemi_tahliye_kantar.sql` + `20261125190000_ic_gemi_kantar_koruma.sql` (canlıda, kod
+  push'undan ÖNCE uygulandı): durum `beklemede` (kantarda görünmez, araç girilemez; sayfada "Beklemeye Al" / "Tahliyeye
+  Aç"). UNEX aracı İKİ AŞAMA: liman kg ile "yolda" (teslim NULL) → teslim BAYKON tartımından (`kantar_tartimlari`, salt
+  okunur) OTOMATİK: `ic_gemi_kantar_esle_calistir` (pg_cron `gemi-kantar-esle` */2, yalnız SQL; araç eklenince ve ekranlar
+  yenilenince de). Eşleşme: plaka çekici VEYA dorse (boşluksuz, Türkçe harf ASCII), tartım çıkışı fişten 12 sa önce..36 sa
+  sonra, |net − liman| ≤ 1.500 kg, 1'e 1; DBA'lı (ihracat) ya da irsaliyesi iç satış/alış kaydında olan tartım bağlanmaz;
+  KORUMA (canlı denemede bulundu): kantar firma alanı açık alış tedarikçisine / açık iş emri müşterisine uyuyorsa
+  (`kantar_ad_jetonlari`) bağlanmaz — firma alanında gemi adı geçiyorsa bağlanır. Sıra: gemi adı geçen → en yakın kg → en erken.
+  Fark > max(300 kg, %1) uyarı. Elle: `ic_gemi_teslim_gir(p_id, kg)` (kantarcı yoldaki araca; kantardan geleni yalnız
+  ic_piyasa değiştirir), `p_teslim = NULL` = eşleşmeyi kaldır (yalnız ic_piyasa; `esleme_kapali` → bir daha otomatik eşleşmez).
+  Fişi gelmemiş tartım: `kantar_gemi_fissiz_tartimlar(p_gemi)` (firma alanında gemi adı geçen, bağlanmamış); liman kg
+  girilince `ic_gemi_arac_ekle(... kantar_tartim_id)` ile bağlanır. KANTARCIYA KURAL: gemi aracında firma alanına gemi adı.
+- Rapor: fark / fire yalnız teslimi gelen UNEX araçlarından; yolda ayrı (`yoldaArac`, `yoldaKg`); Excel'de yolda satırı
+  "UNEX (tartım bekliyor)", teslim/fark boş, özette "Yolda (tartım bekleyen)".
+- Arayüz: `GemiHizliGiris` (hep açık satır: yer · plaka ⏎ · liman kg ⏎; uyarıda 2. Enter = yine de kaydet, Esc = vazgeç;
+  kayıt sonrası imleç plakaya) Kantar kartında ve Gemi Tahliye sayfasında. Kantar kartı: Yolda listesi (elle teslim ⏎),
+  "Tartıldı · liman fişi gelmedi" listesi (liman kg ⏎), son girilenlerde kaynak (kantar #no / elle).
+- Yerel PG: eşleşme senaryoları (aynı plakanın iki seferi kg'a göre, dorse, irsaliyeli TMO, kg uzak → yolda, fişsiz bağlama,
+  elle, kaldır → tekrar eşleşmez, kantarcı yetki sınırları, TMO firma koruması). Canlı rollback denemeleri.

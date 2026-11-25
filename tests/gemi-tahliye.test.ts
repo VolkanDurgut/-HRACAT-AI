@@ -112,3 +112,21 @@ test("Excel: uzun / ayni kisaltmali sayfa adlari benzersiz ve <= 31", () => {
 test("Excel dosya adi ASCII", () => {
   assert.equal(gemiRaporDosyaAdi({ gemi_adi: "MV ÇİĞ ÖRNEK" }, "2026-11-25"), "25.11.2026_MV_CIG_ORNEK_TAHLIYE_RAPORU.xlsx");
 });
+
+test("Iki asama: yoldaki UNEX araci fark / fire'ye girmez, ayri sayilir", () => {
+  const ek = [...araclar, arac("2026-11-26", "34 KRG 003", 30000, null, null)];
+  const r = gemiRaporu(gemi, alicilar, ek);
+  assert.equal(r.yoldaArac, 1);
+  assert.equal(r.yoldaKg, 30000);
+  assert.equal(r.unexLimanKg, 117000);
+  assert.equal(r.unexTeslimliLimanKg, 87000);
+  assert.equal(r.unexFarkKg, -100);
+  assert.equal(Math.round((r.firePct ?? 0) * 1000) / 1000, 0.115);
+  assert.equal(r.yerler[0].yoldaArac, 1);
+  const s = gemiRaporSayfalari(gemi, alicilar, ek);
+  const satir = s[0].satirlar.find((x) => x[1]?.v === "34 KRG 003");
+  assert.equal(satir?.[3]?.v, null);
+  assert.equal(satir?.[4]?.v, null);
+  assert.equal(satir?.[5]?.v, "UNEX (tartım bekliyor)");
+  assert.ok(s[0].satirlar.some((x) => x[1]?.v === "Yolda (tartım bekleyen)" && x[2]?.v === 30000));
+});

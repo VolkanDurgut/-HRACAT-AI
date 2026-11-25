@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, X, Ship, AlertTriangle, ClipboardPaste, Truck, Users } from "lucide-react";
+import { Loader2, X, Ship, AlertTriangle, ClipboardPaste, Truck, Users, CheckCircle2, CornerDownLeft } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi } from "@/lib/ic-piyasa/is-emri";
 import { gunTR, bugunTRIso } from "@/lib/ic-piyasa/alis";
@@ -207,7 +207,7 @@ export function GemiAracFormu({ gemi, alicilar, kaynak, kapat, kaydedildi, varsa
   const dogrula = () => {
     if (!plakaGecerli(plakaBicimle(plaka))) return "Plakayı yazın. Örnek: 34 ABC 123";
     if (!limanKg || limanKg <= 0 || limanKg > 60000) return "Liman fişindeki kg'ı yazın (1 - 60.000).";
-    if (unex && (!teslimKg || teslimKg <= 0 || teslimKg > 60000)) return "Kantarımızdaki teslim kg'ını yazın (1 - 60.000).";
+    if (unex && teslim.trim() && (!teslimKg || teslimKg <= 0 || teslimKg > 60000)) return "Teslim kg 1 - 60.000 arasında olmalı (boş bırakırsanız kantardan otomatik gelir).";
     return null;
   };
   const kontrol = async () => {
@@ -226,7 +226,7 @@ export function GemiAracFormu({ gemi, alicilar, kaynak, kapat, kaydedildi, varsa
     const { error } = await supabase.rpc("ic_gemi_arac_ekle", { p_veri: veri(), p_kaydet: true });
     setMesgul(false);
     if (error) { setUyarilar(null); setHata(gemiHataMesaji(error)); return; }
-    showToast(`${plakaBicimle(plaka)} kaydedildi (${gemi.gemi_adi}).`, "success");
+    showToast(`${plakaBicimle(plaka)} kaydedildi (${gemi.gemi_adi})${unex && !teslimKg ? " · kantar tartımı bekleniyor" : ""}.`, "success");
     kaydedildi();
   };
 
@@ -249,7 +249,7 @@ export function GemiAracFormu({ gemi, alicilar, kaynak, kapat, kaydedildi, varsa
           <input value={liman} onChange={(e) => { setLiman(e.target.value); setUyarilar(null); }} inputMode="numeric" placeholder="29.260" className={`${girdi} mt-1`} style={{ borderColor: CARD_BORDER }} data-testid="gemi-arac-liman" />
         </label>
         {unex ? (
-          <label className="text-xs" style={{ color: TEXT_MUTED }}>Teslim kg (kantarımız) *
+          <label className="text-xs" style={{ color: TEXT_MUTED }}>Teslim kg (boş = kantardan otomatik)
             <input value={teslim} onChange={(e) => { setTeslim(e.target.value); setUyarilar(null); }} inputMode="numeric" placeholder="29.220" className={`${girdi} mt-1`} style={{ borderColor: CARD_BORDER }} data-testid="gemi-arac-teslim" />
           </label>
         ) : <p className="text-xs self-end pb-2" style={{ color: TEXT_MUTED }}>Gemiden satışta teslim tartımı yoktur.</p>}
@@ -364,5 +364,93 @@ export function LimanListesiPenceresi({ gemi, alicilar, kapat, kaydedildi }: {
       )}
       <Altbar hata={hata} mesgul={mesgul} kapat={kapat} onay={uyarilar ? kaydet : kontrol} onayEtiket={uyarilar ? "Yine de Kaydet" : `${satirlar.length || ""} Aracı Kaydet`.trim()} devreDisi={!satirlar.length} />
     </Pencere>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HIZLI GIRIS (25.11.2026, kullanici: "panel hep acik dursun; plaka + Enter -> tonaj"): satir hep acik.
+// Plaka [Enter] -> Liman kg [Enter] -> kayit (uyari varsa ikinci Enter = yine de kaydet, Esc = vazgec) -> imlec plakaya doner.
+// UNEX araci "yolda" kaydedilir; teslim kg BAYKON tartimindan otomatik gelir (ic_gemi_kantar_esle).
+// ---------------------------------------------------------------------------
+export function GemiHizliGiris({ gemi, alicilar, kaynak, kaydedildi, testId = "gemi-hizli" }: {
+  gemi: Pick<GemiTahliye, "id" | "gemi_adi">; alicilar: Pick<GemiAlici, "id" | "firma">[]; kaynak: "kantar" | "ofis";
+  kaydedildi: () => void; testId?: string;
+}) {
+  const [alici, setAlici] = useState("");
+  const [plaka, setPlaka] = useState("");
+  const [liman, setLiman] = useState("");
+  const [uyarilar, setUyarilar] = useState<string[] | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [son, setSon] = useState<string | null>(null);
+  const [mesgul, setMesgul] = useState(false);
+  const plakaRef = useRef<HTMLInputElement>(null);
+  const limanRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (alici && !alicilar.some((l) => l.id === alici)) setAlici(""); }, [alicilar, alici]);
+
+  const sifirla = () => { setUyarilar(null); setHata(null); };
+  const veri = () => ({ gemi_id: gemi.id, alici_id: alici || null, plaka: plakaBicimle(plaka), liman_kg: trSayiOku(liman), kaynak });
+  const kaydet = async (zorla: boolean) => {
+    setHata(null);
+    const p = plakaBicimle(plaka);
+    const kg = trSayiOku(liman);
+    if (!plakaGecerli(p)) { setHata("Plaka okunamadı."); plakaRef.current?.focus(); return; }
+    if (!kg || kg < 1000 || kg > 60000) { setHata(kg && kg < 1000 ? "Kg 1.000'den küçük; ton mu yazıldı? Kg girin." : "Liman kg'ını yazın (1.000 - 60.000)."); limanRef.current?.focus(); return; }
+    setMesgul(true);
+    if (!zorla) {
+      const k = await supabase.rpc("ic_gemi_arac_ekle", { p_veri: veri(), p_kaydet: false });
+      if (k.error) { setMesgul(false); setHata(gemiHataMesaji(k.error)); return; }
+      const u = ((k.data as { uyarilar?: string[] })?.uyarilar) || [];
+      if (u.length) { setMesgul(false); setUyarilar(u); limanRef.current?.focus(); return; }
+    }
+    const { data, error } = await supabase.rpc("ic_gemi_arac_ekle", { p_veri: veri(), p_kaydet: true });
+    setMesgul(false);
+    if (error) { setUyarilar(null); setHata(gemiHataMesaji(error)); return; }
+    const d = (data || {}) as { kantar_eslesti?: boolean; yolda?: boolean };
+    const yer = alici ? (alicilar.find((l) => l.id === alici)?.firma || "") : "UNEX";
+    setSon(`${p} · ${kg.toLocaleString("tr-TR")} kg · ${yer}${d.kantar_eslesti ? " · kantar tartımı bulundu" : d.yolda ? " · kantar tartımı bekleniyor" : ""}`);
+    setPlaka(""); setLiman(""); setUyarilar(null);
+    kaydedildi();
+    window.setTimeout(() => plakaRef.current?.focus(), 0);
+  };
+  const tus = (alan: "plaka" | "liman") => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") { sifirla(); return; }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (mesgul) return;
+    if (alan === "plaka") { if (plakaGecerli(plakaBicimle(plaka))) { setHata(null); limanRef.current?.focus(); limanRef.current?.select(); } else setHata("Plaka okunamadı."); return; }
+    kaydet(!!uyarilar);
+  };
+
+  return (
+    <div className="rounded-lg border p-2.5" style={{ borderColor: "rgba(16,185,129,0.35)", backgroundColor: "rgba(16,185,129,0.05)" }} data-testid={testId}>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-[10px] font-semibold uppercase tracking-wide flex-1 min-w-[150px]" style={{ color: TEXT_MUTED }}>Gittiği yer
+          <select value={alici} onChange={(e) => { setAlici(e.target.value); sifirla(); plakaRef.current?.focus(); }} className={`${girdi} mt-1 py-1.5 normal-case tracking-normal font-normal`} style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} data-testid={`${testId}-yer`}>
+            <option value="">UNEX (depoya)</option>
+            {alicilar.map((l) => <option key={l.id} value={l.id}>{l.firma} (gemiden satış)</option>)}
+          </select>
+        </label>
+        <label className="text-[10px] font-semibold uppercase tracking-wide w-36" style={{ color: TEXT_MUTED }}>Plaka
+          <input ref={plakaRef} value={plaka} onChange={(e) => { setPlaka(plakaYazarken(e.target.value)); sifirla(); }} onKeyDown={tus("plaka")}
+            placeholder="34 ABC 123" autoComplete="off" enterKeyHint="next" className={`${girdi} mt-1 py-1.5 uppercase font-semibold tracking-normal`} style={{ borderColor: CARD_BORDER }} data-testid={`${testId}-plaka`} />
+        </label>
+        <label className="text-[10px] font-semibold uppercase tracking-wide w-32" style={{ color: TEXT_MUTED }}>Liman kg (fiş)
+          <input ref={limanRef} value={liman} onChange={(e) => { setLiman(e.target.value.replace(/[^0-9.,]/g, "")); sifirla(); }} onKeyDown={tus("liman")}
+            inputMode="numeric" placeholder="29.260" autoComplete="off" enterKeyHint="done" className={`${girdi} mt-1 py-1.5 tabular-nums tracking-normal`} style={{ borderColor: CARD_BORDER }} data-testid={`${testId}-liman`} />
+        </label>
+        <button onClick={() => kaydet(!!uyarilar)} disabled={mesgul} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold text-white hover:brightness-110 disabled:opacity-50" style={{ backgroundColor: uyarilar ? "#D97706" : ACCENT }} data-testid={`${testId}-kaydet`}>
+          {mesgul ? <Loader2 size={14} className="animate-spin" /> : <CornerDownLeft size={14} />} {uyarilar ? "Yine de kaydet" : "Kaydet"}
+        </button>
+      </div>
+      {uyarilar && (
+        <div className="mt-2 text-xs text-amber-200 space-y-0.5" role="alert">
+          {uyarilar.map((u) => <p key={u} className="flex items-start gap-1.5"><AlertTriangle size={12} className="mt-0.5 shrink-0" /> {u}</p>)}
+          <p style={{ color: TEXT_MUTED }}>Doğruysa tekrar Enter, vazgeçmek için Esc.</p>
+        </div>
+      )}
+      {hata && <p className="mt-2 text-xs text-red-400 flex items-center gap-1.5" role="alert"><AlertTriangle size={12} /> {hata}</p>}
+      {!hata && !uyarilar && son && <p className="mt-2 text-xs text-emerald-300 flex items-center gap-1.5" data-testid={`${testId}-son`}><CheckCircle2 size={12} /> Kaydedildi: {son}</p>}
+      {!hata && !uyarilar && !son && <p className="mt-2 text-[11px]" style={{ color: TEXT_MUTED }}>Şoförün liman fişinden: plaka → Enter → kg → Enter. UNEX araçlarında teslim kg kantar tartımından otomatik gelir.</p>}
+    </div>
   );
 }

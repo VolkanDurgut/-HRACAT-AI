@@ -15,7 +15,8 @@ import { plakaBicimle, plakaGecerli, trSayiOku } from "./irsaliye-oku";
 
 export const UNEX_YER = "UNEX";
 
-export type GemiDurum = "acik" | "tamamlandi";
+/** beklemede (25.11.2026): gemi henuz gelmedi; kantarda gorunmez, arac girilemez */
+export type GemiDurum = "acik" | "beklemede" | "tamamlandi";
 
 export type GemiTahliye = {
   id: string;
@@ -50,8 +51,13 @@ export type GemiArac = {
   tarih: string;
   plaka: string;
   liman_kg: number;
+  /** UNEX araci: NULL = yolda (kantar tartimi bekleniyor); satis araci: hep NULL */
   teslim_kg: number | null;
   kaynak: "kantar" | "ofis";
+  kantar_tartim_id?: string | null;
+  teslim_kaynak?: "kantar" | "elle" | null;
+  teslim_zamani?: string | null;
+  esleme_kapali?: boolean;
   uyarilar: string[];
   notlar: string | null;
   girilen_email: string | null;
@@ -71,6 +77,8 @@ export type KantarGemi = {
   unex_teslim_kg: number;
   unex_arac: number;
   bugun_arac: number;
+  yolda_arac: number;
+  yolda_kg: number;
   alicilar: { id: string; firma: string; miktar_kg: number; gelen_kg: number; arac: number }[];
 };
 
@@ -78,7 +86,14 @@ export type KantarGemiArac = {
   id: string; gemi_id: string; gemi_adi: string; alici_id: string | null; firma: string | null; tarih: string;
   plaka: string; liman_kg: number; teslim_kg: number | null; kaynak: string; uyari_var: boolean;
   girilen_email: string | null; olusturma: string;
+  teslim_kaynak: "kantar" | "elle" | null; kantar_kayit_no: number | null; teslim_zamani: string | null;
 };
+
+/** kantar_gemi_fissiz_tartimlar: firma alaninda gemi adi gecen, hicbir araca bagli olmayan BAYKON tartimi */
+export type KantarFissizTartim = { id: string; kayit_no: number; plaka: string | null; dorse: string | null; firma: string | null; cikis: string; net_kg: number };
+
+/** UNEX araci tartim bekliyor mu */
+export const yoldaMi = (a: Pick<GemiArac, "alici_id" | "teslim_kg">) => !a.alici_id && (a.teslim_kg === null || a.teslim_kg === undefined);
 
 export type YerOzeti = {
   /** null = UNEX depo */
@@ -88,8 +103,10 @@ export type YerOzeti = {
   hedefKg: number | null;
   arac: number;
   limanKg: number;
-  /** Yalniz UNEX */
+  /** Yalniz UNEX (teslimi gelen araclar) */
   teslimKg: number | null;
+  /** Yalniz UNEX: kantar tartimi bekleyen arac */
+  yoldaArac?: number;
   /** Satista: hedef - liman (negatif = asim) */
   kalanKg: number | null;
 };
@@ -104,12 +121,18 @@ export type GemiRaporu = {
   aracOrtalamasi: number;
   /** Tahmini: ceil(kalan / ortalama); arac yoksa null */
   kalanAracTahmini: number | null;
+  /** UNEX'e giden tum araclarin liman toplami (yolda dahil) */
   unexLimanKg: number;
   unexTeslimKg: number;
-  /** teslim - liman (UNEX araclari) */
+  /** Teslimi gelen UNEX araclarinin liman toplami (fark / fire bunun uzerinden) */
+  unexTeslimliLimanKg: number;
+  /** teslim - liman (yalniz teslimi gelen UNEX araclari) */
   unexFarkKg: number;
-  /** (liman - teslim) / liman * 100 (UNEX araclari); arac yoksa null */
+  /** (liman - teslim) / liman * 100 (yalniz teslimi gelen UNEX araclari); yoksa null */
   firePct: number | null;
+  /** Kantar tartimi bekleyen UNEX araclari */
+  yoldaArac: number;
+  yoldaKg: number;
   yerler: YerOzeti[];
   /** Gun bazinda (en yeni ustte) */
   gunler: { tarih: string; arac: number; limanKg: number; teslimKg: number }[];
@@ -125,12 +148,15 @@ export function gemiRaporu(gemi: Pick<GemiTahliye, "bl_kg">, alicilar: GemiAlici
   const gelenArac = araclar.length;
   const unex = araclar.filter((a) => !a.alici_id);
   const unexLimanKg = yuvarla2(unex.reduce((t, a) => t + sayi(a.liman_kg), 0));
-  const unexTeslimKg = yuvarla2(unex.reduce((t, a) => t + sayi(a.teslim_kg), 0));
+  const teslimli = unex.filter((a) => !yoldaMi(a));
+  const yolda = unex.filter((a) => yoldaMi(a));
+  const unexTeslimKg = yuvarla2(teslimli.reduce((t, a) => t + sayi(a.teslim_kg), 0));
+  const unexTeslimliLimanKg = yuvarla2(teslimli.reduce((t, a) => t + sayi(a.liman_kg), 0));
   const aracOrtalamasi = gelenArac ? gelenKg / gelenArac : 0;
   const kalanKg = yuvarla2(siparisKg - gelenKg);
 
   const yerler: YerOzeti[] = [{
-    aliciId: null, ad: UNEX_YER, hedefKg: null, arac: unex.length, limanKg: unexLimanKg, teslimKg: unexTeslimKg, kalanKg: null,
+    aliciId: null, ad: UNEX_YER, hedefKg: null, arac: unex.length, limanKg: unexLimanKg, teslimKg: unexTeslimKg, kalanKg: null, yoldaArac: yolda.length,
   }];
   for (const l of alicilar) {
     const ar = araclar.filter((a) => a.alici_id === l.id);
@@ -151,9 +177,11 @@ export function gemiRaporu(gemi: Pick<GemiTahliye, "bl_kg">, alicilar: GemiAlici
     kalanKg,
     aracOrtalamasi,
     kalanAracTahmini: gelenArac ? Math.max(0, Math.ceil(kalanKg / aracOrtalamasi)) : null,
-    unexLimanKg, unexTeslimKg,
-    unexFarkKg: yuvarla2(unexTeslimKg - unexLimanKg),
-    firePct: unexLimanKg > 0 ? ((unexLimanKg - unexTeslimKg) * 100) / unexLimanKg : null,
+    unexLimanKg, unexTeslimKg, unexTeslimliLimanKg,
+    unexFarkKg: yuvarla2(unexTeslimKg - unexTeslimliLimanKg),
+    firePct: unexTeslimliLimanKg > 0 ? ((unexTeslimliLimanKg - unexTeslimKg) * 100) / unexTeslimliLimanKg : null,
+    yoldaArac: yolda.length,
+    yoldaKg: yuvarla2(yolda.reduce((t, a) => t + sayi(a.liman_kg), 0)),
     yerler,
     gunler: Array.from(gunMap.values()).sort((a, b) => (a.tarih < b.tarih ? 1 : -1)),
   };

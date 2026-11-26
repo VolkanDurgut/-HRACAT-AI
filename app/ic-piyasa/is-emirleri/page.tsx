@@ -9,12 +9,13 @@ import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { IcPiyasaSekmeler, bildirimSayaciniYenile } from "@/components/ic-piyasa-sekmeler";
 import { IcIsEmriForm } from "@/components/ic-is-emri-form";
+import { gemiAdlariOku } from "@/lib/ic-piyasa/gemi-satis-veri";
 import { IcSiparisFormuPenceresi } from "@/components/ic-siparis-formu-penceresi";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { IcGecmisSevkPenceresi, GecmisSevkEmri } from "@/components/ic-gecmis-sevk-penceresi";
 import {
   ClipboardList, Plus, AlertCircle, ChevronDown, ChevronRight, Pencil, CheckCircle2, XCircle,
-  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History, ArrowRightLeft,
+  RotateCcw, Trash2, FileText, AlertTriangle, Truck, RefreshCw, Search, Link2, Clock, Copy, FileInput, Bell, History, ArrowRightLeft, Anchor,
 } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -82,6 +83,8 @@ export default function IsEmirleriPage() {
   const [devirler, setDevirler] = useState<IcDevir[]>([]);
   const [devirKaynak, setDevirKaynak] = useState<EmirSatiri | null>(null);
   const [geriAlinacak, setGeriAlinacak] = useState<IcDevir | null>(null);
+  /** Gemiden satis rozeti: gemi_id -> gemi adi (ayri sorgu; okunamazsa rozet "Gemi" yazar, liste bozulmaz) */
+  const [gemiAdlari, setGemiAdlari] = useState<Record<string, string>>({});
 
   const getir = useCallback(async () => {
     if (!companyId) return;
@@ -106,6 +109,8 @@ export default function IsEmirleriPage() {
       setBildirimler([]);
       setDevirler([]);
     }
+    const gemiIdleri = Array.from(new Set(e.map((x) => x.gemi_id).filter((x): x is string => !!x)));
+    setGemiAdlari(await gemiAdlariOku(companyId, gemiIdleri));
     setEmirler(e);
     setSevkler(s);
     setMusteriler((mRes.data || []) as IcMusteri[]);
@@ -193,7 +198,7 @@ export default function IsEmirleriPage() {
       // Dogru sira: once kayitlar (tek islem, sunucuda), SADECE basariliysa PDF'ler
       const { data: yollar, error } = await supabase.rpc("ic_is_emri_tamamen_sil", { p_id: emir.id });
       if (error) { setIsleniyor(false); showToast(hataMesaji(error), "error"); return; }
-      const liste = (yollar as string[] | null) || [];
+      const liste = ((yollar as (string | null)[] | null) || []).filter((y): y is string => !!y);
       if (liste.length) {
         const { error: dHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove(liste);
         if (dHata) console.error("İrsaliye / sipariş formu dosyaları silinemedi:", dHata.message);
@@ -251,8 +256,11 @@ export default function IsEmirleriPage() {
     const { data, error } = await supabase.from("ic_sevkler").delete().eq("id", silinecekSevk.id).eq("company_id", companyId).select("id");
     const hata = yazmaHatasi(error, data);
     if (hata) { setIsleniyor(false); showToast(`Silinemedi: ${hataMesaji({ message: hata })}`, "error"); return; }
-    const { error: dosyaHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove([silinecekSevk.irsaliye_dosya_yolu]);
-    if (dosyaHata) console.error("İrsaliye dosyası silinemedi:", dosyaHata.message);
+    // 26.11.2026: irsaliyesiz elle girilen aracin dosyasi yoktur
+    if (silinecekSevk.irsaliye_dosya_yolu) {
+      const { error: dosyaHata } = await supabase.storage.from(IC_BELGE_BUCKET).remove([silinecekSevk.irsaliye_dosya_yolu]);
+      if (dosyaHata) console.error("İrsaliye dosyası silinemedi:", dosyaHata.message);
+    }
     setIsleniyor(false);
     showToast(`${silinecekSevk.plaka} sevki silindi.`, "success");
     setSilinecekSevk(null);
@@ -367,6 +375,7 @@ export default function IsEmirleriPage() {
                       <tr className="border-b hover:bg-white/[0.03] transition-colors cursor-pointer" style={{ borderColor: CARD_BORDER }} onClick={() => setAcikDetay(acik ? null : e.id)}>
                         <td className="px-3 py-3 align-top">
                           <p className="text-xs font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.is_emri_no}</p>
+                          {e.gemi_id && <span className="inline-flex items-center gap-1 mt-1 mr-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-sky-500/15 text-sky-300 whitespace-nowrap" title="Gemiden satış" data-testid="is-emri-gemi-rozet"><Anchor size={10} /> {gemiAdlari[e.gemi_id] || "Gemi"}</span>}
                           <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${DURUM_RENK[e.durum]}`}>{DURUM_ETIKET[e.durum]}</span>
                           {e.durum === "acik" && tamamIrs && <span className="ml-1 inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 whitespace-nowrap" data-testid="kapatmaya-hazir">Kapatmaya hazır</span>}
                         </td>
@@ -498,9 +507,11 @@ export default function IsEmirleriPage() {
                                           <td className="px-3 py-2 text-white">{s.sofor_ad || "-"}</td>
                                           <td className="px-3 py-2 text-right font-semibold text-white whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
                                           <td className="px-3 py-2 whitespace-nowrap">
-                                            <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
-                                              <FileText size={11} /> {s.irsaliye_no || "Gör"}
-                                            </button>
+                                            {s.irsaliye_dosya_yolu ? (
+                                              <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu!)} className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20">
+                                                <FileText size={11} /> {s.irsaliye_no || "Gör"}
+                                              </button>
+                                            ) : <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold text-amber-300 bg-amber-500/10" title="İrsaliye PDF'i yok; plaka ve tonaj elle girildi">Elle giriş</span>}
                                             {s.irsaliye_tarihi && <span className="block text-[10px] mt-0.5" style={{ color: TEXT_MUTED }}>{s.gecmis ? new Date(s.irsaliye_tarihi).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : tarihSaatYazi(s.irsaliye_tarihi)}</span>}
                                           </td>
                                           <td className="px-3 py-2 whitespace-nowrap">

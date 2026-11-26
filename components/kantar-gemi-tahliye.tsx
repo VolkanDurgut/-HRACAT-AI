@@ -7,7 +7,7 @@ import { Loader2, Ship, AlertTriangle, Clock, Scale, Plus, ChevronDown } from "l
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { trSayiOku, plakaBicimle } from "@/lib/ic-piyasa/irsaliye-oku";
-import { KantarGemi, KantarGemiArac, UNEX_YER, farkTonu, farkYazi, gemiHataMesaji, yuzdeYazi } from "@/lib/ic-piyasa/gemi-tahliye";
+import { KantarGemi, KantarGemiArac, UNEX_YER, eskiGemiAlicilari, farkTonu, farkYazi, gemiHataMesaji, yuzdeYazi } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiSlug } from "@/lib/kantar-gorunum";
 import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
 import { GemiHizliGiris, GemiLimanExcelYukle } from "@/components/ic-gemi-pencereler";
@@ -161,7 +161,7 @@ function GemiGorunumu({ g, araclar, tetik, yenile, dar }: { g: KantarGemi; aracl
         </div>
       </div>
 
-      {elle && <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}><GemiHizliGiris gemi={g} alicilar={g.alicilar} kaynak="kantar" kaydedildi={yenile} testId={`kantar-gemi-hizli-${g.id.slice(0, 8)}`} /></div>}
+      {elle && <div className="px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}><GemiHizliGiris gemi={g} alicilar={eskiGemiAlicilari(g.alicilar)} kaynak="kantar" kaydedildi={yenile} testId={`kantar-gemi-hizli-${g.id.slice(0, 8)}`} /></div>}
 
       {bekleyenAcik && bekleyenSayi > 0 && (
         <div className="border-b" style={{ borderColor: CARD_BORDER }} data-testid="kantar-gemi-liman-bekleyen">
@@ -248,13 +248,17 @@ function GemiGorunumu({ g, araclar, tetik, yenile, dar }: { g: KantarGemi; aracl
             <td className={`${px} py-2 text-right tabular-nums text-white`}>teslim {kgYazi(g.unex_teslim_kg)}</td>
           </tr>
           {g.alicilar.map((l) => {
-            const kalan = Number(l.miktar_kg) - Number(l.gelen_kg);
+            const hedef = l.miktar_kg === null || l.miktar_kg === undefined ? null : Number(l.miktar_kg);
+            const kalan = hedef === null ? null : hedef - Number(l.gelen_kg);
             return (
-              <tr key={l.id} className="border-t" style={{ borderColor: CARD_BORDER }}>
-                <td className={`${px} py-2 text-white truncate`} title={l.firma}>{l.firma}</td>
+              <tr key={l.id} className="border-t" style={{ borderColor: CARD_BORDER }} data-testid={l.is_emri_no ? "gemi-yer-is-emri" : undefined}>
+                <td className={`${px} py-2 text-white truncate`} title={l.is_emri_no ? `${l.is_emri_no} · ${l.firma}` : l.firma}>
+                  {l.firma}
+                  {l.is_emri_no && <span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{l.is_emri_no}{hedef !== null ? ` · hedef ${kgYazi(hedef)}` : ""} · irsaliyeli</span>}
+                </td>
                 <td className={`${px} py-2 text-right tabular-nums text-white`}>{l.arac}</td>
                 <td className={`${px} py-2 text-right tabular-nums text-white`}>{kgYazi(l.gelen_kg)}</td>
-                <td className={`${px} py-2 text-right tabular-nums ${kalan < 0 ? "text-sky-400" : "text-amber-300"}`}>{kalan < 0 ? `Fazla ${kgYazi(-kalan)}` : `Kalan ${kgYazi(kalan)}`}</td>
+                <td className={`${px} py-2 text-right tabular-nums ${kalan === null ? "" : kalan < 0 ? "text-sky-400" : "text-amber-300"}`} style={kalan === null ? { color: TEXT_MUTED } : undefined}>{kalan === null ? "-" : kalan < 0 ? `Fazla ${kgYazi(-kalan)}` : `Kalan ${kgYazi(kalan)}`}</td>
               </tr>
             );
           })}

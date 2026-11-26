@@ -8,6 +8,7 @@ import { useToast } from "@/lib/toast-context";
 import { Loader2, X, Save, FileText, Truck, Scale, Upload, Trash2, Plus, ExternalLink, AlertTriangle } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { IC_BELGE_BUCKET, IcIsEmri, IcMusteri, hataMesaji } from "@/lib/ic-piyasa/is-emri";
+import { GemiSecenegi, gemiSecenekleriOku, teslimYerindenGemi } from "@/lib/ic-piyasa/gemi-satis-veri";
 import { AZAMI_FORM_BAYT, AZAMI_OZELLIK, NAKLIYE_ETIKET, SiparisEki, UrunOzelligi, gunAyYil, isEmriOnDolum, ozellikleriHazirla, ozellikleriOku, siparisFormuYolu } from "@/lib/ic-piyasa/siparis-formu";
 import {
   IcFiyatFormu,
@@ -70,13 +71,18 @@ type Taslak = {
   nakliye: "" | "alici" | "satici";
   teslim_suresi_gun: string;
   urun_ozellikleri: UrunOzelligi[];
+  /** 26.11.2026: gemiden satis -> bagli gemi tahliyesi ("" = normal satis) */
+  gemi_id: string;
 };
+
+/** Gemiden satista teslim secenegi (alicinin araci limanda gemiden yukler) */
+const GEMI_TESLIM = "Liman Teslim (Supalan)";
 
 const BOS: Taslak = {
   musteri_id: "", urun: "", ambalaj: "Dökme", hedef_tur: "kg", hedef_ton: "", hedef_arac: "",
   birim_fiyat: "", kdv_dahil: false, vade_gun: "30", odeme: "Çek", teslim: "Fabrika Teslim", teslim_adresi: "",
   fiyat_formu_id: null, fiyat_formu_no: null, talimat_veren: "Burak Tuncay", musteri_siparis_no: "", notlar: "",
-  siparis_tarihi: "", nakliye: "", teslim_suresi_gun: "", urun_ozellikleri: [],
+  siparis_tarihi: "", nakliye: "", teslim_suresi_gun: "", urun_ozellikleri: [], gemi_id: "",
 };
 
 const inputSinif = "w-full px-3 py-2 rounded-lg border text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40";
@@ -133,6 +139,7 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
         nakliye: duzenlenen.nakliye || "",
         teslim_suresi_gun: duzenlenen.teslim_suresi_gun !== null && duzenlenen.teslim_suresi_gun !== undefined ? String(duzenlenen.teslim_suresi_gun) : "",
         urun_ozellikleri: ozellikleriOku(duzenlenen.urun_ozellikleri),
+        gemi_id: duzenlenen.gemi_id || "",
       });
       setYeniForm(null);
       setOkumaUyarilari([]);
@@ -169,6 +176,22 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
     // musteriler bilerek bagimlilik degil: liste yenilenince kullanicinin duzenlemesi ezilmesin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acik, duzenlenen, onDolum]);
+
+  // 26.11.2026 gemiden satis: acik gemiler (+ duzenlenen is emrinin kapali gemisi). Siparis formunun "Teslim Yeri"nde
+  // gemi adi geciyorsa (ornek: "... SUPALAN TESLIM (KURGU GEMISI)") yeni is emrinde gemi kendiliginden secilir.
+  const [gemiler, setGemiler] = useState<GemiSecenegi[]>([]);
+  useEffect(() => {
+    if (!acik || !companyId) return;
+    let iptal = false;
+    gemiSecenekleriOku(companyId).then((liste) => {
+      if (iptal) return;
+      setGemiler(liste);
+      const g = !duzenlenen ? teslimYerindenGemi(onDolum?.ek.okuma?.teslimYeri, liste) : null;
+      if (g) setTaslak((t) => ({ ...t, gemi_id: g.id, teslim: !t.teslim || t.teslim === "Fabrika Teslim" ? GEMI_TESLIM : t.teslim }));
+    });
+    return () => { iptal = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acik, companyId, onDolum]);
 
   useEffect(() => {
     if (!acik || !companyId) return;
@@ -264,6 +287,7 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
       nakliye: taslak.nakliye || null,
       teslim_suresi_gun: teslimSuresi,
       urun_ozellikleri: oz.deger,
+      gemi_id: taslak.gemi_id || null,
     };
     setKaydediliyor(true);
 
@@ -514,8 +538,19 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
               <Alan etiket="Teslim" genis>
                 <select value={taslak.teslim} onChange={(e) => setTaslak({ ...taslak, teslim: e.target.value })} className={inputSinif} style={inputStil}>
                   <option value="">Seçin</option>
-                  {Array.from(new Set([...TESLIM_SECENEKLERI, ...(taslak.teslim ? [taslak.teslim] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
+                  {Array.from(new Set([...TESLIM_SECENEKLERI, ...(taslak.gemi_id ? [GEMI_TESLIM] : []), ...(taslak.teslim ? [taslak.teslim] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
+              </Alan>
+              <Alan etiket="Gemiden satış" genis>
+                <select value={taslak.gemi_id} data-testid="is-emri-gemi"
+                  onChange={(e) => { const v = e.target.value; setTaslak((t) => ({ ...t, gemi_id: v, teslim: v && (!t.teslim || t.teslim === "Fabrika Teslim") ? GEMI_TESLIM : !v && t.teslim === GEMI_TESLIM ? "Fabrika Teslim" : t.teslim })); }}
+                  className={inputSinif} style={inputStil}>
+                  <option value="">Hayır (fabrikadan satış)</option>
+                  {gemiler.filter((g) => g.durum !== "tamamlandi" || g.id === taslak.gemi_id).map((g) => (
+                    <option key={g.id} value={g.id}>{g.gemi_adi}{g.durum === "tamamlandi" ? " (tamamlandı)" : ""}</option>
+                  ))}
+                </select>
+                {taslak.gemi_id && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Alıcı araçları limanda gemiden yükler; irsaliyeler (ya da elle plaka + tonaj) Kantar Paneli › Yurt İçi › Satış&apos;tan girilir ve gemi tahliye tonajına eklenir.</span>}
               </Alan>
             </div>
           </section>

@@ -900,3 +900,19 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   ic_gemi_tartim_bagla) hata verdi; pg_cron / yönetim oturumunda uzantı yok → gece eşleşmeleri cron'dan sorunsuz.
   Düzeltme: `where true`. KURAL: uygulamadan çağrılabilecek fonksiyonlarda WHERE'siz DELETE / UPDATE yazılmaz (geçici
   tablo dahil). Ayrıca Liman Excel penceresi kayıt hatasını artık pencerenin içinde gösterir (önceden görünmüyordu).
+
+### Gemiden satış = iş emri (26.11.2026; migration 20261126120000)
+- Karar: gemiden satış ayrı "Satış Ekle" (ic_gemi_alicilari) ile DEĞİL, normal **iş emri** ile yürür. İş emri formunda
+  "Gemiden satış" seçimi → `ic_is_emirleri.gemi_id` (FK ic_gemi_tahliyeleri, on delete set null; tetikleyici
+  `ic_is_emri_gemi_kontrol` aynı şirket). Teslim seçeneği "Liman Teslim (Supalan)" kendiliğinden gelir; sipariş formunun
+  Teslim Yeri metninde açık bir geminin adı geçiyorsa (kelime sınırlı, `teslimYerindenGemi`) gemi kendiliğinden seçilir.
+- Alıcı aracı limanda gemiden yükler; kantarcı Kantar Paneli › Yurt İçi › Satış'ta iş emrine (⚓ gemi rozeti) irsaliye PDF'i
+  yükler YA DA **"İrsaliye PDF'i yok · plaka ve tonajı elle gir"** (p_veri.elle=true, dosya yolu NULL; uyarı "İrsaliye PDF'i yok;
+  plaka ve tonaj elle girildi."). `ic_sevkler.irsaliye_dosya_yolu` artık NULL olabilir → tüm açma / indirme / silme yerleri
+  null korumalı ("Elle giriş" rozeti; storage.remove öncesi null süzülür; yola çıktı mesajına PDF eklenemez uyarısı).
+- Tonaj gemiye yazılır: `kantar_gemi_tahliyeleri` gelen kg / araç / bugün bu sevkleri içerir, `alicilar` listesine iş emirleri
+  `{id: is emri id, firma, is_emri_no, miktar_kg (kg hedefi ya da null), gelen_kg, arac}` olarak eklenir. Ofis gemi sayfası
+  aynı veriyi `isEmriSatislariniEkle` ile rapora / Excel'e salt okunur yer + araç (kaynak 'irsaliye') olarak katar; düzeltme
+  İş Emirleri'nden. Kantar kartındaki hızlı araç formu yalnız eski satırları alır (`eskiGemiAlicilari`).
+- Eşleştirici koruması: bir gemi iş emri sevkiyle aynı plaka + ±500 kg + ±1 gün olan liman fişi UNEX aracına
+  eşlenmez (`ic_gemi_kantar_esle_calistir`, `kantar_gemi_liman_adaylari`).

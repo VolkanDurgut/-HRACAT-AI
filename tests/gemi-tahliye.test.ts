@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GemiAlici, GemiArac, GemiTahliye, aracFarki, bekleyenDurumu, farkTonu, farkYazi, gemiRaporu, limanBekliyorMu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
+import { GemiAlici, GemiArac, GemiTahliye, aracFarki, eskiGemiAlicilari, isEmriSatislariniEkle, bekleyenDurumu, farkTonu, farkYazi, gemiRaporu, limanBekliyorMu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiRaporSayfalari, gemiRaporDosyaAdi } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
 
 const gemi: GemiTahliye = {
@@ -174,4 +174,56 @@ test("farkYazi / farkTonu: eksik kirmizi -120, fazla yesil +60", () => {
   assert.equal(farkTonu(-20), "eksik");
   assert.equal(farkTonu(40), "fazla");
   assert.equal(farkTonu(0), "esit");
+});
+
+// ---- 26.11.2026 gemiden satis (is emri) ----
+test("isEmriSatislariniEkle: is emri yer + sevk araci olarak rapora girer, toplamlar tutar", () => {
+  const emirler = [
+    { id: "ie1", is_emri_no: "IE-KURGU-1", firma: "KURGU UN A.S.", hedef_tur: "kg" as const, hedef_kg: "50000", olusturma: "2026-11-26T08:00:00Z" },
+    { id: "ie2", is_emri_no: "IE-KURGU-2", firma: "KURGU GIDA LTD.", hedef_tur: "arac" as const, hedef_kg: null, olusturma: "2026-11-26T08:05:00Z" },
+  ];
+  const sevkler = [
+    // 23:30 UTC = ertesi gun Turkiye saatiyle
+    { id: "s1", is_emri_id: "ie1", plaka: "34 KRG 301", net_kg: "26000", irsaliye_no: "KRG2026000000001", irsaliye_tarihi: "2026-11-26T23:30:00Z", irsaliye_dosya_yolu: "c/irsaliye/ie1/1.pdf", girilen_email: null, olusturma: "2026-11-26T23:31:00Z" },
+    { id: "s2", is_emri_id: "ie1", plaka: "34 KRG 302", net_kg: 25000, irsaliye_no: null, irsaliye_tarihi: null, irsaliye_dosya_yolu: null, girilen_email: null, olusturma: "2026-11-26T10:00:00Z" },
+    { id: "s3", is_emri_id: "ie2", plaka: "34 KRG 303", net_kg: 27000, irsaliye_no: null, irsaliye_tarihi: null, irsaliye_dosya_yolu: null, girilen_email: null, olusturma: "2026-11-26T11:00:00Z" },
+    { id: "s9", is_emri_id: "baska", plaka: "34 KRG 309", net_kg: 1, irsaliye_no: null, irsaliye_tarihi: null, irsaliye_dosya_yolu: null, girilen_email: null, olusturma: "2026-11-26T11:00:00Z" },
+  ];
+  const t = isEmriSatislariniEkle("g1", alicilar, araclar, emirler, sevkler);
+  assert.equal(t.alicilar.length, alicilar.length + 2);
+  assert.equal(t.araclar.length, araclar.length + 3, "baska is emrinin sevki girmez");
+  const s1 = t.araclar.find((a) => a.id === "s1")!;
+  assert.equal(s1.tarih, "2026-11-27");
+  assert.equal(s1.kaynak, "irsaliye");
+  assert.equal(s1.liman_kg, 26000);
+  assert.deepEqual(t.araclar.find((a) => a.id === "s2")!.uyarilar, ["İrsaliyesiz elle giriş"]);
+
+  const r = gemiRaporu(gemi, t.alicilar, t.araclar);
+  const r0 = gemiRaporu(gemi, alicilar, araclar);
+  assert.equal(r.gelenKg, r0.gelenKg + 78000);
+  assert.equal(r.gelenArac, r0.gelenArac + 3);
+  assert.equal(r.unexLimanKg, r0.unexLimanKg, "UNEX toplamina karismaz");
+  const y1 = r.yerler.find((y) => y.aliciId === "ie1")!;
+  assert.equal(y1.hedefKg, 50000);
+  assert.equal(y1.limanKg, 51000);
+  assert.equal(y1.kalanKg, -1000);
+  const y2 = r.yerler.find((y) => y.aliciId === "ie2")!;
+  assert.equal(y2.hedefKg, null, "arac hedefli is emrinde tonaj yok");
+  assert.equal(y2.kalanKg, null);
+
+  // Excel: is emri sayfasi uretilir, arac hedefli de bozulmaz
+  const sayfalar = gemiRaporSayfalari(gemi, t.alicilar, t.araclar);
+  assert.ok(sayfalar.some((s) => s.ad.includes("KURGU UN")));
+  assert.ok(sayfalar.some((s) => s.ad.includes("KURGU GIDA")));
+});
+
+test("isEmriSatislariniEkle: is emri yoksa listeler aynen doner", () => {
+  const t = isEmriSatislariniEkle("g1", alicilar, araclar, [], []);
+  assert.equal(t.alicilar, alicilar);
+  assert.equal(t.araclar, araclar);
+});
+
+test("eskiGemiAlicilari: is emri satirlarini arac formundan ayirir", () => {
+  const l = [{ id: "a", is_emri_no: null }, { id: "b", is_emri_no: "IE-KURGU-1" }, { id: "c" }];
+  assert.deepEqual(eskiGemiAlicilari(l).map((x) => x.id), ["a", "c"]);
 });

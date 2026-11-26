@@ -59,6 +59,8 @@ export type IcIsEmri = {
   siparis_formu_adi: string | null;
   /** Siparisler arasi tonaj devri, net kg (+ gelen, - giden). Migration 20261104150000. */
   devir_kg?: number | string | null;
+  /** Gemiden satis: bagli gemi tahliyesi (26.11.2026; migration 20261126120000). NULL = fabrika satisi. */
+  gemi_id?: string | null;
 };
 
 /** Siparisler arasi tonaj devri kaydi (ic_is_emri_devirleri; 04.11.2026). */
@@ -95,7 +97,8 @@ export type IcSevk = {
   ettn: string | null;
   sofor_ad: string | null;
   irsaliye_urun: string | null;
-  irsaliye_dosya_yolu: string;
+  /** NULL = irsaliyesiz elle giris (26.11.2026) */
+  irsaliye_dosya_yolu: string | null;
   irsaliye_dosya_adi: string | null;
   elle_duzeltildi: boolean;
   uyarilar: string[];
@@ -123,6 +126,8 @@ export type KantarIsEmri = {
   yuklenen_kg: number;
   yuklenen_arac: number;
   olusturma: string;
+  /** Gemiden satis (26.11.2026): bagli geminin adi; NULL = fabrika satisi */
+  gemi_adi?: string | null;
 };
 
 export type KantarSonSevk = {
@@ -134,7 +139,8 @@ export type KantarSonSevk = {
   dorse_plaka: string | null;
   net_kg: number;
   irsaliye_no: string | null;
-  irsaliye_dosya_yolu: string;
+  /** NULL = irsaliyesiz elle giris (26.11.2026) */
+  irsaliye_dosya_yolu: string | null;
   uyari_var: boolean;
   girilen_email: string | null;
   olusturma: string;

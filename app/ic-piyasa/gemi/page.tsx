@@ -18,8 +18,10 @@ import { kgYazi, tonYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { bugunTRIso, gunTR } from "@/lib/ic-piyasa/alis";
 import { trSayiOku } from "@/lib/ic-piyasa/irsaliye-oku";
 import {
-  GemiAlici, GemiArac, GemiDurum, GemiTahliye, UNEX_YER, aracFarki, araclariSirala, farkTonu, farkYazi, gemiHataMesaji, gemiRaporu, yerAdi, yoldaMi, yuzdeYazi,
+  GemiAlici, GemiArac, GemiDurum, GemiIsEmri, GemiIsEmriSevk, GemiTahliye, UNEX_YER, aracFarki, araclariSirala, farkTonu, farkYazi, gemiHataMesaji, gemiRaporu, isEmriSatislariniEkle, yerAdi, yoldaMi, yuzdeYazi,
 } from "@/lib/ic-piyasa/gemi-tahliye";
+import { gemiIsEmriSatislariOku } from "@/lib/ic-piyasa/gemi-satis-veri";
+import Link from "next/link";
 import { GemiLimanBekleyenListesi } from "@/components/gemi-liman-bekleyen";
 import { gemiRaporDosyaAdi, gemiRaporXlsx } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
 
@@ -49,6 +51,8 @@ export default function GemiTahliyePage() {
   const [gemiler, setGemiler] = useState<GemiTahliye[]>([]);
   const [alicilar, setAlicilar] = useState<GemiAlici[]>([]);
   const [araclar, setAraclar] = useState<GemiArac[]>([]);
+  // 26.11.2026 gemiden satis: gemiye bagli is emirleri + sevkleri (rapora salt okunur yer / arac olarak girer)
+  const [isEmriSatis, setIsEmriSatis] = useState<{ emirler: GemiIsEmri[]; sevkler: GemiIsEmriSevk[] }>({ emirler: [], sevkler: [] });
   const [seciliId, setSeciliId] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [okumaHatasi, setOkumaHatasi] = useState<string | null>(null);
@@ -81,14 +85,16 @@ export default function GemiTahliyePage() {
     const hedef = (seciliId && liste.find((x) => x.id === seciliId)) || liste.find((x) => x.durum === "acik") || liste[0] || null;
     setSeciliId(hedef?.id || null);
     if (hedef) {
-      const [l, a] = await Promise.all([
+      const [l, a, ie] = await Promise.all([
         supabase.from("ic_gemi_alicilari").select("*").eq("gemi_id", hedef.id).order("olusturma"),
         supabase.from("ic_gemi_araclari").select("*").eq("gemi_id", hedef.id).order("tarih").order("olusturma").limit(5000),
+        gemiIsEmriSatislariOku(companyId, hedef.id),
       ]);
       if (l.error || a.error) { setOkumaHatasi((l.error || a.error)!.message); setYukleniyor(false); return; }
       setAlicilar((l.data || []) as GemiAlici[]);
       setAraclar((a.data || []) as GemiArac[]);
-    } else { setAlicilar([]); setAraclar([]); }
+      setIsEmriSatis(ie);
+    } else { setAlicilar([]); setAraclar([]); setIsEmriSatis({ emirler: [], sevkler: [] }); }
     setOkumaHatasi(null);
     setYukleniyor(false);
   }, [companyId, seciliId]);
@@ -103,11 +109,14 @@ export default function GemiTahliyePage() {
   }, [yetkili, getir]);
 
   const gemi = gemiler.find((x) => x.id === seciliId) || null;
-  const rapor = useMemo(() => (gemi ? gemiRaporu(gemi, alicilar, araclar) : null), [gemi, alicilar, araclar]);
+  // Rapor / Excel / filtreler: eski satislar + is emri satislari. Formlar (Satis Ekle, arac girisi) yalniz eski `alicilar`.
+  const tum = useMemo(() => (gemi ? isEmriSatislariniEkle(gemi.id, alicilar, araclar, isEmriSatis.emirler, isEmriSatis.sevkler) : { alicilar, araclar }),
+    [gemi, alicilar, araclar, isEmriSatis]);
+  const rapor = useMemo(() => (gemi ? gemiRaporu(gemi, tum.alicilar, tum.araclar) : null), [gemi, tum]);
   const acik = gemi?.durum === "acik";
-  const gunler = useMemo(() => Array.from(new Set(araclar.map((a) => a.tarih))).sort().reverse(), [araclar]);
-  const gorunen = useMemo(() => araclariSirala(araclar).filter((a) =>
-    (yer === "tumu" || (yer === "unex" ? !a.alici_id : a.alici_id === yer)) && (!gunFiltre || a.tarih === gunFiltre)).reverse(), [araclar, yer, gunFiltre]);
+  const gunler = useMemo(() => Array.from(new Set(tum.araclar.map((a) => a.tarih))).sort().reverse(), [tum]);
+  const gorunen = useMemo(() => araclariSirala(tum.araclar).filter((a) =>
+    (yer === "tumu" || (yer === "unex" ? !a.alici_id : a.alici_id === yer)) && (!gunFiltre || a.tarih === gunFiltre)).reverse(), [tum, yer, gunFiltre]);
   const gorunenToplam = useMemo(() => {
     // fark yalniz liman + teslimi olan UNEX araclarindan (yolda / liman fisi bekleyen haric)
     const eslesmis = gorunen.filter((a) => !a.alici_id && aracFarki(a) !== null);
@@ -127,7 +136,7 @@ export default function GemiTahliyePage() {
     if (!gemi) return;
     setIndiriliyor(true);
     try {
-      const blob = await gemiRaporXlsx(gemi, alicilar, araclar);
+      const blob = await gemiRaporXlsx(gemi, tum.alicilar, tum.araclar);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url; a.download = gemiRaporDosyaAdi(gemi, bugunTRIso());
@@ -275,7 +284,7 @@ export default function GemiTahliyePage() {
                     {acik && <button onClick={() => setGemiIslem("kapat")} className={dugme} style={{ borderColor: CARD_BORDER }}><CheckCircle2 size={14} /> Tahliyeyi Tamamla</button>}
                     {gemi.durum === "beklemede" && <button onClick={() => setGemiIslem("ac")} className={dugme} style={{ borderColor: CARD_BORDER }} data-testid="gemi-tahliyeye-ac"><PlayCircle size={14} /> Tahliyeye Aç</button>}
                     {gemi.durum === "tamamlandi" && <button onClick={() => setGemiIslem("ac")} className={dugme} style={{ borderColor: CARD_BORDER }}><RotateCcw size={14} /> Yeniden Aç</button>}
-                    {!araclar.length && <button onClick={() => setGemiIslem("sil")} className={`${dugme} text-red-300`} style={{ borderColor: CARD_BORDER }} title="Aracı olmayan gemi silinebilir" aria-label="Sil"><Trash2 size={14} /></button>}
+                    {!araclar.length && !isEmriSatis.emirler.length && <button onClick={() => setGemiIslem("sil")} className={`${dugme} text-red-300`} style={{ borderColor: CARD_BORDER }} title="Aracı olmayan gemi silinebilir" aria-label="Sil"><Trash2 size={14} /></button>}
                   </div>
                 </div>
 
@@ -308,7 +317,11 @@ export default function GemiTahliyePage() {
                   <section className="rounded-xl border overflow-hidden self-start" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-labelledby="gemi-yerler">
                     <div className="flex items-center justify-between gap-2 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
                       <h3 id="gemi-yerler" className="text-sm font-bold text-white flex items-center gap-2"><Users size={14} /> Gittiği Yer · Gemiden Satış</h3>
-                      {acik && <button onClick={() => setSatisForm({ mevcut: null })} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }} data-testid="gemi-satis-ekle"><Plus size={13} /> Satış Ekle</button>}
+                      {/* 26.11.2026: gemiden satis is emriyle yurur (Is Emirleri › "Gemiden satış"); eski "Satış Ekle" yalniz eski satis varsa */}
+                      <span className="flex items-center gap-1.5">
+                        {acik && alicilar.length > 0 && <button onClick={() => setSatisForm({ mevcut: null })} className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="gemi-satis-ekle"><Plus size={13} /> Satış Ekle</button>}
+                        {acik && <Link href="/ic-piyasa/is-emirleri" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }} title="Yeni iş emri açıp &quot;Gemiden satış&quot; alanında bu gemiyi seçin" data-testid="gemi-is-emri-ac"><Plus size={13} /> İş emri</Link>}
+                      </span>
                     </div>
                     <table className="w-full text-left border-collapse text-sm">
                       <thead style={{ backgroundColor: ROW_HEADER_BG }}>
@@ -317,15 +330,19 @@ export default function GemiTahliyePage() {
                       <tbody>
                         {rapor.yerler.map((y) => {
                           const l = y.aliciId ? alicilar.find((x) => x.id === y.aliciId) : null;
+                          const ie = y.aliciId && !l ? tum.alicilar.find((x) => x.id === y.aliciId) : null;
                           const sec = (y.aliciId || "unex") === yer;
                           return (
                             <tr key={y.aliciId || "unex"} className={`border-t cursor-pointer ${sec ? "bg-emerald-500/[0.06]" : "hover:bg-white/[0.02]"}`} style={{ borderColor: CARD_BORDER }}
                               onClick={() => setYer(sec ? "tumu" : (y.aliciId || "unex"))} data-gemi-yer={y.ad}>
-                              <td className="px-3 py-2 text-white font-semibold">{y.ad === UNEX_YER ? "UNEX GIDA (depo)" : y.ad}</td>
+                              <td className="px-3 py-2 text-white font-semibold">
+                                {y.ad === UNEX_YER ? "UNEX GIDA (depo)" : y.ad}
+                                {ie?.is_emri_no && <span className="block text-[10px] font-normal" style={{ color: TEXT_MUTED }} data-testid="gemi-yer-is-emri-no">{ie.is_emri_no} · iş emri (irsaliye)</span>}
+                              </td>
                               <td className="px-3 py-2 text-right tabular-nums text-white">{y.arac}</td>
                               <td className="px-3 py-2 text-right tabular-nums text-white">{kgYazi(y.limanKg)}</td>
                               <td className="px-3 py-2 text-right tabular-nums text-xs">
-                                {y.hedefKg === null ? <span style={{ color: TEXT_MUTED }}>teslim {kgYazi(y.teslimKg)}</span> : (
+                                {y.hedefKg === null ? <span style={{ color: TEXT_MUTED }}>{y.aliciId ? "-" : `teslim ${kgYazi(y.teslimKg)}`}</span> : (
                                   <>
                                     <span className="text-white">{tonYazi(y.hedefKg)}</span>
                                     <span className={`block ${y.kalanKg !== null && y.kalanKg < 0 ? "text-sky-400" : "text-amber-300"}`}>
@@ -370,11 +387,11 @@ export default function GemiTahliyePage() {
                   {/* Araclar (rapor satirlari) */}
                   <section className="rounded-xl border overflow-hidden" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-labelledby="gemi-araclar">
                     <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b" style={{ borderColor: CARD_BORDER }}>
-                      <h3 id="gemi-araclar" className="text-sm font-bold text-white mr-auto flex items-center gap-2"><Truck size={14} /> Araçlar <span className="font-normal text-xs" style={{ color: TEXT_MUTED }}>({gorunen.length}{gorunen.length !== araclar.length ? ` / ${araclar.length}` : ""})</span></h3>
+                      <h3 id="gemi-araclar" className="text-sm font-bold text-white mr-auto flex items-center gap-2"><Truck size={14} /> Araçlar <span className="font-normal text-xs" style={{ color: TEXT_MUTED }}>({gorunen.length}{gorunen.length !== tum.araclar.length ? ` / ${tum.araclar.length}` : ""})</span></h3>
                       <select value={yer} onChange={(e) => setYer(e.target.value)} className="px-2 py-1 rounded-md border text-xs text-white" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label="Gittiği yer">
                         <option value="tumu">Tüm yerler</option>
                         <option value="unex">UNEX</option>
-                        {alicilar.map((l) => <option key={l.id} value={l.id}>{l.firma}</option>)}
+                        {tum.alicilar.map((l) => <option key={l.id} value={l.id}>{l.is_emri_no ? `${l.is_emri_no} · ${l.firma}` : l.firma}</option>)}
                       </select>
                       <select value={gunFiltre} onChange={(e) => setGunFiltre(e.target.value)} className="px-2 py-1 rounded-md border text-xs text-white" style={{ backgroundColor: CARD_BG, borderColor: CARD_BORDER }} aria-label="Gün">
                         <option value="">Tüm günler</option>
@@ -407,20 +424,20 @@ export default function GemiTahliyePage() {
                                 </td>
                                 <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${fark === null ? "" : { eksik: "text-red-400", fazla: "text-emerald-400", esit: "text-white/70" }[farkTonu(fark)]}`}>{fark === null ? "" : farkYazi(fark)}</td>
                                 <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ color: a.alici_id ? undefined : TEXT_MUTED }}>
-                                  <span className={a.alici_id ? "text-white" : ""}>{yerAdi(a, alicilar)}</span>
+                                  <span className={a.alici_id ? "text-white" : ""}>{yerAdi(a, tum.alicilar)}</span>
                                   {yoldaMi(a) && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-300"><Clock size={10} /> yolda</span>}
-                                  <span className="ml-1.5 text-[10px]" style={{ color: TEXT_MUTED }} title={`${a.girilen_email || "otomatik"} · ${tarihSaatYazi(a.olusturma)}`}>{a.kaynak === "liman" ? "liman Excel" : a.kaynak === "ofis" ? "ofis" : a.kaynak === "otomatik" ? (a.esleme_onayli ? "kantar · fiş onaylı" : "kantar") : "kantar (elle)"}</span>
+                                  <span className="ml-1.5 text-[10px]" style={{ color: TEXT_MUTED }} title={`${a.girilen_email || "otomatik"} · ${tarihSaatYazi(a.olusturma)}`}>{a.kaynak === "irsaliye" ? (a.uyarilar.length ? "iş emri · elle" : `iş emri · irsaliye${a.notlar ? ` ${a.notlar}` : ""}`) : a.kaynak === "liman" ? "liman Excel" : a.kaynak === "ofis" ? "ofis" : a.kaynak === "otomatik" ? (a.esleme_onayli ? "kantar · fiş onaylı" : "kantar") : "kantar (elle)"}</span>
                                 </td>
                                 <td className="px-2 py-1.5 text-right">
                                   {acik && a.kaynak === "otomatik" && a.liman_kg !== null && <button onClick={() => setLimanKaldir(a)} className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }} title="Liman fişi bağlantısını kaldır (yanlış eşleşme)" aria-label={`${a.plaka} liman eşleşmesini kaldır`}><Unlink size={13} /></button>}
                                   {acik && a.kaynak !== "otomatik" && !a.alici_id && a.teslim_kg !== null && <button onClick={() => setEslesmeKaldir(a)} className="p-1 rounded hover:bg-white/5" style={{ color: TEXT_MUTED }} title="Teslim kg'ını kaldır (yanlış eşleşme)" aria-label={`${a.plaka} teslim kaldır`}><Unlink size={13} /></button>}
-                                  {acik && <button onClick={() => setSilinecekArac(a)} className="p-1 rounded hover:bg-white/5 text-red-300/80" title={a.kaynak === "otomatik" ? "Gemiye ait değil: gemiden çıkar" : "Sil"} aria-label={`${a.plaka} sil`}><Trash2 size={13} /></button>}
+                                  {acik && a.kaynak !== "irsaliye" && <button onClick={() => setSilinecekArac(a)} className="p-1 rounded hover:bg-white/5 text-red-300/80" title={a.kaynak === "otomatik" ? "Gemiye ait değil: gemiden çıkar" : "Sil"} aria-label={`${a.plaka} sil`}><Trash2 size={13} /></button>}
                                 </td>
                               </tr>
                             );
                           })}
                           {!gorunen.length && (
-                            <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: TEXT_MUTED }}>{araclar.length ? "Filtreye uyan araç yok." : "Henüz araç girilmedi. Kantarcı Kantar Paneli › Yurt İçi › Gemi'den girer."}</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: TEXT_MUTED }}>{tum.araclar.length ? "Filtreye uyan araç yok." : "Henüz araç girilmedi. Kantarcı Kantar Paneli › Yurt İçi › Gemi'den girer."}</td></tr>
                           )}
                         </tbody>
                         {gorunen.length > 0 && (

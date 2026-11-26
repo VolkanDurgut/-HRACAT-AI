@@ -86,3 +86,14 @@ export function aramaUyar(o: Record<string, unknown>, arama: string): boolean {
   if (!q) return true;
   return Object.values(o).some((v) => (typeof v === "string" || typeof v === "number") && duz(String(v)).includes(q));
 }
+
+/** Gemiden satis secenegi (is emri formu) */
+export type GemiSecenegi = { id: string; gemi_adi: string; durum: string };
+
+/** Siparis formunun "Teslim Yeri" metninde acik bir geminin adi geciyorsa o gemi (SAF; testlenir). */
+export function teslimYerindenGemi(teslimYeri: string | null | undefined, gemiler: GemiSecenegi[]): GemiSecenegi | null {
+  const yer = gemiSlug(teslimYeri || "");
+  if (!yer) return null;
+  // Kelime sinirli arama: "ada" gemisi "kadarli" icinde eslesmesin
+  return gemiler.find((g) => { const s = gemiSlug(g.gemi_adi); return g.durum !== "tamamlandi" && s.length >= 3 && `-${yer}-`.includes(`-${s}-`); }) || null;
+}

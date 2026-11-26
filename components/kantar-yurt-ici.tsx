@@ -6,8 +6,9 @@ import { KantarBekleyenSatiri, KantarliCubuk } from "@/components/kantar-canli-s
 import { kantarDahil, type KantarBekleyenIs } from "@/lib/kantar-canli";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
+import { kantarIcSevkEkle } from "@/lib/ic-piyasa/gemi-satis-veri";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, Upload, X, FileText, AlertTriangle, CheckCircle2, Truck, RefreshCw, ScanText, PencilLine } from "lucide-react";
+import { Loader2, Upload, X, FileText, AlertTriangle, CheckCircle2, Truck, RefreshCw, ScanText, PencilLine, Anchor } from "lucide-react";
 import { KalanRozet } from "@/components/ic-kalan-rozet";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import {
@@ -97,10 +98,18 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
   const [tarihElle, setTarihElle] = useState("");
   const [uyarilar, setUyarilar] = useState<string[] | null>(null);
   const [hata, setHata] = useState<string | null>(null);
+  // 26.11.2026: irsaliyesiz elle giris (gemiden satis vb.): PDF yok, plaka + net kg yazilir
+  const [elle, setElle] = useState(false);
   const kontrolSira = useRef(0);
 
   const pencereAc = (e: KantarIsEmri) => {
-    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setTarihElle(""); setUyarilar(null); setHata(null);
+    setSecili(e); setAdim("dosya"); setDosya(null); setOkuma(null); setPlaka(""); setDorse(""); setNet(""); setIrsNoElle(""); setTarihElle(""); setUyarilar(null); setHata(null); setElle(false);
+  };
+  const elleBasla = () => {
+    setHata(null); setDosya(null); setOkuma(null); setElle(true);
+    setIrsNoElle(""); setTarihElle(trTarihSaatGirdisi()); setPlaka(""); setDorse(""); setNet("");
+    dosyaYolu.current = "";
+    setAdim("kontrol");
   };
   const pencereKapat = () => { if (adim !== "kaydediliyor") setSecili(null); };
 
@@ -156,41 +165,52 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
     sofor_ad: okuma?.soforAd || null,
     alici_vkn: okuma?.aliciVkn || null,
     irsaliye_urun: okuma?.urun || null,
-    irsaliye_dosya_yolu: yol,
-    irsaliye_dosya_adi: dosya?.name || null,
+    irsaliye_dosya_yolu: elle ? null : yol,
+    irsaliye_dosya_adi: elle ? null : dosya?.name || null,
+    elle,
     elle_duzeltildi: elleDuzeltildi,
     urun_uyusmuyor: urunFarkli,
     okunan: okuma ? {
       irsaliye_no: okuma.irsaliyeNo, tarih: okuma.tarih, plaka: okuma.plaka, dorse: okuma.dorsePlaka,
       net_kg: okuma.netKg, urun: okuma.urun, alici_unvan: okuma.aliciUnvan, kalemler: okuma.kalemler,
     } : null,
-  }), [secili, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, dosya, elleDuzeltildi, urunFarkli, elleTarih.iso]);
+  }), [secili, plakaSon, dorse, netSayi, okuma, irsNoSon, ettnDosyaAdindan, dosya, elleDuzeltildi, urunFarkli, elleTarih.iso, elle]);
 
   // Girdi degistikce sunucuda KURU kontrol (kaydetmeden uyarilari getirir)
   useEffect(() => {
     if (adim !== "kontrol" || !secili || !companyId || !girdiGecerli) { setUyarilar(null); return; }
-    if (!dosyaYolu.current) dosyaYolu.current = `${companyId}/irsaliye/${secili.id}/${Date.now()}.pdf`;
+    if (!dosyaYolu.current && !elle) dosyaYolu.current = `${companyId}/irsaliye/${secili.id}/${Date.now()}.pdf`;
     const sira = ++kontrolSira.current;
     const z = window.setTimeout(async () => {
-      const { data, error } = await supabase.rpc("kantar_ic_sevk_ekle", { p_veri: veri(dosyaYolu.current), p_kaydet: false });
+      const { data, error } = await kantarIcSevkEkle(veri(dosyaYolu.current), false);
       if (sira !== kontrolSira.current) return;
       if (error) { setHata(hataMesaji(error)); setUyarilar(null); return; }
       setHata(null);
       setUyarilar(((data as { uyarilar?: string[] })?.uyarilar) || []);
     }, 350);
     return () => window.clearTimeout(z);
-  }, [adim, secili, companyId, girdiGecerli, veri]);
+  }, [adim, secili, companyId, girdiGecerli, veri, elle]);
 
   useEffect(() => { if (!secili) dosyaYolu.current = ""; }, [secili]);
 
   const kaydet = async () => {
-    if (!secili || !dosya || !companyId || !girdiGecerli) return;
+    if (!secili || (!dosya && !elle) || !companyId || !girdiGecerli) return;
     setAdim("kaydediliyor");
     setHata(null);
+    if (elle) {
+      const { data, error } = await kantarIcSevkEkle(veri(""), true);
+      if (error || !(data as { kaydedildi?: boolean })?.kaydedildi) { setHata(hataMesaji(error || { message: "Kaydedilemedi." })); setAdim("kontrol"); return; }
+      const d = data as { yuklenen_kg: number; yuklenen_arac: number };
+      showToast(`${plakaSon} · ${kgYazi(netSayi)} elle kaydedildi. ${secili.is_emri_no}: ${ilerlemeYazi(secili, Number(d.yuklenen_kg), d.yuklenen_arac)}`, "success");
+      setSecili(null);
+      getir();
+      return;
+    }
+    if (!dosya) return;
     const yol = dosyaYolu.current || `${companyId}/irsaliye/${secili.id}/${Date.now()}.pdf`;
     const { error: yErr } = await supabase.storage.from(IC_BELGE_BUCKET).upload(yol, dosya, { contentType: "application/pdf", upsert: false });
     if (yErr) { setHata(`Dosya yüklenemedi: ${yErr.message}`); setAdim("kontrol"); return; }
-    const { data, error } = await supabase.rpc("kantar_ic_sevk_ekle", { p_veri: veri(yol), p_kaydet: true });
+    const { data, error } = await kantarIcSevkEkle(veri(yol), true);
     if (error || !(data as { kaydedildi?: boolean })?.kaydedildi) {
       // Kayda baglanamayan dosya depoda sahipsiz kalmasin
       await supabase.storage.from(IC_BELGE_BUCKET).remove([yol]);
@@ -263,6 +283,7 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                       <td className="px-3 py-2">
                         <p className="text-[11px] truncate"><span className="font-bold" style={{ color: ACCENT }}>{e.is_emri_no}</span> <span className="font-semibold text-white">· {e.urun}</span>{e.ambalaj ? <span style={{ color: TEXT_MUTED }}> · {e.ambalaj}</span> : null}</p>
                         <p className="text-xs text-white truncate" title={e.musteri_maskeli}>{e.musteri_maskeli}</p>
+                        {e.gemi_adi && <p className="mt-0.5"><span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-sky-500/15 text-sky-300 whitespace-nowrap" title="Gemiden satış: alıcı aracı limanda gemiden yükler" data-testid="kantar-is-emri-gemi"><Anchor size={10} /> {e.gemi_adi}</span></p>}
                         <p className="text-[10.5px] truncate" style={{ color: TEXT_MUTED }}>{e.teslim || "-"}</p>
                       </td>
                       <td className="px-3 py-2">
@@ -307,9 +328,11 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                     <td className="px-3 py-1.5 text-[11px] text-white"><span className="block truncate" title={s.musteri_maskeli}>{s.musteri_maskeli}</span><span className="block text-[10px] truncate" style={{ color: TEXT_MUTED }}>{s.is_emri_no} · {s.urun}</span></td>
                     <td className="px-3 py-1.5 text-[11px] font-bold text-white text-right whitespace-nowrap">{kgYazi(Number(s.net_kg))}</td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
-                      <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" title="İrsaliyeyi aç">
-                        <FileText size={10} /> {s.irsaliye_no || "Gör"}
-                      </button>
+                      {s.irsaliye_dosya_yolu ? (
+                        <button onClick={() => irsaliyeAc(s.irsaliye_dosya_yolu!)} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" title="İrsaliyeyi aç">
+                          <FileText size={10} /> {s.irsaliye_no || "Gör"}
+                        </button>
+                      ) : <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-300 bg-amber-500/10" title="İrsaliye PDF'i yok; plaka ve tonaj elle girildi">Elle giriş</span>}
                       {s.uyari_var && <AlertTriangle size={12} className="inline ml-1.5 text-amber-400" aria-label="Uyarı var" />}
                       <span className={`block w-fit mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cikisEtiketi(s).sinif}`}>{cikisEtiketi(s).metin}</span>
                     </td>
@@ -340,6 +363,12 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                   <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(ev) => { const f = ev.target.files?.[0]; if (f) dosyaSec(f); ev.target.value = ""; }} />
                 </label>
               )}
+              {adim === "dosya" && (
+                <button type="button" onClick={elleBasla} data-testid="irsaliyesiz-elle"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>
+                  <PencilLine size={13} /> İrsaliye PDF&apos;i yok · plaka ve tonajı elle gir
+                </button>
+              )}
 
               {adim === "okunuyor" && (
                 <div className="flex items-center justify-center gap-2 py-10 text-sm" style={{ color: TEXT_MUTED }}>
@@ -352,8 +381,10 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
                   <div className="rounded-lg border px-3 py-2.5 text-xs flex items-start gap-2" style={{ borderColor: CARD_BORDER, backgroundColor: "#0F131A" }}>
                     {kismenOkundu ? <ScanText size={14} className="mt-0.5 text-emerald-400 shrink-0" /> : <PencilLine size={14} className="mt-0.5 text-amber-400 shrink-0" />}
                     <div className="min-w-0">
-                      <p className="text-white truncate">{dosya?.name}</p>
-                      {kismenOkundu ? (
+                      <p className="text-white truncate">{elle ? "İrsaliyesiz elle giriş" : dosya?.name}</p>
+                      {elle ? (
+                        <p style={{ color: TEXT_MUTED }}>Plaka ve net tonajı yazın; irsaliye no biliniyorsa ekleyin. Kayıt &quot;Elle giriş&quot; olarak işaretlenir, yetkili listede görür.</p>
+                      ) : kismenOkundu ? (
                         <p style={{ color: TEXT_MUTED }}>
                           İrsaliyeden okundu{okuma!.irsaliyeNo ? ` · ${okuma!.irsaliyeNo}` : ""}{okuma!.tarih ? ` · ${tarihSaatYazi(okuma!.tarih)}` : ""}{okuma!.urun ? ` · ${okuma!.urun}` : ""}{okuma!.soforAd ? ` · Şoför: ${okuma!.soforAd}` : ""}
                         </p>
@@ -428,8 +459,8 @@ export function KantarYurtIci({ yenileTetik = 0, acikSayiBildir, kantarBekleyen 
 
             {(adim === "kontrol" || adim === "kaydediliyor") && (
               <div className="flex justify-between gap-2 px-5 py-4 border-t" style={{ borderColor: CARD_BORDER }}>
-                <button onClick={() => { setAdim("dosya"); setDosya(null); setOkuma(null); setUyarilar(null); setHata(null); dosyaYolu.current = ""; }} disabled={adim === "kaydediliyor"}
-                  className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>Başka dosya</button>
+                <button onClick={() => { setAdim("dosya"); setDosya(null); setOkuma(null); setUyarilar(null); setHata(null); setElle(false); dosyaYolu.current = ""; }} disabled={adim === "kaydediliyor"}
+                  className="px-3 py-2 rounded-lg border text-sm hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }}>{elle ? "Geri" : "Başka dosya"}</button>
                 <button onClick={kaydet} disabled={adim === "kaydediliyor" || !girdiGecerli || uyarilar === null}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-bold text-white hover:brightness-110 disabled:opacity-50"
                   style={{ backgroundColor: uyarilar && uyarilar.length ? "#B45309" : ACCENT }}>

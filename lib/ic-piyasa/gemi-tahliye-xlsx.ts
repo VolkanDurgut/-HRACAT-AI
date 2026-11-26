@@ -117,8 +117,11 @@ export function gemiRaporSayfalari(gemi: GemiTahliye, alicilar: GemiAlici[], ara
     }
     ls.push([{ v: "TOPLAM", s: XS.toplamMetin }, { v: `${ar.length} araç`, s: XS.toplamMetin }, { v: y?.limanKg ?? 0, s: XS.toplamTamSayi }, { v: null, s: XS.toplamMetin }, { v: null, s: XS.toplamMetin }]);
     ls.push([]);
-    ls.push([null, { v: "SATIŞ TONAJI", s: XS.metin }, { v: Number(l.miktar_kg), s: XS.tamSayi }]);
-    ls.push([null, { v: "KALAN", s: XS.metin }, { v: y?.kalanKg ?? Number(l.miktar_kg), s: XS.tamSayi }]);
+    if (l.is_emri_no) ls.push([null, { v: "İŞ EMRİ", s: XS.metin }, { v: l.is_emri_no, s: XS.metin }]);
+    // Is emri hedefi arac sayisiyla verildiyse tonaj / kalan yoktur
+    const hedef = l.miktar_kg === null || l.miktar_kg === undefined ? null : Number(l.miktar_kg);
+    ls.push([null, { v: "SATIŞ TONAJI", s: XS.metin }, hedef === null ? { v: "-", s: XS.metin } : { v: hedef, s: XS.tamSayi }]);
+    ls.push([null, { v: "KALAN", s: XS.metin }, hedef === null ? { v: "-", s: XS.metin } : { v: y?.kalanKg ?? hedef, s: XS.tamSayi }]);
     sayfalar.push({ ad: benzersizAd(`${gemi.gemi_adi}- ${l.firma}`, kullanilan), sutunGenislik: [12, 28, 14, 24, 18], satirlar: ls, dondur: "A2", yazdirBaslik: "1:1" });
   }
   return sayfalar;

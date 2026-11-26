@@ -44,7 +44,7 @@ type Satir = {
   durum: "bekliyor" | "gonderiliyor" | "gonderildi" | "atlandi" | "hata"; hata: string | null; deneme: number;
   olusturma: string; islem_zamani: string | null; isleyen: string | null; cc: string[] | null;
   ic_is_emirleri: { is_emri_no: string; ic_musteriler: { id: string; unvan: string; telefon: string | null; whatsapp_izin: boolean } | null } | null;
-  ic_sevkler: { irsaliye_dosya_yolu: string; irsaliye_no: string | null; plaka: string } | null;
+  ic_sevkler: { irsaliye_dosya_yolu: string | null; irsaliye_no: string | null; plaka: string } | null;
 };
 
 /** "IRS2026000002468" / "59 AGD 271" -> dosya adina uygun */
@@ -223,6 +223,7 @@ export default function BildirimlerPage() {
   const irsaliyeDosyasi = async (s: Satir): Promise<File | null> => {
     const sv = s.ic_sevkler;
     if (!sv) return null;
+    if (!sv.irsaliye_dosya_yolu) { showToast("Bu araç irsaliyesiz (elle) girildi; eklenecek irsaliye PDF'i yok.", "error"); return null; }
     const { data, error } = await supabase.storage.from(IC_BELGE_BUCKET).download(sv.irsaliye_dosya_yolu);
     if (error || !data) { showToast(`İrsaliye alınamadı: ${error?.message || "bilinmeyen hata"}`, "error"); return null; }
     return new File([data], `${dosyaAdi(sv.irsaliye_no || sv.plaka)}.pdf`, { type: "application/pdf" });

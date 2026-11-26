@@ -21,7 +21,7 @@ type Sevk = {
   plaka: string;
   net_kg: number;
   irsaliye_no: string | null;
-  irsaliye_dosya_yolu: string;
+  irsaliye_dosya_yolu: string | null;
   olusturma: string;
   cikis_durumu: CikisDurumu;
   cikis_planlanan: string | null;
@@ -230,9 +230,11 @@ export function IcMusteriDetay({
                               <td className="px-3 py-2 whitespace-nowrap text-white">{kgYazi(s.net_kg)}</td>
                               <td className="px-3 py-2 whitespace-nowrap"><span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${c.sinif}`}>{c.metin}</span></td>
                               <td className="px-3 py-2 whitespace-nowrap text-right">
-                                <button onClick={() => belgeAc(s.irsaliye_dosya_yolu, "İrsaliye")} title={s.irsaliye_no || "İrsaliye"} className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: ACCENT }}>
-                                  <FileText size={12} /> İrsaliye
-                                </button>
+                                {s.irsaliye_dosya_yolu ? (
+                                  <button onClick={() => belgeAc(s.irsaliye_dosya_yolu!, "İrsaliye")} title={s.irsaliye_no || "İrsaliye"} className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: ACCENT }}>
+                                    <FileText size={12} /> İrsaliye
+                                  </button>
+                                ) : <span className="text-[11px] text-amber-300" title="İrsaliye PDF'i yok; plaka ve tonaj elle girildi">Elle giriş</span>}
                               </td>
                             </tr>
                           );

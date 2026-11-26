@@ -43,9 +43,12 @@ export type GemiAlici = {
   id: string;
   gemi_id: string;
   firma: string;
-  miktar_kg: number;
+  /** NULL yalniz is emri satirinda (hedef arac sayisiyla verilmis) */
+  miktar_kg: number | null;
   notlar: string | null;
   olusturma: string;
+  /** 26.11.2026: gemiye bagli IS EMRI satiri (id = is emri id; duzenleme / silme Is Emirleri'nden). Bos = ic_gemi_alicilari satiri. */
+  is_emri_no?: string | null;
 };
 
 export type GemiArac = {
@@ -58,7 +61,8 @@ export type GemiArac = {
   liman_kg: number | null;
   /** UNEX araci: NULL = yolda (elle girilen fisin kantar tartimi bekleniyor); satis araci: hep NULL */
   teslim_kg: number | null;
-  kaynak: "kantar" | "ofis" | "liman" | "otomatik";
+  /** irsaliye (26.11.2026): gemiye bagli is emrinin sevki (ic_sevkler); salt okunur, liman_kg = irsaliye / elle net */
+  kaynak: "kantar" | "ofis" | "liman" | "otomatik" | "irsaliye";
   /** Operator liman fisini secti / liman kg'ini elle girdi (otomatik eslestirme dokunmaz) */
   esleme_onayli?: boolean;
   kantar_tartim_id?: string | null;
@@ -91,8 +95,17 @@ export type KantarGemi = {
   /** Kantarda tartildi, liman fisi henuz eslesmedi (teslim toplami) */
   liman_bekleyen_arac?: number;
   liman_bekleyen_kg?: number;
-  alicilar: { id: string; firma: string; miktar_kg: number; gelen_kg: number; arac: number }[];
+  /**
+   * Gemiden satis yerleri. 26.11.2026: gemiye bagli IS EMIRLERI de gelir (`is_emri_no` dolu; id = is emri id,
+   * gelen_kg = irsaliye / elle girilen sevk toplami, miktar_kg = kg hedefi ya da null). `is_emri_no` bos = eski ic_gemi_alicilari satiri.
+   */
+  alicilar: { id: string; firma: string; miktar_kg: number | null; gelen_kg: number; arac: number; is_emri_no?: string | null }[];
 };
+
+/** Kantar gemi ozetindeki yerlerden yalniz eski ic_gemi_alicilari satirlari (arac formu bunlara baglanir; is emri satirlari irsaliyeyle gelir). */
+export function eskiGemiAlicilari<T extends { is_emri_no?: string | null }>(alicilar: T[]): T[] {
+  return alicilar.filter((l) => !l.is_emri_no);
+}
 
 export type KantarGemiArac = {
   id: string; gemi_id: string; gemi_adi: string; alici_id: string | null; firma: string | null; tarih: string;
@@ -223,7 +236,8 @@ export function gemiRaporu(gemi: Pick<GemiTahliye, "bl_kg">, alicilar: GemiAlici
   for (const l of alicilar) {
     const ar = araclar.filter((a) => a.alici_id === l.id);
     const lim = yuvarla2(ar.reduce((t, a) => t + sayi(a.liman_kg), 0));
-    yerler.push({ aliciId: l.id, ad: l.firma, hedefKg: sayi(l.miktar_kg), arac: ar.length, limanKg: lim, teslimKg: null, kalanKg: yuvarla2(sayi(l.miktar_kg) - lim) });
+    const hedef = l.miktar_kg === null || l.miktar_kg === undefined ? null : sayi(l.miktar_kg);
+    yerler.push({ aliciId: l.id, ad: l.firma, hedefKg: hedef, arac: ar.length, limanKg: lim, teslimKg: null, kalanKg: hedef === null ? null : yuvarla2(hedef - lim) });
   }
 
   const gunMap = new Map<string, { tarih: string; arac: number; limanKg: number; teslimKg: number }>();
@@ -328,3 +342,38 @@ export function gemiHataMesaji(e: unknown): string {
 
 export const yuzdeYazi = (n: number | null, hane = 2) =>
   n === null || !Number.isFinite(n) ? "-" : `%${n.toLocaleString("tr-TR", { minimumFractionDigits: hane, maximumFractionDigits: hane })}`;
+
+/** Gemiye bagli is emri (ic_is_emirleri.gemi_id) - rapor icin gereken alanlar */
+export type GemiIsEmri = { id: string; is_emri_no: string; firma: string; hedef_tur: "kg" | "arac"; hedef_kg: number | string | null; olusturma: string };
+/** O is emrinin sevki (ic_sevkler) - irsaliyeli ya da elle girilmis */
+export type GemiIsEmriSevk = {
+  id: string; is_emri_id: string; plaka: string; net_kg: number | string; irsaliye_no: string | null;
+  irsaliye_tarihi: string | null; irsaliye_dosya_yolu: string | null; girilen_email: string | null; olusturma: string;
+};
+
+/** ISO zaman -> Turkiye gunu (YYYY-MM-DD) */
+function trGunu(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+/**
+ * 26.11.2026 gemiden satis: gemiye bagli is emirlerini rapora "yer", sevklerini "arac" olarak ekler (SAF; testlenir).
+ * Is emri satiri id'si is emri id'sidir; sevk araclari kaynak 'irsaliye' (salt okunur: duzenleme Is Emirleri'nden).
+ * Eski ic_gemi_alicilari / ic_gemi_araclari satirlarina dokunmaz; toplamlar (gelen kg / arac) kantar ozetiyle ayni olur.
+ */
+export function isEmriSatislariniEkle(
+  gemiId: string, alicilar: GemiAlici[], araclar: GemiArac[], emirler: GemiIsEmri[], sevkler: GemiIsEmriSevk[],
+): { alicilar: GemiAlici[]; araclar: GemiArac[] } {
+  if (!emirler.length) return { alicilar, araclar };
+  const ids = new Set(emirler.map((e) => e.id));
+  const yeniAlici: GemiAlici[] = emirler.map((e) => ({
+    id: e.id, gemi_id: gemiId, firma: e.firma, notlar: null, olusturma: e.olusturma, is_emri_no: e.is_emri_no,
+    miktar_kg: e.hedef_tur === "kg" && e.hedef_kg !== null && e.hedef_kg !== "" ? Number(e.hedef_kg) : null,
+  }));
+  const yeniArac: GemiArac[] = sevkler.filter((s) => ids.has(s.is_emri_id)).map((s) => ({
+    id: s.id, gemi_id: gemiId, alici_id: s.is_emri_id, tarih: trGunu(s.irsaliye_tarihi || s.olusturma), plaka: s.plaka,
+    liman_kg: Number(s.net_kg), teslim_kg: null, kaynak: "irsaliye",
+    uyarilar: s.irsaliye_dosya_yolu ? [] : ["İrsaliyesiz elle giriş"], notlar: s.irsaliye_no, girilen_email: s.girilen_email, olusturma: s.olusturma,
+  }));
+  return { alicilar: [...alicilar, ...yeniAlici], araclar: [...araclar, ...yeniArac] };
+}

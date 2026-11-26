@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aramaUyar, baslangicAnaSekmesi, eksikDolumlar, gemiSlug, gorunenSevkiyatlar, kantarAnaSekmesi, kantarDosyaYolu, kantarSekmesi, kantarYiSekmesi, panelDosyaYolu } from "@/lib/kantar-gorunum";
+import { aramaUyar, baslangicAnaSekmesi, teslimYerindenGemi, eksikDolumlar, gemiSlug, gorunenSevkiyatlar, kantarAnaSekmesi, kantarDosyaYolu, kantarSekmesi, kantarYiSekmesi, panelDosyaYolu } from "@/lib/kantar-gorunum";
 import type { SevkiyatDurumu } from "@/lib/kantar-sevkiyat";
 
 const s = (dosya_no: string, dolu: number, toplam: number, durum: SevkiyatDurumu) => ({ dosya_id: dosya_no, dosya_no, dolu, toplam, durum });
@@ -54,4 +54,17 @@ test("gemiSlug ve aramaUyar", () => {
   assert.equal(aramaUyar({ musteri: "KURGU İÇ TİCARET" }, "ic tic"), true);
   assert.equal(aramaUyar({ plaka: "34 KRG 001" }, "06"), false);
   assert.equal(aramaUyar({ plaka: "x" }, "  "), true);
+});
+
+test("teslimYerindenGemi: siparis formu teslim yerindeki gemi adi (kelime sinirli, acik gemi)", () => {
+  const gemiler = [
+    { id: "1", gemi_adi: "MV KURGU YILDIZ", durum: "acik" },
+    { id: "2", gemi_adi: "ADA", durum: "acik" },
+    { id: "3", gemi_adi: "M/V ESKI GEMI", durum: "tamamlandi" },
+  ];
+  assert.equal(teslimYerindenGemi("KURGU LIMANI SUPALAN TESLİM (KURGU YILDIZ)", gemiler)?.id, "1");
+  assert.equal(teslimYerindenGemi("KADARLI FABRIKA TESLIM", gemiler), null, "ada, kadarli icinde eslesmez");
+  assert.equal(teslimYerindenGemi("SUPALAN (ESKI GEMI)", gemiler), null, "tamamlanan gemi secilmez");
+  assert.equal(teslimYerindenGemi("", gemiler), null);
+  assert.equal(teslimYerindenGemi(null, gemiler), null);
 });

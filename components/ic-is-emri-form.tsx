@@ -5,7 +5,7 @@ import Link from "next/link";
 import { supabase, yazmaHatasi } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
-import { Loader2, X, Save, FileText, Truck, Scale, Upload, Trash2, Plus, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, X, Save, FileText, Truck, Scale, Upload, Trash2, Plus, ExternalLink, AlertTriangle, Ship } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT } from "@/lib/theme";
 import { IC_BELGE_BUCKET, IcIsEmri, IcMusteri, hataMesaji } from "@/lib/ic-piyasa/is-emri";
 import { GemiSecenegi, gemiSecenekleriOku, teslimYerindenGemi } from "@/lib/ic-piyasa/gemi-satis-veri";
@@ -47,6 +47,8 @@ type Props = {
   sevkVar: boolean;
   /** Sipariş formundan acilis: secilen / olusturulan musteri + form */
   onDolum?: { musteriId: string; ek: SiparisEki } | null;
+  /** Gemi sayfasindan "İş emri" ile acildiysa: gemi on secili (26.11.2026) */
+  varsayilanGemiId?: string | null;
 };
 
 type Taslak = {
@@ -103,7 +105,7 @@ function sayiOku(metin: string): number | null {
 const sayiYaz = (n: number | null | undefined, basamak = 3) =>
   n === null || n === undefined ? "" : Number(n).toLocaleString("tr-TR", { maximumFractionDigits: basamak, useGrouping: false });
 
-export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, sevkVar, onDolum }: Props) {
+export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, sevkVar, onDolum, varsayilanGemiId }: Props) {
   const { companyId, user } = useAuth();
   const { showToast } = useToast();
   const [taslak, setTaslak] = useState<Taslak>(BOS);
@@ -186,12 +188,13 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
     gemiSecenekleriOku(companyId).then((liste) => {
       if (iptal) return;
       setGemiler(liste);
-      const g = !duzenlenen ? teslimYerindenGemi(onDolum?.ek.okuma?.teslimYeri, liste) : null;
+      const g = duzenlenen ? null
+        : (varsayilanGemiId && liste.find((x) => x.id === varsayilanGemiId)) || teslimYerindenGemi(onDolum?.ek.okuma?.teslimYeri, liste);
       if (g) setTaslak((t) => ({ ...t, gemi_id: g.id, teslim: !t.teslim || t.teslim === "Fabrika Teslim" ? GEMI_TESLIM : t.teslim }));
     });
     return () => { iptal = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acik, companyId, onDolum]);
+  }, [acik, companyId, onDolum, varsayilanGemiId]);
 
   useEffect(() => {
     if (!acik || !companyId) return;
@@ -395,6 +398,18 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
                   {!!duzenlenen && sevkVar && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Sevk girilmiş iş emrinin müşterisi değiştirilemez.</span>}
                   {secilenMusteri && !secilenMusteri.vergi_no && <span className="block text-[10px] mt-1 text-amber-400">Müşteri kartında vergi no yok; irsaliyedeki alıcı kontrol edilemez.</span>}
                 </label>
+                <label className="block sm:col-span-2 rounded-lg border px-3 py-2.5" style={{ borderColor: taslak.gemi_id ? "rgba(56,189,248,0.45)" : CARD_BORDER, backgroundColor: taslak.gemi_id ? "rgba(56,189,248,0.06)" : undefined }}>
+                  <span className="flex items-center gap-1.5 text-xs mb-1 font-semibold text-sky-300"><Ship size={13} /> Gemiden satış</span>
+                <select value={taslak.gemi_id} data-testid="is-emri-gemi"
+                  onChange={(e) => { const v = e.target.value; setTaslak((t) => ({ ...t, gemi_id: v, teslim: v && (!t.teslim || t.teslim === "Fabrika Teslim") ? GEMI_TESLIM : !v && t.teslim === GEMI_TESLIM ? "Fabrika Teslim" : t.teslim })); }}
+                  className={inputSinif} style={inputStil}>
+                  <option value="">Hayır (fabrikadan satış)</option>
+                  {gemiler.filter((g) => g.durum !== "tamamlandi" || g.id === taslak.gemi_id).map((g) => (
+                    <option key={g.id} value={g.id}>{g.gemi_adi}{g.durum === "tamamlandi" ? " (tamamlandı)" : ""}</option>
+                  ))}
+                </select>
+                {taslak.gemi_id && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Alıcı araçları limanda gemiden yükler; irsaliyeler (ya da elle plaka + tonaj) Kantar Paneli › Yurt İçi › Satış&apos;tan girilir ve gemi tahliye tonajına eklenir.</span>}
+                </label>
                 <Alan etiket="Talimatı veren">
                   <input value={taslak.talimat_veren} onChange={(e) => setTaslak({ ...taslak, talimat_veren: e.target.value })} className={inputSinif} style={inputStil} />
                 </Alan>
@@ -540,17 +555,6 @@ export function IcIsEmriForm({ acik, kapat, kaydedildi, musteriler, duzenlenen, 
                   <option value="">Seçin</option>
                   {Array.from(new Set([...TESLIM_SECENEKLERI, ...(taslak.gemi_id ? [GEMI_TESLIM] : []), ...(taslak.teslim ? [taslak.teslim] : [])])).map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
-              </Alan>
-              <Alan etiket="Gemiden satış" genis>
-                <select value={taslak.gemi_id} data-testid="is-emri-gemi"
-                  onChange={(e) => { const v = e.target.value; setTaslak((t) => ({ ...t, gemi_id: v, teslim: v && (!t.teslim || t.teslim === "Fabrika Teslim") ? GEMI_TESLIM : !v && t.teslim === GEMI_TESLIM ? "Fabrika Teslim" : t.teslim })); }}
-                  className={inputSinif} style={inputStil}>
-                  <option value="">Hayır (fabrikadan satış)</option>
-                  {gemiler.filter((g) => g.durum !== "tamamlandi" || g.id === taslak.gemi_id).map((g) => (
-                    <option key={g.id} value={g.id}>{g.gemi_adi}{g.durum === "tamamlandi" ? " (tamamlandı)" : ""}</option>
-                  ))}
-                </select>
-                {taslak.gemi_id && <span className="block text-[10px] mt-1" style={{ color: TEXT_MUTED }}>Alıcı araçları limanda gemiden yükler; irsaliyeler (ya da elle plaka + tonaj) Kantar Paneli › Yurt İçi › Satış&apos;tan girilir ve gemi tahliye tonajına eklenir.</span>}
               </Alan>
             </div>
           </section>

@@ -320,7 +320,7 @@ export default function GemiTahliyePage() {
                       {/* 26.11.2026: gemiden satis is emriyle yurur (Is Emirleri › "Gemiden satış"); eski "Satış Ekle" yalniz eski satis varsa */}
                       <span className="flex items-center gap-1.5">
                         {acik && alicilar.length > 0 && <button onClick={() => setSatisForm({ mevcut: null })} className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-semibold hover:bg-white/5" style={{ borderColor: CARD_BORDER, color: TEXT_MUTED }} data-testid="gemi-satis-ekle"><Plus size={13} /> Satış Ekle</button>}
-                        {acik && <Link href="/ic-piyasa/is-emirleri" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }} title="Yeni iş emri açıp &quot;Gemiden satış&quot; alanında bu gemiyi seçin" data-testid="gemi-is-emri-ac"><Plus size={13} /> İş emri</Link>}
+                        {acik && <Link href={`/ic-piyasa/is-emirleri?gemi=${gemi.id}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white hover:brightness-110" style={{ backgroundColor: ACCENT }} title="Bu gemiden satış için yeni iş emri (gemi seçili açılır)" data-testid="gemi-is-emri-ac"><Plus size={13} /> Gemiden satış iş emri</Link>}
                       </span>
                     </div>
                     <table className="w-full text-left border-collapse text-sm">

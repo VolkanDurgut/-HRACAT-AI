@@ -125,6 +125,16 @@ export default function IsEmirleriPage() {
     getir();
   }, [authLoading, yetkili, getir]);
 
+  // 26.11.2026: Gemi sayfasindaki "İş emri" -> /ic-piyasa/is-emirleri?gemi=<id>: yeni is emri formu gemi secili acilir
+  const [varsayilanGemi, setVarsayilanGemi] = useState<string | null>(null);
+  useEffect(() => {
+    if (authLoading || !yetkili) return;
+    const g = new URLSearchParams(window.location.search).get("gemi");
+    if (!g || !/^[0-9a-f-]{36}$/i.test(g)) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    setVarsayilanGemi(g); setDuzenlenen(null); setOnDolum(null); setFormAcik(true);
+  }, [authLoading, yetkili]);
+
   // Kantarci sevk girdikce ilerleme guncel kalsin (sayfa acikken dakikada bir)
   useEffect(() => {
     if (!yetkili) return;
@@ -607,12 +617,13 @@ export default function IsEmirleriPage() {
 
       <IcIsEmriForm
         acik={formAcik}
-        kapat={() => { setFormAcik(false); setOnDolum(null); }}
-        kaydedildi={() => { setFormAcik(false); setOnDolum(null); getir(); }}
+        kapat={() => { setFormAcik(false); setOnDolum(null); setVarsayilanGemi(null); }}
+        kaydedildi={() => { setFormAcik(false); setOnDolum(null); setVarsayilanGemi(null); getir(); }}
         musteriler={musteriler}
         duzenlenen={duzenlenen}
         sevkVar={!!duzenlenen && (sevkMap.get(duzenlenen.id)?.length ?? 0) > 0}
         onDolum={duzenlenen ? null : onDolum}
+        varsayilanGemiId={duzenlenen ? null : varsayilanGemi}
       />
 
       <IcSiparisFormuPenceresi

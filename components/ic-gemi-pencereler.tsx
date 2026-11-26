@@ -507,7 +507,7 @@ export function GemiLimanExcelYukle({ gemi, kaydedildi, testId = "gemi-liman-exc
   };
   const yukle = async () => {
     if (!hazir) return;
-    setMesgul(true);
+    setMesgul(true); setHata(null);
     const { data, error } = await gonder(hazir.satirlar, true);
     setMesgul(false);
     if (error) { setHata(gemiHataMesaji(error)); return; }
@@ -557,7 +557,8 @@ export function GemiLimanExcelYukle({ gemi, kaydedildi, testId = "gemi-liman-exc
             return bilgi.length ? <p className="text-xs text-sky-200">{bilgi.join(" · ")}</p> : null;
           })()}
           <p className="text-xs" style={{ color: TEXT_MUTED }}>Rapora yalnız bizim kantarda gemi adıyla tartılan araçlar girer; liman fişi bu araçlarla limandan çıkış saati + dolu/net ağırlıkla eşleşir (plaka farklı olabilir). Diğer fişler havuzda bekler. Aynı Excel tekrar yüklenebilir.</p>
-          <Altbar hata={null} mesgul={mesgul} kapat={() => setHazir(null)} onay={yukle}
+          {/* 26.11.2026: kayit hatasi pencerenin ICINDE gosterilir (onceden hata yalniz pencere kapaninca gorunuyordu -> "bir sey olmuyor") */}
+          <Altbar hata={hata} mesgul={mesgul} kapat={() => { setHazir(null); setHata(null); }} onay={yukle}
             onayEtiket={hazir.ozet.eklenen ? `${hazir.ozet.eklenen} Fişi Yükle` : "Yeni fiş yok"} devreDisi={!hazir.ozet.eklenen || hazir.ozet.hatalar.length > 0} />
         </Pencere>
       )}

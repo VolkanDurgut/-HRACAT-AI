@@ -894,3 +894,9 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   sıkı kurala uyan her çifti 100 puan avantaj (en fazla 300). İki aracın ilk seferi belirsiz kalsa bile ikinci sefer
   gelince ikili netleşir ve ilk sefer de kendiliğinden bağlanır. "Daha önce eşleşmiş ikili" avantajı artık yalnız
   operatör onaylı eşleşmeden gelir (otomatik eşleşme kendini beslemez). Geçici tablolar `_gm_aday2` / `_gm_es2`.
+- DÜZELTME 26.11.2026 sabah (`20261126090000_ic_gemi_esle_safeupdate.sql`, CANLIDA): Supabase PostgREST oturumlarında
+  `pg_safeupdate` yüklü → WHERE'siz `DELETE` reddedilir ("DELETE requires a WHERE clause", 21000). Eşleştiricideki
+  `delete from _gm_aday2;` uygulamadan çağrılınca (Liman Excel'i kaydet, ic_gemi_kantar_esle, ic_gemi_liman_esle,
+  ic_gemi_tartim_bagla) hata verdi; pg_cron / yönetim oturumunda uzantı yok → gece eşleşmeleri cron'dan sorunsuz.
+  Düzeltme: `where true`. KURAL: uygulamadan çağrılabilecek fonksiyonlarda WHERE'siz DELETE / UPDATE yazılmaz (geçici
+  tablo dahil). Ayrıca Liman Excel penceresi kayıt hatasını artık pencerenin içinde gösterir (önceden görünmüyordu).

@@ -7,7 +7,7 @@ import { Loader2, Ship, AlertTriangle, Clock, Scale, Plus, ChevronDown } from "l
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { kgYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { trSayiOku, plakaBicimle } from "@/lib/ic-piyasa/irsaliye-oku";
-import { KantarGemi, KantarGemiArac, UNEX_YER, gemiHataMesaji, yuzdeYazi } from "@/lib/ic-piyasa/gemi-tahliye";
+import { KantarGemi, KantarGemiArac, UNEX_YER, farkTonu, farkYazi, gemiHataMesaji, yuzdeYazi } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiSlug } from "@/lib/kantar-gorunum";
 import { adresiGuncelle, adresParametresi } from "@/lib/url-durumu";
 import { GemiHizliGiris, GemiLimanExcelYukle } from "@/components/ic-gemi-pencereler";
@@ -216,8 +216,9 @@ function GemiGorunumu({ g, araclar, tetik, yenile, dar }: { g: KantarGemi; aracl
                     <td className={`${td} text-right tabular-nums text-white`}>{a.teslim_kg !== null ? Number(a.teslim_kg).toLocaleString("tr-TR") : "—"}</td>
                     <td className={`${td} text-right`}>
                       {fark !== null && (
-                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold tabular-nums ${Math.abs(fark) > 300 ? "bg-red-500/15 text-red-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-                          {fark > 0 ? "+" : ""}{fark.toLocaleString("tr-TR")}
+                        <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold tabular-nums ${{ eksik: "bg-red-500/15 text-red-300", fazla: "bg-emerald-500/15 text-emerald-300", esit: "bg-white/5 text-white/70" }[farkTonu(fark)]}`}
+                          title={fark < 0 ? "Kantarımız limandan eksik" : fark > 0 ? "Kantarımız limandan fazla" : "Fark yok"}>
+                          {farkYazi(fark)}
                         </span>
                       )}
                     </td>

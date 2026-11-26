@@ -135,6 +135,13 @@ export const limanBekliyorMu = (a: Pick<GemiArac, "alici_id" | "liman_kg">) => !
 export const aracFarki = (a: Pick<GemiArac, "liman_kg" | "teslim_kg">): number | null =>
   a.teslim_kg === null || a.teslim_kg === undefined || a.liman_kg === null || a.liman_kg === undefined ? null : Number(a.teslim_kg) - Number(a.liman_kg);
 
+/**
+ * Fark yazimi (26.11.2026 kullanici: "Kantar farki sifirin altindaysa kirmizi -120, fazlalik varsa yesil +60"):
+ * isaretli tam sayi; renk tonu: eksik (< 0) kirmizi, fazla (> 0) yesil, 0 notr.
+ */
+export const farkYazi = (f: number) => `${f > 0 ? "+" : ""}${Math.round(f).toLocaleString("tr-TR")}`;
+export const farkTonu = (f: number): "eksik" | "fazla" | "esit" => (f < 0 ? "eksik" : f > 0 ? "fazla" : "esit");
+
 /** Tonaja giren miktar: liman (yoksa kantar) */
 export const aracMiktari = (a: Pick<GemiArac, "liman_kg" | "teslim_kg">): number => Number(a.liman_kg ?? a.teslim_kg ?? 0);
 

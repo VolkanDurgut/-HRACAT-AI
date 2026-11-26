@@ -18,7 +18,7 @@ import { kgYazi, tonYazi, tarihSaatYazi } from "@/lib/ic-piyasa/is-emri";
 import { bugunTRIso, gunTR } from "@/lib/ic-piyasa/alis";
 import { trSayiOku } from "@/lib/ic-piyasa/irsaliye-oku";
 import {
-  GemiAlici, GemiArac, GemiDurum, GemiTahliye, UNEX_YER, aracFarki, araclariSirala, gemiHataMesaji, gemiRaporu, yerAdi, yoldaMi, yuzdeYazi,
+  GemiAlici, GemiArac, GemiDurum, GemiTahliye, UNEX_YER, aracFarki, araclariSirala, farkTonu, farkYazi, gemiHataMesaji, gemiRaporu, yerAdi, yoldaMi, yuzdeYazi,
 } from "@/lib/ic-piyasa/gemi-tahliye";
 import { GemiLimanBekleyenListesi } from "@/components/gemi-liman-bekleyen";
 import { gemiRaporDosyaAdi, gemiRaporXlsx } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
@@ -405,7 +405,7 @@ export default function GemiTahliyePage() {
                                         {a.teslim_kaynak && <span className="ml-1 text-[10px]" style={{ color: TEXT_MUTED }} title={a.teslim_zamani ? tarihSaatYazi(a.teslim_zamani) : ""}>{a.teslim_kaynak === "kantar" ? "kantar" : "elle"}</span>}
                                       </> : <span style={{ color: TEXT_MUTED }}>—</span>}
                                 </td>
-                                <td className={`px-3 py-1.5 text-right tabular-nums ${fark === null ? "" : Math.abs(fark) > 300 ? "text-amber-400" : fark < 0 ? "text-white/80" : "text-white"}`}>{fark === null ? "" : fark.toLocaleString("tr-TR")}</td>
+                                <td className={`px-3 py-1.5 text-right tabular-nums font-semibold ${fark === null ? "" : { eksik: "text-red-400", fazla: "text-emerald-400", esit: "text-white/70" }[farkTonu(fark)]}`}>{fark === null ? "" : farkYazi(fark)}</td>
                                 <td className="px-3 py-1.5 text-xs whitespace-nowrap" style={{ color: a.alici_id ? undefined : TEXT_MUTED }}>
                                   <span className={a.alici_id ? "text-white" : ""}>{yerAdi(a, alicilar)}</span>
                                   {yoldaMi(a) && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-amber-300"><Clock size={10} /> yolda</span>}
@@ -429,7 +429,7 @@ export default function GemiTahliyePage() {
                               <td colSpan={2} className="px-3 py-2 text-xs font-bold text-white">TOPLAM · {gorunen.length} araç</td>
                               <td className="px-3 py-2 text-right tabular-nums font-bold text-white">{gorunenToplam.liman.toLocaleString("tr-TR")}</td>
                               <td className="px-3 py-2 text-right tabular-nums font-bold text-white">{gorunenToplam.teslim ? gorunenToplam.teslim.toLocaleString("tr-TR") : ""}</td>
-                              <td className="px-3 py-2 text-right tabular-nums font-bold text-white">{gorunenToplam.eslesmisSayi ? gorunenToplam.fark.toLocaleString("tr-TR") : ""}</td>
+                              <td className={`px-3 py-2 text-right tabular-nums font-bold ${gorunenToplam.eslesmisSayi ? { eksik: "text-red-400", fazla: "text-emerald-400", esit: "text-white" }[farkTonu(gorunenToplam.fark)] : ""}`}>{gorunenToplam.eslesmisSayi ? farkYazi(gorunenToplam.fark) : ""}</td>
                               <td colSpan={2} />
                             </tr>
                           </tfoot>

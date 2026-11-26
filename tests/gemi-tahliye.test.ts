@@ -3,7 +3,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GemiAlici, GemiArac, GemiTahliye, aracFarki, bekleyenDurumu, gemiRaporu, limanBekliyorMu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
+import { GemiAlici, GemiArac, GemiTahliye, aracFarki, bekleyenDurumu, farkTonu, farkYazi, gemiRaporu, limanBekliyorMu, limanListesiAyristir, araclariSirala } from "@/lib/ic-piyasa/gemi-tahliye";
 import { gemiRaporSayfalari, gemiRaporDosyaAdi } from "@/lib/ic-piyasa/gemi-tahliye-xlsx";
 
 const gemi: GemiTahliye = {
@@ -164,4 +164,14 @@ test("bekleyenDurumu: aday yok -> excel, aday var -> onay, kaldirildi -> kapali"
   assert.equal(bekleyenDurumu({ adaylar: [], kapali: false }), "excel");
   assert.equal(bekleyenDurumu({ adaylar: [f], kapali: false }), "onay");
   assert.equal(bekleyenDurumu({ adaylar: [f], kapali: true }), "kapali");
+});
+
+test("farkYazi / farkTonu: eksik kirmizi -120, fazla yesil +60", () => {
+  assert.equal(farkYazi(-120), "-120");
+  assert.equal(farkYazi(60), "+60");
+  assert.equal(farkYazi(0), "0");
+  assert.equal(farkYazi(1240), "+1.240");
+  assert.equal(farkTonu(-20), "eksik");
+  assert.equal(farkTonu(40), "fazla");
+  assert.equal(farkTonu(0), "esit");
 });

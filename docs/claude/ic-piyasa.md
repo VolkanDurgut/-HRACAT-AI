@@ -916,3 +916,22 @@ tıklandığında ilgili irsaliyeleri inceleyebileceği bir evren karşılamalı
   İş Emirleri'nden. Kantar kartındaki hızlı araç formu yalnız eski satırları alır (`eskiGemiAlicilari`).
 - Eşleştirici koruması: bir gemi iş emri sevkiyle aynı plaka + ±500 kg + ±1 gün olan liman fişi UNEX aracına
   eşlenmez (`ic_gemi_kantar_esle_calistir`, `kantar_gemi_liman_adaylari`).
+
+### Gemi Tahliye 4: SEA BREEZE mutabakatı + renkli Excel raporu (27.11.2026)
+- Liman Excel'i (106 fiş, 2.744.400 kg) ↔ sistem: 106/106 birebir. Fabrika kantarı farkının üç nedeni (veri düzeltmeleri
+  CANLIDA, migration'lar `20261127100000/101000/102000_*`):
+  1. Liman fişi DORSE, fabrika kantarı ÇEKİCİ plakasıyla kesiliyor (59 AOP 959 ↔ 59 ADC 706, 59 AGD 271 ↔ 34 ZPT 45). Sefer
+     desteği çoğunu bağladı; #2631 bağlanmamıştı (elle bağlandı).
+  2. Limanda iki parça tartılan tek yük (12.840 + 12.100 = 24.940 ↔ kantar #2685). `ic_gemi_liman_fisleri.arac_id` TEKİL:
+     ilk fiş araca bağlı, araç `liman_kg` iki fişin toplamı, ikinci fiş araç notunda. 106 fiş = 105 araç seferi.
+  3. Kantar #2664 hatalı kayıt (34 ZPT 45 dolu + 59 ACK 015 darası) → `ic_gemi_haric_tartimlar` + araç kaldırıldı
+     (kullanıcı onaylı; `ic_gemi_arac_sil` ile aynı işlem).
+  + 34 ZFN 83 (17.000 kg) gemiden satış, irsaliyesiz `gecmis=true` sevk olarak IE-2026-0025'e (lojistiğe e-posta YOK;
+  irsaliye gelince bu kayda işlenir, yeniden eklenmez).
+- Renkli rapor (kullanıcı: "Excel her seferinde kendini bu şekilde üretsin"): `_shared/xlsx-yaz.ts` XS 30–69 (`g*`) ek
+  stiller (mevcut 0–29 kimlikleri DEĞİŞMEDİ) + `XlsxSayfa.izgaraGizle` / `genislikSigdir` (sheetPr fitToPage). Değerler ve
+  düzen aynı; yalnız stil: lacivert başlık, gün gün satır bandı, FARK bandı |f| ≤ 100 yeşil · 101–300 sarı · > 300 kırmızı
+  (eksi kırmızı yazı), gemiden satış satırı açık mavi, tartım / liman fişi bekleyen yer sarı, KALAN > 0 sarı · 0 yeşil ·
+  < 0 kırmızı, % 99–100 yeşil · > 100 kırmızı, fire ≤ %0,5 yeşil; ilk sayfada renk anahtarı (I sütunu).
+- `_shared/xlsx-yaz.ts` değiştiği için `siparis-rapor`, `navlun-tablosu`, `siparissiz-musteri-rapor` edge'lerinin canlı
+  kopyası (yalnız bu dosyada) repodan eski; ek stiller kullanılmadığı için davranış farkı yok, bir sonraki deploy'da eşitlenir.

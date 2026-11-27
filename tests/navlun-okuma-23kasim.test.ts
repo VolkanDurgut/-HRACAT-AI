@@ -54,6 +54,8 @@ test("Excel navlun tablosu: cikis lokali HARIC teklif '+lokal' stiliyle, dipnotl
   assert.ok([XS.navTutarA, XS.navTutarB].includes(hucre(800).s));
   assert.ok(s.satirlar.some((r: { v: unknown }[]) => String(r?.[1]?.v || "").includes("+lokal")));
   // stil tablosu kimliklerle ayni sayida
-  assert.match(STIL_XML, /<cellXfs count="30">/);
-  assert.equal((STIL_XML.match(/<cellXfs[\s\S]*<\/cellXfs>/)![0].match(/<xf /g) || []).length, 30);
+  // 27.11.2026: gemi raporu stilleri eklendi (30 -> 70); sayac, xf sayisi ve en buyuk XS kimligi birlikte tutmali
+  const xfAdet = Object.values(XS).reduce((m, v) => Math.max(m, v), 0) + 1;
+  assert.match(STIL_XML, new RegExp(`<cellXfs count="${xfAdet}">`));
+  assert.equal((STIL_XML.match(/<cellXfs[\s\S]*<\/cellXfs>/)![0].match(/<xf /g) || []).length, xfAdet);
 });

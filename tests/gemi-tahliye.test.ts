@@ -227,3 +227,47 @@ test("eskiGemiAlicilari: is emri satirlarini arac formundan ayirir", () => {
   const l = [{ id: "a", is_emri_no: null }, { id: "b", is_emri_no: "IE-KURGU-1" }, { id: "c" }];
   assert.deepEqual(eskiGemiAlicilari(l).map((x) => x.id), ["a", "c"]);
 });
+
+test("Excel renk (27.11.2026): fark bandi, satis satiri, bekleyen yer, kalan / % / fire durum stilleri", async () => {
+  const { XS } = await import("@/lib/xlsx-yaz");
+  const { farkStili, kalanStili } = await import("@/lib/ic-piyasa/gemi-tahliye-xlsx");
+  assert.equal(farkStili(40), XS.gFarkOk);
+  assert.equal(farkStili(-100), XS.gFarkOk);
+  assert.equal(farkStili(120), XS.gFarkUyari);
+  assert.equal(farkStili(-300), XS.gFarkUyari);
+  assert.equal(farkStili(301), XS.gFarkHata);
+  assert.equal(kalanStili(4560), XS.gKalanUyari);
+  assert.equal(kalanStili(0), XS.gKalanOk);
+  assert.equal(kalanStili(-4080), XS.gKalanHata);
+
+  const bekleyen: GemiArac = { ...arac("2026-11-26", "34 KRG 005", 0, 26000, null), liman_kg: null, kaynak: "otomatik" };
+  const s = gemiRaporSayfalari(gemi, alicilar, [...araclar, bekleyen]);
+  const ana = s[0].satirlar;
+  assert.equal(ana[0]?.[0]?.s, XS.gBaslik);
+  const unex = ana.find((r) => r[1]?.v === "34 KRG 001");
+  assert.equal(unex?.[4]?.s, XS.gFarkOk); // -40
+  const satis = ana.find((r) => r[1]?.v === "34 KRG 101");
+  assert.equal(satis?.[0]?.s, XS.gSatisTarih);
+  assert.equal(satis?.[5]?.s, XS.gSatisAlici);
+  assert.equal(satis?.[3]?.v, null); // deger degismez
+  const bek = ana.find((r) => r[1]?.v === "34 KRG 005");
+  assert.equal(bek?.[5]?.s, XS.gBekleyen);
+  // gun bandi: 25.11 ve 26.11 farkli zemin
+  const g25 = ana.find((r) => r[1]?.v === "34 KRG 002");
+  const g26 = ana.find((r) => r[1]?.v === "34 KRG 001" && (r[0]?.v as Date).getDate() === 26);
+  assert.notEqual(g25?.[1]?.s, g26?.[1]?.s);
+  // ozet: bekleyen 26.000 ile gelen 205.000 > B/L 200.000 -> kalan eksi ve % > 100 kirmizi
+  assert.equal(ana.find((r) => r[1]?.v === "KALAN KG")?.[2]?.s, XS.gKalanHata);
+  assert.equal(ana.find((r) => r[1]?.v === "%")?.[2]?.s, XS.gYuzdeHata);
+  // bekleyensiz: kalan 21.000 sari, %89,5 duz
+  const s0 = gemiRaporSayfalari(gemi, alicilar, araclar)[0].satirlar;
+  assert.equal(s0.find((r) => r[1]?.v === "KALAN KG")?.[2]?.s, XS.gKalanUyari);
+  assert.equal(s0.find((r) => r[1]?.v === "%")?.[2]?.s, XS.gYuzde);
+  assert.equal(ana.find((r) => r[1]?.v === "KURGU ALICI A")?.[5]?.s, XS.gKalanHata); // 60.000 - 61.000 = -1.000 (fazla)
+  // renk anahtari I sutununda, sayfa izgarasiz
+  assert.equal(ana[1]?.[8]?.v, "RENK ANAHTARI");
+  assert.equal(s[0].izgaraGizle, true);
+  // alici sayfasi KALAN
+  const a2 = s.find((x) => x.ad.endsWith("KURGU ALICI B"))!;
+  assert.equal(a2.satirlar.find((r) => r[1]?.v === "KALAN")?.[2]?.s, XS.gKalanHata); // 30.000 - 31.000
+});

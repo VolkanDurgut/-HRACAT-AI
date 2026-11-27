@@ -23,6 +23,7 @@ const SAYFA_YETKI_MAP: Record<string, keyof import("@/lib/auth-context").SayfaYe
   // 04.11.2026: DIIB Takibi ihracat verisi; ayri yetki yok, "ihracatlar" ile ayni
   "/diib": "ihracatlar",
   "/etd-eta": "etd_eta",
+  "/hat-takip": "etd_eta", // 27.11.2026: Hat Takip (Hapag-Lloyd, deneme modu) - ETD/ETA yetkisiyle
   "/analiz": "analiz",
   "/kantar": "kantar",
   "/draft-onay": "draft_onay",

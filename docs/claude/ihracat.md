@@ -1714,3 +1714,31 @@ Kullanıcı: "Fatura talimatında 'Varis Limani ASHDOD PORT' yazan kısımda var
 - Önizleme sonrası (kullanıcı: "Ekranı 3'e böl ve bütün 3 başlık altında hepsini göster"): ≥ 1280 px'te üç bölüm
   YAN YANA üç sütun (başlık + sayı, her sütun kendi içinde kayar; gemi yoksa iki sütun). Dar ekranda sekmeler. Gemi
   sütunu `dar` kipte: sıkı tablo, "Gittiği yer" plaka altında, Excel düğmesi küçük.
+
+## Hat Takip — Hapag-Lloyd API, Aşama 1 deneme modu (27.11.2026) — migration'lar 20261127140000 / 150000 / 160000 (CANLIDA)
+Kullanıcı: "İlk önce genel plan … kısım kısım ekleyelim, tereyağından kıl çeker gibi." Onaylı yol haritası:
+0 bağlantı ✅ · **1 ayrı sayfa, salt okuma** ✅ · 2 mevcut ekranlarda etiket + uyarı (yalnız görüntü) · 3 onaylı
+"ETA'yı güncelle" · 4 sefer programı (Commercial Schedule v3) · 5 otomasyon (mail: ÖNCE yalnız test adresi
+mesensei282@gmail.com, kullanıcı onayıyla canlı) · 6 Basic plan (ücret teyidi sonrası) + MSC/CMA/Maersk (DCSA ortak).
+- Portal: api-portal.hlag.com, kuruluş UNEX GIDA (UNEXTR003), uygulama **UNEX-AI** (Client Credentials, teknik kullanıcı
+  execution@, sahip operation@). Abonelik: Track and Trace v2 + Commercial Schedule v3, **Tryout** (T&T 100/gün, 1/dk;
+  CS 50/saat). Secret 27.11.2028'de yenilenir. Kimlik: edge secret `HAPAG_CLIENT_ID` / `HAPAG_CLIENT_SECRET`
+  (repoda YOK); istek başlıkları `X-IBM-Client-Id` / `X-IBM-Client-Secret`. Taban `https://api.hlag.com/hlag/external`
+  (T&T `/v2/events/?carrierBookingReference=…`, CS `/v1/point-to-point-routes?placeOfReceipt=&placeOfDelivery=`).
+- Acente (ESNA / DRAFT) üzerinden açılan Hapag booking'leri kendi hesabımızla görünüyor (27.11 denemesi: 96615245,
+  73 olay, 10 konteyner).
+- Edge `hat-takip`: `{"islem":"deneme"}` (salt okuma özet), `{"islem":"yenile"}` (pg_cron `hat-takip-yenile` 15 dk).
+  Yetki `x-cron-anahtar` = Vault `hat_takip_anahtari` (anon anahtarla kota tüketilemez). Kapatma: secret
+  `HAT_TAKIP_KAPALI=evet` ya da `cron.unschedule('hat-takip-yenile')`. Basic plana geçince `HAT_TAKIP_ADET`,
+  `HAT_TAKIP_GUNLUK_KOTA`.
+- Tablolar (yazma yalnız service_role, okuma kendi şirketi + `etd_eta`): `hat_takip_kayitlari` (booking özeti; takibe
+  giriş: acente HAPAG + booking 8–10 rakam + ETA boş / son 21 gün), `hat_olaylari` (DCSA olayları, tekil anahtar,
+  revizyonda güncellenir), `hat_takip_cagrilari` (kota izi; `hat_takip_sira()` 24 saatte 95'te durur).
+- Yorum TEK YER `supabase/functions/_shared/hat-takip.ts` (edge + sayfa + test): POL = ilk DEPA, POD = son ARRI
+  (aktarma değil), ETA/ETD en güvenilir olay ACT > EST > PLN (eşitse en yeni oluşan); konteyner adımları
+  GTOT boş → GTIN dolu → LOAD → (POD) DISC → GTOT dolu. Test: `tests/hat-takip.test.ts` (kurgusal veri).
+- Sayfa `/hat-takip` (menü Operasyon › Hat Takip, yetki `etd_eta`, "Deneme modu" rozeti): sistem ETA ↔ Hapag ETA
+  farkı (0 aynı, 1–2 gün sarı, 3+ kırmızı), satır açılınca gemi hareketleri + konteyner yolculuğu. Veri
+  `lib/hat-takip/veri.ts`, görünüm kuralları `lib/hat-takip/gorunum.ts`. **Sistem kayıtlarına yazmaz, mail yok.**
+- İlk bulgu: SEASPAN LUMACO 2643S iki Tema booking'i (IHR-2026-0103 / -0104) sistemde farklı ETA (04.12 / 01.12);
+  Hapag planı 05.12.

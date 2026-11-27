@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ilkErisilebilirSayfa } from "@/lib/yetki-utils";
 import { yoneticiMi } from "@/lib/asistan/gorunum";
-import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup, Link2, ListTodo } from "lucide-react";
+import { LayoutDashboard, FolderOpen, FileUp, Archive, LogOut, Menu, X, Weight, User, Anchor, Settings, ChevronDown, ShieldCheck, Ship, FileCheck2, Wheat, FileSignature, ShoppingCart, BookOpen, PackageOpen, ClipboardCheck, ClipboardList, Store, Mail, DatabaseBackup, Link2, ListTodo, Radar } from "lucide-react";
 
 type MenuItem = {
   label: string;
@@ -39,6 +39,8 @@ const mainItems: MenuItem[] = [
 
 const opsItems: MenuItem[] = [
   { label: "ETD/ETA",       href: "/etd-eta", icon: <Ship size={18} />,      yetkiKey: "etd_eta" },
+  // 27.11.2026: Hat Takip (Hapag-Lloyd T&T, Asama 1 deneme modu) - ETD/ETA yetkisiyle; yalniz yetkiliye gorunur
+  { label: "Hat Takip", href: "/hat-takip", icon: <Radar size={18} />, yetkiKey: "etd_eta", yalnizYetkili: true },
   { label: "Kantar Paneli", href: "/kantar",  icon: <Weight size={18} />,    yetkiKey: "kantar" },
   // 10.11.2026: Navlun Bildirimi - acente teklifleri maillerden otomatik. 16.11.2026: kendi yetkisi "navlun"
   // (Yetkilendirme > Operasyon); eskiden Kontrol Merkezi ("analiz") ile aciliyordu.

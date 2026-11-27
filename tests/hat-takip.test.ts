@@ -96,3 +96,25 @@ test("konteynerYolculuklari: adimlar POL / POD'a gore, bos-dolu ayrimi", () => {
   assert.equal(adimBul(gtot, null), null);
   assert.equal(adimBul(olaylar.find((o) => o.kod === "LOAD")!, null), "yuklendi");
 });
+
+test("gorunum: ETA karsilastirma seviyeleri, fark yazisi, TR zaman, gemi hareketleri", async () => {
+  const { etaKarsilastir, farkYazi, trZaman, trGun, onceYazi, gemiHareketleri } = await import("@/lib/hat-takip/gorunum");
+  assert.deepEqual(etaKarsilastir("2026-12-05", "2026-12-05T14:00:00Z"), { fark: 0, seviye: "ayni" });
+  assert.deepEqual(etaKarsilastir("2026-12-04", "2026-12-05T14:00:00Z"), { fark: 1, seviye: "uyari" });
+  assert.deepEqual(etaKarsilastir("2026-12-01", "2026-12-05T14:00:00Z"), { fark: 4, seviye: "kritik" });
+  assert.deepEqual(etaKarsilastir(null, "2026-12-05T14:00:00Z"), { fark: null, seviye: "yok" });
+  assert.equal(farkYazi(2), "+2 gün");
+  assert.equal(farkYazi(-1), "−1 gün");
+  assert.equal(farkYazi(0), "aynı");
+  assert.equal(farkYazi(null), "—");
+  assert.equal(trZaman("2026-12-05T14:00:00Z"), "05.12.2026 17:00");
+  assert.equal(trZaman("2026-10-31T15:15:00+03:00", false), "31.10.2026");
+  assert.equal(trZaman(null), "—");
+  assert.equal(trGun("2026-12-04"), "04.12.2026");
+  const simdi = Date.parse("2026-11-27T12:00:00Z");
+  assert.equal(onceYazi("2026-11-27T11:48:00Z", simdi), "12 dk önce");
+  assert.equal(onceYazi("2026-11-27T09:00:00Z", simdi), "3 sa önce");
+  assert.equal(onceYazi(null, simdi), "henüz sorgulanmadı");
+  const h = gemiHareketleri(olaylar);
+  assert.deepEqual(h.map((o) => `${o.kod}@${o.yer}/${o.sinif}`), ["DEPA@TRKUR/ACT", "ARRI@XXTRS/PLN", "ARRI@XXAAA/EST"]);
+});

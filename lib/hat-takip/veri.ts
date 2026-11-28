@@ -80,7 +80,7 @@ type HamOzet = Omit<HatEtaOzeti, "sistem_eta" | "dosya_id" | "dosya_no" | "alici
 export async function hatEtaOzetleriOku(): Promise<HatEtaOzeti[]> {
   const { data, error } = await supabase
     .from("hat_takip_kayitlari")
-    .select("rezervasyon_id,booking_no,durum,son_sorgu,hat_eta,hat_eta_sinif,gemi,sefer,rezervasyonlar(eta,dosya_id,ihracat_dosyalari(dosya_no,alici_firma))")
+    .select("rezervasyon_id,booking_no,durum,son_sorgu,hat_eta,hat_eta_sinif,gemi,sefer,eta_otomatik,rezervasyonlar(eta,dosya_id,ihracat_dosyalari(dosya_no,alici_firma))")
     .eq("aktif", true)
     .limit(500);
   if (error) throw new Error(`Hat ETA özeti okunamadı: ${error.message}`);

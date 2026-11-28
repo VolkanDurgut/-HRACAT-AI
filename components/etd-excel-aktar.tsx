@@ -11,7 +11,7 @@
  */
 
 import React from "react";
-import { X, FileSpreadsheet, Loader2, AlertTriangle, ArrowRight, Info } from "lucide-react";
+import { X, FileSpreadsheet, Loader2, AlertTriangle, ArrowRight, Info, Radar } from "lucide-react";
 import { CARD_BG, CARD_BORDER, TEXT_MUTED, ACCENT, ROW_HEADER_BG } from "@/lib/theme";
 import { etdExceliOku, excelSistemleEslestir, type EslesmeSonucu, type SistemSevkiyati, type ExcelSatiri } from "@/lib/etd-excel";
 import { KONSIMENTO_ETIKETI, odemeAlindiMi, konsimentoDurumuMu } from "@/lib/odeme-takibi";
@@ -29,6 +29,8 @@ export type ExcelYuklemeOzeti = {
   /** 21.11.2026 */
   etaDegisen?: number;
   etaSupheli?: number;
+  /** 28.11.2026: Excel'de farkli ama Hapag-Lloyd'dan otomatik gelen (uygulanmadi) */
+  etaHat?: number;
 };
 
 const trGun = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}` : "—");
@@ -107,6 +109,7 @@ export function EtdExcelAktar({
       yeniBekleyen: secilen.filter((d) => !odemeAlindiMi(d.yeni) && (d.eski === null || odemeAlindiMi(d.eski))).map(kisa),
       etaDegisen: etalar.length,
       etaSupheli: sonuc.etaSupheli.length,
+      etaHat: sonuc.etaHat.length,
     };
     setUygulaniyor(true); setHata(null);
     const h = await onUygula(satirlar, ozet, dosyaAdi || "", etalar);
@@ -157,6 +160,7 @@ export function EtdExcelAktar({
                   ["Eşleşen sevkiyat", sonuc.eslesen],
                   ["Konşimento değişecek", sonuc.degisecek.length],
                   ["ETA değişecek", sonuc.etaDegisecek.length],
+                  ...(sonuc.etaHat.length ? [["Hapag ETA'sı korunur", sonuc.etaHat.length]] : []),
                   ["Zaten aynı", sonuc.ayni],
                   ["Excel'de boş (korunur)", sonuc.excelBos],
                 ].map(([ad, n]) => (
@@ -216,6 +220,18 @@ export function EtdExcelAktar({
                   <ul className="space-y-0.5" style={{ color: "#E2C76B" }}>
                     {sonuc.etaSupheli.map((d) => (
                       <li key={d.rezervasyon_id}>{d.firma} · {d.booking}: ETA {trGun(d.yeni)}, ETD {trGun(d.etd)} — {d.sebep}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 28.11.2026: ETA'si Hapag-Lloyd'dan otomatik gelen sevkiyatlar - Excel'deki ETA uygulanmaz */}
+              {sonuc.etaHat.length > 0 && (
+                <div className="rounded-lg border px-3 py-2.5 text-[11.5px]" style={{ borderColor: "rgba(56,189,248,0.35)", backgroundColor: "rgba(56,189,248,0.06)" }} data-testid="eta-hat">
+                  <p className="text-sky-300 font-medium mb-1 flex items-center gap-1.5"><Radar size={12} /> Hapag-Lloyd&apos;dan otomatik gelen ETA ({sonuc.etaHat.length}) — Excel&apos;deki tarih uygulanmaz</p>
+                  <ul className="space-y-0.5" style={{ color: "#BAE6FD" }}>
+                    {sonuc.etaHat.map((d) => (
+                      <li key={d.rezervasyon_id}>{d.firma} · {d.booking}: sistemde {trGun(d.eski)} (Hapag-Lloyd) · Excel&apos;de {trGun(d.yeni)}</li>
                     ))}
                   </ul>
                 </div>

@@ -16,6 +16,8 @@ export type HatEtaOzeti = {
   hat_eta_sinif: string | null;
   gemi: string | null;
   sefer: string | null;
+  /** 28.11.2026: true -> hattin ETA'si sisteme otomatik yazilir (hat_eta_esitle), Excel ETA'si uygulanmaz */
+  eta_otomatik?: boolean;
   sistem_eta: string | null;
   dosya_id: string | null;
   dosya_no: string | null;
@@ -57,9 +59,17 @@ export function etaUyarisi(sistemEta: string | null, ozet: HatEtaOzeti | null | 
     sistemEta ? `Sistem ETA: ${trGun(sistemEta.slice(0, 10))}` : "Sistemde ETA girilmemiş",
     seviye === "ayni" ? "Tarihler aynı" : fark !== null ? `Fark: ${farkYazi(fark)}` : null,
     `Son sorgu: ${onceYazi(ozet.son_sorgu, simdi)}${guncel ? "" : " (güncel değil)"}`,
-    "Bu bilgi sistemdeki ETA'yı değiştirmez.",
+    hatEtaOtomatik(ozet) ? "ETA Hapag-Lloyd'dan otomatik güncellenir; Excel bu ETA'yı değiştirmez." : "Bu bilgi sistemdeki ETA'yı değiştirmez.",
   ].filter(Boolean).join("\n");
   return { seviye, fark, hatGun, guncel, metin, ipucu };
+}
+
+/**
+ * 28.11.2026: Bu sevkiyatin ETA'si hattan otomatik mi geliyor? (sunucu kurali ile ayni: aktif + eta_otomatik + tamam + hat ETA'si var;
+ * odeme_excel_yukleme_kaydet / hat_eta_esitle). Liste yalniz aktif takipleri icerir.
+ */
+export function hatEtaOtomatik(ozet: HatEtaOzeti | null | undefined): boolean {
+  return !!ozet && ozet.eta_otomatik !== false && ozet.durum === "tamam" && !!ozet.hat_eta;
 }
 
 /** Uyarilacaklar: farki olan (uyari / kritik) booking'ler; once kritik, sonra farki buyuk olan, sonra dosya no. */

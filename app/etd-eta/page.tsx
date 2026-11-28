@@ -20,7 +20,7 @@ import { EtdExcelAktar, type ExcelYuklemeOzeti } from "@/components/etd-excel-ak
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
 // 28.11.2026 Hat Takip Asama 2: hat ETA rozeti (yalniz goruntu; ETA'yi degistirmez)
 import { hatEtaOzetleriOku } from "@/lib/hat-takip/veri";
-import { etaUyarisi, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
+import { etaUyarisi, hatEtaOtomatik, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
 import { HatEtaRozeti } from "@/components/hat-takip/hat-eta-uyarisi";
 
 type SevkiyatSatir = {
@@ -299,13 +299,15 @@ export default function EtdEtaPage() {
       }
       return `Güncellenemedi: ${error.message}`;
     }
-    const kayit = data as ExcelYukleme & { eta_guncellenen?: number };
+    const kayit = data as ExcelYukleme & { eta_guncellenen?: number; eta_hat_atlanan?: number };
     setExcelAcik(false);
     setYuklemeSonucu(kayit);
     setEtaFilter("odeme");
     const etaSay = kayit.eta_guncellenen || 0;
     const parcalar = [kayit.guncellenen > 0 ? `${kayit.guncellenen} konşimento` : "", etaSay > 0 ? `${etaSay} ETA` : ""].filter(Boolean);
-    showToast(parcalar.length ? `Excel yüklendi: ${parcalar.join(" + ")} güncellendi, yeni hatırlatma turu başladı.` : "Excel yüklendi: değişiklik yok, yeni hatırlatma turu başladı.", "success");
+    const hatSay = kayit.eta_hat_atlanan || 0;
+    const hatNotu = hatSay > 0 ? ` ${hatSay} Hapag-Lloyd ETA'sı korundu.` : "";
+    showToast((parcalar.length ? `Excel yüklendi: ${parcalar.join(" + ")} güncellendi, yeni hatırlatma turu başladı.` : "Excel yüklendi: değişiklik yok, yeni hatırlatma turu başladı.") + hatNotu, "success");
     await fetchData();
     return null;
   };
@@ -785,6 +787,8 @@ export default function EtdEtaPage() {
             rezervasyon_id: s.rezervasyon_id, booking_no: s.booking_no, bl_no: s.bl_no,
             alici_firma: s.alici_firma, dosya_no: s.dosya_no, konsimento_durumu: s.konsimento_durumu,
             etd: s.etd, eta: s.eta,
+            // 28.11.2026: Hapag-Lloyd'dan otomatik ETA -> Excel ETA'si uygulanmaz
+            eta_hat: hatEtaOtomatik(hatOzetleri[s.rezervasyon_id]),
           }))}
           onKapat={() => setExcelAcik(false)}
           onUygula={handleExcelUygula}

@@ -1770,3 +1770,17 @@ mesensei282@gmail.com, kullanıcı onayıyla canlı) · 6 Basic plan (ücret tey
   `_shared/hat-sefer.ts` (gemi adı `vessel.name`; aktarma = gemi bacakları arası limanlar). Test `tests/hat-sefer.test.ts`.
 - 28.11.2026 canlı doğrulanan kodlar (TRIST'ten): GHTEM, DJJIB, KEMBA, SGSIN, ILASH, BJCOO, LBBEY, GQBSG, GQSSG, TZDAR, SRPBM
   (sefer var); KMMUT, CUMAR, CUSCU (kod geçerli, 4 haftada sefer yok); TRTEK geçerli. Sistem kaydına yazmaz, mail yok.
+
+## Hat Takip — Hapag ETA otomatik + Excel koruması (28.11.2026)
+- Kullanıcı: "Hapag için ETA verileri otomatik güncellenmeli … Excel eklendiğinde Hapag için ETA ETD bilgileri değişmemeli."
+  (Aşama 3'ün "onaylı düğme" planı yerine.)
+- `hat_eta_esitle(takip)` (migration 20261128120000): `hat_takip_kaydet` her başarılı sorgudan sonra çağırır; hattın ETA'sı
+  (İstanbul günü; PLN/EST/ACT) `rezervasyonlar.eta`'dan farklıysa yazar + `eta_guncelleme_tarihi`. ETD ≤ ETA ≤ ETD+180
+  değilse YAZMAZ ("atlandi"). İz `hat_eta_guncellemeleri` (guncellendi / atlandi / hata; RLS etd_eta). Hata takip kaydını
+  bozmaz. Booking bazında kapatma `hat_takip_kayitlari.eta_otomatik = false`. ETA tetikleyicisi yok → mail yok.
+- ETD (`gemi_kalkis_tarihi`) OTOMATİK YAZILMAZ (fatura onayı, konşimento hatırlatma, sigorta, DİİB, draft BL kullanır) —
+  ayrı karar. ETD/ETA Excel'i zaten ETD yazmaz.
+- `odeme_excel_yukleme_kaydet`: Hapag'dan otomatik ETA'lı rezervasyonun Excel ETA'sı atlanır (`eta_hat_atlanan`).
+  İstemci `lib/etd-excel.ts` `eta_hat` → `etaHat` listesi (önizlemede "Hapag-Lloyd'dan otomatik gelen ETA", uygulanmaz);
+  kural tek yer `lib/hat-takip/eta-uyari.ts hatEtaOtomatik` (sunucu ile aynı).
+- 28.11.2026 14:34 "ETD-ETA 28.11.2026.xlsm" (koruma öncesi) 37983286'nın ETA'sını 05.12 → 01.12 yapmıştı; senkron düzeltir.

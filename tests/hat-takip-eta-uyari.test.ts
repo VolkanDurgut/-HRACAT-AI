@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { etaFarkiOlanlar, etaUyarisi, GUNCEL_SAAT, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
+import { etaFarkiOlanlar, etaUyarisi, GUNCEL_SAAT, hatEtaOtomatik, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
 
 // Kurgusal veri (gercek booking / firma degil)
 const SIMDI = Date.parse("2026-11-28T09:00:00Z");
@@ -72,4 +72,15 @@ test("panel listesi: yalniz farkli olanlar; once kritik, sonra buyuk fark", () =
     ozet({ rezervasyon_id: "e", dosya_no: "E", sistem_eta: "2026-12-01", durum: "hata" }),
   ], SIMDI);
   assert.deepEqual(liste.map((x) => x.ozet.rezervasyon_id), ["d", "c", "b"]);
+});
+
+test("hatEtaOtomatik: aktif takip + tamam + hat ETA'si var + kapatilmamis (sunucu kurali ile ayni)", () => {
+  assert.equal(hatEtaOtomatik(ozet()), true);
+  assert.equal(hatEtaOtomatik(ozet({ eta_otomatik: true })), true);
+  assert.equal(hatEtaOtomatik(ozet({ eta_otomatik: false })), false);
+  assert.equal(hatEtaOtomatik(ozet({ durum: "hata" })), false);
+  assert.equal(hatEtaOtomatik(ozet({ hat_eta: null })), false);
+  assert.equal(hatEtaOtomatik(null), false);
+  assert.match(etaUyarisi("2026-12-05", ozet(), SIMDI)!.ipucu, /otomatik güncellenir/);
+  assert.match(etaUyarisi("2026-12-05", ozet({ eta_otomatik: false }), SIMDI)!.ipucu, /değiştirmez\.$/);
 });

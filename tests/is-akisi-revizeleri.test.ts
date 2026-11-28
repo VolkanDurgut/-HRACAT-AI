@@ -57,6 +57,17 @@ test("ETA: sistemde ETD yoksa Excel ETD'si ile kontrol edilir", () => {
   assert.equal(e.etaSupheli.length, 1);
 });
 
+test("ETA: Hapag-Lloyd'dan otomatik gelen sevkiyat (eta_hat) -> Excel ETA'si uygulanmaz, ayri listelenir (28.11.2026)", () => {
+  const hapag = { ...sis("7", "DEMOBK7", "2026-10-31", "2026-12-05"), eta_hat: true };
+  const diger = sis("8", "DEMOBK8", "2026-11-20", "2026-12-03");
+  const e = excelSistemleEslestir([ex("DEMOBK7", "01.12.2026"), ex("DEMOBK8", "06.12.2026")], [hapag, diger]);
+  assert.deepEqual(e.etaHat.map((d) => [d.booking, d.eski, d.yeni]), [["DEMOBK7", "2026-12-05", "2026-12-01"]]);
+  assert.deepEqual(e.etaDegisecek.map((d) => d.booking), ["DEMOBK8"]);
+  assert.equal(e.etaSupheli.length, 0);
+  // Excel'de ayni tarih -> hicbir listede yok
+  assert.equal(excelSistemleEslestir([ex("DEMOBK7", "05.12.2026")], [hapag]).etaHat.length, 0);
+});
+
 // ------------------------------------------------------------------ 1) Silinen proformalar
 const sp = (no: string, alici: string, silinme: string, ek: Partial<SilinenProforma> = {}): SilinenProforma => ({
   denetim_id: `d-${no}`, proforma_no: no, alici_unvan: alici, tarih: "2026-11-03", para_birimi: "USD", toplam: 10000, toplam_mts: 25,

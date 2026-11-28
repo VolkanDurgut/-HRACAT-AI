@@ -12,6 +12,7 @@
  * 21.11.2026 (kullanici: "Excel'de ETA bilgileri belirtilmesine ragmen listeye yansimadi"): aktarim eskiden YALNIZ
  * KONSIMENTO sutununu yaziyordu; ETA'lar hep elle girilmisti. Artik ETA da eslestirilir (etaDegisecek): Excel'de dolu
  * ve sistemdekinden farkli ETA onizlemede listelenir, onaylaninca yazilir. Excel'de bos ETA sistemdekini SILMEZ.
+ * 28.11.2026: ETA'si Hapag-Lloyd'dan otomatik gelen sevkiyatin (eta_hat) Excel ETA'si uygulanmaz -> etaHat (bilgi).
  * Kural (veritabaniyla ayni, odeme_excel_yukleme_kaydet): ETA, ETD'den once ya da ETD'den 180 gunden sonra olamaz;
  * boyle satirlar "supheli" listesinde gosterilir ve uygulanmaz (or. yil yanlis yazilmis: 27.01.2026 / ETD 18.12.2026).
  */
@@ -202,6 +203,8 @@ export type SistemSevkiyati = {
   /** 21.11.2026: ETA karsilastirmasi icin (YYYY-MM-DD) */
   etd?: string | null;
   eta?: string | null;
+  /** 28.11.2026: ETA'si hattan (Hapag-Lloyd) otomatik gelir -> Excel ETA'si UYGULANMAZ (sunucu da atlar) */
+  eta_hat?: boolean;
 };
 
 export type EtaDegisikligi = {
@@ -263,6 +266,8 @@ export type EslesmeSonucu = {
   /** 21.11.2026 ETA */
   etaDegisecek: EtaDegisikligi[];
   etaSupheli: EtaDegisikligi[];
+  /** 28.11.2026: Excel'de farkli ama ETA'si Hapag-Lloyd'dan otomatik gelen sevkiyatlar (uygulanmaz, bilgi) */
+  etaHat: EtaDegisikligi[];
 };
 
 export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiyati[]): EslesmeSonucu {
@@ -288,6 +293,7 @@ export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiy
   const taninmayan: ExcelSatiri[] = [];
   const etaDegisecek: EtaDegisikligi[] = [];
   const etaSupheli: EtaDegisikligi[] = [];
+  const etaHat: EtaDegisikligi[] = [];
   let ayni = 0;
   let excelBos = 0;
   for (const { s, e } of Array.from(son.values())) {
@@ -301,7 +307,8 @@ export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiy
         rezervasyon_id: s.rezervasyon_id, dosya_no: s.dosya_no, firma: s.alici_firma || e.firma, booking: s.booking_no || e.booking,
         eski: eskiEta, yeni: yeniEta, etd, kaynak: `${e.sayfa} / satır ${e.satir}`,
       };
-      if (sebep) etaSupheli.push({ ...d, sebep }); else etaDegisecek.push(d);
+      if (s.eta_hat) etaHat.push(d);
+      else if (sebep) etaSupheli.push({ ...d, sebep }); else etaDegisecek.push(d);
     }
     if (!e.durum) {
       if (e.durumHam) taninmayan.push(e); else excelBos++;
@@ -321,5 +328,5 @@ export function excelSistemleEslestir(excel: ExcelSatiri[], sistem: SistemSevkiy
       odemeDegisimi: once === sonra ? null : sonra ? "alindi" : "bekliyor",
     });
   }
-  return { degisecek, ayni, excelBos, taninmayan, sistemdeYok, eslesen: son.size, etaDegisecek, etaSupheli };
+  return { degisecek, ayni, excelBos, taninmayan, sistemdeYok, eslesen: son.size, etaDegisecek, etaSupheli, etaHat };
 }

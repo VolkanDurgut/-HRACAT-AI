@@ -32,6 +32,10 @@ import type { IsEmriSatiri } from "@/lib/panel/is-emirleri";
 import { yuklemeEvraklariTamam } from "@/lib/yukleme-evrak-tamam";
 import { doluDurumu, isListesiKur, LISTE_FILTRELERI, listeAra, listeFiltresi, listeSayilari, filtreyeUyar, listeGruplari, kapaliGruplariOku, durumGrubu, type ListeFiltresi, type ListeGrubu, type OdemeBekleyen } from "@/lib/panel/is-listesi";
 import { ListeGrupCercevesi } from "@/components/panel/liste-grup-cercevesi";
+// 28.11.2026 Hat Takip Asama 2: hat ETA farki seridi (yalniz goruntu; "etd_eta" yetkisi olana)
+import { hatEtaOzetleriOku } from "@/lib/hat-takip/veri";
+import { etaFarkiOlanlar, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
+import { HatEtaSeridi } from "@/components/hat-takip/hat-eta-uyarisi";
 import { DoluGostergesi, DurumHucresi, durumKenari, IsEmriListeSatiri, OdemeListeSatiri, CutoffSatiri, HUCRE, HUCRE_TAM, HUCRE_EVRAK, LISTE_TABLO, LISTE_GOVDE, LISTE_BASLIK, LISTE_SATIR, LISTE_SUTUN_SAYISI, EVRAK_SAYAC_DAR, HUCRE_GENIS, HUCRE_ISLEM } from "@/components/panel/is-listesi-satirlari";
 
 type FaturaParcasi = { sira: number; fatura_dosya_url: string | null };
@@ -190,6 +194,9 @@ function PanelContent() {
   const [yuklemeGunleri, setYuklemeGunleri] = useState<string[]>([]);
   // 23.11.2026 aksam: filo ve bugday denklemi (panel_filo_durumu; okunamazsa / yetki yoksa bolum gizli)
   const [filoVerisi, setFiloVerisi] = useState<FiloVerisi | null>(null);
+  // 28.11.2026 Hat Takip Asama 2: hat ETA ozeti (yalniz "etd_eta" yetkisi olana; okunamazsa serit gizli)
+  const [hatOzetleri, setHatOzetleri] = useState<HatEtaOzeti[]>([]);
+  const etdYetkisi = !!yetkiler.sayfa_yetkileri.etd_eta;
   const isEmirleriniGetir = useCallback(async () => {
     if (!user?.id || !companyId) return;
     // Biri okunamazsa (yetki / ag) digeri yine gelir; okunamayan grup listede gorunmez, dosyalar etkilenmez
@@ -199,6 +206,18 @@ function PanelContent() {
     if (gc.status === "fulfilled") { setKapasite(kapasiteHesapla(gc.value)); setYuklemeGunleri(gc.value); }
     if (fl.status === "fulfilled") setFiloVerisi(fl.value);
   }, [user?.id, companyId]);
+  // Hat ozeti ayri okunur: mevcut panel sorgulari etkilenmez; ayni yenileme araligi (sekme gorunurken)
+  useEffect(() => {
+    if (!user?.id || !companyId || !etdYetkisi) { setHatOzetleri([]); return; }
+    let iptal = false;
+    const getir = () => { hatEtaOzetleriOku().then((l) => { if (!iptal) setHatOzetleri(l); }).catch(() => { /* ek bilgi; okunamazsa serit gizli */ }); };
+    getir();
+    const yenile = () => { if (document.visibilityState === "visible") getir(); };
+    const zamanlayici = window.setInterval(yenile, IS_EMRI_YENILEME_MS);
+    document.addEventListener("visibilitychange", yenile);
+    return () => { iptal = true; window.clearInterval(zamanlayici); document.removeEventListener("visibilitychange", yenile); };
+  }, [user?.id, companyId, etdYetkisi]);
+  const hatEtaFarklari = useMemo(() => etaFarkiOlanlar(hatOzetleri), [hatOzetleri]);
   useEffect(() => {
     isEmirleriniGetir();
     const yenile = () => { if (document.visibilityState === "visible") isEmirleriniGetir(); };
@@ -551,6 +570,8 @@ function PanelContent() {
       {!loading && <PanelOzetKartlari dosyalar={dosyalar} companyId={companyId} yenileme={yenileme} haftalik={haftalik} isEmirleri={isEmirleri?.rezervasyonlu || []} />}
 
       {!loading && <GunlukYuklemeKarti plan={yuklemePlani} kapasite={kapasite} etiket={isEtiketi} karsilastirma={karsilastirma} filo={filoPlani ? <FiloBolumu plan={filoPlani} /> : null} />}
+
+      {!loading && <HatEtaSeridi liste={hatEtaFarklari} />}
 
       {/* 23.11.2026 TEK IS LISTESI: ayri cut-off cubugu / is emri seritleri / dosya sekmeleri kalkti; tek filtre cubugu
           (durumlar, adreste ?filtre=) + arama. Durum renkleri ve sira kayitlardan otomatik (lib/panel/is-listesi.ts). */}

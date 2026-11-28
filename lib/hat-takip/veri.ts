@@ -4,6 +4,7 @@
  */
 import { supabase } from "@/lib/supabase";
 import type { HatOlayi } from "@/supabase/functions/_shared/hat-takip";
+import type { HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
 
 export type TakipSatiri = {
   id: string;
@@ -64,6 +65,28 @@ export async function hatTakipListesiOku(): Promise<TakipSatiri[]> {
             konteyner_adedi: r.konteyner_adedi, acente_ismi: r.acente_ismi, dosya: tek(r.ihracat_dosyalari) }
         : null,
     };
+  });
+}
+
+type HamOzetDosya = { dosya_no: string | null; alici_firma: string | null };
+type HamOzetRez = { eta: string | null; dosya_id: string | null; ihracat_dosyalari: HamOzetDosya | HamOzetDosya[] | null };
+type HamOzet = Omit<HatEtaOzeti, "sistem_eta" | "dosya_id" | "dosya_no" | "alici_firma"> & { rezervasyonlar: HamOzetRez | HamOzetRez[] | null };
+
+/**
+ * Asama 2 (28.11.2026): ETD/ETA ekrani ve Ana Panel uyarisi icin aktif takiplerin kisa ozeti (SALT OKUMA).
+ * RLS: "etd_eta" yetkisi olmayan kullaniciya bos liste doner. Cagiranlar hatayi yutar; ana ekran etkilenmez.
+ */
+export async function hatEtaOzetleriOku(): Promise<HatEtaOzeti[]> {
+  const { data, error } = await supabase
+    .from("hat_takip_kayitlari")
+    .select("rezervasyon_id,booking_no,durum,son_sorgu,hat_eta,hat_eta_sinif,gemi,sefer,rezervasyonlar(eta,dosya_id,ihracat_dosyalari(dosya_no,alici_firma))")
+    .eq("aktif", true)
+    .limit(500);
+  if (error) throw new Error(`Hat ETA özeti okunamadı: ${error.message}`);
+  return ((data || []) as unknown as HamOzet[]).map(({ rezervasyonlar, ...k }) => {
+    const r = tek(rezervasyonlar);
+    const d = tek(r?.ihracat_dosyalari);
+    return { ...k, sistem_eta: r?.eta ?? null, dosya_id: r?.dosya_id ?? null, dosya_no: d?.dosya_no ?? null, alici_firma: d?.alici_firma ?? null };
   });
 }
 

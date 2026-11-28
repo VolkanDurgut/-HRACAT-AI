@@ -1742,3 +1742,16 @@ mesensei282@gmail.com, kullanıcı onayıyla canlı) · 6 Basic plan (ücret tey
   `lib/hat-takip/veri.ts`, görünüm kuralları `lib/hat-takip/gorunum.ts`. **Sistem kayıtlarına yazmaz, mail yok.**
 - İlk bulgu: SEASPAN LUMACO 2643S iki Tema booking'i (IHR-2026-0103 / -0104) sistemde farklı ETA (04.12 / 01.12);
   Hapag planı 05.12.
+
+## Hat Takip — Aşama 2: ETD/ETA + Ana Panel uyarısı (28.11.2026) — DB değişikliği yok, YALNIZ GÖRÜNTÜ
+- Kural tek yer `lib/hat-takip/eta-uyari.ts` (`etaUyarisi`, `etaFarkiOlanlar`; seviye `gorunum.ts etaKarsilastir` ile
+  aynı: 0 aynı / 1–2 gün sarı / 3+ kırmızı; fark = hat − sistem, Istanbul günü). Hat bilgisi yok / sorgu `tamam` değil →
+  rozet yok. Son sorgu 24 saatten eskiyse rozet soluk + ipucunda "güncel değil". Test `tests/hat-takip-eta-uyari.test.ts`.
+- Veri `lib/hat-takip/veri.ts hatEtaOzetleriOku()` (aktif takipler + rezervasyon ETA + dosya no / firma; RLS `etd_eta`).
+  Okunamazsa sessizce boş: ETD/ETA ve Ana Panel'in mevcut sorguları etkilenmez.
+- ETD/ETA (`app/etd-eta/page.tsx`): ETA hücresinin altında rozet ("Hat ✓" / "Hat 05.12 · +4 gün" / sistemde ETA yoksa
+  nötr "Hat 05.12"), tıklayınca `/hat-takip`. Fark varsa "Hat ETA Farkı (n)" filtresi görünür; ETA elle düzeltilince
+  rozet hemen güncellenir, fark kalmayınca filtre "Hepsi"ye döner.
+- Ana Panel (`app/panel/page.tsx`): Günlük yükleme kartının altında "Hat ETA farkı" şeridi (ERP `AcilirSerit`; 3+ gün
+  varsa kırmızı, yoksa amber; yalnız `etd_eta` yetkisi olana; 5 dk'da bir ayrı okunur). Satır → `/etd-eta`.
+- **ETA'ya yazmaz, mail yok.** Onaylı "ETA'yı güncelle" Aşama 3'te (1–2 hafta gözlem sonrası).

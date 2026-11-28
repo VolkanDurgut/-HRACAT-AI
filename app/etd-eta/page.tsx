@@ -18,6 +18,10 @@ import {
 import { OdemeHatirlatmaPenceresi, type HatirlatmaKaydi } from "@/components/odeme-hatirlatma-penceresi";
 import { EtdExcelAktar, type ExcelYuklemeOzeti } from "@/components/etd-excel-aktar";
 import SayfaYukleniyor from "@/components/sayfa-yukleniyor";
+// 28.11.2026 Hat Takip Asama 2: hat ETA rozeti (yalniz goruntu; ETA'yi degistirmez)
+import { hatEtaOzetleriOku } from "@/lib/hat-takip/veri";
+import { etaUyarisi, type HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
+import { HatEtaRozeti } from "@/components/hat-takip/hat-eta-uyarisi";
 
 type SevkiyatSatir = {
   rezervasyon_id: string;
@@ -42,7 +46,7 @@ type SevkiyatSatir = {
   konteyner_tipi: string;
 };
 
-type EtaFiltre = "hepsi" | "eksik" | "tamam" | "odeme" | "gonderilen";
+type EtaFiltre = "hepsi" | "eksik" | "tamam" | "hatfark" | "odeme" | "gonderilen";
 
 /** Onaylanan Excel yuklemesi = hatirlatma turunun baslangici (28.10.2026) */
 type ExcelYukleme = {
@@ -94,6 +98,8 @@ export default function EtdEtaPage() {
   const [yuklemeSonucu, setYuklemeSonucu] = useState<ExcelYukleme | null>(null);
   const [editingEta, setEditingEta] = useState<{ id: string; value: string } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Hat Takip ozeti (rezervasyon_id -> ozet). Okunamazsa / yetki yoksa bos kalir; sayfa etkilenmez.
+  const [hatOzetleri, setHatOzetleri] = useState<Record<string, HatEtaOzeti>>({});
 
   const fetchData = useCallback(async () => {
     if (!user?.id || !companyId) return; // companyId kontrolü eklendi
@@ -190,6 +196,29 @@ export default function EtdEtaPage() {
   }, [user?.id, companyId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!user?.id || !companyId || !yetkiler.sayfa_yetkileri.etd_eta) return;
+    let iptal = false;
+    hatEtaOzetleriOku()
+      .then((liste) => { if (!iptal) setHatOzetleri(Object.fromEntries(liste.map((o) => [o.rezervasyon_id, o]))); })
+      .catch(() => { /* hat bilgisi ek bilgidir; okunamazsa rozet gosterilmez */ });
+    return () => { iptal = true; };
+  }, [user?.id, companyId, yetkiler.sayfa_yetkileri.etd_eta]);
+
+  // Ekranda gorunen ETA ile (elle duzeltilince hemen) hat ETA'si karsilastirmasi
+  const hatUyarilari = useMemo(() => {
+    const m: Record<string, ReturnType<typeof etaUyarisi>> = {};
+    satirlar.forEach((s: SevkiyatSatir) => { m[s.rezervasyon_id] = etaUyarisi(s.eta, hatOzetleri[s.rezervasyon_id]); });
+    return m;
+  }, [satirlar, hatOzetleri]);
+  const hatFarkiVar = useCallback((id: string) => {
+    const sv = hatUyarilari[id]?.seviye;
+    return sv === "uyari" || sv === "kritik";
+  }, [hatUyarilari]);
+  const hatFarkSayisi = useMemo(() => satirlar.filter((s: SevkiyatSatir) => hatFarkiVar(s.rezervasyon_id)).length, [satirlar, hatFarkiVar]);
+  // Fark kalmayinca (ETA duzeltildi) filtre kendiliginden "Hepsi"ye doner
+  useEffect(() => { if (etaFilter === "hatfark" && hatFarkSayisi === 0) setEtaFilter("hepsi"); }, [etaFilter, hatFarkSayisi]);
 
   useEffect(() => {
     // Yetkiler veritabanindan gelmeden karar verilmez: yuklenirken tum yetkiler
@@ -328,6 +357,7 @@ export default function EtdEtaPage() {
     let rows = satirlar;
     if (etaFilter === "eksik") rows = rows.filter(s => !s.eta);
     if (etaFilter === "tamam") rows = rows.filter(s => !!s.eta);
+    if (etaFilter === "hatfark") rows = rows.filter((s: SevkiyatSatir) => hatFarkiVar(s.rezervasyon_id));
     if (etaFilter === "odeme") {
       // Bu turda henuz hatirlatilmayanlar uste, sonra en eski kalkis
       rows = rows.filter(s => odemeBekliyorMu(s)).sort((a, b) =>
@@ -341,7 +371,7 @@ export default function EtdEtaPage() {
       );
     }
     return rows;
-  }, [satirlar, search, etaFilter, buTurGonderildi]);
+  }, [satirlar, search, etaFilter, buTurGonderildi, hatFarkiVar]);
 
   const eksikEtaSayisi = satirlar.filter(s => !s.eta).length;
 
@@ -494,14 +524,15 @@ export default function EtdEtaPage() {
           />
         </div>
         <div className="flex rounded-lg border overflow-hidden text-xs font-medium overflow-x-auto shrink-0" style={{ borderColor: CARD_BORDER }}>
-          {((odemeDestek ? ["hepsi", "eksik", "tamam", "odeme", "gonderilen"] : ["hepsi", "eksik", "tamam"]) as EtaFiltre[]).map((f) => (
+          {((odemeDestek ? ["hepsi", "eksik", "tamam", "hatfark", "odeme", "gonderilen"] : ["hepsi", "eksik", "tamam", "hatfark"]) as EtaFiltre[])
+            .filter((f) => f !== "hatfark" || hatFarkSayisi > 0 || etaFilter === "hatfark").map((f) => (
             <button
               key={f}
               onClick={() => setEtaFilter(f)}
               className="px-3 py-2 transition-colors whitespace-nowrap"
               style={etaFilter === f ? { backgroundColor: ACCENT, color: "white" } : { backgroundColor: CARD_BG, color: TEXT_MUTED }}
             >
-              {f === "hepsi" ? "Hepsi" : f === "eksik" ? "ETA Eksik" : f === "tamam" ? "ETA Tamam" : f === "odeme" ? `Ödeme Bekleyen (${odemeBekleyenler.length})` : `Gönderilen Mailler (${hatirlatmalar.length})`}
+              {f === "hepsi" ? "Hepsi" : f === "eksik" ? "ETA Eksik" : f === "tamam" ? "ETA Tamam" : f === "hatfark" ? `Hat ETA Farkı (${hatFarkSayisi})` : f === "odeme" ? `Ödeme Bekleyen (${odemeBekleyenler.length})` : `Gönderilen Mailler (${hatirlatmalar.length})`}
             </button>
           ))}
         </div>
@@ -654,6 +685,7 @@ export default function EtdEtaPage() {
                             {new Date(s.eta_guncelleme_tarihi).toLocaleDateString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                           </p>
                         )}
+                        {editingEta?.id !== s.rezervasyon_id && <HatEtaRozeti uyari={hatUyarilari[s.rezervasyon_id] ?? null} />}
                       </td>
                       <td className="px-2 py-2 max-w-[125px]" style={{ color: TEXT_MUTED }} title={[s.gemi_adi, s.acente_ismi].filter(Boolean).join(" · ") || undefined}>
                         <span className="block truncate">{s.gemi_adi || "—"}</span>

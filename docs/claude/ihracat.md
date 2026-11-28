@@ -1755,3 +1755,18 @@ mesensei282@gmail.com, kullanıcı onayıyla canlı) · 6 Basic plan (ücret tey
 - Ana Panel (`app/panel/page.tsx`): Günlük yükleme kartının altında "Hat ETA farkı" şeridi (ERP `AcilirSerit`; 3+ gün
   varsa kırmızı, yoksa amber; yalnız `etd_eta` yetkisi olana; 5 dk'da bir ayrı okunur). Satır → `/etd-eta`.
 - **ETA'ya yazmaz, mail yok.** Onaylı "ETA'yı güncelle" Aşama 3'te (1–2 hafta gözlem sonrası).
+
+## Hat Takip — Aşama 4: Sefer Ara + müşteri görseli (28.11.2026)
+- Hat Takip sayfasında sekme (`?sekme=sefer`): çıkış (TRIST = Ambarlı Kumport/Marport/Mardaş; Hapag TRAMR'yi tanımaz) +
+  varış (önce sistemdeki dosyaların varış limanları, `lib/hat-takip/limanlar.ts` sözlüğü; listede yoksa UN/LOCODE elle) +
+  dönem (2–8 hafta). Tablo: kalkış (liman yerel saati, terminal), gemi / sefer / IMO, servis, varış, transit, aktarma
+  limanları + ara gemiler, cut-off (doküman · VGM · konteyner). Cut-off'u geçen sefer soluk, görsele varsayılan girmez.
+- Müşteri görseli `components/hat-takip/sefer-karti.tsx`: beyaz, logolu, İngilizce, 760 px; seçili seferler (≤ 8),
+  "Doküman cut-off" / "Hat adı" seçenekleri. "Görseli kopyala" = html2canvas → panoya PNG (izin yoksa indirir), "PNG indir".
+  Müşteri / fiyat bilgisi İÇERMEZ.
+- Edge `hat-takip` `{"islem":"sefer_ara"}` (v5): kullanıcının kendi JWT'si + `ic_sayfa_yetkisi('etd_eta')` (ya da cron
+  anahtarı + `sirket`). Önbellek `hat_sefer_aramalari` (migration 20261128100000; yazma yalnız edge): aynı rota + gün 6 saat;
+  "Yenile" en erken 15 dk. Kota: CS Tryout 50/saat (45'te durur), 1/sn (429'da bekleyip 1 kez tekrar). Ayrıştırma tek yer
+  `_shared/hat-sefer.ts` (gemi adı `vessel.name`; aktarma = gemi bacakları arası limanlar). Test `tests/hat-sefer.test.ts`.
+- 28.11.2026 canlı doğrulanan kodlar (TRIST'ten): GHTEM, DJJIB, KEMBA, SGSIN, ILASH, BJCOO, LBBEY, GQBSG, GQSSG, TZDAR, SRPBM
+  (sefer var); KMMUT, CUMAR, CUSCU (kod geçerli, 4 haftada sefer yok); TRTEK geçerli. Sistem kaydına yazmaz, mail yok.

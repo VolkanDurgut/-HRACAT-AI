@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { hatOzeti, olayNormalle, type HatOlayi } from "../_shared/hat-takip.ts";
+import { hapagHataMetni, seferleriNormalle, type Sefer } from "../_shared/hat-sefer.ts";
 
 // ============================================================================
 // HAT TAKIP (hat-takip) - 27.11.2026 · ASAMA 0 (deneme) + ASAMA 1 (yenile: deneme modu, ayri tablolar)
@@ -17,6 +18,11 @@ import { hatOzeti, olayNormalle, type HatOlayi } from "../_shared/hat-takip.ts";
 // Govde: {"islem":"deneme","booking":"96615245","pol":"TRGEM","pod":"KEMBA"}.
 // Yetki: "x-cron-anahtar" basligi = Vault hat_takip_anahtari (migration 20261127140000), RPC ile dogrulanir
 // (anon anahtarla cagrilip Hapag kotasi tuketilemesin).
+// {"islem":"sefer_ara","pol":"TRIST","pod":"GHTEM","hafta":4,"yenile":false} (28.11.2026, Asama 4): Hat Takip > Sefer Ara.
+//   Yetki: oturum acmis kullanici + "etd_eta" sayfa yetkisi (kullanicinin kendi JWT'siyle ic_sayfa_yetkisi) ya da cron anahtari.
+//   Onbellek hat_sefer_aramalari (migration 20261128100000): ayni rota + gun 6 saat icinde Hapag'a tekrar sorulmaz
+//   ("yenile" en erken 15 dk sonra). Kota: Commercial Schedules Tryout 50 / saat (45'te durur), 1 / sn (429'da 1 kez
+//   tekrar). Ayristirma TEK YER _shared/hat-sefer.ts. Yalniz hat_sefer_aramalari + hat_takip_cagrilari'na yazar.
 // ============================================================================
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -28,6 +34,10 @@ const KAPALI = (Deno.env.get("HAT_TAKIP_KAPALI") || "").trim().toLowerCase() ===
 const ADET = Math.min(10, Math.max(1, Number(Deno.env.get("HAT_TAKIP_ADET") || "1") || 1));
 const GUNLUK_KOTA = Math.min(5000, Math.max(1, Number(Deno.env.get("HAT_TAKIP_GUNLUK_KOTA") || "95") || 95));
 const servis = { apikey: SERVICE_ROLE_KEY, Authorization: `Bearer ${SERVICE_ROLE_KEY}`, "Content-Type": "application/json" };
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const CS_SAATLIK = 45; // Tryout 50 / saat - 5 pay
+const ONBELLEK_SAAT = 6;
+const YENILE_EN_ERKEN_DK = 15;
 
 async function rpc<T>(ad: string, govde: unknown): Promise<T> {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${ad}`, { method: "POST", headers: servis, body: JSON.stringify(govde) });
@@ -119,12 +129,141 @@ function olayOzeti(o: Olay) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Asama 4: Sefer Ara
+// ---------------------------------------------------------------------------
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const jsonC = (veri: unknown, status = 200) => new Response(JSON.stringify(veri), { status, headers: { "Content-Type": "application/json", ...CORS } });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function jwtRolu(token: string | null): string | null {
+  const parca = token?.split(".")[1];
+  if (!parca) return null;
+  try {
+    const b64 = parca.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(parca.length / 4) * 4, "=");
+    const r = (JSON.parse(atob(b64)) as { role?: unknown }).role;
+    return typeof r === "string" ? r : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Kullanicinin KENDI yetkisiyle: ic_sayfa_yetkisi('etd_eta') + auth_company_id() (RLS ile ayni kural). */
+async function kullaniciYetkisi(req: Request): Promise<{ id: string; sirket: string } | null> {
+  const baslik = req.headers.get("Authorization") || "";
+  const token = baslik.startsWith("Bearer ") ? baslik.slice(7).trim() : null;
+  if (!token || jwtRolu(token) !== "authenticated" || !ANON_KEY) return null;
+  const kb = { apikey: ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  try {
+    const kRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: kb });
+    if (!kRes.ok) { await kRes.body?.cancel(); return null; }
+    const k = (await kRes.json()) as { id?: string };
+    if (!k.id || !UUID.test(k.id)) return null;
+    const [y, c] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/ic_sayfa_yetkisi`, { method: "POST", headers: kb, body: JSON.stringify({ p_anahtar: "etd_eta" }) }),
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/auth_company_id`, { method: "POST", headers: kb, body: "{}" }),
+    ]);
+    if (!y.ok || !c.ok) { await y.body?.cancel(); await c.body?.cancel(); return null; }
+    const yetki = await y.json();
+    const sirket = await c.json();
+    return yetki === true && typeof sirket === "string" && UUID.test(sirket) ? { id: k.id, sirket } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function rest<T>(yol: string, secenek: RequestInit = {}): Promise<T> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${yol}`, { ...secenek, headers: { ...servis, ...(secenek.headers || {}) } });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`${yol.split("?")[0]}: ${r.status} ${t.slice(0, 200)}`);
+  return (t ? JSON.parse(t) : null) as T;
+}
+
+/** Istanbul takvim gunu (YYYY-MM-DD), gun eklenmis. */
+const istGun = (ekGun = 0) => new Date(Date.now() + 3 * 3600_000 + ekGun * 864e5).toISOString().slice(0, 10);
+
+type OnbellekSatiri = { sorgu_zamani: string; rotalar: Sefer[]; bit_gun: string; durum_kodu: number | null };
+
+async function seferAra(g: Record<string, unknown>, sirket: string, kullanici: string | null): Promise<Record<string, unknown>> {
+  const pol = String(g.pol || "").trim().toUpperCase();
+  const pod = String(g.pod || "").trim().toUpperCase();
+  if (!KOD.test(pol) || !KOD.test(pod)) return { hata: "Liman kodu 5 karakter olmalı (örnek: TRIST, GHTEM)." };
+  if (pol === pod) return { hata: "Çıkış ve varış limanı aynı olamaz." };
+  const hafta = Math.min(8, Math.max(1, Math.round(Number(g.hafta) || 4)));
+  const bas = istGun(0);
+  const bit = istGun(hafta * 7);
+  const yenileIstegi = g.yenile === true;
+
+  // 1) Onbellek: ayni rota + gun, son 6 saat, basarili ve en az istenen aralik kadar
+  const esik = new Date(Date.now() - ONBELLEK_SAAT * 3600_000).toISOString();
+  const onceki = await rest<OnbellekSatiri[]>(
+    `hat_sefer_aramalari?select=sorgu_zamani,rotalar,bit_gun,durum_kodu&company_id=eq.${sirket}&pol=eq.${pol}&pod=eq.${pod}` +
+    `&bas_gun=eq.${bas}&durum_kodu=eq.200&bit_gun=gte.${bit}&sorgu_zamani=gte.${encodeURIComponent(esik)}&order=sorgu_zamani.desc&limit=1`);
+  const ob = onceki[0];
+  const obYasDk = ob ? (Date.now() - Date.parse(ob.sorgu_zamani)) / 60_000 : Infinity;
+  const sinirla = (r: Sefer[]) => r.filter((x) => !x.kalkis || x.kalkis.slice(0, 10) <= bit);
+  if (ob && (!yenileIstegi || obYasDk < YENILE_EN_ERKEN_DK)) {
+    return { pol, pod, bas_gun: bas, bit_gun: bit, hafta, rotalar: sinirla(ob.rotalar || []), sorgu_zamani: ob.sorgu_zamani, onbellek: true,
+      not: yenileIstegi ? `Son sorgu ${Math.floor(obYasDk)} dk önce; yenileme en erken ${YENILE_EN_ERKEN_DK} dk sonra.` : null };
+  }
+  if (KAPALI) return { hata: "Hat bağlantısı kapalı (HAT_TAKIP_KAPALI)." };
+  if (!HAPAG_ID || !HAPAG_SECRET) return { hata: "Hapag-Lloyd anahtarları tanımlı değil." };
+
+  // 2) Kota: son 1 saatte CS_SAATLIK; son cagridan 1,1 sn gecmemisse bekle
+  const saatOnce = new Date(Date.now() - 3600_000).toISOString();
+  const cagrilar = await rest<{ zaman: string }[]>(`hat_takip_cagrilari?select=zaman&api=eq.cs&zaman=gte.${encodeURIComponent(saatOnce)}&order=zaman.desc&limit=100`);
+  if (cagrilar.length >= CS_SAATLIK) {
+    return { hata: "Hapag-Lloyd saatlik sefer sorgusu sınırına ulaşıldı. Biraz sonra tekrar deneyin.", kota_kalan: 0 };
+  }
+  const sonCagri = cagrilar[0] ? Date.parse(cagrilar[0].zaman) : 0;
+  if (Date.now() - sonCagri < 1100) await bekle(1100 - (Date.now() - sonCagri));
+
+  // 3) Hapag (429'da 1 kez tekrar)
+  const yol = `/v1/point-to-point-routes?placeOfReceipt=${pol}&placeOfDelivery=${pod}&departureStartDate=${bas}&departureEndDate=${bit}`;
+  let r = await hapagGet(yol);
+  await rest("hat_takip_cagrilari", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ api: "cs", durum_kodu: r.durum, sure_ms: r.sure_ms }) });
+  if (r.durum === 429) {
+    await bekle(1500);
+    r = await hapagGet(yol);
+    await rest("hat_takip_cagrilari", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ api: "cs", durum_kodu: r.durum, sure_ms: r.sure_ms }) });
+  }
+  const basarili = r.durum === 200 && Array.isArray(r.govde);
+  const rotalar = basarili ? seferleriNormalle(r.govde) : [];
+  const hata = basarili ? null : hapagHataMetni(r.durum, r.govde);
+  const kayit = await rest<{ sorgu_zamani: string }[]>("hat_sefer_aramalari?select=sorgu_zamani", {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ company_id: sirket, pol, pod, bas_gun: bas, bit_gun: bit, durum_kodu: r.durum, sure_ms: r.sure_ms,
+      rota_sayisi: rotalar.length, rotalar, hata, sorgulayan: kullanici }),
+  });
+  return { pol, pod, bas_gun: bas, bit_gun: bit, hafta, rotalar, sorgu_zamani: kayit[0]?.sorgu_zamani ?? new Date().toISOString(),
+    onbellek: false, hata, kota_kalan: Math.max(0, CS_SAATLIK - cagrilar.length - 1) };
+}
+
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: CORS });
   if (req.method !== "POST") return json({ hata: "Yalniz POST." }, 405);
-  if (!(await anahtarGecerli(req.headers.get("x-cron-anahtar") || ""))) return json({ hata: "Yetkisiz." }, 401);
 
   let g: Record<string, unknown> = {};
   try { g = await req.json(); } catch { /* bos */ }
+
+  // Asama 4: Sefer Ara - tarayicidan (kullanici JWT + etd_eta) ya da cron anahtariyla (deneme; govdede sirket)
+  if (g.islem === "sefer_ara") {
+    const cron = await anahtarGecerli(req.headers.get("x-cron-anahtar") || "");
+    const kullanici = cron ? null : await kullaniciYetkisi(req);
+    const sirket = cron ? (UUID.test(String(g.sirket || "")) ? String(g.sirket) : null) : kullanici?.sirket ?? null;
+    if (!sirket) return jsonC({ hata: "Bu işlem için ETD/ETA yetkisi gerekir." }, 401);
+    try {
+      return jsonC(await seferAra(g, sirket, kullanici?.id ?? null));
+    } catch (e) {
+      return jsonC({ hata: `Sefer programı alınamadı: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300) }, 500);
+    }
+  }
+
+  if (!(await anahtarGecerli(req.headers.get("x-cron-anahtar") || ""))) return json({ hata: "Yetkisiz." }, 401);
   if (g.islem === "yenile") {
     if (!HAPAG_ID || !HAPAG_SECRET) return json({ hata: "HAPAG_CLIENT_ID / HAPAG_CLIENT_SECRET tanimli degil." }, 200);
     try {
@@ -169,18 +308,13 @@ Deno.serve(async (req: Request) => {
     const liste = Array.isArray(r.govde) ? (r.govde as Record<string, unknown>[]) : null;
     sonuc.program = {
       pol, pod, durum: r.durum, sure_ms: r.sure_ms, rota_sayisi: liste?.length ?? null,
-      ornek: (liste ?? []).slice(0, 5).map((p) => {
-        const kalkis = (p.placeOfReceipt ?? {}) as Record<string, unknown>;
-        const varis = (p.placeOfDelivery ?? {}) as Record<string, unknown>;
-        const bacaklar = Array.isArray(p.legs) ? (p.legs as Record<string, unknown>[]) : [];
-        const ilk = (bacaklar[0]?.transport ?? {}) as Record<string, unknown>;
-        return {
-          kalkis: s(kalkis.dateTime), varis: s(varis.dateTime), transit_gun: p.transitTime ?? null,
-          aktarma: Math.max(0, bacaklar.filter((b) => s((b as Record<string, unknown>).modeOfTransport) === "VESSEL").length - 1),
-          ilk_gemi: s((ilk.vessel as Record<string, unknown> | undefined)?.vesselName ?? ilk.vesselName),
-          cutoff: Array.isArray(p.cutOffTimes) ? (p.cutOffTimes as Record<string, unknown>[]).map((c) => `${s(c.cutOffDateTimeCode)} ${s(c.cutOffDateTime)}`) : null,
-        };
-      }),
+      // 28.11.2026: ortak ayristirici (gemi adi "vessel.name"; aktarma = gemi bacaklari arasi limanlar)
+      ornek: seferleriNormalle(liste ?? []).slice(0, 5).map((x) => ({
+        kalkis: x.kalkis, varis: x.varis, transit_gun: x.transit_gun, aktarma: x.aktarmalar.length,
+        gemi: x.gemi, sefer: x.sefer, servis: x.servis_kodu, cutoff: x.cutoff,
+      })),
+      // 28.11.2026 Asama 4 hazirligi: ilk rotanin ham hali (bicim dogrulamasi; musteri verisi icermez)
+      ham_ilk: g.ham === true ? JSON.stringify(liste?.[0] ?? null).slice(0, 6000) : undefined,
       hata: liste ? null : r.govde,
     };
   }

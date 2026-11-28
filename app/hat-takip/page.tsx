@@ -7,7 +7,7 @@
  * Sistem ETA <-> Hapag ETA farki gosterilir; guncelleme Asama 3'te (onayli). Yetki: "etd_eta".
  */
 import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, Clock, Radar, RefreshCw, Ship, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Clock, Radar, RefreshCw, Search, Ship, XCircle } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { SayfaBasligi } from "@/components/sayfa-basligi";
 import { EmptyState } from "@/components/empty-state";
@@ -18,6 +18,13 @@ import { useAuth } from "@/lib/auth-context";
 import { hatTakipListesiOku, type TakipSatiri } from "@/lib/hat-takip/veri";
 import { DURUM_ETIKETI, etaKarsilastir, farkYazi, onceYazi, SINIF_ETIKETI, trGun, trZaman, type FarkSeviyesi } from "@/lib/hat-takip/gorunum";
 import { CARD_BG, CARD_BORDER, ROW_HEADER_BG, TEXT_MUTED } from "@/lib/theme";
+// 28.11.2026 Asama 4: Sefer Ara sekmesi (Hapag-Lloyd Commercial Schedules + musteri gorseli)
+import { SekmeCubugu } from "@/components/erp/sekme-cubugu";
+import { useUrlSekmesi } from "@/components/erp/use-url-sekmesi";
+import { SeferAra } from "@/components/hat-takip/sefer-ara";
+
+type Sekme = "takip" | "sefer";
+const sekmeOku = (v: string | null): Sekme | null => (v === "sefer" || v === "takip" ? v : null);
 
 const FARK_RENGI: Record<FarkSeviyesi, string> = { yok: TEXT_MUTED, ayni: "#6EE7B7", uyari: "#FCD34D", kritik: "#FCA5A5" };
 
@@ -33,6 +40,7 @@ function HatTakipIcerik() {
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [acik, setAcik] = useState<string | null>(null);
+  const [sekme, setSekme] = useUrlSekmesi<Sekme>(sekmeOku, "takip");
 
   const yukle = useCallback(async () => {
     setYukleniyor(true); setHata(null);
@@ -56,13 +64,21 @@ function HatTakipIcerik() {
       <SayfaBasligi
         ikon={<Radar size={20} />}
         baslik={<span className="inline-flex items-center gap-2">Hat Takip <Rozet metin="Deneme modu" renk="mavi" /></span>}
-        aciklama="Hapag-Lloyd booking'lerinin hat verisi. Yalnızca gösterir; sistemdeki kayıtları değiştirmez."
-        sag={
+        aciklama="Hapag-Lloyd booking'lerinin hat verisi ve sefer programı. Yalnızca gösterir; sistemdeki kayıtları değiştirmez."
+        sag={sekme !== "takip" ? undefined : (
           <button type="button" onClick={yukle} disabled={yukleniyor} className="h-9 px-3 rounded-lg border text-sm text-white inline-flex items-center gap-2 disabled:opacity-60 hover:bg-white/[0.04]" style={{ borderColor: CARD_BORDER }}>
             <RefreshCw size={14} className={yukleniyor ? "animate-spin" : ""} /> Yenile
           </button>
-        }
+        )}
       />
+
+      <SekmeCubugu varyant="alt-cizgi" ariaLabel="Hat Takip" testId="hat-takip-sekmeleri" secili={sekme} onSec={setSekme}
+        ogeler={[
+          { deger: "takip", etiket: "Booking Takibi", ikon: <Radar size={14} />, ipucu: "Açık Hapag-Lloyd booking'lerinin ETA ve konteyner hareketleri" },
+          { deger: "sefer", etiket: "Sefer Ara", ikon: <Search size={14} />, ipucu: "Rota için gemi listesi; müşteriye görsel olarak gönderilebilir" },
+        ]} />
+
+      {sekme === "sefer" ? <SeferAra /> : (<>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <OzetKarti ikon={<Ship size={14} />} etiket="Takipteki booking" deger={ozet.toplam} alt="Hapag-Lloyd · açık sevkiyatlar" testId="hat-ozet-toplam" />
@@ -142,6 +158,7 @@ function HatTakipIcerik() {
         Kaynak: Hapag-Lloyd Track &amp; Trace (DCSA, beta). Booking&apos;ler 15 dakikada bir sırayla yenilenir. &quot;Planlanan&quot; ve
         &quot;Tahmini&quot; tarihler hattın güncel planıdır; gerçekleşen olaylar beyaz, planlananlar gri gösterilir. Bu sayfa sistemdeki ETA&apos;yı değiştirmez.
       </p>
+      </>)}
     </div>
   );
 }

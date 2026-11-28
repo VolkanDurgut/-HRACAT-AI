@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabase";
 import type { HatOlayi } from "@/supabase/functions/_shared/hat-takip";
 import type { HatEtaOzeti } from "@/lib/hat-takip/eta-uyari";
+import type { Sefer } from "@/supabase/functions/_shared/hat-sefer";
 
 export type TakipSatiri = {
   id: string;
@@ -109,4 +110,48 @@ export async function hatOlaylariOku(takipId: string): Promise<HatOlayi[]> {
     anahtar: o.olay_anahtari, tur: o.olay_turu, kod: o.olay_kodu, sinif: o.sinif, zaman: o.olay_zamani, olusma: o.olusma_zamani,
     konteyner: o.konteyner, bos_dolu: o.bos_dolu, yer: o.yer_kodu, yer_adi: o.yer_adi, gemi: o.gemi, imo: o.imo, sefer: o.sefer,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Asama 4 (28.11.2026): Sefer Ara
+// ---------------------------------------------------------------------------
+export type SeferAramaSonucu = {
+  pol: string;
+  pod: string;
+  bas_gun: string;
+  bit_gun: string;
+  hafta: number;
+  rotalar: Sefer[];
+  sorgu_zamani: string;
+  onbellek: boolean;
+  not?: string | null;
+  kota_kalan?: number;
+};
+
+/**
+ * Hapag-Lloyd sefer programi (edge hat-takip "sefer_ara"; kullanicinin kendi oturumu + "etd_eta" yetkisi).
+ * Ayni rota 6 saat onbellekten gelir; yenile en erken 15 dk sonra Hapag'a sorar. Hata metni kullaniciya gosterilir.
+ */
+export async function seferAra(p: { pol: string; pod: string; hafta: number; yenile?: boolean }): Promise<SeferAramaSonucu> {
+  const { data, error } = await supabase.functions.invoke("hat-takip", { body: { islem: "sefer_ara", ...p } });
+  const govde = (data ?? null) as (Partial<SeferAramaSonucu> & { hata?: string | null }) | null;
+  if (error) {
+    // Edge 4xx/5xx govdesindeki Turkce hata metni (FunctionsHttpError.context = Response)
+    let metin: string | null = null;
+    const ctx = (error as { context?: unknown }).context;
+    if (ctx instanceof Response) {
+      try { metin = ((await ctx.clone().json()) as { hata?: string }).hata ?? null; } catch { /* govde yok */ }
+    }
+    throw new Error(metin || "Sefer programı alınamadı. Bağlantıyı kontrol edip tekrar deneyin.");
+  }
+  if (!govde) throw new Error("Sefer programı alınamadı.");
+  if (govde.hata) throw new Error(govde.hata);
+  return { ...(govde as SeferAramaSonucu), rotalar: Array.isArray(govde.rotalar) ? govde.rotalar : [] };
+}
+
+/** Sistemdeki dosyalarin varis limanlari (Sefer Ara liman listesi icin; yalniz ad). */
+export async function varisLimanlariOku(): Promise<{ varis_limani: string | null }[]> {
+  const { data, error } = await supabase.from("ihracat_dosyalari").select("varis_limani").not("varis_limani", "is", null).limit(2000);
+  if (error) throw new Error(`Varış limanları okunamadı: ${error.message}`);
+  return (data || []) as { varis_limani: string | null }[];
 }
